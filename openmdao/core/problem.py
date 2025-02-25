@@ -1151,7 +1151,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             self.check_config(logger, checks=checks)
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
-                       compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
+                       compact_print=False, abs_err_tol=0.0, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
                        minimum_step=1e-12, force_dense=True, show_only_incorrect=False):
         """
@@ -1205,10 +1205,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             First key is the component name.
             Second key is the (output, input) tuple of strings.
             The third key is one of:
-            'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_abs',
-            'vals_at_max_rel', and 'rank_inconsistent'.
-            For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
-            tuple containing values for forward - fd, adjoint - fd, forward - adjoint. For
+            'tol violation', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_error',
+            and 'rank_inconsistent'.
+            For 'tol violation' and 'vals_at_max_error' the value is a tuple containing values for
+            forward - fd, adjoint - fd, forward - adjoint. For
             'magnitude' the value is a tuple indicating the maximum magnitude of values found in
             Jfwd, Jrev, and Jfd.
             The boolean 'rank_inconsistent' indicates if the derivative wrt a serial variable is
@@ -1295,7 +1295,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         return partials_data
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
-                     driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd',
+                     driver_scaling=False, abs_err_tol=0.0, rel_err_tol=1e-6, method='fd',
                      step=None, form=None, step_calc='abs', show_progress=False,
                      show_only_incorrect=False, directional=False, sort=True):
         """
@@ -1356,13 +1356,12 @@ class Problem(object, metaclass=ProblemMetaclass):
             First key:
                 is the (output, input) tuple of strings;
             Second key:
-                'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_abs',
-                'vals_at_max_rel', and 'rank_inconsistent'.
+                'tol violation', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_error',
+                and 'rank_inconsistent'.
 
-            For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
-            tuple containing values for forward - fd, reverse - fd, forward - reverse. For
-            'magnitude' the value is a tuple indicating the maximum magnitude of values found in
-            Jfwd, Jrev, and Jfd.
+            For 'tol violation' and 'vals_at_max_error' the value is a tuple containing values for
+            forward - fd, reverse - fd, forward - reverse. For 'magnitude' the value is a tuple
+            indicating the maximum magnitude of values found in Jfwd, Jrev, and Jfd.
         """
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout

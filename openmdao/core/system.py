@@ -26,7 +26,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table, NA
-from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_errors, \
+from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_error, \
     sparsity_diff_viz, get_sparsity_diff_array
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -7005,7 +7005,7 @@ class _MagnitudeData(object):
                 self.fd = max(self.fd, np.max(np.abs(J)))
 
 
-def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
+def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, atol, rtol):
     """
     Compute the errors between derivatives that were computed using different modes or methods.
 
@@ -7021,11 +7021,16 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
         True if the current dirivtives are directional.
     totals : bool or _TotalJacInfo
         _TotalJacInfo if the current derivatives are total derivatives.
+    atol : float
+        Absolute error tolerance.
+    rtol : float
+        Relative error tolerance.
 
     Returns
     -------
-    float
-        The norm of the FD jacobian.
+    bool
+        True if any errors are above the tolerance, i.e., they violate the inequality
+        abs(err) <= atol + rtol * abs(err_ref).
     """
     Jforward = derivative_info.get('J_fwd')
     Jreverse = derivative_info.get('J_rev')
@@ -7038,37 +7043,32 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
         fdinfo = (None,)
         steps = (None,)
 
-    derivative_info['abs error'] = []
-    derivative_info['rel error'] = []
+    derivative_info['tol violation'] = []
     derivative_info['magnitude'] = []
-    derivative_info['vals_at_max_abs'] = []
-    derivative_info['vals_at_max_rel'] = []
-    derivative_info['denom_idx'] = []
+    derivative_info['vals_at_max_error'] = []
     derivative_info['steps'] = []
 
     abs_mags = _MagnitudeData()
     abs_mags.update(Jforward, 'fwd')
     abs_mags.update(Jreverse, 'rev')
 
-    abs_errs_fwd_rev = abs_vals_fwd_rev = rel_errs_fwd_rev = rel_vals_fwd_rev = None
-    fwd_rev_didx = 1
+    above_tol = above = False
+    errs_fwd_rev = err_vals_fwd_rev = None
     if matrix_free:
         derivative_info['matrix_free'] = True
         if directional:
             if Jforward is not None and Jreverse is not None:
                 mhatdotm, dhatdotd = derivative_info['directional_fwd_rev']
-                (abs_errs_fwd_rev, abs_vals_fwd_rev, rel_errs_fwd_rev, rel_vals_fwd_rev,
-                 fwd_rev_didx) = get_errors(dhatdotd, mhatdotm)
+                (errs_fwd_rev, err_vals_fwd_rev, above) = get_error(dhatdotd, mhatdotm)
         elif not totals:
-            (abs_errs_fwd_rev, abs_vals_fwd_rev, rel_errs_fwd_rev, rel_vals_fwd_rev,
-             fwd_rev_didx) = get_errors(Jforward, Jreverse)
+            (errs_fwd_rev, err_vals_fwd_rev, above) = get_error(Jforward, Jreverse)
+
+        above_tol |= above
 
     for i, Jfd in enumerate(fdinfo):
-        abs_errs = _ErrorData()
-        abs_vals = _ErrorData()
-        rel_errs = _ErrorData()
-        rel_vals = _ErrorData()
-        denom_idxs = {'fwd': 1, 'rev': 1, 'fwd_rev': fwd_rev_didx}
+        above = False
+        errs = _ErrorData()
+        err_vals = _ErrorData()
 
         step = steps[i]
         abs_mags.update(Jfd, 'fd')
@@ -7077,96 +7077,39 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals):
             if Jforward is not None:
                 if totals:
                     mhatdotm, dhatdotd = derivative_info['directional_fd_fwd'][i]
-                    (abs_errs.forward, abs_vals.forward,
-                     rel_errs.forward, rel_vals.forward, didx) = get_errors(mhatdotm, dhatdotd)
+                    errs.forward, err_vals.forward, above = get_error(mhatdotm, dhatdotd,
+                                                                      atol, rtol)
                 else:
-                    (abs_errs.forward, abs_vals.forward,
-                     rel_errs.forward, rel_vals.forward, didx) = get_errors(Jforward, Jfd)
-                denom_idxs['fwd'] = didx
+                    errs.forward, err_vals.forward, above = get_error(Jforward, Jfd, atol, rtol)
 
             if Jreverse is not None and 'directional_fd_rev' in derivative_info:
                 mhatdotm, dhatdotd = derivative_info['directional_fd_rev'][i]
-                (abs_errs.reverse, abs_vals.reverse, rel_errs.reverse, rel_vals.reverse, didx) = \
-                    get_errors(mhatdotm, dhatdotd)
-                denom_idxs['rev'] = didx
+                errs.reverse, err_vals.reverse, above = get_error(mhatdotm, dhatdotd, atol, rtol)
         else:
             if Jforward is not None:
-                (abs_errs.forward, abs_vals.forward, rel_errs.forward, rel_vals.forward, didx) = \
-                    get_errors(Jforward, Jfd)
-                denom_idxs['fwd'] = didx
+                errs.forward, err_vals.forward, above = get_error(Jforward, Jfd, atol, rtol)
             if Jreverse is not None:
-                (abs_errs.reverse, abs_vals.reverse, rel_errs.reverse, rel_vals.reverse, didx) = \
-                    get_errors(Jreverse, Jfd)
-                denom_idxs['rev'] = didx
+                errs.reverse, err_vals.reverse, above = get_error(Jreverse, Jfd, atol, rtol)
 
         if Jfd is not None and Jforward is None and Jreverse is None:
-            (abs_errs.reverse, abs_vals.reverse, rel_errs.reverse, rel_vals.reverse, didx) = \
-                get_errors(np.zeros_like(Jfd), Jfd)
-            denom_idxs['rev'] = didx
+            errs.reverse, err_vals.reverse, above = get_error(np.zeros_like(Jfd), Jfd, atol, rtol)
 
-        if abs_errs_fwd_rev is not None:
-            abs_errs.fwd_rev = abs_errs_fwd_rev
-            abs_vals.fwd_rev = abs_vals_fwd_rev
-            rel_errs.fwd_rev = rel_errs_fwd_rev
-            rel_vals.fwd_rev = rel_vals_fwd_rev
+        above_tol |= above
 
-        derivative_info['abs error'].append(abs_errs)
-        derivative_info['rel error'].append(rel_errs)
-        derivative_info['denom_idx'].append(denom_idxs)
+        if errs_fwd_rev is not None:
+            errs.fwd_rev = errs_fwd_rev
+            err_vals.fwd_rev = err_vals_fwd_rev
+
+        derivative_info['tol violation'].append(errs)
         derivative_info['magnitude'].append(abs_mags)
-        derivative_info['vals_at_max_abs'].append(abs_vals)
-        derivative_info['vals_at_max_rel'].append(rel_vals)
+        derivative_info['vals_at_max_error'].append(err_vals)
         derivative_info['steps'].append(step)
 
-    return max([err.max() for err in derivative_info['abs error']])
-
-
-def _errors_above_tol(deriv_info, abs_error_tol, rel_error_tol):
-    """
-    Return if either abs or rel tolerances are violated when comparing a group of derivatives.
-
-    Parameters
-    ----------
-    deriv_info : dict
-        Metadata dict corresponding to a particular (of, wrt) pair.
-    abs_error_tol : float
-        Absolute error tolerance.
-    rel_error_tol : float
-        Relative error tolerance.
-
-    Returns
-    -------
-    bool
-        True if absolute tolerance is violated.
-    bool
-        True if relative tolerance is violated.
-    """
-    abs_errs = deriv_info['abs error']
-    rel_errs = deriv_info['rel error']
-
-    above_abs = above_rel = False
-
-    for abs_err in abs_errs:
-        for error in abs_err:
-            if error is not None and not np.isnan(error) and error >= abs_error_tol:
-                above_abs = True
-                break
-        if above_abs:
-            break
-
-    for rel_err in rel_errs:
-        for error in rel_err:
-            if error is not None and not np.isnan(error) and error >= rel_error_tol:
-                above_rel = True
-                break
-        if above_rel:
-            break
-
-    return above_abs, above_rel
+    return above_tol
 
 
 def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_derivs,
-                 matrix_free, abs_error_tol=1e-6, rel_error_tol=1e-6, incon_keys=(),
+                 matrix_free, abs_error_tol=0.0, rel_error_tol=1e-6, incon_keys=(),
                  sort=True):
     """
     Iterate over all of the derivatives.
@@ -7207,9 +7150,7 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
     bool
         True if the current derivatives are directional.
     bool
-        True if the differences for the current derivatives are above the absolute error tolerance.
-    bool
-        True if the differences for the current derivatives are above the relative error tolerance.
+        True if the differences for the current derivatives are above tolerance.
     bool
         True if the current derivative was computed where some serial d_inputs variables were not
         consistent across processes.
@@ -7232,16 +7173,15 @@ def _iter_derivs(derivatives, show_only_incorrect, all_fd_opts, totals, nondep_d
 
         directional = bool(fd_opts) and fd_opts.get('directional')
 
-        max_mag = _compute_deriv_errors(derivative_info, matrix_free, directional, totals)
+        above_tol = _compute_deriv_errors(derivative_info, matrix_free, directional, totals,
+                                          abs_error_tol, rel_error_tol)
 
         # Skip printing the non-dependent keys if the derivatives are fine.
-        if key in nondep_derivs and max_mag < abs_error_tol:
+        if key in nondep_derivs and not above_tol:
             del derivatives[key]
             continue
 
-        above_abs, above_rel = _errors_above_tol(derivative_info, abs_error_tol, rel_error_tol)
-
-        if show_only_incorrect and not (above_abs or above_rel or inconsistent):
+        if show_only_incorrect and not (above_tol or inconsistent):
             continue
 
-        yield key, fd_opts, directional, above_abs, above_rel, inconsistent
+        yield key, fd_opts, directional, above_tol, inconsistent

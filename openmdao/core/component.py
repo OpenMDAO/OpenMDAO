@@ -2133,7 +2133,7 @@ class Component(System):
                                       category=OMInvalidCheckDerivativesOptionsWarning)
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM,
-                       compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
+                       compact_print=False, abs_err_tol=0.0, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
                        minimum_step=1e-12, force_dense=True, show_only_incorrect=False,
                        show_worst=True):
@@ -2184,11 +2184,11 @@ class Component(System):
             Where derivs_dict is a dict, where the top key is the component pathname.
             Under the top key, the subkeys are the (of, wrt) keys of the subjacs.
             Within the (of, wrt) entries are the following keys:
-            'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_abs',
-            'vals_at_max_rel', and 'rank_inconsistent'.
+            'tol violation', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_error',
+            and 'rank_inconsistent'.
             For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
             Jacobian for the three different methods of computation.
-            For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
+            For 'tol violation' and 'vals_at_max_error' the value is a
             tuple containing values for forward - fd, reverse - fd, forward - reverse. For
             'magnitude' the value is a tuple indicating the maximum magnitude of values found in
             Jfwd, Jrev, and Jfd.
@@ -2196,8 +2196,8 @@ class Component(System):
             inconsistent across MPI ranks.
 
             worst is either None or a tuple of the form (error, table_row, header)
-            where error is the max relative error found, table_row is the formatted table row
-            containing the max relative error, and header is the formatted table header.  'worst'
+            where error is the max error found, table_row is the formatted table row
+            containing the max error, and header is the formatted table header.  'worst'
             is not None only if compact_print is True.
         """
         if out_stream == _DEFAULT_OUT_STREAM:

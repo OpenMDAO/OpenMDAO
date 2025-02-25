@@ -1118,54 +1118,42 @@ def safe_norm(arr):
     return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
 
 
-def get_errors(x, y):
+def get_error(x, ref, atol=0.0, rtol=1e-5):
     """
-    Compute the max absolute and relative errors of the difference in x and y.
+    Compute the max tolerance violation of the difference between x and ref.
+
+    tolerance violation is defined as:
+
+        abs(x - ref) - (atol + rtol * abs(ref))
+
+    If the result is positive, then the tolerance is violated.
 
     Parameters
     ----------
     x : ndarray
-        The first array.
-    y : ndarray
-        The second array.
+        The test array.
+    ref : ndarray
+        The reference array.
+    atol : float
+        The absolute tolerance.
+    rtol : float
+        The relative tolerance.
 
     Returns
     -------
     tuple
-        Tuple of (max_abs_error, (abs_max_x, abs_max_y), max_rel_error, (rel_max_x, rel_max_y),
-        denom_idx), where ???_max_x and ???_max_y are the values of x and y at the locations where
-        absolute and relative errors are max, respectively, and denom_idx is the index specifying
-        which argument, 0 (x) or 1 (y), was used as the denominator in the relative error.
+        Max_error, (max_x_location, max_ref_location), above_tolerance.
     """
-    args = (x, y)
-    abs_error = np.abs(x - y)
+    abs_error = np.abs(x - ref)
     if abs_error.size == 0:
-        return 0.0, (0.0, 0.0), 0.0, (0.0, 0.0), 0
+        return 0.0, (0, 0), False
 
-    max_abs_error_idx = np.argmax(abs_error)
-    max_abs_error = abs_error.flat[max_abs_error_idx]
-    abs_max_x = x.flat[max_abs_error_idx]
-    abs_max_y = y.flat[max_abs_error_idx]
+    mixed_atol_rtol = atol + rtol * np.abs(ref)
+    diff = abs_error - mixed_atol_rtol  # any values > 0 violate tolerance check
 
-    # Filter values where the divisor would be zero
-    denom_idx = 1
-    nonzero = y != 0.
-    if not nonzero.any():
-        nonzero = x != 0.
-        if not nonzero.any():
-            return max_abs_error, (abs_max_x, abs_max_y), float('nan'), (0.0, 0.0), denom_idx
-        else:
-            denom_idx = 0
+    max_error_idx = np.argmax(diff)
+    max_error = diff.flat[max_error_idx]
+    max_error_x = x.flat[max_error_idx]
+    max_error_ref = ref.flat[max_error_idx]
 
-    max_rel_error_nz = abs_error[nonzero] / np.abs(args[denom_idx][nonzero])
-    max_rel_error_idx = np.argmax(max_rel_error_nz)
-    max_rel_error = max_rel_error_nz.flat[max_rel_error_idx]
-    rel_max_x = x[nonzero].flat[max_rel_error_idx]
-    rel_max_y = y[nonzero].flat[max_rel_error_idx]
-
-    # if one value is zero the relative error doesn't really make sense, so just defer to whatever
-    # the absolute error check says.
-    if rel_max_x == 0.0 or rel_max_y == 0.0:
-        max_rel_error = float('nan')
-
-    return max_abs_error, (abs_max_x, abs_max_y), max_rel_error, (rel_max_x, rel_max_y), denom_idx
+    return max_error, (max_error_x, max_error_ref), np.any(diff > 0.)

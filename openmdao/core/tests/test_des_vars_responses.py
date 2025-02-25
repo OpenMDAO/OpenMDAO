@@ -1049,7 +1049,6 @@ class TestObjectiveOnModel(unittest.TestCase):
         # Formerly a KeyError
         derivs = p.check_totals(compact_print=True, out_stream=None)
         assert_check_totals(derivs)
-        assert_near_equal(0.0, derivs['y', 'x']['abs error'][1])
 
 
 if __name__ == '__main__':
