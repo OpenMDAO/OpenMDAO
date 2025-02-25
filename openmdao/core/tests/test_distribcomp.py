@@ -367,7 +367,7 @@ class DistributedIO(unittest.TestCase):
             self.assertEqual(model_size, ndvs)
 
 
-# @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MPITests(unittest.TestCase):
 
     N_PROCS = 2
