@@ -357,6 +357,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'serial_multi_src_inds_units_promoted_no_src':"

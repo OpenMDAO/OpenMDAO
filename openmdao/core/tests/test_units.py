@@ -285,6 +285,7 @@ class TestUnitConversion(unittest.TestCase):
 
         with assert_warning(UserWarning, msg):
             prob.setup()
+            prob.final_setup()
 
     def test_basic_implicit_conn(self):
         """Test units with all implicit connections."""
@@ -574,6 +575,7 @@ class TestUnitConversion(unittest.TestCase):
         prob.model.connect('src.x2', 'dest.x2')
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'incompatible_connections':"
@@ -586,6 +588,7 @@ class TestUnitConversion(unittest.TestCase):
         prob.model.add_subsystem('dest', BadComp(),promotes=['x2'])
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'incompatible_connections2':"
@@ -919,6 +922,8 @@ class TestUnitConversion(unittest.TestCase):
         # trying to convert J/s/s to m/s**2 should cause Incompatible units TypeError exception
         with self.assertRaises(Exception) as e:
             p.setup()
+            p.final_setup()
+
         self.assertEqual(str(e.exception),
            "\nCollected errors for problem 'promotes_non_equivalent_units':"
            "\n   <model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted "
