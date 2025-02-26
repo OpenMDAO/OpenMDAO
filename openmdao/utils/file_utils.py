@@ -10,8 +10,10 @@ from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath
 import pathlib
 import shutil
+import tempfile
 
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.general_utils import env_truthy
 
 
 def get_module_path(fpath):
@@ -443,6 +445,11 @@ def _get_work_dir():
         The working directory.
     """
     workdir = os.environ.get('OPENMDAO_WORKDIR', '')
+    if not workdir and env_truthy('TESTFLO_RUNNING'):
+        # if we're running under testflo, make a tempdir for all of the test related files
+        # so they don't pollute the user's directories
+        workdir = tempfile.mkdtemp()
+        os.environ['OPENMDAO_WORKDIR'] = workdir
 
     if workdir:
         return workdir
