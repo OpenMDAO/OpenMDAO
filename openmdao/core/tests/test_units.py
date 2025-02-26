@@ -3,7 +3,7 @@
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
     TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
 
@@ -115,12 +115,7 @@ class TestUnitConversion(unittest.TestCase):
         assert_near_equal(J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
         # Make sure check partials handles conversion
-        data = prob.check_partials(out_stream=None)
-
-        for key1, val1 in data.items():
-            for key2, val2 in val1.items():
-                assert_near_equal(val2['abs error'][0], 0.0, 1e-6)
-                assert_near_equal(val2['rel error'][0], 0.0, 1e-6)
+        assert_check_partials(prob.check_partials(out_stream=None))
 
     def test_basic_apply(self):
         """Test that output values and total derivatives are correct."""
@@ -241,13 +236,8 @@ class TestUnitConversion(unittest.TestCase):
         assert_near_equal(J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         # Make sure check partials handles conversion
-        data = prob.check_partials(out_stream=None, step=1.1e-6) # Need to make step different
+        assert_check_partials(prob.check_partials(out_stream=None, step=1.1e-6)) # Need to make step different
         #  than for compute, otherwise get error
-
-        for key1, val1 in data.items():
-            for key2, val2 in val1.items():
-                assert_near_equal(val2['abs error'][0], 0.0, 1e-6)
-                assert_near_equal(val2['rel error'][0], 0.0, 1e-6)
 
     def test_bad_units(self):
         """Test error handling when invalid units are declared."""
