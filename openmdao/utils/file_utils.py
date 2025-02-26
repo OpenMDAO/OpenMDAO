@@ -435,6 +435,10 @@ def image2html(imagefile, title='', alt=''):
 """
 
 
+if env_truthy('TESTFLO_RUNNING'):
+    os.environ['TESTFLO_WORKDIR'] = tempfile.mkdtemp()
+
+
 def _get_work_dir():
     """
     Return either os.getcwd() or the value of the OPENMDAO_WORKDIR environment variable.
@@ -446,15 +450,13 @@ def _get_work_dir():
     """
     workdir = os.environ.get('OPENMDAO_WORKDIR', '')
     if not workdir and env_truthy('TESTFLO_RUNNING'):
-        # if we're running under testflo, make a tempdir for all of the test related files
-        # so they don't pollute the user's directories
-        workdir = tempfile.mkdtemp()
-        os.environ['OPENMDAO_WORKDIR'] = workdir
+        # use testflo's temp dir for all of the test related files to avoid polluting the user's
+        # current directory
+        workdir = os.environ.get('TESTFLO_WORKDIR', '')
+        if workdir:
+            os.environ['OPENMDAO_WORKDIR'] = workdir
 
-    if workdir:
-        return workdir
-
-    return os.getcwd()
+    return workdir if workdir else os.getcwd()
 
 
 def _get_outputs_dir(obj, *subdirs, mkdir=True):
