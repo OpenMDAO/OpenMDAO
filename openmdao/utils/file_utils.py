@@ -436,7 +436,9 @@ def image2html(imagefile, title='', alt=''):
 
 
 if env_truthy('TESTFLO_RUNNING'):
-    os.environ['TESTFLO_WORKDIR'] = tempfile.mkdtemp()
+    TESTFLO_WORKDIR = tempfile.mkdtemp()
+else:
+    TESTFLO_WORKDIR = ''
 
 
 def _get_work_dir():
@@ -452,7 +454,7 @@ def _get_work_dir():
     if not workdir and env_truthy('TESTFLO_RUNNING'):
         # use testflo's temp dir for all of the test related files to avoid polluting the user's
         # current directory
-        workdir = os.environ.get('TESTFLO_WORKDIR', '')
+        workdir = TESTFLO_WORKDIR
         if workdir:
             os.environ['OPENMDAO_WORKDIR'] = workdir
 
