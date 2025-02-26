@@ -433,7 +433,7 @@ def image2html(imagefile, title='', alt=''):
 """
 
 
-def get_work_dir():
+def _get_work_dir():
     """
     Return either os.getcwd() or the value of the OPENMDAO_WORKDIR environment variable.
 
@@ -494,7 +494,7 @@ def _get_outputs_dir(obj, *subdirs, mkdir=True):
 
     prob_pathname = prob_meta['pathname']
 
-    work_dir = pathlib.Path(get_work_dir())
+    work_dir = prob_meta['work_dir']
     if mkdir and not work_dir.exists():
         work_dir.mkdir(exist_ok=True)
 
