@@ -5234,7 +5234,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         return self._problem_meta['reports_dir']
 
-    def get_outputs_dir(self, *subdirs, mkdir=True):
+    def get_outputs_dir(self, *subdirs, mkdir=False):
         """
         Get the path under which all output files of this system are to be placed.
 

@@ -461,7 +461,7 @@ def _get_work_dir():
     return workdir if workdir else os.getcwd()
 
 
-def _get_outputs_dir(obj, *subdirs, mkdir=True):
+def _get_outputs_dir(obj, *subdirs, mkdir=False):
     """
     Return a pathlib.Path for the outputs directory related to the given problem or system.
 
@@ -640,7 +640,7 @@ def clean_outputs(obj='.', recurse=False, prompt=True, pattern='*_out', dryrun=F
         # Multiple paths given
         output_dirs.extend(_find_openmdao_output_dirs(obj, pattern, recurse))
     elif hasattr(obj, 'get_outputs_dir'):
-        output_dir = obj.get_outputs_dir(mkdir=False)
+        output_dir = obj.get_outputs_dir()
         prompt = False
         if output_dir and _is_openmdao_output_dir(output_dir):
             output_dirs.append(pathlib.Path(output_dir))
