@@ -482,7 +482,7 @@ class TestMPIColoringBug(unittest.TestCase):
                 if coloring_mod._use_total_sparsity:
                     if self._coloring_info.do_compute_coloring() and self._coloring_info['dynamic']:
                         coloring_mod.dynamic_total_coloring(self, run_model=True,
-                                                            fname=self._get_total_coloring_fname(mode='output'))
+                                                            fname=self.get_coloring_fname(mode='output'))
                         self._setup_tot_jac_sparsity()
 
         p = om.Problem()

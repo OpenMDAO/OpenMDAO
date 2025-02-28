@@ -533,7 +533,7 @@ class pyOptSparseDriver(Driver):
 
         # Need to tell optimizer where to put its .out files
         if self.options['output_dir'] in (None, _DEFAULT_REPORTS_DIR):
-            output_dir = str(self._problem().get_outputs_dir())
+            output_dir = str(self._problem().get_outputs_dir(mkdir=True))
         else:
             output_dir = str(self.options['output_dir'])
 
