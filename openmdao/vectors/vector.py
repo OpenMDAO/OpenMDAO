@@ -376,6 +376,24 @@ class Vector(object):
         else:
             raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
 
+    def get_val(self, name, flat=True):
+        """
+        Get the variable value.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
+        flat : bool
+            If True, return the flat value.
+
+        Returns
+        -------
+        float or ndarray
+            Variable value.
+        """
+        return self._abs_get_val(name, flat=flat)
+
     def _abs_get_val(self, name, flat=True):
         """
         Get the variable value using the absolute name.
