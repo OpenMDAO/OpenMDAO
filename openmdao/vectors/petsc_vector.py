@@ -56,17 +56,18 @@ else:
         cite = CITATION
         distributed = True
 
-        def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
+        def __init__(self, name, kind, system, name_shape_iter, root_vectors, parent_vector=None,
+                     msginfo='', path='', alloc_complex=False, do_scaling=False, do_adder=False):
             """
             Initialize all attributes.
             """
-            super().__init__(name, kind, system, root_vector=root_vector,
-                             alloc_complex=alloc_complex)
+            super().__init__(name, kind, system, name_shape_iter, root_vectors, parent_vector,
+                             msginfo, path, alloc_complex, do_scaling, do_adder)
 
             self._dup_inds = None
             self._dup_scratch = None
 
-        def _initialize_data(self, root_vector):
+        def _initialize_data(self, root_vectors, parent_vector):
             """
             Internally allocate vectors.
 
@@ -75,7 +76,7 @@ else:
             root_vector : Vector or None
                 the root's vector instance or None, if we are at the root.
             """
-            super()._initialize_data(root_vector)
+            super()._initialize_data(root_vectors, parent_vector)
 
             self._petsc = {}
             self._imag_petsc = {}

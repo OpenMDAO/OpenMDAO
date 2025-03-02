@@ -5,7 +5,7 @@ import numpy as np
 
 from openmdao.vectors.vector import Vector, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
-from openmdao.utils.array_utils import array_hash
+from openmdao.utils.array_utils import array_hash, shape_to_len
 
 
 class DefaultVector(Vector):
@@ -33,12 +33,14 @@ class DefaultVector(Vector):
 
     TRANSFER = DefaultTransfer
 
-    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
+    def __init__(self, name, kind, system, name_shape_iter, root_vectors, parent_vector=None,
+                 msginfo='', path='', alloc_complex=False, do_scaling=False, do_adder=False):
         """
         Initialize all attributes.
         """
         self._views_rel = None
-        super().__init__(name, kind, system, root_vector=root_vector, alloc_complex=alloc_complex)
+        super().__init__(name, kind, system, name_shape_iter, root_vectors, parent_vector,
+                         msginfo, path, alloc_complex, do_scaling, do_adder)
 
     def __getitem__(self, name):
         """
@@ -113,8 +115,7 @@ class DefaultVector(Vector):
         """
         system = self._system()
         size = np.sum(system._var_sizes[self._typ][system.comm.rank, :])
-        dtype = complex if self._alloc_complex else float
-        return np.zeros(size, dtype=dtype)
+        return np.zeros(size, dtype=complex if self._alloc_complex else float)
 
     def _extract_root_data(self):
         """
@@ -126,12 +127,11 @@ class DefaultVector(Vector):
             zeros array of correct size.
         """
         system = self._system()
-        type_ = self._typ
         root_vec = self._root_vector
 
         slices = root_vec.get_slice_dict()
 
-        mynames = list(system._var_abs2meta[type_])
+        mynames = list(system._var_abs2meta[self._typ])
         if mynames:
             myslice = slice(slices[mynames[0]].start, slices[mynames[-1]].stop)
         else:
@@ -151,16 +151,16 @@ class DefaultVector(Vector):
 
         return data, scaling
 
-    def _initialize_data(self, root_vector):
+    def _initialize_data(self, root_vectors, parent_vector):
         """
         Internally allocate data array.
 
         Parameters
         ----------
-        root_vector : Vector or None
-            the root's vector instance or None, if we are at the root.
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        if root_vector is None:  # we're the root
+        if parent_vector is None:  # we're the root
             self._data = self._create_data()
 
             if self._do_scaling:
@@ -177,7 +177,7 @@ class DefaultVector(Vector):
                         self._scaling = (None, np.ones(data.size))
                     else:
                         # Reuse the nonlinear scaling vecs since they're the same as ours.
-                        nlvec = self._system()._root_vecs[self._kind]['nonlinear']
+                        nlvec = root_vectors[self._kind]['nonlinear']
                         self._scaling = (None, nlvec._scaling[1])
                 else:
                     self._scaling = (None, np.ones(data.size))
@@ -185,12 +185,11 @@ class DefaultVector(Vector):
         else:
             self._data, self._scaling = self._extract_root_data()
 
-    def _initialize_views(self):
+    def _initialize_views(self, name_shape_iter):
         """
         Internally assemble views onto the vectors.
         """
         system = self._system()
-        io = self._typ
         kind = self._kind
         islinear = self._name == 'linear'
         rel_lookup = system._has_fast_rel_lookup()
@@ -204,14 +203,13 @@ class DefaultVector(Vector):
         self._views_flat = views_flat = {}
         if rel_lookup:
             self._views_rel = views_rel = {}
-            relstart = len(system.pathname) + 1 if system.pathname else 0
+            relstart = len(self._pathname) + 1 if self._pathname else 0
         else:
             self._views_rel = None
 
         start = end = 0
-        for abs_name, meta in system._var_abs2meta[io].items():
-            end = start + meta['size']
-            shape = meta['shape']
+        for abs_name, shape in name_shape_iter:
+            end += shape_to_len(shape)
             views_flat[abs_name] = v = self._data[start:end]
             if shape != v.shape:
                 v = v.view()
@@ -374,16 +372,13 @@ class DefaultVector(Vector):
         mode : str
             Derivative direction.
         """
-        if self._has_solver_ref and mode == 'fwd':
-            scaler = self._scaling_nl_vec[1]
-            adder = None
-        else:
-            adder, scaler = self._scaling
-
         if mode == 'rev':
-            self._scale_reverse(scaler, adder)
+            self._scale_reverse(*self._scaling)
         else:
-            self._scale_forward(scaler, adder)
+            if self._has_solver_ref:
+                self._scale_forward(self._scaling_nl_vec[1], None)
+            else:
+                self._scale_forward(*self._scaling)
 
     def scale_to_phys(self, mode='fwd'):
         """
@@ -394,16 +389,13 @@ class DefaultVector(Vector):
         mode : str
             Derivative direction.
         """
-        if self._has_solver_ref and mode == 'fwd':
-            scaler = self._scaling_nl_vec[1]
-            adder = None
-        else:
-            adder, scaler = self._scaling
-
         if mode == 'rev':
-            self._scale_forward(scaler, adder)
+            self._scale_forward(*self._scaling)
         else:
-            self._scale_reverse(scaler, adder)
+            if self._has_solver_ref:
+                self._scale_reverse(self._scaling_nl_vec[1], None)
+            else:
+                self._scale_reverse(*self._scaling)
 
     def _scale_forward(self, scaler, adder):
         """

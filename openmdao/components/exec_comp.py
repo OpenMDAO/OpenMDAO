@@ -733,7 +733,7 @@ class ExecComp(ExplicitComponent):
                               f"declared so they are assumed to be zero: [{undeclared}].",
                               prefix=self.msginfo, category=DerivativesWarning)
 
-    def _setup_vectors(self, root_vectors):
+    def _setup_vectors(self, root_vectors, parent_vectors=None):
         """
         Compute all vectors for all vec names.
 
@@ -741,8 +741,10 @@ class ExecComp(ExplicitComponent):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vectors : dict or None
+            Parent vectors.  Same structure as root_vectors.
         """
-        super()._setup_vectors(root_vectors)
+        super()._setup_vectors(root_vectors, parent_vectors)
 
         if not self._use_derivatives:
             self._manual_decl_partials = True  # prevents attempts to use _viewdict in compute

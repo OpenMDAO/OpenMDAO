@@ -20,7 +20,7 @@ from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, 
 from openmdao.jacobians.dictionary_jacobian import Jacobian, DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.vectors.vector import _full_slice
+from openmdao.vectors.vector import _full_slice, _type_map
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
@@ -2477,7 +2477,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         pass
 
-    def _setup_vectors(self, root_vectors):
+    def _setup_vectors(self, root_vectors, parent_vectors):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
@@ -2485,37 +2485,53 @@ class System(object, metaclass=SystemMetaclass):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vectors : dict of dict of Vector or None
+            Parent vectors.  Same structure as root_vectors.
         """
-        self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
+        if parent_vectors is None:
+            self._vectors = vectors = root_vectors
+        else:
+            self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
 
-        # Allocate complex if root vector was allocated complex.
-        alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
+            # Allocate complex if root vector was allocated complex.
+            alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
+            do_scaling = {
+                'input': self._has_input_scaling,
+                'output': self._has_output_scaling,
+                'residual': self._has_resid_scaling
+            }
+            do_adder = {
+                'input': self._has_input_adder,
+                'output': self._has_output_adder,
+                'residual': self._has_resid_scaling
+            }
 
-        # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
-        # initially allocated as complex.
-        if not alloc_complex and 'cs' in self._approx_schemes:
-            raise RuntimeError("{}: In order to activate complex step during reconfiguration, "
-                               "you need to set 'force_alloc_complex' to True during setup. e.g. "
-                               "'problem.setup(force_alloc_complex=True)'".format(self.msginfo))
+            # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
+            # initially allocated as complex.
+            if not alloc_complex and 'cs' in self._approx_schemes:
+                raise RuntimeError("{}: In order to activate complex step during reconfiguration, "
+                                "you need to set 'force_alloc_complex' to True during setup. e.g. "
+                                "'problem.setup(force_alloc_complex=True)'".format(self.msginfo))
 
-        if self._vector_class is None:
-            self._vector_class = self._local_vector_class
+            if self._vector_class is None:
+                self._vector_class = self._local_vector_class
 
-        vector_class = self._vector_class
-        vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
+            vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
 
-        for vec_name in vectypes:
+            for vec_name in vectypes:
 
-            # Only allocate complex in the vectors we need.
-            vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
+                # Only allocate complex in the vectors we need.
+                vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
 
-            for kind in ['input', 'output', 'residual']:
-                rootvec = root_vectors[kind][vec_name]
-                vectors[kind][vec_name] = vector_class(
-                    vec_name, kind, self, rootvec, alloc_complex=vec_alloc_complex)
+                for kind in ['input', 'output', 'residual']:
+                    vectors[kind][vec_name] = self._vector_class(
+                        vec_name, kind, self, self._name_shape_iter(kind), root_vectors,
+                        parent_vectors, self.msginfo, self.pathname,
+                        alloc_complex=vec_alloc_complex,
+                        do_scaling=do_scaling[kind], do_adder=do_adder[kind])
 
-        if self._use_derivatives:
-            vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
+            if self._use_derivatives:
+                vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -2526,9 +2542,17 @@ class System(object, metaclass=SystemMetaclass):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-        for subsys in self._sorted_sys_iter():
-            subsys._scale_factors = self._scale_factors
-            subsys._setup_vectors(root_vectors)
+    def _name_shape_iter(self, vectype, subset=None):
+        """
+        Yield variable names and shapes for a given iotype of vector.
+        """
+        if subset is None:
+            for name, meta in self._var_abs2meta[_type_map[vectype]].items():
+                yield name, meta['shape']
+        else:
+            for name, meta in self._var_abs2meta[_type_map[vectype]].items():
+                if name in subset:
+                    yield name, meta['shape']
 
     def _setup_transfers(self):
         """

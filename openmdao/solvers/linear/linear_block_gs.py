@@ -119,6 +119,7 @@ class LinearBlockGS(BlockLinearSolver):
                 # of those groups are doing block linear solves).
                 scope_out = self._vars_union(self._scope_out, scope_out)
                 scope_in = self._vars_union(self._scope_in, scope_in)
+                # offset into the parent vector
                 off = b_vec._root_offset - parent_offset
 
                 if subsys._iter_call_apply_linear():

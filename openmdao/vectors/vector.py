@@ -13,7 +13,7 @@ _full_slice = slice(None)
 _flat_full_indexer = indexer(_full_slice, flat_src=True)
 _full_indexer = indexer(_full_slice, flat_src=False)
 
-_type_map = {
+_type_map = {  # map vector type to iotype
     'input': 'input',
     'output': 'output',
     'residual': 'output'
@@ -52,8 +52,6 @@ class Vector(object):
         Type: 'input' for input vectors; 'output' for output/residual vectors.
     _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.
-    _system : System
-        Weak ref to the owning system.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
     _views_flat : dict
@@ -62,8 +60,8 @@ class Vector(object):
         Set of variables that are relevant in the current context.
     _root_vector : Vector
         Pointer to the vector owned by the root system.
-    _root_offset : int
-        Offset of this vector into the root vector.
+    _parent_slice : slice
+        Slice of the parent vector that this vector represents.
     _alloc_complex : bool
         If True, then space for the complex vector is also allocated.
     _data : ndarray
@@ -94,16 +92,19 @@ class Vector(object):
     # Indicator whether a vector class is MPI-distributed
     distributed = False
 
-    def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
+    def __init__(self, name, kind, system, name_shape_iter, root_vectors, parent_vector=None, msginfo='',
+                 path='', alloc_complex=False, do_scaling=False, do_adder=False):
         """
         Initialize all attributes.
         """
+        # this will go away...
+        self._system = weakref.ref(system)
         self._name = name
         self._typ = _type_map[kind]
         self._kind = kind
         self._len = 0
-
-        self._system = weakref.ref(system)
+        self._pathname = path
+        self.msginfo = msginfo
 
         self._views = {}
         self._views_flat = {}
@@ -115,18 +116,14 @@ class Vector(object):
         self._root_vector = None
         self._data = None
         self._slices = None
-        self._root_offset = 0
+        self._parent_slice = None
 
         # Support for Complex Step
         self._alloc_complex = alloc_complex
         self._under_complex_step = False
 
-        self._do_scaling = ((kind == 'input' and system._has_input_scaling) or
-                            (kind == 'output' and system._has_output_scaling) or
-                            (kind == 'residual' and system._has_resid_scaling))
-        self._do_adder = ((kind == 'input' and system._has_input_adder) or
-                          (kind == 'output' and system._has_output_adder) or
-                          (kind == 'residual' and system._has_resid_scaling))
+        self._do_scaling = do_scaling
+        self._do_adder = do_adder
 
         self._scaling = None
         self._scaling_nl_vec = None
@@ -135,13 +132,13 @@ class Vector(object):
         # for the linear and nonlinear input vectors.
         self._has_solver_ref = system._has_output_scaling and kind == 'input' and name == 'linear'
 
-        if root_vector is None:
-            self._root_vector = self
+        if parent_vector is None:  # we're the root
+            root_vectors[kind][name] = self._root_vector = self
         else:
-            self._root_vector = root_vector
+            self._root_vector = root_vectors[kind][name]
 
-        self._initialize_data(root_vector)
-        self._initialize_views()
+        self._initialize_data(root_vectors, parent_vector)
+        self._initialize_views(name_shape_iter)
 
         self.read_only = False
 

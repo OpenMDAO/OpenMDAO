@@ -432,14 +432,9 @@ class Group(System):
         # This is a combined scale factor that includes the scaling of the connected source
         # and the unit conversion between the source output and each target input.
         if self._has_input_scaling:
-            abs2meta_in = self._var_abs2meta['input']
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
-            for abs_in, abs_out in self._conn_global_abs_in2out.items():
-                if abs_in not in abs2meta_in:
-                    # we only perform scaling on local, non-discrete arrays, so skip
-                    continue
-
-                meta_in = abs2meta_in[abs_in]
+            for abs_in, meta_in in self._var_abs2meta['input'].items():
+                abs_out = self._conn_global_abs_in2out[abs_in]
 
                 meta_out = allprocs_meta_out[abs_out]
                 ref = meta_out['ref']
@@ -1092,7 +1087,7 @@ class Group(System):
         if self._use_derivatives:
             self._setup_partials()
 
-        self._setup_vectors(self._get_root_vectors())
+        self._setup_vectors(self._get_root_vectors(), None)
 
         self._setup_jax()
 
@@ -1127,6 +1122,22 @@ class Group(System):
         self._setup_recording()
 
         self.set_initial_values()
+
+    def _setup_vectors(self, root_vectors, parent_vectors=None):
+        """
+        Compute all vectors for all vec names and assign excluded variables lists.
+
+        Parameters
+        ----------
+        root_vectors : dict of dict of Vector
+            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vectors : dict or None
+            Parent vectors.  Same structure as root_vectors.
+        """
+        super()._setup_vectors(root_vectors, parent_vectors)
+        for subsys in self._sorted_sys_iter():
+            subsys._scale_factors = self._scale_factors
+            subsys._setup_vectors(root_vectors, self._vectors)
 
     def _update_dataflow_graph(self, responses):
         """
@@ -1214,27 +1225,24 @@ class Group(System):
         if self._vector_class is None:
             self._vector_class = self._local_vector_class
 
-        vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
-
         # If any proc's local systems need a complex vector, then all procs need it.
         if self.comm.size > 1:
-            all_nl_alloc_complex = self.comm.allgather(nl_alloc_complex)
-            if np.any(all_nl_alloc_complex):
-                nl_alloc_complex = True
+            need_alloc_complex = np.array([nl_alloc_complex, ln_alloc_complex], dtype=int)
+            result = np.zeros(2, dtype=int)
+            self.comm.Allreduce(need_alloc_complex, result, op=MPI.MAX)
+            nl_alloc_complex = bool(result[0])
+            ln_alloc_complex = bool(result[1])
 
-            all_ln_alloc_complex = self.comm.allgather(ln_alloc_complex)
-            if np.any(all_ln_alloc_complex):
-                ln_alloc_complex = True
-
-        for vec_name in vectypes:
-            if vec_name == 'nonlinear':
-                alloc_complex = nl_alloc_complex
-            else:
-                alloc_complex = ln_alloc_complex
-
-            for key in ['input', 'output', 'residual']:
-                root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
-                                                                 alloc_complex=alloc_complex)
+        for kind in ['input', 'output', 'residual']:
+            root_vectors[kind]['nonlinear'] = self._vector_class('nonlinear', kind, self,
+                                                                 self._name_shape_iter(kind),
+                                                                 root_vectors,
+                                                                 alloc_complex=nl_alloc_complex)
+            if self._use_derivatives:
+                root_vectors[kind]['linear'] = self._vector_class('linear', kind, self,
+                                                                  self._name_shape_iter(kind),
+                                                                  root_vectors,
+                                                                  alloc_complex=ln_alloc_complex)
 
         if self._use_derivatives:
             root_vectors['input']['linear']._scaling_nl_vec = \
