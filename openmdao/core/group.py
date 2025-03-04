@@ -1233,16 +1233,31 @@ class Group(System):
             nl_alloc_complex = bool(result[0])
             ln_alloc_complex = bool(result[1])
 
+        do_scaling = {
+            'input': self._has_input_scaling,
+            'output': self._has_output_scaling,
+            'residual': self._has_resid_scaling
+        }
+        do_adder = {
+            'input': self._has_input_adder,
+            'output': self._has_output_adder,
+            'residual': self._has_resid_scaling
+        }
+
         for kind in ['input', 'output', 'residual']:
             root_vectors[kind]['nonlinear'] = self._vector_class('nonlinear', kind, self,
                                                                  self._name_shape_iter(kind),
                                                                  root_vectors,
-                                                                 alloc_complex=nl_alloc_complex)
+                                                                 alloc_complex=nl_alloc_complex,
+                                                                 do_scaling=do_scaling[kind],
+                                                                 do_adder=do_adder[kind])
             if self._use_derivatives:
                 root_vectors[kind]['linear'] = self._vector_class('linear', kind, self,
                                                                   self._name_shape_iter(kind),
                                                                   root_vectors,
-                                                                  alloc_complex=ln_alloc_complex)
+                                                                  alloc_complex=ln_alloc_complex,
+                                                                  do_scaling=do_scaling[kind],
+                                                                  do_adder=do_adder[kind])
 
         if self._use_derivatives:
             root_vectors['input']['linear']._scaling_nl_vec = \

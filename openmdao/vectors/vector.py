@@ -92,7 +92,7 @@ class Vector(object):
     # Indicator whether a vector class is MPI-distributed
     distributed = False
 
-    def __init__(self, name, kind, system, name_shape_iter, root_vectors, parent_vector=None, msginfo='',
+    def __init__(self, name, kind, system, name_shape_iter, root_vectors, parent_vectors=None, msginfo='',
                  path='', alloc_complex=False, do_scaling=False, do_adder=False):
         """
         Initialize all attributes.
@@ -132,12 +132,12 @@ class Vector(object):
         # for the linear and nonlinear input vectors.
         self._has_solver_ref = system._has_output_scaling and kind == 'input' and name == 'linear'
 
-        if parent_vector is None:  # we're the root
+        if parent_vectors is None:  # we're the root
             root_vectors[kind][name] = self._root_vector = self
         else:
             self._root_vector = root_vectors[kind][name]
 
-        self._initialize_data(root_vectors, parent_vector)
+        self._initialize_data(root_vectors, parent_vectors)
         self._initialize_views(name_shape_iter)
 
         self.read_only = False

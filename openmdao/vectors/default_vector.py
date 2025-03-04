@@ -117,7 +117,7 @@ class DefaultVector(Vector):
         size = np.sum(system._var_sizes[self._typ][system.comm.rank, :])
         return np.zeros(size, dtype=complex if self._alloc_complex else float)
 
-    def _extract_root_data(self):
+    def _extract_root_data(self, parent_vector):
         """
         Extract views of arrays from root_vector.
 
@@ -127,31 +127,26 @@ class DefaultVector(Vector):
             zeros array of correct size.
         """
         system = self._system()
-        root_vec = self._root_vector
 
-        slices = root_vec.get_slice_dict()
+        slices = parent_vector.get_slice_dict()
 
         mynames = list(system._var_abs2meta[self._typ])
         if mynames:
-            myslice = slice(slices[mynames[0]].start, slices[mynames[-1]].stop)
+            self._parent_slice = slice(slices[mynames[0]].start, slices[mynames[-1]].stop)
         else:
-            myslice = slice(0, 0)
-
-        data = root_vec._data[myslice]
-        self._root_offset = myslice.start
+            self._parent_slice = slice(0, 0)
 
         scaling = None
         if self._do_scaling:
-            root_scale = root_vec._scaling
-            rs0 = root_scale[0]
-            if rs0 is None:
-                scaling = (rs0, root_scale[1][myslice])
-            else:
-                scaling = (rs0[myslice], root_scale[1][myslice])
+            ps0, ps1 = parent_vector._scaling
+            if ps0 is not None:
+                ps0 = ps0[self._parent_slice]
+            scaling = (ps0, ps1[self._parent_slice])
 
-        return data, scaling
 
-    def _initialize_data(self, root_vectors, parent_vector):
+        return parent_vector._data[self._parent_slice], scaling
+
+    def _initialize_data(self, root_vectors, parent_vectors):
         """
         Internally allocate data array.
 
@@ -160,8 +155,9 @@ class DefaultVector(Vector):
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        if parent_vector is None:  # we're the root
+        if parent_vectors is None:  # we're the root
             self._data = self._create_data()
+            self._parent_slice = slice(0, len(self))
 
             if self._do_scaling:
                 data = self._data
@@ -183,7 +179,7 @@ class DefaultVector(Vector):
                     self._scaling = (None, np.ones(data.size))
 
         else:
-            self._data, self._scaling = self._extract_root_data()
+            self._data, self._scaling = self._extract_root_data(parent_vectors[self._kind][self._name])
 
     def _initialize_views(self, name_shape_iter):
         """
@@ -373,12 +369,12 @@ class DefaultVector(Vector):
             Derivative direction.
         """
         if mode == 'rev':
-            self._scale_reverse(*self._scaling)
+            self._scale_reverse(self._scaling[1], self._scaling[0])
         else:
             if self._has_solver_ref:
                 self._scale_forward(self._scaling_nl_vec[1], None)
             else:
-                self._scale_forward(*self._scaling)
+                self._scale_forward(self._scaling[1], self._scaling[0])
 
     def scale_to_phys(self, mode='fwd'):
         """
@@ -390,12 +386,12 @@ class DefaultVector(Vector):
             Derivative direction.
         """
         if mode == 'rev':
-            self._scale_forward(*self._scaling)
+            self._scale_forward(self._scaling[1], self._scaling[0])
         else:
             if self._has_solver_ref:
                 self._scale_reverse(self._scaling_nl_vec[1], None)
             else:
-                self._scale_reverse(*self._scaling)
+                self._scale_reverse(self._scaling[1], self._scaling[0])
 
     def _scale_forward(self, scaler, adder):
         """
