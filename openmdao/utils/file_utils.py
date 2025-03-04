@@ -190,6 +190,8 @@ def _load_and_exec(script_name, user_args):
     with open(script_name, 'rb') as fp:
         code = compile(fp.read(), script_name, 'exec')
 
+    os.environ['OPENMDAO_SCRIPT_NAME'] = script_name
+
     globals_dict = {
         '__file__': script_name,
         '__name__': '__main__',

@@ -98,7 +98,11 @@ def _get_top_script():
         The absolute path, or None if it can't be resolved.
     """
     try:
-        return pathlib.Path(__main__.__file__).resolve()
+        script_name = os.environ.get('OPENMDAO_SCRIPT_NAME')
+        if script_name is not None:
+            return pathlib.Path(script_name).resolve()
+        else:
+            return pathlib.Path(__main__.__file__).resolve()
     except Exception:
         # this will error out in some cases, e.g. inside of a jupyter notebook, so just
         # return None in that case.

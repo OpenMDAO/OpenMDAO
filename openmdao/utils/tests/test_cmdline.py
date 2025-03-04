@@ -161,6 +161,23 @@ class CmdlineTestCase(unittest.TestCase):
                 self.assertNotIn(p1_outdir, subdirs)
                 self.assertNotIn(p2_outdir, subdirs)
 
+    def test_outdir(self):
+        env_vars = os.environ.copy()
+        env_vars["OPENMDAO_REPORTS"] = "1"
+        env_vars["TESTFLO_RUNNING"] = "0"
+
+        cmd = f"openmdao {os.path.join(scriptdir, 'circle_opt.py')}"
+        proc = subprocess.Popen(cmd.split(),  # nosec: trusted input
+                                env=env_vars,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            outs, errs = proc.communicate(timeout=10)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            outs, errs = proc.communicate()
+
+        self.assertTrue(os.path.exists('circle_opt_out'))
+
     def test_n2_err(self):
         # command should raise exception but still produce an n2 html file
         cmd = f'openmdao n2 --no_browser {scriptdir}/bad_connection.py'
