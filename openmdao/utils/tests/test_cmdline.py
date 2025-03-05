@@ -205,6 +205,7 @@ class CmdlineTestCase(unittest.TestCase):
         else:
             self.fail("Didn't find expected err msg in output.")
 
+
 class CmdlineTestCaseCheck(unittest.TestCase):
     def test_auto_ivc_warnings_check(self):
         cmd = 'openmdao check -c auto_ivc_warnings {}'.format(os.path.join(scriptdir, 'auto_ivc_warnings.py'))

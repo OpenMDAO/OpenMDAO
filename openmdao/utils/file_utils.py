@@ -12,6 +12,7 @@ import pathlib
 import shutil
 
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.testing_utils import set_env_vars_context
 
 
 def get_module_path(fpath):
@@ -190,8 +191,6 @@ def _load_and_exec(script_name, user_args):
     with open(script_name, 'rb') as fp:
         code = compile(fp.read(), script_name, 'exec')
 
-    os.environ['OPENMDAO_SCRIPT_NAME'] = script_name
-
     globals_dict = {
         '__file__': script_name,
         '__name__': '__main__',
@@ -199,7 +198,8 @@ def _load_and_exec(script_name, user_args):
         '__cached__': None,
     }
 
-    exec(code, globals_dict)  # nosec: private, internal use only
+    with set_env_vars_context(OPENMDAO_SCRIPT_NAME=script_name):
+        exec(code, globals_dict)  # nosec: private, internal use only
 
 
 def fname2mod_name(fname):
