@@ -5476,7 +5476,7 @@ class System(object, metaclass=SystemMetaclass):
                 if distrib:
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
                     if not flat:
-                        val =  np.reshape(val, meta['global_shape']) if get_remote \
+                        val = np.reshape(val, meta['global_shape']) if get_remote \
                             else np.reshape(val, meta['shape'])
                 else:
                     if owner != self.comm.rank:
