@@ -128,12 +128,18 @@ class EQConstraintComp(ExplicitComponent):
             # Compute scaling factors
             # scale factor that normalizes by the rhs, except near 0
             if options['normalize']:
-                # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(cs_safe.abs(rhs) < 2)
-                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)
+                if rhs.shape == ():
+                    if cs_safe.abs(rhs) < 2:
+                        _scale_factor = 1.0 / (.25 * rhs**2 + 1)
+                    elif cs_safe.abs(rhs) >= 2:
+                        _scale_factor = 1.0 / cs_safe.abs(rhs)
+                else:
+                    # Indices where the rhs is near zero or not near zero
+                    idxs_nz = np.where(cs_safe.abs(rhs) < 2)
+                    idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)
 
-                _scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
-                _scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
+                    _scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
+                    _scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
             if options['use_mult']:
                 outputs[name] = (inputs[options['mult_name']] * lhs - rhs) * _scale_factor
@@ -161,16 +167,25 @@ class EQConstraintComp(ExplicitComponent):
             _scale_factor = np.ones((rhs.shape))
             _dscale_drhs = np.zeros((rhs.shape))
             if options['normalize']:
-                # Indices where the rhs is near zero or not near zero
-                idxs_nz = np.where(cs_safe.abs(rhs) < 2)
-                idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)
+                if rhs.shape == ():
+                    # Indices where the rhs is near zero or not near zero
+                    if cs_safe.abs(rhs) < 2:
+                        _scale_factor = 1.0 / (.25 * rhs ** 2 + 1)
+                        _dscale_drhs = -.5 * rhs / (.25 * rhs ** 2 + 1) ** 2
+                    elif cs_safe.abs(rhs) >= 2:
+                        _scale_factor = 1.0 / cs_safe.abs(rhs)
+                        _dscale_drhs = -np.sign(rhs) / rhs**2
+                else:
+                    # Indices where the rhs is near zero or not near zero
+                    idxs_nz = np.where(cs_safe.abs(rhs) < 2)
+                    idxs_nnz = np.where(cs_safe.abs(rhs) >= 2)
 
-                # scale factor that normalizes by the rhs, except near 0
-                _scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
-                _scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
+                    # scale factor that normalizes by the rhs, except near 0
+                    _scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
+                    _scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
-                _dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
-                _dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
+                    _dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
+                    _dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
 
             if options['use_mult']:
                 mult_name = options['mult_name']

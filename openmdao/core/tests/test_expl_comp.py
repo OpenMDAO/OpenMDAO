@@ -165,19 +165,21 @@ class ExplCompTestCase(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('p1', om.IndepVarComp('x', 12.0,
+                                                  shape=(),
                                                   lower=1.0, upper=100.0,
                                                   ref=1.1, ref0=2.1,
                                                   units='inch',
                                                   desc='indep x'))
         model.add_subsystem('p2', om.IndepVarComp('y', 1.0,
+                                                  shape=(),
                                                   lower=2.0, upper=200.0,
                                                   ref=1.2, res_ref=2.2,
                                                   units='ft',
                                                   desc='indep y'))
         model.add_subsystem('comp', om.ExecComp('z=x+y',
-                                                x={'val': 0.0, 'units': 'inch'},
-                                                y={'val': 0.0, 'units': 'inch'},
-                                                z={'val': 0.0, 'units': 'inch'}))
+                                                x={'val': 0.0, 'shape': (), 'units': 'inch'},
+                                                y={'val': 0.0, 'shape': (), 'units': 'inch'},
+                                                z={'val': 0.0, 'shape': (), 'units': 'inch'}))
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
@@ -227,7 +229,7 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "varname  val  ",
             "-------  -----",
-            "x        [12.]",
+            "x        12.0",
             "",
             "",
             "0 Implicit Output(s) in 'p1'",
@@ -262,8 +264,8 @@ class ExplCompTestCase(unittest.TestCase):
         inputs = prob.model.list_inputs(units=True, shape=True, prom_name=False, out_stream=stream)
         tol = 1e-7
         for actual, expected in zip(sorted(inputs), [
-            ('comp.x', {'val': [12.], 'shape': (1,), 'units': 'inch'}),
-            ('comp.y', {'val': [12.], 'shape': (1,), 'units': 'inch'})
+            ('comp.x', {'val': 12., 'shape': (), 'units': 'inch'}),
+            ('comp.y', {'val': 12., 'shape': (), 'units': 'inch'})
         ]):
             self.assertEqual(expected[0], actual[0])
             self.assertEqual(expected[1]['units'], actual[1]['units'])
@@ -273,13 +275,15 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue().split('\n')
         expected_text = [
             "2 Input(s) in 'model'",
-            "",
-            "varname  val    units  shape",
-            "-------  -----  -----  -----",
-            "comp",
-            "  x    [12.]  inch   (1,)",
-            "  y    [12.]  inch   (1,)"
-        ]
+            '', 'varname  val                 units  shape',
+            '-------  ------------------  -----  -----',
+            'comp',
+            '  x      12.0                inch   ()   ',
+            '  y      12.000000000000002  inch   ()   ',
+            '',
+            '',
+            '']
+
         for i, line in enumerate(expected_text):
             if line and not line.startswith('-'):
                 self.assertEqual(remove_whitespace(text[i]).replace('1L', ''), remove_whitespace(line))
@@ -304,30 +308,31 @@ class ExplCompTestCase(unittest.TestCase):
                                           out_stream=stream)
 
         self.assertEqual([
-            ('comp.z', {'val': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': '',
+            ('comp.z', {'val': 24., 'resids': [0.], 'units': 'inch', 'shape': (), 'desc': '',
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
-            ('p1.x', {'val': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': 'indep x',
+            ('p1.x', {'val': 12., 'resids': [0.], 'units': 'inch', 'shape': (), 'desc': 'indep x',
                       'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
-            ('p2.y', {'val': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,), 'desc': 'indep y',
+            ('p2.y', {'val': 1., 'resids': [0.], 'units': 'ft', 'shape': (), 'desc': 'indep y',
                       'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
         ], sorted(outputs))
 
         text = stream.getvalue().split('\n')
         expected_text = [
             "3 Explicit Output(s) in 'model'",
-            "",
-            "varname  val   resids  units  shape  lower  upper   ref  ref0  res_ref  desc",
-            "-------  ----  ------  -----  -----  -----  ------  ---  ----  -------  -------",
-            "p1",
-            "  x    [12.]  [0.]    inch   (1,)   [1.]   [100.]  1.1  2.1   1.1      indep x",
-            "p2",
-            "  y    [1.]   [0.]    ft     (1,)   [2.]   [200.]  1.2  0.0   2.2      indep y",
-            "comp",
-            "  z    [24.]  [0.]    inch   (1,)   None   None    1.0  0.0   1.0",
-            "",
-            "",
+            '',
+            'varname  val   resids  units  shape  lower  upper  ref  ref0  res_ref  desc   ',
+            '-------  ----  ------  -----  -----  -----  -----  ---  ----  -------  -------',
+            'p1', '  x      12.0  0.0     inch   ()     1.0    100.0  1.1  2.1   1.1      indep x',
+            'p2', '  y      1.0   0.0     ft     ()     2.0    200.0  1.2  0.0   2.2      indep y',
+            'comp',
+            '  z      24.0  0.0     inch   ()     None   None   1.0  0.0   1.0             ',
+            '',
+            '',
             "0 Implicit Output(s) in 'model'",
-        ]
+            '',
+            '',
+            '']
+
         for i, line in enumerate(expected_text):
             if line and not line.startswith('-'):
                 self.assertEqual(remove_whitespace(text[i]).replace('1L', ''), remove_whitespace(line))
@@ -373,11 +378,11 @@ class ExplCompTestCase(unittest.TestCase):
                                           print_arrays=False)
 
         self.assertEqual(sorted(outputs), [
-            ('comp.z', {'val': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+            ('comp.z', {'val': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1, ),
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
-            ('p1.x', {'val': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+            ('p1.x', {'val': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1, ),
                       'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
-            ('p2.y', {'val': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,),
+            ('p2.y', {'val': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1, ),
                       'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
         ])
 
@@ -741,8 +746,8 @@ class ExplCompTestCase(unittest.TestCase):
         class EComp(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('x', val=1)
-                self.add_output('y', val=1)
+                self.add_input('x', val=1, shape=())
+                self.add_output('y', val=1, shape=())
 
             def compute(self, inputs, outputs):
                 outputs['y'] = 2*inputs['x']
@@ -750,10 +755,10 @@ class ExplCompTestCase(unittest.TestCase):
         class IComp(om.ImplicitComponent):
 
             def setup(self):
-                self.add_input('y', val=1)
-                self.add_output('z1', val=1)
-                self.add_output('z2', val=1)
-                self.add_output('z3', val=1)
+                self.add_input('y', val=1, shape=())
+                self.add_output('z1', val=1, shape=())
+                self.add_output('z2', val=1, shape=())
+                self.add_output('z3', val=1, shape=())
 
             def solve_nonlinear(self, inputs, outputs):
                 # only solving z1 so that one specific residual goes to 0
@@ -778,27 +783,27 @@ class ExplCompTestCase(unittest.TestCase):
         stream = StringIO()
         p.model.list_outputs(residuals=True, prom_name=False, out_stream=stream)
 
-        expected_text = [
-            "1 Explicit Output(s) in 'model'",
-            "",
-            "varname  val   resids",
-            "-------  ----  ------",
-            "ec",
-            "  y      [2.]  [0.]  ",
-            "",
-            "",
-            "3 Implicit Output(s) in 'model'",
-            "",
-            "varname  val   resids",
-            "-------  ----  ------",
-            "ic",
-            "  z1     [4.]  [0.]  ",
-            "  z2     [1.]  [-3.] ",
-            "  z3     [1.]  [3.]  ",
-            "",
-            "",
-            "",
-        ]
+        expected_text = \
+"""1 Explicit Output(s) in 'model'
+
+varname  val  resids
+-------  ---  ------
+ec
+  y      2.0  0.0
+
+
+3 Implicit Output(s) in 'model'
+
+varname  val  resids
+-------  ---  ------
+ic
+  z1     4.0  0.0
+  z2     1.0  -3.0
+  z3     1.0  3.0
+
+
+
+""".split('\n')
 
         captured_output = stream.getvalue()
         for i, line in enumerate(captured_output.split('\n')):
@@ -811,21 +816,21 @@ class ExplCompTestCase(unittest.TestCase):
         # Note: Explicit output has 0 residual, so it should not be included.
         # Note: Implicit outputs Z2 and Z3 should both be shown, because the
         #       tolerance check uses the norm, which is always gives positive.
-        expected_text = [
-            "0 Explicit Output(s) in 'model'",
-            "",
-            "",
-            "2 Implicit Output(s) in 'model'",
-            "",
-            "varname  val   resids",
-            "-------  ----  ------",
-            "ic",
-              "z2     [1.]  [-3.]",
-              "z3     [1.]  [3.]",
-            "",
-            "",
-            "",
-        ]
+        expected_text = \
+"""0 Explicit Output(s) in 'model'
+
+
+2 Implicit Output(s) in 'model'
+
+varname  val  resids
+-------  ---  ------
+ic
+  z2     1.0  -3.0
+  z3     1.0  3.0
+
+
+
+""".split('\n')
 
         captured_output = stream.getvalue()
         for i, line in enumerate(captured_output.split('\n')):

@@ -14,8 +14,8 @@ class ParaboloidMatVec(Paraboloid):
     def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
         """Returns the product of the incoming vector with the Jacobian."""
 
-        x = inputs['x'][0]
-        y = inputs['y'][0]
+        x = inputs['x']
+        y = inputs['y']
 
         if mode == 'fwd':
             if 'x' in dinputs:

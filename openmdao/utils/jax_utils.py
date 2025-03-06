@@ -1296,25 +1296,45 @@ def to_compute_primal(inst, outfile='stdout', verbose=False):
 
 
 def _update_add_input_kwargs(self, name, **kwargs):
+    shape = kwargs.get('shape')
+    shape_by_conn = kwargs.get('shape_by_conn')
+    copy_shape = kwargs.get('copy_shape')
+    compute_shape = kwargs.get('compute_shape')
+    val = kwargs.get('val')
+
     # override Component.add_input for jax components to use shape_by_conn by default
     if self.options['derivs_method'] == 'jax':
         # for jax components, make shape_by_conn the default behavior if the shape isn't defined
-        if 'val' not in kwargs:
-            if (kwargs.get('shape') is None and kwargs.get('copy_shape') is None and
-                    kwargs.get('compute_shape') is None):
+        if val is None and shape is None:
+            if shape_by_conn is None and copy_shape is None and compute_shape is None:
                 kwargs['shape_by_conn'] = True
+
+    if shape is None and not (kwargs.get('shape_by_conn') or copy_shape or compute_shape):
+        if val is None or np.isscalar(val):
+            kwargs['shape'] = ()
 
     return kwargs
 
 
 def _update_add_output_kwargs(self, name, **kwargs):
+    shape = kwargs.get('shape')
+    shape_by_conn = kwargs.get('shape_by_conn')
+    copy_shape = kwargs.get('copy_shape')
+    compute_shape = kwargs.get('compute_shape')
+    val = kwargs.get('val')
+
     # override Component.add_output for jax components to use dynamic shaping by default
     if self.options['derivs_method'] == 'jax':
-        if 'val' not in kwargs:
-            if (kwargs.get('shape') is None and kwargs.get('copy_shape') is None and
-                    kwargs.get('compute_shape') is None):
+        if val is None and shape is None and copy_shape is None and compute_shape is None:
+            if shape is None and copy_shape is None and compute_shape is None:
                 # add our own compute_shape function
                 kwargs['compute_shape'] = self._get_compute_shape_func(name)
+
+    if shape is None and not (shape_by_conn or copy_shape or kwargs.get('compute_shape')):
+        if val is None or np.isscalar(val):
+            # default to a scalar if shape isn't provided in order to avoid jax shape errors,
+            # and for consistency do it even if derivs_method is not 'jax'
+            kwargs['shape'] = ()
 
     return kwargs
 

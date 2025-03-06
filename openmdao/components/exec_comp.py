@@ -435,12 +435,14 @@ class ExecComp(ExplicitComponent):
                                            "variable '%s', but shape of %s has been "
                                            "specified for the entire component." %
                                            (self.msginfo, vshape, varname, shape))
-                    elif vval is not None and np.atleast_1d(vval).shape != shape:
-                        raise RuntimeError("%s: value of shape %s has been specified for "
-                                           "variable '%s', but shape of %s has been "
-                                           "specified for the entire component." %
-                                           (self.msginfo, np.atleast_1d(vval).shape,
-                                            varname, shape))
+                    elif vval is not None:
+                        if (shape and np.atleast_1d(vval).shape != shape) or \
+                           (not shape and np.asarray(vval).shape != shape):
+                            raise RuntimeError("%s: value of shape %s has been specified for "
+                                               "variable '%s', but shape of %s has been "
+                                               "specified for the entire component." %
+                                               (self.msginfo, np.atleast_1d(vval).shape,
+                                                varname, shape))
                     else:
                         init_vals[varname] = np.ones(shape)
 
@@ -457,12 +459,14 @@ class ExecComp(ExplicitComponent):
                 if vshape is not None:
                     if varname not in init_vals:
                         init_vals[varname] = np.ones(vshape)
-                    elif np.atleast_1d(init_vals[varname]).shape != vshape:
+                    elif (vshape and np.atleast_1d(init_vals[varname]).shape != vshape) or \
+                         (vshape == () and np.asarray(init_vals[varname]).shape != vshape):
                         raise RuntimeError("%s: shape of %s has been specified for variable "
                                            "'%s', but a value of shape %s has been provided." %
                                            (self.msginfo, str(vshape), varname,
                                             str(np.atleast_1d(init_vals[varname]).shape)))
-                    del kwargs2[varname]['shape']
+                    if shape is not None:
+                        del kwargs2[varname]['shape']
             else:
                 init_vals[varname] = val
 
@@ -781,7 +785,8 @@ class ExecComp(ExplicitComponent):
             # combine lookup dicts for faster exec calls
             viewdict = self._indict.copy()
             viewdict.update(outdict)
-            viewdict.update(self._constants)
+            viewdict.update({n: (np.atleast_1d(v), np.isscalar(v))
+                             for n, v in self._constants.items()})
             self._viewdict = _ViewDict(viewdict)
 
     def compute(self, inputs, outputs):
@@ -1081,12 +1086,11 @@ class ExecComp(ExplicitComponent):
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
         inarr = self._inarray
-        indict = self._indict
         vdict = self._viewdict
 
         inarr[:] = self._inputs.asarray(copy=False)
 
-        for inp, ival in indict.items():
+        for inp, (ival, _) in self._indict.items():
             psize = ival.size
 
             if has_diag_partials or psize == 1:
@@ -1124,16 +1128,18 @@ class _ViewDict(object):
         self.dct = dct
 
     def __getitem__(self, name):
-        return self.dct[name]
+        val, is_scalar = self.dct[name]
+        return val[0] if is_scalar else val
 
     def __setitem__(self, name, value):
+        val, _ = self.dct[name]
         try:
-            self.dct[name][:] = value
+            val[:] = value
         except ValueError:
             # see if value fits if size 1 dimensions are removed
             sqz = np.squeeze(value)
-            if np.squeeze(self.dct[name]).shape == sqz.shape:
-                self.dct[name][:] = sqz
+            if np.squeeze(val).shape == sqz.shape:
+                val[:] = sqz
             else:
                 raise
 
@@ -1191,15 +1197,19 @@ class _IODict(object):
                 return self._constants[name]
 
     def __setitem__(self, name, value):
-        try:
-            self._outputs[name][:] = value
-        except ValueError:
-            # see if value fits if size 1 dimensions are removed
-            sqz = np.squeeze(value)
-            if np.squeeze(self._outputs[name]).shape == sqz.shape:
-                self._outputs[name][:] = sqz
-            else:
-                raise
+        oval = self._outputs[name]
+        if oval.shape == ():
+            self._outputs[name] = np.squeeze(value)
+        else:
+            try:
+                oval[:] = value
+            except ValueError:
+                # see if value fits if size 1 dimensions are removed
+                sqz = np.squeeze(value)
+                if np.squeeze(oval).shape == sqz.shape:
+                    oval[:] = sqz
+                else:
+                    raise
 
     def __contains__(self, name):
         return name in self._inputs or name in self._outputs or name in self._constants

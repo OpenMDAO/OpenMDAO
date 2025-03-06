@@ -608,7 +608,7 @@ class Component(System):
                             f"a '{type(compute_shape).__name__}' was given.")
 
         if shape_by_conn or copy_shape or compute_shape:
-            if shape is not None or ndim(val) > 0:
+            if shape or ndim(val) > 0:
                 raise ValueError("%s: If shape is to be set dynamically, 'shape' and 'val' should "
                                  "be a scalar, but shape of '%s' and val of '%s' was given for "
                                  "variable '%s'." % (self.msginfo, shape, val, name))

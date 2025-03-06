@@ -578,11 +578,16 @@ class BroydenSolver(NonlinearSolver):
                 if wrt_name in d_res:
                     d_wrt = d_res[wrt_name]
 
+                is_scalar = d_wrt.shape == ()
+
                 for j in range(j_wrt - i_wrt):
 
                     # Increment each variable.
                     if wrt_name in d_res:
-                        d_wrt[j] = 1.0
+                        if is_scalar:
+                            d_res[wrt_name] = 1.0
+                        else:
+                            d_wrt[j] = 1.0
 
                     # Solve for total derivatives.
                     ln_solver.solve('fwd')
@@ -593,7 +598,10 @@ class BroydenSolver(NonlinearSolver):
                         inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
 
                     if wrt_name in d_res:
-                        d_wrt[j] = 0.0
+                        if is_scalar:
+                            d_res[wrt_name] = 0.0
+                        else:
+                            d_wrt[j] = 0.0
         finally:
             # Enable local fd
             system._owns_approx_jac = approx_status
