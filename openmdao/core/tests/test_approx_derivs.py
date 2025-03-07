@@ -1991,10 +1991,10 @@ class TestComponentComplexStep(unittest.TestCase):
                     self.assertIn('<BAD SPARSITY>', lines[13])
                     self.assertIn("| y1            | x0             |", lines[13])
                 else:
-                    self.assertIn("comp: 'y1' wrt 'x0'", lines[52])
-                    self.assertIn("Sparsity excludes 1 entries which appear to be non-zero. (Magnitudes exceed 1e-16) *", lines[58])
-                    self.assertIn("Rows: [1]", lines[59])
-                    self.assertIn("Cols: [3]", lines[60])
+                    self.assertIn("comp: 'y1' wrt 'x0'", lines[58])
+                    self.assertIn("Sparsity excludes 1 entries which appear to be non-zero. (Magnitudes exceed 1e-16) *", lines[66])
+                    self.assertIn("Rows: [1]", lines[67])
+                    self.assertIn("Cols: [3]", lines[68])
 
 
 class ApproxTotalsFeature(unittest.TestCase):

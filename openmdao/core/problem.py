@@ -1283,7 +1283,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                     worst = wrst + (type(comp).__name__, comp.pathname)
 
         if worst is not None:
-            _, table_data, headers, col_meta,ctype, cpath = worst
+            _, table_data, headers, col_meta, ctype, cpath = worst
             print(file=out_stream)
             print(add_border(f"Sub Jacobian with Largest Tolerance Violation: {ctype} '{cpath}'",
                              '#'), file=out_stream)

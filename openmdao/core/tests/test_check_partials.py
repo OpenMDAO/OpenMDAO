@@ -964,9 +964,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertTrue('cs:' in lines[8],
+        self.assertTrue('cs:' in lines[10],
                         msg='Did you change the format for printing check derivs?')
-        self.assertTrue('fd:' in lines[22],
+        self.assertTrue('fd:' in lines[26],
                         msg='Did you change the format for printing check derivs?')
 
     def test_set_check_partial_options_invalid(self):
@@ -1168,7 +1168,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('>TOL'), 2)
+        self.assertEqual(stream.getvalue().count('>TOL'), 3)
 
     def test_check_partials_display_rev(self):
 
@@ -1193,9 +1193,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream, abs_err_tol=1.1e-6, compact_print=True)
 
         self.assertEqual(stream.getvalue().count('n/a'), 0)
-        self.assertEqual(stream.getvalue().count('rev'), 10)
+        self.assertEqual(stream.getvalue().count('rev'), 5)
         self.assertEqual(stream.getvalue().count('Component'), 2)
-        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 12) # counts rows (including headers)
+        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 10) # counts rows (including headers)
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
@@ -1254,7 +1254,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('rev'), 10)
+        self.assertEqual(stream.getvalue().count('rev'), 5)
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
@@ -1279,9 +1279,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('n/a'), 0)
-        self.assertEqual(stream.getvalue().count('rev'), 10)
+        self.assertEqual(stream.getvalue().count('rev'), 5)
         self.assertEqual(stream.getvalue().count('Component'), 2)
-        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 8)
+        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 6)
 
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)
@@ -1474,7 +1474,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         J = prob.check_partials(method='cs', out_stream=stream, compact_print=True)
         lines = stream.getvalue().splitlines()
 
-        entries = [s.strip() for s in lines[7].split('|') if s.strip()]
+        entries = [s.strip()[1:-1] for s in lines[7].split('|') if s.strip()]
         self.assertLessEqual(float(entries[10]), 0.0)
 
     def test_directional_mixed_matrix_free(self):
@@ -1763,7 +1763,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
 
         data = prob.check_partials(method='cs', out_stream=None)
-        
+
         # Comp1 and Comp3 are complex step, so have tighter tolerances.
         for key, c1 in data['comp1'].items():
             c2 = data['comp2'][key]
@@ -2820,8 +2820,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count(">TOL"), 2)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">TOL"), 3)
         self.assertEqual(contents.count("step"), 0)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
@@ -2831,7 +2831,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         # check cols
         self.assertEqual(tables[0][0].count('+'), 7)
         self.assertEqual(tables[1][0].count('+'), 7)
-        self.assertEqual(tables[2][0].count('+'), 6)
+        self.assertEqual(tables[2][0].count('+'), 7)
 
     def test_single_cs_step_compact(self):
         p = self.setup_model()
@@ -2840,8 +2840,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count(">TOL"), 2)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">TOL"), 3)
         self.assertEqual(contents.count("step"), 0)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
@@ -2851,7 +2851,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         # check cols
         self.assertEqual(tables[0][0].count('+'), 7)
         self.assertEqual(tables[1][0].count('+'), 7)
-        self.assertEqual(tables[2][0].count('+'), 6)
+        self.assertEqual(tables[2][0].count('+'), 7)
 
     def test_multi_fd_steps(self):
         p = self.setup_model()
@@ -2873,8 +2873,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count(">TOL"), 4)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">TOL"), 5)
         self.assertEqual(contents.count("step"), 3)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
@@ -2884,7 +2884,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         # check cols
         self.assertEqual(tables[0][0].count('+'), 8)
         self.assertEqual(tables[1][0].count('+'), 8)
-        self.assertEqual(tables[2][0].count('+'), 7)
+        self.assertEqual(tables[2][0].count('+'), 8)
 
     def test_multi_cs_steps_compact(self):
         p = self.setup_model()
@@ -2893,8 +2893,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count(">TOL"), 4)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">TOL"), 5)
         self.assertEqual(contents.count("step"), 3)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
@@ -2904,7 +2904,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         # check cols
         self.assertEqual(tables[0][0].count('+'), 8)
         self.assertEqual(tables[1][0].count('+'), 8)
-        self.assertEqual(tables[2][0].count('+'), 7)
+        self.assertEqual(tables[2][0].count('+'), 8)
 
     def test_multi_fd_steps_compact_directional(self):
         p = self.setup_model(directional=True)
@@ -2913,8 +2913,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count(">TOL"), 4)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">TOL"), 5)
         self.assertEqual(contents.count("step"), 3)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
@@ -2924,7 +2924,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         # check cols
         self.assertEqual(tables[0][0].count('+'), 8)
         self.assertEqual(tables[1][0].count('+'), 8)
-        self.assertEqual(tables[2][0].count('+'), 7)
+        self.assertEqual(tables[2][0].count('+'), 8)
 
 
 if __name__ == "__main__":

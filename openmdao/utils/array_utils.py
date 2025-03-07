@@ -1146,7 +1146,7 @@ def get_tol_violation(x, ref, atol=0.0, rtol=1e-5):
     """
     abs_error = np.abs(x - ref)
     if abs_error.size == 0:
-        return 0.0, (0, 0), False
+        return 0.0, (0, 0), False, 0.0, 0.0
 
     mixed_atol_rtol = atol + rtol * np.abs(ref)
     diff = abs_error - mixed_atol_rtol  # any values > 0 violate tolerance check

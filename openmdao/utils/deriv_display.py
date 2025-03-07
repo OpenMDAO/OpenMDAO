@@ -99,8 +99,8 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             wrt = f"(d){wrt}"
 
         tol_violations = derivative_info['tol violation']
-        abs_errs = derivative_info['abs_err']
-        rel_errs = derivative_info['rel_err']
+        abs_errs = derivative_info['abs error']
+        rel_errs = derivative_info['rel error']
         vals_at_max_err = derivative_info['vals_at_max_error']
         steps = derivative_info['steps']
 
@@ -268,8 +268,8 @@ def _print_tv(tol_violation):
         The formatted tolerance violation.
     """
     if tol_violation < 0:
-        return f'({tol_violation:.6g})'
-    return f'{tol_violation:.6g}'
+        return f'({tol_violation:.6e})'
+    return f'{tol_violation:.6e}'
 
 
 def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=False,
@@ -360,9 +360,9 @@ def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=Fal
         for tol_violation, abs_val, step in zip(tol_violations, vals_at_max_err, steps):
 
             err_desc = []
-            maxtv =  tol_violation.max(use_abs=False)
+            maxtv = tol_violation.max(use_abs=False)
             if maxtv > 0.:
-                err_desc.append(f'{maxtv: 1.6e}>TOL')
+                err_desc.append(f'{maxtv: .6e}>TOL')
             if inconsistent:
                 err_desc.append(' <RANK INCONSISTENT>')
             if 'uncovered_nz' in derivative_info:
@@ -489,7 +489,7 @@ def _print_deriv_table(table_data, headers, out_stream, tablefmt='grid', col_met
         Dict containing metadata keyed by column index.
     """
     if table_data and out_stream is not None:
-        num_col_meta = {'format': '{: 1.6e}'}
+        num_col_meta = {'format': '{: .6e}'}
         column_meta = [{}, {}]
         column_meta.extend([num_col_meta.copy() for _ in range(len(headers) - 3)])
         column_meta.append({})

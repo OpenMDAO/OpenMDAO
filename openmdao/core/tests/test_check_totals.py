@@ -419,9 +419,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Make sure auto-ivc sources are translated to promoted input names.
         self.assertTrue('x' in lines[4])
 
-        self.assertTrue('-9.80614' in lines[7], "'-9.80614' not found in '%s'" % lines[5])
-        self.assertTrue('-9.80614' in lines[8], "'-9.80614' not found in '%s'" % lines[6])
-        self.assertTrue('cs:None' in lines[8], "'cs:None not found in '%s'" % lines[6])
+        self.assertTrue('-9.80614' in lines[9], "'-9.80614' not found in '%s'" % lines[9])
+        self.assertTrue('-9.80614' in lines[10], "'-9.80614' not found in '%s'" % lines[10])
+        self.assertTrue('cs:None' in lines[10], "'cs:None not found in '%s'" % lines[10])
 
         assert_near_equal(totals['con2', 'x']['J_fwd'], [[0.09692762]], 1e-5)
         assert_near_equal(totals['con2', 'x']['J_fd'], [[0.09692762]], 1e-5)
@@ -501,8 +501,8 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue('1.000' in lines[7])
-        self.assertTrue('1.000' in lines[8])
+        self.assertTrue('1.000' in lines[9])
+        self.assertTrue('1.000' in lines[10])
         self.assertFalse(lines[6].strip().endswith('*'))
 
         assert_near_equal(totals['x', 'x']['J_fwd'], [[1.0]], 1e-5)
@@ -2043,7 +2043,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+------------------------+------------+"), nsubjacs + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+---------------+---------------+------------------------+-------------------+"), nsubjacs + 1)
 
     def test_single_cs_step_compact(self):
         for mode in ('fwd', 'rev'):
@@ -2057,7 +2057,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+------------------------+------------+"), nsubjacs + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+---------------+---------------+------------------------+------------+"), nsubjacs + 1)
 
     def test_multi_fd_steps_fwd(self):
         p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
@@ -2121,7 +2121,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+-------------+------------------------+------------+"), (nsubjacs*2) + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+---------------+---------------+---------------+------------------------+------------+"), (nsubjacs*2) + 1)
 
     def test_multi_cs_steps_compact(self):
         for mode in ('fwd', 'rev'):
@@ -2135,7 +2135,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-----------------------------+----------------+-------------+-------------+-------------+------------------------+------------+"), (nsubjacs*2) + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+---------------+---------------+---------------+------------------------+------------+"), (nsubjacs*2)+1)
 
     def test_multi_fd_steps_compact_directional(self):
         expected_divs = {

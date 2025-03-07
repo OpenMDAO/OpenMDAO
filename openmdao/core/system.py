@@ -7086,8 +7086,8 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, ato
     derivative_info['tol violation'] = []
     derivative_info['magnitude'] = []
     derivative_info['vals_at_max_error'] = []
-    derivative_info['abs_err'] = []
-    derivative_info['rel_err'] = []
+    derivative_info['abs error'] = []
+    derivative_info['rel error'] = []
     derivative_info['steps'] = []
 
     abs_mags = _MagnitudeData()
@@ -7159,14 +7159,9 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, ato
         derivative_info['tol violation'].append(errs)
         derivative_info['magnitude'].append(abs_mags)
         derivative_info['vals_at_max_error'].append(err_vals)
-        derivative_info['abs_err'].append(abs_errs)
-        derivative_info['rel_err'].append(rel_errs)
+        derivative_info['abs error'].append(abs_errs)
+        derivative_info['rel error'].append(rel_errs)
         derivative_info['steps'].append(step)
-
-    # for backward compatibility, keep 'abs error' around
-    derivative_info['abs error'] = _abs_from_tol_violation(derivative_info['tol violation'],
-                                                           derivative_info['vals_at_max_error'],
-                                                           atol, rtol)
 
     return above_tol
 
