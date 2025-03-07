@@ -309,6 +309,10 @@ class Case(object):
             abs_name = prom2abs['input'][name][0]
             return meta[self._conns[abs_name]]['units']
 
+        elif name in self._var_info:
+            # This can happen if name is an alias.
+            return self._var_info[name]['units']
+
         raise KeyError('Variable name "{}" not found.'.format(name))
 
     def get_design_vars(self, scaled=True, use_indices=True):

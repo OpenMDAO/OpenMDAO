@@ -4,6 +4,7 @@ import pathlib
 import sys
 import unittest
 import itertools
+import tempfile
 
 from io import StringIO
 import numpy as np
@@ -19,7 +20,7 @@ import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
 from openmdao.utils.om_warnings import DerivativesWarning, OMDeprecationWarning, OpenMDAOWarning
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
-from openmdao.utils.file_utils import get_work_dir
+from openmdao.utils.file_utils import _get_work_dir
 from openmdao.utils.tests.test_hooks import hooks_active
 
 try:
@@ -1880,6 +1881,49 @@ class TestProblem(unittest.TestCase):
         # make sure the deprecated function still returns tha data
         self.assertEqual(set(prob_vars.keys()), {'constraints', 'design_vars', 'objectives'})
 
+    def test_list_driver_vars_bounds_bug(self):
+
+        model = SellarDerivatives()
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob = om.Problem(model)
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]), scaler=2.0)
+        model.add_objective('obj', scaler=0.1)
+        model.add_constraint('con1', upper=1.0, scaler=7.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        info =  prob.list_driver_vars(
+            driver_scaling=False,
+            desvar_opts=['lower', 'upper', 'scaler', 'adder'],
+            cons_opts=['lower', 'upper', 'scaler', 'adder'],
+            objs_opts=['scaler', 'adder'],
+        )
+
+        upper = info['design_vars'][0][1]['upper']
+        assert_near_equal(upper, np.array([10., 10.]))
+
+        upper = info['constraints'][0][1]['upper']
+        assert_near_equal(upper, 1.0)
+
+        info =  prob.list_driver_vars(
+            driver_scaling=False,
+            desvar_opts=['lower', 'upper', 'scaler', 'adder'],
+            cons_opts=['lower', 'upper', 'scaler', 'adder'],
+            objs_opts=['scaler', 'adder'],
+        )
+
+        upper = info['design_vars'][0][1]['upper']
+        assert_near_equal(upper, np.array([10., 10.]))
+
+        upper = info['constraints'][0][1]['upper']
+        assert_near_equal(upper, 1.0)
+
     def test_list_driver_vars_before_final_setup(self):
         prob = om.Problem()
         prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
@@ -2233,6 +2277,28 @@ class TestProblem(unittest.TestCase):
         except RuntimeError:
             self.fail("'setup raised RuntimeError unexpectedly")
 
+    def test_set_work_dir(self):
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            prob = om.Problem(name='prob_name', work_dir=temp_dir_name)
+            model = prob.model
+
+            model.add_subsystem('comp', Paraboloid())
+
+            model.set_input_defaults('comp.x', 3.0)
+            model.set_input_defaults('comp.y', -4.0)
+
+            with self.assertRaises(RuntimeError) as e:
+                prob.get_outputs_dir()
+
+            self.assertEqual('The output directory cannot be accessed before setup.',
+                            str(e.exception))
+
+            prob.setup()
+
+            d = prob.get_outputs_dir('subdir')
+            self.assertEqual(str(pathlib.Path(temp_dir_name, 'prob_name_out', 'subdir')), str(d))
+
     def test_get_outputs_dir(self):
 
         prob = om.Problem(name='prob_name')
@@ -2252,7 +2318,7 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         d = prob.get_outputs_dir('subdir')
-        self.assertEqual(str(pathlib.Path(get_work_dir(), 'prob_name_out', 'subdir')), str(d))
+        self.assertEqual(str(pathlib.Path(_get_work_dir(), 'prob_name_out', 'subdir')), str(d))
 
     def test_duplicate_prob_name(self):
 

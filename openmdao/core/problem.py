@@ -6,6 +6,7 @@ import shutil
 import sys
 import pprint
 import os
+from copy import deepcopy
 import weakref
 import pathlib
 import textwrap
@@ -54,7 +55,7 @@ from openmdao.utils.general_utils import pad_name, _find_dict_meta, env_truthy, 
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.file_utils import _get_outputs_dir, text2html, get_work_dir
+from openmdao.utils.file_utils import _get_outputs_dir, text2html, _get_work_dir
 from openmdao.utils.testing_utils import _fix_comp_check_data
 
 try:
@@ -264,8 +265,11 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
+        default_workdir = options['work_dir'] if 'work_dir' in options else _get_work_dir()
+        self.options.declare('work_dir', default=default_workdir,
+                             desc='Working directory for the problem.')
         self.options.declare('coloring_dir', types=str,
-                             default=os.path.join(get_work_dir(), 'coloring_files'),
+                             default=os.path.join(default_workdir, 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.declare('group_by_pre_opt_post', types=bool,
                              default=False,
@@ -962,6 +966,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             'name': self._name,  # the name of this Problem
             'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
+            'work_dir': pathlib.Path(self.options['work_dir']),
             'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for input coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
@@ -1037,7 +1042,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         # from a previous run.
         # Start setup by deleting any existing reports so that the files
         # that are in that directory are all from this run and not a previous run
-        reports_dirpath = self.get_reports_dir(force=False)
+        reports_dirpath = self.get_reports_dir()
         if not MPI or (self.comm is not None and self.comm.rank == 0):
             if os.path.isdir(reports_dirpath):
                 try:
@@ -1045,7 +1050,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                 except FileNotFoundError:
                     # Folder already removed by another proccess
                     pass
-        self._metadata['reports_dir'] = self.get_reports_dir(force=False)
+        self._metadata['reports_dir'] = self.get_reports_dir()
 
         try:
             model._setup(model_comm, self._metadata)
@@ -1835,7 +1840,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         desvars = self.driver._designvars
         vals = self.driver.get_design_var_values(get_remote=True, driver_scaling=driver_scaling)
         if not driver_scaling:
-            desvars = desvars.copy()
+            desvars = deepcopy(desvars)
             for meta in desvars.values():
                 scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
                 adder = meta['adder'] if meta.get('adder') is not None else 0.
@@ -1863,7 +1868,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         cons = self.driver._cons
         vals = self.driver.get_constraint_values(driver_scaling=driver_scaling)
         if not driver_scaling:
-            cons = cons.copy()
+            cons = deepcopy(cons)
             for meta in cons.values():
                 scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
                 adder = meta['adder'] if meta.get('adder') is not None else 0.
@@ -2203,7 +2208,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             checks = sorted(_all_non_redundant_checks)
 
         if logger is None and checks:
-            check_file_path = None if out_file is None else str(self.get_outputs_dir() / out_file)
+            if out_file is None:
+                check_file_path = None
+            else:
+                check_file_path = str(self.get_outputs_dir(mkdir=True) / out_file)
             logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         for c in checks:
@@ -2268,7 +2276,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return self.get_outputs_dir('reports', mkdir=force or len(self._reports) > 0)
 
-    def get_outputs_dir(self, *subdirs, mkdir=True):
+    def get_outputs_dir(self, *subdirs, mkdir=False):
         """
         Get the path under which all output files of this problem are to be placed.
 
@@ -2563,7 +2571,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                     coloring = \
                         coloring_mod.dynamic_total_coloring(
                             self.driver, run_model=do_run,
-                            fname=self.driver._get_total_coloring_fname(mode='output'),
+                            fname=self.model.get_coloring_fname(mode='output'),
                             of=of, wrt=wrt)
             else:
                 return coloring_info.coloring
