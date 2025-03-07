@@ -184,6 +184,7 @@ class TestGroup(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'double_promote_conns':"
@@ -214,6 +215,7 @@ class TestGroup(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
         self.assertEqual(cm.exception.args[0], f"{p.model.msginfo}: Absolute variable name 'g1.g3.c1.x'"
                                                " is masked by a matching promoted name. Try"
                                                " promoting to a different name. This can be caused"
@@ -232,6 +234,8 @@ class TestGroup(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
+
         self.assertEqual(cm.exception.args[0], f"{p.model.msginfo}: Absolute variable name 'g1.g3.c1.y'"
                                                " is masked by a matching promoted name. Try"
                                                " promoting to a different name. This can be caused"
@@ -489,6 +493,7 @@ class TestGroup(unittest.TestCase):
         msg = r"Output name 'y' refers to multiple outputs: \['G1.C1.y', 'G1.C2.y'\]."
         with self.assertRaisesRegex(Exception, msg):
             prob.setup()
+            prob.final_setup()
 
     def test_required_connection_input_unconnected(self):
         class RequiredConnComp(om.ExplicitComponent):
@@ -499,7 +504,7 @@ class TestGroup(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = 2 * inputs['x']
 
-        p = om.Problem()
+        p = om.Problem(name='test_required_connection_input_unconnected')
         p.model.add_subsystem('comp', RequiredConnComp())
         p.setup()
 
@@ -507,7 +512,8 @@ class TestGroup(unittest.TestCase):
             p.final_setup()
 
         self.assertEqual(str(cm.exception),
-                         '<model> <class Group>: Input "comp.x" requires a connection but is not connected.')
+                         '\nCollected errors for problem \'test_required_connection_input_unconnected\':\n'
+                            '   <model> <class Group>: Input "comp.x" requires a connection but is not connected.')
 
     def test_required_connection_promoted_input_unconnected(self):
         class RequiredConnComp(om.ExplicitComponent):
@@ -518,7 +524,7 @@ class TestGroup(unittest.TestCase):
             def compute(self, inputs, outputs):
                 outputs['y'] = 2 * inputs['x']
 
-        p = om.Problem()
+        p = om.Problem(name='test_required_connection_promoted_input_unconnected')
         p.model.add_subsystem('comp', RequiredConnComp(), promotes=['*'])
         p.setup()
 
@@ -526,7 +532,8 @@ class TestGroup(unittest.TestCase):
             p.final_setup()
 
         self.assertEqual(str(cm.exception),
-                         '<model> <class Group>: Input "comp.x", promoted as "x", requires a connection but is not connected.')
+                         '\nCollected errors for problem \'test_required_connection_promoted_input_unconnected\':\n'
+                         '   <model> <class Group>: Input "comp.x", promoted as "x", requires a connection but is not connected.')
 
     def test_required_connection_desvar(self):
         class RequiredConnComp(om.ExplicitComponent):
@@ -628,11 +635,10 @@ class TestGroup(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(context.exception),
-           "\nCollected errors for problem 'src_indices_error':"
-           "\n   'phase' <class Phase>: src_indices shape (1,) does not match phase.comp2.x "
-           "shape (1, 2).")
+           "\nCollected errors for problem 'src_indices_error':\n   'phase' <class Phase>: src_indices shape (1,) does not match phase.comp2.x shape (1, 2).")
 
     def test_connect_to_flat_array_with_slice(self):
         class SlicerComp(om.ExplicitComponent):
@@ -1488,8 +1494,9 @@ class TestGroup(unittest.TestCase):
         model.connect('C2.y', 'C3.x')
         model.options['auto_order'] = True
 
-        with assert_warning(om.OpenMDAOWarning, "<model> <class Group>: A new execution order ['_auto_ivc', 'C1', 'C2', 'C3'] is recommended, but auto ordering has been disabled because the Problem option 'allow_post_setup_reorder' is False. It is recommended to either set `allow_post_setup_reorder` to True or to manually set the execution order to the recommended order using `set_order`."):
+        with assert_warning(om.OpenMDAOWarning, "<model> <class Group>: A new execution order ['C1', 'C2', 'C3'] is recommended, but auto ordering has been disabled because the Problem option 'allow_post_setup_reorder' is False. It is recommended to either set `allow_post_setup_reorder` to True or to manually set the execution order to the recommended order using `set_order`."):
             p.setup()
+            p.final_setup()
 
     def test_auto_order2(self):
         p = om.Problem()
@@ -1522,6 +1529,7 @@ class TestGroup(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
                          "\nCollected errors for problem 'promote_units_and_none':\n   "
@@ -1568,6 +1576,7 @@ class TestGroup(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'input_defaults_promotes_error':"
@@ -1589,6 +1598,7 @@ class TestGroup(unittest.TestCase):
         model.set_input_defaults('bad_name', 3.0)
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         msg = ("\nCollected errors for problem 'set_input_def_key_error':\n"
                "   <model> <class Group>: The following group inputs, passed to set_input_defaults(), could not be found: ['bad_name'].")
@@ -1620,6 +1630,7 @@ class TestGroup(unittest.TestCase):
             model.set_input_defaults('x', val=[1.0, 1.0], src_shape=(2,))
 
         prob.setup()
+        prob.final_setup()
 
         np.testing.assert_array_equal(prob['x'], np.ones(2))
 
@@ -1648,6 +1659,7 @@ class TestGroup(unittest.TestCase):
         model.set_input_defaults('x', val=1.0, src_shape=(2,))
 
         prob.setup()
+        prob.final_setup()
 
         np.testing.assert_array_equal(prob['x'], np.ones(2))
 
@@ -1688,6 +1700,7 @@ class TestGroup(unittest.TestCase):
         p.model.add_subsystem('G1', MyGroup(), promotes_inputs=['x'])
 
         p.setup()
+        p.final_setup()
 
         np.testing.assert_array_equal(p['x'], np.ones(5))
 
@@ -1923,6 +1936,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as context:
             top.setup()
+            top.final_setup()
 
         self.assertEqual(str(context.exception),
             "\nCollected errors for problem 'alias_from_parent':"
@@ -2098,6 +2112,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             top.setup()
+            top.final_setup()
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'promotes_bad_spec':"
@@ -2117,6 +2132,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             top.setup()
+            top.final_setup()
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'src_indices_bad_type':"
@@ -2136,6 +2152,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             top.setup()
+            top.final_setup()
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'promotes_src_indices_bad_dtype':"
@@ -2157,6 +2174,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'src_indices_bad_shape':"
@@ -2284,6 +2302,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'src_indices_wildcard_output':"
@@ -2317,6 +2336,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'promotes_src_indices_collision':"
@@ -2443,6 +2463,7 @@ class TestConnect(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(context.exception),
            "\nCollected errors for problem 'invalid_source':"
@@ -2462,6 +2483,7 @@ class TestConnect(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2476,6 +2498,7 @@ class TestConnect(unittest.TestCase):
         p.model.sub.connect('tgt.x', 'cmp.x')
         with self.assertRaises(Exception) as context:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2503,6 +2526,7 @@ class TestConnect(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2528,6 +2552,7 @@ class TestConnect(unittest.TestCase):
 
         with self.assertRaises(Exception) as ctx:
             prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(ctx.exception), msg)
 
@@ -2545,9 +2570,11 @@ class TestConnect(unittest.TestCase):
 
         with assert_warning(UserWarning, msg):
             prob.setup()
+            prob.final_setup()
 
         with assert_warning(UserWarning, msg):
             prob.setup()
+            prob.final_setup()
 
     def test_connect_incompatible_units(self):
         msg = "\nCollected errors for problem 'connect_incompatible_units':" + \
@@ -2565,6 +2592,7 @@ class TestConnect(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2584,6 +2612,7 @@ class TestConnect(unittest.TestCase):
 
         with assert_warning(UserWarning, msg):
             prob.setup()
+            prob.final_setup()
 
         prob.run_model()
 
@@ -2602,6 +2631,7 @@ class TestConnect(unittest.TestCase):
 
         with assert_warning(UserWarning, msg):
             prob.setup()
+            prob.final_setup()
 
         prob.run_model()
 
@@ -2664,6 +2694,7 @@ class TestConnect(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2681,6 +2712,7 @@ class TestConnect(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(context.exception), msg)
 
@@ -2694,6 +2726,7 @@ class TestConnect(unittest.TestCase):
               "indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
         try:
             p.setup()
+            p.final_setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
@@ -2711,6 +2744,7 @@ class TestConnect(unittest.TestCase):
 
         try:
             p.setup()
+            p.final_setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
@@ -2749,6 +2783,7 @@ class TestSrcIndices(unittest.TestCase):
                                 name='src_indices_shape_bad_idx_flat')
         try:
             p.setup()
+            p.final_setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
@@ -2764,6 +2799,7 @@ class TestSrcIndices(unittest.TestCase):
               " index 9 is out of bounds for source dimension of size 9."
         try:
             p.setup()
+            p.final_setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
@@ -2778,6 +2814,7 @@ class TestSrcIndices(unittest.TestCase):
                                 name='src_indices_shape_bad_idx_flat_neg')
         try:
             p.setup()
+            p.final_setup()
         except Exception as err:
             self.assertEqual(str(err), msg)
         else:
@@ -2795,6 +2832,7 @@ class TestSrcIndices(unittest.TestCase):
 
         with self.assertRaises(Exception) as err:
             p.setup()
+            p.final_setup()
 
         expected_error_msg = "\nCollected errors for problem 'slice_with_ellipsis_error_in_connect':" + \
             "\n   <model> <class Group>: When connecting 'indep.x' to 'row4_comp.x': index 4 is out " + \
@@ -2884,6 +2922,7 @@ class TestGroupAddInput(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'missing_diff_units':"
@@ -2902,6 +2941,7 @@ class TestGroupAddInput(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'missing_diff_vals':"
@@ -2928,6 +2968,7 @@ class TestGroupAddInput(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'conflicting_units':"
@@ -2957,6 +2998,7 @@ class TestGroupAddInput(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'conflicting_units_multi_level':"
@@ -3086,6 +3128,7 @@ class TestGroupAddInput(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'conflicting_units_multi_level_par':"
@@ -3116,6 +3159,7 @@ class TestGroupAddInput(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'group_input_not_found':"
@@ -3150,6 +3194,7 @@ class TestGroupAddInput(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'conflicting_val':"
@@ -3234,8 +3279,9 @@ class TestGroupAddInput(unittest.TestCase):
             "   <model> <class Group>: Cannot set 'src_shape=(1,)' for discrete variable 'square.material'.",
         ]
 
+        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.setup()
+            p.final_setup()
 
         err_msgs = cm.exception.args[0].split('\n')
         for err_msg in expect_errors:
@@ -3682,6 +3728,7 @@ class TestFeatureAddSubsystem(unittest.TestCase):
                          promotes_inputs=['a'])
         g1.set_input_defaults('a', val=3.5)
         p.setup()
+        p.final_setup()
 
         # output G1.comp1.b is promoted
         self.assertEqual(p.get_val('G1.b'), 6.0)
@@ -4085,6 +4132,8 @@ class TestFeatureConfigure(unittest.TestCase):
         p.model.add_subsystem('C2', om.ExecComp('y=3*x'), promotes_inputs=['x'])
 
         p.setup()
+        p.final_setup()
+
         self.assertEqual(p['x'], 99.)
 
     def test_configure_add_input_output(self):
@@ -4351,6 +4400,7 @@ class TestNaturalNaming(unittest.TestCase):
         g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
         g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
         p.setup()
+        p.final_setup()
 
         full_in = 'g1.g2.g3.g4.c1.x'
         full_out = 'g1.g2.g3.g4.c1.y'
@@ -4435,6 +4485,7 @@ class TestNaturalNamingMPI(unittest.TestCase):
         g4a.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
 
         p.setup()
+        p.final_setup()
 
         for gtop in ['par.g1', 'par.g1a']:
             full_in = f'{gtop}.g2.g3.g4.c1.x'

@@ -29,6 +29,8 @@ class _SetupStatus(IntEnum):
         Configure has been called.
     POST_SETUP : int
         The `setup` method has been called, but vectors not initialized.
+    POST_SETUP2 : int
+        The `setup_part2` method has been called, vectors not initialized.
     POST_FINAL_SETUP : int
         The `final_setup` has been run, everything ready to run.
     """
@@ -36,7 +38,8 @@ class _SetupStatus(IntEnum):
     PRE_SETUP = 0
     POST_CONFIGURE = 1
     POST_SETUP = 2
-    POST_FINAL_SETUP = 3
+    POST_SETUP2 = 3
+    POST_FINAL_SETUP = 4
 
 
 class _ReprClass(object):

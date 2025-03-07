@@ -30,7 +30,7 @@ def _reset_all_hooks():
     _hooks = {}
 
 
-def _hook_meta_factory(pass_args, pass_return):
+def _hook_class_factory(pass_args, pass_return):
     """
     Return classes for hook functions that accept different arguments.
 
@@ -80,8 +80,7 @@ class _HookMeta(object):
         If True, pass the return value to the hook function.  Only valid for post hooks.
     predicate : function or None
         If not None, a function that will be called to determine if the hook should run. The
-        function should take the instance as its only argument, returning True if the hook should
-        run.
+        function returns True if the hook should run.
     **reg_kwargs : dict of keyword arguments
         Keyword arguments specified at registration time that will be passed to the hook function.
 
@@ -486,7 +485,7 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
         pre_hook = None
     else:
         pre_exit = exit if post is None else False
-        klass = _hook_meta_factory(pass_args, False)
+        klass = _hook_class_factory(pass_args, False)
         pre_hook = klass(class_name, inst_id, pre, ncalls=ncalls, exit=pre_exit,
                          pass_args=pass_args, pass_return=pass_return,
                          predicate=predicate, **kwargs)
@@ -494,7 +493,7 @@ def _register_hook(fname, class_name, inst_id=None, pre=None, post=None, ncalls=
     if post is None:
         post_hook = None
     else:
-        klass = _hook_meta_factory(pass_args, pass_return)
+        klass = _hook_class_factory(pass_args, pass_return)
         post_hook = klass(class_name, inst_id, post, ncalls=ncalls, exit=exit,
                           pass_args=pass_args, pass_return=pass_return,
                           predicate=predicate, **kwargs)

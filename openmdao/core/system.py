@@ -5140,10 +5140,6 @@ class System(object, metaclass=SystemMetaclass):
 
         self._rec_mgr.append(recorder)
 
-        if recurse:
-            for s in self.system_iter(include_self=False, recurse=recurse):
-                s._rec_mgr.append(recorder)
-
     def record_iteration(self):
         """
         Record an iteration of the current System.
@@ -5670,6 +5666,16 @@ class System(object, metaclass=SystemMetaclass):
                 abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
             else:
                 abs_name = abs_names[0]
+
+            if not has_vectors:
+                has_dyn_shape = []
+                for n in abs_names:
+                    if n in all_meta['input']:
+                        m = all_meta['input'][n]
+                        if 'shape_by_conn' in m and m['shape_by_conn']:
+                            has_dyn_shape.append(True)
+                    else:
+                        has_dyn_shape.append(False)
         else:
             raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
 
@@ -5716,10 +5722,10 @@ class System(object, metaclass=SystemMetaclass):
                         ivalue = model.convert_units(name, value, units, gunits)
                     value = model.convert_from_units(src, value, units)
                 set_units = sunits
-        else:
+        else:  # setting an output or an unconnected input
             src = abs_name
             if units is not None:
-                value = model.convert_from_units(abs_name, value, units)
+                value = model.convert_from_units(abs_name, np.asarray(value), units)
                 try:
                     set_units = all_meta['output'][abs_name]['units']
                 except KeyError:  # this can happen if a component is the top level System
@@ -5735,7 +5741,7 @@ class System(object, metaclass=SystemMetaclass):
                     if _is_slicer_op(indices):
                         try:
                             ic_cache[abs_name] = (value[indices], set_units, self.pathname, name)
-                        except IndexError:
+                        except (IndexError, TypeError):
                             cval[indices] = value
                             ic_cache[abs_name] = (cval, set_units, self.pathname, name)
                     else:
@@ -5745,6 +5751,14 @@ class System(object, metaclass=SystemMetaclass):
                     raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
             else:
                 ic_cache[abs_name] = (value, set_units, self.pathname, name)
+
+            for n, dyn in zip(abs_names, has_dyn_shape):
+                if dyn:
+                    val = ic_cache[abs_name][0]
+                    shape = () if np.isscalar(val) else val.shape
+                    all_meta['input'][n]['shape'] = shape
+                    if n in loc_meta['input']:
+                        loc_meta['input'][n]['shape'] = shape
         else:
             myrank = model.comm.rank
 
