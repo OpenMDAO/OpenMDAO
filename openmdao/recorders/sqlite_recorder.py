@@ -176,7 +176,7 @@ class SqliteRecorder(CaseRecorder):
         self._pickle_version = pickle_version
         self._filepath = str(filepath)
 
-        self._use_outputs_dir = not (os.path.sep in str(filepath) or '/' in str(filepath))
+        self._use_outputs_dir = not (os.path.sep in self._filepath or '/' in self._filepath)
 
         self._database_initialized = False
         self._started = set()
@@ -193,6 +193,7 @@ class SqliteRecorder(CaseRecorder):
             The communicator for the recorder (should be the comm for the Problem).
         """
         filepath = None
+        self.connection = self.metadata_connection = None
 
         if MPI and comm and comm.size > 1:
             if self._record_on_proc:
@@ -351,7 +352,7 @@ class SqliteRecorder(CaseRecorder):
                              ': {0}'.format(recording_requester))
 
         if self._use_outputs_dir:
-            self._filepath = system.get_outputs_dir() / self._filepath
+            self._filepath = system.get_outputs_dir(mkdir=True) / self._filepath
 
         if not self._database_initialized:
             self._initialize_database(comm)

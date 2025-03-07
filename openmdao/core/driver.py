@@ -1492,13 +1492,13 @@ class Driver(object, metaclass=DriverMetaclass):
                 if isinstance(static, str):
                     fname = static
                 else:
-                    fname = self._get_total_coloring_fname(mode='input')
+                    fname = self.get_coloring_fname(mode='input')
 
                 print(f"loading total coloring from file {fname}")
                 coloring = info.coloring = coloring_mod.Coloring.load(fname)
                 info.update(coloring._meta)
 
-                ofname = self._get_total_coloring_fname(mode='output')
+                ofname = self.get_coloring_fname(mode='output')
                 if ((model._full_comm is not None and model._full_comm.rank == 0) or
                         (model._full_comm is None and model.comm.rank == 0)):
                     coloring.save(ofname)
@@ -1518,8 +1518,21 @@ class Driver(object, metaclass=DriverMetaclass):
 
         return coloring
 
-    def _get_total_coloring_fname(self, mode='output'):
-        return self._problem().get_coloring_dir(mode='output') / 'total_coloring.pkl'
+    def get_coloring_fname(self, mode='output'):
+        """
+        Get the filename for the coloring file.
+
+        Parameters
+        ----------
+        mode : str
+            'input' or 'output'.
+
+        Returns
+        -------
+        str
+            The filename for the coloring file.
+        """
+        return self._problem().model.get_coloring_fname(mode)
 
     def scaling_report(self, outfile='driver_scaling_report.html', title=None, show_browser=True,
                        jac=True):
@@ -1661,7 +1674,7 @@ class Driver(object, metaclass=DriverMetaclass):
                               "already been computed.")
 
             if self._coloring_info.dynamic and self._coloring_info.do_compute_coloring():
-                ofname = self._get_total_coloring_fname(mode='output')
+                ofname = self.get_coloring_fname(mode='output')
                 self._coloring_info.coloring = \
                     coloring_mod.dynamic_total_coloring(self,
                                                         run_model=run_model,

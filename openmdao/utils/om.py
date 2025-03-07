@@ -108,22 +108,15 @@ def _view_connections_cmd(options, user_args):
         view_connections(prob, outfile=options.outfile, show_browser=not options.no_browser,
                          show_values=options.show_values, title=title)
 
-    # register the hook
-    if options.show_values:
-        funcname = 'final_setup'
-    else:
-        funcname = 'setup'
-
     def _view_model_w_errors(prob):
         if prob._metadata['saved_errors']:
-            # run the viewer here if we've had setup errors. Normally we'd wait until
-            # after setup or final_setup.
             _viewconns(prob)
             # errors will result in exit at the end of the _check_collected_errors method
 
+    # register the hooks
     hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
-    hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_viewconns,
-                         exit=True)
+    hooks._register_hook('final_setup', 'Problem', inst_id=options.problem,
+                         post=_viewconns, exit=True)
 
     _load_and_exec(options.file[0], user_args)
 
@@ -440,7 +433,7 @@ def _cite_cmd(options, user_args):
         if not MPI or MPI.COMM_WORLD.rank == 0:
             print_citations(prob, classes=options.classes, out_stream=out)
 
-    hooks._register_hook('setup', 'Problem', post=_cite, exit=True)
+    hooks._register_hook('final_setup', 'Problem', post=_cite, exit=True)
     _load_and_exec(options.file[0], user_args)
 
 

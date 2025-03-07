@@ -142,8 +142,8 @@ class CmdlineTestCase(unittest.TestCase):
                 p2.setup()
                 p2.run_model()
 
-                p1_outdir = os.path.basename(str(p1.get_outputs_dir()))
-                p2_outdir = os.path.basename(str(p2.get_outputs_dir()))
+                p1_outdir = os.path.basename(str(p1.get_outputs_dir(mkdir=True)))
+                p2_outdir = os.path.basename(str(p2.get_outputs_dir(mkdir=True)))
 
                 subdirs = os.listdir(os.getcwd())
                 self.assertIn(p1_outdir, subdirs)

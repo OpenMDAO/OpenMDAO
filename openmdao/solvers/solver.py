@@ -575,7 +575,7 @@ class Solver(object, metaclass=SolverMetaclass):
         """
         return True
 
-    def get_outputs_dir(self, *subdirs, mkdir=True):
+    def get_outputs_dir(self, *subdirs, mkdir=False):
         """
         Get the path under which all output files of this solver are to be placed.
 
