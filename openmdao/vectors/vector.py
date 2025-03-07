@@ -211,9 +211,6 @@ class Vector(object):
         ndarray or float
             Value of each variable.
         """
-        # if scalar_flags is None:
-        #     scalar_flags = repeat(False)
-
         if self._under_complex_step:
             for n, (v, is_scalar) in self._views.items():
                 if n in self._names:

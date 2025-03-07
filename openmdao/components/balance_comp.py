@@ -170,21 +170,19 @@ class BalanceComp(ImplicitComponent):
             if options['normalize']:
 
                 # Indices where the rhs is near zero or not near zero
-                less = cs_safe.abs(rhs) < 2
-                greater = cs_safe.abs(rhs) >= 2
-
                 if rhs.shape == ():
-                    if less:
+                    if cs_safe.abs(rhs) < 2:
                         _scale_factor = 1.0 / (.25 * rhs**2 + 1)
-                    elif greater:
+                    elif cs_safe.abs(rhs) >= 2:
                         _scale_factor = 1.0 / cs_safe.abs(rhs)
                 else:
-                    idxs_nz = np.where(less)
-                    idxs_nnz = np.where(greater)
+                    absrhs = cs_safe.abs(rhs)
+                    idxs_nz = np.where(absrhs < 2)
+                    idxs_nnz = np.where(absrhs >= 2)
 
                     # Compute scaling factors
                     # scale factor that normalizes by the rhs, except near 0
-                    _scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
+                    _scale_factor[idxs_nnz] = 1.0 / absrhs[idxs_nnz]
                     _scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
             if options['use_mult']:
@@ -216,26 +214,24 @@ class BalanceComp(ImplicitComponent):
             _dscale_drhs = np.zeros((rhs.shape), dtype=rhs.dtype)
 
             if options['normalize']:
-                less = cs_safe.abs(rhs) < 2
-                greater = cs_safe.abs(rhs) >= 2
-
                 if rhs.shape == ():
-                    if less:
+                    if cs_safe.abs(rhs) < 2:
                         _scale_factor = 1.0 / (.25 * rhs**2 + 1)
                         _dscale_drhs = -.5 * rhs / (.25 * rhs**2 + 1) ** 2
-                    elif greater:
+                    elif cs_safe.abs(rhs) >= 2:
                         _scale_factor = 1.0 / cs_safe.abs(rhs)
                         _dscale_drhs = -np.sign(rhs) / rhs**2
                 else:
+                    absrhs = cs_safe.abs(rhs)
                     # Indices where the rhs is near zero or not near zero
-                    idxs_nz = np.where(less)[0]
-                    idxs_nnz = np.where(greater)[0]
+                    idxs_nz = np.where(absrhs < 2)[0]
+                    idxs_nnz = np.where(absrhs >= 2)[0]
 
                     # scale factor that normalizes by the rhs, except near 0
-                    _scale_factor[idxs_nnz] = 1.0 / cs_safe.abs(rhs[idxs_nnz])
+                    _scale_factor[idxs_nnz] = 1.0 / absrhs[idxs_nnz]
                     _scale_factor[idxs_nz] = 1.0 / (.25 * rhs[idxs_nz] ** 2 + 1)
 
-                    _dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz]**2
+                    _dscale_drhs[idxs_nnz] = -np.sign(rhs[idxs_nnz]) / rhs[idxs_nnz] ** 2
                     _dscale_drhs[idxs_nz] = -.5 * rhs[idxs_nz] / (.25 * rhs[idxs_nz] ** 2 + 1) ** 2
 
             if options['use_mult']:

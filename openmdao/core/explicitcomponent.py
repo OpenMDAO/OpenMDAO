@@ -613,7 +613,6 @@ class ExplicitComponent(Component):
             discrete_inputs = self._discrete_inputs
 
         yield from inputs.values()
-
         if discrete_inputs:
             yield from discrete_inputs.values()
 
