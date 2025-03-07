@@ -26,7 +26,7 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table, NA
-from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_error, \
+from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_tol_violation, \
     sparsity_diff_viz, get_sparsity_diff_array
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
@@ -6952,17 +6952,24 @@ class _ErrorData(object):
         return f"{self.__class__.__name__}(forward={self.forward}, reverse={self.reverse}, " \
             f"fwd_rev={self.fwd_rev})"
 
-    def max(self):
+    def max(self, use_abs=True):
+        if use_abs:
+            func = np.abs
+        else:
+            def func(x):
+                return x
+
         ret = 0.0
         for err in self:
             if err is not None:
                 if isinstance(err, tuple):
-                    for e in err:
-                        if ret < np.abs(e):
-                            ret = np.abs(e)
+                    mx = max(func(e) for e in err)
+                    if ret < mx:
+                        ret = mx
                 else:
-                    if ret < np.abs(err):
-                        ret = np.abs(err)
+                    mx = func(err)
+                    if ret < mx:
+                        ret = mx
         return ret
 
     def __getitem__(self, idx):
@@ -7079,6 +7086,8 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, ato
     derivative_info['tol violation'] = []
     derivative_info['magnitude'] = []
     derivative_info['vals_at_max_error'] = []
+    derivative_info['abs_err'] = []
+    derivative_info['rel_err'] = []
     derivative_info['steps'] = []
 
     abs_mags = _MagnitudeData()
@@ -7092,15 +7101,19 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, ato
         if directional:
             if Jforward is not None and Jreverse is not None:
                 mhatdotm, dhatdotd = derivative_info['directional_fwd_rev']
-                (errs_fwd_rev, err_vals_fwd_rev, above) = get_error(dhatdotd, mhatdotm)
+                errs_fwd_rev, err_vals_fwd_rev, above, abs_errs_fwd_rev, rel_errs_fwd_rev = \
+                    get_tol_violation(dhatdotd, mhatdotm, atol, rtol)
+                above_tol |= above
         elif not totals:
-            (errs_fwd_rev, err_vals_fwd_rev, above) = get_error(Jforward, Jreverse)
-
-        above_tol |= above
+            errs_fwd_rev, err_vals_fwd_rev, above, abs_errs_fwd_rev, rel_errs_fwd_rev = \
+                get_tol_violation(Jforward, Jreverse, atol, rtol)
+            above_tol |= above
 
     for i, Jfd in enumerate(fdinfo):
         above = False
         errs = _ErrorData()
+        abs_errs = _ErrorData()
+        rel_errs = _ErrorData()
         err_vals = _ErrorData()
 
         step = steps[i]
@@ -7110,32 +7123,44 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, ato
             if Jforward is not None:
                 if totals:
                     mhatdotm, dhatdotd = derivative_info['directional_fd_fwd'][i]
-                    errs.forward, err_vals.forward, above = get_error(mhatdotm, dhatdotd,
-                                                                      atol, rtol)
+                    errs.forward, err_vals.forward, above, abs_errs.forward, rel_errs.forward = \
+                        get_tol_violation(mhatdotm, dhatdotd, atol, rtol)
                 else:
-                    errs.forward, err_vals.forward, above = get_error(Jforward, Jfd, atol, rtol)
+                    errs.forward, err_vals.forward, above, abs_errs.forward, rel_errs.forward = \
+                        get_tol_violation(Jforward, Jfd, atol, rtol)
+                above_tol |= above
 
             if Jreverse is not None and 'directional_fd_rev' in derivative_info:
                 mhatdotm, dhatdotd = derivative_info['directional_fd_rev'][i]
-                errs.reverse, err_vals.reverse, above = get_error(mhatdotm, dhatdotd, atol, rtol)
+                errs.reverse, err_vals.reverse, above, abs_errs.reverse, rel_errs.reverse = \
+                    get_tol_violation(mhatdotm, dhatdotd, atol, rtol)
+                above_tol |= above
         else:
             if Jforward is not None:
-                errs.forward, err_vals.forward, above = get_error(Jforward, Jfd, atol, rtol)
+                errs.forward, err_vals.forward, above, abs_errs.forward, rel_errs.forward = \
+                    get_tol_violation(Jforward, Jfd, atol, rtol)
+                above_tol |= above
             if Jreverse is not None:
-                errs.reverse, err_vals.reverse, above = get_error(Jreverse, Jfd, atol, rtol)
+                errs.reverse, err_vals.reverse, above, abs_errs.reverse, rel_errs.reverse = \
+                    get_tol_violation(Jreverse, Jfd, atol, rtol)
+                above_tol |= above
 
         if Jfd is not None and Jforward is None and Jreverse is None:
-            errs.reverse, err_vals.reverse, above = get_error(np.zeros_like(Jfd), Jfd, atol, rtol)
-
-        above_tol |= above
+            errs.reverse, err_vals.reverse, above, abs_errs.reverse, rel_errs.reverse = \
+                get_tol_violation(np.zeros_like(Jfd), Jfd, atol, rtol)
+            above_tol |= above
 
         if errs_fwd_rev is not None:
             errs.fwd_rev = errs_fwd_rev
             err_vals.fwd_rev = err_vals_fwd_rev
+            abs_errs.fwd_rev = abs_errs_fwd_rev
+            rel_errs.fwd_rev = rel_errs_fwd_rev
 
         derivative_info['tol violation'].append(errs)
         derivative_info['magnitude'].append(abs_mags)
         derivative_info['vals_at_max_error'].append(err_vals)
+        derivative_info['abs_err'].append(abs_errs)
+        derivative_info['rel_err'].append(rel_errs)
         derivative_info['steps'].append(step)
 
     # for backward compatibility, keep 'abs error' around

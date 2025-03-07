@@ -1283,11 +1283,11 @@ class Problem(object, metaclass=ProblemMetaclass):
                     worst = wrst + (type(comp).__name__, comp.pathname)
 
         if worst is not None:
-            _, table_data, headers, ctype, cpath = worst
+            _, table_data, headers, col_meta,ctype, cpath = worst
             print(file=out_stream)
-            print(add_border(f"Sub Jacobian with Largest Relative Error: {ctype} '{cpath}'", '#'),
-                  file=out_stream)
-            _print_deriv_table([table_data[:-1]], headers[:-1], out_stream)
+            print(add_border(f"Sub Jacobian with Largest Tolerance Violation: {ctype} '{cpath}'",
+                             '#'), file=out_stream)
+            _print_deriv_table([table_data], headers, out_stream, col_meta=col_meta)
 
         if step is None or isinstance(step, (float, int)):
             _fix_check_data(partials_data)

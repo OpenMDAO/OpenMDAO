@@ -1118,7 +1118,7 @@ def safe_norm(arr):
     return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
 
 
-def get_error(x, ref, atol=0.0, rtol=1e-5):
+def get_tol_violation(x, ref, atol=0.0, rtol=1e-5):
     """
     Compute the max tolerance violation of the difference between x and ref.
 
@@ -1155,5 +1155,10 @@ def get_error(x, ref, atol=0.0, rtol=1e-5):
     max_error = diff.flat[max_error_idx]
     max_error_x = x.flat[max_error_idx]
     max_error_ref = ref.flat[max_error_idx]
+    abs_at_max = abs_error.flat[max_error_idx]
+    if max_error_ref:
+        rel_at_max = abs_at_max / np.abs(max_error_ref)
+    else:
+        rel_at_max = np.inf
 
-    return max_error, (max_error_x, max_error_ref), np.any(diff > 0.)
+    return max_error, (max_error_x, max_error_ref), np.any(diff > 0.), abs_at_max, rel_at_max
