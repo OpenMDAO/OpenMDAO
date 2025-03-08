@@ -1862,3 +1862,18 @@ def call_depth2indent(tabsize=2, offset=-1):
         A string of spaces.
     """
     return ' ' * ((len(stack()) + offset) * tabsize)
+
+
+def print_with_line_numbers(text, **kwargs):
+    """
+    Print a string with each line preceded by its line number.
+
+    Parameters
+    ----------
+    text : str
+        The text to print with line numbers.
+    **kwargs : dict
+        Keyword arguments to pass to print.
+    """
+    for i, line in enumerate(text.splitlines(), 1):
+        print(f"{i:5d} | {line}", **kwargs)
