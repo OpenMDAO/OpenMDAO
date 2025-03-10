@@ -572,6 +572,7 @@ class ReturnChecker(ast.NodeVisitor):
 
     def __init__(self, method):  # noqa
         self._returns = []
+        self.fstack = []
         self.visit(ast.parse(textwrap.dedent(inspect.getsource(method)), mode='exec'))
 
     def returns_tuple(self):
@@ -602,6 +603,22 @@ class ReturnChecker(ast.NodeVisitor):
             The return node being visited.
         """
         self._returns.append(isinstance(node.value, ast.Tuple))
+
+    def visit_FunctionDef(self, node):
+        """
+        Visit a FunctionDef node.
+
+        Parameters
+        ----------
+        node : ASTnode
+            The function definition node being visited.
+        """
+        if self.fstack:
+            return  # skip nested functions
+        self.fstack.append(node)
+        for stmt in node.body:
+            self.visit(stmt)
+        self.fstack.pop()
 
 
 def get_self_static_attrs(method):
