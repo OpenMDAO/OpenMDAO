@@ -201,6 +201,9 @@ class Group(System):
         within this group, keyed by active response.  These determine if contributions
         from all ranks will be added together to get the correct input values when derivatives
         in the larger model are being solved using reverse mode.
+    _auto_ivc_recorders : list
+        List of recorders that were added to _auto_ivc before it existed so they can be added
+        after _auto_ivc is created.
     _is_explicit : bool or None
         True if neither this Group nor any of its descendants contains implicit systems or cycles.
     _ivcs : dict
@@ -238,6 +241,7 @@ class Group(System):
         self._post_components = None
         self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
+        self._auto_ivc_recorders = []
         self._is_explicit = None
         self._ivcs = {}
         self._bad_conn_vars = None
@@ -755,6 +759,7 @@ class Group(System):
         # save a ref to the problem level options.
         self._problem_meta = prob_meta
         self._initial_condition_cache = {}
+        self._auto_ivc_recorders = []
         self._sys_graph_cache = None
 
         # reset any coloring if a Coloring object was not set explicitly
@@ -802,16 +807,6 @@ class Group(System):
         # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
         # the connections.
         self._setup_global_connections()
-        self._setup_dynamic_shapes()
-
-        self._top_level_post_connections()
-
-        self._setup_var_sizes()
-
-        self._top_level_post_sizes()
-
-        # determine which connections are managed by which group, and check validity of connections
-        self._setup_connections()
 
     def _check_required_connections(self):
         conns = self._conn_global_abs_in2out
@@ -1076,14 +1071,48 @@ class Group(System):
 
         return sarr, tarr, tsize, has_dist_data
 
+    def _setup_part2(self):
+        """
+        Complete setup of connections, sizes, and residuals.
+
+        This part of setup is called automatically at the start of run_model or run_driver.
+        This method is called only on the top level Group.
+        """
+        self._setup_dynamic_shapes()
+
+        self._problem_meta['vars_to_gather'] = self._vars_to_gather
+
+        self._resolve_group_input_defaults()
+        self._setup_auto_ivcs()
+        self._problem_meta['prom2abs'] = self._get_all_promotes()
+        self._check_prom_masking()
+        self._check_order()
+
+        self._setup_var_sizes()
+
+        self._top_level_post_sizes()
+
+        # determine which connections are managed by which group, and check validity of connections
+        self._setup_connections()
+
+        self._check_required_connections()
+
+        # setup of residuals must occur before setup of vectors and partials
+        self._setup_residuals()
+
+        for recorder in self._auto_ivc_recorders:
+            self._auto_ivc.add_recorder(recorder)
+        self._auto_ivc_recorders = []
+
+        self._problem_meta['setup_status'] = _SetupStatus.POST_SETUP2
+
     def _final_setup(self):
         """
         Perform final setup for this system and its descendant systems.
 
         This part of setup is called automatically at the start of run_model or run_driver.
+        This method is called only on the top level Group.
         """
-        self._setup_residuals()
-
         if self._use_derivatives:
             self._setup_partials()
 
@@ -1322,16 +1351,6 @@ class Group(System):
 
         return prom2abs
 
-    def _top_level_post_connections(self):
-        # this is called on the top level group after all connections are known
-        self._problem_meta['vars_to_gather'] = self._vars_to_gather
-
-        self._resolve_group_input_defaults()
-        self._setup_auto_ivcs()
-        self._problem_meta['prom2abs'] = self._get_all_promotes()
-        self._check_prom_masking()
-        self._check_order()
-
     def _check_prom_masking(self):
         """
         Raise exception if any promoted variable name masks an absolute variable name.
@@ -1434,6 +1453,8 @@ class Group(System):
         if self._problem_meta['allow_post_setup_reorder']:
             self.set_order(new_order)
         else:
+            if '_auto_ivc' in new_order:
+                new_order.remove('_auto_ivc')
             issue_warning(f"{self.msginfo}: A new execution order {new_order} is recommended, but "
                           "auto ordering has been disabled because the Problem option "
                           "'allow_post_setup_reorder' is False. It is recommended to either set "
@@ -2441,14 +2462,12 @@ class Group(System):
                     elif 'val' in d:
                         return np.asarray(d['val']).shape
 
-        def compute_var_meta(graph, to_var, shapes, func):
+        def compute_var_shape(to_var, shapes, func):
             """
             Compute shape info for the given variable using the given function.
 
             Parameters
             ----------
-            graph : nx.DiGraph
-                Graph containing all variables with shape info.
             to_var : str
                 Name of variable to compute shape info for.
             shapes : dict
@@ -2462,24 +2481,20 @@ class Group(System):
                 If the shape of the variable is known, return the shape.
                 Otherwise, return None.
             """
-            compname = to_var.rpartition('.')[0]
             try:
                 from_shape = func(shapes)
-            except KeyError as err:
-                abs_name = f"{compname}.{err.args[0]}"
+            except KeyError:
                 self._collect_error(f"{self.msginfo}: Can't compute shape of variable '{to_var}': "
-                                    f"variable '{abs_name}' doesn't exist.")
+                                    f"variable '{to_var}' doesn't exist.")
                 return
             except Exception as err:
                 self._collect_error(f"{self.msginfo}: Error occurred while computing the shape "
                                     f"of variable '{to_var}': {err}")
                 return
-            else:
-                graph.nodes[to_var]['shape'] = from_shape
 
             return from_shape
 
-        def copy_var_meta(graph, from_var, to_var, distrib_sizes):
+        def copy_var_shape(graph, from_var, to_var, distrib_sizes):
             """
             Copy shape info from from_var's metadata to to_var's metadata in the graph.
 
@@ -2503,22 +2518,18 @@ class Group(System):
             if to_var.startswith('#'):
                 return
 
-            nprocs = self.comm.size
-
             from_meta = graph.nodes[from_var]
-            from_dist = nprocs > 1 and from_meta['distributed']
-            from_shape = from_meta['shape']
-            from_io = from_meta['io']
-
             to_meta = graph.nodes[to_var]
-            to_dist = nprocs > 1 and to_meta['distributed']
-            to_io = to_meta['io']
+
+            from_shape = from_meta['shape']
 
             # known dist output to/from non-distributed input.  We don't allow this case because
             # non-distributed variables must have the same value on all procs and the only way
             # this is possible is if the src_indices on each proc are identical, but that's not
             # possible if we assume 'always local' transfer (see POEM 46).
-            if from_dist and not to_dist:
+            if (self.comm.size > 1 and from_meta['distributed']) and not to_meta['distributed']:
+                from_io = from_meta['io']
+                to_io = to_meta['io']
                 if from_io == 'output':
                     self._collect_error(
                         f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
@@ -2604,21 +2615,21 @@ class Group(System):
             -------
             active_single_edges : set of (str, str)
                 Set of active 'single' edges (for copy_shape and shape_by_conn).
-            active_multi_nodes : set of str
+            computed_shape_nodes : set of str
                 Set of active nodes with 'multi' edges (for compute_shape).
             """
             active_single_edges = set()
-            active_multi_nodes = set()
+            computed_shape_nodes = set()
 
             for known in knowns:
                 for succ in graph.successors(known):
                     if nodes[succ]['shape'] is None:
                         if edges[known, succ]['multi']:
-                            active_multi_nodes.add(succ)
+                            computed_shape_nodes.add(succ)
                         else:
                             active_single_edges.add((known, succ))
 
-            return active_single_edges, active_multi_nodes
+            return active_single_edges, computed_shape_nodes
 
         def is_unresolved(graph, node):
             """
@@ -2706,8 +2717,8 @@ class Group(System):
                                 graph.add_edge(inp, name, multi=False)
                         elif not meta['compute_shape'] and not meta['copy_shape']:
                             # check to see if we can get shape from _group_inputs
-                            fail = True
-                            if io == 'input':
+                            fail = meta['shape'] is None
+                            if fail and io == 'input':
                                 prom = all_abs2prom_in[name]
                                 grp_shape = get_group_input_shape(prom, grp_shapes)
                                 if grp_shape is not None:
@@ -2812,22 +2823,22 @@ class Group(System):
                 # no knowns in this component, so we fail.
                 continue
 
-            progress = 1
+            progress = True
             while progress:
-                progress = 0
+                progress = False
                 unresolved_knowns = get_unresolved_knowns(graph, unresolved_knowns)
 
-                active_single_edges, active_multi_nodes = get_actives(graph, unresolved_knowns)
+                active_single_edges, computed_shape_nodes = get_actives(graph, unresolved_knowns)
                 for k, u in active_single_edges:
-                    shp = copy_var_meta(graph, k, u, distrib_sizes)
+                    shp = copy_var_shape(graph, k, u, distrib_sizes)
                     if shp is not None:
                         if is_unresolved(graph, u):
                             unresolved_knowns.add(u)
 
                         all_knowns.add(u)
-                        progress += 1
+                        progress = True
 
-                for mnode in active_multi_nodes:
+                for mnode in computed_shape_nodes:
                     for k, _, data in graph.in_edges(mnode, data=True):
                         if nodes[k]['shape'] is None and data['multi']:
                             break
@@ -2837,20 +2848,25 @@ class Group(System):
                             n.rpartition('.')[-1]: nodes[n]['shape']
                             for n in graph.predecessors(mnode)
                         }
-                        shp = compute_var_meta(graph, mnode, shapes, nodes[mnode]['compute_shape'])
+                        shp = compute_var_shape(mnode, shapes, nodes[mnode]['compute_shape'])
                         if shp is not None:
+                            graph.nodes[mnode]['shape'] = shp
                             if is_unresolved(graph, mnode):
                                 unresolved_knowns.add(mnode)
                             all_knowns.add(mnode)
-                            progress += 1
+                            progress = True
 
         # now perform a consistency check on all computed/copied shapes
         mismatches = set()
         for u, v, data in graph.edges(data=True):
             if not data['multi']:
                 ushape = nodes[u]['shape']
+                if ushape is None:
+                    continue
                 vshape = nodes[v]['shape']
-                if ushape != vshape and ushape is not None and vshape is not None:
+                if vshape is None:
+                    continue
+                if ushape != vshape:
                     udist = nodes[u]['distributed']
                     vdist = nodes[v]['distributed']
                     if not (udist ^ vdist):
@@ -3443,6 +3459,33 @@ class Group(System):
         setattr(self, name, subsys)
 
         return subsys
+
+    def add_recorder(self, recorder, recurse=False):
+        """
+        Add a recorder to the system.
+
+        Parameters
+        ----------
+        recorder : <CaseRecorder>
+           A recorder instance.
+        recurse : bool
+            Flag indicating if the recorder should be added to all the subsystems.
+        """
+        if MPI:
+            raise RuntimeError(self.msginfo + ": Recording of Systems when running parallel "
+                                              "code is not supported yet")
+
+        self._rec_mgr.append(recorder)
+
+        if recurse:
+            for s in self.system_iter(include_self=False, recurse=recurse):
+                s._rec_mgr.append(recorder)
+
+            if self.pathname == '':  # top level group
+                # too early in setup for _auto_ivc to exist, so we'll add recorder to it later
+                if '_auto_ivc' not in self._subsystems_allprocs:
+                    if recorder not in self._auto_ivc_recorders:
+                        self._auto_ivc_recorders.append(recorder)
 
     def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
         """
