@@ -158,8 +158,9 @@ class Component(System):
                                   'across multiple processes')
         self.options.declare('run_root_only', types=bool, default=False,
                              desc='If True, call compute, compute_partials, linearize, '
-                                  'apply_linear, apply_nonlinear, and compute_jacvec_product '
-                                  'only on rank 0 and broadcast the results to the other ranks.')
+                                  'apply_linear, apply_nonlinear, solve_linear, solve_nonlinear, '
+                                  'and compute_jacvec_product only on rank 0 and broadcast the '
+                                  'results to the other ranks.')
         self.options.declare('always_opt', types=bool, default=False,
                              desc='If True, force nonlinear operations on this component to be '
                                   'included in the optimization loop even if this component is not '
