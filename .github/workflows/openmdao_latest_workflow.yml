@@ -20,11 +20,8 @@ on:
         description: 'Select a job from the matrix to run (default: all jobs)'
         type: choice
         options:
-          - ''
-          - 'Ubuntu Latest, NumPy<2'
-          - 'Ubuntu Latest, NumPy 2 (No PETSc/pyOptSparse)'
-          - 'MacOS Latest, NumPy<2'
-          - 'MacOS Latest, NumPy 2 (No PETSc/pyOptSparse)'
+          - 'Ubuntu Latest'
+          - 'MacOS Latest'
         required: false
         default: ''
       debug_enabled:
@@ -48,42 +45,17 @@ jobs:
       matrix:
         include:
           # test latest versions on ubuntu
-          # Include pyOptSparse, which requires NumPy<2
-          - NAME: Ubuntu Latest, NumPy<2
-            OS: ubuntu-22.04
-            PY: '3.12'
-            NUMPY: '<2'
-            PETSc: true
-            PYOPTSPARSE: true
-            SNOPT: true
-            BANDIT: true
-            BUILD_DOCS: true
-
-          # test latest versions on ubuntu
-          # Exclude pyOptSparse, which requires NumPy<2
-          # NumPy>=2.1 is required with Python 3.13
-          - NAME: Ubuntu Latest, NumPy 2 (No pyOptSparse)
-            OS: ubuntu-22.04
-            PY: '3.13'
-            NUMPY: '>=2.1'
+          - NAME: Ubuntu Latest
+            OS: ubuntu-latest
+            PY: 3
+            NUMPY: 2
             PETSc: true
 
           # test latest versions on macos
-          # Include pyOptSparse, which requires NumPy<2
-          - NAME: MacOS Latest, NumPy<2
-            OS: macos-13
-            PY: '3.12'
-            NUMPY: '<2'
-            PETSc: true
-            PYOPTSPARSE: true
-
-          # test latest versions on macos
-          # Exclude pyOptSparse, which require NumPy<2
-          # NumPy>=2.1 is required with Python 3.13
-          - NAME: MacOS Latest, NumPy 2 (No pyOptSparse)
-            OS: macos-13
-            PY: '3.13'
-            NUMPY: '>=2.1'
+          - NAME: MacOS Latest
+            OS: macos-latest
+            PY: 3
+            NUMPY: 2
             PETSc: true
 
     runs-on: ${{ matrix.OS }}
@@ -159,11 +131,7 @@ jobs:
           echo "============================================================="
           echo "Install latest PETSc"
           echo "============================================================="
-          if [[ "${{ matrix.NUMPY }}" == "<2" ]]; then
-            conda install mpich mpi4py petsc4py=3.21.2 -q -y
-          else
-            conda install mpich mpi4py petsc4py=3.22.2 -q -y
-          fi
+          conda install mpich mpi4py petsc4py=3.22.2 -q -y
 
           echo "============================================================="
           echo "Check MPI and PETSc installation"
@@ -228,10 +196,6 @@ jobs:
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
-          if [[ "${{ matrix.NUMPY }}" == "" ]]; then
-            sed -i.bak 's/numpy<2/numpy/g' pyproject.toml
-            grep numpy pyproject.toml
-          fi
           python -m pip install .
 
       - name: Display environment info
@@ -376,16 +340,6 @@ jobs:
           message:
             Security issue found on `${{ matrix.NAME }}` build.
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Check NumPy 2.0 Compatibility
-        run: |
-          echo "============================================================="
-          echo "Check OpenMDAO code for NumPy 2.0 compatibility"
-          echo "See: https://numpy.org/devdocs/numpy_2_0_migration_guide.html"
-          echo "============================================================="
-          python -m pip install ruff
-          cd ${{ github.workspace }}
-          ruff check . --select NPY201
 
       - name: Slack env change
         if: steps.env_info.outputs.errors != ''
