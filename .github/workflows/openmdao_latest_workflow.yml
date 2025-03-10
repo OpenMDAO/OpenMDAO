@@ -117,7 +117,7 @@ jobs:
           echo "============================================================="
           echo "Install latest versions of NumPy/SciPy"
           echo "============================================================="
-          python -m pip install --upgrade --pre "numpy=${{ matrix.NUMPY }}"
+          python -m pip install --upgrade --pre "numpy==${{ matrix.NUMPY }}"
           python -m pip install --upgrade --pre scipy
 
           # remember versions so we can check them later
