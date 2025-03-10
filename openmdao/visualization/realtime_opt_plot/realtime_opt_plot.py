@@ -197,8 +197,11 @@ if (toggle.active) {{
 
             //lines[index].glyph.line_color.setv({{'value': '#ff0000'}});
 
-            const glyph = lines[index].glyph;
-            glyph.line_color = color;
+
+            lines[index].glyph.properties.line_color.set_value(color);
+
+            //const glyph = lines[index].glyph;
+            //glyph.line_color = color;
             lines[index].change.emit();
 
         }} catch(err) {{
@@ -406,9 +409,9 @@ class CaseTracker:
                 return "Ambiguous"
             raise
         except KeyError as err:
-            meta2 = self._initial_cr_with_one_case.problem_metadata
-            if name in meta2['variables']:
-                return meta2['variables'][name]['units']
+            # meta2 = self._initial_cr_with_one_case.problem_metadata
+            # if name in meta2['variables']:
+            #     return meta2['variables'][name]['units']
             return "Unavailable"
 
         return units
