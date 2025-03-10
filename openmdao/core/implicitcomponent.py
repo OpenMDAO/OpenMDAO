@@ -286,7 +286,7 @@ class ImplicitComponent(Component):
 
     def _solve_linear_wrapper(self, *args):
         """
-        Call apply_linear based on the value of the "run_root_only" option.
+        Call solve_linear based on the value of the "run_root_only" option.
 
         Parameters
         ----------
