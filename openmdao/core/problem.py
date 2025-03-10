@@ -55,7 +55,7 @@ from openmdao.utils.general_utils import pad_name, _find_dict_meta, env_truthy, 
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.file_utils import _get_outputs_dir, text2html, get_work_dir
+from openmdao.utils.file_utils import _get_outputs_dir, text2html, _get_work_dir
 from openmdao.utils.testing_utils import _fix_comp_check_data
 
 try:
@@ -98,7 +98,11 @@ def _get_top_script():
         The absolute path, or None if it can't be resolved.
     """
     try:
-        return pathlib.Path(__main__.__file__).resolve()
+        script_name = os.environ.get('OPENMDAO_SCRIPT_NAME')
+        if script_name is not None:
+            return pathlib.Path(script_name).resolve()
+        else:
+            return pathlib.Path(__main__.__file__).resolve()
     except Exception:
         # this will error out in some cases, e.g. inside of a jupyter notebook, so just
         # return None in that case.
@@ -265,8 +269,11 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
+        default_workdir = options['work_dir'] if 'work_dir' in options else _get_work_dir()
+        self.options.declare('work_dir', default=default_workdir,
+                             desc='Working directory for the problem.')
         self.options.declare('coloring_dir', types=str,
-                             default=os.path.join(get_work_dir(), 'coloring_files'),
+                             default=os.path.join(default_workdir, 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.declare('group_by_pre_opt_post', types=bool,
                              default=False,
@@ -531,7 +538,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         object
             The value of the requested output/input variable.
         """
-        if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
+        if self._metadata['setup_status'] <= _SetupStatus.POST_SETUP2:
             abs_names = name2abs_names(self.model, name)
             if abs_names:
                 val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
@@ -959,10 +966,11 @@ class Problem(object, metaclass=ProblemMetaclass):
         self._orig_mode = mode
 
         # this metadata will be shared by all Systems/Solvers in the system tree
-        self._metadata = {
+        self._metadata.update({
             'name': self._name,  # the name of this Problem
             'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
+            'work_dir': pathlib.Path(self.options['work_dir']),
             'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for input coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
@@ -1015,7 +1023,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             'rel_array_cache': {},  # cache of relevance arrays
             'ncompute_totals': 0,  # number of times compute_totals has been called
             'jax_group': None,  # not None if a Group is currently performing a jax operation
-        }
+        })
 
         model_comm = self.driver._setup_comm(comm)
 
@@ -1038,7 +1046,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         # from a previous run.
         # Start setup by deleting any existing reports so that the files
         # that are in that directory are all from this run and not a previous run
-        reports_dirpath = self.get_reports_dir(force=False)
+        reports_dirpath = self.get_reports_dir()
         if not MPI or (self.comm is not None and self.comm.rank == 0):
             if os.path.isdir(reports_dirpath):
                 try:
@@ -1046,7 +1054,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                 except FileNotFoundError:
                     # Folder already removed by another proccess
                     pass
-        self._metadata['reports_dir'] = self.get_reports_dir(force=False)
+        self._metadata['reports_dir'] = self.get_reports_dir()
 
         try:
             model._setup(model_comm, self._metadata)
@@ -1060,8 +1068,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         self._logger = logger
 
         self._metadata['setup_status'] = _SetupStatus.POST_SETUP
-
-        self._check_collected_errors()
 
         return self
 
@@ -1078,50 +1084,63 @@ class Problem(object, metaclass=ProblemMetaclass):
         driver = self.driver
         model = self.model
 
-        responses = model.get_responses(recurse=True, use_prom_ivc=True)
-        designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
-
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            model._final_setup()
+            first = True
+            self._metadata['static_mode'] = False
+            try:
+                model._setup_part2()
+                self._check_collected_errors()
 
-        model._check_required_connections()
+                responses = model.get_responses(recurse=True, use_prom_ivc=True)
+                designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
+                response_size, desvar_size = driver._update_voi_meta(model, responses,
+                                                                     designvars)
 
-        response_size, desvar_size = driver._update_voi_meta(model, responses, designvars)
+                model._final_setup()
+            finally:
+                self._metadata['static_mode'] = True
 
-        # update mode if it's been set to 'auto'
-        if self._orig_mode == 'auto':
-            mode = 'rev' if response_size < desvar_size else 'fwd'
+            # update mode if it's been set to 'auto'
+            if self._orig_mode == 'auto':
+                mode = 'rev' if response_size < desvar_size else 'fwd'
+            else:
+                mode = self._orig_mode
+
+            self._metadata['mode'] = mode
         else:
-            mode = self._orig_mode
+            first = False
+            mode = self._metadata['mode']
 
-        self._metadata['mode'] = mode
+            responses = model.get_responses(recurse=True, use_prom_ivc=True)
+            designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
+            response_size, desvar_size = driver._update_voi_meta(model, responses, designvars)
 
-        # If set_solver_print is called after an initial run, in a multi-run scenario,
-        #  this part of _final_setup still needs to happen so that change takes effect
-        #  in subsequent runs
-        if self._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP:
+            # If set_solver_print is called after an initial run, in a multi-run scenario,
+            #  this part of _final_setup still needs to happen so that change takes effect
+            #  in subsequent runs
             model._setup_solver_print()
 
         driver._setup_driver(self)
 
-        if coloring_mod._use_total_sparsity:
-            coloring = driver._coloring_info.coloring
-            if coloring is not None:
-                # if we're using simultaneous total derivatives then our effective size is less
-                # than the full size
-                if coloring._fwd and coloring._rev:
-                    pass  # we're doing both!
-                elif mode == 'fwd' and coloring._fwd:
-                    desvar_size = coloring.total_solves()
-                elif mode == 'rev' and coloring._rev:
-                    response_size = coloring.total_solves()
+        if first:
+            if coloring_mod._use_total_sparsity:
+                coloring = driver._coloring_info.coloring
+                if coloring is not None:
+                    # if we're using simultaneous total derivatives then our effective size is less
+                    # than the full size
+                    if coloring._fwd and coloring._rev:
+                        pass  # we're doing both!
+                    elif mode == 'fwd' and coloring._fwd:
+                        desvar_size = coloring.total_solves()
+                    elif mode == 'rev' and coloring._rev:
+                        response_size = coloring.total_solves()
 
-        if ((mode == 'fwd' and desvar_size > response_size) or
-                (mode == 'rev' and response_size > desvar_size)):
-            issue_warning(f"Inefficient choice of derivative mode.  You chose '{mode}' for a "
-                          f"problem with {desvar_size} design variables and {response_size} "
-                          "response variables (objectives and nonlinear constraints).",
-                          category=DerivativesWarning)
+            if ((mode == 'fwd' and desvar_size > response_size) or
+                    (mode == 'rev' and response_size > desvar_size)):
+                issue_warning(f"Inefficient choice of derivative mode.  You chose '{mode}' for a "
+                              f"problem with {desvar_size} design variables and {response_size} "
+                              "response variables (objectives and nonlinear constraints).",
+                              category=DerivativesWarning)
 
         if (not self._metadata['allow_post_setup_reorder'] and
                 self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
@@ -1149,6 +1168,39 @@ class Problem(object, metaclass=ProblemMetaclass):
             else:
                 logger = TestLogger()
             self.check_config(logger, checks=checks)
+
+    def set_setup_status(self, status, **setup_kwargs):
+        """
+        Set the setup status of the problem, running any setup steps that haven't been run yet.
+
+        If the status is already at or beyond the requested status, this method does nothing,
+        i.e., it won't reset the status to an earlier step.
+
+        Parameters
+        ----------
+        status : _SetupStatus
+            The status to set the problem to.
+        **setup_kwargs : dict
+            Keyword arguments to pass to the setup method if it hasn't already been called.
+        """
+        current_status = self._metadata['setup_status']
+        if current_status >= status:
+            return
+
+        if status >= _SetupStatus.POST_SETUP:
+            if current_status < _SetupStatus.POST_SETUP:
+                self.setup(**setup_kwargs)
+                current_status = _SetupStatus.POST_SETUP
+
+        if status >= _SetupStatus.POST_SETUP2:
+            if current_status < _SetupStatus.POST_SETUP2:
+                self.model._setup_part2()
+                current_status = _SetupStatus.POST_SETUP2
+
+        if status >= _SetupStatus.POST_FINAL_SETUP:
+            if current_status < _SetupStatus.POST_FINAL_SETUP:
+                self.final_setup()
+                current_status = _SetupStatus.POST_FINAL_SETUP
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
@@ -2160,7 +2212,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             checks = sorted(_all_non_redundant_checks)
 
         if logger is None and checks:
-            check_file_path = None if out_file is None else str(self.get_outputs_dir() / out_file)
+            if out_file is None:
+                check_file_path = None
+            else:
+                check_file_path = str(self.get_outputs_dir(mkdir=True) / out_file)
             logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         for c in checks:
@@ -2225,7 +2280,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return self.get_outputs_dir('reports', mkdir=force or len(self._reports) > 0)
 
-    def get_outputs_dir(self, *subdirs, mkdir=True):
+    def get_outputs_dir(self, *subdirs, mkdir=False):
         """
         Get the path under which all output files of this problem are to be placed.
 
@@ -2520,7 +2575,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                     coloring = \
                         coloring_mod.dynamic_total_coloring(
                             self.driver, run_model=do_run,
-                            fname=self.driver._get_total_coloring_fname(mode='output'),
+                            fname=self.model.get_coloring_fname(mode='output'),
                             of=of, wrt=wrt)
             else:
                 return coloring_info.coloring

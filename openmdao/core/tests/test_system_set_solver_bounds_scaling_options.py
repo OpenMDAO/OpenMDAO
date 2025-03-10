@@ -302,6 +302,7 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         prob.model.add_design_var('x', lower=-100, upper=100, ref0=-100.0, ref=100)
         prob.model.add_design_var('z', lower=-100, upper=100)
         prob.setup()
+        prob.final_setup()
         des_vars_using_add_design_var = prob.model.get_design_vars()
 
         # then set the options using set_design_var_options
@@ -312,6 +313,7 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         prob.model.set_design_var_options(name='x', lower=-100, upper=100, ref0=-100.0, ref=100)
         prob.model.set_design_var_options(name='z', lower=-100, upper=100)
         prob.setup()
+        prob.final_setup()
         des_vars_using_set_design_var_options = prob.model.get_design_vars()
 
         self.assertEqual(des_vars_using_add_design_var, des_vars_using_set_design_var_options)
@@ -323,6 +325,7 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         prob.model.add_design_var('x', lower=-100, upper=100, adder=3, scaler=10)
         prob.model.add_design_var('z', lower=-100, upper=100)
         prob.setup()
+        prob.final_setup()
         des_vars_using_add_design_var = prob.model.get_design_vars()
 
         # then set the options using set_design_var_options
@@ -333,6 +336,7 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         prob.model.set_design_var_options(name='x', lower=-100, upper=100, adder=3, scaler=10)
         prob.model.set_design_var_options(name='z', lower=-100, upper=100)
         prob.setup()
+        prob.final_setup()
         des_vars_using_set_design_var_options = prob.model.get_design_vars()
 
         self.assertEqual(des_vars_using_add_design_var, des_vars_using_set_design_var_options)
@@ -345,6 +349,7 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         prob.model.add_design_var('x', lower=-100, upper=100, scaler=3.5, adder=77.0)
         prob.model.add_design_var('z', lower=-100, upper=100)
         prob.setup()
+        prob.final_setup()
 
         des_vars_using_add_design_var = prob.model.get_design_vars()
 
@@ -355,6 +360,7 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         prob.model.add_design_var('z', lower=-100, upper=100)
         prob.model.set_design_var_options(name='x', scaler=3.5, adder=77.0)
         prob.setup()
+        prob.final_setup()
         des_vars_using_set_design_var_options = prob.model.get_design_vars()
 
         assert_near_equal(des_vars_using_add_design_var, des_vars_using_set_design_var_options)
@@ -365,6 +371,7 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         prob.model.add_design_var('x', lower=-100, upper=100, ref0=-2.0, ref=20)
         prob.model.add_design_var('z', lower=-100, upper=100)
         prob.setup()
+        prob.final_setup()
         des_vars_using_add_design_var = prob.model.get_design_vars()
 
         # then set the options for ref and ref0 using set_design_var_options
@@ -374,6 +381,7 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         prob.model.add_design_var('z', lower=-100, upper=100)
         prob.model.set_design_var_options(name='x', ref0=-2.0, ref=20)
         prob.setup()
+        prob.final_setup()
         des_vars_using_set_design_var_options = prob.model.get_design_vars()
 
         assert_near_equal(des_vars_using_add_design_var, des_vars_using_set_design_var_options)
@@ -434,6 +442,7 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         model.add_constraint('con2', upper=0.0)
 
         prob.setup()
+        prob.final_setup()
         new_z_lower_bound = np.array([0.0, 0.0])
         model.set_design_var_options("z", lower=np.array(new_z_lower_bound))
         des_vars_using_set_design_var_options = prob.model.get_design_vars()
@@ -449,6 +458,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con1', lower=-100, upper=100)
         prob.model.add_constraint('con2')
         prob.setup()
+        prob.final_setup()
         constraints_using_add_constraint = prob.model.get_constraints()
 
         # then set the options using set_constraint_options
@@ -458,6 +468,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con2')
         prob.model.set_constraint_options(name='con1', lower=-100, upper=100)
         prob.setup()
+        prob.final_setup()
         constraints_using_set_objective_options = prob.model.get_constraints()
 
         self.assertEqual(constraints_using_add_constraint, constraints_using_set_objective_options)
@@ -469,6 +480,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con1', equals=345.)
         prob.model.add_constraint('con2')
         prob.setup()
+        prob.final_setup()
         constraints_using_add_constraint = prob.model.get_constraints()
 
         # Then set am equals constraint using an override via set_constraint_options
@@ -478,6 +490,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con2')
         prob.model.set_constraint_options('con1', equals=345.)
         prob.setup()
+        prob.final_setup()
         constraints_using_set_constraint_options = prob.model.get_constraints()
         self.assertEqual(constraints_using_add_constraint, constraints_using_set_constraint_options)
 
@@ -503,6 +516,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         # prob.model.approx_totals()
 
         prob.setup()
+        prob.final_setup()
         prob.set_solver_print(level=0)
 
         objs = {}
@@ -542,6 +556,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         # prob.model.approx_totals()
 
         prob.setup()
+        prob.final_setup()
         prob.set_solver_print(level=0)
 
         objs = {}
@@ -566,6 +581,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con1', lower=-100, upper=100)
         prob.model.add_constraint('con2')
         prob.setup()
+        prob.final_setup()
         constraints_using_add_constraint = prob.model.get_constraints()
 
         # Then set it using an override via set_constraint_options
@@ -575,6 +591,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con2')
         prob.model.set_constraint_options('con1', lower=-100, upper=100)
         prob.setup()
+        prob.final_setup()
         constraints_using_set_constraint_options = prob.model.get_constraints()
 
         self.assertEqual(constraints_using_add_constraint, constraints_using_set_constraint_options)
@@ -586,6 +603,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con1', ref0=-100.0, ref=100)
         prob.model.add_constraint('con2')
         prob.setup()
+        prob.final_setup()
         constraints_using_add_constraint = prob.model.get_constraints()
 
         # then set the options using set_constraint_options
@@ -595,6 +613,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con2')
         prob.model.set_constraint_options(name='con1', ref0=-100.0, ref=100)
         prob.setup()
+        prob.final_setup()
         constraints_using_set_constraint_options = prob.model.get_constraints()
 
         self.assertEqual(constraints_using_add_constraint, constraints_using_set_constraint_options)
@@ -606,6 +625,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con1', adder=3, scaler=10)
         prob.model.add_constraint('con2')
         prob.setup()
+        prob.final_setup()
         constraints_using_add_constraint = prob.model.get_constraints()
 
         # then set the options using set_constraint_options
@@ -615,6 +635,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con2')
         prob.model.set_constraint_options(name='con1', adder=3, scaler=10)
         prob.setup()
+        prob.final_setup()
         constraints_using_set_constraint_options = prob.model.get_constraints()
 
         self.assertEqual(constraints_using_add_constraint, constraints_using_set_constraint_options)
@@ -630,6 +651,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con1', scaler=3.5, adder=77.0, lower=-100, upper=100)
         prob.model.add_constraint('con2')
         prob.setup()
+        prob.final_setup()
         constraints_using_add_constraint = prob.model.get_constraints()
 
         # then set the options for scaler and adder using set_constraint_options
@@ -640,6 +662,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con2')
         prob.model.set_constraint_options(name='con1', scaler=3.5, adder=77.0)
         prob.setup()
+        prob.final_setup()
         constraints_using_set_constraint_options = prob.model.get_constraints()
 
         assert_near_equal(constraints_using_add_constraint,
@@ -651,6 +674,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con1', ref0=-2.0, ref=20, lower=-100, upper=100)
         prob.model.add_constraint('con2')
         prob.setup()
+        prob.final_setup()
         constraints_using_add_constraint = prob.model.get_constraints()
 
         # then set the options for ref and ref0 using set_constraint_options
@@ -660,6 +684,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('con2')
         prob.model.set_constraint_options('con1', ref0=-2.0, ref=20)
         prob.setup()
+        prob.final_setup()
         constraints_using_set_constraint_options = prob.model.get_constraints()
 
         assert_near_equal(constraints_using_add_constraint,
@@ -677,6 +702,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
                                   adder=77.0)
         prob.model.add_constraint('exec.y', alias='yf', indices=slicer[-1, 0], equals=0)
         prob.setup()
+        prob.final_setup()
         constraints_using_add_constraint = prob.model.get_constraints()
 
         prob = Problem()
@@ -686,6 +712,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.model.add_constraint('exec.y', alias='yf', indices=slicer[-1, 0], equals=0)
         prob.model.set_constraint_options(name='exec.y', alias='y0', scaler=3.5, adder=77.0)
         prob.setup()
+        prob.final_setup()
 
         constraints_using_set_constraint_options = prob.model.get_constraints()
 
@@ -725,6 +752,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         model.add_constraint('areas', equals=np.array([24.0, 21.0, 3.5, 17.5]))
 
         prob.setup()
+        prob.final_setup()
 
         new_areas_equals_bound = np.array([4.0, 1.0, 0.5, 7.5])
         prob.model.set_constraint_options(name='areas', equals=new_areas_equals_bound)
@@ -743,6 +771,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model = SellarDerivatives()
         prob.model.add_objective('obj', ref0=-100.0, ref=100)
         prob.setup()
+        prob.final_setup()
         objective_using_add_objective = prob.model.get_objectives()
 
         # then set the options using set_objective_options
@@ -751,6 +780,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model.add_objective('obj')
         prob.model.set_objective_options(name='obj', ref0=-100.0, ref=100)
         prob.setup()
+        prob.final_setup()
         objective_using_set_objective_options = prob.model.get_objectives()
 
         self.assertEqual(objective_using_add_objective, objective_using_set_objective_options)
@@ -760,6 +790,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model = SellarDerivatives()
         prob.model.add_objective('obj', adder=3, scaler=10)
         prob.setup()
+        prob.final_setup()
         objective_using_add_objective = prob.model.get_objectives()
 
         # then set the options using set_objective_options
@@ -768,6 +799,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model.add_objective('obj')
         prob.model.set_objective_options(name='obj', adder=3, scaler=10)
         prob.setup()
+        prob.final_setup()
         objective_using_set_objective_options = prob.model.get_objectives()
 
         self.assertEqual(objective_using_add_objective, objective_using_set_objective_options)
@@ -778,6 +810,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model = SellarDerivatives()
         prob.model.add_objective('obj', scaler=3.5, adder=77.0)
         prob.setup()
+        prob.final_setup()
         objective_using_add_objective = prob.model.get_objectives()
 
         # then set the options for ref and ref0 using set_objective_options
@@ -786,6 +819,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model.add_objective('obj', ref0=-2.0, ref=20)
         prob.model.set_objective_options(name='obj', scaler=3.5, adder=77.0)
         prob.setup()
+        prob.final_setup()
         objective_using_set_objective_options = prob.model.get_objectives()
 
         assert_near_equal(objective_using_add_objective, objective_using_set_objective_options)
@@ -795,6 +829,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model = SellarDerivatives()
         prob.model.add_objective('obj', ref0=-2.0, ref=20)
         prob.setup()
+        prob.final_setup()
         objective_using_add_objective = prob.model.get_objectives()
 
         # then set the options for ref and ref0 using set_design_var_options
@@ -803,6 +838,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model.add_objective('obj', scaler=3.5, adder=77.0)
         prob.model.set_objective_options(name='obj', ref0=-2.0, ref=20)
         prob.setup()
+        prob.final_setup()
         objective_using_set_objective_options = prob.model.get_objectives()
 
         assert_near_equal(objective_using_add_objective, objective_using_set_objective_options)
@@ -831,6 +867,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model.add_constraint('fg_xy', indices=[1], alias='g_xy', lower=0, upper=10)
         prob.model.add_objective('fg_xy', index=0, alias='f_xy', ref=3.0, ref0=2.0)
         prob.setup()
+        prob.final_setup()
         objective_using_add_objective = deepcopy(prob.model.get_objectives())
         prob.run_driver()
 
@@ -844,6 +881,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model.add_objective('fg_xy', index=0, alias='f_xy')
         prob.model.set_objective_options(name='f_xy', ref=3.0, ref0=2.0)
         prob.setup()
+        prob.final_setup()
 
         objective_using_set_objective_options = deepcopy(prob.model.get_objectives())
         assert_near_equal(objective_using_set_objective_options, objective_using_add_objective)
@@ -859,6 +897,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model.add_constraint('fg_xy', indices=[1], alias='g_xy', lower=0, upper=10)
         prob.model.add_objective('fg_xy', index=0, alias='f_xy', scaler=3.0, adder=2.0)
         prob.setup()
+        prob.final_setup()
         objective_using_add_objective = deepcopy(prob.model.get_objectives())
 
         prob.run_driver()
@@ -872,6 +911,7 @@ class TestSystemSetObjectiveOptions(unittest.TestCase):
         prob.model.add_objective('fg_xy', index=0, alias='f_xy')
         prob.model.set_objective_options(name='f_xy', scaler=3.0, adder=2.0)
         prob.setup()
+        prob.final_setup()
 
         objective_using_set_objective_options = deepcopy(prob.model.get_objectives())
         assert_near_equal(objective_using_set_objective_options, objective_using_add_objective)

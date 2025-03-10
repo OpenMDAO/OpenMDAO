@@ -30,7 +30,7 @@ class TestWarnings(unittest.TestCase):
                 self.add_output('y', shape=(10,), units='m')
                 self.add_output('z', shape=(10,), units='m/s')
 
-                self.declare_coloring(wrt='*', form='cs')
+                self.declare_coloring(wrt='*', method='cs')
 
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['a'] * inputs['x'] + inputs['b']
@@ -53,6 +53,7 @@ class TestWarnings(unittest.TestCase):
 
         with warnings.catch_warnings(record=True) as w:
             p.setup()
+            p.final_setup()
             unit_warnings = [wm for wm in w if wm.category is om.UnitsWarning]
             assert (len(unit_warnings) == 2)
 
@@ -76,7 +77,7 @@ class TestWarnings(unittest.TestCase):
                 self.add_output('y', shape=(10,), units='m')
                 self.add_output('z', shape=(10,), units='m/s')
 
-                self.declare_coloring(wrt='*', form='cs')
+                self.declare_coloring(wrt='*', method='cs')
 
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['a'] * inputs['x'] + inputs['b']
@@ -99,8 +100,10 @@ class TestWarnings(unittest.TestCase):
             warnings.filterwarnings('ignore', category=om.UnitsWarning)
 
             p.setup()
-            unit_warnings = [wm for wm in w if wm.category is om.UnitsWarning]
-            assert (len(unit_warnings) == 0)
+            p.final_setup()
+
+        unit_warnings = [wm for wm in w if wm.category is om.UnitsWarning]
+        assert (len(unit_warnings) == 0)
 
     def test_doc_error_on_openmdao_warning(self):
         """
@@ -146,6 +149,7 @@ class TestWarnings(unittest.TestCase):
 
             with self.assertRaises(Exception) as e:
                 p.setup()
+                p.final_setup()
 
         expected = "\nCollected errors for problem 'error_on_openmdao_warning':" \
                    "\n   <model> <class Group>: Output 'a_comp.y' with units of 'm' is connected to " \
