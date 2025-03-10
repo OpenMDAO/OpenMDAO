@@ -228,7 +228,7 @@ def deserialize(json_data, abs2meta, prom2abs, conns):
             src_name = conns[abs_name[0]]
             has_shape = 'shape' in abs2meta[src_name]
 
-        if isinstance(value, list) and has_shape:
+        if isinstance(value, (list, float)) and has_shape:
             values[name] = np.asarray(value)  # array will be proper shape based on list structure
         else:
             all_array = False

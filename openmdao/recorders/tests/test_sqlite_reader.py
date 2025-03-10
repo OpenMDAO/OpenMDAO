@@ -2070,10 +2070,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0, shape=()), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0, shape=()), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y', c={'shape': ()}), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -2107,12 +2107,12 @@ class TestSqliteCaseReader(unittest.TestCase):
         last_case = cr.get_case(driver_cases[-1])
 
         dvs = last_case.get_design_vars(scaled=False)
-        unscaled_x = dvs['x'][0]
-        unscaled_y = dvs['y'][0]
+        unscaled_x = dvs['x']
+        unscaled_y = dvs['y']
 
         dvs = last_case.get_design_vars(scaled=True)
-        scaled_x = dvs['x'][0]
-        scaled_y = dvs['y'][0]
+        scaled_x = dvs['x']
+        scaled_y = dvs['y']
 
         adder, scaler = determine_adder_scaler(ref0, ref, None, None)
         self.assertAlmostEqual((unscaled_x + adder) * scaler, scaled_x, places=12)
@@ -2838,7 +2838,7 @@ class TestSqliteCaseReader(unittest.TestCase):
             responses = prob.model._static_responses
         else:
             responses = prob.model._responses
-        
+
         responses.clear()
 
         prob.model.add_objective('obj', alias='objective_alias')
@@ -2849,12 +2849,12 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         prob.run_driver()
 
-        prob.cleanup()   
+        prob.cleanup()
 
-        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)     
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         cr.list_cases()
         c = cr.get_case(0)
-        
+
         units = c._get_units('obj')
         units_alias = c._get_units('objective_alias')
         self.assertEqual(units, units_alias)

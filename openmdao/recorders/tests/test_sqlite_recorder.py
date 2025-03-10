@@ -476,7 +476,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        use_jit: True",
             "        name: UNDEFINED",
             "        val: 1.0",
-            "        shape: None",
+            "        shape: ()",
             "        units: None",
             "        res_units: None",
             "        desc: None",
@@ -494,7 +494,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        use_jit: True",
             "        name: UNDEFINED",
             "        val: 1.0",
-            "        shape: None",
+            "        shape: ()",
             "        units: None",
             "        res_units: None",
             "        desc: None",
@@ -517,7 +517,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        use_jit: True",
             "        has_diag_partials: False",
             "        units: None",
-            "        shape: None",
+            "        shape: ()",
             "        shape_by_conn: False",
             "        do_coloring: False",
             ""
@@ -587,7 +587,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        use_jit: True",
             "        name: UNDEFINED",
             "        val: 1.0",
-            "        shape: None",
+            "        shape: ()",
             "        units: None",
             "        res_units: None",
             "        desc: None",
@@ -605,7 +605,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        use_jit: True",
             "        name: UNDEFINED",
             "        val: 1.0",
-            "        shape: None",
+            "        shape: ()",
             "        units: None",
             "        res_units: None",
             "        desc: None",
@@ -628,7 +628,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        use_jit: True",
             "        has_diag_partials: False",
             "        units: None",
-            "        shape: None",
+            "        shape: ()",
             "        shape_by_conn: False",
             "        do_coloring: False",
             ""
@@ -733,9 +733,9 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'ScipyOptimize_SLSQP', (3, )]
 
-        expected_desvars = {"p1.x": [7.16706813, ], "p2.y": [-7.83293187]}
-        expected_objectives = {"comp.f_xy": [-27.0833]}
-        expected_constraints = {"con.c": [-15.0]}
+        expected_desvars = {"p1.x": 7.16706813, "p2.y": -7.83293187}
+        expected_objectives = {"comp.f_xy": -27.0833}
+        expected_constraints = {"con.c": -15.0}
 
         expected_inputs = {
             "con.x": 7.1666667,
@@ -2331,7 +2331,7 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('case2')
         self.assertEqual(set(final_case.inputs.keys()), {'comp.y', 'con.x', 'con.y', 'comp.x'})
-        self.assertAlmostEqual(final_case.inputs['comp.y'][0], -7.833333333333334)
+        self.assertAlmostEqual(final_case.inputs['comp.y'], -7.833333333333334)
 
         # Default is includes = ['*'] and excludes = []
 
@@ -2383,7 +2383,7 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('final')
         self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
-        self.assertAlmostEqual(final_case.residuals['f_xy'][0], 0.0)
+        self.assertAlmostEqual(final_case.residuals['f_xy'], 0.0)
 
         # run again with includes and excludes
         prob.recording_options['excludes'] = ['f*']
@@ -2424,7 +2424,7 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('final')
         self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
-        self.assertAlmostEqual(final_case.residuals['f_xy'][0], 0.0)
+        self.assertAlmostEqual(final_case.residuals['f_xy'], 0.0)
 
         # run again with includes and excludes
         prob.recording_options['excludes'] = ['f*']

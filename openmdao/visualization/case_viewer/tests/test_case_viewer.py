@@ -83,12 +83,12 @@ class TestCaseRetrieval(unittest.TestCase):
         g_meta = _get_var_meta(cr, case_name, 'const.g')
         self.assertEqual(g_meta['prom_name'], 'const.g')
         self.assertEqual(g_meta['units'], None)
-        self.assertEqual(g_meta['shape'], (1,))
+        self.assertEqual(g_meta['shape'], (1, ))
 
         f_xy_meta = _get_var_meta(cr, case_name, 'parab.f_xy')
         self.assertEqual(f_xy_meta['prom_name'], 'parab.f_xy')
         self.assertEqual(f_xy_meta['units'], None)
-        self.assertEqual(f_xy_meta['shape'], (1,))
+        self.assertEqual(f_xy_meta['shape'], ())
 
         x_meta = _get_var_meta(cr, case_name, 'x')
         self.assertEqual(x_meta['prom_name'], 'x')
