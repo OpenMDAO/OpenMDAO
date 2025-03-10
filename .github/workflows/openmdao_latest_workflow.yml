@@ -20,6 +20,7 @@ on:
         description: 'Select a job from the matrix to run (default: all jobs)'
         type: choice
         options:
+          - ''
           - 'Ubuntu Latest'
           - 'MacOS Latest'
         required: false
@@ -116,7 +117,7 @@ jobs:
           echo "============================================================="
           echo "Install latest versions of NumPy/SciPy"
           echo "============================================================="
-          python -m pip install --upgrade --pre "numpy${{ matrix.NUMPY }}"
+          python -m pip install --upgrade --pre "numpy=${{ matrix.NUMPY }}"
           python -m pip install --upgrade --pre scipy
 
           # remember versions so we can check them later
