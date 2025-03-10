@@ -1258,7 +1258,7 @@ class Group(System):
         if self.comm.size > 1:
             need_alloc_complex = np.array([nl_alloc_complex, ln_alloc_complex], dtype=int)
             result = np.zeros(2, dtype=int)
-            self.comm.Allreduce(need_alloc_complex, result, op=MPI.MAX)
+            self.comm.Allreduce(need_alloc_complex, result)
             nl_alloc_complex = bool(result[0])
             ln_alloc_complex = bool(result[1])
 
