@@ -546,12 +546,6 @@ class Group(System):
         self._problem_meta['setup_status'] = _SetupStatus.POST_CONFIGURE
         self.configure()
 
-        # In configure, we may have added outputs with bounds to components further
-        # down in the tree.  Make sure we propagate _has_bounds up to the groups
-        # that contain those components.
-        for subsys in self._sorted_sys_iter():
-            self._has_bounds |= subsys._has_bounds
-
         # if our configure() has added or promoted any variables, we have to call
         # _setup_var_data again on any modified systems and their ancestors (only those that
         # are our descendents).
@@ -805,16 +799,14 @@ class Group(System):
         self._has_resid_scaling = False
         self._has_bounds = False
 
-        for subsys in self.system_iter(include_self=True, recurse=True):
-            subsys._apply_output_solver_options()
+        for grp in self.system_iter(include_self=True, recurse=True, depth_first=True, typ=Group):
+            for subsys in grp.system_iter(include_self=True, recurse=False):
+                subsys._apply_output_solver_options()
 
-            self._has_output_scaling |= subsys._has_output_scaling
-            self._has_output_adder |= subsys._has_output_adder
-            self._has_resid_scaling |= subsys._has_resid_scaling
-            self._has_bounds |= subsys._has_bounds
-
-        
-        print(f'_has_bounds is now {self._has_bounds}')
+                grp._has_output_scaling |= subsys._has_output_scaling
+                grp._has_output_adder |= subsys._has_output_adder
+                grp._has_resid_scaling |= subsys._has_resid_scaling
+                grp._has_bounds |= subsys._has_bounds
 
         # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
