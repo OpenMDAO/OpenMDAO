@@ -10,7 +10,7 @@ from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.utils.units import unit_conversion
-from openmdao.utils.iter_utils import size2range_iter, meta2item_iter
+from openmdao.utils.iter_utils import meta2range_iter
 
 _empty_dict = {}
 
@@ -84,8 +84,8 @@ class AssembledJacobian(Jacobian):
         """
         return {
             name: rng
-            for name, rng in size2range_iter(meta2item_iter(system._var_abs2meta[vtype].items(),
-                                                            'size'))
+            for name, rng in meta2range_iter(system._var_abs2meta[vtype].items(),
+                                             size_name='size')
         }
 
     def _initialize(self, system):

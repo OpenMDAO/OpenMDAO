@@ -33,13 +33,13 @@ class DefaultVector(Vector):
 
     TRANSFER = DefaultTransfer
 
-    def __init__(self, name, kind, system, name_shape_iter, root_vectors, parent_vector=None,
+    def __init__(self, name, kind, system, name_shape_iter, parent_vectors=None,
                  msginfo='', path='', alloc_complex=False, do_scaling=False, do_adder=False):
         """
         Initialize all attributes.
         """
         self._views_rel = None
-        super().__init__(name, kind, system, name_shape_iter, root_vectors, parent_vector,
+        super().__init__(name, kind, system, name_shape_iter, parent_vectors,
                          msginfo, path, alloc_complex, do_scaling, do_adder)
 
     def __getitem__(self, name):
@@ -101,7 +101,7 @@ class DefaultVector(Vector):
         """
         return self._data if self._under_complex_step else self._data.real
 
-    def _create_data(self):
+    def _create_data(self, system):
         """
         Allocate data array.
 
@@ -113,7 +113,6 @@ class DefaultVector(Vector):
         ndarray
             zeros array of correct size to hold all of this vector's variables.
         """
-        system = self._system()
         size = np.sum(system._var_sizes[self._typ][system.comm.rank, :])
         return np.zeros(size, dtype=complex if self._alloc_complex else float)
 
@@ -143,21 +142,22 @@ class DefaultVector(Vector):
                 ps0 = ps0[self._parent_slice]
             scaling = (ps0, ps1[self._parent_slice])
 
-
         return parent_vector._data[self._parent_slice], scaling
 
-    def _initialize_data(self, root_vectors, parent_vectors):
+    def _initialize_data(self, parent_vectors, system):
         """
         Internally allocate data array.
 
         Parameters
         ----------
-        root_vectors : dict of dict of Vector
-            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vectors : dict of dict of Vector
+            Parent vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        if parent_vectors is None:  # we're the root
-            self._data = self._create_data()
+        if self._name not in parent_vectors[self._kind]:  # this is a root vector
+            self._data = self._create_data(system)
             self._parent_slice = slice(0, len(self))
+            if self._name == 'nonlinear':
+                parent_vectors[self._kind]['nonlinear'] = self
 
             if self._do_scaling:
                 data = self._data
@@ -173,13 +173,14 @@ class DefaultVector(Vector):
                         self._scaling = (None, np.ones(data.size))
                     else:
                         # Reuse the nonlinear scaling vecs since they're the same as ours.
-                        nlvec = root_vectors[self._kind]['nonlinear']
+                        # The nonlinear vectors are created before the linear vectors
+                        nlvec = parent_vectors[self._kind]['nonlinear']
                         self._scaling = (None, nlvec._scaling[1])
                 else:
                     self._scaling = (None, np.ones(data.size))
-
         else:
-            self._data, self._scaling = self._extract_root_data(parent_vectors[self._kind][self._name])
+            parent_vector = parent_vectors[self._kind][self._name]
+            self._data, self._scaling = self._extract_root_data(parent_vector)
 
     def _initialize_views(self, name_shape_iter):
         """

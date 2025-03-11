@@ -1116,7 +1116,7 @@ class Group(System):
         if self._use_derivatives:
             self._setup_partials()
 
-        self._setup_vectors(self._get_root_vectors(), None)
+        self._setup_vectors(None)
 
         self._setup_jax()
 
@@ -1152,21 +1152,20 @@ class Group(System):
 
         self.set_initial_values()
 
-    def _setup_vectors(self, root_vectors, parent_vectors=None):
+    def _setup_vectors(self, parent_vectors):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
         Parameters
         ----------
-        root_vectors : dict of dict of Vector
-            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         parent_vectors : dict or None
             Parent vectors.  Same structure as root_vectors.
         """
-        super()._setup_vectors(root_vectors, parent_vectors)
+        super()._setup_vectors(parent_vectors)
+
         for subsys in self._sorted_sys_iter():
             subsys._scale_factors = self._scale_factors
-            subsys._setup_vectors(root_vectors, self._vectors)
+            subsys._setup_vectors(self._vectors)
 
     def _update_dataflow_graph(self, responses):
         """
@@ -1224,10 +1223,6 @@ class Group(System):
         dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
-        # linear root vec
-        self._root_vecs = root_vectors = {'input': {}, 'output': {}, 'residual': {}}
-
         force_alloc_complex = self._problem_meta['force_alloc_complex']
 
         # Check for complex step to set vectors up appropriately.
@@ -1246,14 +1241,6 @@ class Group(System):
         else:
             ln_alloc_complex = False
 
-        if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
-            self._scale_factors = self._compute_root_scale_factors()
-        else:
-            self._scale_factors = None
-
-        if self._vector_class is None:
-            self._vector_class = self._local_vector_class
-
         # If any proc's local systems need a complex vector, then all procs need it.
         if self.comm.size > 1:
             need_alloc_complex = np.array([nl_alloc_complex, ln_alloc_complex], dtype=int)
@@ -1261,6 +1248,14 @@ class Group(System):
             self.comm.Allreduce(need_alloc_complex, result)
             nl_alloc_complex = bool(result[0])
             ln_alloc_complex = bool(result[1])
+
+        if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
+            self._scale_factors = self._compute_root_scale_factors()
+        else:
+            self._scale_factors = None
+
+        if self._vector_class is None:
+            self._vector_class = self._local_vector_class
 
         do_scaling = {
             'input': self._has_input_scaling,
@@ -1272,6 +1267,10 @@ class Group(System):
             'output': self._has_output_adder,
             'residual': self._has_resid_scaling
         }
+
+        # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
+        # linear root vec
+        self._root_vecs = root_vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         for kind in ['input', 'output', 'residual']:
             root_vectors[kind]['nonlinear'] = self._vector_class('nonlinear', kind, self,
@@ -3072,7 +3071,7 @@ class Group(System):
                     if src_indices.indexed_src_size == 0:
                         continue
 
-                    if src_indices.indexed_src_size != shape_to_len(in_shape):
+                    if src_indices.indexed_src_size != meta_in['size']:
                         # initial dimensions of indices shape must be same shape as target
                         for idx_d, inp_d in zip(src_indices.indexed_src_shape, in_shape):
                             if idx_d != inp_d:

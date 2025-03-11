@@ -2477,24 +2477,22 @@ class System(object, metaclass=SystemMetaclass):
         """
         pass
 
-    def _setup_vectors(self, root_vectors, parent_vectors):
+    def _setup_vectors(self, parent_vectors):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
         Parameters
         ----------
-        root_vectors : dict of dict of Vector
-            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         parent_vectors : dict of dict of Vector or None
             Parent vectors.  Same structure as root_vectors.
         """
         if parent_vectors is None:
-            self._vectors = vectors = root_vectors
+            self._vectors = vectors = self._get_root_vectors()
         else:
             self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
 
             # Allocate complex if root vector was allocated complex.
-            alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
+            alloc_complex = parent_vectors['output']['nonlinear']._alloc_complex
             do_scaling = {
                 'input': self._has_input_scaling,
                 'output': self._has_output_scaling,
@@ -2509,9 +2507,9 @@ class System(object, metaclass=SystemMetaclass):
             # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
             # initially allocated as complex.
             if not alloc_complex and 'cs' in self._approx_schemes:
-                raise RuntimeError("{}: In order to activate complex step during reconfiguration, "
-                                "you need to set 'force_alloc_complex' to True during setup. e.g. "
-                                "'problem.setup(force_alloc_complex=True)'".format(self.msginfo))
+                raise RuntimeError(f"{self.msginfo}: In order to activate complex step during "
+                                   "reconfiguration, you need to set 'force_alloc_complex' to True "
+                                   "during setup. e.g. 'problem.setup(force_alloc_complex=True)'")
 
             if self._vector_class is None:
                 self._vector_class = self._local_vector_class
@@ -2521,13 +2519,12 @@ class System(object, metaclass=SystemMetaclass):
             for vec_name in vectypes:
 
                 # Only allocate complex in the vectors we need.
-                vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
+                vec_alloc_complex = parent_vectors['output'][vec_name]._alloc_complex
 
                 for kind in ['input', 'output', 'residual']:
                     vectors[kind][vec_name] = self._vector_class(
-                        vec_name, kind, self, self._name_shape_iter(kind), root_vectors,
-                        parent_vectors, self.msginfo, self.pathname,
-                        alloc_complex=vec_alloc_complex,
+                        vec_name, kind, self, self._name_shape_iter(kind), parent_vectors,
+                        self.msginfo, self.pathname, alloc_complex=vec_alloc_complex,
                         do_scaling=do_scaling[kind], do_adder=do_adder[kind])
 
             if self._use_derivatives:

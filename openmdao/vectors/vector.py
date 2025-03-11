@@ -39,8 +39,9 @@ class Vector(object):
         The kind of vector, 'input', 'output', or 'residual'.
     system : <System>
         Pointer to the owning system.
-    root_vector : <Vector>
-        Pointer to the vector owned by the root system.
+    parent_vectors : dict of dict of Vector
+        Parent vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        If None, this is a root vector.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
 
@@ -58,8 +59,6 @@ class Vector(object):
         Dictionary mapping absolute variable names to the flattened ndarray views.
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
-    _root_vector : Vector
-        Pointer to the vector owned by the root system.
     _parent_slice : slice
         Slice of the parent vector that this vector represents.
     _alloc_complex : bool
@@ -92,8 +91,8 @@ class Vector(object):
     # Indicator whether a vector class is MPI-distributed
     distributed = False
 
-    def __init__(self, name, kind, system, name_shape_iter, root_vectors, parent_vectors=None, msginfo='',
-                 path='', alloc_complex=False, do_scaling=False, do_adder=False):
+    def __init__(self, name, kind, system, name_shape_iter, parent_vectors=None,
+                 msginfo='', path='', alloc_complex=False, do_scaling=False, do_adder=False):
         """
         Initialize all attributes.
         """
@@ -113,7 +112,6 @@ class Vector(object):
         # set of variables relevant to the current matvec product.
         self._names = self._views
 
-        self._root_vector = None
         self._data = None
         self._slices = None
         self._parent_slice = None
@@ -132,12 +130,11 @@ class Vector(object):
         # for the linear and nonlinear input vectors.
         self._has_solver_ref = system._has_output_scaling and kind == 'input' and name == 'linear'
 
-        if parent_vectors is None:  # we're the root
-            root_vectors[kind][name] = self._root_vector = self
-        else:
-            self._root_vector = root_vectors[kind][name]
+        if name not in parent_vectors[kind]:  # we're a root vec
+            parent_vectors[kind][name] = self
+            self._create_data(system)
 
-        self._initialize_data(root_vectors, parent_vectors)
+        self._initialize_data(parent_vectors, system)
         self._initialize_views(name_shape_iter)
 
         self.read_only = False
@@ -451,7 +448,7 @@ class Vector(object):
         """
         self.set_var(name, value)
 
-    def _initialize_data(self, root_vector):
+    def _initialize_data(self, parent_vectors):
         """
         Internally allocate vectors.
 
@@ -459,8 +456,8 @@ class Vector(object):
 
         Parameters
         ----------
-        root_vector : <Vector> or None
-            the root's vector instance or None, if we are at the root.
+        parent_vectors : dict of dict of Vector
+            Parent vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
         raise NotImplementedError('_initialize_data not defined for vector type '
                                   f'{type(self).__name__}')
@@ -594,7 +591,7 @@ class Vector(object):
         """
         Set the data array of this vector using a value or iter of values, one for each variable.
 
-        The values must be in the same order as the variables appear in this Vector.
+        The values must be in the same order and size as the variables appear in this Vector.
 
         Parameters
         ----------
@@ -762,15 +759,12 @@ class Vector(object):
                                f"given array is size {arr.size} but expected size is {len(self)}.")
 
         dct = {}
-        path = self._system().pathname
-        pathlen = len(path) + 1 if path else 0
+        pathlen = len(self._pathname) + 1 if self._pathname else 0
 
         start = end = 0
         for name, val in self._abs_item_iter(flat=False):
             end += val.size
-            view = arr[start:end]
-            view.shape = val.shape
-            dct[name[pathlen:]] = view
+            dct[name[pathlen:]] = arr[start:end].reshape(val.shape)
             start = end
 
         return dct
