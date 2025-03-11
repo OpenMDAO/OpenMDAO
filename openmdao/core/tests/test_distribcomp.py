@@ -8,7 +8,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.distributed_components import DistribComp, Summer
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.array_utils import evenly_distrib_idxs, take_nth
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.utils.om_warnings import DistributedComponentWarning
 from openmdao.utils.variable_table import NA
 
@@ -32,10 +32,13 @@ class InOutArrayComp(om.ExplicitComponent):
 
         self.add_input('invec', np.ones(arr_size, float))
         self.add_output('outvec', np.ones(arr_size, float))
-
+        self.declare_partials('outvec', 'invec', rows=np.arange(arr_size), cols=np.arange(arr_size))
     def compute(self, inputs, outputs):
         time.sleep(self.options['delay'])
         outputs['outvec'] = inputs['invec'] * 2.
+
+    def compute_partials(self, inputs, partials):
+        partials['outvec', 'invec'] = 2.0 * np.ones((self.options['arr_size'],))
 
 
 class DistribCompSimple(om.ExplicitComponent):
@@ -453,9 +456,7 @@ class MPITests(unittest.TestCase):
         p.run_model()
 
         # this used to fail (bug #1279)
-        cpd = p.check_partials(out_stream=None)
-        for (of, wrt) in cpd['C2']:
-            np.testing.assert_allclose(cpd['C2'][of, wrt]['rel error'][0], 0.0, atol=1e-9)
+        assert_check_partials(p.check_partials(out_stream=None))
 
     def test_list_inputs_outputs(self):
         size = 11
@@ -588,6 +589,7 @@ class MPITests(unittest.TestCase):
 
         p = om.Problem(Model())
         p.setup()
+        p.final_setup()
 
         # verify list_inputs/list_outputs work before final_setup for distributed comp on rank 0 only
         inputs = p.model.C2.list_inputs(shape=True, global_shape=True, val=True, out_stream=None)
@@ -598,8 +600,6 @@ class MPITests(unittest.TestCase):
         inputs = p.model.C2.list_inputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
         outputs = p.model.C2.list_outputs(shape=True, global_shape=True, val=True, all_procs=True, out_stream=None)
         verify(inputs, outputs, pathnames=False, comm=p.comm, final=True)
-
-        p.final_setup()
 
         p['C1.invec'] = np.ones(size, float) * 5.0
 
@@ -812,6 +812,7 @@ class MPITests(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as context:
             prob.setup()
+            prob.final_setup()
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, 'Distributed component input "C.invec" is not connected.')
@@ -821,9 +822,10 @@ class MPITests(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem("C", DistribCompSimple(arr_size=size), promotes=['*'])
+        prob.setup()
 
         with self.assertRaises(RuntimeError) as context:
-            prob.setup()
+            prob.final_setup()
 
         err_msg = str(context.exception).split(':')[-1]
         self.assertEqual(err_msg, 'Distributed component input "C.invec", promoted as "invec", is not connected.')
@@ -844,9 +846,9 @@ class MPITests(unittest.TestCase):
         prob.model.add_subsystem('adder', Adder())
 
         prob.model.connect('ivc.x0','adder.x')
-
+        prob.setup()
         try:
-            prob.setup()
+            prob.final_setup()
         except Exception as err:
             self.assertTrue(
                 "\nCollected errors for problem 'bad_distrib_problem':"
