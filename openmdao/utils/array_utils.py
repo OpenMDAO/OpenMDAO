@@ -947,6 +947,7 @@ else:
     def allclose(a, b, rtol=3e-16, atol=3e-16):
         """
         Return True if all elements of a and b pass a tolerance check.
+
         The tolerance check is:
             abs(a - b) <= atol + rtol * abs(b)
 

@@ -6437,12 +6437,13 @@ class System(object, metaclass=SystemMetaclass):
             # to avoid a confusing KeyError
             return (0,)
         high_dims = shape[1:]
+        sz = shape_to_len(shape)
         with multi_proc_exception_check(self.comm):
             if high_dims:
                 high_size = shape_to_len(high_dims)
 
                 dim_size_match = bool(global_size % high_size == 0)
-                if not dim_size_match and meta['size'] > 0:
+                if dim_size_match is False and sz > 0:
                     raise RuntimeError(f"{self.msginfo}: All but the first dimension of the "
                                        "shape's local parts in a distributed variable must match "
                                        f"across processes. For output '{abs_name}', local shape "

@@ -514,7 +514,7 @@ class _FuncGrapher(ast.NodeVisitor):
 
         for arg in node.args.args:
             self.graph.add_node(arg.arg)
-            
+
         self.fstack.append(node)
         for stmt in node.body:
             self.visit(stmt)

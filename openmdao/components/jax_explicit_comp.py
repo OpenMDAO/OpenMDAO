@@ -169,7 +169,7 @@ class JaxExplicitComponent(ExplicitComponent):
             if self.matrix_free:
                 if self._coloring_info.use_coloring():
                     issue_warning(f"{self.msginfo}: coloring has been set but matrix_free is True, "
-                                "so coloring will be ignored.")
+                                  "so coloring will be ignored.")
                 self._coloring_info.deactivate()
                 self.compute_jacvec_product = self._compute_jacvec_product
             else:
@@ -177,7 +177,7 @@ class JaxExplicitComponent(ExplicitComponent):
                     contvars = set(self._var_rel_names['input'])
                     contvars.update(self._var_rel_names['output'])
                     for of, wrt in get_function_deps(self._orig_compute_primal,
-                                                    self._var_rel_names['output']):
+                                                     self._var_rel_names['output']):
                         if of in contvars and wrt in contvars:
                             self.declare_partials(of, wrt)
 

@@ -3044,7 +3044,7 @@ class Group(System):
                     if src_indices.indexed_src_size == 0:
                         continue
 
-                    if src_indices.indexed_src_size != meta_in['size']:
+                    if src_indices.indexed_src_size != shape_to_len(in_shape):
                         # initial dimensions of indices shape must be same shape as target
                         for idx_d, inp_d in zip(src_indices.indexed_src_shape, in_shape):
                             if idx_d != inp_d:
