@@ -536,10 +536,10 @@ class ImplicitComponent(Component):
             # if we have renamed resids, remap them to use output naming
 
             plen = len(self.pathname) + 1
-            resid_mapper = RangeMapper.create([(n, shape_to_len(meta['shape']))
+            resid_mapper = RangeMapper.create([(n, meta['size'])
                                                for n, meta in self._declared_residuals.items()],
                                               max_flat_range_size=100)
-            out_mapper = RangeMapper.create([(n[plen:], shape_to_len(meta['shape']))
+            out_mapper = RangeMapper.create([(n[plen:], meta['size'])
                                              for n, meta in self._var_abs2meta['output'].items()],
                                             max_flat_range_size=100)
 
@@ -583,9 +583,9 @@ class ImplicitComponent(Component):
                 wrt_sizes = set()
                 for abs_wrt in abs_wrts:
                     if abs_wrt in self._var_abs2meta['input']:
-                        wrtsize = shape_to_len(self._var_abs2meta['input'][abs_wrt]['shape'])
+                        wrtsize = self._var_abs2meta['input'][abs_wrt]['size']
                     else:
-                        wrtsize = shape_to_len(self._var_abs2meta['output'][abs_wrt]['shape'])
+                        wrtsize = self._var_abs2meta['output'][abs_wrt]['size']
                     wrt_sizes.add(wrtsize)
 
                 if len(wrt_sizes) > 1:
@@ -659,8 +659,7 @@ class ImplicitComponent(Component):
                             meta['val'] = val
 
                 else:  # resid partials are all dense
-                    outsize = shape_to_len(self._var_abs2meta['output'][self.pathname + '.' +
-                                                                        oname]['shape'])
+                    outsize = self._var_abs2meta['output'][self.pathname + '.' + oname]['size']
                     for meta in existing_metas:
                         if pattern_val is not None:
                             val, r, c = _subjac_meta2value(meta)

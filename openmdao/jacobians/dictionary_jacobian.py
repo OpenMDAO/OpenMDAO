@@ -141,8 +141,13 @@ class DictionaryJacobian(Jacobian):
         is_explicit = system.is_explicit()
         do_randomize = self._randgen is not None and system._problem_meta['randomize_subjacs']
 
+        do_reset = False
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system):
+                if abs_key not in subjacs_info:
+                    do_reset = True
+                    continue
+
                 res_name, other_name = abs_key
 
                 if other_name in d_out_names:
@@ -216,6 +221,9 @@ class DictionaryJacobian(Jacobian):
                                     d_outputs._abs_set_val(other_name, left_vec)
                                 elif other_name in d_inp_names:
                                     d_inputs._abs_set_val(other_name, left_vec)
+
+            if do_reset:
+                self._iter_keys = None  # subjacs_info has been reduced, so update iter keys
 
 
 class _CheckingJacobian(DictionaryJacobian):
