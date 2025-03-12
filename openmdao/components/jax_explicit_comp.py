@@ -173,13 +173,23 @@ class JaxExplicitComponent(ExplicitComponent):
                 self._coloring_info.deactivate()
                 self.compute_jacvec_product = self._compute_jacvec_product
             else:
+                # if user hasn't declared partials, try to infer them from the compute_primal. If
+                # that fails, declare all partials.
                 if not self._declared_partials_patterns:
-                    contvars = set(self._var_rel_names['input'])
-                    contvars.update(self._var_rel_names['output'])
-                    for of, wrt in get_function_deps(self._orig_compute_primal,
-                                                     self._var_rel_names['output']):
-                        if of in contvars and wrt in contvars:
-                            self.declare_partials(of, wrt)
+                    try:
+                        deps = list(get_function_deps(self._orig_compute_primal,
+                                                      self._var_rel_names['output']))
+                    except Exception:
+                        deps = []
+
+                    if deps:
+                        contvars = set(self._var_rel_names['input'])
+                        contvars.update(self._var_rel_names['output'])
+                        for of, wrt in deps:
+                            if of in contvars and wrt in contvars:
+                                self.declare_partials(of, wrt)
+                    else:
+                        self.declare_partials('*', '*')
 
                 self.compute_partials = self._compute_partials
                 self._has_compute_partials = True

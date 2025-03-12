@@ -510,6 +510,7 @@ class _FuncGrapher(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node):
         if self.fstack:
+            # TODO: support nested functions
             raise RuntimeError("Function contains nested functions, which are not supported.")
 
         for arg in node.args.args:
