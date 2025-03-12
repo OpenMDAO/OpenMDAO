@@ -3170,7 +3170,7 @@ class System(object, metaclass=SystemMetaclass):
 
         return ()  # for dynamic coloring or no coloring
 
-    def system_iter(self, include_self=False, recurse=True, typ=None):
+    def system_iter(self, include_self=False, recurse=True, typ=None, depth_first=False):
         """
         Yield a generator of local subsystems of this system.
 
@@ -3183,20 +3183,32 @@ class System(object, metaclass=SystemMetaclass):
         typ : type
             If not None, only yield Systems that match that are instances of the
             given type.
+        depth_first : bool
+            If recurse is True, this specifies whether subsystems are returned
+            in depth-first order (if True) or bredth-first order (if False).
 
         Yields
         ------
         type or None
         """
-        if include_self and (typ is None or isinstance(self, typ)):
-            yield self
+        if not recurse or not depth_first:
+            if include_self and (typ is None or isinstance(self, typ)):
+                yield self
 
-        for s in self._subsystems_myproc:
-            if typ is None or isinstance(s, typ):
-                yield s
-            if recurse:
-                for sub in s.system_iter(recurse=True, typ=typ):
+            for s in self._subsystems_myproc:
+                if typ is None or isinstance(s, typ):
+                    yield s
+                if recurse:
+                    for sub in s.system_iter(recurse=True, typ=typ):
+                        yield sub
+        else:
+            for s in self._subsystems_myproc:
+                for sub in s.system_iter(recurse=True, typ=typ, depth_first=True):
                     yield sub
+                if typ is None or isinstance(s, typ):
+                    yield s
+            if include_self and (typ is None or isinstance(self, typ)):
+                yield self
 
     def _all_subsystem_iter(self):
         """
