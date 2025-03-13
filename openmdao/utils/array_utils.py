@@ -979,10 +979,11 @@ else:
             if abs_err < 0.:
                 abs_err = -abs_err
 
+            if abs_err > atol:
+                return False
+
             if bval < 0.:
                 bval = -bval
-
-
 
             if abs_err > atol + rtol * bval:
                 return False
