@@ -568,11 +568,13 @@ class ReturnChecker(ast.NodeVisitor):
     _returns : list
         The list of boolean values indicating whether or not the method returns a tuple. One
         entry for each return statement in the method.
+    _fstack : list
+        The stack of function definitions being visited.
     """
 
     def __init__(self, method):  # noqa
         self._returns = []
-        self.fstack = []
+        self._fstack = []
         self.visit(ast.parse(textwrap.dedent(inspect.getsource(method)), mode='exec'))
 
     def returns_tuple(self):
@@ -613,12 +615,12 @@ class ReturnChecker(ast.NodeVisitor):
         node : ASTnode
             The function definition node being visited.
         """
-        if self.fstack:
+        if self._fstack:
             return  # skip nested functions
-        self.fstack.append(node)
+        self._fstack.append(node)
         for stmt in node.body:
             self.visit(stmt)
-        self.fstack.pop()
+        self._fstack.pop()
 
 
 def get_self_static_attrs(method):
