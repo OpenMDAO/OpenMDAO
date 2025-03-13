@@ -145,6 +145,9 @@ class DictionaryJacobian(Jacobian):
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._iter_abs_keys(system):
                 if abs_key not in subjacs_info:
+                    # for components that compute sparsity at first linearization, some subjacs
+                    # will be determined to be zero and removed from subjacs_info., so we need to
+                    # update our iteration keys.
                     do_reset = True
                     continue
 

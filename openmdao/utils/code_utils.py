@@ -533,9 +533,9 @@ class _FuncGrapher(ast.NodeVisitor):
     def visit_Attribute(self, node):
         name = _get_long_name(node.value)
         if name is not None:
-            parts = name.split('.')
-            if parts[0] in self.graph:
-                self.names.append(parts[0])
+            base = name.partition('.')[0]
+            if base in self.graph:
+                self.names.append(base)
 
     def visit_Call(self, node):
         # only visit the args

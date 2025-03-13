@@ -951,7 +951,7 @@ else:
         The tolerance check is:
             abs(a - b) <= atol + rtol * abs(b)
 
-        Returns when the first non-close element is found.  a and b must have the same size.
+        Returns when the first non-close element is found.
 
         Parameters
         ----------
@@ -970,28 +970,21 @@ else:
             True if all elements of a and b are close within the given absolute and
             relative tolerance.
         """
-        for i in range(len(a)):
-            aval = a[i]
-            bval = b[i]
+        if a.size != b.size:
+            return False
 
-            absdiff = aval - bval
-            if absdiff < 0.:
-                absdiff = -absdiff
+        for aval, bval in zip(a, b):
+            abs_err = aval - bval
 
-            if aval < 0.:
-                aval = -aval
+            if abs_err < 0.:
+                abs_err = -abs_err
+
             if bval < 0.:
                 bval = -bval
 
-            if aval < bval:
-                vmax = rtol * bval
-            else:
-                vmax = rtol * aval
 
-            if atol > vmax:
-                vmax = atol
 
-            if absdiff > vmax:
+            if abs_err > atol + rtol * bval:
                 return False
 
         return True

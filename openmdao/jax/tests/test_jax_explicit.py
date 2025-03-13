@@ -436,6 +436,25 @@ class TestJaxComp(unittest.TestCase):
                                            method=method, show_only_incorrect=True))
         assert_sparsity_matches_fd(comp, outstream=None)
 
+    def test_jax_subjacs_info_entries(self):
+        p = om.Problem()
+        G = p.model.add_subsystem('G', om.Group())
+        G.add_subsystem('comp', DotProdMultPrimalNoDeclPartials())
+
+        p.setup()
+
+        p['G.comp.x'] = np.array([1, 2])
+        p['G.comp.y'] = np.array([3, 4])
+
+        p.run_model()
+
+        self.assertEqual(len(G._subjacs_info), 5)
+        self.assertEqual(set(G._subjacs_info.keys()),
+                         {('G.comp.z', 'G.comp.x'), ('G.comp.zz', 'G.comp.y'),
+                          ('G.comp.z', 'G.comp.y'), ('G.comp.zz', 'G.comp.zz'),
+                          ('G.comp.z', 'G.comp.z')})
+
+
 if sys.version_info >= (3, 9):
 
     class CompRetValue(om.JaxExplicitComponent):
