@@ -488,7 +488,7 @@ class Driver(object, metaclass=DriverMetaclass):
 
         # Now determine if later we'll need to allgather cons, objs, or desvars.
         if model.comm.size > 1:
-            loc_vars = set(model._outputs._abs_iter())
+            loc_vars = set(model._outputs)
             # some of these lists could have duplicate src names if aliases are used. We'll
             # fix that when we convert to sets after the allgather.
             remote_dvs = [n for n in _src_name_iter(self._designvars) if n not in loc_vars]
@@ -742,7 +742,7 @@ class Driver(object, metaclass=DriverMetaclass):
 
         if recording_options['record_residuals']:
             match_names.update(model._residuals)
-            myresiduals = [n for n in model._residuals._abs_iter()
+            myresiduals = [n for n in model._residuals
                            if check_path(abs2prom_output[n], incl, excl)]
 
         if recording_options['record_desvars']:

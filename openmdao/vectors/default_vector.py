@@ -374,16 +374,14 @@ class DefaultVector(Vector):
         mode : str
             Derivative direction.
         """
-        if self._has_solver_ref and mode == 'fwd':
-            scaler = self._scaling_nl_vec[1]
-            adder = None
-        else:
-            adder, scaler = self._scaling
-
         if mode == 'rev':
-            self._scale_reverse(scaler, adder)
+            self._scale_reverse(self._scaling[1], self._scaling[0])
         else:
-            self._scale_forward(scaler, adder)
+            if self._has_solver_ref:
+                self._scale_forward(self._scaling_nl_vec[1], None)
+            else:
+                adder, scaler = self._scaling
+                self._scale_forward(scaler, adder)
 
     def scale_to_phys(self, mode='fwd'):
         """
@@ -394,16 +392,14 @@ class DefaultVector(Vector):
         mode : str
             Derivative direction.
         """
-        if self._has_solver_ref and mode == 'fwd':
-            scaler = self._scaling_nl_vec[1]
-            adder = None
-        else:
-            adder, scaler = self._scaling
-
         if mode == 'rev':
-            self._scale_forward(scaler, adder)
+            self._scale_forward(self._scaling[1], self._scaling[0])
         else:
-            self._scale_reverse(scaler, adder)
+            if self._has_solver_ref:
+                self._scale_reverse(self._scaling_nl_vec[1], None)
+            else:
+                adder, scaler = self._scaling
+                self._scale_reverse(scaler, adder)
 
     def _scale_forward(self, scaler, adder):
         """

@@ -436,14 +436,9 @@ class Group(System):
         # This is a combined scale factor that includes the scaling of the connected source
         # and the unit conversion between the source output and each target input.
         if self._has_input_scaling:
-            abs2meta_in = self._var_abs2meta['input']
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
-            for abs_in, abs_out in self._conn_global_abs_in2out.items():
-                if abs_in not in abs2meta_in:
-                    # we only perform scaling on local, non-discrete arrays, so skip
-                    continue
-
-                meta_in = abs2meta_in[abs_in]
+            for abs_in, meta_in in self._var_abs2meta['input'].items():
+                abs_out = self._conn_global_abs_in2out[abs_in]
 
                 meta_out = allprocs_meta_out[abs_out]
                 ref = meta_out['ref']

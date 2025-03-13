@@ -13,7 +13,7 @@ _full_slice = slice(None)
 _flat_full_indexer = indexer(_full_slice, flat_src=True)
 _full_indexer = indexer(_full_slice, flat_src=False)
 
-_type_map = {
+_type_map = {  # map vector type to iotype
     'input': 'input',
     'output': 'output',
     'residual': 'output'
@@ -579,7 +579,7 @@ class Vector(object):
         """
         Set the data array of this vector using a value or iter of values, one for each variable.
 
-        The values must be in the same order as the variables appear in this Vector.
+        The values must be in the same order and size as the variables appear in this Vector.
 
         Parameters
         ----------
@@ -753,9 +753,7 @@ class Vector(object):
         start = end = 0
         for name, val in self._abs_item_iter(flat=False):
             end += val.size
-            view = arr[start:end]
-            view.shape = val.shape
-            dct[name[pathlen:]] = view
+            dct[name[pathlen:]] = arr[start:end].reshape(val.shape)
             start = end
 
         return dct

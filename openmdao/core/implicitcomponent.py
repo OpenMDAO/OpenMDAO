@@ -16,7 +16,7 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.coloring import _ColSparsityJac
-
+from openmdao.utils.iter_utils import meta2range_iter
 
 _tuplist = (tuple, list)
 
@@ -1008,46 +1008,6 @@ class ImplicitComponent(Component):
             self._apply_nonlinear()
             self.compute_fd_jac(jac=jac, method=method)
         return jac.get_sparsity()
-
-
-def meta2range_iter(meta_dict, names=None, shp_name='shape'):
-    """
-    Iterate over variables and their ranges, based on shape metadata for each variable.
-
-    Parameters
-    ----------
-    meta_dict : dict
-        Mapping of variable name to metadata (which contains shape information).
-    names : iter of str or None
-        If not None, restrict the ranges to those variables contained in names.
-    shp_name : str
-        Name of the shape metadata entry.  Defaults to 'shape', but could also be 'global_shape'.
-
-    Yields
-    ------
-    str
-        Name of variable.
-    int
-        Starting index.
-    int
-        Ending index.
-    """
-    start = end = 0
-
-    if names is None:
-        for name in meta_dict:
-            end += shape_to_len(meta_dict[name][shp_name])
-            yield name, start, end
-            start = end
-    else:
-        if not isinstance(names, (set, dict)):
-            names = set(names)
-
-        for name in meta_dict:
-            end += shape_to_len(meta_dict[name][shp_name])
-            if name in names:
-                yield name, start, end
-            start = end
 
 
 def _overlap_range_iter(meta_dict1, meta_dict2, names1=None, names2=None):
