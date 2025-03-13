@@ -799,13 +799,17 @@ class Group(System):
         self._has_resid_scaling = False
         self._has_bounds = False
 
-        for subsys in self.system_iter(include_self=True, recurse=True):
-            subsys._apply_output_solver_options()
+        _has_applied_options = set()
+        for grp in self.system_iter(include_self=True, recurse=True, depth_first=True, typ=Group):
+            for subsys in grp.system_iter(include_self=True, recurse=False):
+                if subsys.pathname not in _has_applied_options:
+                    subsys._apply_output_solver_options()
+                    _has_applied_options.add(subsys.pathname)
 
-            self._has_output_scaling |= subsys._has_output_scaling
-            self._has_output_adder |= subsys._has_output_adder
-            self._has_resid_scaling |= subsys._has_resid_scaling
-            self._has_bounds |= subsys._has_bounds
+                grp._has_output_scaling |= subsys._has_output_scaling
+                grp._has_output_adder |= subsys._has_output_adder
+                grp._has_resid_scaling |= subsys._has_resid_scaling
+                grp._has_bounds |= subsys._has_bounds
 
         # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone

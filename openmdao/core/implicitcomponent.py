@@ -284,6 +284,33 @@ class ImplicitComponent(Component):
                 finally:
                     d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
+    def _solve_linear_wrapper(self, *args):
+        """
+        Call solve_linear based on the value of the "run_root_only" option.
+
+        Parameters
+        ----------
+        *args : list
+            List of positional arguments.
+        """
+        d_outputs, d_residuals, mode = args
+        if self._run_root_only():
+            if self.comm.rank == 0:
+                self.solve_linear(d_outputs, d_residuals, mode)
+                if mode == 'fwd':
+                    self.comm.bcast(d_outputs.asarray(), root=0)
+                else:  # rev
+                    self.comm.bcast((d_residuals.asarray()), root=0)
+            else:
+                if mode == 'fwd':
+                    new_outs = self.comm.bcast(None, root=0)
+                    d_outputs.set_val(new_outs)
+                else:  # rev
+                    new_res = self.comm.bcast(None, root=0)
+                    d_residuals.set_val(new_res)
+        else:
+            self.solve_linear(d_outputs, d_residuals, mode)
+
     def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
@@ -314,7 +341,7 @@ class ImplicitComponent(Component):
 
                 try:
                     with self._call_user_function('solve_linear'):
-                        self.solve_linear(d_outputs, d_residuals, mode)
+                        self._solve_linear_wrapper(d_outputs, d_residuals, mode)
                 finally:
                     d_outputs.read_only = d_residuals.read_only = False
 

@@ -98,7 +98,11 @@ def _get_top_script():
         The absolute path, or None if it can't be resolved.
     """
     try:
-        return pathlib.Path(__main__.__file__).resolve()
+        script_name = os.environ.get('OPENMDAO_SCRIPT_NAME')
+        if script_name is not None:
+            return pathlib.Path(script_name).resolve()
+        else:
+            return pathlib.Path(__main__.__file__).resolve()
     except Exception:
         # this will error out in some cases, e.g. inside of a jupyter notebook, so just
         # return None in that case.
@@ -1199,7 +1203,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                 current_status = _SetupStatus.POST_FINAL_SETUP
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
-                       compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
+                       compact_print=False, abs_err_tol=0.0, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
                        minimum_step=1e-12, force_dense=True, show_only_incorrect=False):
         """
@@ -1253,10 +1257,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             First key is the component name.
             Second key is the (output, input) tuple of strings.
             The third key is one of:
-            'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_abs',
-            'vals_at_max_rel', and 'rank_inconsistent'.
-            For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
-            tuple containing values for forward - fd, adjoint - fd, forward - adjoint. For
+            'tol violation', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_error',
+            and 'rank_inconsistent'.
+            For 'tol violation' and 'vals_at_max_error' the value is a tuple containing values for
+            forward - fd, adjoint - fd, forward - adjoint. For
             'magnitude' the value is a tuple indicating the maximum magnitude of values found in
             Jfwd, Jrev, and Jfd.
             The boolean 'rank_inconsistent' indicates if the derivative wrt a serial variable is
@@ -1331,11 +1335,11 @@ class Problem(object, metaclass=ProblemMetaclass):
                     worst = wrst + (type(comp).__name__, comp.pathname)
 
         if worst is not None:
-            _, table_data, headers, ctype, cpath = worst
+            _, table_data, headers, col_meta, ctype, cpath = worst
             print(file=out_stream)
-            print(add_border(f"Sub Jacobian with Largest Relative Error: {ctype} '{cpath}'", '#'),
-                  file=out_stream)
-            _print_deriv_table([table_data[:-1]], headers[:-1], out_stream)
+            print(add_border(f"Sub Jacobian with Largest Tolerance Violation: {ctype} '{cpath}'",
+                             '#'), file=out_stream)
+            _print_deriv_table([table_data], headers, out_stream, col_meta=col_meta)
 
         if step is None or isinstance(step, (float, int)):
             _fix_check_data(partials_data)
@@ -1343,7 +1347,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         return partials_data
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
-                     driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd',
+                     driver_scaling=False, abs_err_tol=0.0, rel_err_tol=1e-6, method='fd',
                      step=None, form=None, step_calc='abs', show_progress=False,
                      show_only_incorrect=False, directional=False, sort=True):
         """
@@ -1404,13 +1408,12 @@ class Problem(object, metaclass=ProblemMetaclass):
             First key:
                 is the (output, input) tuple of strings;
             Second key:
-                'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_abs',
-                'vals_at_max_rel', and 'rank_inconsistent'.
+                'tol violation', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_error',
+                and 'rank_inconsistent'.
 
-            For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
-            tuple containing values for forward - fd, reverse - fd, forward - reverse. For
-            'magnitude' the value is a tuple indicating the maximum magnitude of values found in
-            Jfwd, Jrev, and Jfd.
+            For 'tol violation' and 'vals_at_max_error' the value is a tuple containing values for
+            forward - fd, reverse - fd, forward - reverse. For 'magnitude' the value is a tuple
+            indicating the maximum magnitude of values found in Jfwd, Jrev, and Jfd.
         """
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout

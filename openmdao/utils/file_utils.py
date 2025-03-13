@@ -13,7 +13,7 @@ import shutil
 import tempfile
 
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.general_utils import env_truthy
+from openmdao.utils.testing_utils import set_env_vars_context, env_truthy
 
 
 def get_module_path(fpath):
@@ -199,7 +199,8 @@ def _load_and_exec(script_name, user_args):
         '__cached__': None,
     }
 
-    exec(code, globals_dict)  # nosec: private, internal use only
+    with set_env_vars_context(OPENMDAO_SCRIPT_NAME=script_name):
+        exec(code, globals_dict)  # nosec: private, internal use only
 
 
 def fname2mod_name(fname):

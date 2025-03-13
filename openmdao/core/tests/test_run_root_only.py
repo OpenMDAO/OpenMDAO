@@ -70,6 +70,7 @@ class ImplCompArrayMatVecCounted(TestImplCompArrayMatVec):
         self.napply_linears = 0
         self.nsolve_nonlinears = 0
         self.napply_nonlinears = 0
+        self.nsolve_linears = 0
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         super().apply_nonlinear(inputs, outputs, residuals)
@@ -83,6 +84,10 @@ class ImplCompArrayMatVecCounted(TestImplCompArrayMatVec):
                      mode):
         super().apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
         self.napply_linears += 1
+
+    def solve_linear(self, d_outputs, d_residuals, mode):
+        super().solve_linear(d_outputs, d_residuals, mode)
+        self.nsolve_linears += 1
 
 
 @unittest.skipUnless(MPI is not None and PETScVector is not None, "MPI and PETSc are required.")
@@ -294,6 +299,11 @@ class TestRunRootOnly(unittest.TestCase):
             self.assertEqual(comp.napply_linears, 2)
         else:
             self.assertEqual(comp.napply_linears, 0)
+
+        if prob.comm.rank == 0:
+            self.assertEqual(comp.nsolve_linears, 2)
+        else:
+            self.assertEqual(comp.nsolve_linears, 0)
 
         np.testing.assert_allclose(J['comp.x', 'indeps.x'], np.eye(2))
 
