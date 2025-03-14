@@ -31,6 +31,7 @@ See the Bug Fixes section below for various other improvements in this release.
 - Added work_dir as an option to problem, [#3455](https://github.com/OpenMDAO/OpenMDAO/pull/3455)
 - Calling set_val can now set shapes of dynamically shaped variables (shape_by_conn) [#3458](https://github.com/OpenMDAO/OpenMDAO/pull/3458)
 - Derivative checks are now like numpy.allclose [#3465](https://github.com/OpenMDAO/OpenMDAO/pull/3465)
+- Improved handling of scalar Component inputs and outputs. [#3482](https://github.com/OpenMDAO/OpenMDAO/pull/3482)
 
 ## Bug Fixes
 
@@ -46,6 +47,7 @@ See the Bug Fixes section below for various other improvements in this release.
 - When running under testflo, sets OPENMDAO_WORKDIR to a temp dir if it's not already set [#3466](https://github.com/OpenMDAO/OpenMDAO/pull/3466)
 - Updated the `latest` GitHub workflow to just test with NumPy 2.x and latest pyOptSparse [#3474](https://github.com/OpenMDAO/OpenMDAO/pull/3474)
 - Added numba as optional dependency for some performance-sensitive areas. [#3479](https://github.com/OpenMDAO/OpenMDAO/pull/3479)
+- Added an ARM image [#3481](https://github.com/OpenMDAO/OpenMDAO/pull/3481)
 
 ***********************************
 # Release Notes for OpenMDAO 3.37.0
