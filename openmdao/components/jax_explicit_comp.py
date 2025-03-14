@@ -129,8 +129,7 @@ class JaxExplicitComponent(ExplicitComponent):
         **kwargs : dict
             The kwargs to pass to the base class method.
         """
-        kwargs = _update_add_input_kwargs(self, **kwargs)
-        super().add_input(name, **kwargs)
+        super().add_input(name, **_update_add_input_kwargs(self, **kwargs))
 
     def add_output(self, name, **kwargs):
         """
@@ -146,8 +145,7 @@ class JaxExplicitComponent(ExplicitComponent):
         **kwargs : dict
             The kwargs to pass to the base class method.
         """
-        kwargs = _update_add_output_kwargs(self, name, **kwargs)
-        super().add_output(name, **kwargs)
+        super().add_output(name, **_update_add_output_kwargs(self, name, **kwargs))
 
     def _setup_jax(self):
         """

@@ -65,6 +65,17 @@ class JaxImplicitComponent(ImplicitComponent):
                           f"'{fallback_derivs_method}' will be used for derivatives.")
             self.options['derivs_method'] = fallback_derivs_method
 
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super()._declare_options()
+        self.options.declare('default_to_dyn_shapes', types=bool, default=False,
+                             desc='If True, use dynamic shaping for any variables whose value is '
+                             'scalar and whose shape is not explicitly set. Inputs will use '
+                             'shape_by_conn and outputs will use a compute_shape method based '
+                             'on jax.eval_shape. Default is False.')
+
     def add_input(self, name, **kwargs):
         """
         Add an input to the component.
