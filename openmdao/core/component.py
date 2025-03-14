@@ -167,10 +167,10 @@ class Component(System):
         self.options.declare('use_jit', types=bool, default=True,
                              desc='If True, attempt to use jit on compute_primal, assuming jax or '
                              'some other AD package capable of jitting is active.')
-        self.options.declare('default_shape', types=tuple, default=(1,), allow_none=True,
+        self.options.declare('default_shape', types=tuple, default=(1,),
                              desc='Default shape for variables that do not set val to a non-scalar '
                              'value or set shape, set shape_by_conn, copy_shape, or compute_shape.'
-                             ' If None, default_shape will not be used. Default is (1,).')
+                             ' Default is (1,).')
 
     def setup(self):
         """

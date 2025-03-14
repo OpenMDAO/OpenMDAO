@@ -80,11 +80,6 @@ def ensure_compatible(name, value, shape=None, indices=None, default_shape=(1,))
                 shape = indshape
 
     if shape is None:
-        # if we get here and default_shape is None, just use the typical default of (1,).
-        # In jax components, for example, we won't get here because default_shape of None
-        # activates auto dynamic shaping.
-        if default_shape is None:
-            default_shape = (1,)
         # shape is not determined, assume the shape of value was intended
         if np.isscalar(value):
             value = np.full(default_shape, value)

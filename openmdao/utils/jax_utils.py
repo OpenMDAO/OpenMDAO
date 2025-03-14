@@ -1316,10 +1316,8 @@ def to_compute_primal(inst, outfile='stdout', verbose=False):
             print(jaxer.get_class_src(), file=f)
 
 
-def _update_add_input_kwargs(self, name, **kwargs):
-    if self.options['derivs_method'] == 'jax' and self.options['default_shape'] is None:
-        # for jax components, make shape_by_conn the default behavior if the shape and
-        # default_shape aren't defined
+def _update_add_input_kwargs(self, **kwargs):
+    if self.options['default_to_dyn_shapes']:
         if kwargs.get('val') is None and kwargs.get('shape') is None:
             if kwargs.get('copy_shape') is None and kwargs.get('compute_shape') is None:
                 if kwargs.get('shape_by_conn') is None:
@@ -1329,9 +1327,7 @@ def _update_add_input_kwargs(self, name, **kwargs):
 
 
 def _update_add_output_kwargs(self, name, **kwargs):
-    if self.options['derivs_method'] == 'jax' and self.options['default_shape'] is None:
-        # for jax components, use compute_shape for outputs if the shape and
-        # default_shape aren't defined
+    if self.options['default_to_dyn_shapes']:
         if kwargs.get('val') is None and kwargs.get('shape') is None:
             if kwargs.get('copy_shape') is None and kwargs.get('compute_shape') is None:
                 # add our own compute_shape function
