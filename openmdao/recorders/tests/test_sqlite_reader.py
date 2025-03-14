@@ -2070,10 +2070,10 @@ class TestSqliteCaseReader(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0, shape=()), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0, shape=()), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = x - y', c={'shape': ()}), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(default_shape=()), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y', default_shape=()), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -3153,7 +3153,7 @@ class DummyClass(object):
         parab_component_options = cr._system_options['parab_with_dummy_metadata']['component_options']
         component_options_names = [name for name in parab_component_options]
         from openmdao.recorders.sqlite_reader import UnknownType
-        self.assertEqual(['always_opt', 'derivs_method', 'distributed', 'dummy', 'run_root_only', 'use_jit'],
+        self.assertEqual(['always_opt', 'default_shape', 'derivs_method', 'distributed', 'dummy', 'run_root_only', 'use_jit'],
                          sorted(component_options_names))
         self.assertTrue(isinstance(parab_component_options['dummy'], UnknownType))
 

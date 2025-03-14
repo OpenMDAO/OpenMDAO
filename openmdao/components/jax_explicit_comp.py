@@ -63,11 +63,15 @@ class JaxExplicitComponent(ExplicitComponent):
         self.compute_primal = self._ret_tuple_compute_primal
 
         # if derivs_method is explicitly passed in, just use it
-        if 'derivs_method' in kwargs:
+        if 'derivs_method' in kwargs and kwargs['derivs_method'] != 'jax':
             return
 
         if jax:
             self.options['derivs_method'] = 'jax'
+
+            if 'default_shape' not in kwargs:
+                # by default, use auto dynamic shaping
+                self.options['default_shape'] = None
         else:
             issue_warning(f"{self.msginfo}: JAX is not available, so '{fallback_derivs_method}' "
                           "will be used for derivatives.")

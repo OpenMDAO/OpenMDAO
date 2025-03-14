@@ -182,7 +182,7 @@ class BroydenSolver(NonlinearSolver):
             n = 0
             meta = system._var_allprocs_abs2meta['output']
 
-            for i, name in enumerate(states):
+            for name in states:
                 size = meta[prom2abs[name][0]]['global_size']
                 self._idx[name] = (n, n + size)
                 n += size

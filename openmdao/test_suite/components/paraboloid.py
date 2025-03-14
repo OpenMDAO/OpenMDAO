@@ -10,10 +10,10 @@ class Paraboloid(om.ExplicitComponent):
     """
 
     def setup(self):
-        self.add_input('x', val=0.0, shape=())
-        self.add_input('y', val=0.0, shape=())
+        self.add_input('x', val=0.0)
+        self.add_input('y', val=0.0)
 
-        self.add_output('f_xy', val=0.0, shape=())
+        self.add_output('f_xy', val=0.0)
 
     def setup_partials(self):
         self.declare_partials('*', '*')

@@ -17,7 +17,7 @@ class TestCaseRetrieval(unittest.TestCase):
     def setUp(self):
         # build the model
         prob = self._prob = om.Problem()
-        prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
+        prob.model.add_subsystem('parab', Paraboloid(default_shape=()), promotes_inputs=['x', 'y'])
 
         # define the component whose output will be constrained
         prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])

@@ -738,7 +738,7 @@ class TestDOEDriver(unittest.TestCase):
 
         model.set_input_defaults('x', 0.0)
         model.set_input_defaults('y', 0.0)
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model.add_subsystem('comp', Paraboloid(default_shape=()), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
         model.add_design_var('y', lower=0.0, upper=1.0)

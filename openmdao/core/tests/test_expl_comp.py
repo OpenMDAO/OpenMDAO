@@ -746,8 +746,8 @@ class ExplCompTestCase(unittest.TestCase):
         class EComp(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('x', val=1, shape=())
-                self.add_output('y', val=1, shape=())
+                self.add_input('x', val=1)
+                self.add_output('y', val=1)
 
             def compute(self, inputs, outputs):
                 outputs['y'] = 2*inputs['x']
@@ -755,10 +755,10 @@ class ExplCompTestCase(unittest.TestCase):
         class IComp(om.ImplicitComponent):
 
             def setup(self):
-                self.add_input('y', val=1, shape=())
-                self.add_output('z1', val=1, shape=())
-                self.add_output('z2', val=1, shape=())
-                self.add_output('z3', val=1, shape=())
+                self.add_input('y', val=1)
+                self.add_output('z1', val=1)
+                self.add_output('z2', val=1)
+                self.add_output('z3', val=1)
 
             def solve_nonlinear(self, inputs, outputs):
                 # only solving z1 so that one specific residual goes to 0
@@ -771,8 +771,8 @@ class ExplCompTestCase(unittest.TestCase):
 
 
         p = om.Problem()
-        p.model.add_subsystem('ec', EComp(), promotes=['*'])
-        p.model.add_subsystem('ic', IComp(), promotes=['*'])
+        p.model.add_subsystem('ec', EComp(default_shape=()), promotes=['*'])
+        p.model.add_subsystem('ic', IComp(default_shape=()), promotes=['*'])
 
         p.setup()
 

@@ -27,10 +27,9 @@ _allowed_meta = {'value', 'val', 'shape', 'units', 'res_units', 'desc',
                  'constant'}
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only',
-                     'constant', 'do_coloring',
-                     'assembled_jac_type', 'derivs_method',
-                     'distributed', 'always_opt', 'use_jit'}
+_option_names = {'has_diag_partials', 'units', 'shape', 'default_shape', 'shape_by_conn',
+                 'run_root_only', 'constant', 'do_coloring', 'assembled_jac_type', 'derivs_method',
+                 'distributed', 'always_opt', 'use_jit'}
 
 
 def check_option(option, value):
@@ -214,7 +213,7 @@ class ExecComp(ExplicitComponent):
                                  'units': 'ft'})
         """
         options = {}
-        for name in _disallowed_names:
+        for name in _option_names:
             if name in kwargs:
                 options[name] = kwargs.pop(name)
 
@@ -297,7 +296,7 @@ class ExecComp(ExplicitComponent):
         if name in _expr_dict:
             raise NameError(f"{cls.__name__}: '{name}' has already been registered.")
 
-        if name in _disallowed_names:
+        if name in _option_names:
             raise NameError(f"{cls.__name__}: cannot register name '{name}' because "
                             "it's a reserved keyword.")
 
@@ -589,7 +588,7 @@ class ExecComp(ExplicitComponent):
         fnames = [n[:-1] for n in names if n[-1] == '(']
         to_remove = []
         for v in vnames:
-            if v in _disallowed_names:
+            if v in _option_names:
                 raise NameError("%s: cannot use variable name '%s' because "
                                 "it's a reserved keyword." % (self.msginfo, v))
             if v in _expr_dict:

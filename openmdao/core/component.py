@@ -166,7 +166,11 @@ class Component(System):
                                   'relevant to the design variables and responses.')
         self.options.declare('use_jit', types=bool, default=True,
                              desc='If True, attempt to use jit on compute_primal, assuming jax or '
-                             'some other AD package is active.')
+                             'some other AD package capable of jitting is active.')
+        self.options.declare('default_shape', types=tuple, default=(1,), allow_none=True,
+                             desc='Default shape for variables that do not set val to a non-scalar '
+                             'value or set shape, set shape_by_conn, copy_shape, or compute_shape.'
+                             ' If None, default_shape will not be used. Default is (1,).')
 
     def setup(self):
         """
@@ -615,7 +619,8 @@ class Component(System):
                                  "variable '%s'." % (self.msginfo, shape, val, name))
         else:
             # value, shape: based on args, making sure they are compatible
-            val, shape = ensure_compatible(name, val, shape)
+            val, shape = ensure_compatible(name, val, shape,
+                                           default_shape=self.options['default_shape'])
 
         # until we get rid of component level distributed option, handle the case where
         # component distributed has been set to True but variable distributed has been set
@@ -834,14 +839,15 @@ class Component(System):
                 msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
                 raise TypeError(msg % self.msginfo)
 
+            default_shape = self.options['default_shape']
             # value, shape: based on args, making sure they are compatible
-            val, shape = ensure_compatible(name, val, shape)
+            val, shape = ensure_compatible(name, val, shape, default_shape=default_shape)
 
             if lower is not None:
-                lower = ensure_compatible(name, lower, shape)[0]
+                lower = ensure_compatible(name, lower, shape, default_shape=default_shape)[0]
                 self._has_bounds = True
             if upper is not None:
-                upper = ensure_compatible(name, upper, shape)[0]
+                upper = ensure_compatible(name, upper, shape, default_shape=default_shape)[0]
                 self._has_bounds = True
 
             # All refs: check the shape if necessary
