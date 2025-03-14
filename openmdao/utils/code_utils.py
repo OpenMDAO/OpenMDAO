@@ -510,7 +510,12 @@ class _FuncGrapher(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node):
         if self.fstack:
+            # TODO: support nested functions
             raise RuntimeError("Function contains nested functions, which are not supported.")
+
+        for arg in node.args.args:
+            self.graph.add_node(arg.arg)
+
         self.fstack.append(node)
         for stmt in node.body:
             self.visit(stmt)
@@ -526,9 +531,14 @@ class _FuncGrapher(ast.NodeVisitor):
         self._update_graph()
 
     def visit_Attribute(self, node):
-        pass  # skip any Name nodes that are part of an Attribute node
+        name = _get_long_name(node.value)
+        if name is not None:
+            base = name.partition('.')[0]
+            if base in self.graph:
+                self.names.append(base)
 
     def visit_Call(self, node):
+        # only visit the args
         for arg in node.args:
             self.visit(arg)
 
@@ -575,12 +585,12 @@ def get_func_graph(func, outnames=None, display=False):
         A graph containing edges from inputs to outputs.  Returns None if the function graph
         couldn't be determined.
     """
-    node = ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec')
     try:
+        node = ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec')
         visitor = _FuncGrapher(node)
-    except RuntimeError as err:
+    except Exception as err:
         issue_warning(f"Can't determine function graph for function '{func.__name__}' "
-                      f"due to: {err}")
+                      f"so assuming all outputs depend on all inputs.  Error was: {err}")
         return
 
     retnames = _get_return_names(visitor.outs)
@@ -597,7 +607,7 @@ def get_func_graph(func, outnames=None, display=False):
                                    f"expected name '{ret}.")
     else:
         outnames = []
-        for i, ret in enumerate(retnames):
+        for ret in retnames:
             if ret is None or ret in inputs:
                 outnames.append(f'out{len(outnames)}')
             else:
@@ -645,7 +655,7 @@ def get_function_deps(func, outputs=None):
     graph = get_func_graph(func, outputs)
     if graph is None:
         if outputs is None:
-            return None
+            return
 
         # assume full dependency
         for inp in inspect.signature(func).parameters:

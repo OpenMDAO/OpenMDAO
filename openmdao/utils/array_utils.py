@@ -914,9 +914,7 @@ def convert_ndarray_to_support_nans_in_json(val):
     val = np.asarray(val)
 
     # do a quick check for any nans or infs and if not we can avoid the slow check
-    nans = np.where(np.isnan(val))
-    infs = np.where(np.isinf(val))
-    if nans[0].size == 0 and infs[0].size == 0:
+    if not (np.any(np.isnan(val)) or np.any(np.isinf(val))):
         return val.tolist()
 
     val_as_list = val.tolist()
@@ -948,9 +946,12 @@ else:
     @numba.jit(nopython=True, nogil=True)
     def allclose(a, b, rtol=3e-16, atol=3e-16):
         """
-        Return True if all elements of a and b are close within the given absolute tolerance.
+        Return True if all elements of a and b pass a tolerance check.
 
-        Returns when the first non-close element is found.  a and b must have the same size.
+        The tolerance check is:
+            abs(a - b) <= atol + rtol * abs(b)
+
+        Returns when the first non-close element is found.
 
         Parameters
         ----------
@@ -969,28 +970,22 @@ else:
             True if all elements of a and b are close within the given absolute and
             relative tolerance.
         """
-        for i in range(len(a)):
-            aval = a[i]
-            bval = b[i]
+        if a.size != b.size:
+            return False
 
-            absdiff = aval - bval
-            if absdiff < 0.:
-                absdiff = -absdiff
+        for aval, bval in zip(a, b):
+            abs_err = aval - bval
 
-            if aval < 0.:
-                aval = -aval
+            if abs_err < 0.:
+                abs_err = -abs_err
+
+            if abs_err > atol:
+                return False
+
             if bval < 0.:
                 bval = -bval
 
-            if aval < bval:
-                vmax = rtol * bval
-            else:
-                vmax = rtol * aval
-
-            if atol > vmax:
-                vmax = atol
-
-            if absdiff > vmax:
+            if abs_err > atol + rtol * bval:
                 return False
 
         return True

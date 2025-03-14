@@ -1880,14 +1880,14 @@ class System(object, metaclass=SystemMetaclass):
             if abs_key in self._subjacs_info:
                 self._subjacs_info[abs_key]['sparsity'] = (rows, cols, shape)
 
-    def subjac_sparsity_iter(self, sparsity=None, wrt_matches=None):
+    def subjac_sparsity_iter(self, sparsity, wrt_matches=None):
         """
         Iterate over sparsity for each subjac in the jacobian.
 
         Parameters
         ----------
-        sparsity : coo_matrix or None
-            Sparsity matrix to use. If None, compute_sparsity will be called to compute it.
+        sparsity : coo_matrix
+            Sparsity matrix to use.
         wrt_matches : set or None
             Only include row vars that are contained in this set.
 
@@ -1904,8 +1904,6 @@ class System(object, metaclass=SystemMetaclass):
         tuple
             Shape of the subjac.
         """
-        if sparsity is None:
-            sparsity, _ = self.compute_sparsity()
         rows = sparsity.row
         cols = sparsity.col
         plen = len(self.pathname) + 1 if self.pathname else 0
@@ -1941,19 +1939,12 @@ class System(object, metaclass=SystemMetaclass):
         bool
             True if they match, False otherwise.
         """
-        if self.pathname == '' or not ('derivs_method' in self.options and
-                                       self.options['derivs_method'] == 'jax'):
-            if outstream is not None:
-                print(f"{self.msginfo} already uses fd to compute sparsity so no comparison was "
-                      "performed.")
-            return True
-
         Jsys, _ = self.compute_sparsity(direction)
         Jfd, _ = self.compute_fd_sparsity()
 
         if outstream is not None:
             print(f"{self.msginfo} sparsity comparison with fd (direction={direction})")
-            print("0 or x = both agree, 1 = sys nonzero and fd zero, 2 = fd nonzero and sys zero")
+            print(". or x = both agree, 1 = sys nonzero and fd zero, 2 = fd nonzero and sys zero")
             ret = sparsity_diff_viz(Jsys, Jfd, stream=outstream)
         else:
             spdiff = get_sparsity_diff_array(Jsys, Jfd)
