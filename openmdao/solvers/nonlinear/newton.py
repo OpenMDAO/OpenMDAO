@@ -171,8 +171,8 @@ class NewtonSolver(NonlinearSolver):
         solve_subsystems = self.options['solve_subsystems'] and not system.under_complex_step
 
         if self.options['debug_print']:
-            self._err_cache['inputs'] = system._inputs._copy_views()
-            self._err_cache['outputs'] = system._outputs._copy_views()
+            self._err_cache['inputs'] = system._inputs._copy_vars()
+            self._err_cache['outputs'] = system._outputs._copy_vars()
 
         # Execute guess_nonlinear if specified and
         # we have not restarted from a saved point

@@ -182,7 +182,7 @@ class BroydenSolver(NonlinearSolver):
             n = 0
             meta = system._var_allprocs_abs2meta['output']
 
-            for i, name in enumerate(states):
+            for name in states:
                 size = meta[prom2abs[name][0]]['global_size']
                 self._idx[name] = (n, n + size)
                 n += size
@@ -290,8 +290,8 @@ class BroydenSolver(NonlinearSolver):
         """
         system = self._system()
         if self.options['debug_print']:
-            self._err_cache['inputs'] = system._inputs._copy_views()
-            self._err_cache['outputs'] = system._outputs._copy_views()
+            self._err_cache['inputs'] = system._inputs._copy_vars()
+            self._err_cache['outputs'] = system._outputs._copy_vars()
 
         # Convert local storage if we are under complex step.
         if system.under_complex_step:
@@ -578,11 +578,16 @@ class BroydenSolver(NonlinearSolver):
                 if wrt_name in d_res:
                     d_wrt = d_res[wrt_name]
 
+                is_scalar = d_wrt.shape == ()
+
                 for j in range(j_wrt - i_wrt):
 
                     # Increment each variable.
                     if wrt_name in d_res:
-                        d_wrt[j] = 1.0
+                        if is_scalar:
+                            d_res[wrt_name] = 1.0
+                        else:
+                            d_wrt[j] = 1.0
 
                     # Solve for total derivatives.
                     ln_solver.solve('fwd')
@@ -593,7 +598,10 @@ class BroydenSolver(NonlinearSolver):
                         inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
 
                     if wrt_name in d_res:
-                        d_wrt[j] = 0.0
+                        if is_scalar:
+                            d_res[wrt_name] = 0.0
+                        else:
+                            d_wrt[j] = 0.0
         finally:
             # Enable local fd
             system._owns_approx_jac = approx_status

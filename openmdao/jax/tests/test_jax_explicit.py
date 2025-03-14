@@ -43,19 +43,14 @@ class DotProdMult(om.ExplicitComponent):
 
 
 class DotProdMultPrimalNoDeclPartials(om.JaxExplicitComponent):
+    def initialize(self):
+        self.options['default_to_dyn_shapes'] = True
+
     def setup(self):
-        # If we're using jax, dynamic shaping is the default behavior and output shapes are computed
-        # from the input shapes automatically.
-        if self.options['derivs_method'] == 'jax':
-            self.add_input('x')
-            self.add_input('y')
-            self.add_output('z')
-            self.add_output('zz')
-        else:
-            self.add_input('x', shape_by_conn=True)
-            self.add_input('y', shape_by_conn=True)
-            self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
-            self.add_output('zz', copy_shape='y')
+        self.add_input('x')
+        self.add_input('y')
+        self.add_output('z')
+        self.add_output('zz')
 
     def compute_primal(self, x, y):
         z = jnp.dot(x, y)
@@ -268,7 +263,7 @@ class TestJaxComp(unittest.TestCase):
 
         p = om.Problem()
         p.model.add_subsystem('C1', DotProdMultPrimalNoDeclPartials())
-        p.model.add_subsystem('T', Transpose())
+        p.model.add_subsystem('T', Transpose(default_to_dyn_shapes=True))
         p.model.add_subsystem('C2', DotProdMultPrimalNoDeclPartials())
 
         p.model.connect('C1.z', 'C2.x')
@@ -292,7 +287,7 @@ class TestJaxComp(unittest.TestCase):
                 return x, y, z
 
         p = om.Problem()
-        p.model.add_subsystem('comp', SuperSimpleJaxComp())
+        p.model.add_subsystem('comp', SuperSimpleJaxComp(default_to_dyn_shapes=True))
         p.setup(mode=mode)
         if shape == ():
             p.set_val('comp.a', 2.0)
@@ -435,6 +430,25 @@ class TestJaxComp(unittest.TestCase):
         assert_check_totals(p.check_totals(of=['comp.z','comp.zz'], wrt=['comp.x', 'comp.y'],
                                            method=method, show_only_incorrect=True))
         assert_sparsity_matches_fd(comp, outstream=None)
+
+    def test_jax_subjacs_info_entries(self):
+        p = om.Problem()
+        G = p.model.add_subsystem('G', om.Group())
+        G.add_subsystem('comp', DotProdMultPrimalNoDeclPartials())
+
+        p.setup()
+
+        p['G.comp.x'] = np.array([1, 2])
+        p['G.comp.y'] = np.array([3, 4])
+
+        p.run_model()
+
+        self.assertEqual(len(G._subjacs_info), 5)
+        self.assertEqual(set(G._subjacs_info.keys()),
+                         {('G.comp.z', 'G.comp.x'), ('G.comp.zz', 'G.comp.y'),
+                          ('G.comp.z', 'G.comp.y'), ('G.comp.zz', 'G.comp.zz'),
+                          ('G.comp.z', 'G.comp.z')})
+
 
 if sys.version_info >= (3, 9):
 

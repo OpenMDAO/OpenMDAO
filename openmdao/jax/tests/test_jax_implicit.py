@@ -16,15 +16,14 @@ except ImportError:
 
 
 class QuadraticComp(om.ImplicitComponent):
-    def __init__(self, shape=(), **kwargs):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.shape = shape
 
     def setup(self):
-        self.add_input('a', shape=self.shape)
-        self.add_input('b', shape=self.shape)
-        self.add_input('c', shape=self.shape)
-        self.add_output('x', val=5., shape=self.shape)
+        self.add_input('a',)
+        self.add_input('b',)
+        self.add_input('c',)
+        self.add_output('x', val=5.,)
 
         self.declare_partials(of=['*'], wrt=['*'])
 
@@ -45,15 +44,11 @@ class QuadraticComp(om.ImplicitComponent):
 
 
 class JaxQuadraticCompPrimal(om.JaxImplicitComponent):
-    def __init__(self, shape=(), **kwargs):
-        super().__init__(**kwargs)
-        self.shape = shape
-
     def setup(self):
-        self.add_input('a', shape=self.shape)
-        self.add_input('b', shape=self.shape)
-        self.add_input('c', shape=self.shape)
-        self.add_output('x', val=5., shape=self.shape)
+        self.add_input('a')
+        self.add_input('b')
+        self.add_input('c')
+        self.add_output('x', val=5.)
 
         self.declare_partials(of=['*'], wrt=['*'])
 
@@ -216,7 +211,7 @@ class TestJaxImplicitComp(unittest.TestCase):
         ivc = p.model.add_subsystem('ivc', om.IndepVarComp('a', shape=shape))
         ivc.add_output('b', shape=shape)
         ivc.add_output('c', shape=shape)
-        comp = p.model.add_subsystem('comp', JaxQuadraticCompPrimal(shape=shape))
+        comp = p.model.add_subsystem('comp', JaxQuadraticCompPrimal(default_shape=shape))
         comp.matrix_free = bool(matrix_free)
         p.model.connect('ivc.a', 'comp.a')
         p.model.connect('ivc.b', 'comp.b')

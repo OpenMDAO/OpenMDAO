@@ -83,9 +83,9 @@ class AssembledJacobian(Jacobian):
             Tuples of the form (start, end) keyed on variable name.
         """
         return {
-            name: rng
-            for name, rng in meta2range_iter(system._var_abs2meta[vtype].items(),
-                                             size_name='size')
+            name: (start, end)
+            for name, start, end in meta2range_iter(system._var_abs2meta[vtype].items(),
+                                                    size_name='size')
         }
 
     def _initialize(self, system):

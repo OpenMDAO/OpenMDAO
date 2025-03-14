@@ -193,7 +193,9 @@ class TestMPIScatter(unittest.TestCase):
         prob.run_driver()
 
         proc_vals = prob.comm.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
-        np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
+        # f_xy is a scalar, so compare it separately
+        self.assertAlmostEqual(proc_vals[0][3], proc_vals[1][3])
+        np.testing.assert_array_almost_equal(proc_vals[0][:3], proc_vals[1][:3])
 
     @require_pyoptsparse(OPTIMIZER)
     def test_opt_distcomp(self):

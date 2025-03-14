@@ -92,7 +92,7 @@ jobs:
             PYOPTSPARSE: 'v2.11.0'
             # PAROPT: true
             SNOPT: '7.7'
-            OPTIONAL: '[all]'
+            OPTIONAL: '[docs,doe,jax,notebooks,numba,test,visualization]'
             BANDIT: true
             PEP517: true
             TESTS: true
@@ -108,7 +108,7 @@ jobs:
             PYOPTSPARSE: 'v2.11.0'
             # PAROPT: true
             SNOPT: '7.7'
-            OPTIONAL: '[docs,doe,jax,notebooks,test]'
+            OPTIONAL: '[docs,doe,jax,notebooks,numba,test]'
             TESTS: true
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_Baseline }}
 

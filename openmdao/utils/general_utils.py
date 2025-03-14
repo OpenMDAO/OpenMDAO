@@ -22,7 +22,7 @@ from openmdao.utils.array_utils import shape_to_len
 _float_inf = float('inf')
 
 
-def ensure_compatible(name, value, shape=None, indices=None):
+def ensure_compatible(name, value, shape=None, indices=None, default_shape=(1,)):
     """
     Make value compatible with the specified shape or the shape of indices.
 
@@ -36,6 +36,8 @@ def ensure_compatible(name, value, shape=None, indices=None):
         The expected or desired shape of the value.
     indices : Indexer or None
         The indices into a source variable.
+    default_shape : tuple
+        The default shape to use if shape is not provided.
 
     Returns
     -------
@@ -79,7 +81,10 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     if shape is None:
         # shape is not determined, assume the shape of value was intended
-        value = np.atleast_1d(value)
+        if np.isscalar(value):
+            value = np.full(default_shape, value)
+        else:
+            value = np.asarray(value).reshape(default_shape)
         shape = value.shape
     else:
         # shape is determined, if value is scalar assign it to array of shape

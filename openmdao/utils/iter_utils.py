@@ -100,8 +100,13 @@ def meta2range_iter(meta_iter, size_name='size', subset=None):
         if not isinstance(subset, (set, dict)):
             subset = set(subset)
 
+        seen = set()
         for name, meta in meta_iter:
             end += meta[size_name]
             if name in subset:
                 yield name, start, end
+            seen.add(name)
             start = end
+
+        if subset - seen:
+            raise KeyError(f"In meta2range_iter, subset members {sorted(subset - seen)} not found.")

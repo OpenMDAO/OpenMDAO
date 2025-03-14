@@ -913,15 +913,15 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
         assert_near_equal(prob.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
         assert_near_equal(prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
-        assert_near_equal(prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
-        assert_near_equal(prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y', 'degF'), 32.0, 1e-6)
 
         assert_near_equal(prob.get_val('axx', indices=0), 77.0, 1e-6)
         assert_near_equal(prob.get_val('axx', indices=1), 95.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
-        assert_near_equal(prob.get_val('ayy', indices=0), 0.0, 1e-6)
-        assert_near_equal(prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy', 'degF'), 32.0, 1e-6)
 
         # Sets
 
@@ -961,15 +961,15 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
         assert_near_equal(prob.get_val('acomp.x', 'degC', indices=[0]), 30.0, 1e-6)
         assert_near_equal(prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
-        assert_near_equal(prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
-        assert_near_equal(prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y', 'degF'), 32.0, 1e-6)
 
         assert_near_equal(prob.get_val('axx', indices=0), 86.0, 1e-6)
         assert_near_equal(prob.get_val('axx', indices=1), 95.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=0), 30.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
-        assert_near_equal(prob.get_val('ayy', indices=0), 0.0, 1e-6)
-        assert_near_equal(prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy', 'degF'), 32.0, 1e-6)
 
         # Sets
 

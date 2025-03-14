@@ -168,7 +168,7 @@ class TestDriverScalingReport2(unittest.TestCase):
 
         prob.model.add_design_var('indeps.x', lower=-50, upper=50)
         prob.model.add_design_var('indeps.y', lower=-50, upper=50)
-        prob.model.add_objective('paraboloid.f_xy', index=0)
+        prob.model.add_objective('paraboloid.f_xy')
 
         prob.setup()
         prob.run_driver()
