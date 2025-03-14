@@ -64,7 +64,7 @@ class JaxExplicitComponent(ExplicitComponent):
         self.compute_primal = self._ret_tuple_compute_primal
 
         # if derivs_method is explicitly passed in, just use it
-        if 'derivs_method' in kwargs:
+        if 'derivs_method' in kwargs and kwargs['derivs_method'] != 'jax':
             return
 
         if jax:
@@ -73,6 +73,17 @@ class JaxExplicitComponent(ExplicitComponent):
             issue_warning(f"{self.msginfo}: JAX is not available, so '{fallback_derivs_method}' "
                           "will be used for derivatives.")
             self.options['derivs_method'] = fallback_derivs_method
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super()._declare_options()
+        self.options.declare('default_to_dyn_shapes', types=bool, default=False,
+                             desc='If True, use dynamic shaping for any variables whose value is '
+                             'scalar and whose shape is not explicitly set. Inputs will use '
+                             'shape_by_conn and outputs will use a compute_shape method based '
+                             'on jax.eval_shape. Default is False.')
 
     def _re_init(self):
         """
@@ -118,8 +129,7 @@ class JaxExplicitComponent(ExplicitComponent):
         **kwargs : dict
             The kwargs to pass to the base class method.
         """
-        kwargs = _update_add_input_kwargs(self, name, **kwargs)
-        super().add_input(name, **kwargs)
+        super().add_input(name, **_update_add_input_kwargs(self, **kwargs))
 
     def add_output(self, name, **kwargs):
         """
@@ -135,8 +145,7 @@ class JaxExplicitComponent(ExplicitComponent):
         **kwargs : dict
             The kwargs to pass to the base class method.
         """
-        kwargs = _update_add_output_kwargs(self, name, **kwargs)
-        super().add_output(name, **kwargs)
+        super().add_output(name, **_update_add_output_kwargs(self, name, **kwargs))
 
     def _setup_jax(self):
         """

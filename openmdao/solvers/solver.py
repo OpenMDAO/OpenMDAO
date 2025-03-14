@@ -716,8 +716,8 @@ class NonlinearSolver(Solver):
         """
         system = self._system()
         if self.options['debug_print']:
-            self._err_cache['inputs'] = system._inputs._copy_views()
-            self._err_cache['outputs'] = system._outputs._copy_views()
+            self._err_cache['inputs'] = system._inputs._copy_vars()
+            self._err_cache['outputs'] = system._outputs._copy_vars()
 
         if self.options['maxiter'] > 0:
             self._run_apply()

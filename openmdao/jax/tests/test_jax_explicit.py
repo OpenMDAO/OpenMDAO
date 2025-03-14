@@ -43,19 +43,14 @@ class DotProdMult(om.ExplicitComponent):
 
 
 class DotProdMultPrimalNoDeclPartials(om.JaxExplicitComponent):
+    def initialize(self):
+        self.options['default_to_dyn_shapes'] = True
+
     def setup(self):
-        # If we're using jax, dynamic shaping is the default behavior and output shapes are computed
-        # from the input shapes automatically.
-        if self.options['derivs_method'] == 'jax':
-            self.add_input('x')
-            self.add_input('y')
-            self.add_output('z')
-            self.add_output('zz')
-        else:
-            self.add_input('x', shape_by_conn=True)
-            self.add_input('y', shape_by_conn=True)
-            self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
-            self.add_output('zz', copy_shape='y')
+        self.add_input('x')
+        self.add_input('y')
+        self.add_output('z')
+        self.add_output('zz')
 
     def compute_primal(self, x, y):
         z = jnp.dot(x, y)
@@ -268,7 +263,7 @@ class TestJaxComp(unittest.TestCase):
 
         p = om.Problem()
         p.model.add_subsystem('C1', DotProdMultPrimalNoDeclPartials())
-        p.model.add_subsystem('T', Transpose())
+        p.model.add_subsystem('T', Transpose(default_to_dyn_shapes=True))
         p.model.add_subsystem('C2', DotProdMultPrimalNoDeclPartials())
 
         p.model.connect('C1.z', 'C2.x')
@@ -292,7 +287,7 @@ class TestJaxComp(unittest.TestCase):
                 return x, y, z
 
         p = om.Problem()
-        p.model.add_subsystem('comp', SuperSimpleJaxComp())
+        p.model.add_subsystem('comp', SuperSimpleJaxComp(default_to_dyn_shapes=True))
         p.setup(mode=mode)
         if shape == ():
             p.set_val('comp.a', 2.0)

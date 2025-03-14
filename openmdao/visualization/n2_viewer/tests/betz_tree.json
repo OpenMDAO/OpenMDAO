@@ -128,6 +128,9 @@
                 "run_root_only": false,
                 "always_opt": false,
                 "use_jit": true,
+                "default_shape": [
+                    1
+                ],
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -377,7 +380,10 @@
                 "distributed": false,
                 "run_root_only": false,
                 "always_opt": false,
-                "use_jit": true
+                "use_jit": true,
+                "default_shape": [
+                    1
+                ]
             }
         }
     ],

@@ -1160,10 +1160,12 @@ class Case(object):
 
             if var_type in abs2meta[src]['type']:
                 try:
-                    val = self.outputs[src].copy()
+                    val = self.outputs[src]
                 except KeyError:
                     # not recorded
                     continue
+                if isinstance(val, np.ndarray):
+                    val = val.copy()
                 if use_indices and meta['indices'] is not None:
                     val = val[meta['indices']]
                 if scaled:
