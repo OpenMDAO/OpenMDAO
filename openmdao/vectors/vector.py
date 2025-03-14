@@ -177,19 +177,19 @@ class Vector(object):
         """
         return len(self._views)
 
-    def _copy_views(self):
+    def _copy_vars(self):
         """
-        Return a dictionary containing just the views.
+        Return a dictionary containing the variable values.
 
         Returns
         -------
         dict
-            Dictionary containing the _views.
+            Dictionary containing the variable values.
         """
-        views = {}
+        values = {}
         for n, (v, is_scalar) in self._views.items():
-            views[n] = v[0] if is_scalar else v.copy()
-        return views
+            values[n] = v[0] if is_scalar else v.copy()
+        return values
 
     def keys(self):
         """
