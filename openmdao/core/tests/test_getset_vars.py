@@ -108,13 +108,11 @@ class TestGetSetVariables(unittest.TestCase):
         """
         Tests for error-handling for invalid variable names and keys.
         """
-        g = Group(assembled_jac_type='dense')
-        g.linear_solver = DirectSolver(assemble_jac=True)
-        g.add_subsystem('c', ExecComp('y=2*x'))
-
         p = Problem()
         model = p.model
-        model.add_subsystem('g', g)
+        g = model.add_subsystem('g', Group(assembled_jac_type='dense'))
+        g.linear_solver = DirectSolver(assemble_jac=True)
+        g.add_subsystem('c', ExecComp('y=2*x'))
         p.setup()
 
         # -------------------------------------------------------------------

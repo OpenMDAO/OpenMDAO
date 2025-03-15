@@ -3,7 +3,7 @@ from collections import defaultdict
 import hashlib
 import numpy as np
 
-from openmdao.vectors.vector import Vector, _full_slice
+from openmdao.vectors.vector import Vector, _VecData, _full_slice
 from openmdao.vectors.default_transfer import DefaultTransfer
 from openmdao.utils.array_utils import array_hash, shape_to_len
 
@@ -33,14 +33,14 @@ class DefaultVector(Vector):
 
     TRANSFER = DefaultTransfer
 
-    def __init__(self, name, kind, system, name_shape_iter, parent_vectors=None,
-                 msginfo='', path='', alloc_complex=False, do_scaling=False, do_adder=False):
+    def __init__(self, name, kind, system, name_shape_iter, parent_vector=None, msginfo='', path='',
+                 alloc_complex=False):
         """
         Initialize all attributes.
         """
         self._views_rel = None
-        super().__init__(name, kind, system, name_shape_iter, parent_vectors,
-                         msginfo, path, alloc_complex, do_scaling, do_adder)
+        super().__init__(name, kind, system, name_shape_iter, parent_vector, msginfo, path,
+                         alloc_complex)
 
     def __getitem__(self, name):
         """
@@ -58,9 +58,8 @@ class DefaultVector(Vector):
         """
         if self._views_rel is not None:
             try:
-                val, is_scalar = self._views_rel[name]
-                if is_scalar:
-                    val = val[0]
+                vinfo = self._views_rel[name]
+                val = vinfo.view[0] if vinfo.is_scalar else vinfo.view
                 if self._under_complex_step:
                     return val
                 return val.real
@@ -82,7 +81,7 @@ class DefaultVector(Vector):
         """
         if self._views_rel is not None and not self.read_only:
             try:
-                self._views_rel[name][0][:] = value
+                self._views_rel[name].view[:] = value
                 return
             except Exception:
                 pass  # fall through to normal set if fast one failed in any way
@@ -104,129 +103,108 @@ class DefaultVector(Vector):
         """
         return self._data if self._under_complex_step else self._data.real
 
-    def _create_data(self, system):
+    def _initialize_data(self, parent_vector, name_shape_iter):
         """
-        Allocate data array.
-
-        This happens only in the top level system.  Child systems use views of the array
-        we allocate here.
-
-        Returns
-        -------
-        ndarray
-            zeros array of correct size to hold all of this vector's variables.
-        """
-        size = np.sum(system._var_sizes[self._typ][system.comm.rank, :])
-        return np.zeros(size, dtype=complex if self._alloc_complex else float)
-
-    def _extract_root_data(self, parent_vector):
-        """
-        Extract views of arrays from root_vector.
-
-        Returns
-        -------
-        ndarray
-            zeros array of correct size.
-        """
-        system = self._system()
-
-        slices = parent_vector.get_slice_dict()
-
-        mynames = list(system._var_abs2meta[self._typ])
-        if mynames:
-            self._parent_slice = slice(slices[mynames[0]].start, slices[mynames[-1]].stop)
-        else:
-            self._parent_slice = slice(0, 0)
-
-        scaling = None
-        if self._do_scaling:
-            ps0, ps1 = parent_vector._scaling
-            if ps0 is not None:
-                ps0 = ps0[self._parent_slice]
-            scaling = (ps0, ps1[self._parent_slice])
-
-        return parent_vector._data[self._parent_slice], scaling
-
-    def _initialize_data(self, parent_vectors, system):
-        """
-        Internally allocate data array.
+        Set up internal data structures.
 
         Parameters
         ----------
-        parent_vectors : dict of dict of Vector
-            Parent vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vector : <Vector> or None
+            Parent vector.
+        name_shape_iter : iterator of (str, tuple)
+            Iterator of (name, shape) tuples.
         """
-        if self._name not in parent_vectors[self._kind]:  # this is a root vector
-            self._data = self._create_data(system)
-            self._parent_slice = slice(0, len(self))
-            if self._name == 'nonlinear':
-                parent_vectors[self._kind]['nonlinear'] = self
+        self._views = {}
+        start = end = 0
+        for name, shape in name_shape_iter:
+            end += shape_to_len(shape)
+            self._views[name] = _VecData(shape, (start, end))
+            start = end
 
-            if self._do_scaling:
-                data = self._data
-                if self._name == 'nonlinear':
-                    if self._do_adder:
-                        self._scaling = (np.zeros(data.size), np.ones(data.size))
-                    else:
-                        self._scaling = (None, np.ones(data.size))
-                elif self._name == 'linear':
-                    if self._has_solver_ref:
-                        # We only allocate an extra scaling vector when we have output scaling
-                        # somewhere in the model.
-                        self._scaling = (None, np.ones(data.size))
-                    else:
-                        # Reuse the nonlinear scaling vecs since they're the same as ours.
-                        # The nonlinear vectors are created before the linear vectors
-                        nlvec = parent_vectors[self._kind]['nonlinear']
-                        self._scaling = (None, nlvec._scaling[1])
-                else:
-                    self._scaling = (None, np.ones(data.size))
+        if parent_vector is None:  # this is a root vector
+            self._parent_slice = slice(0, end)
+            self._data = np.zeros(end, dtype=complex if self._alloc_complex else float)
         else:
-            parent_vector = parent_vectors[self._kind][self._name]
-            self._data, self._scaling = self._extract_root_data(parent_vector)
+            for name in self._views:
+                # just get our first name to get the starting index in the parent vector
+                start = parent_vector._views[name].range[0]
+                self._parent_slice = slice(start, start + end)
+                self._data = parent_vector._data[self._parent_slice]
+                break
+            else:
+                self._parent_slice = slice(0, 0)
+                self._data = np.zeros(0, dtype=complex if self._alloc_complex else float)
 
-    def _initialize_views(self, name_shape_iter):
+            if parent_vector._scaling is not None:
+                ps0, ps1 = parent_vector._scaling
+                if ps0 is not None:
+                    ps0 = ps0[self._parent_slice]
+                self._scaling = (ps0, ps1[self._parent_slice])
+
+    def _initialize_scaling(self, nlvec, do_adder):
+        """
+        Initialize root scaling vectors.
+
+        Parameters
+        ----------
+        nlvec : <Vector>
+            nonlinear vector.
+        do_adder : bool
+            Whether to initialize with an additive term.
+        """
+        data = self._data
+        if self._name == 'nonlinear':
+            if do_adder:
+                self._scaling = (np.zeros(data.size), np.ones(data.size))
+            else:
+                self._scaling = (None, np.ones(data.size))
+        elif self._name == 'linear':
+            if self._has_solver_ref:
+                # We only allocate an extra scaling vector when we have output scaling
+                # somewhere in the model.
+                self._scaling = (None, np.ones(data.size))
+            else:
+                # Reuse the nonlinear scaling vecs since they're the same as ours.
+                # The nonlinear vectors are created before the linear vectors
+                self._scaling = (None, nlvec._scaling[1])
+        else:
+            self._scaling = (None, np.ones(data.size))
+
+    def _initialize_views(self, system):
         """
         Internally assemble views onto the vectors.
         """
-        system = self._system()
         kind = self._kind
         islinear = self._name == 'linear'
         rel_lookup = system._has_fast_rel_lookup()
 
-        do_scaling = self._do_scaling
-        if do_scaling:
+        scaling = self._scaling
+        if scaling is not None:
             factors = system._scale_factors
-            scaling = self._scaling
 
-        self._views = views = {}
-        self._views_flat = views_flat = {}
         if rel_lookup:
             self._views_rel = views_rel = {}
             relstart = len(self._pathname) + 1 if self._pathname else 0
         else:
             self._views_rel = None
 
+        views = self._views
         start = end = 0
-        for abs_name, shape in name_shape_iter:
-            end += shape_to_len(shape)
-            views_flat[abs_name] = v = self._data[start:end]
-            if shape != v.shape and shape != ():
-                v = v.view()
-                v.shape = shape
+        for abs_name, vinfo in self._views.items():
+            end += vinfo.size
+            vflat = v = self._data[start:end]
+            if vinfo.shape != vflat.shape and vinfo.shape != ():
+                v = vflat.view().reshape(vinfo.shape)
 
-            # we use a tuple here because we want to support scalars but we
-            # also need to update the underlying data array and we can't have
-            # a view of a scalar, so we store the size 1 array view associated with
-            # the variable and use that to update the underlying data array. The second
-            # part of the tuple is a flag telling us if the variable is a scalar, and we
-            # use that flag to return view[0] instead of view on gets when the variable is scalar.
-            views[abs_name] = (v, shape == ())
+            print(abs_name, v.shape, vflat.shape)
+
+            vinfo.view = v
+            vinfo.flat = vflat
 
             if rel_lookup:
-                views_rel[abs_name[relstart:]] = (v, shape == ())
+                views_rel[abs_name[relstart:]] = vinfo
 
-            if do_scaling:
+            if scaling is not None:
                 factor_tuple = factors[abs_name][kind]
 
                 if len(factor_tuple) == 4:
@@ -254,7 +232,37 @@ class DefaultVector(Vector):
             start = end
 
         self._names = frozenset(views) if islinear else views
-        self._len = end
+
+    def _name2abs_name(self, name):
+        """
+        Map the given absolute or relative name to the absolute name.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative variable name in the owning system's namespace.
+
+        Returns
+        -------
+        str or None
+            Absolute variable name if unique abs_name found or None otherwise.
+        """
+        # try relative name first
+        if self._views_rel is not None and name in self._views_rel:
+            return self._pathname + '.' + name if self._pathname else name
+
+        return super()._name2abs_name(name)
+
+    def __len__(self):
+        """
+        Return the flattened length of this Vector.
+
+        Returns
+        -------
+        int
+            Total flattened length of this vector.
+        """
+        return self._data.size
 
     def _in_matvec_context(self):
         """
@@ -382,10 +390,10 @@ class DefaultVector(Vector):
         if mode == 'rev':
             self._scale_reverse(self._scaling[1], self._scaling[0])
         else:
-            if self._has_solver_ref:
-                self._scale_forward(self._scaling_nl_vec[1], None)
-            else:
-                self._scale_forward(self._scaling[1], self._scaling[0])
+            # if self._has_solver_ref:
+            #     self._scale_forward(self._scaling_nl_vec[1], None)
+            # else:
+            self._scale_forward(self._scaling[1], self._scaling[0])
 
     def scale_to_phys(self, mode='fwd'):
         """
@@ -399,10 +407,10 @@ class DefaultVector(Vector):
         if mode == 'rev':
             self._scale_forward(self._scaling[1], self._scaling[0])
         else:
-            if self._has_solver_ref:
-                self._scale_reverse(self._scaling_nl_vec[1], None)
-            else:
-                self._scale_reverse(self._scaling[1], self._scaling[0])
+            # if self._has_solver_ref:
+            #     self._scale_reverse(self._scaling_nl_vec[1], None)
+            # else:
+            self._scale_reverse(self._scaling[1], self._scaling[0])
 
     def _scale_forward(self, scaler, adder):
         """
@@ -555,11 +563,8 @@ class DefaultVector(Vector):
         """
         if self._slices is None:
             slices = {}
-            start = end = 0
-            for name, arr in self._views_flat.items():
-                end += arr.size
-                slices[name] = slice(start, end)
-                start = end
+            for name, vinfo in self._views.items():
+                slices[name] = slice(*vinfo.range)
             self._slices = slices
 
         return self._slices
@@ -582,8 +587,8 @@ class DefaultVector(Vector):
         """
         name2inds = defaultdict(list)
         start = end = 0
-        for name, arr in self._views_flat.items():
-            end += arr.size
+        for name, vinfo in self._views.items():
+            start, end = vinfo.range
             for idx in idxs:
                 if start <= idx < end:
                     name2inds[name].append(idx - start)

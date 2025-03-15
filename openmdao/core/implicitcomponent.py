@@ -111,7 +111,15 @@ class ImplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
+        print("scaled:")
+        print(self._outputs._data)
+        print(self._residuals._data)
+        print(self._inputs._data)
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+            print("unscaled:")
+            print(self._outputs._data)
+            print(self._residuals._data)
+            print(self._inputs._data)
             with self._call_user_function('apply_nonlinear', protect_outputs=True):
                 if self._run_root_only():
                     if self.comm.rank == 0:
@@ -517,18 +525,16 @@ class ImplicitComponent(Component):
         """
         self.setup_residuals()
 
-    def _setup_vectors(self, root_vectors, parent_vectors=None):
+    def _setup_vectors(self, parent_vectors=None):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
         Parameters
         ----------
-        root_vectors : dict of dict of Vector
-            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         parent_vectors : dict or None
             Parent vectors.  Same structure as root_vectors.
         """
-        super()._setup_vectors(root_vectors, parent_vectors)
+        super()._setup_vectors(parent_vectors)
         if self._jacobian is None:
             self._init_jacobian()
 

@@ -669,6 +669,36 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 yield from self._var_allprocs_discrete[iotype]
 
+    def to_abs_names(self, names, iotype):
+        """
+        Convert a list of promoted or relative names to absolute names.
+
+        Parameters
+        ----------
+        names : list of str
+            List of promoted or relative names.
+        iotype : str
+            Either 'input' or 'output'.
+
+        Yields
+        ------
+        str
+            Absolute name.
+        """
+        prefix = self.pathname + '.' if self.pathname else ''
+        prom2abs = self._var_allprocs_prom2abs_list[iotype]
+        abs2idx = self._var_allprocs_abs2idx
+        for name in names:
+            if name in prom2abs:
+                yield prom2abs[name][0]
+            else:
+                abs_name = prefix + name
+                if abs_name in abs2idx:
+                    yield abs_name
+                else:
+                    raise ValueError(f"{self.msginfo}: Name '{name}' not found in {iotype} "
+                                     "variables.")
+
     def abs_meta_iter(self, iotype, local=True, cont=True, discrete=False):
         """
         Iterate over absolute variable names and their metadata for this System.
@@ -2484,16 +2514,6 @@ class System(object, metaclass=SystemMetaclass):
 
             # Allocate complex if root vector was allocated complex.
             alloc_complex = parent_vectors['output']['nonlinear']._alloc_complex
-            do_scaling = {
-                'input': self._has_input_scaling,
-                'output': self._has_output_scaling,
-                'residual': self._has_resid_scaling
-            }
-            do_adder = {
-                'input': self._has_input_adder,
-                'output': self._has_output_adder,
-                'residual': self._has_resid_scaling
-            }
 
             # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
             # initially allocated as complex.
@@ -2508,18 +2528,16 @@ class System(object, metaclass=SystemMetaclass):
             vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
 
             for vec_name in vectypes:
-
                 # Only allocate complex in the vectors we need.
-                vec_alloc_complex = parent_vectors['output'][vec_name]._alloc_complex
-
                 for kind in ['input', 'output', 'residual']:
+                    parent_vector =  parent_vectors[kind][vec_name]
                     vectors[kind][vec_name] = self._vector_class(
-                        vec_name, kind, self, self._name_shape_iter(kind), parent_vectors,
-                        self.msginfo, self.pathname, alloc_complex=vec_alloc_complex,
-                        do_scaling=do_scaling[kind], do_adder=do_adder[kind])
+                        vec_name, kind, self, self._name_shape_iter(kind), parent_vector,
+                        msginfo=self.msginfo, path=self.pathname,
+                        alloc_complex=parent_vector._alloc_complex)
 
-            if self._use_derivatives:
-                vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
+            # if self._use_derivatives:
+            #     vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -5474,7 +5492,7 @@ class System(object, metaclass=SystemMetaclass):
                     val = my_meta[abs_name]['val']
             else:
                 if from_root:
-                    vec = vec._root_vector
+                    vec = self._problem_meta['model_ref']()._vectors[kind][vec_name]
                 if vec._contains_abs(abs_name):
                     val = vec._abs_get_val(abs_name, flat)
 

@@ -316,9 +316,11 @@ class TestScaling(unittest.TestCase):
 
         # Don't use scaling - but output scaling needed
         use_scal = False
+        print("**** no scaling")
         self.assertTrue(not runs_successfully(use_scal, coeffs))
         # Use scaling - output scaling works successfully
         use_scal = True
+        print("****** using scaling")
         self.assertTrue(runs_successfully(use_scal, coeffs))
 
         # ---------------------------

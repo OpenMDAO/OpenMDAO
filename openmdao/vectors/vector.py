@@ -4,9 +4,8 @@ import hashlib
 
 import numpy as np
 
-from openmdao.utils.name_maps import prom_name2abs_name
 from openmdao.utils.indexer import Indexer, indexer
-
+from openmdao.utils.array_utils import shape_to_len
 
 _full_slice = slice(None)
 _flat_full_indexer = indexer(_full_slice, flat_src=True)
@@ -17,6 +16,21 @@ _type_map = {  # map vector type to iotype
     'output': 'output',
     'residual': 'output'
 }
+
+
+class _VecData(object):
+    """
+    Internal data structure for each variable in a Vector.
+    """
+    __slots__ = ['shape', 'size', 'is_scalar', 'range', 'view', 'flat']
+
+    def __init__(self, shape, rng):
+        self.shape = shape
+        self.size = shape_to_len(shape)
+        self.is_scalar = shape == ()
+        self.range = rng
+        self.view = None
+        self.flat = None
 
 
 class Vector(object):
@@ -54,8 +68,6 @@ class Vector(object):
         Specific kind of vector, either 'input', 'output', or 'residual'.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
-    _views_flat : dict
-        Dictionary mapping absolute variable names to the flattened ndarray views.
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
     _parent_slice : slice
@@ -68,15 +80,8 @@ class Vector(object):
         Mapping of var name to slice.
     _under_complex_step : bool
         When True, this vector is under complex step, and data is swapped with the complex data.
-    _do_scaling : bool
-        True if this vector performs scaling.
-    _do_adder : bool
-        True if this vector's scaling includes an additive term.
     _scaling : dict
         Contains scale factors to convert data arrays.
-    _scaling_nl_vec : dict
-        Reference to the scaling factors in the nonlinear vector. Only used for linear input
-        vectors.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _len : int
@@ -90,22 +95,21 @@ class Vector(object):
     # Indicator whether a vector class is MPI-distributed
     distributed = False
 
-    def __init__(self, name, kind, system, name_shape_iter, parent_vectors=None,
-                 msginfo='', path='', alloc_complex=False, do_scaling=False, do_adder=False):
+    def __init__(self, name, kind, system, name_shape_iter, parent_vector=None,
+                 msginfo='', path='', alloc_complex=False):
         """
         Initialize all attributes.
         """
-        # this will go away...
+        # TODO: remove system ref...
         self._system = weakref.ref(system)
         self._name = name
         self._typ = _type_map[kind]
         self._kind = kind
-        self._len = 0
         self._pathname = path
         self.msginfo = msginfo
+        self._prom2abs = system._var_allprocs_prom2abs_list[self._typ]
 
         self._views = {}
-        self._views_flat = {}
 
         # self._names will either contain the same names as self._views or to the
         # set of variables relevant to the current matvec product.
@@ -119,22 +123,14 @@ class Vector(object):
         self._alloc_complex = alloc_complex
         self._under_complex_step = False
 
-        self._do_scaling = do_scaling
-        self._do_adder = do_adder
-
         self._scaling = None
-        self._scaling_nl_vec = None
 
         # If we define 'ref' on an output, then we will need to allocate a separate scaling ndarray
         # for the linear and nonlinear input vectors.
         self._has_solver_ref = system._has_output_scaling and kind == 'input' and name == 'linear'
 
-        if name not in parent_vectors[kind]:  # we're a root vec
-            parent_vectors[kind][name] = self
-            self._create_data(system)
-
-        self._initialize_data(parent_vectors, system)
-        self._initialize_views(name_shape_iter)
+        self._initialize_data(parent_vector, name_shape_iter)
+        self._initialize_views(system)
 
         self.read_only = False
 
@@ -158,7 +154,8 @@ class Vector(object):
         int
             Total flattened length of this vector.
         """
-        return self._len
+        raise NotImplementedError('__len__ not defined for vector type '
+                                  f'{type(self).__name__}')
 
     def nvars(self):
         """
@@ -180,10 +177,8 @@ class Vector(object):
         dict
             Dictionary containing the variable values.
         """
-        values = {}
-        for n, (v, is_scalar) in self._views.items():
-            values[n] = v[0] if is_scalar else v.copy()
-        return values
+        return {n: vinfo.view[0] if vinfo.is_scalar else vinfo.view.copy()
+                for n, vinfo in self._views.items()}
 
     def keys(self):
         """
@@ -206,17 +201,17 @@ class Vector(object):
             Value of each variable.
         """
         if self._under_complex_step:
-            for n, (v, is_scalar) in self._views.items():
+            for n, vinfo in self._views.items():
                 if n in self._names:
-                    yield v[0] if is_scalar else v
+                    yield vinfo.view[0] if vinfo.is_scalar else vinfo.view
                 else:
-                    yield 0.0j if is_scalar else np.zeros_like(v)
+                    yield 0.0j if vinfo.is_scalar else np.zeros_like(vinfo.view)
         else:
-            for n, (v, is_scalar) in self._views.items():
+            for n, vinfo in self._views.items():
                 if n in self._names:
-                    yield v[0].real if is_scalar else v.real
+                    yield vinfo.view[0].real if vinfo.is_scalar else vinfo.view.real
                 else:
-                    yield 0.0 if is_scalar else np.zeros_like(v.real)
+                    yield 0.0 if vinfo.is_scalar else np.zeros_like(vinfo.view.real)
 
     def items(self):
         """
@@ -229,19 +224,19 @@ class Vector(object):
         ndarray or float
             Value of each variable.
         """
-        if self._system().pathname:
-            plen = len(self._system().pathname) + 1
+        if self._pathname:
+            plen = len(self._pathname) + 1
         else:
             plen = 0
 
         if self._under_complex_step:
-            for n, (v, is_scalar) in self._views.items():
+            for n, vinfo in self._views.items():
                 if n in self._names:
-                    yield n[plen:], v[0] if is_scalar else v
+                    yield n[plen:], vinfo.view[0] if vinfo.is_scalar else vinfo.view
         else:
-            for n, (v, is_scalar) in self._views.items():
+            for n, vinfo in self._views.items():
                 if n in self._names:
-                    yield n[plen:], v[0].real if is_scalar else v.real
+                    yield n[plen:], vinfo.view[0].real if vinfo.is_scalar else vinfo.view.real
 
     def _name2abs_name(self, name):
         """
@@ -259,14 +254,25 @@ class Vector(object):
         str or None
             Absolute variable name if unique abs_name found or None otherwise.
         """
-        system = self._system()
+        if name in self._prom2abs:
+            lst = self._prom2abs[name]
+            if len(lst) > 1:
+                model = self._system()._problem_meta['model_ref']()
+                src_name = model._var_abs2prom['output'][model._conn_global_abs_in2out[lst[0]]]
+                raise RuntimeError(f"The promoted name {name} is invalid because it refers to "
+                                   f"multiple inputs: [{' ,'.join(lst)}]. Access the value from "
+                                   f"the connected output variable {src_name} instead.")
 
-        # try relative name first
-        abs_name = system.pathname + '.' + name if system.pathname else name
-        if abs_name in self._views:
-            return abs_name
+            for abs_name in self._prom2abs[name]:
+                if abs_name in self._views:
+                    return abs_name
 
-        abs_name = prom_name2abs_name(system, name, self._typ)
+        ## test abs name
+        #if name in self._views:
+            #return name
+
+        # test relative name
+        abs_name = self._pathname + '.' + name if self._pathname else name
         if abs_name in self._views:
             return abs_name
 
@@ -279,8 +285,7 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        system = self._system()
-        path = system.pathname
+        path = self._pathname
         idx = len(path) + 1 if path else 0
 
         return (n[idx:] for n in self._views if n in self._names)
@@ -303,22 +308,23 @@ class Vector(object):
         """
         if flat:
             if self._under_complex_step:
-                yield from self._views_flat.items()
+                for name, vinfo in self._views.items():
+                    yield name, vinfo.flat
             else:
-                for name, val in self._views_flat.items():
-                    yield name, val.real
+                for name, vinfo in self._views.items():
+                    yield name, vinfo.flat.real
         else:
-            for name, (val, is_scalar) in self._views.items():
-                if is_scalar:
+            for name, vinfo in self._views.items():
+                if vinfo.is_scalar:
                     if self._under_complex_step:
-                        yield name, val[0]
+                        yield name, vinfo.view[0]
                     else:
-                        yield name, val[0].real
+                        yield name, vinfo.view[0].real
                 else:
                     if self._under_complex_step:
-                        yield name, val
+                        yield name, vinfo.view
                     else:
-                        yield name, val.real
+                        yield name, vinfo.view.real
 
     def _abs_iter(self):
         """
@@ -421,15 +427,15 @@ class Vector(object):
         """
         if flat:
             if self._under_complex_step:
-                return self._views_flat[name]
+                return self._views[name].flat
             else:
-                return self._views_flat[name].real
+                return self._views[name].flat.real
 
-        val, is_scalar = self._views[name]
-        if is_scalar:
-            val = val[0]
+        vinfo = self._views[name]
+        if vinfo.is_scalar:
+            return vinfo.view[0]
 
-        return val if self._under_complex_step else val.real
+        return vinfo.view if self._under_complex_step else vinfo.view.real
 
     def _abs_set_val(self, name, val):
         """
@@ -445,9 +451,9 @@ class Vector(object):
             Value to set.
         """
         if self._under_complex_step:
-            self._views[name][0][:] = val
+            self._views[name].view[:] = val
         else:
-            self._views[name][0].real[:] = val
+            self._views[name].view.real[:] = val
 
     def __setitem__(self, name, value):
         """
@@ -612,18 +618,8 @@ class Vector(object):
         vals : iter of ndarrays
             Values for each variable contained in this vector, in the proper order.
         """
-        arr = self.asarray()
-
-        start = end = 0
-        for v in vals:
-            try:
-                end += v.size
-            except AttributeError:  # assume a plain float
-                arr[start] = v
-                end += 1
-            else:
-                arr[start:end] = v.ravel()
-            start = end
+        for vinfo, val in zip(self._views.values(), vals):
+            vinfo.flat[:] = val.ravel()
 
     def set_var(self, name, val, idxs=_full_slice, flat=False, var_name=None):
         """
@@ -662,23 +658,21 @@ class Vector(object):
         elif not isinstance(idxs, Indexer):
             idxs = indexer(idxs, flat_src=flat)
 
+        vinfo = self._views[abs_name]
+        value = np.asarray(val)
+
         if flat:
-            if isinstance(val, float):
-                self._views_flat[abs_name][idxs.flat()] = val
-            else:
-                self._views_flat[abs_name][idxs.flat()] = np.asarray(val).flat
+            vinfo.flat[idxs.flat()] = value.flat
         else:
-            value = np.asarray(val)
-            view = self._views[abs_name][0]
             try:
-                view[idxs()] = value
+                vinfo.view[idxs()] = value
             except Exception as err:
                 try:
-                    value = value.reshape(view[idxs()].shape)
+                    value = value.reshape(vinfo.view[idxs()].shape)
                 except Exception:
                     raise ValueError(f"{self._system().msginfo}: Failed to set value of "
                                      f"'{var_name if var_name else name}': {str(err)}.")
-                view[idxs()] = value
+                vinfo.view[idxs()] = value
 
     def dot(self, vec):
         """
@@ -770,9 +764,9 @@ class Vector(object):
         pathlen = len(self._pathname) + 1 if self._pathname else 0
 
         start = end = 0
-        for name, (val, is_scalar) in self._views.items():
-            end += val.size
-            dct[name[pathlen:]] = (arr[start:end].reshape(val.shape), is_scalar)
+        for name, vinfo in self._views.items():
+            end += vinfo.size
+            dct[name[pathlen:]] = (arr[start:end].reshape(vinfo.view.shape), vinfo.is_scalar)
             start = end
 
         return dct

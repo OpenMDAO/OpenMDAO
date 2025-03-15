@@ -1277,23 +1277,30 @@ class Group(System):
         self._root_vecs = root_vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         for kind in ['input', 'output', 'residual']:
-            root_vectors[kind]['nonlinear'] = self._vector_class('nonlinear', kind, self,
-                                                                 self._name_shape_iter(kind),
-                                                                 root_vectors,
-                                                                 alloc_complex=nl_alloc_complex,
-                                                                 do_scaling=do_scaling[kind],
-                                                                 do_adder=do_adder[kind])
-            if self._use_derivatives:
-                root_vectors[kind]['linear'] = self._vector_class('linear', kind, self,
-                                                                  self._name_shape_iter(kind),
-                                                                  root_vectors,
-                                                                  alloc_complex=ln_alloc_complex,
-                                                                  do_scaling=do_scaling[kind],
-                                                                  do_adder=do_adder[kind])
+            rvec = root_vectors[kind]
+            rvec['nonlinear'] = nlvec = self._vector_class('nonlinear', kind, self,
+                                                           self._name_shape_iter(kind),
+                                                           None,
+                                                           path=self.pathname,
+                                                           alloc_complex=nl_alloc_complex)
+            if do_scaling[kind]:
+                nlvec._initialize_scaling(None, do_adder[kind])
 
-        if self._use_derivatives:
-            root_vectors['input']['linear']._scaling_nl_vec = \
-                root_vectors['input']['nonlinear']._scaling
+            if self._use_derivatives:
+                rvec['linear'] = self._vector_class('linear', kind, self,
+                                                    self._name_shape_iter(kind),
+                                                    None,
+                                                    path=self.pathname,
+                                                    alloc_complex=ln_alloc_complex)
+
+                if do_scaling[kind]:
+                    if rvec['linear']._has_solver_ref:
+                        nlvec = None
+                    rvec['linear']._initialize_scaling(nlvec, do_adder[kind])
+
+        # if self._use_derivatives:
+        #     root_vectors['input']['linear']._scaling_nl_vec = \
+        #         root_vectors['input']['nonlinear']._scaling
 
         return root_vectors
 

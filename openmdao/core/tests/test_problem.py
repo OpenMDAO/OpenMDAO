@@ -457,7 +457,7 @@ class TestProblem(unittest.TestCase):
         J = prob.compute_totals(of, wrt, return_format='array')
 
         seed = []
-        for name in seed_names:
+        for name in prob.model.to_abs_names(seed_names, 'output'):
             seed.append(np.random.random(rvec[name].size))
 
         resdict = prob.compute_jacvec_product(of, wrt, mode, seed)
@@ -1251,8 +1251,8 @@ class TestProblem(unittest.TestCase):
 
         inputs, outputs, residuals = prob.model.get_nonlinear_vectors()
 
-        self.assertLess(residuals['y1'], 1e-6)
-        self.assertLess(residuals['y2'], 1e-6)
+        self.assertLess(prob.model.get_val('y1', kind='residual'), 1e-6)
+        self.assertLess(prob.model.get_val('y2', kind='residual'), 1e-6)
 
     def test_setup_bad_mode(self):
         # Test error message when passing bad mode to setup.

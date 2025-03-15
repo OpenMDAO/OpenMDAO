@@ -57,26 +57,28 @@ else:
         distributed = True
 
         def __init__(self, name, kind, system, name_shape_iter, parent_vector=None,
-                     msginfo='', path='', alloc_complex=False, do_scaling=False, do_adder=False):
+                     msginfo='', path='', alloc_complex=False):
             """
             Initialize all attributes.
             """
             super().__init__(name, kind, system, name_shape_iter, parent_vector,
-                             msginfo, path, alloc_complex, do_scaling, do_adder)
+                             msginfo, path, alloc_complex)
 
             self._dup_inds = None
             self._dup_scratch = None
 
-        def _initialize_data(self, parent_vectors):
+        def _initialize_data(self, parent_vector, name_shape_iter):
             """
             Internally allocate vectors.
 
             Parameters
             ----------
-            parent_vectors : dict of dict of Vector
-                Parent vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+            parent_vector : <Vector>
+                Parent vector.
+            name_shape_iter : iterator
+                Iterator yielding variable names and their shapes.
             """
-            super()._initialize_data(parent_vectors)
+            super()._initialize_data(parent_vector, name_shape_iter)
 
             self._petsc = {}
             self._imag_petsc = {}
