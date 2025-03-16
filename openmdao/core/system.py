@@ -2561,7 +2561,7 @@ class System(object, metaclass=SystemMetaclass):
 
         print(self.msginfo, '_setup_vectors')
         for v in [self._inputs, self._outputs, self._residuals, self._dinputs, self._doutputs, self._dresiduals]:
-            print(v._kind, v._name, 'scaling', v._do_scaling, getattr(v, '_scaling_nl_vec', 'NO_NL_VEC'), 'data', v._data)
+            print(v._kind, v._name, 'scaling', v._do_scaling, v._scaling, getattr(v, '_scaling_nl_vec', 'NO_NL_VEC'))
 
     def _name_shape_iter(self, vectype, subset=None):
         """
