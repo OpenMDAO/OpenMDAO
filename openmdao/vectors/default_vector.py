@@ -233,7 +233,7 @@ class DefaultVector(Vector):
                     scaling[0][start:end] = scale0
                 scaling[1][start:end] = scale1
 
-                # print('scaling for', abs_name, self._kind, self._name, self._scaling)
+                print(f"{system.msginfo} {self._kind} {self._name} : setting scale factor for {abs_name}: {self._scaling}")
 
             start = end
 
