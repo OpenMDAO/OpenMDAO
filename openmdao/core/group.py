@@ -447,7 +447,7 @@ class Group(System):
                 scalar_ref = np.ndim(ref) == 0
                 scalar_ref0 = np.ndim(ref0) == 0
 
-                has_scaling = not scalar_ref or not scalar_ref0 and ref != 1.0 and ref0 != 0.0
+                has_scaling = not scalar_ref or not scalar_ref0 or ref != 1.0 or ref0 != 0.0
 
                 units_in = meta_in['units']
                 units_out = meta_out['units']
@@ -462,8 +462,12 @@ class Group(System):
                     factor = 1.0
                     offset = 0.0
 
-                if not has_scaling and not has_unit_conv:
-                    continue
+                print(abs_in, 'has_scaling', has_scaling, 'has_unit_conv', has_unit_conv)
+                print('--------', abs_in, 'ref', ref, 'ref0', ref0, 'units_in', units_in, 'units_out', units_out)
+
+                # if not has_scaling and not has_unit_conv:
+                #     print("SKIPPING", abs_in)
+                #     continue
 
                 src_indices = meta_in['src_indices']
 
