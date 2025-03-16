@@ -111,13 +111,7 @@ class ImplicitComponent(Component):
         """
         Compute residuals. The model is assumed to be in a scaled state.
         """
-        print("scaled:")
-        for v in [self._outputs, self._residuals, self._inputs]:
-            print(v._kind, v._name, v._data)
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-            print("unscaled:")
-            for v in [self._outputs, self._residuals, self._inputs]:
-                print(v._kind, v._name, v._data)
             with self._call_user_function('apply_nonlinear', protect_outputs=True):
                 if self._run_root_only():
                     if self.comm.rank == 0:

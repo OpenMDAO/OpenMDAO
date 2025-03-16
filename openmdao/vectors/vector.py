@@ -124,11 +124,11 @@ class Vector(object):
         self._scaling = None
         self._do_scaling = do_scaling
         self._do_adder = do_adder
-        self._nlvec = nlvec
 
         # If we define 'ref' on an output, then we will need to allocate a separate scaling ndarray
         # for the linear and nonlinear input vectors.
         self._has_solver_ref = system._has_output_scaling and kind == 'input' and name == 'linear'
+        self._nlvec =nlvec
 
         self._initialize_data(parent_vector, name_shape_iter)
         self._initialize_views(parent_vector, system)

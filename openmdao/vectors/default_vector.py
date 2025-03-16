@@ -398,10 +398,11 @@ class DefaultVector(Vector):
         if mode == 'rev':
             self._scale_reverse(self._scaling[1], self._scaling[0])
         else:
-            # if self._has_solver_ref:
-            #     self._scale_forward(self._scaling_nl_vec[1], None)
-            # else:
-            self._scale_forward(self._scaling[1], self._scaling[0])
+            if self._has_solver_ref:
+                self._scale_forward(self._nlvec._scaling[1], None)
+            else:
+                adder, scaler = self._scaling
+                self._scale_forward(scaler, adder)
 
     def scale_to_phys(self, mode='fwd'):
         """
@@ -415,10 +416,11 @@ class DefaultVector(Vector):
         if mode == 'rev':
             self._scale_forward(self._scaling[1], self._scaling[0])
         else:
-            # if self._has_solver_ref:
-            #     self._scale_reverse(self._scaling_nl_vec[1], None)
-            # else:
-            self._scale_reverse(self._scaling[1], self._scaling[0])
+            if self._has_solver_ref:
+                self._scale_reverse(self._nlvec._scaling[1], None)
+            else:
+                adder, scaler = self._scaling
+                self._scale_reverse(scaler, adder)
 
     def _scale_forward(self, scaler, adder):
         """

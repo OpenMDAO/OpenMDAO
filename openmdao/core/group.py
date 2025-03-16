@@ -425,12 +425,15 @@ class Group(System):
         for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
             ref0 = meta['ref0']
             res_ref = meta['res_ref']
+            if res_ref is None:
+                res_ref = 1.0
             a0 = ref0
             a1 = meta['ref'] - ref0
             scale_factors[abs_name] = {
                 'output': (a0, a1),
-                'residual': (0.0, 1.0 if res_ref is None else res_ref),
+                'residual': (0.0, res_ref),
             }
+            print('--------', abs_name, 'ref', meta['ref'], 'ref0', ref0, 'res_ref', res_ref)
 
         # Input scaling for connected inputs is added here.
         # This is a combined scale factor that includes the scaling of the connected source
@@ -447,7 +450,7 @@ class Group(System):
                 scalar_ref = np.ndim(ref) == 0
                 scalar_ref0 = np.ndim(ref0) == 0
 
-                # has_scaling = not scalar_ref or not scalar_ref0 or ref != 1.0 or ref0 != 0.0
+                has_scaling = not scalar_ref or not scalar_ref0 or ref != 1.0 or ref0 != 0.0
 
                 units_in = meta_in['units']
                 units_out = meta_out['units']
@@ -464,9 +467,9 @@ class Group(System):
 
                 print('--------', abs_in, 'ref', ref, 'ref0', ref0, 'units_in', units_in, 'units_out', units_out)
 
-                # if not has_scaling and not has_unit_conv:
-                #     print("SKIPPING", abs_in)
-                #     continue
+                if not has_scaling and not has_unit_conv:
+                    # print("SKIPPING", abs_in)
+                    continue
 
                 src_indices = meta_in['src_indices']
 
@@ -1313,7 +1316,7 @@ class Group(System):
                                                     alloc_complex=ln_alloc_complex,
                                                     do_scaling=do_scaling[kind],
                                                     do_adder=do_adder[kind],
-                                                    nlvec=None if self._has_output_scaling and kind=='input' else nlvec)
+                                                    nlvec=nlvec)
 
                 # if do_scaling[kind]:
                 #     if rvec['linear']._has_solver_ref:

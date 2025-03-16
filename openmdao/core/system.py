@@ -2541,7 +2541,7 @@ class System(object, metaclass=SystemMetaclass):
             for vec_name in vectypes:
                 # Only allocate complex in the vectors we need.
                 for kind in ['input', 'output', 'residual']:
-                    if kind == 'input' and vec_name == 'linear':
+                    if vec_name == 'linear':
                         nlvec = vectors['input']['nonlinear']
                     else:
                         nlvec = None
@@ -2566,10 +2566,10 @@ class System(object, metaclass=SystemMetaclass):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-        print(self.msginfo, '_setup_vectors')
-        for v in [self._inputs, self._outputs, self._residuals, self._dinputs, self._doutputs, self._dresiduals]:
-            if v._do_scaling:
-                print(v._kind, v._name, 'scaling', v._do_scaling, v._scaling, v._nlvec._scaling if v._nlvec is not None else None)
+        # print(self.msginfo, '_setup_vectors')
+        # for v in [self._inputs, self._outputs, self._residuals, self._dinputs, self._doutputs, self._dresiduals]:
+        #     if v._do_scaling:
+        #         print(v._kind, v._name, 'scaling', v._do_scaling, v._scaling, v._nlvec._scaling if v._nlvec is not None else None)
 
     def _name_shape_iter(self, vectype, subset=None):
         """
