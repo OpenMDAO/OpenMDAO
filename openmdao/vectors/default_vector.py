@@ -179,7 +179,7 @@ class DefaultVector(Vector):
         isinput = kind == 'input'
         rel_lookup = system._has_fast_rel_lookup()
 
-        if parent_vector is None:
+        if parent_vector is None and self._do_scaling:
             self._initialize_scaling()
 
         scaling = self._scaling

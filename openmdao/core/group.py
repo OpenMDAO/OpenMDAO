@@ -444,10 +444,31 @@ class Group(System):
                 ref = meta_out['ref']
                 ref0 = meta_out['ref0']
 
+                scalar_ref = np.ndim(ref) == 0
+                scalar_ref0 = np.ndim(ref0) == 0
+
+                has_scaling = not scalar_ref or not scalar_ref0 and ref != 1.0 and ref0 != 0.0
+
+                units_in = meta_in['units']
+                units_out = meta_out['units']
+
+                has_unit_conv = \
+                    units_in is not None and units_out is not None and units_in != units_out
+                if has_unit_conv:
+                    factor, offset = unit_conversion(units_out, units_in)
+                    if factor == 1.0 and offset == 0.0:
+                        has_unit_conv = False
+                else:
+                    factor = 1.0
+                    offset = 0.0
+
+                if not has_scaling and not has_unit_conv:
+                    continue
+
                 src_indices = meta_in['src_indices']
 
                 if src_indices is not None:
-                    if not (np.ndim(ref) == 0 and np.ndim(ref0) == 0):
+                    if not (scalar_ref and scalar_ref0):
                         # TODO: if either ref or ref0 are not scalar and the output is
                         # distributed, we need to do a scatter
                         # to obtain the values needed due to global src_indices
@@ -461,11 +482,11 @@ class Group(System):
                                                                meta_out['global_shape'],
                                                                meta_out['global_size'])
 
-                        if np.ndim(ref) > 0:
+                        if not scalar_ref:
                             ref = ref[src_indices]
                         else:  # ref is scalar so ref0 must be an array
                             ref = np.full(ref0.shape, ref)
-                        if np.ndim(ref0) > 0:
+                        if not scalar_ref0:
                             ref0 = ref0[src_indices]
                         else:  # ref0 is scalar so ref must be an array
                             ref0 = np.full(ref.shape, ref0)
@@ -483,36 +504,29 @@ class Group(System):
                 #   b1 = d0 + d1 a1 - d0
                 #   b1 = g(a1) - g(0)
 
-                units_in = meta_in['units']
-                units_out = meta_out['units']
-
-                if units_in is None or units_out is None or units_in == units_out:
-                    a0 = ref0
-                    a1 = ref - ref0
-
-                    # No unit conversion, only scaling. Just send the scale factors.
-                    scale_factors[abs_in] = {
-                        'input': (a0, a1),
-                    }
-
-                else:
-                    factor, offset = unit_conversion(units_out, units_in)
+                if has_unit_conv:
                     a0 = ref0
                     a1 = ref - ref0
 
                     # Send both unit scaling and solver scaling. Linear input vectors need to
                     # treat them differently in reverse mode.
-                    scale_factors[abs_in] = {
-                        'input': (a0, a1, factor, offset),
-                    }
+                    scale_factors[abs_in] = {'input': (a0, a1, factor, offset)}
 
                     # For adder allocation check.
                     a0 = (ref0 + offset) * factor
+                else:
+                    a0 = ref0
+                    a1 = ref - ref0
+
+                    # No unit conversion, only scaling. Just send the scale factors.
+                    scale_factors[abs_in] = {'input': (a0, a1)}
 
                 # Check whether we need to allocate an adder for the input vector.
-                if np.any(np.asarray(a0)):
-                    self._has_input_adder = True
+                self._has_input_adder = np.any(np.asarray(a0))
 
+        print('scale_factors', self.pathname)
+        import pprint
+        pprint.pprint(scale_factors)
         return scale_factors
 
     def _configure(self):
@@ -1296,8 +1310,7 @@ class Group(System):
                                                     alloc_complex=ln_alloc_complex,
                                                     do_scaling=do_scaling[kind],
                                                     do_adder=do_adder[kind],
-                                                    nlvec=nlvec if kind == 'input' and
-                                                    self._has_output_scaling else None)
+                                                    nlvec=None if self._has_output_scaling and kind=='input' else nlvec)
 
                 # if do_scaling[kind]:
                 #     if rvec['linear']._has_solver_ref:
