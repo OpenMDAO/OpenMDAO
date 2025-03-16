@@ -234,6 +234,8 @@ class DefaultVector(Vector):
                 scaling[1][start:end] = scale1
 
                 print(f"{system.msginfo} {self._kind} {self._name} : setting scale factor for {abs_name}: {self._scaling}")
+            else:
+                print(f"{system.msginfo} {self._kind} {self._name} : NO scaling for {abs_name}")
 
             start = end
 
