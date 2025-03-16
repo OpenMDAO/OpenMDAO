@@ -34,13 +34,13 @@ class DefaultVector(Vector):
     TRANSFER = DefaultTransfer
 
     def __init__(self, name, kind, system, name_shape_iter, parent_vector=None, msginfo='', path='',
-                 alloc_complex=False, do_scaling=False):
+                 alloc_complex=False, do_scaling=False, do_adder=False, nlvec=None):
         """
         Initialize all attributes.
         """
         self._views_rel = None
         super().__init__(name, kind, system, name_shape_iter, parent_vector, msginfo, path,
-                         alloc_complex, do_scaling)
+                         alloc_complex, do_scaling, do_adder, nlvec)
 
     def __getitem__(self, name):
         """
@@ -143,20 +143,18 @@ class DefaultVector(Vector):
 
         # print(self._kind, self._name, 'scaling', self._scaling)
 
-    def _initialize_scaling(self, nlvec, do_adder):
+    def _initialize_scaling(self):
         """
         Initialize root scaling vectors.
 
         Parameters
         ----------
-        nlvec : <Vector>
-            nonlinear vector.
         do_adder : bool
             Whether to initialize with an additive term.
         """
         data = self._data
         if self._name == 'nonlinear':
-            if do_adder:
+            if self._do_adder:
                 self._scaling = (np.zeros(data.size), np.ones(data.size))
             else:
                 self._scaling = (None, np.ones(data.size))
@@ -168,20 +166,24 @@ class DefaultVector(Vector):
             else:
                 # Reuse the nonlinear scaling vecs since they're the same as ours.
                 # The nonlinear vectors are created before the linear vectors
-                self._scaling = (None, nlvec._scaling[1])
+                self._scaling = (None, self._nlvec._scaling[1])
         else:
             self._scaling = (None, np.ones(data.size))
 
-    def _initialize_views(self, system):
+    def _initialize_views(self, parent_vector, system):
         """
         Internally assemble views onto the vectors.
         """
         kind = self._kind
         islinear = self._name == 'linear'
+        isinput = kind == 'input'
         rel_lookup = system._has_fast_rel_lookup()
 
+        if parent_vector is None:
+            self._initialize_scaling()
+
         scaling = self._scaling
-        if scaling is not None:
+        if self._do_scaling:
             factors = system._scale_factors
 
         if rel_lookup:
@@ -206,7 +208,7 @@ class DefaultVector(Vector):
             if rel_lookup:
                 views_rel[abs_name[relstart:]] = vinfo
 
-            if scaling is not None:
+            if self._do_scaling:
                 factor_tuple = factors[abs_name][kind]
 
                 if len(factor_tuple) == 4:
@@ -221,7 +223,7 @@ class DefaultVector(Vector):
                         scale0 = (a0 + offset) * factor
                         scale1 = a1 * factor
                 else:
-                    if self._name == 'linear' and self._typ == 'input':
+                    if islinear and isinput:
                         scale0 = None
                         scale1 = 1.0 / factor_tuple[1]
                     else:

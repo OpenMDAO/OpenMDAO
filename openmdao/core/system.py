@@ -2532,20 +2532,27 @@ class System(object, metaclass=SystemMetaclass):
                 'output': self._has_output_scaling,
                 'residual': self._has_resid_scaling
             }
-            # do_adder = {
-            #     'input': self._has_input_adder,
-            #     'output': self._has_output_adder,
-            #     'residual': self._has_resid_scaling
-            # }
+            do_adder = {
+                'input': self._has_input_adder,
+                'output': self._has_output_adder,
+                'residual': self._has_resid_scaling
+            }
 
             for vec_name in vectypes:
                 # Only allocate complex in the vectors we need.
                 for kind in ['input', 'output', 'residual']:
+                    if kind == 'input' and vec_name == 'linear':
+                        nlvec = vectors['input']['nonlinear']
+                    else:
+                        nlvec = None
                     parent_vector =  parent_vectors[kind][vec_name]
                     vectors[kind][vec_name] = self._vector_class(
                         vec_name, kind, self, self._name_shape_iter(kind), parent_vector,
                         msginfo=self.msginfo, path=self.pathname,
-                        alloc_complex=parent_vector._alloc_complex, do_scaling=do_scaling[kind])
+                        alloc_complex=parent_vector._alloc_complex,
+                        do_scaling=do_scaling[kind],
+                        do_adder=do_adder[kind],
+                        nlvec=nlvec)
 
             # if self._use_derivatives:
             #     vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
@@ -2562,7 +2569,7 @@ class System(object, metaclass=SystemMetaclass):
         print(self.msginfo, '_setup_vectors')
         for v in [self._inputs, self._outputs, self._residuals, self._dinputs, self._doutputs, self._dresiduals]:
             if v._do_scaling:
-                print(v._kind, v._name, 'scaling', v._do_scaling, v._scaling, getattr(v, '_scaling_nl_vec', 'NO_NL_VEC'))
+                print(v._kind, v._name, 'scaling', v._do_scaling, v._scaling, v._nlvec._scaling if v._nlvec is not None else None)
 
     def _name_shape_iter(self, vectype, subset=None):
         """

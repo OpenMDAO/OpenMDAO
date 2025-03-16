@@ -1283,9 +1283,10 @@ class Group(System):
                                                            None,
                                                            path=self.pathname,
                                                            alloc_complex=nl_alloc_complex,
-                                                           do_scaling=do_scaling[kind])
-            if do_scaling[kind]:
-                nlvec._initialize_scaling(None, do_adder[kind])
+                                                           do_scaling=do_scaling[kind],
+                                                           do_adder=do_adder[kind])
+            # if do_scaling[kind]:
+            #     nlvec._initialize_scaling(None, do_adder[kind])
 
             if self._use_derivatives:
                 rvec['linear'] = self._vector_class('linear', kind, self,
@@ -1293,12 +1294,15 @@ class Group(System):
                                                     None,
                                                     path=self.pathname,
                                                     alloc_complex=ln_alloc_complex,
-                                                    do_scaling=do_scaling[kind])
+                                                    do_scaling=do_scaling[kind],
+                                                    do_adder=do_adder[kind],
+                                                    nlvec=nlvec if kind == 'input' and
+                                                    self._has_output_scaling else None)
 
-                if do_scaling[kind]:
-                    if rvec['linear']._has_solver_ref:
-                        nlvec = None
-                    rvec['linear']._initialize_scaling(nlvec, do_adder[kind])
+                # if do_scaling[kind]:
+                #     if rvec['linear']._has_solver_ref:
+                #         nlvec = None
+                #     rvec['linear']._initialize_scaling(nlvec, do_adder[kind])
 
         # if self._use_derivatives:
         #     root_vectors['input']['linear']._scaling_nl_vec = \

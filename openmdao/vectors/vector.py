@@ -94,7 +94,8 @@ class Vector(object):
     distributed = False
 
     def __init__(self, name, kind, system, name_shape_iter, parent_vector=None,
-                 msginfo='', path='', alloc_complex=False, do_scaling=False):
+                 msginfo='', path='', alloc_complex=False, do_scaling=False, do_adder=False,
+                 nlvec=None):
         """
         Initialize all attributes.
         """
@@ -122,13 +123,15 @@ class Vector(object):
 
         self._scaling = None
         self._do_scaling = do_scaling
+        self._do_adder = do_adder
+        self._nlvec = nlvec
 
         # If we define 'ref' on an output, then we will need to allocate a separate scaling ndarray
         # for the linear and nonlinear input vectors.
         self._has_solver_ref = system._has_output_scaling and kind == 'input' and name == 'linear'
 
         self._initialize_data(parent_vector, name_shape_iter)
-        self._initialize_views(system)
+        self._initialize_views(parent_vector, system)
 
         self.read_only = False
 
@@ -480,7 +483,7 @@ class Vector(object):
         raise NotImplementedError('_initialize_data not defined for vector type '
                                   f'{type(self).__name__}')
 
-    def _initialize_views(self):
+    def _initialize_views(self, parent_vector, system):
         """
         Internally assemble views onto the vectors.
 
