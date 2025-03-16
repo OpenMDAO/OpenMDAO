@@ -462,12 +462,11 @@ class Group(System):
                     factor = 1.0
                     offset = 0.0
 
-                print(abs_in, 'has_scaling', has_scaling, 'has_unit_conv', has_unit_conv)
                 print('--------', abs_in, 'ref', ref, 'ref0', ref0, 'units_in', units_in, 'units_out', units_out)
 
-                # if not has_scaling and not has_unit_conv:
-                #     print("SKIPPING", abs_in)
-                #     continue
+                if not has_scaling and not has_unit_conv:
+                    print("SKIPPING", abs_in)
+                    continue
 
                 src_indices = meta_in['src_indices']
 

@@ -429,6 +429,7 @@ class DefaultVector(Vector):
         adder : darray
             Vector of additive scaling factors.
         """
+        print(f"{self._system().msginfo} {self._kind} {self._name} : scaling forward ({scaler}, {adder})")
         data = self.asarray()
         if adder is not None:  # nonlinear only
             data -= adder
@@ -445,6 +446,7 @@ class DefaultVector(Vector):
         adder : darray
             Vector of additive scaling factors.
         """
+        print(f"{self._system().msginfo} {self._kind} {self._name} : scaling reverse ({scaler}, {adder})")
         data = self.asarray()
         data *= scaler
         if adder is not None:  # nonlinear only
