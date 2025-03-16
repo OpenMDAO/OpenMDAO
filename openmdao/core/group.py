@@ -433,7 +433,7 @@ class Group(System):
                 'output': (a0, a1),
                 'residual': (0.0, res_ref),
             }
-            print('--------', abs_name, 'ref', meta['ref'], 'ref0', ref0, 'res_ref', res_ref)
+            # print('--------', abs_name, 'ref', meta['ref'], 'ref0', ref0, 'res_ref', res_ref)
 
         # Input scaling for connected inputs is added here.
         # This is a combined scale factor that includes the scaling of the connected source
@@ -465,7 +465,7 @@ class Group(System):
                     factor = 1.0
                     offset = 0.0
 
-                print('--------', abs_in, 'ref', ref, 'ref0', ref0, 'units_in', units_in, 'units_out', units_out)
+                # print('--------', abs_in, 'ref', ref, 'ref0', ref0, 'units_in', units_in, 'units_out', units_out)
 
                 if not has_scaling and not has_unit_conv:
                     # print("SKIPPING", abs_in)
@@ -528,11 +528,11 @@ class Group(System):
                     scale_factors[abs_in] = {'input': (a0, a1)}
 
                 # Check whether we need to allocate an adder for the input vector.
-                self._has_input_adder = np.any(np.asarray(a0))
+                self._has_input_adder |= np.any(np.asarray(a0))
 
-        print('scale_factors', self.pathname)
-        import pprint
-        pprint.pprint(scale_factors)
+        # print('scale_factors', self.pathname)
+        # import pprint
+        # pprint.pprint(scale_factors)
         return scale_factors
 
     def _configure(self):
