@@ -211,6 +211,8 @@ class DefaultVector(Vector):
             if self._do_scaling:
                 factor_tuple = factors[abs_name][kind]
 
+                print('factor_tuple', abs_name, kind, factor_tuple)
+
                 if len(factor_tuple) == 4:
                     # Only input vectors can have 4 factors. Linear input vectors need to be able
                     # to handle the unit and solver scaling in opposite directions in reverse mode.
