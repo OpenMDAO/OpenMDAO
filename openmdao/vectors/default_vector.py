@@ -141,7 +141,7 @@ class DefaultVector(Vector):
                     ps0 = ps0[self._parent_slice]
                 self._scaling = (ps0, ps1[self._parent_slice])
 
-        print(self._kind, self._name, 'scaling', self._scaling)
+        # print(self._kind, self._name, 'scaling', self._scaling)
 
     def _initialize_scaling(self, nlvec, do_adder):
         """
