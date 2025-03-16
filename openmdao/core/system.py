@@ -2527,6 +2527,17 @@ class System(object, metaclass=SystemMetaclass):
 
             vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
 
+            do_scaling = {
+                'input': self._has_input_scaling,
+                'output': self._has_output_scaling,
+                'residual': self._has_resid_scaling
+            }
+            # do_adder = {
+            #     'input': self._has_input_adder,
+            #     'output': self._has_output_adder,
+            #     'residual': self._has_resid_scaling
+            # }
+
             for vec_name in vectypes:
                 # Only allocate complex in the vectors we need.
                 for kind in ['input', 'output', 'residual']:
@@ -2534,7 +2545,7 @@ class System(object, metaclass=SystemMetaclass):
                     vectors[kind][vec_name] = self._vector_class(
                         vec_name, kind, self, self._name_shape_iter(kind), parent_vector,
                         msginfo=self.msginfo, path=self.pathname,
-                        alloc_complex=parent_vector._alloc_complex)
+                        alloc_complex=parent_vector._alloc_complex, do_scaling=do_scaling[kind])
 
             # if self._use_derivatives:
             #     vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
@@ -2547,6 +2558,10 @@ class System(object, metaclass=SystemMetaclass):
             self._dinputs = vectors['input']['linear']
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
+
+        print(self.msginfo, '_setup_vectors')
+        for v in [self._inputs, self._outputs, self._residuals, self._dinputs, self._doutputs, self._dresiduals]:
+            print(v._kind, v._name, 'scaling', v._do_scaling, getattr(v, '_scaling_nl_vec', 'NO_NL_VEC'), 'data', v._data)
 
     def _name_shape_iter(self, vectype, subset=None):
         """

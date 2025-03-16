@@ -57,12 +57,12 @@ else:
         distributed = True
 
         def __init__(self, name, kind, system, name_shape_iter, parent_vector=None,
-                     msginfo='', path='', alloc_complex=False):
+                     msginfo='', path='', alloc_complex=False, do_scaling=False):
             """
             Initialize all attributes.
             """
             super().__init__(name, kind, system, name_shape_iter, parent_vector,
-                             msginfo, path, alloc_complex)
+                             msginfo, path, alloc_complex, do_scaling)
 
             self._dup_inds = None
             self._dup_scratch = None

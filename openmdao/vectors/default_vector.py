@@ -34,13 +34,13 @@ class DefaultVector(Vector):
     TRANSFER = DefaultTransfer
 
     def __init__(self, name, kind, system, name_shape_iter, parent_vector=None, msginfo='', path='',
-                 alloc_complex=False):
+                 alloc_complex=False, do_scaling=False):
         """
         Initialize all attributes.
         """
         self._views_rel = None
         super().__init__(name, kind, system, name_shape_iter, parent_vector, msginfo, path,
-                         alloc_complex)
+                         alloc_complex, do_scaling)
 
     def __getitem__(self, name):
         """
@@ -135,7 +135,7 @@ class DefaultVector(Vector):
                 self._parent_slice = slice(0, 0)
                 self._data = np.zeros(0, dtype=complex if self._alloc_complex else float)
 
-            if parent_vector._scaling is not None:
+            if self._do_scaling:
                 ps0, ps1 = parent_vector._scaling
                 if ps0 is not None:
                     ps0 = ps0[self._parent_slice]

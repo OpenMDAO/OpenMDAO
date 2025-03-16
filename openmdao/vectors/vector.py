@@ -76,12 +76,10 @@ class Vector(object):
         If True, then space for the complex vector is also allocated.
     _data : ndarray
         Actual allocated data.
-    _slices : dict
-        Mapping of var name to slice.
     _under_complex_step : bool
         When True, this vector is under complex step, and data is swapped with the complex data.
-    _scaling : dict
-        Contains scale factors to convert data arrays.
+    _scaling : tuple
+        If scaling is active, this is a tuple of (scale_factor, adder) for _data.
     read_only : bool
         When True, values in the vector cannot be changed via the user __setitem__ API.
     _len : int
@@ -96,7 +94,7 @@ class Vector(object):
     distributed = False
 
     def __init__(self, name, kind, system, name_shape_iter, parent_vector=None,
-                 msginfo='', path='', alloc_complex=False):
+                 msginfo='', path='', alloc_complex=False, do_scaling=False):
         """
         Initialize all attributes.
         """
@@ -108,7 +106,6 @@ class Vector(object):
         self._pathname = path
         self.msginfo = msginfo
         self._prom2abs = system._var_allprocs_prom2abs_list[self._typ]
-
         self._views = {}
 
         # self._names will either contain the same names as self._views or to the
@@ -124,6 +121,7 @@ class Vector(object):
         self._under_complex_step = False
 
         self._scaling = None
+        self._do_scaling = do_scaling
 
         # If we define 'ref' on an output, then we will need to allocate a separate scaling ndarray
         # for the linear and nonlinear input vectors.

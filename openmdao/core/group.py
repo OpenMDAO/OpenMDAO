@@ -1282,7 +1282,8 @@ class Group(System):
                                                            self._name_shape_iter(kind),
                                                            None,
                                                            path=self.pathname,
-                                                           alloc_complex=nl_alloc_complex)
+                                                           alloc_complex=nl_alloc_complex,
+                                                           do_scaling=do_scaling[kind])
             if do_scaling[kind]:
                 nlvec._initialize_scaling(None, do_adder[kind])
 
@@ -1291,7 +1292,8 @@ class Group(System):
                                                     self._name_shape_iter(kind),
                                                     None,
                                                     path=self.pathname,
-                                                    alloc_complex=ln_alloc_complex)
+                                                    alloc_complex=ln_alloc_complex,
+                                                    do_scaling=do_scaling[kind])
 
                 if do_scaling[kind]:
                     if rvec['linear']._has_solver_ref:
