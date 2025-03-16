@@ -196,7 +196,7 @@ class DefaultVector(Vector):
             if vinfo.shape != vflat.shape and vinfo.shape != ():
                 v = vflat.view().reshape(vinfo.shape)
 
-            print(abs_name, v.shape, vflat.shape)
+            # print(abs_name, v.shape, vflat.shape)
 
             vinfo.view = v
             vinfo.flat = vflat
@@ -228,6 +228,8 @@ class DefaultVector(Vector):
                 if scaling[0] is not None:
                     scaling[0][start:end] = scale0
                 scaling[1][start:end] = scale1
+
+                print('scaling for', abs_name, self._kind, self._name, self._scaling)
 
             start = end
 
