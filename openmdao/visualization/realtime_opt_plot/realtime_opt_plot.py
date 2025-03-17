@@ -1,5 +1,7 @@
 """ A real-plot of the optimization process"""
 
+import os
+import sys
 from collections import defaultdict
 import sqlite3
 
@@ -8,6 +10,7 @@ from bokeh.models import (
     LinearAxis,
     Range1d,
     Toggle,
+    Button,
     Column,
     Row,
     CustomJS,
@@ -31,10 +34,6 @@ from bokeh.server.server import Server
 from bokeh.application.application import Application
 from bokeh.application.handlers import FunctionHandler
 
-# from bokeh.core.property.validation import validate
-
-# validate(False)
-
 import numpy as np
 
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
@@ -47,7 +46,7 @@ except:
     def get_free_port():
         return 5000
 
-_time_between_callbacks_in_ms = 2000
+_time_between_callbacks_in_ms = 1000
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10  # TODO try different values here
 _obj_color = "black"  # color of the plot line for the objective function
 _non_active_plot_color = "black"
@@ -70,7 +69,6 @@ colorPalette = (
     RGB.from_hex_string('#1f77b4'),
     RGB.from_hex_string('#98df8a'),
 )
-
 
 # This is the JavaScript code that gets run when a user clicks on 
 #   one of the toggle buttons that change what is being plotted
@@ -98,19 +96,9 @@ if (typeof window.ColorManager === 'undefined') {{
                 ]
             }};
             
-
-            //this.palette = new Set(palette) ;
-            //this.palette = colorPalette ;
             this.palette = this.palettes['Colorblind'] ;
-
-            console.log("in Constructor: this.palette = " + this.palette);
-
-
-
-
             this.usedColors = new Set();
             this.variableColorMap = new Map();
-            
             ColorManager.instance = this;
         }} //  end of constructor
     
@@ -119,7 +107,6 @@ if (typeof window.ColorManager === 'undefined') {{
                 return this.variableColorMap.get(variableName);
             }}
     
-            console.log("in getColor: this.palette = " + this.palette);
             const availableColor = this.palette.find(color => !this.usedColors.has(color));
             const newColor = availableColor || this.palette[this.usedColors.size % this.palette.length];
             
@@ -177,31 +164,46 @@ let variable_name = cb_obj.label;
 if (toggle.active) {{
     let color = window.colorManager.getColor(variable_name);
 
-
-    console.log("typeof color = ", typeof color);
-    console.log("typeof lines[index].glyph.line_color = " + typeof lines[index].glyph.line_color);
-
     if (index > 0) {{
         axes[index-1].axis_label_text_color = color
     }}
-
-    console.log("color = " + color);
-
 
     if (lines[index].glyph.type == "VArea"){{
         lines[index].glyph.fill_color = color;
     }}
     if (lines[index].glyph.type == "Line"){{
         try {{
-            // lines[index].glyph.line_color = '#138231';
-
-            //lines[index].glyph.line_color.setv({{'value': '#ff0000'}});
-
-
             lines[index].glyph.properties.line_color.set_value(color);
 
-            //const glyph = lines[index].glyph;
-            //glyph.line_color = color;
+            // Force complete redraw via the plot's view
+            const view = plot.view;
+            if (view) {{
+                console.log("view.update_dataranges");
+                view.update_dataranges();
+                view.request_render();
+            }}
+
+            
+                // Toggle a property to force redraw
+    const old_visible = plot.visible;
+    plot.visible = !old_visible;
+    setTimeout(function() {{ 
+        plot.visible = old_visible; 
+    }}, 1);
+
+
+                // also causes the errors
+
+                // Save current line width
+                //const old_width = lines[index].glyph.line_width;
+                
+                // Modify and restore to trigger redraw
+                //lines[index].glyph.line_width = old_width + 0.001;
+                //setTimeout(function() {{
+                //    lines[index].glyph.line_width = old_width;
+                //}}, 5);
+
+
             lines[index].change.emit();
 
         }} catch(err) {{
@@ -227,6 +229,21 @@ if (toggle.active) {{
 }}
 """
 
+
+def is_process_running(pid):
+    try:
+        if sys.platform == "win32":
+            # Windows - attempt to send signal 0, which doesn't actually send a signal
+            # but checks if the process exists
+            os.kill(pid, 0)
+            return True
+        else:
+            # Unix/Linux/macOS
+            return os.kill(pid, 0) is None
+    except OSError:
+        # Process doesn't exist or we don't have permission
+        return False
+
 def _realtime_opt_plot_setup_parser(parser):
     """
     Set up the realtime plot subparser for the 'openmdao realtime_opt_plot' command.
@@ -242,6 +259,8 @@ def _realtime_opt_plot_setup_parser(parser):
         help="Name of openmdao case recorder filename. It should contain driver cases",
     )
 
+    parser.add_argument('--pid', type=int, help='Process ID of calling optimization script')
+
 
 def _realtime_opt_plot_cmd(options, user_args):
     """
@@ -255,7 +274,7 @@ def _realtime_opt_plot_cmd(options, user_args):
         Args to be passed to the user script.
     """
     print("in _realtime_opt_plot_cmd")
-    realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms)
+    realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms, options.pid)
 
 def _update_y_min_max(name, y, y_min, y_max):
     min_max_changed = False
@@ -409,16 +428,17 @@ class CaseTracker:
                 return "Ambiguous"
             raise
         except KeyError as err:
-            # meta2 = self._initial_cr_with_one_case.problem_metadata
-            # if name in meta2['variables']:
-            #     return meta2['variables'][name]['units']
             return "Unavailable"
 
+        if units is None:
+            units = "Unitless"
         return units
 
 class RealTimeOptPlot(object):
-    def __init__(self, case_recorder_filename, callback_period, doc):
+    def __init__(self, case_recorder_filename, callback_period, doc, pid_of_calling_script):
+
         self._case_recorder_filename = case_recorder_filename
+        self._pid_of_calling_script = pid_of_calling_script
 
         self._source = None
         self._lines = []
@@ -427,6 +447,9 @@ class RealTimeOptPlot(object):
         self._axes = []
         self._labels_updated_with_units = False
         self._case_tracker = CaseTracker(case_recorder_filename)
+        self._doc = doc
+        self._update_callback = None
+        self._source_stream_dict = None
 
         self._setup_figure()
 
@@ -436,10 +459,20 @@ class RealTimeOptPlot(object):
         self.y_max = defaultdict(lambda: float("-inf"))
 
         def update():
-            print("updating")
+
             new_data = self._case_tracker.get_new_case()
             if new_data is None:
+                if not is_process_running(self._pid_of_calling_script):
+                    # Just keep sending the last data point
+                    # This is a hack to force the plot to re-draw
+                    # Otherwise if the user clicks on the variable buttons, the
+                    #   lines will not change color because of the hack done to get
+                    #   get around the bug in setting the line color from JavaScript
+                    print("redrawing")
+                    self._source.stream(self._source_stream_dict)
                 return
+
+            print("updating")
 
             # See if source is defined yet. If not, see if we have any data
             #   in the case file yet. If there is data, create the
@@ -459,7 +492,8 @@ class RealTimeOptPlot(object):
                 
                 # Create CustomJS callback for toggle buttons
                 legend_item_callback = CustomJS(
-                    args=dict(lines=self._lines, axes=self._axes, toggles=self._toggles, colorPalette=colorPalette),
+                    args=dict(lines=self._lines, axes=self._axes, toggles=self._toggles, colorPalette=colorPalette, plot=self.p,                    
+                    ),
                     code=callback_code,
                 )
 
@@ -504,10 +538,6 @@ class RealTimeOptPlot(object):
                     self._make_axis("cons", cons_name, float_value, units)
                     i_line += 1
 
-                # Add callback to all toggles
-                # for toggle in self._toggles:
-                #     toggle.js_on_change("active", legend_item_callback)
-
                 # Create a column of toggles with scrolling
                 toggle_column = Column(
                     children=self._column_items,
@@ -522,6 +552,15 @@ class RealTimeOptPlot(object):
                     },
                 )
 
+                quit_button = Button(label="Quit Application", button_type="danger")
+                # Define callback function for the quit button
+                def quit_app():
+                    # print("shutting down optimization plot server")
+                    raise KeyboardInterrupt("Quit button pressed")
+
+                # Attach the callback to the button
+                quit_button.on_click(quit_app)
+
                 # header for the variable list
                 label = Div(
                     text="Variables",
@@ -529,6 +568,7 @@ class RealTimeOptPlot(object):
                     styles={"font-size": "20px", "font-weight": "bold"},
                 )
                 label_and_toggle_column = Column(
+                    quit_button, 
                     label,
                     toggle_column,
                     sizing_mode="stretch_height",
@@ -549,12 +589,14 @@ class RealTimeOptPlot(object):
                 # end of self._source is None - plottng is setup
 
             counter = new_data["counter"]
-            source_stream_dict = {"iteration": [counter]}
+
+
+            self._source_stream_dict = {"iteration": [counter]}
 
             iline = 0
             for obj_name, obj_value in new_data["objs"].items():
                 float_obj_value = _get_value_for_plotting(obj_value, "objs")
-                source_stream_dict[obj_name] = [float_obj_value]
+                self._source_stream_dict[obj_name] = [float_obj_value]
                 min_max_changed = _update_y_min_max(obj_name, float_obj_value, self.y_min, self.y_max)
                 if min_max_changed:
                     self.p.y_range.start = self.y_min[obj_name]
@@ -574,8 +616,8 @@ class RealTimeOptPlot(object):
                     )
                     self.p.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
 
-                source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
-                source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
+                self._source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
+                self._source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
                 iline += 1
 
             for cons_name, cons_value in new_data["cons"].items():
@@ -585,7 +627,7 @@ class RealTimeOptPlot(object):
                     units = self._case_tracker.get_units(cons_name)
                     self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
 
-                source_stream_dict[cons_name] = [float_cons_value]
+                self._source_stream_dict[cons_name] = [float_cons_value]
                 min_max_changed = _update_y_min_max(cons_name, float_cons_value, self.y_min, self.y_max)
                 if min_max_changed:
                     range = Range1d(
@@ -593,33 +635,33 @@ class RealTimeOptPlot(object):
                     )
                     self.p.extra_y_ranges[f"extra_y_{cons_name}"] = range
                 iline += 1
-            self._source.stream(source_stream_dict)
+            self._source.stream(self._source_stream_dict)
             self._labels_updated_with_units = True 
             # end of update method
 
-        doc.add_periodic_callback(update, callback_period)
+        self._update_callback = doc.add_periodic_callback(update, callback_period)
         doc.title = "OpenMDAO Optimization"
 
     def setup_data_source(self):
-        _source_dict = {"iteration": []}
+        self._source_dict = {"iteration": []}
 
         # Obj
         obj_names = self._case_tracker.get_obj_names()
         for obj_name in obj_names:
-            _source_dict[obj_name] = []
+            self._source_dict[obj_name] = []
 
         # Desvars
         desvar_names = self._case_tracker.get_desvar_names()
         for desvar_name in desvar_names:
-            _source_dict[f"{desvar_name}_min"] = []
-            _source_dict[f"{desvar_name}_max"] = []
+            self._source_dict[f"{desvar_name}_min"] = []
+            self._source_dict[f"{desvar_name}_max"] = []
 
         # Cons
         con_names = self._case_tracker.get_cons_names()
         for con_name in con_names:
-            _source_dict[con_name] = []
+            self._source_dict[con_name] = []
 
-        self._source = ColumnDataSource(_source_dict)
+        self._source = ColumnDataSource(self._source_dict)
 
     def _make_legend_item(self, varname, color, active, callback):
         toggle = Toggle(
@@ -670,9 +712,6 @@ class RealTimeOptPlot(object):
                 color=color,
                 visible=visible,
             )
-
-
-
 
         if var_type == "desvars":
             line.y_range_name=f"extra_y_{varname}_min"
@@ -749,7 +788,7 @@ class RealTimeOptPlot(object):
 
 
 
-def realtime_opt_plot(case_recorder_filename, callback_period):
+def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_script):
     """
     Visualize the objectives, desvars, and constraints during an optimization process.
 
@@ -759,10 +798,12 @@ def realtime_opt_plot(case_recorder_filename, callback_period):
         The metamodel component.
     callback_period : float
         The time period between when the application calls the update method.
+    pid_of_calling_script : int
+        The process id of the calling optimization script, if called this way.
     """
 
     def _make_realtime_opt_plot_doc(doc):
-        RealTimeOptPlot(case_recorder_filename, callback_period, doc=doc)
+        RealTimeOptPlot(case_recorder_filename, callback_period, doc=doc, pid_of_calling_script=pid_of_calling_script)
 
     _port_number = get_free_port()
 
