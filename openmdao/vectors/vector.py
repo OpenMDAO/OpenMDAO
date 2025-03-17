@@ -620,7 +620,7 @@ class Vector(object):
             Values for each variable contained in this vector, in the proper order.
         """
         for vinfo, val in zip(self._views.values(), vals):
-            vinfo.flat[:] = val.ravel()
+            vinfo.flat[:] = val if vinfo.is_scalar else val.ravel()
 
     def set_var(self, name, val, idxs=_full_slice, flat=False, var_name=None):
         """

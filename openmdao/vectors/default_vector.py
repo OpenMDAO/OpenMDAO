@@ -211,7 +211,7 @@ class DefaultVector(Vector):
             if self._do_scaling:
                 factor_tuple = factors[abs_name][kind]
 
-                print(system.msginfo, 'factor_tuple', abs_name, kind, self._name, factor_tuple)
+                # print(system.msginfo, 'factor_tuple', abs_name, kind, self._name, factor_tuple)
 
                 if len(factor_tuple) == 4:
                     # Only input vectors can have 4 factors. Linear input vectors need to be able
@@ -235,9 +235,9 @@ class DefaultVector(Vector):
                     scaling[0][start:end] = scale0
                 scaling[1][start:end] = scale1
 
-                print(f"{system.msginfo} {self._kind} {self._name} : setting scale factor for {abs_name}: {self._scaling}")
-            else:
-                print(f"{system.msginfo} {self._kind} {self._name} : NO scaling for {abs_name}")
+            #     print(f"{system.msginfo} {self._kind} {self._name} : setting scale factor for {abs_name}: {self._scaling}")
+            # else:
+            #     print(f"{system.msginfo} {self._kind} {self._name} : NO scaling for {abs_name}")
 
             start = end
 
@@ -435,7 +435,7 @@ class DefaultVector(Vector):
         adder : darray
             Vector of additive scaling factors.
         """
-        print(f"{self._system().msginfo} {self._kind} {self._name} : scaling forward ({scaler}, {adder})")
+        # print(f"{self._system().msginfo} {self._kind} {self._name} : scaling forward ({scaler}, {adder})")
         data = self.asarray()
         if adder is not None:  # nonlinear only
             data -= adder
@@ -452,7 +452,7 @@ class DefaultVector(Vector):
         adder : darray
             Vector of additive scaling factors.
         """
-        print(f"{self._system().msginfo} {self._kind} {self._name} : scaling reverse ({scaler}, {adder})")
+        # print(f"{self._system().msginfo} {self._kind} {self._name} : scaling reverse ({scaler}, {adder})")
         data = self.asarray()
         data *= scaler
         if adder is not None:  # nonlinear only
