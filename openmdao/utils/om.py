@@ -508,13 +508,16 @@ def _rtplot_cmd(options, user_args):
 
         recorder_filepath = str(problem.driver._rec_mgr._recorders[0]._filepath) 
 
-        print(f"in _view_realtime_opt_plot {recorder_filepath=}")      
-        cmd = ['openmdao', 'realtime_opt_plot', recorder_filepath]
-        cp = subprocess.Popen(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)  # nosec: trusted input
+        cmd = ['openmdao', 'realtime_opt_plot', '--pid', str(os.getpid()), recorder_filepath]
+        cp = subprocess.Popen(cmd)  # nosec: trusted input
 
-        print(f"done running run {cmd=}")
-        if (cp.returncode != 0):
-            raise RuntimeError(f"Failed to start up the realtime plot server ({cp.stderr}).")
+        # You can optionally do a quick non-blocking check to see if it immediately failed
+        # This will catch immediate failures but won't wait for the process to finish
+        quick_check = cp.poll()
+        if quick_check is not None and quick_check != 0:
+            # Process already terminated with an error
+            stderr = cp.stderr.read().decode()
+            raise RuntimeError(f"Failed to start up the realtime plot server with code {quick_check}: {stderr}.")
 
     # register the hook
     hooks._register_hook('_setup_recording', 'Problem', post=_view_realtime_opt_plot, ncalls=1)
