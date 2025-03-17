@@ -157,15 +157,20 @@ class Component(System):
                                   'across multiple processes')
         self.options.declare('run_root_only', types=bool, default=False,
                              desc='If True, call compute, compute_partials, linearize, '
-                                  'apply_linear, apply_nonlinear, and compute_jacvec_product '
-                                  'only on rank 0 and broadcast the results to the other ranks.')
+                                  'apply_linear, apply_nonlinear, solve_linear, solve_nonlinear, '
+                                  'and compute_jacvec_product only on rank 0 and broadcast the '
+                                  'results to the other ranks.')
         self.options.declare('always_opt', types=bool, default=False,
                              desc='If True, force nonlinear operations on this component to be '
                                   'included in the optimization loop even if this component is not '
                                   'relevant to the design variables and responses.')
         self.options.declare('use_jit', types=bool, default=True,
                              desc='If True, attempt to use jit on compute_primal, assuming jax or '
-                             'some other AD package is active.')
+                             'some other AD package capable of jitting is active.')
+        self.options.declare('default_shape', types=tuple, default=(1,),
+                             desc='Default shape for variables that do not set val to a non-scalar '
+                             'value or set shape, set shape_by_conn, copy_shape, or compute_shape.'
+                             ' Default is (1,).')
 
     def setup(self):
         """
@@ -608,13 +613,14 @@ class Component(System):
                             f"a '{type(compute_shape).__name__}' was given.")
 
         if shape_by_conn or copy_shape or compute_shape:
-            if shape is not None or ndim(val) > 0:
+            if shape or ndim(val) > 0:
                 raise ValueError("%s: If shape is to be set dynamically, 'shape' and 'val' should "
                                  "be a scalar, but shape of '%s' and val of '%s' was given for "
                                  "variable '%s'." % (self.msginfo, shape, val, name))
         else:
             # value, shape: based on args, making sure they are compatible
-            val, shape = ensure_compatible(name, val, shape)
+            val, shape = ensure_compatible(name, val, shape,
+                                           default_shape=self.options['default_shape'])
 
         # until we get rid of component level distributed option, handle the case where
         # component distributed has been set to True but variable distributed has been set
@@ -833,14 +839,15 @@ class Component(System):
                 msg = '%s: The val argument should be a float, list, tuple, ndarray or Iterable'
                 raise TypeError(msg % self.msginfo)
 
+            default_shape = self.options['default_shape']
             # value, shape: based on args, making sure they are compatible
-            val, shape = ensure_compatible(name, val, shape)
+            val, shape = ensure_compatible(name, val, shape, default_shape=default_shape)
 
             if lower is not None:
-                lower = ensure_compatible(name, lower, shape)[0]
+                lower = ensure_compatible(name, lower, shape, default_shape=default_shape)[0]
                 self._has_bounds = True
             if upper is not None:
-                upper = ensure_compatible(name, upper, shape)[0]
+                upper = ensure_compatible(name, upper, shape, default_shape=default_shape)[0]
                 self._has_bounds = True
 
             # All refs: check the shape if necessary
@@ -2132,7 +2139,7 @@ class Component(System):
                                       category=OMInvalidCheckDerivativesOptionsWarning)
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM,
-                       compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
+                       compact_print=False, abs_err_tol=0.0, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
                        minimum_step=1e-12, force_dense=True, show_only_incorrect=False,
                        show_worst=True):
@@ -2183,11 +2190,11 @@ class Component(System):
             Where derivs_dict is a dict, where the top key is the component pathname.
             Under the top key, the subkeys are the (of, wrt) keys of the subjacs.
             Within the (of, wrt) entries are the following keys:
-            'rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_abs',
-            'vals_at_max_rel', and 'rank_inconsistent'.
+            'tol violation', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_error',
+            and 'rank_inconsistent'.
             For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
             Jacobian for the three different methods of computation.
-            For 'rel error', 'abs error', 'vals_at_max_abs' and 'vals_at_max_rel' the value is a
+            For 'tol violation' and 'vals_at_max_error' the value is a
             tuple containing values for forward - fd, reverse - fd, forward - reverse. For
             'magnitude' the value is a tuple indicating the maximum magnitude of values found in
             Jfwd, Jrev, and Jfd.
@@ -2195,8 +2202,8 @@ class Component(System):
             inconsistent across MPI ranks.
 
             worst is either None or a tuple of the form (error, table_row, header)
-            where error is the max relative error found, table_row is the formatted table row
-            containing the max relative error, and header is the formatted table header.  'worst'
+            where error is the max error found, table_row is the formatted table row
+            containing the max error, and header is the formatted table header.  'worst'
             is not None only if compact_print is True.
         """
         if out_stream == _DEFAULT_OUT_STREAM:

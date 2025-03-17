@@ -199,12 +199,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         self.assertTrue(lines[y_wrt_x1_line+2].endswith('*'),
                         msg='Error flag expected in output but not displayed')
-        self.assertTrue(lines[y_wrt_x1_line+6].endswith('*'),
-                        msg='Error flag expected in output but not displayed')
         y_wrt_x2_line = lines.index("  comp: 'y' wrt 'x2'")
         self.assertTrue(lines[y_wrt_x2_line+2].endswith('*'),
-                        msg='Error flag not expected in output but displayed')
-        self.assertTrue(lines[y_wrt_x2_line+6].endswith('*'),
                         msg='Error flag not expected in output but displayed')
 
     def test_component_has_no_outputs(self):
@@ -343,17 +339,13 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         self.assertEqual(prob.model.comp.lin_count, 1)
 
-        abs_error = data['comp']['y', 'x1']['abs error']
-        rel_error = data['comp']['y', 'x1']['rel error']
-        self.assertAlmostEqual(abs_error.forward, 0.)
-        self.assertAlmostEqual(rel_error.forward, 0.)
+        tolv = data['comp']['y', 'x1']['tol violation']
+        self.assertLessEqual(tolv.forward, 0.)
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x1']['J_fd'] - 3.), 0.,
                                delta=1e-6)
 
-        abs_error = data['comp']['y', 'x2']['abs error']
-        rel_error = data['comp']['y', 'x2']['rel error']
-        self.assertAlmostEqual(abs_error.forward, 4.)
-        self.assertTrue(np.isnan(rel_error.forward))
+        tolv = data['comp']['y', 'x2']['tol violation']
+        self.assertAlmostEqual(tolv.forward, 4., places=5)
         self.assertAlmostEqual(np.linalg.norm(data['comp']['y', 'x2']['J_fd'] - 4.), 0.,
                                delta=1e-6)
 
@@ -712,7 +704,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=None, compact_print=True)
 
         # This will fail unless you set the check_step.
-        x_error = data['comp']['f_xy', 'x']['rel error']
+        x_error = data['comp']['f_xy', 'x']['tol violation']
         self.assertLess(x_error.forward, 1e-5)
 
     def test_set_step_global(self):
@@ -733,7 +725,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=None, step=1e-2)
 
         # This will fail unless you set the global step.
-        x_error = data['comp']['f_xy', 'x']['rel error']
+        x_error = data['comp']['f_xy', 'x']['tol violation']
         self.assertLess(x_error.forward, 1e-5)
 
     def test_complex_step_not_allocated(self):
@@ -828,7 +820,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=None, compact_print=True)
 
         # This will fail unless you set the check_step.
-        x_error = data['comp']['f_xy', 'x']['rel error']
+        x_error = data['comp']['f_xy', 'x']['tol violation']
         self.assertLess(x_error.forward, 1e-3)
 
     def test_set_form_global(self):
@@ -849,7 +841,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=None, form='central')
 
         # This will fail unless you set the check_step.
-        x_error = data['comp']['f_xy', 'x']['rel error']
+        x_error = data['comp']['f_xy', 'x']['tol violation']
         self.assertLess(x_error.forward, 1e-3)
 
     def test_set_step_calc_on_comp(self):
@@ -872,7 +864,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=None, compact_print=True)
 
         # This will fail unless you set the check_step.
-        x_error = data['comp']['f_xy', 'x']['rel error']
+        x_error = data['comp']['f_xy', 'x']['tol violation']
         self.assertLess(x_error.forward, 3e-3)
 
     def test_set_step_calc_global(self):
@@ -893,7 +885,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=None, step_calc='rel')
 
         # This will fail unless you set the global step.
-        x_error = data['comp']['f_xy', 'x']['rel error']
+        x_error = data['comp']['f_xy', 'x']['tol violation']
         self.assertLess(x_error.forward, 3e-3)
 
     def test_set_check_option_precedence(self):
@@ -972,9 +964,9 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertTrue('CS' in lines[17],
+        self.assertTrue('cs:' in lines[10],
                         msg='Did you change the format for printing check derivs?')
-        self.assertTrue('FD' in lines[35],
+        self.assertTrue('fd:' in lines[26],
                         msg='Did you change the format for printing check derivs?')
 
     def test_set_check_partial_options_invalid(self):
@@ -1167,8 +1159,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('>ABS_TOL'), 0)
-        self.assertEqual(stream.getvalue().count('>REL_TOL'), 0)
+        self.assertEqual(stream.getvalue().count('>TOL'), 0)
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', MyCompBadPartials(), promotes=['*'])
@@ -1177,8 +1168,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('>ABS_TOL'), 2)
-        self.assertEqual(stream.getvalue().count('>REL_TOL'), 2)
+        self.assertEqual(stream.getvalue().count('>TOL'), 3)
 
     def test_check_partials_display_rev(self):
 
@@ -1203,15 +1193,15 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream, abs_err_tol=1.1e-6, compact_print=True)
 
         self.assertEqual(stream.getvalue().count('n/a'), 0)
-        self.assertEqual(stream.getvalue().count('rev'), 8)
+        self.assertEqual(stream.getvalue().count('rev'), 5)
         self.assertEqual(stream.getvalue().count('Component'), 2)
-        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 12) # counts rows (including headers)
+        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 10) # counts rows (including headers)
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
-        self.assertEqual(stream.getvalue().count('rev value:'), 16)
+        self.assertEqual(stream.getvalue().count('rev value:'), 8)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 4)
-        self.assertEqual(stream.getvalue().count('Jrev'), 20)
+        self.assertEqual(stream.getvalue().count('Jrev'), 12)
 
         # 2: Explicit comp, all comps define Jacobians for compact and non-compact display
         class MyComp(om.ExplicitComponent):
@@ -1242,10 +1232,10 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)
         # So for this case, they do all provide them, so rev should not be shown
-        self.assertEqual(stream.getvalue().count('fwd value'), 4)
+        self.assertEqual(stream.getvalue().count('fwd value'), 2)
         self.assertEqual(stream.getvalue().count('rev value'), 0)
-        self.assertEqual(stream.getvalue().count('Absolute Error'), 2)
-        self.assertEqual(stream.getvalue().count('Relative Error'), 2)
+        self.assertEqual(stream.getvalue().count('Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd)'), 2)
+        self.assertEqual(stream.getvalue().count('Relative Error'), 0)
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 0)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 2)
@@ -1264,12 +1254,12 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.run_model()
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count('rev'), 16)
+        self.assertEqual(stream.getvalue().count('rev'), 5)
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
         self.assertEqual(stream.getvalue().count('Reverse'), 2)
-        self.assertEqual(stream.getvalue().count('Jrev'), 10)
+        self.assertEqual(stream.getvalue().count('Jrev'), 6)
 
         # 4: Mixed comps. Some with jacobians. Some not
         prob = om.Problem()
@@ -1289,16 +1279,15 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
         self.assertEqual(stream.getvalue().count('n/a'), 0)
-        self.assertEqual(stream.getvalue().count('rev'), 16)
+        self.assertEqual(stream.getvalue().count('rev'), 5)
         self.assertEqual(stream.getvalue().count('Component'), 2)
-        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 8)
+        self.assertEqual(len([ln for ln in stream.getvalue().splitlines() if ln.startswith('| ')]), 6)
 
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)
-        self.assertEqual(stream.getvalue().count('fwd value:'), 12)
-        self.assertEqual(stream.getvalue().count('rev value'), 8)
-        self.assertEqual(stream.getvalue().count('Absolute Error'), 8)
-        self.assertEqual(stream.getvalue().count('Relative Error'), 8)
+        self.assertEqual(stream.getvalue().count('fwd value:'), 6)
+        self.assertEqual(stream.getvalue().count('rev value'), 4)
+        self.assertEqual(stream.getvalue().count('Max Tolerance Violation'), 8)
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 4)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 4)
@@ -1330,7 +1319,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True)
-        self.assertEqual(stream.getvalue().count("z             | y1"), 2)
+        self.assertEqual(stream.getvalue().count("z             | y2"), 2)
 
     def test_check_partials_show_only_incorrect(self):
         # The second is adding an option to show only the incorrect subjacs
@@ -1356,7 +1345,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=True, show_only_incorrect=True)
         self.assertEqual(stream.getvalue().count("MyCompBadPartials"), 2)
-        self.assertEqual(stream.getvalue().count("z             | y1"), 2)
+        self.assertEqual(stream.getvalue().count("z             | y2"), 2)
         self.assertEqual(stream.getvalue().count("MyCompGoodPartials"), 0)
 
         stream = StringIO()
@@ -1485,8 +1474,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         J = prob.check_partials(method='cs', out_stream=stream, compact_print=True)
         lines = stream.getvalue().splitlines()
 
-        entries = [s.strip() for s in lines[7].split('|') if s.strip()]
-        assert_near_equal(float(entries[19]), 0.0, 4e-15)
+        entries = [s.strip()[1:-1] for s in lines[7].split('|') if s.strip()]
+        self.assertLessEqual(float(entries[10]), 0.0)
 
     def test_directional_mixed_matrix_free(self):
 
@@ -1776,12 +1765,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(method='cs', out_stream=None)
 
         # Comp1 and Comp3 are complex step, so have tighter tolerances.
-        for key, val in data['comp1'].items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-15)
-        for key, val in data['comp2'].items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-6)
-        for key, val in data['comp3'].items():
-            assert_near_equal(val['rel error'][0], 0.0, 1e-15)
+        for key, c1 in data['comp1'].items():
+            c2 = data['comp2'][key]
+            c3 = data['comp3'][key]
+            self.assertLess(c1['tol violation'].forward, c2['tol violation'].forward)
+            self.assertLess(c3['tol violation'].forward, c2['tol violation'].forward)
 
     def test_rel_error_fd_zero(self):
         # When the fd turns out to be zero, test that we switch the definition of relative
@@ -1813,7 +1801,7 @@ class TestProblemCheckPartials(unittest.TestCase):
         prob.check_partials(out_stream=stream)
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue("Max Relative Error (Jfwd - Jfd) / Jfwd : nan" in lines[10])
+        self.assertTrue(lines[6].strip().endswith('*'))
 
     def test_directional_bug_implicit(self):
         # Test for bug in directional derivative direction for implicit var and matrix-free.
@@ -2361,13 +2349,9 @@ class TestCheckPartialsFeature(unittest.TestCase):
 
         data = prob.check_partials()
 
-        x1_error = data['comp']['y', 'x1']['abs error']
+        x1_error = data['comp']['y', 'x1']['tol violation']
 
-        assert_near_equal(x1_error.forward, 1., 1e-8)
-
-        x2_error = data['comp']['y', 'x2']['rel error']
-
-        assert_near_equal(x2_error.forward, 9., 1e-8)
+        assert_near_equal(x1_error.forward, 1., 4e-6)
 
     def test_feature_check_partials_suppress(self):
 
@@ -2823,10 +2807,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         nderivs = ncomps * 2
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("fwd value:"), nderivs * 2)
-        self.assertEqual(contents.count("Absolute Error (Jfwd - Jfd), step="), 0)
-        self.assertEqual(contents.count("Absolute Error (Jfwd - Jfd)"), nderivs)
-        self.assertEqual(contents.count("Relative Error (Jfwd - Jfd) / Jf"), nderivs)
+        self.assertEqual(contents.count("fwd value:"), nderivs)
+        self.assertEqual(contents.count("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd), step="), 0)
+        self.assertEqual(contents.count("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd)"), nderivs)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), 0)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd)"), nderivs)
 
@@ -2837,8 +2820,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 2)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">TOL"), 3)
         self.assertEqual(contents.count("step"), 0)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
@@ -2846,9 +2829,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         self.assertEqual(len(tables[1]), 7)
         self.assertEqual(len(tables[2]), 5)
         # check cols
-        self.assertEqual(tables[0][0].count('+'), 10)
-        self.assertEqual(tables[1][0].count('+'), 10)
-        self.assertEqual(tables[2][0].count('+'), 9)
+        self.assertEqual(tables[0][0].count('+'), 7)
+        self.assertEqual(tables[1][0].count('+'), 7)
+        self.assertEqual(tables[2][0].count('+'), 7)
 
     def test_single_cs_step_compact(self):
         p = self.setup_model()
@@ -2857,8 +2840,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 2)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">TOL"), 3)
         self.assertEqual(contents.count("step"), 0)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
@@ -2866,9 +2849,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         self.assertEqual(len(tables[1]), 7)
         self.assertEqual(len(tables[2]), 5)
         # check cols
-        self.assertEqual(tables[0][0].count('+'), 10)
-        self.assertEqual(tables[1][0].count('+'), 10)
-        self.assertEqual(tables[2][0].count('+'), 9)
+        self.assertEqual(tables[0][0].count('+'), 7)
+        self.assertEqual(tables[1][0].count('+'), 7)
+        self.assertEqual(tables[2][0].count('+'), 7)
 
     def test_multi_fd_steps(self):
         p = self.setup_model()
@@ -2879,9 +2862,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         nderivs = ncomps * 2
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("fwd value:"), nderivs * 4)
-        self.assertEqual(contents.count("Absolute Error (Jfwd - Jfd), step="), nderivs * 2)
-        self.assertEqual(contents.count("Relative Error (Jfwd - Jfd) / Jf"), nderivs * 2)
+        self.assertEqual(contents.count("fwd value:"), nderivs * 2)
+        self.assertEqual(contents.count("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd), step="), nderivs * 2)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), nderivs * 2)
 
     def test_multi_fd_steps_compact(self):
@@ -2891,8 +2873,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 4)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">TOL"), 5)
         self.assertEqual(contents.count("step"), 3)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
@@ -2900,9 +2882,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         self.assertEqual(len(tables[1]), 11)
         self.assertEqual(len(tables[2]), 5)
         # check cols
-        self.assertEqual(tables[0][0].count('+'), 11)
-        self.assertEqual(tables[1][0].count('+'), 11)
-        self.assertEqual(tables[2][0].count('+'), 10)
+        self.assertEqual(tables[0][0].count('+'), 8)
+        self.assertEqual(tables[1][0].count('+'), 8)
+        self.assertEqual(tables[2][0].count('+'), 8)
 
     def test_multi_cs_steps_compact(self):
         p = self.setup_model()
@@ -2911,8 +2893,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 4)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">TOL"), 5)
         self.assertEqual(contents.count("step"), 3)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
@@ -2920,9 +2902,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         self.assertEqual(len(tables[1]), 11)
         self.assertEqual(len(tables[2]), 5)
         # check cols
-        self.assertEqual(tables[0][0].count('+'), 11)
-        self.assertEqual(tables[1][0].count('+'), 11)
-        self.assertEqual(tables[2][0].count('+'), 10)
+        self.assertEqual(tables[0][0].count('+'), 8)
+        self.assertEqual(tables[1][0].count('+'), 8)
+        self.assertEqual(tables[2][0].count('+'), 8)
 
     def test_multi_fd_steps_compact_directional(self):
         p = self.setup_model(directional=True)
@@ -2931,8 +2913,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         contents = stream.getvalue()
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("Sub Jacobian with Largest Relative Error: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count(">ABS_TOL >REL_TOL"), 4)
+        self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
+        self.assertEqual(contents.count(">TOL"), 5)
         self.assertEqual(contents.count("step"), 3)
         tables = self.get_tables(contents)
         self.assertEqual(len(tables), 3)
@@ -2940,9 +2922,9 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         self.assertEqual(len(tables[1]), 11)
         self.assertEqual(len(tables[2]), 5)
         # check cols
-        self.assertEqual(tables[0][0].count('+'), 11)
-        self.assertEqual(tables[1][0].count('+'), 11)
-        self.assertEqual(tables[2][0].count('+'), 10)
+        self.assertEqual(tables[0][0].count('+'), 8)
+        self.assertEqual(tables[1][0].count('+'), 8)
+        self.assertEqual(tables[2][0].count('+'), 8)
 
 
 if __name__ == "__main__":

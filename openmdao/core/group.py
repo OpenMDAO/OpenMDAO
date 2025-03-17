@@ -436,14 +436,9 @@ class Group(System):
         # This is a combined scale factor that includes the scaling of the connected source
         # and the unit conversion between the source output and each target input.
         if self._has_input_scaling:
-            abs2meta_in = self._var_abs2meta['input']
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
-            for abs_in, abs_out in self._conn_global_abs_in2out.items():
-                if abs_in not in abs2meta_in:
-                    # we only perform scaling on local, non-discrete arrays, so skip
-                    continue
-
-                meta_in = abs2meta_in[abs_in]
+            for abs_in, meta_in in self._var_abs2meta['input'].items():
+                abs_out = self._conn_global_abs_in2out[abs_in]
 
                 meta_out = allprocs_meta_out[abs_out]
                 ref = meta_out['ref']
@@ -799,13 +794,17 @@ class Group(System):
         self._has_resid_scaling = False
         self._has_bounds = False
 
-        for subsys in self.system_iter(include_self=True, recurse=True):
-            subsys._apply_output_solver_options()
+        _has_applied_options = set()
+        for grp in self.system_iter(include_self=True, recurse=True, depth_first=True, typ=Group):
+            for subsys in grp.system_iter(include_self=True, recurse=False):
+                if subsys.pathname not in _has_applied_options:
+                    subsys._apply_output_solver_options()
+                    _has_applied_options.add(subsys.pathname)
 
-            self._has_output_scaling |= subsys._has_output_scaling
-            self._has_output_adder |= subsys._has_output_adder
-            self._has_resid_scaling |= subsys._has_resid_scaling
-            self._has_bounds |= subsys._has_bounds
+                grp._has_output_scaling |= subsys._has_output_scaling
+                grp._has_output_adder |= subsys._has_output_adder
+                grp._has_resid_scaling |= subsys._has_resid_scaling
+                grp._has_bounds |= subsys._has_bounds
 
         # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone

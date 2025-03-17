@@ -499,10 +499,10 @@ class ShapedIntIndexer(Indexer):
         """
         Check that indices are within the bounds of the source shape.
         """
-        if self._src_shape is not None and (self._idx >= self._dist_shape[0] or
-                                            self._idx < -self._dist_shape[0]):
-            raise IndexError(f"index {self._idx} is out of bounds of the source shape "
-                             f"{self._dist_shape}.")
+        if self._src_shape is not None and self._dist_shape:
+            if self._idx >= self._dist_shape[0] or self._idx < -self._dist_shape[0]:
+                raise IndexError(f"index {self._idx} is out of bounds of the source shape "
+                                 f"{self._dist_shape}.")
 
     def to_json(self):
         """

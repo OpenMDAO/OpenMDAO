@@ -1,5 +1,4 @@
 """Define the base Vector and Transfer classes."""
-from copy import deepcopy
 import weakref
 import hashlib
 
@@ -13,7 +12,7 @@ _full_slice = slice(None)
 _flat_full_indexer = indexer(_full_slice, flat_src=True)
 _full_indexer = indexer(_full_slice, flat_src=False)
 
-_type_map = {
+_type_map = {  # map vector type to iotype
     'input': 'input',
     'output': 'output',
     'residual': 'output'
@@ -178,16 +177,19 @@ class Vector(object):
         """
         return len(self._views)
 
-    def _copy_views(self):
+    def _copy_vars(self):
         """
-        Return a dictionary containing just the views.
+        Return a dictionary containing the variable values.
 
         Returns
         -------
         dict
-            Dictionary containing the _views.
+            Dictionary containing the variable values.
         """
-        return deepcopy(self._views)
+        values = {}
+        for n, (v, is_scalar) in self._views.items():
+            values[n] = v[0] if is_scalar else v.copy()
+        return values
 
     def keys(self):
         """
@@ -210,17 +212,17 @@ class Vector(object):
             Value of each variable.
         """
         if self._under_complex_step:
-            for n, v in self._views.items():
+            for n, (v, is_scalar) in self._views.items():
                 if n in self._names:
-                    yield v
+                    yield v[0] if is_scalar else v
                 else:
-                    yield np.zeros_like(v)
+                    yield 0.0j if is_scalar else np.zeros_like(v)
         else:
-            for n, v in self._views.items():
+            for n, (v, is_scalar) in self._views.items():
                 if n in self._names:
-                    yield v.real
+                    yield v[0].real if is_scalar else v.real
                 else:
-                    yield np.zeros_like(v.real)
+                    yield 0.0 if is_scalar else np.zeros_like(v.real)
 
     def items(self):
         """
@@ -239,13 +241,13 @@ class Vector(object):
             plen = 0
 
         if self._under_complex_step:
-            for n, v in self._views.items():
+            for n, (v, is_scalar) in self._views.items():
                 if n in self._names:
-                    yield n[plen:], v
+                    yield n[plen:], v[0] if is_scalar else v
         else:
-            for n, v in self._views.items():
+            for n, (v, is_scalar) in self._views.items():
                 if n in self._names:
-                    yield n[plen:], v.real
+                    yield n[plen:], v[0].real if is_scalar else v.real
 
     def _name2abs_name(self, name):
         """
@@ -305,13 +307,24 @@ class Vector(object):
         ndarray or float
             Value of each variable.
         """
-        arrs = self._views_flat if flat else self._views
-
-        if self._under_complex_step:
-            yield from arrs.items()
+        if flat:
+            if self._under_complex_step:
+                yield from self._views_flat.items()
+            else:
+                for name, val in self._views_flat.items():
+                    yield name, val.real
         else:
-            for name, val in arrs.items():
-                yield name, val.real
+            for name, (val, is_scalar) in self._views.items():
+                if is_scalar:
+                    if self._under_complex_step:
+                        yield name, val[0]
+                    else:
+                        yield name, val[0].real
+                else:
+                    if self._under_complex_step:
+                        yield name, val
+                    else:
+                        yield name, val.real
 
     def _abs_iter(self):
         """
@@ -400,10 +413,11 @@ class Vector(object):
             else:
                 return self._views_flat[name].real
 
-        if self._under_complex_step:
-            return self._views[name]
-        else:
-            return self._views[name].real
+        val, is_scalar = self._views[name]
+        if is_scalar:
+            val = val[0]
+
+        return val if self._under_complex_step else val.real
 
     def _abs_set_val(self, name, val):
         """
@@ -419,9 +433,9 @@ class Vector(object):
             Value to set.
         """
         if self._under_complex_step:
-            self._views[name][:] = val
+            self._views[name][0][:] = val
         else:
-            self._views[name].real[:] = val
+            self._views[name][0].real[:] = val
 
     def __setitem__(self, name, value):
         """
@@ -579,7 +593,7 @@ class Vector(object):
         """
         Set the data array of this vector using a value or iter of values, one for each variable.
 
-        The values must be in the same order as the variables appear in this Vector.
+        The values must be in the same order and size as the variables appear in this Vector.
 
         Parameters
         ----------
@@ -643,15 +657,9 @@ class Vector(object):
                 self._views_flat[abs_name][idxs.flat()] = np.asarray(val).flat
         else:
             value = np.asarray(val)
-            view = self._views[abs_name]
+            view = self._views[abs_name][0]
             try:
-                if view.shape:
-                    view[idxs()] = value
-                else:
-                    # view is a scalar so we can't update it without breaking its connection
-                    # to the underlying array, so set the value into the
-                    # array using the flat view, which is an array of size 1.
-                    self._views_flat[abs_name][0] = value
+                view[idxs()] = value
             except Exception as err:
                 try:
                     value = value.reshape(view[idxs()].shape)
@@ -738,7 +746,7 @@ class Vector(object):
         Returns
         -------
         dict
-            A dict of views into the data array keyed using local names.
+            A dict of (view, is_scalar) tuples into the data array keyed using local names.
         """
         if arr is None:
             arr = self.asarray(copy=False)
@@ -751,11 +759,9 @@ class Vector(object):
         pathlen = len(path) + 1 if path else 0
 
         start = end = 0
-        for name, val in self._abs_item_iter(flat=False):
+        for name, (val, is_scalar) in self._views.items():
             end += val.size
-            view = arr[start:end]
-            view.shape = val.shape
-            dct[name[pathlen:]] = view
+            dct[name[pathlen:]] = (arr[start:end].reshape(val.shape), is_scalar)
             start = end
 
         return dct

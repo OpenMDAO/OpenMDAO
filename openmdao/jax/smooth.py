@@ -49,7 +49,7 @@ def act_tanh(x, mu=1.0E-2, z=0., a=-1., b=1.):
     """
     dy = b - a
     tanh_term = jnp.tanh((x - z) / mu)
-    return 0.5 * dy * (1 + tanh_term) + a
+    return 0.5 * dy * (1. + tanh_term) + a
 
 
 @jit
@@ -77,7 +77,7 @@ def smooth_max(x, y, mu=1.0E-2):
         at the expense of the smoothness of the approximation.
     """
     x_greater = act_tanh(x, mu, y, 0.0, 1.0)
-    y_greater = 1 - x_greater
+    y_greater = 1. - x_greater
     return x_greater * x + y_greater * y
 
 
@@ -106,7 +106,7 @@ def smooth_min(x, y, mu=1.0E-2):
         smoothness of the approximation.
     """
     x_greater = act_tanh(x, mu, y, 0.0, 1.0)
-    y_greater = 1 - x_greater
+    y_greater = 1. - x_greater
     return x_greater * y + y_greater * x
 
 
@@ -131,8 +131,7 @@ def smooth_abs(x, mu=1.0E-2):
         An approximation of the absolute value. Near zero, the value will
         differ from the true absolute value but its derivative will be continuous.
     """
-    act = act_tanh(x, mu, 0.0, -1.0, 1.0)
-    return x * act
+    return x * act_tanh(x, mu, 0.0, -1.0, 1.0)
 
 
 @jit
@@ -157,4 +156,5 @@ def smooth_round(x, mu=0.01):
         by the user. The values returned will not be exact integers. However, they
         will be smooth and the derivatives will be continuous.
     """
-    return jnp.floor(x) + 0.5 * (1 + jnp.tanh((x - jnp.floor(x) - 0.5) / mu))
+    floor_x = jnp.floor(x)
+    return floor_x + 0.5 * (1 + jnp.tanh((x - floor_x - 0.5) / mu))

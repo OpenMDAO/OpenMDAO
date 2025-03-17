@@ -568,10 +568,13 @@ class ReturnChecker(ast.NodeVisitor):
     _returns : list
         The list of boolean values indicating whether or not the method returns a tuple. One
         entry for each return statement in the method.
+    _fstack : list
+        The stack of function definitions being visited.
     """
 
     def __init__(self, method):  # noqa
         self._returns = []
+        self._fstack = []
         self.visit(ast.parse(textwrap.dedent(inspect.getsource(method)), mode='exec'))
 
     def returns_tuple(self):
@@ -602,6 +605,22 @@ class ReturnChecker(ast.NodeVisitor):
             The return node being visited.
         """
         self._returns.append(isinstance(node.value, ast.Tuple))
+
+    def visit_FunctionDef(self, node):
+        """
+        Visit a FunctionDef node.
+
+        Parameters
+        ----------
+        node : ASTnode
+            The function definition node being visited.
+        """
+        if self._fstack:
+            return  # skip nested functions
+        self._fstack.append(node)
+        for stmt in node.body:
+            self.visit(stmt)
+        self._fstack.pop()
 
 
 def get_self_static_attrs(method):
@@ -990,6 +1009,8 @@ def _compute_output_shapes(func, input_shapes):
     """
     Compute the shapes of the outputs of the function.
 
+    The function must be traceable by jax.
+
     Parameters
     ----------
     func : function
@@ -1295,24 +1316,20 @@ def to_compute_primal(inst, outfile='stdout', verbose=False):
             print(jaxer.get_class_src(), file=f)
 
 
-def _update_add_input_kwargs(self, name, **kwargs):
-    # override Component.add_input for jax components to use shape_by_conn by default
-    if self.options['derivs_method'] == 'jax':
-        # for jax components, make shape_by_conn the default behavior if the shape isn't defined
-        if 'val' not in kwargs:
-            if (kwargs.get('shape') is None and kwargs.get('copy_shape') is None and
-                    kwargs.get('compute_shape') is None):
-                kwargs['shape_by_conn'] = True
+def _update_add_input_kwargs(self, **kwargs):
+    if self.options['default_to_dyn_shapes']:
+        if kwargs.get('val') is None and kwargs.get('shape') is None:
+            if kwargs.get('copy_shape') is None and kwargs.get('compute_shape') is None:
+                if kwargs.get('shape_by_conn') is None:
+                    kwargs['shape_by_conn'] = True
 
     return kwargs
 
 
 def _update_add_output_kwargs(self, name, **kwargs):
-    # override Component.add_output for jax components to use dynamic shaping by default
-    if self.options['derivs_method'] == 'jax':
-        if 'val' not in kwargs:
-            if (kwargs.get('shape') is None and kwargs.get('copy_shape') is None and
-                    kwargs.get('compute_shape') is None):
+    if self.options['default_to_dyn_shapes']:
+        if kwargs.get('val') is None and kwargs.get('shape') is None:
+            if kwargs.get('copy_shape') is None and kwargs.get('compute_shape') is None:
                 # add our own compute_shape function
                 kwargs['compute_shape'] = self._get_compute_shape_func(name)
 

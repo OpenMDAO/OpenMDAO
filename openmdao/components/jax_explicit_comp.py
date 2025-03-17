@@ -14,7 +14,8 @@ from openmdao.utils.jax_utils import jax, jit, \
     _update_subjac_sparsity, _jax_derivs2partials, _uncompress_jac, _jax2np, \
     _ensure_returns_tuple, _compute_output_shapes, _update_add_input_kwargs, \
     _update_add_output_kwargs
-from openmdao.utils.code_utils import get_return_names
+from openmdao.utils.code_utils import get_return_names, get_function_deps
+import openmdao.utils.coloring as coloring_mod
 
 
 class JaxExplicitComponent(ExplicitComponent):
@@ -63,7 +64,7 @@ class JaxExplicitComponent(ExplicitComponent):
         self.compute_primal = self._ret_tuple_compute_primal
 
         # if derivs_method is explicitly passed in, just use it
-        if 'derivs_method' in kwargs:
+        if 'derivs_method' in kwargs and kwargs['derivs_method'] != 'jax':
             return
 
         if jax:
@@ -72,6 +73,17 @@ class JaxExplicitComponent(ExplicitComponent):
             issue_warning(f"{self.msginfo}: JAX is not available, so '{fallback_derivs_method}' "
                           "will be used for derivatives.")
             self.options['derivs_method'] = fallback_derivs_method
+
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super()._declare_options()
+        self.options.declare('default_to_dyn_shapes', types=bool, default=False,
+                             desc='If True, use dynamic shaping for any variables whose value is '
+                             'scalar and whose shape is not explicitly set. Inputs will use '
+                             'shape_by_conn and outputs will use a compute_shape method based '
+                             'on jax.eval_shape. Default is False.')
 
     def _re_init(self):
         """
@@ -91,6 +103,8 @@ class JaxExplicitComponent(ExplicitComponent):
         Variables will have default metadata for a jax component, so inputs will be shape_by_conn
         and outputs will use compute_shape.
         """
+        self._re_init()
+
         if not self._var_rel_names['input']:
             for argname in inspect.signature(self._orig_compute_primal).parameters:
                 self.add_input(argname)
@@ -115,8 +129,7 @@ class JaxExplicitComponent(ExplicitComponent):
         **kwargs : dict
             The kwargs to pass to the base class method.
         """
-        kwargs = _update_add_input_kwargs(self, name, **kwargs)
-        super().add_input(name, **kwargs)
+        super().add_input(name, **_update_add_input_kwargs(self, **kwargs))
 
     def add_output(self, name, **kwargs):
         """
@@ -132,8 +145,7 @@ class JaxExplicitComponent(ExplicitComponent):
         **kwargs : dict
             The kwargs to pass to the base class method.
         """
-        kwargs = _update_add_output_kwargs(self, name, **kwargs)
-        super().add_output(name, **kwargs)
+        super().add_output(name, **_update_add_output_kwargs(self, name, **kwargs))
 
     def _setup_jax(self):
         """
@@ -143,30 +155,55 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         _jax_register_pytree_class(self.__class__)
 
-        self._re_init()
-
-        self.compute = self._jax_compute
-
         if not self._discrete_inputs and not self.get_self_statics():
             # avoid unnecessary statics checks
             self._statics_changed = self._statics_noop
 
-        if self.matrix_free:
-            if self._coloring_info.use_coloring():
-                issue_warning(f"{self.msginfo}: coloring has been set but matrix_free is True, "
-                              "so coloring will be ignored.")
-                self._coloring_info.deactivate()
-            self.compute_jacvec_product = self._compute_jacvec_product
-        else:
-            if self._coloring_info.use_coloring():
-                # ensure coloring (and sparsity) is computed before partials
+    def _check_first_linearize(self):
+        if self._first_call_to_linearize:
+            self._first_call_to_linearize = False  # only do this once
+            if not self.matrix_free and self._coloring_info.use_coloring() and \
+                    coloring_mod._use_partial_sparsity:
                 self._get_coloring()
+                if self._jacobian is not None:
+                    self._jacobian._restore_approx_sparsity()
+            elif not self._declared_partials_patterns and self.options['derivs_method'] == 'jax':
+                self.compute_sparsity()
+
+    def _setup_partials(self):
+        """
+        Call setup_partials in components.
+        """
+        if self.options['derivs_method'] == 'jax':
+            if self.matrix_free:
+                if self._coloring_info.use_coloring():
+                    issue_warning(f"{self.msginfo}: coloring has been set but matrix_free is True, "
+                                  "so coloring will be ignored.")
+                self._coloring_info.deactivate()
+                self.compute_jacvec_product = self._compute_jacvec_product
             else:
+                # if user hasn't declared partials, try to infer them from the compute_primal. If
+                # that fails, declare all partials.
                 if not self._declared_partials_patterns:
-                    # auto determine subjac sparsities
-                    self.compute_sparsity()
-            self.compute_partials = self._compute_partials
-            self._has_compute_partials = True
+                    try:
+                        deps = list(get_function_deps(self._orig_compute_primal,
+                                                      self._var_rel_names['output']))
+                    except Exception:
+                        deps = []
+
+                    if deps:
+                        contvars = set(self._var_rel_names['input'])
+                        contvars.update(self._var_rel_names['output'])
+                        for of, wrt in deps:
+                            if of in contvars and wrt in contvars:
+                                self.declare_partials(of, wrt)
+                    else:
+                        self.declare_partials('*', '*')
+
+                self.compute_partials = self._compute_partials
+                self._has_compute_partials = True
+
+        super()._setup_partials()
 
     def _statics_changed(self, discrete_inputs):
         """
@@ -206,7 +243,7 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         return False
 
-    def _jax_compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """
         Compute outputs given inputs. The model is assumed to be in an unscaled state.
 
@@ -224,13 +261,12 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_outputs : dict-like or None
             If not None, dict-like object containing discrete output values.
         """
+        returns = self.compute_primal(*self._get_compute_primal_invals(inputs, discrete_inputs))
         if discrete_outputs:
-            returns = self.compute_primal(*self._get_compute_primal_invals(inputs, discrete_inputs))
             outputs.set_vals(returns[:outputs.nvars()])
             self._discrete_outputs.set_vals(returns[outputs.nvars():])
         else:
-            outputs.set_vals(self.compute_primal(*self._get_compute_primal_invals(inputs,
-                                                                                  discrete_inputs)))
+            outputs.set_vals(returns)
 
     def _get_differentiable_compute_primal(self, discrete_inputs):
         """

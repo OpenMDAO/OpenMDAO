@@ -16,7 +16,7 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.coloring import _ColSparsityJac
-
+from openmdao.utils.iter_utils import meta2range_iter
 
 _tuplist = (tuple, list)
 
@@ -284,6 +284,33 @@ class ImplicitComponent(Component):
                 finally:
                     d_inputs.read_only = d_outputs.read_only = d_residuals.read_only = False
 
+    def _solve_linear_wrapper(self, *args):
+        """
+        Call solve_linear based on the value of the "run_root_only" option.
+
+        Parameters
+        ----------
+        *args : list
+            List of positional arguments.
+        """
+        d_outputs, d_residuals, mode = args
+        if self._run_root_only():
+            if self.comm.rank == 0:
+                self.solve_linear(d_outputs, d_residuals, mode)
+                if mode == 'fwd':
+                    self.comm.bcast(d_outputs.asarray(), root=0)
+                else:  # rev
+                    self.comm.bcast((d_residuals.asarray()), root=0)
+            else:
+                if mode == 'fwd':
+                    new_outs = self.comm.bcast(None, root=0)
+                    d_outputs.set_val(new_outs)
+                else:  # rev
+                    new_res = self.comm.bcast(None, root=0)
+                    d_residuals.set_val(new_res)
+        else:
+            self.solve_linear(d_outputs, d_residuals, mode)
+
     def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
         Apply inverse jac product. The model is assumed to be in a scaled state.
@@ -314,7 +341,7 @@ class ImplicitComponent(Component):
 
                 try:
                     with self._call_user_function('solve_linear'):
-                        self.solve_linear(d_outputs, d_residuals, mode)
+                        self._solve_linear_wrapper(d_outputs, d_residuals, mode)
                 finally:
                     d_outputs.read_only = d_residuals.read_only = False
 
@@ -981,46 +1008,6 @@ class ImplicitComponent(Component):
             self._apply_nonlinear()
             self.compute_fd_jac(jac=jac, method=method)
         return jac.get_sparsity()
-
-
-def meta2range_iter(meta_dict, names=None, shp_name='shape'):
-    """
-    Iterate over variables and their ranges, based on shape metadata for each variable.
-
-    Parameters
-    ----------
-    meta_dict : dict
-        Mapping of variable name to metadata (which contains shape information).
-    names : iter of str or None
-        If not None, restrict the ranges to those variables contained in names.
-    shp_name : str
-        Name of the shape metadata entry.  Defaults to 'shape', but could also be 'global_shape'.
-
-    Yields
-    ------
-    str
-        Name of variable.
-    int
-        Starting index.
-    int
-        Ending index.
-    """
-    start = end = 0
-
-    if names is None:
-        for name in meta_dict:
-            end += shape_to_len(meta_dict[name][shp_name])
-            yield name, start, end
-            start = end
-    else:
-        if not isinstance(names, (set, dict)):
-            names = set(names)
-
-        for name in meta_dict:
-            end += shape_to_len(meta_dict[name][shp_name])
-            if name in names:
-                yield name, start, end
-            start = end
 
 
 def _overlap_range_iter(meta_dict1, meta_dict2, names1=None, names2=None):

@@ -218,7 +218,7 @@ class TestGraphFunction(unittest.TestCase):
                 return b + 1
             return nested(a)
 
-        msg = "Can't determine function graph for function 'func' due to: Function contains nested functions, which are not supported."
+        msg = "Can't determine function graph for function 'func' so assuming all outputs depend on all inputs.  Error was: Function contains nested functions, which are not supported."
         with assert_warning(UserWarning, msg):
             get_func_graph(func)
 

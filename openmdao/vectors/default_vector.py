@@ -56,9 +56,12 @@ class DefaultVector(Vector):
         """
         if self._views_rel is not None:
             try:
+                val, is_scalar = self._views_rel[name]
+                if is_scalar:
+                    val = val[0]
                 if self._under_complex_step:
-                    return self._views_rel[name]
-                return self._views_rel[name].real
+                    return val
+                return val.real
             except KeyError:
                 pass  # try normal lookup after rel lookup failed
 
@@ -77,7 +80,7 @@ class DefaultVector(Vector):
         """
         if self._views_rel is not None and not self.read_only:
             try:
-                self._views_rel[name][:] = value
+                self._views_rel[name][0][:] = value
                 return
             except Exception:
                 pass  # fall through to normal set if fast one failed in any way
@@ -213,13 +216,20 @@ class DefaultVector(Vector):
             end = start + meta['size']
             shape = meta['shape']
             views_flat[abs_name] = v = self._data[start:end]
-            if shape != v.shape:
+            if shape != v.shape and shape != ():
                 v = v.view()
                 v.shape = shape
-            views[abs_name] = v
+
+            # we use a tuple here because we want to support scalars but we
+            # also need to update the underlying data array and we can't have
+            # a view of a scalar, so we store the size 1 array view associated with
+            # the variable and use that to update the underlying data array. The second
+            # part of the tuple is a flag telling us if the variable is a scalar, and we
+            # use that flag to return view[0] instead of view on gets when the variable is scalar.
+            views[abs_name] = (v, shape == ())
 
             if rel_lookup:
-                views_rel[abs_name[relstart:]] = v
+                views_rel[abs_name[relstart:]] = (v, shape == ())
 
             if do_scaling:
                 factor_tuple = factors[abs_name][kind]
@@ -374,16 +384,14 @@ class DefaultVector(Vector):
         mode : str
             Derivative direction.
         """
-        if self._has_solver_ref and mode == 'fwd':
-            scaler = self._scaling_nl_vec[1]
-            adder = None
-        else:
-            adder, scaler = self._scaling
-
         if mode == 'rev':
-            self._scale_reverse(scaler, adder)
+            self._scale_reverse(self._scaling[1], self._scaling[0])
         else:
-            self._scale_forward(scaler, adder)
+            if self._has_solver_ref:
+                self._scale_forward(self._scaling_nl_vec[1], None)
+            else:
+                adder, scaler = self._scaling
+                self._scale_forward(scaler, adder)
 
     def scale_to_phys(self, mode='fwd'):
         """
@@ -394,16 +402,14 @@ class DefaultVector(Vector):
         mode : str
             Derivative direction.
         """
-        if self._has_solver_ref and mode == 'fwd':
-            scaler = self._scaling_nl_vec[1]
-            adder = None
-        else:
-            adder, scaler = self._scaling
-
         if mode == 'rev':
-            self._scale_forward(scaler, adder)
+            self._scale_forward(self._scaling[1], self._scaling[0])
         else:
-            self._scale_reverse(scaler, adder)
+            if self._has_solver_ref:
+                self._scale_reverse(self._scaling_nl_vec[1], None)
+            else:
+                adder, scaler = self._scaling
+                self._scale_reverse(scaler, adder)
 
     def _scale_forward(self, scaler, adder):
         """

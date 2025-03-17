@@ -65,6 +65,17 @@ class JaxImplicitComponent(ImplicitComponent):
                           f"'{fallback_derivs_method}' will be used for derivatives.")
             self.options['derivs_method'] = fallback_derivs_method
 
+    def _declare_options(self):
+        """
+        Declare options before kwargs are processed in the init method.
+        """
+        super()._declare_options()
+        self.options.declare('default_to_dyn_shapes', types=bool, default=False,
+                             desc='If True, use dynamic shaping for any variables whose value is '
+                             'scalar and whose shape is not explicitly set. Inputs will use '
+                             'shape_by_conn and outputs will use a compute_shape method based '
+                             'on jax.eval_shape. Default is False.')
+
     def add_input(self, name, **kwargs):
         """
         Add an input to the component.
@@ -79,8 +90,7 @@ class JaxImplicitComponent(ImplicitComponent):
         **kwargs : dict
             The kwargs to pass to the base class method.
         """
-        kwargs = _update_add_input_kwargs(self, name, **kwargs)
-        super().add_input(name, **kwargs)
+        super().add_input(name, **_update_add_input_kwargs(self, **kwargs))
 
     def add_output(self, name, **kwargs):
         """
@@ -96,8 +106,7 @@ class JaxImplicitComponent(ImplicitComponent):
         **kwargs : dict
             The kwargs to pass to the base class method.
         """
-        kwargs = _update_add_output_kwargs(self, name, **kwargs)
-        super().add_output(name, **kwargs)
+        super().add_output(name, **_update_add_output_kwargs(self, name, **kwargs))
 
     def _setup_jax(self):
         self._sparsity = None

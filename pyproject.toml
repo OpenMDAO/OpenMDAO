@@ -60,6 +60,9 @@ jax = [
     "jax>=0.4.0",
     "jaxlib>=0.4.0",
 ]
+numba = [
+    "numba",
+]
 notebooks = [
     "ipympl",
     "notebook",

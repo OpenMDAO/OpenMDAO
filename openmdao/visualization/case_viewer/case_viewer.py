@@ -167,7 +167,7 @@ def _get_resids_vars(cr, case_names):
         case_outputs = case.list_outputs(prom_name=True, units=True, shape=True, val=False,
                                          residuals=True, out_stream=None)
         resid_vars |= {meta['prom_name'] for abs_path, meta in case_outputs
-                       if isinstance(meta['resids'], np.ndarray)}
+                       if isinstance(meta['resids'], (np.ndarray, float))}
     return sorted(list(resid_vars))
 
 

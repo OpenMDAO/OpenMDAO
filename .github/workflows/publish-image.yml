@@ -1,4 +1,4 @@
-name: Publish Image
+name: Publish Images
 
 on:
   release:
@@ -7,16 +7,30 @@ on:
   # Run the workflow manually from the Actions tab
   workflow_dispatch:
 
-env:
-  # Will use docker.io for Docker Hub if empty
-  REGISTRY: ghcr.io
-  # github.repository as <account>/<repo>
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
-  build:
 
-    runs-on: ubuntu-latest
+  build_image:
+
+    strategy:
+
+      fail-fast: false
+
+      matrix:
+        include:
+          - NAME: ubuntu
+            OS: ubuntu-24.04
+            FILE: Dockerfile
+            IMAGE_NAME: ${{ github.repository }}
+            REGISTRY: ghcr.io
+
+          - NAME: ubuntu-arm
+            OS: ubuntu-24.04-arm
+            FILE: Dockerfile.arm
+            IMAGE_NAME: ${{ github.repository }}-arm
+            REGISTRY: ghcr.io
+
+    runs-on: ${{ matrix.OS }}
+
     permissions:
       contents: read
       packages: write
@@ -37,11 +51,11 @@ jobs:
           git describe --tags > tag.txt
           echo "TAG=$(cat tag.txt)" >> $GITHUB_ENV
 
-      # Login against the registry
-      - name: Log into registry ${{ env.REGISTRY }}
+      # Login to container registry
+      - name: Log into registry ${{ matrix.REGISTRY }}
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ${{ matrix.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -50,7 +64,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ matrix.REGISTRY }}/${{ matrix.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ env.TAG }}
 
@@ -59,6 +73,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           push: true
-          context: ${{ inputs.image_name }}
+          file: ${{ matrix.FILE }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

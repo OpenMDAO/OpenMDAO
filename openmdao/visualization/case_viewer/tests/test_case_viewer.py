@@ -17,7 +17,7 @@ class TestCaseRetrieval(unittest.TestCase):
     def setUp(self):
         # build the model
         prob = self._prob = om.Problem()
-        prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
+        prob.model.add_subsystem('parab', Paraboloid(default_shape=()), promotes_inputs=['x', 'y'])
 
         # define the component whose output will be constrained
         prob.model.add_subsystem('const', om.ExecComp('g = x + y'), promotes_inputs=['x', 'y'])
@@ -83,12 +83,12 @@ class TestCaseRetrieval(unittest.TestCase):
         g_meta = _get_var_meta(cr, case_name, 'const.g')
         self.assertEqual(g_meta['prom_name'], 'const.g')
         self.assertEqual(g_meta['units'], None)
-        self.assertEqual(g_meta['shape'], (1,))
+        self.assertEqual(g_meta['shape'], (1, ))
 
         f_xy_meta = _get_var_meta(cr, case_name, 'parab.f_xy')
         self.assertEqual(f_xy_meta['prom_name'], 'parab.f_xy')
         self.assertEqual(f_xy_meta['units'], None)
-        self.assertEqual(f_xy_meta['shape'], (1,))
+        self.assertEqual(f_xy_meta['shape'], ())
 
         x_meta = _get_var_meta(cr, case_name, 'x')
         self.assertEqual(x_meta['prom_name'], 'x')
