@@ -172,43 +172,7 @@ if (toggle.active) {{
         lines[index].glyph.fill_color = color;
     }}
     if (lines[index].glyph.type == "Line"){{
-        try {{
-            lines[index].glyph.properties.line_color.set_value(color);
-
-            // Force complete redraw via the plot's view
-            const view = plot.view;
-            if (view) {{
-                console.log("view.update_dataranges");
-                view.update_dataranges();
-                view.request_render();
-            }}
-
-            
-                // Toggle a property to force redraw
-    const old_visible = plot.visible;
-    plot.visible = !old_visible;
-    setTimeout(function() {{ 
-        plot.visible = old_visible; 
-    }}, 1);
-
-
-                // also causes the errors
-
-                // Save current line width
-                //const old_width = lines[index].glyph.line_width;
-                
-                // Modify and restore to trigger redraw
-                //lines[index].glyph.line_width = old_width + 0.001;
-                //setTimeout(function() {{
-                //    lines[index].glyph.line_width = old_width;
-                //}}, 5);
-
-
-            lines[index].change.emit();
-
-        }} catch(err) {{
-            console.log("err " + err);
-        }}
+        lines[index].glyph.properties.line_color.set_value(color);
     }}
     // make the button background color the same as the line, just slightly transparent
     toggle.stylesheets = [`
@@ -228,7 +192,6 @@ if (toggle.active) {{
 
 }}
 """
-
 
 def is_process_running(pid):
     try:
