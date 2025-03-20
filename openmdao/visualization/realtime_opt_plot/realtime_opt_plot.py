@@ -33,6 +33,7 @@ from bokeh.plotting import figure
 from bokeh.server.server import Server
 from bokeh.application.application import Application
 from bokeh.application.handlers import FunctionHandler
+from bokeh.palettes import Category20, Category20b, Category20c, Colorblind
 
 import numpy as np
 
@@ -59,16 +60,9 @@ toggle_styles = """
                 0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
                 inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
-from bokeh.palettes import Category20, Category20b, Category20c
-colorPalette = (
-    Category20[20] + Category20b[20] + Category20c[20]
-)  # gives us 60 colors
 
-from bokeh.colors.color import RGB
-colorPalette = (
-    RGB.from_hex_string('#1f77b4'),
-    RGB.from_hex_string('#98df8a'),
-)
+# start with colorblind friendly colors and then use others if needed
+colorPalette = Colorblind[8] + Category20[20]
 
 # This is the JavaScript code that gets run when a user clicks on 
 #   one of the toggle buttons that change what is being plotted
@@ -78,25 +72,12 @@ callback_code=f"""
 //   for use with a different variable plot
 if (typeof window.ColorManager === 'undefined') {{
     window.ColorManager = class {{
-        constructor(palette = 'Category10') {{
+        constructor() {{
             if (ColorManager.instance) {{
                 return ColorManager.instance;
             }}
-            // Define our own palettes
-            this.palettes = {{
-                'Category20': [
-                '#1f77b4', '#aec7e8', '#ff7f0e', '#ffbb78', '#2ca02c',
-                '#98df8a', '#d62728', '#ff9896', '#9467bd', '#c5b0d5',
-                '#8c564b', '#c49c94', '#e377c2', '#f7b6d2', '#7f7f7f',
-                '#c7c7c7', '#bcbd22', '#dbdb8d', '#17becf', '#9edae5'
-                ],
-                'Colorblind': [
-                '#0072B2', '#E69F00', '#009E73', '#CC79A7', '#56B4E9',
-                '#D55E00', '#F0E442', '#000000'
-                ]
-            }};
-            
-            this.palette = this.palettes['Colorblind'] ;
+
+            this.palette = colorPalette;
             this.usedColors = new Set();
             this.variableColorMap = new Map();
             ColorManager.instance = this;
@@ -140,7 +121,7 @@ if (typeof window.ColorManager === 'undefined') {{
 
     }}; // end of class definition
 
-    window.colorManager = new window.ColorManager("Colorblind");
+    window.colorManager = new window.ColorManager();
 }}
 
 // Get the toggle that triggered the callback
@@ -169,7 +150,7 @@ if (toggle.active) {{
     }}
 
     if (lines[index].glyph.type == "VArea"){{
-        lines[index].glyph.fill_color = color;
+        lines[index].glyph.properties.fill_color.set_value(color);
     }}
     if (lines[index].glyph.type == "Line"){{
         lines[index].glyph.properties.line_color.set_value(color);
@@ -431,11 +412,8 @@ class RealTimeOptPlot(object):
                     # Otherwise if the user clicks on the variable buttons, the
                     #   lines will not change color because of the hack done to get
                     #   get around the bug in setting the line color from JavaScript
-                    print("redrawing")
                     self._source.stream(self._source_stream_dict)
                 return
-
-            print("updating")
 
             # See if source is defined yet. If not, see if we have any data
             #   in the case file yet. If there is data, create the
@@ -552,7 +530,6 @@ class RealTimeOptPlot(object):
                 # end of self._source is None - plottng is setup
 
             counter = new_data["counter"]
-
 
             self._source_stream_dict = {"iteration": [counter]}
 
@@ -779,13 +756,13 @@ def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_sc
         server.start()
         server.io_loop.add_callback(server.show, "/")
 
-        print(f"Bokeh server running on http://localhost:{_port_number}")
+        print(f"Real-time optimization plot server running on http://localhost:{_port_number}")
         server.io_loop.start()
     except KeyboardInterrupt as e:
-        print(f"Server stopped due to keyboard interrupt")
+        print(f"Real-time optimization plot server stopped due to keyboard interrupt")
     except Exception as e:
-        print(f"Error starting Bokeh server: {e}")
+        print(f"Error starting real-time optimization plot server: {e}")
     finally:
-        print("Stopping server")
+        print("Stopping real-time optimization plot server")
         if "server" in globals():
             server.stop()
