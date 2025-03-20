@@ -511,7 +511,7 @@ def _rtplot_cmd(options, user_args):
         cmd = ['openmdao', 'realtime_opt_plot', '--pid', str(os.getpid()), recorder_filepath]
         cp = subprocess.Popen(cmd)  # nosec: trusted input
 
-        # You can optionally do a quick non-blocking check to see if it immediately failed
+        # Do a quick non-blocking check to see if it immediately failed
         # This will catch immediate failures but won't wait for the process to finish
         quick_check = cp.poll()
         if quick_check is not None and quick_check != 0:
@@ -521,6 +521,7 @@ def _rtplot_cmd(options, user_args):
 
     # register the hook
     hooks._register_hook('_setup_recording', 'Problem', post=_view_realtime_opt_plot, ncalls=1)
+
     # run the script
     _load_and_exec(options.file[0], user_args)
 
