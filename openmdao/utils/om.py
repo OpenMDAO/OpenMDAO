@@ -485,6 +485,8 @@ def _rtplot_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('--no-display', action='store_false', dest='show',
+                        help="do not launch browser showing plot.")
 
 
 def _rtplot_cmd(options, user_args):
@@ -508,7 +510,10 @@ def _rtplot_cmd(options, user_args):
 
         recorder_filepath = str(problem.driver._rec_mgr._recorders[0]._filepath) 
 
-        cmd = ['openmdao', 'realtime_opt_plot', '--pid', str(os.getpid()), recorder_filepath]
+        if options.show:
+            cmd = ['openmdao', 'realtime_opt_plot', '--pid', str(os.getpid()), recorder_filepath]
+        else:
+            cmd = ['openmdao', 'realtime_opt_plot', '--pid', '--no-display', str(os.getpid()), recorder_filepath]
         cp = subprocess.Popen(cmd)  # nosec: trusted input
 
         # Do a quick non-blocking check to see if it immediately failed
