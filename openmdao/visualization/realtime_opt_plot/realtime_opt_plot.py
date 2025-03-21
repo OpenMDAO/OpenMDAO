@@ -204,6 +204,8 @@ def _realtime_opt_plot_setup_parser(parser):
     )
 
     parser.add_argument('--pid', type=int, help='Process ID of calling optimization script')
+    parser.add_argument('--no-display', action='store_false', dest='show',
+                        help="do not launch browser showing plot.")
 
 
 def _realtime_opt_plot_cmd(options, user_args):
@@ -217,8 +219,7 @@ def _realtime_opt_plot_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    print("in _realtime_opt_plot_cmd")
-    realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms, options.pid)
+    realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms, options.pid, options.show)
 
 def _update_y_min_max(name, y, y_min, y_max):
     min_max_changed = False
@@ -728,7 +729,7 @@ class RealTimeOptPlot(object):
 
 
 
-def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_script):
+def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_script, show):
     """
     Visualize the objectives, desvars, and constraints during an optimization process.
 
@@ -740,6 +741,8 @@ def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_sc
         The time period between when the application calls the update method.
     pid_of_calling_script : int
         The process id of the calling optimization script, if called this way.
+    show : boolean
+        If true, launch the browser display of the plot.
     """
 
     def _make_realtime_opt_plot_doc(doc):
@@ -754,7 +757,8 @@ def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_sc
             unused_session_lifetime_milliseconds=_unused_session_lifetime_milliseconds,
         )
         server.start()
-        server.io_loop.add_callback(server.show, "/")
+        if not show:
+            server.io_loop.add_callback(server.show, "/")
 
         print(f"Real-time optimization plot server running on http://localhost:{_port_number}")
         server.io_loop.start()
