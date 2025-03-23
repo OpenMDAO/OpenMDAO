@@ -418,7 +418,7 @@ class Component(System):
                     raise RuntimeError(f"{self.msginfo}: compute_primal must be defined if using "
                                        "a derivs_method option of 'cs' or 'fd'")
                 # declare all partials as 'cs' or 'fd'
-                for of, wrt in get_function_deps(self.compute_primal,
+                for of, wrt in get_function_deps(self._orig_compute_primal,
                                                  self._var_rel_names['output']):
                     if of in self._discrete_outputs or wrt in self._discrete_inputs:
                         continue
