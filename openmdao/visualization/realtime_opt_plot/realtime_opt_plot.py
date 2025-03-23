@@ -1,5 +1,6 @@
-""" A real-plot of the optimization process"""
+""" A real-time plot monitoring the optimization process as an OpenMDAO script runs"""
 
+import errno
 import os
 import sys
 from collections import defaultdict
@@ -33,12 +34,11 @@ from bokeh.plotting import figure
 from bokeh.server.server import Server
 from bokeh.application.application import Application
 from bokeh.application.handlers import FunctionHandler
-from bokeh.palettes import Category20, Category20b, Category20c, Colorblind
+from bokeh.palettes import Category20, Colorblind
 
 import numpy as np
 
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
-import openmdao.utils.hooks as hooks
 
 try:
     from openmdao.utils.gui_testing_utils import get_free_port
@@ -47,10 +47,12 @@ except:
     def get_free_port():
         return 5000
 
-_time_between_callbacks_in_ms = 1000
-_unused_session_lifetime_milliseconds = 1000 * 60 * 10  # TODO try different values here
+# Constants
+_time_between_callbacks_in_ms = 1000 # the time between calls to the udpate method
+# Number of milliseconds for unused session lifetime
+_unused_session_lifetime_milliseconds = 1000 * 60 * 10
 _obj_color = "black"  # color of the plot line for the objective function
-_non_active_plot_color = "black"
+_non_active_plot_color = "black" # color of the buttons for variables not being shown
 _varea_alpha = 0.3 # how transparent is the area part of the plot for desvars that are vectors
 # the CSS for the toggle buttons to let user choose what variables to plot
 toggle_styles = """
@@ -61,11 +63,12 @@ toggle_styles = """
                 inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
 
-# start with colorblind friendly colors and then use others if needed
+# colors used for the plot lines and associated buttons and axes labels
+# start with color-blind friendly colors and then use others if needed
 colorPalette = Colorblind[8] + Category20[20]
 
 # This is the JavaScript code that gets run when a user clicks on 
-#   one of the toggle buttons that change what is being plotted
+#   one of the buttons that change what variables are plotted
 callback_code=f"""
 // The ColorManager provides color from a palette for plotting lines. When the 
 //   user turns off the plotting of a line, the color is returned to the manager
@@ -104,21 +107,6 @@ if (typeof window.ColorManager === 'undefined') {{
             }}
         }} // end of releaseColor
     
-        // Get all available palettes
-        getPaletteNames() {{
-            return Object.keys(this.palettes);
-        }}
-    
-        // Change active palette
-        setPalette(paletteName) {{
-            if (this.palettes[paletteName]) {{
-                this.palette = this.palettes[paletteName];
-                // Optionally reset all color assignments
-                this.usedColors.clear();
-                this.variableColorMap.clear();
-            }}
-        }} // end of setPalette
-
     }}; // end of class definition
 
     window.colorManager = new window.ColorManager();
@@ -128,8 +116,8 @@ if (typeof window.ColorManager === 'undefined') {{
 const toggle = cb_obj;
 const index = toggles.indexOf(toggle);
 // index value of 0 is for the objective variable whose axis
-//    is on the left. The index variable really refers to the list of toggles.
-// The axes list variable only is for desvars and cons, whose axes are on the right
+// is on the left. The index variable really refers to the list of toggle buttons.
+// The axes list variable only is for desvars and cons, whose axes are on the right.
 // The lines list variables includes all vars
 
 // Set line visibility
@@ -149,6 +137,8 @@ if (toggle.active) {{
         axes[index-1].axis_label_text_color = color
     }}
 
+    // using set_value is a workaround because of a bug in Bokeh.
+    // see https://github.com/bokeh/bokeh/issues/14364 for more info
     if (lines[index].glyph.type == "VArea"){{
         lines[index].glyph.properties.fill_color.set_value(color);
     }}
@@ -162,7 +152,7 @@ if (toggle.active) {{
             {toggle_styles}
         }}
     `];
-// if turning off, return the color to the pool
+// if turning off a variable, return the color to the pool
 }} else {{
     window.colorManager.releaseColor(variable_name);
     toggle.stylesheets = [`
@@ -174,19 +164,34 @@ if (toggle.active) {{
 }}
 """
 
-def is_process_running(pid):
-    try:
-        if sys.platform == "win32":
-            # Windows - attempt to send signal 0, which doesn't actually send a signal
-            # but checks if the process exists
-            os.kill(pid, 0)
+def _is_process_running(pid):
+    if sys.platform == "win32":
+        # PROCESS_QUERY_LIMITED_INFORMATION is available on Windows Vista and later.
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+        # Attempt to open the process.
+        handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if handle:
+            ctypes.windll.kernel32.CloseHandle(handle)
             return True
         else:
-            # Unix/Linux/macOS
-            return os.kill(pid, 0) is None
-    except OSError:
-        # Process doesn't exist or we don't have permission
-        return False
+            # If OpenProcess fails, check if it's due to access being denied.
+            ERROR_ACCESS_DENIED = 5
+            if ctypes.windll.kernel32.GetLastError() == ERROR_ACCESS_DENIED:
+                return True
+            return False
+    else:
+        try:
+            os.kill(pid, 0)
+        except OSError as err:
+            if err.errno == errno.ESRCH:  # No such process
+                return False
+            elif err.errno == errno.EPERM:  # Process exists, no permission to signal
+                return True
+            else:
+                raise
+        else:
+            return True
 
 def _realtime_opt_plot_setup_parser(parser):
     """
@@ -203,9 +208,9 @@ def _realtime_opt_plot_setup_parser(parser):
         help="Name of openmdao case recorder filename. It should contain driver cases",
     )
 
-    parser.add_argument('--pid', type=int, help='Process ID of calling optimization script')
+    parser.add_argument('--pid', type=int, default=None, help='Process ID of calling optimization script')
     parser.add_argument('--no-display', action='store_false', dest='show',
-                        help="do not launch browser showing plot.")
+                        help="do not launch browser showing plot. Primarily used for testing")
 
 
 def _realtime_opt_plot_cmd(options, user_args):
@@ -222,6 +227,25 @@ def _realtime_opt_plot_cmd(options, user_args):
     realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms, options.pid, options.show)
 
 def _update_y_min_max(name, y, y_min, y_max):
+    """
+    Update the y_min and y_max dicts containing the min and max of the variables.
+
+    Parameters
+    ----------
+    name : str
+        Name of the variable.
+    y : double
+        Value of the variable.
+    y_min : dict
+        Dict of mins of each variable.
+    y_max : dict
+        Dict of maxs of each variable.
+
+    Returns
+    -------
+    bool
+        True if either min or max were updated.
+    """
     min_max_changed = False
     if y < y_min[name]:
         y_min[name] = y
@@ -232,6 +256,23 @@ def _update_y_min_max(name, y, y_min, y_max):
     return min_max_changed
 
 def _get_value_for_plotting(value_from_recorder, var_type):
+    """
+    Return the double value to be used for plotting the variable.
+
+    Need to handle variables that are vectors.
+
+    Parameters
+    ----------
+    value_from_recorder : str
+        Name of the variable.
+    var_type : str
+        String indicating of 'objs', 'desvars' or 'cons'.
+
+    Returns
+    -------
+    double
+        The value to be used for plotting the variable.
+    """
     if value_from_recorder is None or value_from_recorder.size == 0:
         return (0.0)
     if var_type == 'cons':
@@ -239,10 +280,23 @@ def _get_value_for_plotting(value_from_recorder, var_type):
         return np.linalg.norm(value_from_recorder, ord=np.inf)
     elif var_type == 'objs':
         return value_from_recorder.item() # get as scalar
-    else:
+    else:  # for desvars, just L2 norm
         return np.linalg.norm(value_from_recorder)
 
 def _make_header_text_for_variable_chooser(header_text):
+    """
+    Return a Div to be used for the label for the type of variables in the variable list.
+
+    Parameters
+    ----------
+    header_text : str
+        Label string.
+
+    Returns
+    -------
+    Div
+        The header Div for the section of variables of that type.
+    """
     header_text_div = Div(
         text=f"<b>{header_text}</b>",
         styles={"font-size": "14"},
@@ -250,9 +304,12 @@ def _make_header_text_for_variable_chooser(header_text):
     return header_text_div
 
 
-class CaseTracker:
+class _CaseTracker:
+    """
+    A class that is used to get information from a case recorder 
+    that is needed by the code in this file.
+    """
     def __init__(self, case_recorder_filename):
-        self._case_ids_read = []
         self._case_recorder_filename = case_recorder_filename
         self._cr = None
         self.source = None
@@ -391,7 +448,7 @@ class RealTimeOptPlot(object):
         self._column_items = []
         self._axes = []
         self._labels_updated_with_units = False
-        self._case_tracker = CaseTracker(case_recorder_filename)
+        self._case_tracker = _CaseTracker(case_recorder_filename)
         self._doc = doc
         self._update_callback = None
         self._source_stream_dict = None
@@ -407,7 +464,7 @@ class RealTimeOptPlot(object):
 
             new_data = self._case_tracker.get_new_case()
             if new_data is None:
-                if not is_process_running(self._pid_of_calling_script):
+                if self._pid_of_calling_script is None or not _is_process_running(self._pid_of_calling_script):
                     # Just keep sending the last data point
                     # This is a hack to force the plot to re-draw
                     # Otherwise if the user clicks on the variable buttons, the
@@ -727,8 +784,6 @@ class RealTimeOptPlot(object):
         self.p.axis.axis_label_text_font_size = "20pt"
 
 
-
-
 def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_script, show):
     """
     Visualize the objectives, desvars, and constraints during an optimization process.
@@ -757,7 +812,7 @@ def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_sc
             unused_session_lifetime_milliseconds=_unused_session_lifetime_milliseconds,
         )
         server.start()
-        if not show:
+        if show:
             server.io_loop.add_callback(server.show, "/")
 
         print(f"Real-time optimization plot server running on http://localhost:{_port_number}")
