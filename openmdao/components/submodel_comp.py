@@ -575,8 +575,8 @@ class SubmodelComp(ExplicitComponent):
         submodel.
         """
         submod = self._subprob.model
-        sub_slices = submod._outputs.get_slice_dict()
-        slices = self._inputs.get_slice_dict()
+        subouts = submod._outputs
+        subins = self._inputs
         prefix = self.pathname + '.'
 
         input_ranges = []
@@ -584,26 +584,22 @@ class SubmodelComp(ExplicitComponent):
         for inner_prom, outer_name in self._submodel_inputs.items():
             sub_src = submod.get_source(inner_prom)
             if submod._owned_size(sub_src) > 0:
-                sub_slc = sub_slices[sub_src]
-                sub_out_ranges.append((sub_slc.start, sub_slc.stop))
-                slc = slices[prefix + outer_name]
-                input_ranges.append((slc.start, slc.stop))
+                sub_out_ranges.append(subouts.get_range(sub_src))
+                input_ranges.append(subins.get_range(prefix + outer_name))
 
         self._ins_idxs = ranges2indexer(input_ranges, src_shape=(len(self._inputs),))
         self._ins2sub_outs_idxs = ranges2indexer(sub_out_ranges, src_shape=(len(submod._outputs),))
 
         prom2abs = submod._var_allprocs_prom2abs_list['output']
-        slices = self._outputs.get_slice_dict()
+        outs = self._outputs
         sub_out_ranges = []
         out_ranges = []
 
         for inner_prom, outer_name in self._submodel_outputs.items():
             sub_src = prom2abs[inner_prom][0]
             if submod._owned_size(sub_src) > 0:
-                sub_slc = sub_slices[sub_src]
-                slc = slices[prefix + outer_name]
-                out_ranges.append((slc.start, slc.stop))
-                sub_out_ranges.append((sub_slc.start, sub_slc.stop))
+                out_ranges.append(outs.get_range(prefix + outer_name))
+                sub_out_ranges.append(subouts.get_range(sub_src))
 
         self._outs_idxs = ranges2indexer(out_ranges, src_shape=(len(self._outputs),))
         self._sub_outs_idxs = ranges2indexer(sub_out_ranges, src_shape=(len(submod._outputs),))

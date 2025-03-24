@@ -155,7 +155,7 @@ class ApproximationScheme(object):
         wrt_ranges = []
 
         wrt_matches = system._coloring_info._update_wrt_matches(system)
-        out_slices = system._outputs.get_slice_dict()
+        outvec = system._outputs
 
         # this maps column indices into colored jac into indices into full jac
         if wrt_matches is not None:
@@ -172,13 +172,13 @@ class ApproximationScheme(object):
                     colored_end += cend - cstart
                     if wrt_matches is not None:
                         ccol2jcol[colored_start:colored_end] = range(cstart, cend)
-                    if is_total and abs_wrt in out_slices:
-                        slc = out_slices[abs_wrt]
+                    if is_total and outvec._contains_abs(abs_wrt):
+                        start, stop = outvec.get_range(abs_wrt)
                         if cinds is not None:
-                            rng = np.arange(slc.start, slc.stop)[cinds]
+                            rng = np.arange(start, stop)[cinds]
                         else:
-                            rng = range(slc.start, slc.stop)
-                        wrt_ranges.append((abs_wrt, slc.stop - slc.start))
+                            rng = range(start, stop)
+                        wrt_ranges.append((abs_wrt, stop - start))
                         ccol2outvec[colored_start:colored_end] = rng
                     colored_start = colored_end
 
@@ -236,10 +236,6 @@ class ApproximationScheme(object):
             The system having its derivs approximated.
         """
         total = system.pathname == ''
-
-        in_slices = system._inputs.get_slice_dict()
-        out_slices = system._outputs.get_slice_dict()
-
         coloring = system._get_static_coloring()
 
         self._approx_groups = []
@@ -261,10 +257,6 @@ class ApproximationScheme(object):
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:
                     continue
-                if vec is system._inputs:
-                    slices = in_slices
-                else:
-                    slices = out_slices
 
                 data = self._get_approx_data(system, wrt, meta)
                 directional = meta['directional'] or self._totals_directions
@@ -278,7 +270,7 @@ class ApproximationScheme(object):
                         # local index into var
                         vec_idx = sinds.copy()
                         # convert into index into input or output vector
-                        vec_idx += slices[wrt].start
+                        vec_idx += vec.get_range(wrt)[0]
                         # Directional derivatives for quick deriv checking.
                         # Place the indices in a list so that they are all stepped at the same time.
                         if directional:

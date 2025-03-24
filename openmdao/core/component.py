@@ -1892,8 +1892,8 @@ class Component(System):
                 bad_inds = np.arange(len(v), dtype=INT_DTYPE)[inds][result]
                 bad_mask = np.zeros(len(v), dtype=bool)
                 bad_mask[bad_inds] = True
-                for inname, slc in v.get_slice_dict().items():
-                    if np.any(bad_mask[slc]):
+                for inname, start, stop in v.ranges():
+                    if np.any(bad_mask[start:stop]):
                         for outname in nz_dist_outputs:
                             key = (outname, inname)
                             self._inconsistent_keys.add(key)

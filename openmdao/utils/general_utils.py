@@ -1339,12 +1339,12 @@ class LocalRangeIterable(object):
         all_abs2meta = system._var_allprocs_abs2meta['output']
         if vname in all_abs2meta:
             sizes = system._var_sizes['output']
-            slices = system._outputs.get_slice_dict()
+            vec = system._outputs
             abs2meta = system._var_abs2meta['output']
         else:
             all_abs2meta = system._var_allprocs_abs2meta['input']
             sizes = system._var_sizes['input']
-            slices = system._inputs.get_slice_dict()
+            vec = system._inputs
             abs2meta = system._var_abs2meta['input']
 
         if all_abs2meta[vname]['distributed']:
@@ -1361,10 +1361,11 @@ class LocalRangeIterable(object):
             self._var_size = all_abs2meta[vname]['global_size']
         else:
             self._iter = self._serial_iter
+            start, stop = vec.get_range(vname)
             if use_vec_offset:
-                self._inds = range(slices[vname].start, slices[vname].stop)
+                self._inds = range(start, stop)
             else:
-                self._inds = range(slices[vname].stop - slices[vname].start)
+                self._inds = range(stop - start)
             self._var_size = all_abs2meta[vname]['global_size']
 
     def __repr__(self):

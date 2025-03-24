@@ -3820,14 +3820,15 @@ class Group(System):
                     seed_vars = self._problem_meta['seed_vars']
                     if seed_vars is not None:
                         seed_vars = [n for n in seed_vars if n in self._fd_rev_xfer_correction_dist]
-                        slices = self._dinputs.get_slice_dict()
-                        inarr = self._dinputs.asarray()
+                        dinvec = self._dinputs
+                        inarr = dinvec.asarray()
                         data = {}
                         for seed_var in seed_vars:
                             for inp in self._fd_rev_xfer_correction_dist[seed_var]:
                                 if inp not in data:
-                                    if inp in slices:  # inp is a local input
-                                        arr = inarr[slices[inp]]
+                                    if dinvec._contains_abs(inp):  # inp is a local input
+                                        start, stop = dinvec.get_range(inp)
+                                        arr = inarr[start:stop]
                                         if np.any(arr):
                                             data[inp] = arr
                                         else:
@@ -3840,8 +3841,9 @@ class Group(System):
                             for rank, d in enumerate(self.comm.allgather(data)):
                                 if rank != myrank:
                                     for n, val in d.items():
-                                        if val is not None and n in slices:
-                                            inarr[slices[n]] += val
+                                        if val is not None and dinvec._contains_abs(n):
+                                            start, stop = dinvec.get_range(n)
+                                            inarr[start:stop] += val
 
         # Apply recursion
         else:

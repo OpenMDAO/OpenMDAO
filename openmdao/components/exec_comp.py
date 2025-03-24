@@ -1003,14 +1003,16 @@ class ExecComp(ExplicitComponent):
         # compute mapping of col index to wrt varname
         self._col_idx2name = idxnames = [None] * len(self._inputs)
         plen = len(self.pathname) + 1
-        for name, slc in self._inputs.get_slice_dict().items():
+        for name, start, stop in self._inputs.ranges():
             name = name[plen:]
-            for i in range(slc.start, slc.stop):
+            for i in range(start, stop):
                 idxnames[i] = name
 
         # get slice dicts using relative name keys
-        self._out_slices = {n[plen:]: slc for n, slc in self._outputs.get_slice_dict().items()}
-        self._in_slices = {n[plen:]: slc for n, slc in self._inputs.get_slice_dict().items()}
+        self._out_slices = {
+            n[plen:]: slice(start, stop) for n, start, stop in self._outputs.ranges()
+        }
+        self._in_slices = {n[plen:]: slice(start, stop) for n, start, stop in self._inputs.ranges()}
 
         return [coloring]
 

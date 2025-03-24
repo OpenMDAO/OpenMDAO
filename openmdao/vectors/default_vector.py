@@ -570,22 +570,21 @@ class DefaultVector(Vector):
         """
         return np.linalg.norm(self.asarray())
 
-    def get_slice_dict(self):
+    def get_range(self, name):
         """
-        Return a dict of var names mapped to their slice in the local data array.
+        Return the range of the variable in the local data array.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
 
         Returns
         -------
-        dict
-            Mapping of var name to slice.
+        tuple
+            Start and stop indices of the variable in the local data array.
         """
-        if self._slices is None:
-            slices = {}
-            for name, vinfo in self._views.items():
-                slices[name] = slice(*vinfo.range)
-            self._slices = slices
-
-        return self._slices
+        return self._views[name].range
 
     def idxs2nameloc(self, idxs):
         """

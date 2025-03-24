@@ -641,8 +641,6 @@ class TestScaling(unittest.TestCase):
 
         assert_near_equal(prob['comp.total_volume'], 4.)
 
-        slices = model._outputs.get_slice_dict()
-
         with model._scaled_context_all():
             val = model.comp._outputs['areas']
             assert_near_equal(val[0, 0], (1.0 - 0.1)/(2 - 0.1), tolerance=1e-11)
@@ -656,28 +654,28 @@ class TestScaling(unittest.TestCase):
             assert_near_equal(val[1, 0], (2.0 - 0.8)/(17 - 0.8), tolerance=1e-11)
             assert_near_equal(val[1, 1], (2.0 - 0.9)/(19 - 0.9), tolerance=1e-11)
 
-            slc = slices['comp.areas']
-            lb = model.nonlinear_solver.linesearch._lower_bounds[slc]
+            start, stop = model._outputs.get_range('comp.areas')
+            lb = model.nonlinear_solver.linesearch._lower_bounds[start:stop]
 
             assert_near_equal(lb[0], (-1000.0 - 0.1)/(2 - 0.1))
             assert_near_equal(lb[1], (-1000.0 - 0.2)/(3 - 0.2))
             assert_near_equal(lb[2], (-1000.0 - 0.3)/(5 - 0.3))
             assert_near_equal(lb[3], (-1000.0 - 0.4)/(7 - 0.4))
 
-            ub = model.nonlinear_solver.linesearch._upper_bounds[slc]
+            ub = model.nonlinear_solver.linesearch._upper_bounds[start:stop]
             assert_near_equal(ub[0], (1000.0 - 0.1)/(2 - 0.1))
             assert_near_equal(ub[1], (1000.0 - 0.2)/(3 - 0.2))
             assert_near_equal(ub[2], (1000.0 - 0.3)/(5 - 0.3))
             assert_near_equal(ub[3], (1000.0 - 0.4)/(7 - 0.4))
 
-            slc = slices['comp.stuff']
-            lb = model.nonlinear_solver.linesearch._lower_bounds[slc]
+            start, stop = model._outputs.get_range('comp.stuff')
+            lb = model.nonlinear_solver.linesearch._lower_bounds[start:stop]
             assert_near_equal(lb[0], (-5000.0 - 0.6)/(11 - 0.6))
             assert_near_equal(lb[1], (-4000.0 - 0.7)/(13 - 0.7))
             assert_near_equal(lb[2], (-3000.0 - 0.8)/(17 - 0.8))
             assert_near_equal(lb[3], (-2000.0 - 0.9)/(19 - 0.9))
 
-            ub = model.nonlinear_solver.linesearch._upper_bounds[slc]
+            ub = model.nonlinear_solver.linesearch._upper_bounds[start:stop]
             assert_near_equal(ub[0], (5000.0 - 0.6)/(11 - 0.6))
             assert_near_equal(ub[1], (4000.0 - 0.7)/(13 - 0.7))
             assert_near_equal(ub[2], (3000.0 - 0.8)/(17 - 0.8))

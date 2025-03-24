@@ -802,7 +802,7 @@ class _TotalJacInfo(object):
         inds = []
         jac_inds = []
         sizes = model._var_sizes['output']
-        slices = model._doutputs.get_slice_dict()
+        doutvec = model._doutputs
         abs2idx = model._var_allprocs_abs2idx
         jstart = jend = 0
 
@@ -813,24 +813,25 @@ class _TotalJacInfo(object):
             meta = allprocs_abs2meta_out[src]
             sz = vmeta['global_size'] if self.get_remote else vmeta['size']
 
-            if (src in abs2idx and src in slices and (self.get_remote or not vmeta['remote'])):
+            if (src in abs2idx and doutvec._contains_abs(src) and
+                    (self.get_remote or not vmeta['remote'])):
                 var_idx = abs2idx[src]
-                slc = slices[src]
-                slcsize = slc.stop - slc.start
+                start, stop = doutvec.get_range(src)
+                slcsize = stop - start
 
                 if MPI and meta['distributed'] and self.get_remote:
                     if indices is not None:
                         local_idx, sizes_idx, _ = self._dist_driver_vars[name]
 
                         dist_offset = np.sum(sizes_idx[:myproc])
-                        full_inds = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
+                        full_inds = np.arange(start, stop, dtype=INT_DTYPE)
                         inds.append(full_inds[local_idx.as_array()])
                         jac_inds.append(jstart + dist_offset +
                                         np.arange(local_idx.indexed_src_size, dtype=INT_DTYPE))
                         name2jinds.append((src, jac_inds[-1]))
                     else:
                         dist_offset = np.sum(sizes[:myproc, var_idx])
-                        inds.append(range(slc.start, slc.stop) if slcsize > 0
+                        inds.append(range(start, stop) if slcsize > 0
                                     else np.zeros(0, dtype=INT_DTYPE))
                         jac_inds.append(np.arange(jstart + dist_offset,
                                         jstart + dist_offset + sizes[myproc, var_idx],
@@ -838,10 +839,10 @@ class _TotalJacInfo(object):
                         name2jinds.append((src, jac_inds[-1]))
                 else:
                     if indices is None:
-                        sol_inds = range(slc.start, slc.stop) if slcsize > 0 \
+                        sol_inds = range(start, stop) if slcsize > 0 \
                             else np.zeros(0, dtype=INT_DTYPE)
                     else:
-                        sol_inds = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
+                        sol_inds = np.arange(start, stop, dtype=INT_DTYPE)
                         sol_inds = sol_inds[indices.flat()]
                     inds.append(sol_inds)
                     jac_inds.append(np.arange(jstart, jstart + sz, dtype=INT_DTYPE))
