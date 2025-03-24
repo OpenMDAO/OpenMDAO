@@ -300,6 +300,7 @@ class Component(System):
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[io][prom_name] = [abs_name]
                 abs2prom[io][abs_name] = prom_name
+                self._resolver.add_mapping(abs_name, prom_name, io, local=True)
 
                 allprocs_abs2meta[abs_name] = {
                     meta_name: metadata[meta_name]
@@ -315,6 +316,7 @@ class Component(System):
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[io][prom_name] = [abs_name]
                 abs2prom[io][abs_name] = prom_name
+                self._resolver.add_mapping(abs_name, prom_name, io, local=True)
 
                 # Compute allprocs_discrete (metadata for discrete vars)
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
@@ -350,6 +352,9 @@ class Component(System):
 
         self._serial_idxs = None
         self._inconsistent_keys = set()
+
+        # TODO: remove after debugging
+        self._resolver.verify(self)
 
     def _missing_vars_error(self, allnames):
         msg = ''

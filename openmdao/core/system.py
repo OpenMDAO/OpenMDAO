@@ -28,7 +28,7 @@ from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table, NA
 from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_tol_violation, \
     sparsity_diff_viz, get_sparsity_diff_array
-from openmdao.utils.name_maps import name2abs_name, name2abs_names
+from openmdao.utils.name_maps import name2abs_name, name2abs_names, NameResolver
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
@@ -400,6 +400,8 @@ class System(object, metaclass=SystemMetaclass):
         Function that computes the primal for the given system.
     _jac_func_ : function or None
         Function that computes the jacobian using AD (jax).  Not used if jax is not active.
+    _resolver : NameResolver
+        Resolves names to absolute names, promoted names, and iotypes.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -454,6 +456,7 @@ class System(object, metaclass=SystemMetaclass):
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
+        self._resolver = None
         self._var_allprocs_prom2abs_list = None
         self._var_prom2inds = {}
         self._var_abs2prom = {'input': {}, 'output': {}}
@@ -668,36 +671,6 @@ class System(object, metaclass=SystemMetaclass):
                     yield prefix + name
             else:
                 yield from self._var_allprocs_discrete[iotype]
-
-    def to_abs_names(self, names, iotype):
-        """
-        Convert a list of promoted or relative names to absolute names.
-
-        Parameters
-        ----------
-        names : list of str
-            List of promoted or relative names.
-        iotype : str
-            Either 'input' or 'output'.
-
-        Yields
-        ------
-        str
-            Absolute name.
-        """
-        prefix = self.pathname + '.' if self.pathname else ''
-        prom2abs = self._var_allprocs_prom2abs_list[iotype]
-        abs2idx = self._var_allprocs_abs2idx
-        for name in names:
-            if name in prom2abs:
-                yield prom2abs[name][0]
-            else:
-                abs_name = prefix + name
-                if abs_name in abs2idx:
-                    yield abs_name
-                else:
-                    raise ValueError(f"{self.msginfo}: Name '{name}' not found in {iotype} "
-                                     "variables.")
 
     def abs_meta_iter(self, iotype, local=True, cont=True, discrete=False):
         """
@@ -2344,6 +2317,7 @@ class System(object, metaclass=SystemMetaclass):
         self._owning_rank = defaultdict(int)
         self._var_sizes = {}
         self._owned_sizes = None
+        self._resolver = NameResolver(self.pathname, self.msginfo)
 
         cfginfo = self._problem_meta['config_info']
         if cfginfo and self.pathname in cfginfo._modified_systems:

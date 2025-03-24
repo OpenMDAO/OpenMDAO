@@ -1,5 +1,404 @@
-"""Maps between promoted/relative/absolute names and name pairs."""
+"""Maps between promoted/relative/absolute names."""
 
+
+class NameResolver(object):
+    def __init__(self, pathname, msginfo='', check_dups=False):
+        self._pathname = pathname
+        self._prefix = '.' + pathname if pathname else ''
+        self._pathlen = len(pathname) + 1 if pathname else 0
+        self._abs2prom = {'input': {}, 'output': {}}
+        self._abs2prom_in = self._abs2prom['input']
+        self._abs2prom_out = self._abs2prom['output']
+        self._prom2abs = None
+        self._prom2abs_in = None
+        self._prom2abs_out = None
+        self.msginfo = msginfo if msginfo else pathname
+        self._conns = None
+        self._check_dups = check_dups
+
+    def verify(self, system):
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+
+        for io in ('input', 'output'):
+            assert len(self._abs2prom[io]) == len(system._var_allprocs_abs2prom[io])
+            for absname, (promname, local) in self._abs2prom[io].items():
+                assert system._var_allprocs_abs2prom[io][absname] == promname
+                if local:
+                    assert system._var_abs2prom[io][absname] == promname
+                else:
+                    assert absname not in system._var_abs2prom[io]
+
+            assert len(self._prom2abs[io]) == len(system._var_allprocs_prom2abs_list[io])
+            for promname, abslist in self._prom2abs[io].items():
+                assert sorted(system._var_allprocs_prom2abs_list[io][promname]) == sorted(abslist)
+
+    def update(self, other, myrank=0, otherrank=0):
+        for io in ('input', 'output'):
+            my_abs2prom = self._abs2prom[io]
+            other_abs2prom = other._abs2prom[io]
+            if myrank == otherrank:
+                my_abs2prom.update(other_abs2prom)
+            else:
+                for absname, (promname, local) in other_abs2prom.items():
+                    if absname not in my_abs2prom:
+                        my_abs2prom[absname] = (promname, False)
+
+        self._prom2abs = None
+        self._prom2abs_in = None
+        self._prom2abs_out = None
+
+    def _populate_prom2abs(self):
+        self._prom2abs = {'input': {}, 'output': {}}
+        for iotype, promdict in self._prom2abs.items():
+            for absname, (promname, _) in self._abs2prom[iotype].items():
+                if promname in promdict:
+                    promdict[promname].append(absname)
+                else:
+                    promdict[promname] = [absname]
+
+        self._prom2abs_in = self._prom2abs['input']
+        self._prom2abs_out = self._prom2abs['output']
+
+        if self._check_dups:
+            for promname, abslist in self._prom2abs_out.items():
+                if len(abslist) > 1:
+                    raise ValueError(f"{self.msginfo}: Output name '{promname}' refers to "
+                                     f"multiple outputs: {sorted(abslist)}.")
+
+    def num_proms(self, iotype=None):
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+        if iotype is None:
+            return len(self._prom2abs_in) + len(self._prom2abs_out)
+        return len(self._prom2abs[iotype])
+
+    def num_abs(self, iotype=None, local=False):
+        if iotype is None:
+            if local:
+                count = 0
+                for io in ('input', 'output'):
+                    for _, loc in self._abs2prom[io].values():
+                        if loc:
+                            count += 1
+                return count
+            else:
+                return len(self._abs2prom_in) + len(self._abs2prom_out)
+        if local:
+            count = 0
+            for _, loc in self._abs2prom[iotype].values():
+                if loc:
+                    count += 1
+            return count
+        else:
+            return len(self._abs2prom[iotype])
+
+    def is_prom(self, promname, iotype=None):
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+        if iotype is None:
+            iotype = self.get_prom_iotype(promname)
+            if iotype is None:
+                return False
+        return promname in self._prom2abs[iotype]
+
+    def is_abs(self, absname, iotype=None, local=False):
+        if iotype is None:
+            iotype = self.get_abs_iotype(absname)
+            if iotype is None:
+                return False
+        if local:
+            return absname in self._abs2prom[iotype] and self._abs2prom[iotype][absname][1]
+        else:
+            return absname in self._abs2prom[iotype]
+
+    def get_abs_iotype(self, absname, report_error=False):
+        if absname in self._abs2prom_out:
+            return 'output'
+        if absname in self._abs2prom_in:
+            return 'input'
+        if report_error:
+            raise ValueError(f"{self.msginfo}: Can't find {absname}.")
+
+    def get_prom_iotype(self, promname, report_error=False):
+        if promname in self._prom2abs_in:
+            return 'input'
+        if promname in self._prom2abs_out:
+            return 'output'
+        if report_error:
+            raise ValueError(f"{self.msginfo}: Can't find {promname}.")
+
+    def prom2abs_iter(self, iotype, local=False):
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+        if local:
+            a2p = self._abs2prom[iotype]
+            for prom, absnames in self._prom2abs[iotype].items():
+                absnames = [n for n in absnames if a2p[n][1]]
+                if absnames:
+                    yield prom, absnames
+        else:
+            yield from self._prom2abs[iotype].items()
+
+    def abs2prom_iter(self, iotype=None, local=False):
+        """
+        Yield absolute names and their promoted names.
+
+        Parameters
+        ----------
+        iotype : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, yield only local names.
+
+        Yields
+        ------
+        absname : str
+            Absolute name.
+        promname : str
+            Promoted name.
+        """
+        if iotype is None:
+            iotype = ('output', 'input')
+        else:
+            iotype = (iotype,)
+
+        for io in iotype:
+            if local:
+                for absname, (promname, loc) in self._abs2prom[io].items():
+                    if loc:
+                        yield absname, promname
+            else:
+                yield from self._abs2prom[io].items()
+
+    def prom_iter(self, iotype):
+        """
+        Yield promoted names.
+
+        Parameters
+        ----------
+        iotype : str
+            Either 'input' or 'output'.
+
+        Yields
+        ------
+        promname : str
+            Promoted name.
+        """
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+
+        yield from self._prom2abs[iotype]
+
+    def abs_iter(self, iotype=None, local=False):
+        """
+        Yield absolute names.
+
+        Parameters
+        ----------
+        iotype : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, yield only local names.
+
+        Yields
+        ------
+        absname : str
+            Absolute name.
+        """
+        if iotype is None:
+            iotype = ('output', 'input')
+        else:
+            iotype = (iotype,)
+
+        for io in iotype:
+            if local:
+                for absname, (_, loc) in self._abs2prom[io].items():
+                    if loc:
+                        yield absname
+            else:
+                yield from self._abs2prom[io]
+
+    def locality_iter(self, iotype):
+        """
+        Yield absolute names and their locality.
+        """
+        for absname, (_, loc) in self._abs2prom[iotype].items():
+            yield absname, loc
+
+    def is_local(self, absname, iotype=None):
+        if iotype is None:
+            iotype = self.get_abs_iotype(absname)
+        if iotype is None:
+            return False
+
+        return self._abs2prom[iotype][absname][1]
+
+    def add_mapping(self, absname, promname, iotype, local=False):
+        """
+        Add a mapping between an absolute name and a promoted name.
+
+        Parameters
+        ----------
+        absname : str
+            Absolute name.
+        promname : str
+            Promoted name.
+        iotype : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, the mapping is local only.
+        """
+        self._abs2prom[iotype][absname] = (promname, local)
+
+    def getsource(self, name):
+        if self._conns is None:
+            raise RuntimeError(f"{self.msginfo}: Can't find source for {name} because "
+                               "connections are not yet known.")
+
+        if name in self._abs2prom_in:
+            try:
+                return self._conns[name]
+            except KeyError:
+                raise KeyError(f"{self.msginfo}: Can't find source for {name}.")
+        elif name in self._abs2prom_out:
+            return name
+        else:  # promoted
+            absnames = self.absnames(name, report_error=False)
+            if absnames is None:
+                absname = name
+            else:
+                absname = absnames[0]
+
+        # absolute input?
+        if absname in self._conns:
+            return self._conns[absname]
+
+        if absname in self._abs2prom_out:
+            return absname
+
+        raise ValueError(f"{self.msginfo}: Can't find source for {name}.")
+
+    def abs2rel(self, absname):
+        return absname[self._pathlen:]
+
+    def rel2abs(self, relname):
+        return self._prefix + relname
+
+    def abs2prom(self, absname, iotype=None, local=False,):
+        try:
+            if iotype is None:
+                iotype = self.get_abs_iotype(absname, report_error=True)
+            if local:
+                name, loc = self._abs2prom[iotype][absname]
+                if loc:
+                    return name
+                else:
+                    raise ValueError(f"{self.msginfo}: {absname} is not a local {iotype}.")
+            else:
+                return self._abs2prom[iotype][absname][0]
+        except KeyError:
+            raise KeyError(f"{self.msginfo}: Can't find {iotype} {absname}.")
+
+    def absnames(self, promname, iotype=None, report_error=True):
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+
+        if iotype is None:
+            iotype = self.get_prom_iotype(promname)
+
+        try:
+            return self._prom2abs[iotype][promname]
+        except KeyError:
+            if report_error:
+                raise KeyError(f"{self.msginfo}: Can't find promoted {iotype} {promname}.")
+
+    def prom2abs(self, promname, iotype=None, local=False):
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+
+        try:
+            if iotype is None:
+                iotype = self.get_prom_iotype(promname)
+
+            lst = self._prom2abs[iotype][promname]
+            if local:
+                a2p = self._abs2prom[iotype]
+                lst = [n for n in lst if a2p[n][1]]
+
+            if len(lst) == 1:
+                return lst[0]
+
+            if self._conns is None:
+                # we can't refer to the source since we don't know the connections yet
+                raise RuntimeError(f"{self.msginfo}: The promoted name {promname} is invalid "
+                                   f"because it refers to multiple inputs: [{' ,'.join(lst)}].")
+
+            # report to the user which connected output to access
+            src_name = self._abs2prom['output'][self.getsource(lst[0])]
+            raise RuntimeError(f"{self.msginfo}: The promoted name {promname} is invalid because it"
+                               f" refers to multiple inputs: [{' ,'.join(lst)}]. Access the value "
+                               f"from the connected output variable {src_name} instead.")
+
+        except KeyError:
+            raise KeyError(f"{self.msginfo}: Can't find promoted {iotype} {promname}.")
+
+    def as_abs(self, name, report_error=False):
+        """
+        Convert any name to an absolute name.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative name.
+
+        Returns
+        -------
+        str
+            Absolute name.
+        """
+        if name in self._prom2abs_in:
+            return self.prom2abs(name, 'input')
+        elif name in self._prom2abs_out:
+            return self._prom2abs_out[name][0]
+        elif name in self._abs2prom_out or name in self._abs2prom_in:
+            return name
+        elif report_error:
+            raise ValueError(f"{self.msginfo}: Can't find variable {name}.")
+
+    def as_prom(self, name, report_error=False):
+        """
+        Convert any name to a promoted name.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative name.
+        report_error : bool
+            If True, raise an error if the name is not found.
+
+        Returns
+        -------
+        str
+            Promoted name.
+        """
+        if name in self._abs2prom_in:
+            return self._abs2prom_in[name][0]
+        elif name in self._abs2prom_out:
+            return self._abs2prom_out[name][0]
+        elif name in self._prom2abs_in or name in self._prom2abs_out:
+            return name
+        elif report_error:
+            raise ValueError(f"{self.msginfo}: Can't find variable {name}.")
+
+    # # TODO: get rid of this once all parts of code have been updated to use resolver
+    # def _get_abs2prom_mapping(self, iotype=None):
+    #     if iotype is None:
+    #         return {
+    #             'input': {k: v[0] for k, v in self._abs2prom['input'].items()},
+    #             'output': {k: v[0] for k, v in self._abs2prom['output'].items()}
+    #         }
+    #     return {k: v[0] for k, v in self._abs2prom[iotype].items()}
 
 def rel_name2abs_name(system, rel_name):
     """

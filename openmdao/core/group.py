@@ -40,6 +40,7 @@ from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOption
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
+from openmdao.utils.name_maps import NameResolver
 
 # regex to check for valid names.
 import re
@@ -1727,6 +1728,8 @@ class Group(System):
 
         super()._setup_var_data()
 
+        self._resolver = NameResolver(self.pathname, self.msginfo, check_dups=True)
+
         var_discrete = self._var_discrete
         allprocs_discrete = self._var_allprocs_discrete
 
@@ -1793,6 +1796,8 @@ class Group(System):
                     for abs_name in sub_abs:
                         if abs_name in sub_loc_proms:
                             abs2prom[io][abs_name] = prom_name
+                        self._resolver.add_mapping(abs_name, prom_name, io,
+                                                   local=abs_name in sub_loc_proms)
 
             if isinstance(subsys, Group):
                 # propagate any subsystem 'set_input_defaults' info up to this Group
@@ -1810,13 +1815,15 @@ class Group(System):
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             if self._gather_full_data():
-                raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
+                raw = (allprocs_discrete, self._resolver, allprocs_prom2abs_list,
+                           allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
                        self._has_resid_scaling, self._group_inputs, self._has_distrib_vars,
                        self._has_fd_group)
             else:
                 raw = (
                     {'input': {}, 'output': {}},
+                    None,
                     {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
                     False,
@@ -1837,7 +1844,7 @@ class Group(System):
                 allprocs_prom2abs_list[io] = {}
 
             myrank = self.comm.rank
-            for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
+            for rank, (proc_discrete, proc_resolver, proc_prom2abs_list, proc_abs2meta,
                        oscale, oadd, rscale, ginputs, has_dist_vars,
                        has_fd_group) in enumerate(gathered):
                 self._has_output_scaling |= oscale
@@ -1851,6 +1858,9 @@ class Group(System):
                         if p not in self._group_inputs:
                             self._group_inputs[p] = []
                         self._group_inputs[p].extend(mlist)
+
+                    if proc_resolver is not None:
+                        self._resolver.update(proc_resolver, myrank=myrank, otherrank=rank)
 
                 for io in ['input', 'output']:
                     allprocs_abs2meta[io].update(proc_abs2meta[io])
@@ -1908,6 +1918,9 @@ class Group(System):
 
         # create mapping of indep var names to their metadata
         self._ivcs = self.get_indep_vars(local=False)
+
+        # TODO: remove after debugging
+        self._resolver.verify(self)
 
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
@@ -4816,6 +4829,11 @@ class Group(System):
         p2abs.update(old)
         self._var_allprocs_prom2abs_list[io] = p2abs
 
+        old = self._resolver
+        self._resolver = NameResolver('', self.msginfo)
+        self._resolver.update(auto_ivc._resolver)
+        self._resolver.update(old)
+
         # set up auto_ivc abs2prom such that promoted name of the auto_ivc output is the same
         # as the promoted name of the input that it is connected to
         abs2prom = self._var_abs2prom[io]
@@ -4826,6 +4844,13 @@ class Group(System):
         all_abs2prom = self._var_allprocs_abs2prom[io]
         for n in auto_ivc._var_allprocs_abs2prom[io]:
             all_abs2prom[n] = abs2prom_in[auto2tgt[n][0]]
+
+        resolver = self._resolver
+        abs2prom_out = resolver._abs2prom_out
+        abs2prom_in = resolver._abs2prom_in
+        for n in auto_ivc._resolver.abs_iter('output'):
+            _, loc = abs2prom_out[n]  # use locality of the output
+            abs2prom_out[n] = (abs2prom_in[auto2tgt[n][0]][0], loc)
 
         self._var_discrete[io].update({'_auto_ivc.' + k: v for k, v in
                                        auto_ivc._var_discrete[io].items()})
