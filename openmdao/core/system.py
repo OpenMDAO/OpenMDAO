@@ -2545,7 +2545,7 @@ class System(object, metaclass=SystemMetaclass):
                         nlvec = vectors['input']['nonlinear']
                     else:
                         nlvec = None
-                    parent_vector =  parent_vectors[kind][vec_name]
+                    parent_vector = parent_vectors[kind][vec_name]
                     vectors[kind][vec_name] = self._vector_class(
                         vec_name, kind, self, self._name_shape_iter(kind), parent_vector,
                         msginfo=self.msginfo, path=self.pathname,
@@ -2553,9 +2553,6 @@ class System(object, metaclass=SystemMetaclass):
                         do_scaling=do_scaling[kind],
                         do_adder=do_adder[kind],
                         nlvec=nlvec)
-
-            # if self._use_derivatives:
-            #     vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -2565,11 +2562,6 @@ class System(object, metaclass=SystemMetaclass):
             self._dinputs = vectors['input']['linear']
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
-
-        # print(self.msginfo, '_setup_vectors')
-        # for v in [self._inputs, self._outputs, self._residuals, self._dinputs, self._doutputs, self._dresiduals]:
-        #     if v._do_scaling:
-        #         print(v._kind, v._name, 'scaling', v._do_scaling, v._scaling, v._nlvec._scaling if v._nlvec is not None else None)
 
     def _name_shape_iter(self, vectype, subset=None):
         """

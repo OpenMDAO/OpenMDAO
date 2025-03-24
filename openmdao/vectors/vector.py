@@ -22,6 +22,7 @@ class _VecData(object):
     """
     Internal data structure for each variable in a Vector.
     """
+
     __slots__ = ['shape', 'size', 'is_scalar', 'range', 'view', 'flat']
 
     def __init__(self, shape, rng):
@@ -39,10 +40,6 @@ class Vector(object):
 
     This class is instantiated for inputs, outputs, and residuals.
     It provides a dictionary interface and an arithmetic operations interface.
-    Implementations:
-
-    - <DefaultVector>
-    - <PETScVector>
 
     Parameters
     ----------
@@ -52,40 +49,65 @@ class Vector(object):
         The kind of vector, 'input', 'output', or 'residual'.
     system : <System>
         Pointer to the owning system.
-    parent_vectors : dict of dict of Vector
-        Parent vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
-        If None, this is a root vector.
+    name_shape_iter : iterable of (str, shape)
+        Iterable of (name, shape) pairs for the variables in the vector.
+    parent_vector : Vector
+        Parent vector.
+    msginfo : str
+        Message information.
+    path : str
+        Path to the vector.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
+    do_scaling : bool
+        Whether to do scaling.
+    do_adder : bool
+        Whether to do adder.
+    nlvec : Vector or None
+        Nonlinear vector.
 
     Attributes
     ----------
+    _system : <System>
+        Pointer to the owning system.
     _name : str
         The name of the vector: 'nonlinear' or 'linear'.
     _typ : str
         Type: 'input' for input vectors; 'output' for output/residual vectors.
     _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.
+    _pathname : str
+        Path to the vector's owning system.
+    msginfo : str
+        Message information.
+    _prom2abs : dict
+        Dictionary mapping promoted variable names to absolute variable names.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
-    _parent_slice : slice
-        Slice of the parent vector that this vector represents.
     _alloc_complex : bool
         If True, then space for the complex vector is also allocated.
     _data : ndarray
         Actual allocated data.
+    _slices : dict
+        Dictionary mapping absolute variable names to slices into the data array.
+    _parent_slice : slice
+        Slice of the parent vector that this vector represents.
     _under_complex_step : bool
         When True, this vector is under complex step, and data is swapped with the complex data.
     _scaling : tuple
         If scaling is active, this is a tuple of (scale_factor, adder) for _data.
-    read_only : bool
-        When True, values in the vector cannot be changed via the user __setitem__ API.
-    _len : int
-        Total length of data vector (including shared memory parts).
+    _do_scaling : bool
+        Whether scaling is active.
+    _do_adder : bool
+        Whether adder is active.
     _has_solver_ref : bool
         This is set to True only when a ref is defined on a solver.
+    _nlvec : Vector or None
+        Nonlinear vector.
+    read_only : bool
+        When True, values in the vector cannot be changed via the user __setitem__ API.
     """
 
     # Listing of relevant citations
@@ -128,7 +150,7 @@ class Vector(object):
         # If we define 'ref' on an output, then we will need to allocate a separate scaling ndarray
         # for the linear and nonlinear input vectors.
         self._has_solver_ref = system._has_output_scaling and kind == 'input' and name == 'linear'
-        self._nlvec =nlvec
+        self._nlvec = nlvec
 
         self._initialize_data(parent_vector, name_shape_iter)
         self._initialize_views(parent_vector, system)
@@ -239,6 +261,39 @@ class Vector(object):
                 if n in self._names:
                     yield n[plen:], vinfo.view[0].real if vinfo.is_scalar else vinfo.view.real
 
+    def ranges(self):
+        """
+        Yield (name, start, stop) for variables contained in this vector.
+
+        Yields
+        ------
+        str
+            Name of each variable.
+        int
+            Start index of the variable.
+        int
+            Stop index of the variable.
+        """
+        for name, vinfo in self._views.items():
+            start, stop = vinfo.range
+            yield name, start, stop
+
+    def get_info(self, name):
+        """
+        Get the info object for the given variable.
+
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+
+        Returns
+        -------
+        _VecData
+            Info object for the variable.
+        """
+        return self._views[name]
+
     def _name2abs_name(self, name):
         """
         Map the given promoted or relative name to the absolute name.
@@ -268,10 +323,6 @@ class Vector(object):
                 if abs_name in self._views:
                     return abs_name
 
-        ## test abs name
-        #if name in self._views:
-            #return name
-
         # test relative name
         abs_name = self._pathname + '.' + name if self._pathname else name
         if abs_name in self._views:
@@ -286,9 +337,7 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        path = self._pathname
-        idx = len(path) + 1 if path else 0
-
+        idx = len(self._pathname) + 1 if self._pathname else 0
         return (n[idx:] for n in self._views if n in self._names)
 
     def _abs_item_iter(self, flat=True):

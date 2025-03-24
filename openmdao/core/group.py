@@ -433,7 +433,6 @@ class Group(System):
                 'output': (a0, a1),
                 'residual': (0.0, res_ref),
             }
-            # print('--------', abs_name, 'ref', meta['ref'], 'ref0', ref0, 'res_ref', res_ref)
 
         # Input scaling for connected inputs is added here.
         # This is a combined scale factor that includes the scaling of the connected source
@@ -465,10 +464,7 @@ class Group(System):
                     factor = 1.0
                     offset = 0.0
 
-                # print('--------', abs_in, 'ref', ref, 'ref0', ref0, 'units_in', units_in, 'units_out', units_out)
-
                 if not has_scaling and not has_unit_conv:
-                    # print("SKIPPING", abs_in)
                     continue
 
                 src_indices = meta_in['src_indices']
@@ -530,9 +526,6 @@ class Group(System):
                 # Check whether we need to allocate an adder for the input vector.
                 self._has_input_adder |= np.any(np.asarray(a0))
 
-        # print('scale_factors', self.pathname)
-        # import pprint
-        # pprint.pprint(scale_factors)
         return scale_factors
 
     def _configure(self):
@@ -1305,8 +1298,6 @@ class Group(System):
                                                            alloc_complex=nl_alloc_complex,
                                                            do_scaling=do_scaling[kind],
                                                            do_adder=do_adder[kind])
-            # if do_scaling[kind]:
-            #     nlvec._initialize_scaling(None, do_adder[kind])
 
             if self._use_derivatives:
                 rvec['linear'] = self._vector_class('linear', kind, self,
@@ -1317,15 +1308,6 @@ class Group(System):
                                                     do_scaling=do_scaling[kind],
                                                     do_adder=do_adder[kind],
                                                     nlvec=nlvec)
-
-                # if do_scaling[kind]:
-                #     if rvec['linear']._has_solver_ref:
-                #         nlvec = None
-                #     rvec['linear']._initialize_scaling(nlvec, do_adder[kind])
-
-        # if self._use_derivatives:
-        #     root_vectors['input']['linear']._scaling_nl_vec = \
-        #         root_vectors['input']['nonlinear']._scaling
 
         return root_vectors
 
