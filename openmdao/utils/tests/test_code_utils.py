@@ -220,7 +220,7 @@ class TestGraphFunction(unittest.TestCase):
         msg = "Function contains nested functions, which are not supported yet."
         with self.assertRaises(Exception) as cm:
             get_func_graph(func)
-        self.assertEquals(cm.exception.args[0], msg)
+        self.assertEqual(cm.exception.args[0], msg)
 
     def test_function_with_tuple_return(self):
         def func(a, b):
