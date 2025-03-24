@@ -39,6 +39,7 @@ from bokeh.palettes import Category20, Colorblind
 import numpy as np
 
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
+from openmdao.recorders.case import Case
 
 try:
     from openmdao.utils.gui_testing_utils import get_free_port
@@ -307,17 +308,21 @@ def _make_header_text_for_variable_chooser(header_text):
 class _CaseTracker:
     """
     A class that is used to get information from a case recorder 
-    that is needed by the code in this file.
+    that is needed by the code in this file. These methods are not
+    provided by the SqliteCaseReader class. 
     """
     def __init__(self, case_recorder_filename):
         self._case_recorder_filename = case_recorder_filename
         self._cr = None
-        self.source = None
-        self._num_iterations_read = 0
-        self._initial_cr_with_one_case = None
+        self._initial_case = None  # need the initial case to get info about the variables
         self._next_id_to_read = 1
 
+    def _open_case_recorder(self):
+        if self._cr is None:
+            self._cr = SqliteCaseReader(self._case_recorder_filename)
+    
     def _get_case_by_counter(self, counter):
+        # use SQL to see if a case with this counter exists
         with sqlite3.connect(self._case_recorder_filename) as con:
             con.row_factory = sqlite3.Row
             cur = con.cursor()
@@ -327,10 +332,9 @@ class _CaseTracker:
             row = cur.fetchone()
         con.close()
 
+        # use SqliteCaseReader code to get the data from this case
         if row:
-            from openmdao.recorders.case import Case
-            if self._cr is None:
-                self._cr = SqliteCaseReader(self._case_recorder_filename)
+            self._open_case_recorder()
             var_info = self._cr.problem_metadata['variables']
             case = Case('driver', row, self._cr._prom2abs, self._cr._abs2prom, self._cr._abs2meta,
                         self._cr._conns, var_info, self._cr._format_version)
@@ -339,7 +343,8 @@ class _CaseTracker:
         else:
             return None
 
-    def get_new_case(self):
+    def _get_new_case(self):
+        # get the next unread case from the recorder
         driver_case = self._get_case_by_counter(self._next_id_to_read)
         if driver_case is None:
             return None
@@ -355,7 +360,6 @@ class _CaseTracker:
         objectives = {}
         for name, value in objs.items():
             objectives[name] = value
-
         new_data["objs"] = objectives
 
         # get des vars
@@ -368,63 +372,47 @@ class _CaseTracker:
         cons = {}
         for name, value in constraints.items():
             cons[name] = value
-
         new_data["cons"] = cons
 
         self._next_id_to_read += 1
         return new_data
+    
+    def _get_initial_case(self):
+        if self._initial_case is not None:
+            return self._initial_case
+        self._open_case_recorder()
+        case_ids = self._cr.list_cases("driver", out_stream=None)
+        if len(case_ids) > 0:
+            self._initial_case = self._cr.get_case(case_ids[0])
+            return self._initial_case
+        return None
 
-    def get_obj_names(self):
-        if self._initial_cr_with_one_case is None:
-            cr = SqliteCaseReader(self._case_recorder_filename)
-            case_ids = cr.list_cases("driver", out_stream=None)
-            if len(case_ids) > 0:
-                self._initial_cr_with_one_case = cr
-            else:
-                return None
-        case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
-        driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
-        obj_vars = driver_case.get_objectives()
+    def _get_obj_names(self):
+        initial_case = self._get_initial_case()
+        if initial_case is None:
+            return None
+        obj_vars = initial_case.get_objectives()
         return obj_vars.keys()
 
-    def get_desvar_names(self):
-        if self._initial_cr_with_one_case is None:
-            cr = SqliteCaseReader(self._case_recorder_filename)
-            case_ids = cr.list_cases("driver", out_stream=None)
-            if len(case_ids) > 0:
-                self._initial_cr_with_one_case = cr
-            else:
-                return None
-        case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
-        driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
-        design_vars = driver_case.get_design_vars()
+    def _get_desvar_names(self):
+        initial_case = self._get_initial_case()
+        if initial_case is None:
+            return None
+        design_vars = initial_case.get_design_vars()
         return design_vars.keys()
 
-    def get_cons_names(self):
-        if self._initial_cr_with_one_case is None:
-            cr = SqliteCaseReader(self._case_recorder_filename)
-            case_ids = cr.list_cases("driver", out_stream=None)
-            if len(case_ids) > 0:
-                self._initial_cr_with_one_case = cr
-            else:
-                return None
-        case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
-        driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
-        cons = driver_case.get_constraints()
+    def _get_cons_names(self):
+        initial_case = self._get_initial_case()
+        if initial_case is None:
+            return None
+        cons = initial_case.get_constraints()
         return cons.keys()
 
-    def get_units(self, name):
-        if self._initial_cr_with_one_case is None:
-            cr = SqliteCaseReader(self._case_recorder_filename)
-            case_ids = cr.list_cases("driver", out_stream=None)
-            if len(case_ids) > 0:
-                self._initial_cr_with_one_case = cr
-            else:
-                return None
-        driver_case = self._initial_cr_with_one_case.get_case(0)
+    def _get_units(self, name):
+        initial_case = self._get_initial_case()
 
         try:
-            units = driver_case._get_units(name)
+            units = initial_case._get_units(name)
         except RuntimeError as err:
             if str(err).startswith("Can't get units for the promoted name"):
                 return "Ambiguous"
@@ -436,10 +424,152 @@ class _CaseTracker:
             units = "Unitless"
         return units
 
+
+
+
+
+
+
+# class _CaseTracker:
+#     """
+#     A class that is used to get information from a case recorder 
+#     that is needed by the code in this file. These methods are not
+#     provided by the SqliteCaseReader class. 
+#     """
+#     def __init__(self, case_recorder_filename):
+#         self._case_recorder_filename = case_recorder_filename
+#         self._cr = None
+#         self._initial_cr_with_one_case = None
+#         self._next_id_to_read = 1
+
+#     def _get_case_by_counter(self, counter):
+#         # use SQL to see if a case with this counter exists
+#         with sqlite3.connect(self._case_recorder_filename) as con:
+#             con.row_factory = sqlite3.Row
+#             cur = con.cursor()
+#             cur.execute("SELECT * FROM driver_iterations WHERE "
+#                         "counter=:counter",
+#                         {"counter": counter})
+#             row = cur.fetchone()
+#         con.close()
+
+#         # use SqliteCaseReader code to get the data from this case
+#         if row:
+#             if self._cr is None:
+#                 self._cr = SqliteCaseReader(self._case_recorder_filename)
+#             var_info = self._cr.problem_metadata['variables']
+#             case = Case('driver', row, self._cr._prom2abs, self._cr._abs2prom, self._cr._abs2meta,
+#                         self._cr._conns, var_info, self._cr._format_version)
+
+#             return case
+#         else:
+#             return None
+
+#     def _get_new_case(self):
+#         # get the next unread case from the recorder
+#         driver_case = self._get_case_by_counter(self._next_id_to_read)
+#         if driver_case is None:
+#             return None
+#         objs = driver_case.get_objectives(scaled=False)
+#         design_vars = driver_case.get_design_vars(scaled=False)
+#         constraints = driver_case.get_constraints(scaled=False)
+
+#         new_data = {
+#             "counter": int(driver_case.counter),
+#         }
+
+#         # get objectives
+#         objectives = {}
+#         for name, value in objs.items():
+#             objectives[name] = value
+#         new_data["objs"] = objectives
+
+#         # get des vars
+#         desvars = {}
+#         for name, value in design_vars.items():
+#             desvars[name] = value
+#         new_data["desvars"] = desvars
+
+#         # get cons
+#         cons = {}
+#         for name, value in constraints.items():
+#             cons[name] = value
+#         new_data["cons"] = cons
+
+#         self._next_id_to_read += 1
+#         return new_data
+
+#     def _get_obj_names(self):
+#         if self._initial_cr_with_one_case is None:
+#             cr = SqliteCaseReader(self._case_recorder_filename)
+#             case_ids = cr.list_cases("driver", out_stream=None)
+#             if len(case_ids) > 0:
+#                 self._initial_cr_with_one_case = cr
+#             else:
+#                 return None
+#         case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
+#         driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
+#         obj_vars = driver_case.get_objectives()
+#         return obj_vars.keys()
+
+#     def _get_desvar_names(self):
+#         if self._initial_cr_with_one_case is None:
+#             cr = SqliteCaseReader(self._case_recorder_filename)
+#             case_ids = cr.list_cases("driver", out_stream=None)
+#             if len(case_ids) > 0:
+#                 self._initial_cr_with_one_case = cr
+#             else:
+#                 return None
+#         case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
+#         driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
+#         design_vars = driver_case.get_design_vars()
+#         return design_vars.keys()
+
+#     def _get_cons_names(self):
+#         if self._initial_cr_with_one_case is None:
+#             cr = SqliteCaseReader(self._case_recorder_filename)
+#             case_ids = cr.list_cases("driver", out_stream=None)
+#             if len(case_ids) > 0:
+#                 self._initial_cr_with_one_case = cr
+#             else:
+#                 return None
+#         case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
+#         driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
+#         cons = driver_case.get_constraints()
+#         return cons.keys()
+
+#     def _get_units(self, name):
+#         if self._initial_cr_with_one_case is None:
+#             cr = SqliteCaseReader(self._case_recorder_filename)
+#             case_ids = cr.list_cases("driver", out_stream=None)
+#             if len(case_ids) > 0:
+#                 self._initial_cr_with_one_case = cr
+#             else:
+#                 return None
+#         driver_case = self._initial_cr_with_one_case.get_case(0)
+
+#         try:
+#             units = driver_case._get_units(name)
+#         except RuntimeError as err:
+#             if str(err).startswith("Can't get units for the promoted name"):
+#                 return "Ambiguous"
+#             raise
+#         except KeyError as err:
+#             return "Unavailable"
+
+#         if units is None:
+#             units = "Unitless"
+#         return units
+
+
+
+
+
 class RealTimeOptPlot(object):
     def __init__(self, case_recorder_filename, callback_period, doc, pid_of_calling_script):
 
         self._case_recorder_filename = case_recorder_filename
+        self._case_tracker = _CaseTracker(case_recorder_filename)
         self._pid_of_calling_script = pid_of_calling_script
 
         self._source = None
@@ -448,21 +578,20 @@ class RealTimeOptPlot(object):
         self._column_items = []
         self._axes = []
         self._labels_updated_with_units = False
-        self._case_tracker = _CaseTracker(case_recorder_filename)
-        self._doc = doc
         self._update_callback = None
         self._source_stream_dict = None
 
         self._setup_figure()
 
         # used to keep track of the y min and max of the data so that 
-        #    the axes ranges can be adjusted as data comes in
+        # the axes ranges can be adjusted as data comes in
         self.y_min = defaultdict(lambda: float("inf") )
         self.y_max = defaultdict(lambda: float("-inf"))
 
-        def update():
-
-            new_data = self._case_tracker.get_new_case()
+        def _update():
+            # this is the main method of the class. It gets called periodically by Bokeh
+            # It looks for new data and if found, updates the plot with the new data
+            new_data = self._case_tracker._get_new_case()
             if new_data is None:
                 if self._pid_of_calling_script is None or not _is_process_running(self._pid_of_calling_script):
                     # Just keep sending the last data point
@@ -473,17 +602,14 @@ class RealTimeOptPlot(object):
                     self._source.stream(self._source_stream_dict)
                 return
 
-            # See if source is defined yet. If not, see if we have any data
-            #   in the case file yet. If there is data, create the
-            #   source object and add the lines to the figure
-            # if source not setup yet, need to do that to setup streaming
+            # See if source object is defined yet. If not, set it up
+            # since now we have data from the case recorder with info about the
+            # variables to be plotted. 
             if self._source is None:
-                self.setup_data_source()
-                # index of lines across all variables: obj, desvars, cons
-                i_line = 0
-                
-                # Objective
-                obj_names = self._case_tracker.get_obj_names()
+                self._setup_data_source()
+
+                # Check to make sure we have 1 and only one objective before going farther
+                obj_names = self._case_tracker._get_obj_names()
                 if len(obj_names) != 1:
                     raise ValueError(
                         f"Plot assumes there is on objective but {len(obj_names)} found"
@@ -491,53 +617,55 @@ class RealTimeOptPlot(object):
                 
                 # Create CustomJS callback for toggle buttons
                 legend_item_callback = CustomJS(
-                    args=dict(lines=self._lines, axes=self._axes, toggles=self._toggles, colorPalette=colorPalette, plot=self.p,                    
+                    args=dict(lines=self._lines, axes=self._axes, toggles=self._toggles, colorPalette=colorPalette, plot=self.plot_figure,                    
                     ),
                     code=callback_code,
                 )
+
+                # for the variables, make lines, axes, and the button to turn on and off the variable plot
+                # All the lines and axes for the desvars and cons are created in python but initially
+                # are not visible. They are turned on and off on the JavaScript side. 
 
                 # objs
                 obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
                 self._column_items.append(obj_label)
 
                 for i, obj_name in enumerate(obj_names):
-                    units = self._case_tracker.get_units(obj_name)
-                    self.p.yaxis.axis_label = f"{obj_name} ({units})"
-                    self._make_legend_item(f"{obj_name} ({units})", _obj_color, True, legend_item_callback)
+                    units = self._case_tracker._get_units(obj_name)
+                    self.plot_figure.yaxis.axis_label = f"{obj_name} ({units})"
+                    self._make_variable_button(f"{obj_name} ({units})", _obj_color, True, legend_item_callback)
                     self._make_line_and_hover_tool("objs", obj_name, False, _obj_color,"solid", True)
                     value = new_data["objs"][obj_name]
                     float_value = _get_value_for_plotting(value, "objs")
-                    self.p.y_range = Range1d(float_value - 1, float_value + 1)
+                    self.plot_figure.y_range = Range1d(float_value - 1, float_value + 1)
 
                 # desvars
                 desvars_label = _make_header_text_for_variable_chooser("DESIGN VARS")
                 self._column_items.append(desvars_label)
-                desvar_names = self._case_tracker.get_desvar_names()
+                desvar_names = self._case_tracker._get_desvar_names()
                 for i, desvar_name in enumerate(desvar_names):
-                    units = self._case_tracker.get_units(desvar_name)
-                    self._make_legend_item(f"{desvar_name} ({units})", "black", False, legend_item_callback)
+                    units = self._case_tracker._get_units(desvar_name)
+                    self._make_variable_button(f"{desvar_name} ({units})", _non_active_plot_color, False, legend_item_callback)
                     value = new_data["desvars"][desvar_name]
                     use_varea = value.size > 1
                     self._make_line_and_hover_tool("desvars", desvar_name, use_varea, _non_active_plot_color, "solid", False)
 
                     float_value = _get_value_for_plotting(value, "desvars")
                     self._make_axis("desvars", desvar_name, float_value, units)
-                    i_line += 1
 
                 # cons
                 cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
                 self._column_items.append(cons_label)
-                cons_names = self._case_tracker.get_cons_names()
+                cons_names = self._case_tracker._get_cons_names()
                 for i, cons_name in enumerate(cons_names):
-                    units = self._case_tracker.get_units(cons_name)
-                    self._make_legend_item(f"{cons_name} ({units})", "black", False, legend_item_callback)
+                    units = self._case_tracker._get_units(cons_name)
+                    self._make_variable_button(f"{cons_name} ({units})", _non_active_plot_color, False, legend_item_callback)
                     self._make_line_and_hover_tool("cons", cons_name, False, _non_active_plot_color, "dashed", False)
                     value = new_data["cons"][cons_name]
                     float_value = _get_value_for_plotting(value, "cons")
                     self._make_axis("cons", cons_name, float_value, units)
-                    i_line += 1
 
-                # Create a column of toggles with scrolling
+                # Create a Column of the variable buttons and headers with scrolling
                 toggle_column = Column(
                     children=self._column_items,
                     sizing_mode="stretch_both",
@@ -583,7 +711,7 @@ class RealTimeOptPlot(object):
                     height_policy="max",
                 )
 
-                graph = Row(self.p, scroll_box, sizing_mode="stretch_both")
+                graph = Row(self.plot_figure, scroll_box, sizing_mode="stretch_both")
                 doc.add_root(graph)
                 # end of self._source is None - plottng is setup
 
@@ -597,13 +725,13 @@ class RealTimeOptPlot(object):
                 self._source_stream_dict[obj_name] = [float_obj_value]
                 min_max_changed = _update_y_min_max(obj_name, float_obj_value, self.y_min, self.y_max)
                 if min_max_changed:
-                    self.p.y_range.start = self.y_min[obj_name]
-                    self.p.y_range.end = self.y_max[obj_name]
+                    self.plot_figure.y_range.start = self.y_min[obj_name]
+                    self.plot_figure.y_range.end = self.y_max[obj_name]
                 iline += 1
 
             for desvar_name, desvar_value in new_data["desvars"].items():
                 if not self._labels_updated_with_units and desvar_value.size > 1:
-                    units = self._case_tracker.get_units(desvar_name)
+                    units = self._case_tracker._get_units(desvar_name)
                     self._toggles[iline].label = f"{desvar_name} ({units}) {desvar_value.shape}"
                 min_max_changed = False
                 min_max_changed = min_max_changed or _update_y_min_max(desvar_name, np.min(desvar_value), self.y_min, self.y_max)
@@ -612,7 +740,7 @@ class RealTimeOptPlot(object):
                     range = Range1d(
                         self.y_min[desvar_name], self.y_max[desvar_name]
                     )
-                    self.p.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
+                    self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
 
                 self._source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
                 self._source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
@@ -622,7 +750,7 @@ class RealTimeOptPlot(object):
                 float_cons_value = _get_value_for_plotting(cons_value, "cons")
 
                 if not self._labels_updated_with_units and cons_value.size > 1:
-                    units = self._case_tracker.get_units(cons_name)
+                    units = self._case_tracker._get_units(cons_name)
                     self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
 
                 self._source_stream_dict[cons_name] = [float_cons_value]
@@ -631,37 +759,37 @@ class RealTimeOptPlot(object):
                     range = Range1d(
                         self.y_min[cons_name], self.y_max[cons_name]
                     )
-                    self.p.extra_y_ranges[f"extra_y_{cons_name}"] = range
+                    self.plot_figure.extra_y_ranges[f"extra_y_{cons_name}"] = range
                 iline += 1
             self._source.stream(self._source_stream_dict)
             self._labels_updated_with_units = True 
-            # end of update method
+            # end of _update method
 
-        self._update_callback = doc.add_periodic_callback(update, callback_period)
+        self._update_callback = doc.add_periodic_callback(_update, callback_period)
         doc.title = "OpenMDAO Optimization"
 
-    def setup_data_source(self):
+    def _setup_data_source(self):
         self._source_dict = {"iteration": []}
 
         # Obj
-        obj_names = self._case_tracker.get_obj_names()
+        obj_names = self._case_tracker._get_obj_names()
         for obj_name in obj_names:
             self._source_dict[obj_name] = []
 
         # Desvars
-        desvar_names = self._case_tracker.get_desvar_names()
+        desvar_names = self._case_tracker._get_desvar_names()
         for desvar_name in desvar_names:
             self._source_dict[f"{desvar_name}_min"] = []
             self._source_dict[f"{desvar_name}_max"] = []
 
         # Cons
-        con_names = self._case_tracker.get_cons_names()
+        con_names = self._case_tracker._get_cons_names()
         for con_name in con_names:
             self._source_dict[con_name] = []
 
         self._source = ColumnDataSource(self._source_dict)
 
-    def _make_legend_item(self, varname, color, active, callback):
+    def _make_variable_button(self, varname, color, active, callback):
         toggle = Toggle(
             label=varname,
             active=active,
@@ -687,7 +815,7 @@ class RealTimeOptPlot(object):
 
     def _make_line_and_hover_tool(self,var_type,varname, use_varea, color,line_dash,visible):
         if use_varea:
-            line = self.p.varea(
+            line = self.plot_figure.varea(
                 x="iteration",
                 y1=f"{varname}_min",
                 y2=f"{varname}_max",
@@ -701,7 +829,7 @@ class RealTimeOptPlot(object):
                 y_name = f"{varname}_min"
             else:
                 y_name = varname
-            line = self.p.line(
+            line = self.plot_figure.line(
                 x="iteration",
                 y=y_name,
                 line_width=3,
@@ -726,7 +854,7 @@ class RealTimeOptPlot(object):
                 mode="vline",
                 visible=visible,
             )
-            self.p.add_tools(hover)
+            self.plot_figure.add_tools(hover)
 
 
     def _make_axis(self, var_type, varname, plot_value, units):
@@ -742,15 +870,15 @@ class RealTimeOptPlot(object):
             visible=False,
         )
         self._axes.append(extra_y_axis)
-        self.p.add_layout(extra_y_axis, "right")
-        self.p.extra_y_ranges[y_range_name] = Range1d(
+        self.plot_figure.add_layout(extra_y_axis, "right")
+        self.plot_figure.extra_y_ranges[y_range_name] = Range1d(
             plot_value - 1, plot_value + 1
         )
 
 
     def _setup_figure(self):
         # Make the figure and all the settings for it
-        self.p = figure(
+        self.plot_figure = figure(
             tools=[
                 PanTool(),
                 WheelZoomTool(),
@@ -769,19 +897,19 @@ class RealTimeOptPlot(object):
             active_tap=None,
             output_backend="webgl",
         )
-        self.p.x_range.follow = "start"
-        # self.p.title.text_font_size = "25px"
-        self.p.title.text_color = "black"
-        self.p.title.text_font = "arial"
-        self.p.title.align = "left"
-        self.p.title.standoff = 40  # Adds 40 pixels of space below the title
+        self.plot_figure.x_range.follow = "start"
+        # self.plot_figure.title.text_font_size = "25px"
+        self.plot_figure.title.text_color = "black"
+        self.plot_figure.title.text_font = "arial"
+        self.plot_figure.title.align = "left"
+        self.plot_figure.title.standoff = 40  # Adds 40 pixels of space below the title
 
-        self.p.xaxis.axis_label = "Driver iterations"
-        self.p.xaxis.minor_tick_line_color = None
-        self.p.xaxis.ticker = SingleIntervalTicker(interval=1)
+        self.plot_figure.xaxis.axis_label = "Driver iterations"
+        self.plot_figure.xaxis.minor_tick_line_color = None
+        self.plot_figure.xaxis.ticker = SingleIntervalTicker(interval=1)
 
-        self.p.axis.axis_label_text_font_style = "bold"
-        self.p.axis.axis_label_text_font_size = "20pt"
+        self.plot_figure.axis.axis_label_text_font_style = "bold"
+        self.plot_figure.axis.axis_label_text_font_size = "20pt"
 
 
 def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_script, show):
