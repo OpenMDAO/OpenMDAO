@@ -169,7 +169,7 @@ class Component(System):
                              'some other AD package capable of jitting is active.')
         self.options.declare('default_shape', types=tuple, default=(1,),
                              desc='Default shape for variables that do not set val to a non-scalar '
-                             'value or set shape, set shape_by_conn, copy_shape, or compute_shape.'
+                             'value or set shape, shape_by_conn, copy_shape, or compute_shape.'
                              ' Default is (1,).')
 
     def setup(self):

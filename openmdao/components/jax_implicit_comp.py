@@ -85,6 +85,8 @@ class JaxImplicitComponent(ImplicitComponent):
                              'shape_by_conn and outputs will use a compute_shape method based '
                              'on jax.eval_shape. Default is False.')
 
+        self.options.undeclare("distributed")
+
     def _setup_check(self):
         """
         Check if inputs and outputs have been added, and if not, determine them from compute_primal.
@@ -207,8 +209,7 @@ class JaxImplicitComponent(ImplicitComponent):
             Whether jitting is needed.
         """
         # if static values change, we need to rejit
-        inhash = tuple(discrete_inputs) if discrete_inputs else ()
-        inhash = inhash + self.get_self_statics()
+        inhash = hash((tuple(discrete_inputs) if discrete_inputs else (), self.get_self_statics()))
         if inhash != self._static_hash:
             self._static_hash = inhash
             return True
