@@ -54,6 +54,7 @@ _time_between_callbacks_in_ms = 1000 # the time between calls to the udpate meth
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10
 _obj_color = "black"  # color of the plot line for the objective function
 _non_active_plot_color = "black" # color of the buttons for variables not being shown
+_plot_line_width = 3
 _varea_alpha = 0.3 # how transparent is the area part of the plot for desvars that are vectors
 # the CSS for the toggle buttons to let user choose what variables to plot
 toggle_styles = """
@@ -334,7 +335,7 @@ class _CaseTracker:
 
         # use SqliteCaseReader code to get the data from this case
         if row:
-            self._open_case_recorder()
+            self._open_case_recorder()  # TODO would be better to not have to open up the file each time
             var_info = self._cr.problem_metadata['variables']
             case = Case('driver', row, self._cr._prom2abs, self._cr._abs2prom, self._cr._abs2meta,
                         self._cr._conns, var_info, self._cr._format_version)
@@ -343,11 +344,7 @@ class _CaseTracker:
         else:
             return None
 
-    def _get_new_case(self):
-        # get the next unread case from the recorder
-        driver_case = self._get_case_by_counter(self._next_id_to_read)
-        if driver_case is None:
-            return None
+    def _get_data_from_case(self, driver_case):
         objs = driver_case.get_objectives(scaled=False)
         design_vars = driver_case.get_design_vars(scaled=False)
         constraints = driver_case.get_constraints(scaled=False)
@@ -374,45 +371,36 @@ class _CaseTracker:
             cons[name] = value
         new_data["cons"] = cons
 
-        self._next_id_to_read += 1
         return new_data
-    
-    def _get_initial_case(self):
-        if self._initial_case is not None:
-            return self._initial_case
-        self._open_case_recorder()
-        case_ids = self._cr.list_cases("driver", out_stream=None)
-        if len(case_ids) > 0:
-            self._initial_case = self._cr.get_case(case_ids[0])
-            return self._initial_case
-        return None
 
-    def _get_obj_names(self):
-        initial_case = self._get_initial_case()
-        if initial_case is None:
+    def _get_new_case(self):
+        # get the next unread case from the recorder
+        driver_case = self._get_case_by_counter(self._next_id_to_read)
+        if driver_case is None:
             return None
-        obj_vars = initial_case.get_objectives()
+
+        if self._initial_case is None:
+            self._initial_case = driver_case
+
+        self._next_id_to_read += 1
+
+        return driver_case
+    
+    def _get_obj_names(self):
+        obj_vars = self._initial_case.get_objectives()
         return obj_vars.keys()
 
     def _get_desvar_names(self):
-        initial_case = self._get_initial_case()
-        if initial_case is None:
-            return None
-        design_vars = initial_case.get_design_vars()
+        design_vars = self._initial_case.get_design_vars()
         return design_vars.keys()
 
     def _get_cons_names(self):
-        initial_case = self._get_initial_case()
-        if initial_case is None:
-            return None
-        cons = initial_case.get_constraints()
+        cons = self._initial_case.get_constraints()
         return cons.keys()
 
     def _get_units(self, name):
-        initial_case = self._get_initial_case()
-
         try:
-            units = initial_case._get_units(name)
+            units = self._initial_case._get_units(name)
         except RuntimeError as err:
             if str(err).startswith("Can't get units for the promoted name"):
                 return "Ambiguous"
@@ -423,146 +411,6 @@ class _CaseTracker:
         if units is None:
             units = "Unitless"
         return units
-
-
-
-
-
-
-
-# class _CaseTracker:
-#     """
-#     A class that is used to get information from a case recorder 
-#     that is needed by the code in this file. These methods are not
-#     provided by the SqliteCaseReader class. 
-#     """
-#     def __init__(self, case_recorder_filename):
-#         self._case_recorder_filename = case_recorder_filename
-#         self._cr = None
-#         self._initial_cr_with_one_case = None
-#         self._next_id_to_read = 1
-
-#     def _get_case_by_counter(self, counter):
-#         # use SQL to see if a case with this counter exists
-#         with sqlite3.connect(self._case_recorder_filename) as con:
-#             con.row_factory = sqlite3.Row
-#             cur = con.cursor()
-#             cur.execute("SELECT * FROM driver_iterations WHERE "
-#                         "counter=:counter",
-#                         {"counter": counter})
-#             row = cur.fetchone()
-#         con.close()
-
-#         # use SqliteCaseReader code to get the data from this case
-#         if row:
-#             if self._cr is None:
-#                 self._cr = SqliteCaseReader(self._case_recorder_filename)
-#             var_info = self._cr.problem_metadata['variables']
-#             case = Case('driver', row, self._cr._prom2abs, self._cr._abs2prom, self._cr._abs2meta,
-#                         self._cr._conns, var_info, self._cr._format_version)
-
-#             return case
-#         else:
-#             return None
-
-#     def _get_new_case(self):
-#         # get the next unread case from the recorder
-#         driver_case = self._get_case_by_counter(self._next_id_to_read)
-#         if driver_case is None:
-#             return None
-#         objs = driver_case.get_objectives(scaled=False)
-#         design_vars = driver_case.get_design_vars(scaled=False)
-#         constraints = driver_case.get_constraints(scaled=False)
-
-#         new_data = {
-#             "counter": int(driver_case.counter),
-#         }
-
-#         # get objectives
-#         objectives = {}
-#         for name, value in objs.items():
-#             objectives[name] = value
-#         new_data["objs"] = objectives
-
-#         # get des vars
-#         desvars = {}
-#         for name, value in design_vars.items():
-#             desvars[name] = value
-#         new_data["desvars"] = desvars
-
-#         # get cons
-#         cons = {}
-#         for name, value in constraints.items():
-#             cons[name] = value
-#         new_data["cons"] = cons
-
-#         self._next_id_to_read += 1
-#         return new_data
-
-#     def _get_obj_names(self):
-#         if self._initial_cr_with_one_case is None:
-#             cr = SqliteCaseReader(self._case_recorder_filename)
-#             case_ids = cr.list_cases("driver", out_stream=None)
-#             if len(case_ids) > 0:
-#                 self._initial_cr_with_one_case = cr
-#             else:
-#                 return None
-#         case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
-#         driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
-#         obj_vars = driver_case.get_objectives()
-#         return obj_vars.keys()
-
-#     def _get_desvar_names(self):
-#         if self._initial_cr_with_one_case is None:
-#             cr = SqliteCaseReader(self._case_recorder_filename)
-#             case_ids = cr.list_cases("driver", out_stream=None)
-#             if len(case_ids) > 0:
-#                 self._initial_cr_with_one_case = cr
-#             else:
-#                 return None
-#         case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
-#         driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
-#         design_vars = driver_case.get_design_vars()
-#         return design_vars.keys()
-
-#     def _get_cons_names(self):
-#         if self._initial_cr_with_one_case is None:
-#             cr = SqliteCaseReader(self._case_recorder_filename)
-#             case_ids = cr.list_cases("driver", out_stream=None)
-#             if len(case_ids) > 0:
-#                 self._initial_cr_with_one_case = cr
-#             else:
-#                 return None
-#         case_ids = self._initial_cr_with_one_case.list_cases("driver", out_stream=None)
-#         driver_case = self._initial_cr_with_one_case.get_case(case_ids[0])
-#         cons = driver_case.get_constraints()
-#         return cons.keys()
-
-#     def _get_units(self, name):
-#         if self._initial_cr_with_one_case is None:
-#             cr = SqliteCaseReader(self._case_recorder_filename)
-#             case_ids = cr.list_cases("driver", out_stream=None)
-#             if len(case_ids) > 0:
-#                 self._initial_cr_with_one_case = cr
-#             else:
-#                 return None
-#         driver_case = self._initial_cr_with_one_case.get_case(0)
-
-#         try:
-#             units = driver_case._get_units(name)
-#         except RuntimeError as err:
-#             if str(err).startswith("Can't get units for the promoted name"):
-#                 return "Ambiguous"
-#             raise
-#         except KeyError as err:
-#             return "Unavailable"
-
-#         if units is None:
-#             units = "Unitless"
-#         return units
-
-
-
 
 
 class RealTimeOptPlot(object):
@@ -577,6 +425,7 @@ class RealTimeOptPlot(object):
         self._toggles = []
         self._column_items = []
         self._axes = []
+        # flag to prevent updating label with units each time we get new data
         self._labels_updated_with_units = False
         self._update_callback = None
         self._source_stream_dict = None
@@ -591,8 +440,9 @@ class RealTimeOptPlot(object):
         def _update():
             # this is the main method of the class. It gets called periodically by Bokeh
             # It looks for new data and if found, updates the plot with the new data
-            new_data = self._case_tracker._get_new_case()
-            if new_data is None:
+            new_case = self._case_tracker._get_new_case()
+
+            if new_case is None:
                 if self._pid_of_calling_script is None or not _is_process_running(self._pid_of_calling_script):
                     # Just keep sending the last data point
                     # This is a hack to force the plot to re-draw
@@ -601,6 +451,8 @@ class RealTimeOptPlot(object):
                     #   get around the bug in setting the line color from JavaScript
                     self._source.stream(self._source_stream_dict)
                 return
+
+            new_data = self._case_tracker._get_data_from_case(new_case)
 
             # See if source object is defined yet. If not, set it up
             # since now we have data from the case recorder with info about the
@@ -647,9 +499,8 @@ class RealTimeOptPlot(object):
                     units = self._case_tracker._get_units(desvar_name)
                     self._make_variable_button(f"{desvar_name} ({units})", _non_active_plot_color, False, legend_item_callback)
                     value = new_data["desvars"][desvar_name]
-                    use_varea = value.size > 1
+                    use_varea = value.size > 1  # for desvars, if value is a vector, use Bokeh Varea glyph
                     self._make_line_and_hover_tool("desvars", desvar_name, use_varea, _non_active_plot_color, "solid", False)
-
                     float_value = _get_value_for_plotting(value, "desvars")
                     self._make_axis("desvars", desvar_name, float_value, units)
 
@@ -680,9 +531,9 @@ class RealTimeOptPlot(object):
                 )
 
                 quit_button = Button(label="Quit Application", button_type="danger")
+
                 # Define callback function for the quit button
                 def quit_app():
-                    # print("shutting down optimization plot server")
                     raise KeyboardInterrupt("Quit button pressed")
 
                 # Attach the callback to the button
@@ -713,8 +564,10 @@ class RealTimeOptPlot(object):
 
                 graph = Row(self.plot_figure, scroll_box, sizing_mode="stretch_both")
                 doc.add_root(graph)
-                # end of self._source is None - plottng is setup
+                # end of self._source is None - plotting is setup
 
+            # Do the actual update of the plot including updating the plot range and adding the new
+            # data to the Bokeh plot stream
             counter = new_data["counter"]
 
             self._source_stream_dict = {"iteration": [counter]}
@@ -741,18 +594,15 @@ class RealTimeOptPlot(object):
                         self.y_min[desvar_name], self.y_max[desvar_name]
                     )
                     self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
-
                 self._source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
                 self._source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
                 iline += 1
 
             for cons_name, cons_value in new_data["cons"].items():
                 float_cons_value = _get_value_for_plotting(cons_value, "cons")
-
                 if not self._labels_updated_with_units and cons_value.size > 1:
                     units = self._case_tracker._get_units(cons_name)
                     self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
-
                 self._source_stream_dict[cons_name] = [float_cons_value]
                 min_max_changed = _update_y_min_max(cons_name, float_cons_value, self.y_min, self.y_max)
                 if min_max_changed:
@@ -832,7 +682,7 @@ class RealTimeOptPlot(object):
             line = self.plot_figure.line(
                 x="iteration",
                 y=y_name,
-                line_width=3,
+                line_width=_plot_line_width,
                 line_dash=line_dash,
                 source=self._source,
                 color=color,
@@ -844,7 +694,7 @@ class RealTimeOptPlot(object):
         elif var_type == "cons":
             line.y_range_name=f"extra_y_{varname}"
         self._lines.append(line)
-        if not use_varea:
+        if not use_varea:  # hover tool does not work with Varea
             hover = HoverTool(
                 renderers=[line],
                 tooltips=[
@@ -858,7 +708,7 @@ class RealTimeOptPlot(object):
 
 
     def _make_axis(self, var_type, varname, plot_value, units):
-        # Make axis for this variable on the right
+        # Make axis for this variable on the right of the plot
         if var_type == "desvars":
             y_range_name = f"extra_y_{varname}_min"
         else:
