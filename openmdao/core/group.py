@@ -1695,16 +1695,12 @@ class Group(System):
             self._resolve_src_inds()
 
     def _resolve_src_inds(self):
-        abs2prom = self._var_abs2prom['input']
         tree_level = self.pathname.count('.') + 1 if self.pathname else 0
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         seen = set()
 
-        for tgt in self._var_abs2meta['input']:
-            if tgt in abs_in2prom_info:
-                prom = abs2prom[tgt]
-                if prom in seen:
-                    continue
+        for tgt, prom in self._resolver.abs2prom_iter('input', local=True):
+            if tgt in abs_in2prom_info and prom not in seen:
                 seen.add(prom)
 
                 plist = abs_in2prom_info[tgt]
@@ -1859,7 +1855,7 @@ class Group(System):
                         self._group_inputs[p].extend(mlist)
 
                     if proc_resolver is not None:
-                        self._resolver.update(proc_resolver, myrank=myrank, otherrank=rank)
+                        self._resolver.update(proc_resolver, my_rank=myrank, other_rank=rank)
 
                 for io in ['input', 'output']:
                     allprocs_abs2meta[io].update(proc_abs2meta[io])
