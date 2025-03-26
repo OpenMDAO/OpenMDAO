@@ -1815,8 +1815,7 @@ class Group(System):
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             if self._gather_full_data():
-                raw = (allprocs_discrete, self._resolver, allprocs_prom2abs_list,
-                           allprocs_abs2meta,
+                raw = (allprocs_discrete, self._resolver, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
                        self._has_resid_scaling, self._group_inputs, self._has_distrib_vars,
                        self._has_fd_group)
