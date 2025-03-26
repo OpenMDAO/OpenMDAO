@@ -1819,7 +1819,7 @@ class Component(System):
                     self._jacobian._restore_approx_sparsity()
 
     def _resolve_src_inds(self):
-        abs2prom = self._var_abs2prom['input']
+        abs2prom = self._resolver.abs2prom
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
         abs2meta_in = self._var_abs2meta['input']
@@ -1846,7 +1846,8 @@ class Component(System):
                             else:
                                 meta['src_indices'] = inds = inds.copy()
                                 inds.set_src_shape(shape)
-                                self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
+                                self._var_prom2inds[abs2prom(tgt, iotype='input', local=True)] = \
+                                    [shape, inds, flat]
                         except Exception:
                             type_exc, exc, tb = sys.exc_info()
                             self._collect_error(f"When accessing '{conns[tgt]}' with src_shape "
