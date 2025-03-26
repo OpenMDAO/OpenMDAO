@@ -235,7 +235,8 @@ class NameResolver(object):
             if iotype is None:
                 return False
         if local:
-            return absname in self._abs2prom[iotype] and self._abs2prom[iotype][absname][1]
+            a2p = self._abs2prom[iotype]
+            return absname in a2p and a2p[absname][1]
         else:
             return absname in self._abs2prom[iotype]
 
@@ -314,8 +315,8 @@ class NameResolver(object):
                 a2p = self._abs2prom[iotype]
                 for prom, absnames in self._prom2abs[iotype].items():
                     absnames = [n for n in absnames if a2p[n][1]]
-                if absnames:
-                    yield prom, absnames
+                    if absnames:
+                        yield prom, absnames
             else:
                 yield from self._prom2abs[iotype].items()
 
@@ -420,29 +421,6 @@ class NameResolver(object):
         else:
             for absname, (_, loc) in self._abs2prom[iotype].items():
                 yield absname, loc
-
-    def is_local(self, absname, iotype=None):
-        """
-        Check if an absolute name is local.
-
-        Parameters
-        ----------
-        absname : str
-            The absolute name to check.
-        iotype : str
-            Either 'input', 'output', or None to check all iotypes.
-
-        Returns
-        -------
-        bool
-            True if the absolute name is local, False otherwise.
-        """
-        if iotype is None:
-            iotype = self.get_abs_iotype(absname)
-        if iotype is None:
-            return False
-
-        return self._abs2prom[iotype][absname][1]
 
     def add_mapping(self, absname, promname, iotype, local=False):
         """
@@ -638,7 +616,9 @@ class NameResolver(object):
 
     def prom2abs(self, promname, iotype=None, local=False):
         """
-        Convert a promoted name to an absolute name.
+        Convert a promoted name to an unique absolute name.
+
+        If the promoted name doesn't correspond to a single absolute name, an error is raised.
 
         Parameters
         ----------
@@ -685,7 +665,7 @@ class NameResolver(object):
 
     def any2abs(self, name, report_error=False):
         """
-        Convert any name to an absolute name.
+        Convert any name to a unique absolute name.
 
         Parameters
         ----------

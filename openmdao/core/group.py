@@ -1333,12 +1333,9 @@ class Group(System):
             for s in self.system_iter(recurse=True, include_self=True):
                 prefix = s.pathname + '.' if s.pathname else ''
                 for typ in iotypes:
-                    # use abs2prom to determine locality since prom2abs is for allprocs
-                    sys_abs2prom = s._var_abs2prom[typ]
                     t_remprom2abs = rem_prom2abs[typ]
                     t_prom2abs = prom2abs[typ]
-                    for prom, alist in s._var_allprocs_prom2abs_list[typ].items():
-                        abs_names = [n for n in alist if n in sys_abs2prom]
+                    for prom, abs_names in s._resolver.prom2abs_iter(typ, local=True):
                         t_prom2abs[prefix + prom].update(abs_names)
                         t_remprom2abs[prefix + prom].update(n for n in abs_names
                                                             if n in vars_to_gather
@@ -1364,8 +1361,8 @@ class Group(System):
                 prefix = s.pathname + '.' if s.pathname else ''
                 for typ in iotypes:
                     t_prom2abs = prom2abs[typ]
-                    for prom, abslist in s._var_allprocs_prom2abs_list[typ].items():
-                        t_prom2abs[prefix + prom] = abslist
+                    for prom, abs_names in s._resolver.prom2abs_iter(typ):
+                        t_prom2abs[prefix + prom] = abs_names
 
         return prom2abs
 
@@ -1375,26 +1372,20 @@ class Group(System):
 
         Only called on the top level group.
         """
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
-        prom2abs_out = self._var_allprocs_prom2abs_list['output']
         abs2meta = self._var_allprocs_abs2meta
+        resolver = self._resolver
 
         for absname in chain(abs2meta['input'], abs2meta['output']):
-            if absname in prom2abs_in:
-                for name in prom2abs_in[absname]:
-                    if name != absname:
-                        raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
-                                           " is masked by a matching promoted name. Try"
-                                           " promoting to a different name. This can be caused"
-                                           " by promoting '*' at group level or promoting using"
-                                           " dotted names.")
-            elif absname in prom2abs_out:
-                if absname != prom2abs_out[absname][0]:
-                    raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}' is"
-                                       " masked by a matching promoted name. Try"
-                                       " promoting to a different name. This can be caused"
-                                       " by promoting '*' at group level or promoting using"
-                                       " dotted names.")
+            iotype = resolver.get_prom_iotype(absname)
+            if iotype is None:  # it's not a promoted name
+                continue
+            for name in resolver.absnames(absname, iotype):
+                if name != absname:
+                    raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
+                                        " is masked by a matching promoted name. Try"
+                                        " promoting to a different name. This can be caused"
+                                        " by promoting '*' at group level or promoting using"
+                                        " dotted names.")
 
     def _check_order(self, reorder=True, recurse=True, out_of_order=None):
         """
@@ -1929,14 +1920,14 @@ class Group(System):
             Bool to show or hide the auto_ivc warnings.
         """
         skip = set(('path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'))
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         abs2meta_in = self._var_allprocs_abs2meta['input']
+        resolver = self._resolver
 
         self._auto_ivc_warnings = []
 
         for prom, metalist in self._group_inputs.items():
-            if prom not in prom2abs_in:
+            if not resolver.is_prom(prom, 'input'):
                 # this error was already collected in setup_var_data, so just continue here
                 continue
             try:
@@ -1993,9 +1984,10 @@ class Group(System):
                                     if common:
                                         sub = self._get_subsystem(common)
                                         if sub is not None:
-                                            for a in prom2abs_in[prom]:
-                                                if a in sub._var_abs2prom['input']:
-                                                    prom = sub._var_abs2prom['input'][a]
+                                            for a in resolver.absnames(prom, 'input'):
+                                                if sub._resolver.is_abs(a, 'input', local=True):
+                                                    prom = sub._resolver.abs2prom(a, 'input',
+                                                                                  local=True)
                                                     break
 
                                     gname = f"Group named '{common}'" if common else 'model'
@@ -2014,7 +2006,7 @@ class Group(System):
                 prefix = meta['path'] + '.' if meta['path'] else ''
                 src_shape = None
                 if 'val' in meta:
-                    abs_in = prom2abs_in[prom][0]
+                    abs_in = resolver.absnames(prom, 'input')[0]
                     if abs_in in abs2meta_in:  # it's a continuous variable
                         src_shape = np.asarray(meta['val']).shape
                 elif 'src_shape' in meta:
@@ -2022,7 +2014,7 @@ class Group(System):
 
                 if src_shape is not None:
                     # Now update the global promotes info dict
-                    for tgt in prom2abs_in[prom]:
+                    for tgt in resolver.absnames(prom, 'input'):
                         if tgt in abs_in2prom_info and tgt.startswith(prefix):
                             pinfo = abs_in2prom_info[tgt][tree_level]
                             if pinfo is not None:
@@ -2045,7 +2037,7 @@ class Group(System):
                                                   promoted_from=self.pathname)
                 else:
                     # check for discrete targets
-                    for tgt in prom2abs_in[prom]:
+                    for tgt in resolver.absnames(prom, 'input'):
                         if tgt in self._discrete_inputs:
                             for key, val in meta.items():
                                 # for discretes we can only set the value (not units/src_shape)
@@ -2201,11 +2193,10 @@ class Group(System):
         """
         global_abs_in2out = defaultdict(set)
 
-        allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
-        allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
-
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
+
+        resolver = self._resolver
 
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
@@ -2234,11 +2225,11 @@ class Group(System):
                             new_conns[in_subsys][abs_in] = abs_out
 
         # Add implicit connections (only ones owned by this group)
-        for prom_name, out_list in allprocs_prom2abs_list_out.items():
-            if prom_name in allprocs_prom2abs_list_in:  # names match ==> a connection
+        for prom_name, out_list in resolver.prom2abs_iter('output'):
+            if resolver.is_prom(prom_name, 'input'):  # names match ==> a connection
                 abs_out = out_list[0]
                 out_subsys, _, _ = abs_out[path_len:].partition('.')
-                for abs_in in allprocs_prom2abs_list_in[prom_name]:
+                for abs_in in resolver.absnames(prom_name, 'input'):
                     in_subsys, _, _ = abs_in[path_len:].partition('.')
                     global_abs_in2out[abs_in].add(abs_out)
                     if out_subsys == in_subsys:
@@ -2265,13 +2256,13 @@ class Group(System):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
-            if not (prom_out in allprocs_prom2abs_list_out or prom_out in allprocs_discrete_out):
-                if (prom_out in allprocs_prom2abs_list_in or prom_out in allprocs_discrete_in):
+            if not (resolver.is_prom(prom_out, 'output') or prom_out in allprocs_discrete_out):
+                if (resolver.is_prom(prom_out, 'input') or prom_out in allprocs_discrete_in):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' is an input. " + \
                           "All connections must be from an output to an input."
                 else:
-                    guesses = get_close_matches(prom_out, list(allprocs_prom2abs_list_out.keys()) +
+                    guesses = get_close_matches(prom_out, list(resolver.prom_iter('output')) +
                                                 list(allprocs_discrete_out.keys()))
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' doesn't exist. Perhaps you meant " + \
@@ -2281,13 +2272,13 @@ class Group(System):
                 self._collect_error(msg)
                 continue
 
-            if not (prom_in in allprocs_prom2abs_list_in or prom_in in allprocs_discrete_in):
-                if (prom_in in allprocs_prom2abs_list_out or prom_in in allprocs_discrete_out):
+            if not (resolver.is_prom(prom_in, 'input') or prom_in in allprocs_discrete_in):
+                if (resolver.is_prom(prom_in, 'output') or prom_in in allprocs_discrete_out):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' is an output. " + \
                           "All connections must be from an output to an input."
                 else:
-                    guesses = get_close_matches(prom_in, list(allprocs_prom2abs_list_in.keys()) +
+                    guesses = get_close_matches(prom_in, list(resolver.prom_iter('input')) +
                                                 list(allprocs_discrete_in.keys()))
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you meant " + \
@@ -2300,11 +2291,11 @@ class Group(System):
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
             # and check if src_indices is defined in both connect and add_input.
-            abs_out = allprocs_prom2abs_list_out[prom_out][0]
+            abs_out = resolver.prom2abs(prom_out, 'output')
             out_comp, _, _ = abs_out.rpartition('.')
             out_subsys, _, _ = abs_out[path_len:].partition('.')
 
-            for abs_in in allprocs_prom2abs_list_in[prom_in]:
+            for abs_in in resolver.absnames(prom_in, 'input'):
                 in_comp, _, _ = abs_in.rpartition('.')
                 if out_comp == in_comp:
                     self._collect_error(
