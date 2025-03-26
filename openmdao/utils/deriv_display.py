@@ -2,14 +2,68 @@
 Functions used for the display of derivatives matrices.
 """
 
+from enum import Enum
 import textwrap
+from itertools import chain
 from io import StringIO
 
 import numpy as np
 
-from openmdao.utils.general_utils import add_border
+try:
+    import rich
+    # from rich.console import Console
+except ImportError:
+    rich is None
+
+from openmdao.core.constants import _UNDEFINED
+from openmdao.utils.array_utils import get_errors
+from openmdao.utils.general_utils import add_border, is_undefined
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.tables.table_builder import generate_table
+
+
+class _Style(Enum):
+    """
+    Styles tags used in formatting output with rich.
+    """
+    ERR = 'bright_red'
+    OUT_SPARSITY = 'dim'
+    IN_SPARSITY = 'bold'
+    WARN = 'orange1'
+    SYSTEM = {'bold', 'blue'}
+    VAR = {'bold', 'green'}
+
+
+def rich_wrap(s, *tags):
+    """
+    If rich is available, wrap the given string in the provided tags.
+    If rich is not available, just return the string.
+
+    Parameters
+    ----------
+    s : str
+        The string to be wrapped in rich tags.
+    *tags : str
+        The rich tags to be wrapped around s. These can either be
+        strings, elements of the _Style enumeration, or sets/lists/tuples thereof.
+
+    Returns
+    -------
+    str
+        The given string wrapped in the provided rich tags.
+    """
+    if rich is None or not tags or not tags[0]:
+        return s
+
+    def flatten(lst):
+        seq = list(chain.from_iterable(x if isinstance(x, (list, set, tuple))
+                                       else [x] for x in lst))
+        return seq
+
+    cmds = sorted(flatten([t if isinstance(t, str) else t.value for t in tags]))
+    on = ' '.join(cmds)
+    off = '/' + ' '.join(reversed(cmds))
+    return f'[{on}]{s}[{off}]'
 
 
 def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, out_stream,
@@ -499,3 +553,148 @@ def _print_deriv_table(table_data, headers, out_stream, tablefmt='grid', col_met
 
         print(generate_table(table_data, headers=headers, tablefmt=tablefmt,
                              column_meta=column_meta, missing_val='n/a'), file=out_stream)
+
+
+class _JacFormatter:
+    """
+    A class
+
+    Parameters
+    ----------
+    shape : tuple
+        The shape of the jacobian matrix being printed.
+    nzrows : array-like or None
+        The nonzero rows in the sparsity pattern.
+    nzcols : array-like or None
+        The nonzero columns in the sparsity pattern.
+    Jref : array-like or None
+        A reference jacobian with which any values are checked for error.
+    abs_err_tol : float
+        The absolute error tolerance to signify errors in the element being printed.
+    rel_err_tol : float
+        The relative error tolerance to signify errors in the element being printed.
+    show_uncovered : bool
+        If True, highlight nonzero elements outside of the given sparsity pattern
+        as erroneous.
+
+    Attributes
+    ----------
+    _shape : tuple[int]
+        Thes hape of the jacobian matrix being printed.
+    _nonzero : array-like or None
+        The nonzero rows and columns in the sparsity pattern.
+    _Jref : array-like or None
+        A reference jacobian with which any values are checked for error.
+    _abs_err_tol : float
+        The absolute error tolerance to signify errors in the element being printed.
+    _rel_err_tol : float
+        The relative error tolerance to signify errors in the element being printed.
+    _show_uncovered : bool
+        If True, highlight nonzero elements outside of the given sparsity pattern
+        as erroneous.
+    _uncovered_nz : list or None
+        If given, the coordinates of the uncovered nonzeros in the sparsity pattern.
+    _i : int
+        An internal counter used to track the current row being printed.
+    _j : int
+        An internal counter used to track the current column being printed.
+    """
+    def __init__(self, shape, nzrows=None, nzcols=None, Jref=None,
+                 abs_err_tol=1.0E-8, rel_err_tol=1.0E-8, uncovered=None):
+        self._shape = shape
+
+        if nzrows is not None and nzcols is not None:
+            self._nonzero = list(zip(nzrows, nzcols))
+        else:
+            self._nonzero = None
+
+        self._Jref = Jref
+
+        self._abs_err_tol = abs_err_tol
+        self._rel_err_tol = rel_err_tol
+
+        self._uncovered = uncovered
+
+        # _i and _j are used to track the current row/col being printed.
+        self._i = 0
+        self._j = 0
+
+    def reset(self, Jref=_UNDEFINED):
+        """
+        Reset the row/column counters, and optionally provide
+        a new reference jacobian for error calculation.
+
+        Parameters
+        ----------
+        Jref : array-like
+            A reference jacobian against any values are checked for error.
+        """
+        self._i = 0
+        self._j = 0
+        if not is_undefined(Jref):
+            self._Jref = Jref
+
+    def __call__(self, x):
+        """
+        Return a formatted version of element x when printing a numpy array.
+
+        If the rich package is available, wrap the formatted x in
+        rich tags to denote
+        - whether the element is included in the sparsity pattern
+        - whether the element causes a violation of the derivative check
+
+        Parameters
+        ----------
+        x : float or int
+            An element of a numpy array to be printed.
+
+        Returns
+        -------
+        str
+            The formatted version of the array element.
+        """
+        i, j = self._i, self._j
+        Jref = self._Jref
+        atol = self._abs_err_tol
+        rtol = self._rel_err_tol
+
+        has_sparsity = self._nonzero is not None
+
+        # Default output, no format.
+        s = f'{x: .6e}'
+
+        if rich is not None:
+            rich_fmt = set()
+            if (Jref is not None and atol is not None and rtol is not None):
+                abs_err, _, rel_err, _, _ = get_errors(x, Jref[i, j])
+            else:
+                abs_err = 0.0
+                rel_err = 0.0
+
+            if has_sparsity:
+                if (i, j) in self._nonzero:
+                    rich_fmt |= {_Style.IN_SPARSITY}
+                    if abs_err > atol:
+                        rich_fmt |= {_Style.ERR}
+                    elif np.abs(x) == 0:
+                        rich_fmt |= {_Style.WARN}
+                else:
+                    rich_fmt |= {_Style.OUT_SPARSITY}
+                    if abs_err > atol:
+                        rich_fmt |= {_Style.ERR}
+                    elif self._uncovered is not None and (i, j) in self._uncovered:
+                        rich_fmt |= {_Style.WARN}
+            else:
+                if abs_err > atol:
+                    rich_fmt |= {_Style.ERR}
+                elif rel_err > rtol:
+                    rich_fmt |= {_Style.ERR}
+
+            s = rich_wrap(s, *rich_fmt)
+
+            # Increment the row and column being printed.
+            self._j += 1
+            if self._j >= self._shape[1]:
+                self._j = 0
+                self._i += 1
+        return s
