@@ -4,7 +4,6 @@ Functions used for the display of derivatives matrices.
 
 from enum import Enum
 import textwrap
-from itertools import chain
 from io import StringIO
 
 import numpy as np
@@ -13,12 +12,13 @@ try:
     import rich
     from rich.console import Console
 except ImportError:
-    rich is None
+    rich = None
 
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.array_utils import get_tol_violation
 from openmdao.utils.general_utils import add_border, is_undefined
 from openmdao.utils.mpi import MPI
+from openmdao.utils.rich_utils import rich_wrap
 from openmdao.visualization.tables.table_builder import generate_table
 
 
@@ -32,38 +32,6 @@ class _Style(Enum):
     WARN = 'orange1'
     SYSTEM = {'bold', 'blue'}
     VAR = {'bold', 'green'}
-
-
-def rich_wrap(s, *tags):
-    """
-    If rich is available, wrap the given string in the provided tags.
-    If rich is not available, just return the string.
-
-    Parameters
-    ----------
-    s : str
-        The string to be wrapped in rich tags.
-    *tags : str
-        The rich tags to be wrapped around s. These can either be
-        strings, elements of the _Style enumeration, or sets/lists/tuples thereof.
-
-    Returns
-    -------
-    str
-        The given string wrapped in the provided rich tags.
-    """
-    if rich is None or not tags or not tags[0]:
-        return s
-
-    def flatten(lst):
-        seq = list(chain.from_iterable(x if isinstance(x, (list, set, tuple))
-                                       else [x] for x in lst))
-        return seq
-
-    cmds = sorted(flatten([t if isinstance(t, str) else t.value for t in tags]))
-    on = ' '.join(cmds)
-    off = '/' + ' '.join(reversed(cmds))
-    return f'[{on}]{s}[{off}]'
 
 
 def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, out_stream,
@@ -181,8 +149,12 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             if directional:
                 if totals and tol_violations[i].forward is not None:
                     err = _format_error(tol_violations[i].forward, 0.0)
-                    parts.append(f'    Max Tolerance Violation ([fwd, fd] Dot Product Test)'
-                                 f'{stepstrs[i]} : {err}')
+                    if rich is not None:
+                        parts.append(r'    Max Tolerance Violation (\[fwd, fd] Dot Product Test)'
+                                    f'{stepstrs[i]} : {err}')
+                    else:
+                        parts.append(r'    Max Tolerance Violation ([fwd, fd] Dot Product Test)'
+                                    f'{stepstrs[i]} : {err}')
                     parts.append(f'      abs error: {abs_errs[i].forward:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].forward:.6e}')
                     parts.append(f'      fwd value: {vals_at_max_err[i].forward[0]:.6e}')
@@ -192,8 +164,12 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                 if ('directional_fd_rev' in derivative_info and
                         derivative_info['directional_fd_rev'][i]):
                     err = _format_error(tol_violations[i].reverse, 0.0)
-                    parts.append(f'    Max Tolerance Violation ([rev, fd] Dot Product Test)'
-                                 f'{stepstrs[i]} : {err}')
+                    if rich is not None:
+                        parts.append(r'    Max Tolerance Violation (\[rev, fd] Dot Product Test)'
+                                    f'{stepstrs[i]} : {err}')
+                    else:
+                        parts.append(r'    Max Tolerance Violation ([rev, fd] Dot Product Test)'
+                                    f'{stepstrs[i]} : {err}')
                     parts.append(f'      abs error: {abs_errs[i].reverse:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].reverse:.6e}')
                     fd, rev = derivative_info['directional_fd_rev'][i]
@@ -224,7 +200,10 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             if ('directional_fwd_rev' in derivative_info and
                     derivative_info['directional_fwd_rev']):
                 err = _format_error(tol_violations[0].fwd_rev, 0.0)
-                parts.append(f'    Max Tolerance Violation ([rev, fwd] Dot Product Test) : {err}')
+                if rich is not None:
+                    parts.append(rf'    Max Tolerance Violation (\[rev, fwd] Dot Product Test) : {err}')
+                else:
+                    parts.append(f'    Max Tolerance Violation ([rev, fwd] Dot Product Test) : {err}')
                 parts.append(f'      abs error: {abs_errs[0].fwd_rev:.6e}')
                 parts.append(f'      rel error: {rel_errs[0].fwd_rev:.6e}')
                 fwd, rev = derivative_info['directional_fwd_rev']
@@ -271,17 +250,22 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
         else:
             shape = None
 
+        nzrows = derivative_info['rows'] if 'rows' in derivative_info else None
+        nzcols = derivative_info['cols'] if 'cols' in derivative_info else None
         jac_fmt = _JacFormatter(shape,
-                                nzrows=derivative_info['rows'] if 'rows' in derivative_info else None,
-                                nzcols=derivative_info['cols'] if 'cols' in derivative_info else None,
+                                nzrows=nzrows,
+                                nzcols=nzcols,
                                 uncovered=uncovered_nz,
                                 Jref=fds[0],
                                 abs_err_tol=abs_error_tol,
                                 rel_err_tol=rel_error_tol)
 
-        with np.printoptions(linewidth=max(np.get_printoptions()['linewidth'], 10000),
-                             edgeitems=10000,
-                             formatter={'all': jac_fmt}):
+        printopts = {'linewidth': np.inf,
+                     'edgeitems': np.inf}
+        if not directional:
+            printopts['formatter'] = {'all': jac_fmt}
+
+        with np.printoptions(**printopts):
             # Raw Derivatives
             if tol_violations[0].forward is not None:
                 if directional:
@@ -330,15 +314,15 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
     if not show_only_incorrect or num_bad_jacs > 0:
 
         if rich is not None:
-            c = Console(file=out_stream, force_terminal=True, record=True)
+            c = Console(file=out_stream, force_terminal=True, record=True, soft_wrap=True)
             c.print(sys_buffer.getvalue(), highlight=False)
             if system.get_reports_dir().is_dir():
-                report = system.get_reports_dir() / f'{system.pathname}_check_partials.html'
+                report = system.get_reports_dir() / f'check_partials-{system.pathname}.html'
                 c.save_html(report)
         else:
             out_stream.write(sys_buffer.getvalue())
             if system.get_reports_dir().is_dir():
-                report = system.get_reports_dir() / f'{system.pathname}_check_partials.html'
+                report = system.get_reports_dir() / f'check_partials-{system.pathname}.html'
                 with open(report, encoding="utf-8") as file:
                     file.write(f'<html><body>\n{sys_buffer.getvalue()}\n</body></html>')
 
@@ -555,9 +539,9 @@ def _format_error(error, tol):
     str
         Formatted and possibly flagged error.
     """
-    if np.isnan(error) or error < tol:
+    if np.isnan(error) or error <= tol:
         return f'({error:.6e})'
-    return f'{error:.6e} *'
+    return rich_wrap(f'{error:.6e}', _Style.ERR) + ' *'
 
 
 def _print_deriv_table(table_data, headers, out_stream, tablefmt='grid', col_meta=None):
@@ -698,7 +682,7 @@ class _JacFormatter:
         has_sparsity = self._nonzero is not None
 
         # Default output, no format.
-        s = f'{x:.12e}'
+        s = f'{x: .12e}'
 
         if self._shape is not None and rich is not None:
             rich_fmt = set()

@@ -1373,11 +1373,15 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
         content = stream.getvalue()
 
+        print(content)
+
         self.assertEqual(content.count('rev value:'), 0)
         self.assertEqual(content.count('fwd value:'), 1)
         self.assertEqual(content.count('fd value:'), 1)
         self.assertEqual(content.count('Directional Derivative (Jfwd)'), 1)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
+        print(content)
+        print('Max Tolerance Violation ([fwd, fd] Dot Product Test) : ')
         self.assertTrue('Max Tolerance Violation ([fwd, fd] Dot Product Test) : ' in content)
         mhatdotm, dhatdotd =  data[(('comp.out',), 'comp.in')]['directional_fd_fwd']
         assert_near_equal(mhatdotm, dhatdotd, tolerance=2e-15)
