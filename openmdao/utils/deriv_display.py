@@ -149,12 +149,8 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             if directional:
                 if totals and tol_violations[i].forward is not None:
                     err = _format_error(tol_violations[i].forward, 0.0)
-                    if rich is not None:
-                        parts.append(r'    Max Tolerance Violation (\[fwd, fd] Dot Product Test)'
-                                    f'{stepstrs[i]} : {err}')
-                    else:
-                        parts.append(r'    Max Tolerance Violation ([fwd, fd] Dot Product Test)'
-                                    f'{stepstrs[i]} : {err}')
+                    parts.append(rich_wrap(f'    Max Tolerance Violation ([fwd, fd] Dot Product Test)'
+                                 f'{stepstrs[i]} : {err}'))
                     parts.append(f'      abs error: {abs_errs[i].forward:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].forward:.6e}')
                     parts.append(f'      fwd value: {vals_at_max_err[i].forward[0]:.6e}')
@@ -164,12 +160,8 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                 if ('directional_fd_rev' in derivative_info and
                         derivative_info['directional_fd_rev'][i]):
                     err = _format_error(tol_violations[i].reverse, 0.0)
-                    if rich is not None:
-                        parts.append(r'    Max Tolerance Violation (\[rev, fd] Dot Product Test)'
-                                    f'{stepstrs[i]} : {err}')
-                    else:
-                        parts.append(r'    Max Tolerance Violation ([rev, fd] Dot Product Test)'
-                                    f'{stepstrs[i]} : {err}')
+                    parts.append(rich_wrap(f'    Max Tolerance Violation ([rev, fd] Dot Product Test)'
+                                 f'{stepstrs[i]} : {err}'))
                     parts.append(f'      abs error: {abs_errs[i].reverse:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].reverse:.6e}')
                     fd, rev = derivative_info['directional_fd_rev'][i]
@@ -200,10 +192,8 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             if ('directional_fwd_rev' in derivative_info and
                     derivative_info['directional_fwd_rev']):
                 err = _format_error(tol_violations[0].fwd_rev, 0.0)
-                if rich is not None:
-                    parts.append(rf'    Max Tolerance Violation (\[rev, fwd] Dot Product Test) : {err}')
-                else:
-                    parts.append(f'    Max Tolerance Violation ([rev, fwd] Dot Product Test) : {err}')
+                parts.append(rich_wrap('    Max Tolerance Violation '
+                                       f'([rev, fwd] Dot Product Test) : {err}'))
                 parts.append(f'      abs error: {abs_errs[0].fwd_rev:.6e}')
                 parts.append(f'      rel error: {rel_errs[0].fwd_rev:.6e}')
                 fwd, rev = derivative_info['directional_fwd_rev']

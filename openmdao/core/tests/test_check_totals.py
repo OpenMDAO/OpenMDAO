@@ -1373,8 +1373,6 @@ class TestProblemCheckTotals(unittest.TestCase):
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
         content = stream.getvalue()
 
-        print(content)
-
         self.assertEqual(content.count('rev value:'), 0)
         self.assertEqual(content.count('fwd value:'), 1)
         self.assertEqual(content.count('fd value:'), 1)
