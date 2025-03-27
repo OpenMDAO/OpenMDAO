@@ -1,3 +1,4 @@
+import itertools
 import re
 
 try:
@@ -36,8 +37,12 @@ def rich_wrap(s, tags=None):
     if isinstance(tags, str):
         tags = {tags}
 
-    # cmds = sorted(flatten([t if isinstance(t, str) else t.value for t in tags]))
-    cmds = sorted(tags)
+    def flatten(lst):
+        seq = list(itertools.chain.from_iterable(x if isinstance(x, (list, set, tuple))
+                                                 else [x] for x in lst))
+        return seq
+
+    cmds = sorted(flatten([t if isinstance(t, str) else t.value for t in tags]))
     on = ' '.join(cmds)
     off = '/' + ' '.join(reversed(cmds))
     return f'[{on}]{s}[{off}]'

@@ -2,7 +2,6 @@
 Functions used for the display of derivatives matrices.
 """
 
-from enum import Enum
 import textwrap
 from io import StringIO
 
@@ -22,16 +21,12 @@ from openmdao.utils.rich_utils import rich_wrap
 from openmdao.visualization.tables.table_builder import generate_table
 
 
-class _Style(Enum):
-    """
-    Styles tags used in formatting output with rich.
-    """
-    ERR = 'bright_red'
-    OUT_SPARSITY = 'dim'
-    IN_SPARSITY = 'bold'
-    WARN = 'orange1'
-    SYSTEM = {'bold', 'blue'}
-    VAR = {'bold', 'green'}
+# Tags used for rich printing
+ERR = 'bright_red'
+OUT_SPARSITY = 'dim'
+IN_SPARSITY = 'bold'
+SYSTEM = {'bold', 'bright_cyan'}
+VAR = {'bold', 'bright_green'}
 
 
 def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, out_stream,
@@ -95,7 +90,7 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
     if totals:
         title = "Total Derivatives"
     else:
-        title = f"{sys_type}: {sys_class_name} '{sys_name}'"
+        title = f"{sys_type}: {sys_class_name} '{rich_wrap(sys_name, SYSTEM)}'"
 
     print(f"{add_border(title, '-')}\n", file=sys_buffer)
     parts = []
@@ -115,12 +110,12 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
 
         # need this check because if directional may be list
         if isinstance(wrt, str):
-            wrt = f"'{wrt}'"
+            wrt = f"'{rich_wrap(wrt, VAR)}'"
         if isinstance(of, str):
-            of = f"'{of}'"
+            of = f"'{rich_wrap(of, VAR)}'"
 
         if directional:
-            wrt = f"(d){wrt}"
+            wrt = f"(d){rich_wrap(wrt, VAR)}"
 
         tol_violations = derivative_info['tol violation']
         abs_errs = derivative_info['abs error']
@@ -149,6 +144,9 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             if directional:
                 if totals and tol_violations[i].forward is not None:
                     err = _format_error(tol_violations[i].forward, 0.0)
+                    print(rich_wrap(f'    Max Tolerance Violation ([fwd, fd] Dot Product Test)'
+                                 f'{stepstrs[i]} : {err}'))
+                    exit(0)
                     parts.append(rich_wrap(f'    Max Tolerance Violation ([fwd, fd] Dot Product Test)'
                                  f'{stepstrs[i]} : {err}'))
                     parts.append(f'      abs error: {abs_errs[i].forward:.6e}')
@@ -302,7 +300,6 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
     sys_buffer.write('\n'.join(parts))
 
     if not show_only_incorrect or num_bad_jacs > 0:
-
         if rich is not None:
             c = Console(file=out_stream, force_terminal=True, record=True, soft_wrap=True)
             c.print(sys_buffer.getvalue(), highlight=False)
@@ -331,7 +328,7 @@ def _print_tv(tol_violation):
     str
         The formatted tolerance violation.
     """
-    if tol_violation < 0:
+    if tol_violation <= 0:
         return f'({tol_violation:.6e})'
     return f'{tol_violation:.6e}'
 
@@ -393,7 +390,7 @@ def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=Fal
     if totals:
         title = "Total Derivatives"
     else:
-        title = f"{sys_type}: {sys_class_name} '{sys_name}'"
+        title = f"{sys_type}: {sys_class_name} '{rich_wrap(sys_name, SYSTEM)}'"
 
     print(f"{add_border(title, '-')}\n", file=sys_buffer)
 
@@ -411,10 +408,10 @@ def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=Fal
         # Informative output for responses that were declared with an index.
         indices = derivative_info.get('indices')
         if indices is not None:
-            of = f'{of} (index size: {indices})'
+            of = f'{rich_wrap(of, VAR)} (index size: {indices})'
 
         if directional:
-            wrt = f"(d) {wrt}"
+            wrt = f"(d) {rich_wrap(wrt, VAR)}"
 
         tol_violations = derivative_info['tol violation']
         vals_at_max_err = derivative_info['vals_at_max_error']
@@ -505,7 +502,18 @@ def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=Fal
                 _print_deriv_table([worst_subjac[1]], headers, sys_buffer, col_meta=column_meta)
 
     if not show_only_incorrect or num_bad_jacs > 0:
-        out_stream.write(sys_buffer.getvalue())
+        if rich is not None:
+            c = Console(file=out_stream, force_terminal=True, record=True, soft_wrap=True)
+            c.print(sys_buffer.getvalue(), highlight=False)
+            if system.get_reports_dir().is_dir():
+                report = system.get_reports_dir() / f'check_partials-{system.pathname}.html'
+                c.save_html(report)
+        else:
+            out_stream.write(sys_buffer.getvalue())
+            if system.get_reports_dir().is_dir():
+                report = system.get_reports_dir() / f'check_partials-{system.pathname}.html'
+                with open(report, encoding="utf-8") as file:
+                    file.write(f'<html><body>\n{sys_buffer.getvalue()}\n</body></html>')
 
     if worst_subjac is None:
         return None
@@ -531,7 +539,7 @@ def _format_error(error, tol):
     """
     if np.isnan(error) or error <= tol:
         return f'({error:.6e})'
-    return rich_wrap(f'{error:.6e}', _Style.ERR) + ' *'
+    return rich_wrap(f'{error:.6e}', ERR) + ' *'
 
 
 def _print_deriv_table(table_data, headers, out_stream, tablefmt='grid', col_meta=None):
@@ -683,18 +691,18 @@ class _JacFormatter:
 
             if has_sparsity:
                 if (i, j) in self._nonzero:
-                    rich_fmt |= {_Style.IN_SPARSITY}
+                    rich_fmt |= {IN_SPARSITY}
                     if tol_viol:
-                        rich_fmt |= {_Style.ERR}
+                        rich_fmt |= {ERR}
                 else:
-                    rich_fmt |= {_Style.OUT_SPARSITY}
+                    rich_fmt |= {OUT_SPARSITY}
                     if tol_viol:
-                        rich_fmt |= {_Style.ERR}
+                        rich_fmt |= {ERR}
                     elif self._uncovered is not None and (i, j) in self._uncovered:
-                        rich_fmt |= {_Style.WARN}
+                        rich_fmt |= {ERR}
             else:
                 if tol_viol:
-                    rich_fmt |= {_Style.ERR}
+                    rich_fmt |= {ERR}
 
             s = rich_wrap(s, *rich_fmt)
 
