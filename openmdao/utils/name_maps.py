@@ -36,8 +36,6 @@ class NameResolver(object):
         A dictionary of promoted to absolute names for outputs.
     msginfo : str
         The message information for the system.
-    _conns : dict
-        A dictionary of connections between absolute names.
     _check_dups : bool
         If True, check for duplicate names.
     """
@@ -65,7 +63,6 @@ class NameResolver(object):
         self._prom2abs_in = None
         self._prom2abs_out = None
         self.msginfo = msginfo if msginfo else pathname
-        self._conns = None
         self._check_dups = check_dups
 
     # TODO: this will go away once all is converted to use the name resolver
@@ -347,7 +344,8 @@ class NameResolver(object):
                     if loc:
                         yield absname, promname
             else:
-                yield from self._abs2prom[iotype].items()
+                for absname, (promname, loc) in self._abs2prom[iotype].items():
+                    yield absname, promname
 
     def prom_iter(self, iotype=None):
         """
@@ -439,7 +437,7 @@ class NameResolver(object):
         """
         self._abs2prom[iotype][absname] = (promname, local)
 
-    def getsource(self, name):
+    def source(self, name, conns):
         """
         Get the source of a variable.
 
@@ -450,19 +448,21 @@ class NameResolver(object):
         ----------
         name : str
             The name to get the source of.
+        conns : dict
+            The connections dictionary.
 
         Returns
         -------
         str
             The source corresponding to the name.
         """
-        if self._conns is None:
+        if conns is None:
             raise RuntimeError(f"{self.msginfo}: Can't find source for {name} because "
                                "connections are not yet known.")
 
         if name in self._abs2prom_in:
             try:
-                return self._conns[name]
+                return conns[name]
             except KeyError:
                 raise KeyError(f"{self.msginfo}: Can't find source for {name}.")
         elif name in self._abs2prom_out:
@@ -475,8 +475,8 @@ class NameResolver(object):
                 absname = absnames[0]
 
                 # absolute input?
-                if absname in self._conns:
-                    return self._conns[absname]
+                if absname in conns:
+                    return conns[absname]
 
                 if absname in self._abs2prom_out:
                     return absname
@@ -614,7 +614,7 @@ class NameResolver(object):
             if report_error:
                 raise KeyError(f"{self.msginfo}: Can't find promoted {iotype} {promname}.")
 
-    def prom2abs(self, promname, iotype=None, local=False):
+    def prom2abs(self, promname, iotype=None, local=False, conns=None):
         """
         Convert a promoted name to an unique absolute name.
 
@@ -624,10 +624,12 @@ class NameResolver(object):
         ----------
         promname : str
             The promoted name to convert.
-        iotype : str
+        iotype : str or None
             Either 'input', 'output', or None to check all iotypes.
         local : bool
             If True, check only local names.
+        conns : dict or None
+            The connections dictionary.
 
         Returns
         -------
@@ -649,13 +651,13 @@ class NameResolver(object):
             if len(lst) == 1:
                 return lst[0]
 
-            if self._conns is None:
+            if conns is None:
                 # we can't refer to the source since we don't know the connections yet
                 raise RuntimeError(f"{self.msginfo}: The promoted name {promname} is invalid "
                                    f"because it refers to multiple inputs: [{' ,'.join(lst)}].")
 
             # report to the user which connected output to access
-            src_name = self._abs2prom['output'][self.getsource(lst[0])]
+            src_name = self._abs2prom['output'][self.source(lst[0], conns)]
             raise RuntimeError(f"{self.msginfo}: The promoted name {promname} is invalid because it"
                                f" refers to multiple inputs: [{' ,'.join(lst)}]. Access the value "
                                f"from the connected output variable {src_name} instead.")
@@ -712,6 +714,40 @@ class NameResolver(object):
             return name
         elif report_error:
             raise KeyError(f"{self.msginfo}: Can't find variable {name}.")
+
+    def prom2prom(self, promname, other, iotype=None):
+        """
+        Convert a promoted name in other to our promoted name.
+
+        This requires a matching absolute name between the two NameResolvers.
+
+        Parameters
+        ----------
+        promname : str
+            The promoted name to convert.
+        other : NameResolver
+            The other name resolver.
+        iotype : str or None
+            Either 'input', 'output', or None to check all iotypes.
+
+        Returns
+        -------
+        str or None
+            The promoted name corresponding to the converted promoted name or None if no match
+            is found.
+        """
+        if iotype is None:
+            iotype = other.get_prom_iotype(promname)
+            if iotype is None:
+                return None
+
+        absnames = other.absnames(promname, iotype, report_error=False)
+        if not absnames:
+            return None
+
+        absname = absnames[0]
+        if absname in self._abs2prom[iotype]:
+            return self._abs2prom[iotype][absname][0]
 
     # # TODO: get rid of this once all parts of code have been updated to use resolver
     # def _get_abs2prom_mapping(self, iotype=None):

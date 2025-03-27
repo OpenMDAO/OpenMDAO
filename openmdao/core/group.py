@@ -2707,6 +2707,7 @@ class Group(System):
         grp_shapes = {}
         compute_shape_functs = {}
         component_io = defaultdict(list)
+        resolver = self._resolver
 
         # find all variables that have an unknown shape (across all procs) and connect them
         # to other unknown and known shape variables to form a directed graph.
@@ -2747,7 +2748,7 @@ class Group(System):
                                     grp_shapes[prom] = grp_shape
                                     fail = False
                                 else:  # see if there are any connected inputs with known shape
-                                    for n in self._var_allprocs_prom2abs_list['input'][prom]:
+                                    for n in resolver.absnames(prom, 'input'):
                                         if n != name:
                                             m = all_abs2meta_in[n]
                                             if not (m['distributed'] or m['has_src_indices']
@@ -4078,7 +4079,6 @@ class Group(System):
 
         wrt = set()
         ivc = set(self.get_indep_vars(local=False))
-        pro2abs = self._var_allprocs_prom2abs_list
 
         if totals:
             # When computing totals, weed out inputs connected to anything inside our system unless
@@ -4097,7 +4097,7 @@ class Group(System):
                 wrt = ivc
 
         else:
-            for abs_inps in pro2abs['input'].values():
+            for _, abs_inps in self._resolver.prom2abs_iter('input'):
                 if abs_inps[0] not in self._conn_abs_in2out:
                     # If connection is inside of this Group, perturbation of all implicitly
                     # connected inputs will be handled properly via internal transfers.
@@ -5144,8 +5144,7 @@ class Group(System):
         out = super().get_design_vars(recurse=recurse, get_sizes=get_sizes,
                                       use_prom_ivc=use_prom_ivc)
         if recurse:
-            abs2prom_in = self._var_allprocs_abs2prom['input']
-            abs2prom_out = self._var_allprocs_abs2prom['output']
+            resolver = self._resolver
             if (self.comm.size > 1 and self._mpi_proc_allocator.parallel):
 
                 # For parallel groups, we need to make sure that the design variable dictionary is
@@ -5158,16 +5157,15 @@ class Group(System):
                     dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
                                                  use_prom_ivc=use_prom_ivc)
                     if use_prom_ivc:
-                        # have to promote subsystem prom name to this level
-                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
+                        # have to promote subsystem prom name to this level's prom name
+                        subres = subsys._resolver
                         for dv, meta in dvs.items():
-                            if dv in sub_pro2abs_in:
-                                abs_dv = sub_pro2abs_in[dv][0]
-                                sub_out[abs2prom_in[abs_dv]] = meta
-                            elif dv in sub_pro2abs_out:
-                                abs_dv = sub_pro2abs_out[dv][0]
-                                sub_out[abs2prom_out[abs_dv]] = meta
+                            if subres.is_prom(dv, 'input'):
+                                abs_dv = subres.absnames(dv, 'input')[0]
+                                sub_out[resolver.abs2prom(abs_dv, 'input')] = meta
+                            elif subres.is_prom(dv, 'output'):
+                                abs_dv = subres.absnames(dv, 'output')[0]
+                                sub_out[resolver.abs2prom(abs_dv, 'output')] = meta
                             else:
                                 sub_out[dv] = meta
                     else:
@@ -5193,15 +5191,12 @@ class Group(System):
                                                  use_prom_ivc=use_prom_ivc)
                     if use_prom_ivc:
                         # have to promote subsystem prom name to this level
-                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
+                        subres = subsys._resolver
                         for dv, meta in dvs.items():
-                            if dv in sub_pro2abs_in:
-                                abs_dv = sub_pro2abs_in[dv][0]
-                                out[abs2prom_in[abs_dv]] = meta
-                            elif dv in sub_pro2abs_out:
-                                abs_dv = sub_pro2abs_out[dv][0]
-                                out[abs2prom_out[abs_dv]] = meta
+                            if subres.is_prom(dv, 'input'):
+                                out[resolver.prom2prom(dv, subsys._resolver, 'input')] = meta
+                            elif subres.is_prom(dv, 'output'):
+                                out[resolver.prom2prom(dv, subsys._resolver, 'output')] = meta
                             else:
                                 out[dv] = meta
                     else:
