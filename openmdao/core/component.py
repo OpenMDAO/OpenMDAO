@@ -2509,6 +2509,8 @@ class Component(System):
                     deriv['steps'] = []
                 deriv['J_fd'].append(partial)
                 deriv['steps'] = actual_steps[rel_key]
+                deriv['rows'] = subjacs_info['rows']
+                deriv['cols'] = subjacs_info['cols']
 
                 if 'uncovered_nz' in subjacs_info:
                     deriv['uncovered_nz'] = subjacs_info['uncovered_nz']
