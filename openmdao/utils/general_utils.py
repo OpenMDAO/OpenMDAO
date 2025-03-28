@@ -404,7 +404,7 @@ def pattern_filter(patterns, var_iter, name_index=None):
     Yields
     ------
     str
-        Variable name that matches a pattern.
+        Variable name or corresponding tuple where the name matches a pattern.
     """
     if '*' in patterns:
         yield from var_iter
