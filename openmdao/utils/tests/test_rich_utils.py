@@ -18,13 +18,13 @@ class TestRichUtils(unittest.TestCase):
     def test_tag_set(self):
         s = 'foo bar baz'
         # Rich requires closing tag have ordering opposite of opeing tag.
-        expected = f'[bold bright_red]{s}[/bright_red bold]'
+        expected = s if rich is None else f'[bold bright_red]{s}[/bright_red bold]'
         self.assertEqual(rich_wrap(s, {'bold', 'bright_red'}), expected)
 
     def test_strip_tags(self):
         s = 'foo bar baz'
         # Rich requires closing tag have ordering opposite of opeing tag.
-        expected = f'[bold bright_red]{s}[/bright_red bold]'
+        expected = s if rich is None else f'[bold bright_red]{s}[/bright_red bold]'
         self.assertEqual(rich_wrap(s, {'bold', 'bright_red'}), expected)
         self.assertEqual(strip_tags(expected), s)
 
