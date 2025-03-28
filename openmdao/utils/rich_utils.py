@@ -32,9 +32,9 @@ def rich_wrap(s, tags=None):
         return s
 
     # Escape any open square brackets in the string.
-    s = re.sub(r'(\[)(?=[^]]*\])', '\\[', s)
+    s = re.sub(r'(\[)(?=[^]]*\])', '\\[', str(s))
 
-    if tags is None:
+    if not tags:
         return s
 
     if isinstance(tags, str):

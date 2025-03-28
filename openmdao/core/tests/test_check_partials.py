@@ -21,6 +21,7 @@ from openmdao.utils.om_warnings import DerivativesWarning, OMInvalidCheckDerivat
 from openmdao.utils.testing_utils import set_env_vars_context, compare_prob_vs_comp_check_partials,\
     snum_equal
 from openmdao.utils.array_utils import safe_norm
+from openmdao.utils.rich_utils import strip_formatting
 
 from openmdao.utils.mpi import MPI
 
@@ -193,7 +194,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         prob.check_partials(out_stream=stream)
-        lines = stream.getvalue().splitlines()
+        lines = [strip_formatting(s) for s in stream.getvalue().splitlines()]
 
         y_wrt_x1_line = lines.index("  comp: 'y' wrt 'x1'")
 
@@ -601,7 +602,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         data = prob.check_partials(out_stream=stream)
-        lines = stream.getvalue().splitlines()
+        lines = [strip_formatting(s) for s in stream.getvalue().splitlines()]
 
         self.assertTrue("  comp: 'g' wrt 'z'" not in lines)
         self.assertTrue(('g', 'z') not in data['comp'])
@@ -677,7 +678,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         data = prob.check_partials(out_stream=stream)
-        lines = stream.getvalue().splitlines()
+        lines = [strip_formatting(s) for s in stream.getvalue().splitlines()]
 
         self.assertTrue("  comp: 'g' wrt 'z'" in lines)
         self.assertTrue(('g', 'z') in data['comp'])
@@ -2806,7 +2807,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(step=[1e-6], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         ncomps = 2
         nderivs = ncomps * 2
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
@@ -2821,7 +2822,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(step=[1e-6], compact_print=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
@@ -2841,7 +2842,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(method='cs', step=[1e-30], compact_print=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
@@ -2861,7 +2862,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(step=[1e-6, 1e-7], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         ncomps = 2
         nderivs = ncomps * 2
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
@@ -2874,7 +2875,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
@@ -2894,7 +2895,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(method='cs', step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
@@ -2914,7 +2915,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model(directional=True)
         stream = StringIO()
         p.check_partials(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)

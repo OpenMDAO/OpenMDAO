@@ -108,9 +108,9 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
 
         # need this check because if directional may be list
         if isinstance(wrt, str):
-            wrt = f"'{rich_wrap(wrt, VAR)}'"
+            wrt = f"'{wrt}'"
         if isinstance(of, str):
-            of = f"'{rich_wrap(of, VAR)}'"
+            of = f"'{of}'"
 
         if directional:
             wrt = f"(d){wrt}"
@@ -130,7 +130,8 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             stepstrs = [""]
 
         fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
-        parts.append(f"  {sys_name}: {of} wrt {wrt}")
+
+        parts.append(f"  {rich_wrap(sys_name, SYSTEM)}: {rich_wrap(of, VAR)} wrt {rich_wrap(wrt, VAR)}")
         if not isinstance(of, tuple) and lcons and of.strip("'") in lcons:
             parts[-1] += " (Linear constraint)"
         parts.append('')
@@ -142,9 +143,9 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             if directional:
                 if totals and tol_violations[i].forward is not None:
                     err = _format_error(tol_violations[i].forward, 0.0)
-                    parts.append(rich_wrap(f'    Max Tolerance Violation '
-                                           '([fwd, fd] Dot Product Test)'
-                                           f'{stepstrs[i]} : {err}'))
+                    parts.append(f'    Max Tolerance Violation '
+                                           f'{rich_wrap("([fwd, fd] Dot Product Test)")}'
+                                           f'{stepstrs[i]} : {err}')
                     parts.append(f'      abs error: {abs_errs[i].forward:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].forward:.6e}')
                     parts.append(f'      fwd value: {vals_at_max_err[i].forward[0]:.6e}')
@@ -155,7 +156,7 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                         derivative_info['directional_fd_rev'][i]):
                     err = _format_error(tol_violations[i].reverse, 0.0)
                     parts.append(rich_wrap('    Max Tolerance Violation '
-                                           '([rev, fd] Dot Product Test)'
+                                           f'{rich_wrap("([rev, fd] Dot Product Test)")}'
                                            f'{stepstrs[i]} : {err}'))
                     parts.append(f'      abs error: {abs_errs[i].reverse:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].reverse:.6e}')
@@ -296,17 +297,22 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
 
     sys_buffer.write('\n'.join(parts))
 
+    if totals:
+        report_name = 'check_totals.html'
+    else:
+        report_name = f'check_partials-{system.pathname}.html'
+
     if not show_only_incorrect or num_bad_jacs > 0:
         if rich is not None:
             c = Console(file=out_stream, force_terminal=True, record=True, soft_wrap=True)
             c.print(sys_buffer.getvalue(), highlight=False)
             if system.get_reports_dir().is_dir():
-                report = system.get_reports_dir() / f'check_partials-{system.pathname}.html'
+                report = system.get_reports_dir() / report_name
                 c.save_html(report)
         else:
             out_stream.write(sys_buffer.getvalue())
             if system.get_reports_dir().is_dir():
-                report = system.get_reports_dir() / f'check_partials-{system.pathname}.html'
+                report = system.get_reports_dir() / report_name
                 with open(report, encoding="utf-8") as file:
                     file.write(f'<html><body>\n{sys_buffer.getvalue()}\n</body></html>')
 
@@ -405,7 +411,7 @@ def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=Fal
         # Informative output for responses that were declared with an index.
         indices = derivative_info.get('indices')
         if indices is not None:
-            of = f'{rich_wrap(of, VAR)} (index size: {indices})'
+            of = f'{of} (index size: {indices})'
 
         if directional:
             wrt = f"(d) {wrt}"
@@ -701,7 +707,7 @@ class _JacFormatter:
                 if tol_viol:
                     rich_fmt |= {ERR}
 
-            s = rich_wrap(s, *rich_fmt)
+            s = rich_wrap(s, rich_fmt)
 
             # Increment the row and column being printed.
             self._j += 1
