@@ -786,12 +786,12 @@ class ImplicitComponent(Component):
         discrete_outputs : dict or None
             If not None, dict containing discrete output values.
         """
+        global _tuplist
         if self.compute_primal is None:
-            raise NotImplementedError('ImplicitComponent.apply_nonlinear() must be overridden '
-                                      'by the child class.')
+            return
 
-        returns = \
-            self.compute_primal(*self._get_compute_primal_invals(inputs, outputs, discrete_inputs))
+        returns = self.compute_primal(*self._get_compute_primal_invals(inputs, outputs,
+                                                                       discrete_inputs))
 
         if not isinstance(returns, _tuplist):
             returns = (returns,)

@@ -529,17 +529,16 @@ class ExplicitComponent(Component):
         if self.compute_primal is None:
             return
 
-        returns = \
-            self.compute_primal(*self._get_compute_primal_invals(inputs, discrete_inputs))
+        returns = self.compute_primal(*self._get_compute_primal_invals(inputs, discrete_inputs))
 
         if not isinstance(returns, _tuplist):
             returns = (returns,)
 
-        if not discrete_outputs:
-            outputs.set_vals(returns)
-        else:
+        if discrete_outputs:
             outputs.set_vals(returns[:outputs.nvars()])
             self._discrete_outputs.set_vals(returns[outputs.nvars():])
+        else:
+            outputs.set_vals(returns)
 
     def compute_partials(self, inputs, partials, discrete_inputs=None):
         """

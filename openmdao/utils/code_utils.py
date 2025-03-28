@@ -511,10 +511,12 @@ class _FuncGrapher(ast.NodeVisitor):
     def visit_FunctionDef(self, node):
         if self.fstack:
             # TODO: support nested functions
-            raise RuntimeError("Function contains nested functions, which are not supported.")
+            raise RuntimeError("Function contains nested functions, which are not supported yet.")
 
+        # add all input args to the graph
         for arg in node.args.args:
-            self.graph.add_node(arg.arg)
+            if arg.arg != 'self':
+                self.graph.add_node(arg.arg)
 
         self.fstack.append(node)
         for stmt in node.body:
@@ -536,11 +538,6 @@ class _FuncGrapher(ast.NodeVisitor):
             base = name.partition('.')[0]
             if base in self.graph:
                 self.names.append(base)
-
-    def visit_Call(self, node):
-        # only visit the args
-        for arg in node.args:
-            self.visit(arg)
 
     def visit_Name(self, node):
         if self.names is not None:
@@ -585,13 +582,8 @@ def get_func_graph(func, outnames=None, display=False):
         A graph containing edges from inputs to outputs.  Returns None if the function graph
         couldn't be determined.
     """
-    try:
-        node = ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec')
-        visitor = _FuncGrapher(node)
-    except Exception as err:
-        issue_warning(f"Can't determine function graph for function '{func.__name__}' "
-                      f"so assuming all outputs depend on all inputs.  Error was: {err}")
-        return
+    node = ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec')
+    visitor = _FuncGrapher(node)
 
     retnames = _get_return_names(visitor.outs)
     inputs = set(inspect.signature(func).parameters)
@@ -625,12 +617,12 @@ def get_func_graph(func, outnames=None, display=False):
     if display:
         # show the function graph visually
         from openmdao.visualization.graph_viewer import write_graph, _to_pydot_graph
-        write_graph(_to_pydot_graph(visitor.graph))
+        write_graph(_to_pydot_graph(visitor.graph), display=True)
 
     return visitor.graph
 
 
-def get_function_deps(func, outputs=None):
+def get_function_deps(func, outputs=None, display=False):
     """
     Generate tuples of the form (output, input) for the given function.
 
@@ -646,25 +638,37 @@ def get_function_deps(func, outputs=None):
         The function to be analyzed.
     outputs : list of str or None
         The list of output variable names.
+    display : bool
+        If True, display the function graph using pydot.
 
     Yields
     ------
     tuple
         A tuple of the form (output, input).
     """
-    graph = get_func_graph(func, outputs)
-    if graph is None:
-        if outputs is None:
-            return
-
+    try:
+        graph = get_func_graph(func, outputs, display)
+        if graph is None:
+            if outputs is None:
+                return
+    except Exception as err:
         # assume full dependency
-        for inp in inspect.signature(func).parameters:
-            for out in outputs:
-                yield out, inp
+        issue_warning(f"Can't determine function graph for function '{func.__name__}' "
+                      f"so assuming all outputs depend on all inputs.  Error was: {err}")
+        if outputs is None:
+            yield '*', '*'
+        else:
+            for inp in inspect.signature(func).parameters:
+                for out in outputs:
+                    yield out, inp
         return
 
     outs = graph.graph['outputs']
     successors = graph.successors
+
+    implicit = set(graph.graph['inputs']).intersection(graph.graph['outputs'])
+    for imp in implicit:
+        yield imp, imp
 
     for start in graph.graph['inputs']:
         visited = set([start])
