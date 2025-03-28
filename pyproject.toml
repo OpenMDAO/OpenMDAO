@@ -85,6 +85,7 @@ visualization = [
     "bokeh>=2.4.0",
     "colorama",
     "matplotlib",
+    "rich"
 ]
 
 [project.scripts]

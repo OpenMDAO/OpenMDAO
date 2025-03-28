@@ -22,6 +22,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
     assert_check_totals, assert_warnings
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
+from openmdao.utils.rich_utils import strip_formatting
 from openmdao.utils.testing_utils import use_tempdirs
 
 try:
@@ -1972,7 +1973,7 @@ class TestComponentComplexStep(unittest.TestCase):
                     end += outputs[outname].size
                     outputs[outname] = prod[start:end]
                     start = end
-        
+
         for compact_print in [True, False]:
             with self.subTest(f'{compact_print=}'):
                 prob = om.Problem()
@@ -1986,6 +1987,8 @@ class TestComponentComplexStep(unittest.TestCase):
                 ss = StringIO()
                 prob.check_partials(includes=['comp'], compact_print=compact_print, out_stream=ss)
                 lines = ss.getvalue().splitlines()
+                for i in range(len(lines)):
+                    lines[i] = strip_formatting(lines[i])
 
                 if compact_print:
                     self.assertIn('<BAD SPARSITY>', lines[13])
