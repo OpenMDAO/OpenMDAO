@@ -137,9 +137,11 @@ jobs:
           echo "============================================================="
           echo "Check MPI and PETSc installation"
           echo "============================================================="
+          export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
           export OMPI_MCA_rmaps_base_oversubscribe=1
           export OMPI_MCA_btl=^openib
 
+          echo "export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> $GITHUB_ENV
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
           echo "OMPI_MCA_btl=^openib" >> $GITHUB_ENV
 

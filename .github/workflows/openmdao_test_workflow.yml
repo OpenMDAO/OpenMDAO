@@ -89,7 +89,7 @@ jobs:
             NUMPY: '1.26'
             SCIPY: '1.14'
             PETSc: '3.20'
-            PYOPTSPARSE: 'v2.11.0'
+            PYOPTSPARSE: 'v2.13.0'
             # PAROPT: true
             SNOPT: '7.7'
             OPTIONAL: '[docs,doe,jax,notebooks,numba,test,visualization]'
@@ -105,7 +105,7 @@ jobs:
             NUMPY: '1.26'
             SCIPY: '1.13'
             PETSc: '3.20'
-            PYOPTSPARSE: 'v2.11.0'
+            PYOPTSPARSE: 'v2.13.0'
             # PAROPT: true
             SNOPT: '7.7'
             OPTIONAL: '[docs,doe,jax,notebooks,numba,test]'
@@ -119,7 +119,7 @@ jobs:
             NUMPY: '1.26'
             SCIPY: '1.14'
             PETSc: '3.20'
-            # PYOPTSPARSE: 'v2.11.0'
+            # PYOPTSPARSE: 'v2.13.0'
             # PAROPT: true
             # SNOPT: '7.7'
             OPTIONAL: '[all]'
@@ -158,7 +158,7 @@ jobs:
             NUMPY: '1.26'
             SCIPY: '1.13'
             PETSc: '3.19'
-            PYOPTSPARSE: 'v2.11.0'
+            PYOPTSPARSE: 'v2.13.0'
             SNOPT: '7.7'
             OPTIONAL: '[all]'
             BUILD_DOCS: true
@@ -265,6 +265,7 @@ jobs:
           echo "============================================================="
           echo "Check MPI and PETSc installation"
           echo "============================================================="
+          export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
           export OMPI_MCA_rmaps_base_oversubscribe=1
           export OMPI_MCA_btl=^openib
           echo "-----------------------"
@@ -278,6 +279,7 @@ jobs:
                                  print(x.getArray())"
           echo "-----------------------"
 
+          echo "export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> $GITHUB_ENV
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
           echo "OMPI_MCA_btl=^openib" >> $GITHUB_ENV
 
