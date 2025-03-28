@@ -67,7 +67,8 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
 from openmdao.visualization.graph_viewer import _graph_setup_parser, _graph_cmd
-from openmdao.visualization.realtime_opt_plot.realtime_opt_plot import _realtime_opt_plot_setup_parser, _realtime_opt_plot_cmd
+from openmdao.visualization.realtime_opt_plot.realtime_opt_plot import \
+    _realtime_opt_plot_setup_parser, _realtime_opt_plot_cmd
 from openmdao.recorders.view_cases import _view_cases_setup_parser, _view_cases_cmd
 
 
@@ -475,6 +476,7 @@ def _list_pre_post_cmd(options, user_args):
 
     _load_and_exec(options.file[0], user_args)
 
+
 def _rtplot_setup_parser(parser):
     """
     Set up the openmdao subparser for the 'openmdao rtplot' command.
@@ -504,16 +506,21 @@ def _rtplot_cmd(options, user_args):
     def _view_realtime_opt_plot(problem):
         driver = problem.driver
         if not driver:
-            raise RuntimeError("Unable to run realtime optimization progress plot because no Driver")
+            raise RuntimeError(
+                "Unable to run realtime optimization progress plot because no Driver")
         if len(problem.driver._rec_mgr._recorders) == 0:
-            raise RuntimeError("Unable to run realtime optimization progress plot because no case recorder attached to Driver")
+            raise RuntimeError(
+                "Unable to run realtime optimization progress plot "
+                    "because no case recorder attached to Driver"
+            )
 
-        recorder_filepath = str(problem.driver._rec_mgr._recorders[0]._filepath) 
+        recorder_filepath = str(problem.driver._rec_mgr._recorders[0]._filepath)
 
         if options.show:
             cmd = ['openmdao', 'realtime_opt_plot', '--pid', str(os.getpid()), recorder_filepath]
         else:
-            cmd = ['openmdao', 'realtime_opt_plot', '--pid', '--no-display', str(os.getpid()), recorder_filepath]
+            cmd = ['openmdao', 'realtime_opt_plot', '--pid', '--no-display',
+                   str(os.getpid()), recorder_filepath]
         cp = subprocess.Popen(cmd)  # nosec: trusted input
 
         # Do a quick non-blocking check to see if it immediately failed
@@ -522,13 +529,15 @@ def _rtplot_cmd(options, user_args):
         if quick_check is not None and quick_check != 0:
             # Process already terminated with an error
             stderr = cp.stderr.read().decode()
-            raise RuntimeError(f"Failed to start up the realtime plot server with code {quick_check}: {stderr}.")
+            raise RuntimeError(
+                f"Failed to start up the realtime plot server with code {quick_check}: {stderr}.")
 
     # register the hook
     hooks._register_hook('_setup_recording', 'Problem', post=_view_realtime_opt_plot, ncalls=1)
 
     # run the script
     _load_and_exec(options.file[0], user_args)
+
 
 def _get_deps(dep_dict: dict, package_name: str) -> None:
     """
@@ -702,12 +711,12 @@ _command_map = {
         "Compute coloring(s) for specified partial jacobians.",
     ),
     'rtplot': (
-        _rtplot_setup_parser, 
+        _rtplot_setup_parser,
         _rtplot_cmd,
         "Run the realtime optimization progress plot tool once the driver recorder file is started"
     ),
     'realtime_opt_plot': (
-        _realtime_opt_plot_setup_parser, 
+        _realtime_opt_plot_setup_parser,
         _realtime_opt_plot_cmd,
         "Run the realtime optimization progress plot tool"
     ),

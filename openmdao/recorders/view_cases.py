@@ -273,7 +273,7 @@ def view_cases(case_recorder_file, show=True):
             case.success,
             case.timestamp,
         ]
-        
+
     cases_table_pane = pn.widgets.Tabulator(
         df,
         show_index=False,
