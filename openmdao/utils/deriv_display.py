@@ -314,7 +314,7 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             out_stream.write(sys_buffer.getvalue())
             if system.get_reports_dir().is_dir():
                 report = system.get_reports_dir() / report_name
-                with open(report, encoding="utf-8") as file:
+                with open(report, mode='w', encoding="utf-8") as file:
                     file.write(f'<html><body>\n{sys_buffer.getvalue()}\n</body></html>')
 
 
