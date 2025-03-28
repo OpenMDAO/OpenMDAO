@@ -5544,8 +5544,6 @@ class System(object, metaclass=SystemMetaclass):
             The value of the requested output/input variable.
         """
         abs_names = name2abs_names(self, name)
-        if not abs_names:
-            raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
         simp_units = simplify_unit(units)
 
         if from_src:
@@ -5663,24 +5661,21 @@ class System(object, metaclass=SystemMetaclass):
         except AttributeError:
             ginputs = {}  # could happen if this system is not a Group
 
-        if abs_names:
-            n_proms = len(abs_names)  # for output this will never be > 1
-            if n_proms > 1 and name in ginputs:
-                abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
-            else:
-                abs_name = abs_names[0]
-
-            if not has_vectors:
-                has_dyn_shape = []
-                for n in abs_names:
-                    if n in all_meta['input']:
-                        m = all_meta['input'][n]
-                        if 'shape_by_conn' in m and m['shape_by_conn']:
-                            has_dyn_shape.append(True)
-                    else:
-                        has_dyn_shape.append(False)
+        n_proms = len(abs_names)  # for output this will never be > 1
+        if n_proms > 1 and name in ginputs:
+            abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
         else:
-            raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
+            abs_name = abs_names[0]
+
+        if not has_vectors:
+            has_dyn_shape = []
+            for n in abs_names:
+                if n in all_meta['input']:
+                    m = all_meta['input'][n]
+                    if 'shape_by_conn' in m and m['shape_by_conn']:
+                        has_dyn_shape.append(True)
+                else:
+                    has_dyn_shape.append(False)
 
         set_units = None
 
