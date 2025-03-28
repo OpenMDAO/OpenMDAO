@@ -1,3 +1,5 @@
+"""Utilities for using rich with OpenMDAO."""
+
 import itertools
 import re
 
@@ -10,6 +12,7 @@ except ImportError:
 def rich_wrap(s, tags=None):
     """
     If rich is available, escape square brackets and wrap the given string in the provided tags.
+
     If rich is not available, just return the string.
 
     Parameters
@@ -46,3 +49,18 @@ def rich_wrap(s, tags=None):
     on = ' '.join(cmds)
     off = '/' + ' '.join(reversed(cmds))
     return f'[{on}]{s}[{off}]'
+
+
+def strip_formatting(s):
+    """
+    Remove formatting applied to a string by rich.
+
+    This method is useful when testing the content of rich-formatted output.
+
+    Parameters
+    ----------
+    s : str
+        The string to have its rich formatting removed.
+    """
+    escape_pattern = r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
+    return re.sub(escape_pattern, '', s)

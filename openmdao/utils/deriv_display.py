@@ -30,7 +30,7 @@ VAR = {'bold', 'bright_green'}
 
 
 def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, out_stream,
-                   fd_opts, totals=False, show_only_incorrect=False, lcons=None, console=None):
+                   fd_opts, totals=False, show_only_incorrect=False, lcons=None):
     """
     Print derivative error info to out_stream.
 
@@ -60,8 +60,6 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
         For total derivatives only, list of outputs that are actually linear constraints.
     sort : bool
         If True, sort subjacobian keys alphabetically.
-    console : Console or None
-        The rich Console object, if being printed with rich. Otherwise None to use stdout.
     """
     from openmdao.core.component import Component
 
@@ -115,7 +113,7 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             of = f"'{rich_wrap(of, VAR)}'"
 
         if directional:
-            wrt = f"(d){rich_wrap(wrt, VAR)}"
+            wrt = f"(d){wrt}"
 
         tol_violations = derivative_info['tol violation']
         abs_errs = derivative_info['abs error']
@@ -144,11 +142,9 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             if directional:
                 if totals and tol_violations[i].forward is not None:
                     err = _format_error(tol_violations[i].forward, 0.0)
-                    print(rich_wrap(f'    Max Tolerance Violation ([fwd, fd] Dot Product Test)'
-                                 f'{stepstrs[i]} : {err}'))
-                    exit(0)
-                    parts.append(rich_wrap(f'    Max Tolerance Violation ([fwd, fd] Dot Product Test)'
-                                 f'{stepstrs[i]} : {err}'))
+                    parts.append(rich_wrap(f'    Max Tolerance Violation '
+                                           '([fwd, fd] Dot Product Test)'
+                                           f'{stepstrs[i]} : {err}'))
                     parts.append(f'      abs error: {abs_errs[i].forward:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].forward:.6e}')
                     parts.append(f'      fwd value: {vals_at_max_err[i].forward[0]:.6e}')
@@ -158,8 +154,9 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                 if ('directional_fd_rev' in derivative_info and
                         derivative_info['directional_fd_rev'][i]):
                     err = _format_error(tol_violations[i].reverse, 0.0)
-                    parts.append(rich_wrap(f'    Max Tolerance Violation ([rev, fd] Dot Product Test)'
-                                 f'{stepstrs[i]} : {err}'))
+                    parts.append(rich_wrap('    Max Tolerance Violation '
+                                           '([rev, fd] Dot Product Test)'
+                                           f'{stepstrs[i]} : {err}'))
                     parts.append(f'      abs error: {abs_errs[i].reverse:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].reverse:.6e}')
                     fd, rev = derivative_info['directional_fd_rev'][i]
@@ -411,7 +408,7 @@ def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=Fal
             of = f'{rich_wrap(of, VAR)} (index size: {indices})'
 
         if directional:
-            wrt = f"(d) {rich_wrap(wrt, VAR)}"
+            wrt = f"(d) {wrt}"
 
         tol_violations = derivative_info['tol violation']
         vals_at_max_err = derivative_info['vals_at_max_error']
@@ -575,7 +572,7 @@ def _print_deriv_table(table_data, headers, out_stream, tablefmt='grid', col_met
 
 class _JacFormatter:
     """
-    A class
+    A formatter for jacobians that highlights sparsity and erroneous values.
 
     Parameters
     ----------
@@ -618,6 +615,7 @@ class _JacFormatter:
     _j : int
         An internal counter used to track the current column being printed.
     """
+
     def __init__(self, shape=None, nzrows=None, nzcols=None, Jref=None,
                  abs_err_tol=1.0E-8, rel_err_tol=1.0E-8, uncovered=None):
         self._shape = shape
@@ -640,12 +638,11 @@ class _JacFormatter:
 
     def reset(self, Jref=_UNDEFINED):
         """
-        Reset the row/column counters, and optionally provide
-        a new reference jacobian for error calculation.
+        Reset the row/column counters and provide a new reference value.
 
         Parameters
         ----------
-        Jref : array-like
+        Jref : array-like, optional.
             A reference jacobian against any values are checked for error.
         """
         self._i = 0

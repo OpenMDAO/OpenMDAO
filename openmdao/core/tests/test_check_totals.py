@@ -22,6 +22,7 @@ from openmdao.core.constants import _UNDEFINED
 import openmdao.core.total_jac as tot_jac_mod
 
 from openmdao.utils.mpi import MPI
+from openmdao.utils.rich_utils import strip_formatting
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -1420,7 +1421,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         stream = StringIO()
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
-        content = stream.getvalue()
+        content = strip_formatting(stream.getvalue())
 
         self.assertEqual(content.count("'comp.out' wrt (d)('comp.in',)"), 1)
         self.assertEqual(content.count('rev value:'), 1)
@@ -1497,6 +1498,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         stream = StringIO()
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
         content = stream.getvalue()
+        content = strip_formatting(content)
 
         self.assertEqual(content.count("('comp.out1', 'comp.out2') wrt (d)'comp.in1'"), 1)
         self.assertEqual(content.count("('comp.out1', 'comp.out2') wrt (d)'comp.in2'"), 1)
