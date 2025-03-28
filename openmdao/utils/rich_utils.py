@@ -61,6 +61,11 @@ def strip_formatting(s):
     ----------
     s : str
         The string to have its rich formatting removed.
+
+    Returns
+    -------
+    str
+        String s with any ascii formatting sequences removed.
     """
     escape_pattern = r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
     return re.sub(escape_pattern, '', s)
