@@ -50,7 +50,6 @@ class JaxQuadraticCompPrimal(om.JaxImplicitComponent):
         self.add_input('c')
         self.add_output('x', val=5.)
 
-        self.declare_partials(of=['*'], wrt=['*'])
 
     def setup_partials(self):
         if self.matrix_free:
@@ -78,24 +77,6 @@ class JaxLinearSystemCompPrimal(om.JaxImplicitComponent):
         self.add_output("x", shape=shape, val=.1)
 
     def setup_partials(self):
-        size = self.options['size']
-        mat_size = size * size
-        full_size = size
-
-        row_col = np.arange(full_size, dtype="int")
-
-        self.declare_partials('x', 'b', val=np.full(full_size, -1.0), rows=row_col, cols=row_col)
-
-        rows = np.repeat(np.arange(full_size), size)
-
-        cols = np.arange(mat_size)
-
-        self.declare_partials('x', 'A', rows=rows, cols=cols)
-
-        cols = np.tile(np.arange(size), size)
-        cols += np.repeat(np.arange(1), mat_size) * size
-
-        self.declare_partials(of='x', wrt='x', rows=rows, cols=cols)
 
         if self.matrix_free:
             self.linear_solver = om.ScipyKrylov()
@@ -123,24 +104,6 @@ class JaxLinearSystemCompPrimalwOption(om.JaxImplicitComponent):
         self.add_output("x", shape=shape, val=.1)
 
     def setup_partials(self):
-        size = self.options['size']
-        mat_size = size * size
-        full_size = size
-
-        row_col = np.arange(full_size, dtype="int")
-
-        self.declare_partials('x', 'b', val=np.full(full_size, -1.0), rows=row_col, cols=row_col)
-
-        rows = np.repeat(np.arange(full_size), size)
-
-        cols = np.arange(mat_size)
-
-        self.declare_partials('x', 'A', rows=rows, cols=cols)
-
-        cols = np.tile(np.arange(size), size)
-        cols += np.repeat(np.arange(1), mat_size) * size
-
-        self.declare_partials(of='x', wrt='x', rows=rows, cols=cols)
 
         if self.matrix_free:
             self.linear_solver = om.ScipyKrylov()
@@ -171,24 +134,6 @@ class JaxLinearSystemCompPrimalwDiscrete(om.JaxImplicitComponent):
         self.add_output("x", shape=shape, val=.1)
 
     def setup_partials(self):
-        size = self.options['size']
-        mat_size = size * size
-        full_size = size
-
-        row_col = np.arange(full_size, dtype="int")
-
-        self.declare_partials('x', 'b', val=np.full(full_size, -1.0), rows=row_col, cols=row_col)
-
-        rows = np.repeat(np.arange(full_size), size)
-
-        cols = np.arange(mat_size)
-
-        self.declare_partials('x', 'A', rows=rows, cols=cols)
-
-        cols = np.tile(np.arange(size), size)
-        cols += np.repeat(np.arange(1), mat_size) * size
-
-        self.declare_partials(of='x', wrt='x', rows=rows, cols=cols)
 
         if self.matrix_free:
             self.linear_solver = om.ScipyKrylov()

@@ -882,6 +882,64 @@ def _update_subjac_sparsity(sparsity_iter, pathname, subjacs_info):
                 })
 
 
+def _re_init(self):
+    """
+    Re-initialize the component for a new run.
+    """
+    self._tangents = {'fwd': None, 'rev': None}
+    self._do_sparsity = False
+    self._sparsity = None
+    self._jac_func_ = None
+    self._static_hash = None
+    self._jac_colored_ = None
+    self._output_shapes = None
+
+
+def _get_differentiable_compute_primal(self, discrete_inputs):
+    """
+    Get the compute_primal function for the jacobian.
+
+    This version of the compute primal should take no discrete inputs and return no discrete
+    outputs. It will be called when computing the jacobian.
+
+    Parameters
+    ----------
+    self : Component
+        The component to get the compute_primal function for.
+    discrete_inputs : iter of discrete values
+        The discrete input values.
+
+    Returns
+    -------
+    function
+        The compute_primal function to be used to compute the jacobian.
+    """
+    # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
+    if discrete_inputs:
+        if self._discrete_outputs:
+            ncontouts = self._outputs.nvars()
+
+            def differentiable_compute_primal(*contvals):
+                return self.compute_primal(*contvals, *discrete_inputs)[:ncontouts]
+
+        else:
+
+            def differentiable_compute_primal(*contvals):
+                return self.compute_primal(*contvals, *discrete_inputs)
+
+        return differentiable_compute_primal
+
+    elif self._discrete_outputs:
+        ncontouts = self._outputs.nvars()
+
+        def differentiable_compute_primal(*contvals):
+            return self.compute_primal(*contvals)[:ncontouts]
+
+        return differentiable_compute_primal
+
+    return self.compute_primal
+
+
 def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_nan=False):
     """
     Compute the sparsity of the Jacobian using jvp/vjp with nans for the seeds.
@@ -916,18 +974,20 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
 
     if implicit:
         ncontins = self._inputs.nvars() + ncontouts
-        pvecs = (self._inputs, self._outputs)
+        pvecs = (self._outputs, self._inputs)
+        wrtsize = len(self._outputs) + len(self._inputs)
         save_vecs = (self._residuals,)
     else:
         ncontins = self._inputs.nvars()
         pvecs = (self._inputs,)
+        wrtsize = len(self._inputs)
         save_vecs = (self._outputs, self._residuals,)
 
     sparsity = None
     idiscvals = tuple(self._discrete_inputs.values())
 
     # exclude the discrete inputs from the inputs and the discrete outputs from the outputs
-    differentiable_part = self._get_differentiable_compute_primal(idiscvals)
+    differentiable_part = _get_differentiable_compute_primal(self, idiscvals)
 
     # when computing tangents we only care about shapes of the values, not the values themselves,
     # so we can use the unperturbed values for the tangents
@@ -955,6 +1015,8 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
     if self.options['use_jit']:
         Jfunc = jax.jit(Jfunc)
 
+    sparsity = np.zeros((len(self._outputs), wrtsize))
+
     for _ in self._perturbation_iter(num_iters=num_iters, perturb_size=perturb_size,
                                      perturb_vecs=pvecs, save_vecs=save_vecs):
         self._apply_nonlinear()
@@ -981,14 +1043,19 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
         if direction != 'fwd':
             J = J.T
 
-        nz = np.nonzero(J)
-        data = np.ones(len(nz[0]), dtype=bool)
-        J = coo_matrix((data, nz), shape=J.shape)
-
         if sparsity is None:
-            sparsity = J
+            sparsity[:, :] = np.abs(J)
         else:
-            sparsity += J
+            sparsity[:, :] += np.abs(J)
+
+    if implicit:
+        # we need to swap input and output cols because OpenMDAO jacs have output wrts first
+        # followed by input wrts but compute_primal takes inputs first followed by outputs
+        sparsity = np.hstack((sparsity[:, -len(self._outputs):], sparsity[:, :len(self._inputs)]))
+
+    nz = np.nonzero(sparsity)
+    data = np.ones(len(nz[0]), dtype=bool)
+    sparsity = coo_matrix((data, nz), shape=sparsity.shape)
 
     info = {
         'tol': 0.,
@@ -1146,6 +1213,7 @@ def _jax_derivs2partials(self, deriv_vals, partials, ofnames, wrtnames):
         isinstance(deriv_vals[0], tuple)
     nof = len(ofnames)
 
+    wrtnames = list(wrtnames)
     for ofidx, ofname in enumerate(ofnames):
         ofmeta = self._var_rel2meta[ofname]
         for wrtidx, wrtname in enumerate(wrtnames):

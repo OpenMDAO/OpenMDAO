@@ -58,7 +58,7 @@ class JaxSparsityComp(JaxExplicitComponent):
     This component is used to test coloring. The jacobian can be computed with and
     without coloring and the two results should be the same.
 
-    This version does not declare partials so sparsity must be computed in order to determine
+    If `declare_partials` is False, then sparsity must be computed in order to determine
     rows/cols for the subjacobian declarations.
 
     Parameters

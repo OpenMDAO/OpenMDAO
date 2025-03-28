@@ -169,7 +169,7 @@ class Component(System):
                              'some other AD package capable of jitting is active.')
         self.options.declare('default_shape', types=tuple, default=(1,),
                              desc='Default shape for variables that do not set val to a non-scalar '
-                             'value or set shape, set shape_by_conn, copy_shape, or compute_shape.'
+                             'value or set shape, shape_by_conn, copy_shape, or compute_shape.'
                              ' Default is (1,).')
 
     def setup(self):
@@ -418,7 +418,7 @@ class Component(System):
                     raise RuntimeError(f"{self.msginfo}: compute_primal must be defined if using "
                                        "a derivs_method option of 'cs' or 'fd'")
                 # declare all partials as 'cs' or 'fd'
-                for of, wrt in get_function_deps(self.compute_primal,
+                for of, wrt in get_function_deps(self._orig_compute_primal,
                                                  self._var_rel_names['output']):
                     if of in self._discrete_outputs or wrt in self._discrete_inputs:
                         continue
