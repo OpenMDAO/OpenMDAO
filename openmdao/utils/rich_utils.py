@@ -69,3 +69,23 @@ def strip_formatting(s):
     """
     escape_pattern = r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])'
     return re.sub(escape_pattern, '', s)
+
+
+def strip_tags(s):
+    """
+    Remove non-escaped tags from a string.
+
+    This method is useful for determining lengths of rich-formatted text.
+
+    Parameters
+    ----------
+    s : str
+        The string to have its rich formatting removed.
+
+    Returns
+    -------
+    str
+        String s with any rich tags removed.
+    """
+    escape_pattern = r'(?<!\\)\[/?\w+[^\]]*\]'
+    return re.sub(escape_pattern, '', s)
