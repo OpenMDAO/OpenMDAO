@@ -462,6 +462,27 @@ class NameResolver(object):
             else:
                 yield from self._abs2prom[iotype]
 
+    def info(self, absname, iotype=None):
+        """
+        Get the information about a variable.
+
+        Parameters
+        ----------
+        absname : str
+            The absolute name of the variable.
+        iotype : str
+            Either 'input', 'output', or None to check all iotypes.
+
+        Returns
+        -------
+        tuple
+            Tuple of the form (promoted_name, _VarData(local, continuous, distributed)).
+        """
+        if iotype is None:
+            iotype = self.get_abs_iotype(absname, report_error=True)
+
+        return self._abs2prom[iotype][absname]
+
     def info_iter(self, iotype=None):
         """
         Yield absolute names and their information.
@@ -679,6 +700,7 @@ class NameResolver(object):
         try:
             if iotype is None:
                 iotype = self.get_abs_iotype(absname, report_error=True)
+
             if local is not None:
                 name, info = self._abs2prom[iotype][absname]
                 if info.local == local:
@@ -846,22 +868,22 @@ class NameResolver(object):
 
         Returns
         -------
-        str or None
-            The promoted name corresponding to the converted promoted name or None if no match
-            is found.
+        str
+            The promoted name corresponding to the converted promoted name or the original promoted
+            name if no match is found.
         """
         if iotype is None:
             iotype = other.get_prom_iotype(promname)
             if iotype is None:
-                return None
+                return promname
 
         absnames = other.absnames(promname, iotype, report_error=False)
-        if not absnames:
-            return None
+        if absnames:
+            absname = absnames[0]
+            if absname in self._abs2prom[iotype]:
+                return self._abs2prom[iotype][absname][0]
 
-        absname = absnames[0]
-        if absname in self._abs2prom[iotype]:
-            return self._abs2prom[iotype][absname][0]
+        return promname
 
     def dump(self, out_stream=sys.stdout):
         """
