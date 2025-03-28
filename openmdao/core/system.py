@@ -456,7 +456,7 @@ class System(object, metaclass=SystemMetaclass):
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
-        self._resolver = None
+        self._resolver = NameResolver(self.pathname, self.msginfo)
         self._var_allprocs_prom2abs_list = None
         self._var_prom2inds = {}
         self._var_abs2prom = {'input': {}, 'output': {}}
@@ -2209,7 +2209,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # includes and excludes for outputs are specified using promoted names
             # includes and excludes for inputs are specified using _absolute_ names
-            abs2prom_output = self._var_allprocs_abs2prom['output']
+            resolver = self._resolver
 
             # set of promoted output names and absolute input and residual names
             # used for matching includes/excludes
@@ -2218,15 +2218,15 @@ class System(object, metaclass=SystemMetaclass):
             # includes and excludes for inputs are specified using _absolute_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_inputs']:
-                abs2prom_inputs = self._var_allprocs_abs2prom['input']
-                match_names.update(abs2prom_inputs)
-                myinputs = sorted([n for n in abs2prom_inputs if check_path(n, incl, excl)])
+                match_names.update(resolver.abs_iter('input'))
+                myinputs = sorted([n for n in resolver.abs_iter('input')
+                                   if check_path(n, incl, excl)])
 
             # includes and excludes for outputs are specified using _promoted_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_outputs']:
-                match_names.update(abs2prom_output.values())
-                myoutputs = sorted([n for n, prom in abs2prom_output.items()
+                match_names.update(resolver.prom_iter('output'))
+                myoutputs = sorted([n for n, prom in resolver.abs2prom_iter('output')
                                     if check_path(prom, incl, excl)])
 
                 if self._var_discrete['output']:
@@ -2240,7 +2240,7 @@ class System(object, metaclass=SystemMetaclass):
             elif options['record_residuals']:
                 match_names.update(self._residuals)
                 myresiduals = [n for n in self._residuals._abs_iter()
-                               if check_path(abs2prom_output[n], incl, excl)]
+                               if check_path(resolver.abs2prom(n, 'output'), incl, excl)]
 
             # check that all exclude/include globs have at least one matching output or input name
             for pattern in excl:
@@ -2279,6 +2279,7 @@ class System(object, metaclass=SystemMetaclass):
         self._responses = {}
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
+        self._resolver = NameResolver(self.pathname, self.msginfo)
 
     def _setup_procs(self, pathname, comm, prob_meta):
         """
@@ -4152,8 +4153,9 @@ class System(object, metaclass=SystemMetaclass):
             need_gather = False  # we can get everything from 'allprocs' dict without gathering
 
         result = {}
+        abs2prom_iter = self._resolver.abs2prom_iter
 
-        it = self._var_allprocs_abs2prom if get_remote else self._var_abs2prom
+        local = None if get_remote else True
 
         if is_design_var is not None:
             des_vars = self.get_design_vars(get_sizes=False, use_prom_ivc=False)
@@ -4162,7 +4164,7 @@ class System(object, metaclass=SystemMetaclass):
             cont2meta = metadict[iotype]
             disc2meta = disc_metadict[iotype]
 
-            for abs_name, prom in it[iotype].items():
+            for abs_name, prom in abs2prom_iter(iotype, local=local):
                 if abs_name.startswith('_auto_ivc.'):
                     if not match_prom_or_abs(abs_name, abs_name, includes, excludes):
                         continue
@@ -5368,15 +5370,13 @@ class System(object, metaclass=SystemMetaclass):
             The new list with promoted names.
         """
         new_list = []
-        abs2prom_in = self._var_allprocs_abs2prom['input']
-        abs2prom_out = self._var_allprocs_abs2prom['output']
+        abs2prom = self._resolver.abs2prom
+
         for tup in var_info:
             lst = list(tup)
-            if tup[0] in abs2prom_out:
-                lst[0] = abs2prom_out[tup[0]]
-            else:
-                lst[0] = abs2prom_in[tup[0]]
+            lst[0] = abs2prom(tup[0])
             new_list.append(lst)
+
         return new_list
 
     def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,
@@ -5462,7 +5462,8 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 return _UNDEFINED
 
-        typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
+        resolver = self._resolver
+        typ = resolver.get_abs_iotype(abs_name)
         if kind is None:
             kind = typ
         if vec_name is None:
@@ -5578,10 +5579,11 @@ class System(object, metaclass=SystemMetaclass):
         if from_src:
             conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
         else:
-            conns = []
+            conns = ()
+
         if from_src and abs_names[0] in conns:  # pull input from source
             src = conns[abs_names[0]]
-            if src in self._var_allprocs_abs2prom['output']:
+            if self._resolver.is_abs(src, 'output'):
                 caller = self
             else:
                 # src is outside of this system so get the value from the model

@@ -1957,7 +1957,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         elif not isinstance(out_stream, TextIOBase):
             raise TypeError("Invalid output stream specified for 'out_stream'")
 
-        abs2prom = self.model._var_abs2prom
+        resolver = self.model._resolver
 
         # Gets the current numpy print options for consistent decimal place
         #   printing between arrays and floats
@@ -1974,10 +1974,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             for col_name in col_names:
                 if col_name == 'name':
                     if show_promoted_name:
-                        if vname in abs2prom['input']:
-                            row[col_name] = abs2prom['input'][vname]
-                        elif vname in abs2prom['output']:
-                            row[col_name] = abs2prom['output'][vname]
+                        if resolver.is_abs(vname, 'input', local=True):
+                            row[col_name] = resolver.abs2prom(vname, 'input')
+                        elif resolver.is_abs(vname, 'output', local=True):
+                            row[col_name] = resolver.abs2prom(vname, 'output')
                         else:
                             # Promoted auto_ivc name. Keep it promoted
                             row[col_name] = vname
@@ -2371,9 +2371,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             raise RuntimeError("list_indep_vars requires that final_setup has been "
                                "run for the Problem.")
 
-        design_vars = model.get_design_vars(recurse=True,
-                                            use_prom_ivc=True,
-                                            get_sizes=False)
+        design_vars = model.get_design_vars(recurse=True, use_prom_ivc=True, get_sizes=False)
 
         problem_indep_vars = []
 
@@ -2382,13 +2380,13 @@ class Problem(object, metaclass=ProblemMetaclass):
             col_names.extend(options)
 
         abs2meta = model._var_allprocs_abs2meta['output']
-        abs2prom = model._var_allprocs_abs2prom['output']
         abs2disc = model._var_allprocs_discrete['output']
+        abs2prom = model._resolver.abs2prom
 
         seen = set()
         for absname, meta in chain(abs2meta.items(), abs2disc.items()):
             if 'openmdao:indep_var' in meta['tags']:
-                name = abs2prom[absname]
+                name = abs2prom(absname, 'output')
                 if (include_design_vars or name not in design_vars) and name not in seen:
                     meta = {key: meta[key] for key in col_names if key in meta}
                     meta['val'] = self.get_val(name)

@@ -1802,6 +1802,7 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+            proc_resolvers = [None] * self.comm.size
             if self._gather_full_data():
                 raw = (allprocs_discrete, self._resolver, allprocs_prom2abs_list, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
@@ -1849,8 +1850,7 @@ class Group(System):
                             self._group_inputs[p] = []
                         self._group_inputs[p].extend(mlist)
 
-                    if proc_resolver is not None:
-                        self._resolver.update(proc_resolver, my_rank=myrank, other_rank=rank)
+                proc_resolvers[rank] = proc_resolver
 
                 for io in ['input', 'output']:
                     allprocs_abs2meta[io].update(proc_abs2meta[io])
@@ -1861,14 +1861,14 @@ class Group(System):
                             allprocs_prom2abs_list[io][prom_name] = []
                         allprocs_prom2abs_list[io][prom_name].extend(abs_names_list)
 
+            self._resolver.update_from_ranks(myrank, proc_resolvers)
+
             for io in ('input', 'output'):
                 if allprocs_abs2meta[io]:
                     # update new allprocs_abs2meta with our local version (now that we have a
                     # consistent order for our dict), so that the 'size' metadata will
                     # accurately reflect this proc's var size instead of one from some other proc.
                     allprocs_abs2meta[io].update(old_abs2meta[io])
-
-        self._resolver.sort()
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
 

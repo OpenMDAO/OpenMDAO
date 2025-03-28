@@ -184,7 +184,7 @@ class ApproximationScheme(object):
 
         row_var_sizes = {v: sz for v, sz in zip(coloring._row_vars, coloring._row_var_sizes)}
         row_map = np.empty(coloring._shape[0], dtype=INT_DTYPE)
-        abs2prom = system._var_allprocs_abs2prom['output']
+        abs2prom = system._resolver.abs2prom
 
         if is_total:
             it = ((of, end - start) for of, start, end, _, _ in system._jac_of_iter())
@@ -195,7 +195,7 @@ class ApproximationScheme(object):
         start = end = colorstart = colorend = 0
         for name, sz in it:
             end += sz
-            prom = name if is_total else abs2prom[name]
+            prom = name if is_total else abs2prom(name, 'output')
             if prom in row_var_sizes:
                 colorend += row_var_sizes[prom]
                 row_map[colorstart:colorend] = range(start, end)
@@ -499,6 +499,7 @@ class ApproximationScheme(object):
         tosend = None
         fd_count = 0
         mycomm = system._full_comm if use_parallel_fd else system.comm
+        abs2prom = system._resolver.abs2prom
 
         # now do uncolored solves
         for group_i, tup in enumerate(approx_groups):
@@ -544,10 +545,7 @@ class ApproximationScheme(object):
 
                     if self._progress_out:
                         end_time = time.perf_counter()
-                        if wrt in system._var_allprocs_abs2prom['output']:
-                            prom_name = system._var_allprocs_abs2prom['output'][wrt]
-                        else:
-                            prom_name = system._var_allprocs_abs2prom['input'][wrt]
+                        prom_name = abs2prom(wrt)
                         self._progress_out.write(f"{fd_count + 1}/{len(result)}: Checking "
                                                  f"derivatives with respect to: "
                                                  f"'{prom_name} [{vecidxs}]' ... "

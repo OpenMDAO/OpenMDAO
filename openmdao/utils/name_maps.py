@@ -145,32 +145,48 @@ class NameResolver(object):
         # these will be recomputed when needed
         self._prom2abs = self._prom2abs_in = self._prom2abs_out = None
 
-    def update(self, other, my_rank=0, other_rank=0):
+    def update(self, other):
         """
-        Update the name resolver with another name resolver.
-
-        This assumes that if my_rank != other_rank, that means that we are in the gather phase
-        and this resolver already contains all of the var data local to this rank.
+        Update the name resolver with another name resolver on the same rank.
 
         Parameters
         ----------
         other : NameResolver
             The name resolver to update with.
-        my_rank : int
-            The rank of the current process.
-        other_rank : int
-            The rank of the other process.
         """
         for io in ('input', 'output'):
-            my_abs2prom = self._abs2prom[io]
-            other_abs2prom = other._abs2prom[io]
-            if my_rank == other_rank:
-                my_abs2prom.update(other_abs2prom)
-            else:
-                for absname, (promname, info) in other_abs2prom.items():
-                    if absname not in my_abs2prom:
-                        info.local = False
-                        my_abs2prom[absname] = (promname, info)
+            self._abs2prom[io].update(other._abs2prom[io])
+
+    def update_from_ranks(self, myrank, others):
+        """
+        Update the name resolver with name resolvers from multiple ranks.
+
+        Parameters
+        ----------
+        myrank : int
+            The rank of the current process.
+        others : list of NameResolver
+            The name resolvers to update with.
+        """
+        # use our existing abs2prom to determine which vars are local to this rank
+        locabs = self._abs2prom
+
+        # reset our abs2prom so all ranks will have the same order
+        self._abs2prom = {'input': {}, 'output': {}}
+
+        for rank, other in enumerate(others):
+            for io in ('input', 'output'):
+                loc_abs2prom = locabs[io]
+                my_abs2prom = self._abs2prom[io]
+                if rank == myrank:
+                    my_abs2prom.update(loc_abs2prom)
+                else:
+                    if other is None:
+                        continue
+                    for absname, (promname, info) in other._abs2prom[io].items():
+                        if absname not in my_abs2prom:
+                            info.local = absname in loc_abs2prom
+                            my_abs2prom[absname] = (promname, info)
 
     def _populate_prom2abs(self):
         """
