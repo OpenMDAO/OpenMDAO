@@ -1004,13 +1004,11 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup()
 
-        with self.assertRaises(NotImplementedError) as cm:
+        with self.assertRaises(ValueError) as cm:
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "'comp1' <class ImpWithInitial>: Error calling apply_nonlinear(), "
-                         "ImplicitComponent.apply_nonlinear() must be overridden by the "
-                         "child class.")
+                         "'comp1' <class ImpWithInitial>: Attempt to set value of 'x' in input vector when it is read only.")
 
 class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
