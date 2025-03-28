@@ -300,7 +300,8 @@ class Component(System):
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[io][prom_name] = [abs_name]
                 abs2prom[io][abs_name] = prom_name
-                self._resolver.add_mapping(abs_name, prom_name, io, local=True)
+                self._resolver.add_mapping(abs_name, prom_name, io, local=True,
+                                           distributed=metadata['distributed'])
 
                 allprocs_abs2meta[abs_name] = {
                     meta_name: metadata[meta_name]
@@ -316,7 +317,8 @@ class Component(System):
                 # Compute allprocs_prom2abs_list, abs2prom
                 allprocs_prom2abs_list[io][prom_name] = [abs_name]
                 abs2prom[io][abs_name] = prom_name
-                self._resolver.add_mapping(abs_name, prom_name, io, local=True)
+                self._resolver.add_mapping(abs_name, prom_name, io, local=True,
+                                           continuous=False)
 
                 # Compute allprocs_discrete (metadata for discrete vars)
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()

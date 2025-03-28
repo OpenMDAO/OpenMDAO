@@ -2721,7 +2721,7 @@ class System(object, metaclass=SystemMetaclass):
 
             return match_type == _MatchType.PATTERN
 
-        def resolve(to_match, io_types, matches, proms):
+        def resolve(to_match, io_types, matches, resolver):
             """
             Determine the mapping of promoted names to the parent scope for a promotion type.
 
@@ -2741,11 +2741,12 @@ class System(object, metaclass=SystemMetaclass):
                         if io == 'output':
                             pinfo = None
                         if key == '*' and not matches[io]:  # special case. add everything
-                            matches[io] = pmap = {n: (n, key, pinfo, match_type) for n in proms[io]}
+                            matches[io] = pmap = {n: (n, key, pinfo, match_type)
+                                                  for n in resolver.prom_iter(io)}
                         else:
                             pmap = matches[io]
                             nmatch = len(pmap)
-                            for n in proms[io]:
+                            for n in resolver.prom_iter(io):
                                 if fnmatchcase(n, key):
                                     if not (n in pmap and _check_dup(io, matches, match_type, n,
                                                                      tup)):
@@ -2757,7 +2758,7 @@ class System(object, metaclass=SystemMetaclass):
                         if io == 'output':
                             pinfo = None
                         pmap = matches[io]
-                        if key in proms[io]:
+                        if resolver.is_prom(key, io):
                             if key in pmap:
                                 _check_dup(io, matches, match_type, key, tup)
                             pmap[key] = (s, key, pinfo, match_type)
@@ -2782,17 +2783,16 @@ class System(object, metaclass=SystemMetaclass):
                 raise RuntimeError(f"{self.msginfo}: '{call}' failed to find any matches for the "
                                    f"following names or patterns: {not_found}.{empty_group_msg}")
 
-        prom2abs_list = self._var_allprocs_prom2abs_list
         maps = {'input': {}, 'output': {}}
 
         if self._var_promotes['input'] or self._var_promotes['output']:
             if self._var_promotes['any']:
                 raise RuntimeError("%s: 'promotes' cannot be used at the same time as "
                                    "'promotes_inputs' or 'promotes_outputs'." % self.msginfo)
-            resolve(self._var_promotes['input'], ('input',), maps, prom2abs_list)
-            resolve(self._var_promotes['output'], ('output',), maps, prom2abs_list)
+            resolve(self._var_promotes['input'], ('input',), maps, self._resolver)
+            resolve(self._var_promotes['output'], ('output',), maps, self._resolver)
         else:
-            resolve(self._var_promotes['any'], ('input', 'output'), maps, prom2abs_list)
+            resolve(self._var_promotes['any'], ('input', 'output'), maps, self._resolver)
 
         return maps
 
@@ -3772,8 +3772,7 @@ class System(object, metaclass=SystemMetaclass):
             meta['orig'] = (prom_name, None)
 
         else:  # Design variable on an input connected to an ivc.
-            pro2abs_in = self._var_allprocs_prom2abs_list['input']
-            src_name = model._conn_global_abs_in2out[pro2abs_in[prom_name][0]]
+            src_name = self._resolver.source(prom_name, model._conn_global_abs_in2out)
             meta['orig'] = (None, prom_name)
 
         key = prom_name if use_prom_ivc else src_name

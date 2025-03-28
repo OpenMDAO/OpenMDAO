@@ -23,7 +23,7 @@ class _VecData(object):
     Internal data structure for each variable in a Vector.
     """
 
-    __slots__ = ['shape', 'size', 'is_scalar', 'range', 'view', 'flat']
+    __slots__ = ('shape', 'size', 'is_scalar', 'range', 'view', 'flat')
 
     def __init__(self, shape, rng):
         self.shape = shape

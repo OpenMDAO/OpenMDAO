@@ -1,5 +1,46 @@
 """Maps between promoted/relative/absolute names."""
 
+import sys
+
+
+class _VarData(object):
+    """
+    Internal data structure for each variable.
+    """
+
+    __slots__ = ('local', 'continuous', 'distributed')
+
+    def __init__(self, local=True, continuous=True, distributed=False):
+        self.local = local
+        self.continuous = continuous
+        self.distributed = distributed
+
+    def __repr__(self):
+        return f"VarData(local={self.local}, continuous={self.continuous}, " \
+               f"distributed={self.distributed})"
+
+    def __iter__(self):
+        return iter((self.local, self.continuous, self.distributed))
+
+    def __eq__(self, other):
+        return self.local == other.local and self.continuous == other.continuous and \
+            self.distributed == other.distributed
+
+    def matches(self, local, continuous, distributed):
+        if distributed is not None:
+            if self.distributed != distributed:
+                return False
+        elif continuous is not None:
+            # if distribute is not None, that implies that continuous is True so we don't need to
+            # check that (and discrete variables will never be distributed)
+            if self.continuous != continuous:
+                return False
+
+        if local is not None and self.local != local:
+            return False
+
+        return True
+
 
 class NameResolver(object):
     """
@@ -54,7 +95,7 @@ class NameResolver(object):
             If True, check for duplicate names.
         """
         self._pathname = pathname
-        self._prefix = '.' + pathname if pathname else ''
+        self._prefix = pathname + '.' if pathname else ''
         self._pathlen = len(pathname) + 1 if pathname else 0
         self._abs2prom = {'input': {}, 'output': {}}
         self._abs2prom_in = self._abs2prom['input']
@@ -80,9 +121,9 @@ class NameResolver(object):
 
         for io in ('input', 'output'):
             assert len(self._abs2prom[io]) == len(system._var_allprocs_abs2prom[io])
-            for absname, (promname, local) in self._abs2prom[io].items():
+            for absname, (promname, info) in self._abs2prom[io].items():
                 assert system._var_allprocs_abs2prom[io][absname] == promname
-                if local:
+                if info.local:
                     assert system._var_abs2prom[io][absname] == promname
                 else:
                     assert absname not in system._var_abs2prom[io]
@@ -91,9 +132,25 @@ class NameResolver(object):
             for promname, abslist in self._prom2abs[io].items():
                 assert sorted(system._var_allprocs_prom2abs_list[io][promname]) == sorted(abslist)
 
+    def sort(self):
+        """
+        Sort the name resolver.
+        """
+        for io in ('input', 'output'):
+            self._abs2prom[io] = {n: v for n, v in sorted(self._abs2prom[io].items(),
+                                                          key=lambda x: x[0])}
+        self._abs2prom_in = self._abs2prom['input']
+        self._abs2prom_out = self._abs2prom['output']
+
+        # these will be recomputed when needed
+        self._prom2abs = self._prom2abs_in = self._prom2abs_out = None
+
     def update(self, other, my_rank=0, other_rank=0):
         """
         Update the name resolver with another name resolver.
+
+        This assumes that if my_rank != other_rank, that means that we are in the gather phase
+        and this resolver already contains all of the var data local to this rank.
 
         Parameters
         ----------
@@ -110,11 +167,10 @@ class NameResolver(object):
             if my_rank == other_rank:
                 my_abs2prom.update(other_abs2prom)
             else:
-                for absname, (promname, local) in other_abs2prom.items():
+                for absname, (promname, info) in other_abs2prom.items():
                     if absname not in my_abs2prom:
-                        my_abs2prom[absname] = (promname, False)
-
-        self._prom2abs = self._prom2abs_in = self._prom2abs_out = None
+                        info.local = False
+                        my_abs2prom[absname] = (promname, info)
 
     def _populate_prom2abs(self):
         """
@@ -157,7 +213,7 @@ class NameResolver(object):
             return len(self._prom2abs_in) + len(self._prom2abs_out)
         return len(self._prom2abs[iotype])
 
-    def num_abs(self, iotype=None, local=False):
+    def num_abs(self, iotype=None, local=None):
         """
         Get the number of absolute names.
 
@@ -165,8 +221,9 @@ class NameResolver(object):
         ----------
         iotype : str
             Either 'input', 'output', or None to count all iotypes.
-        local : bool
-            If True, count only local names.
+        local : bool or None
+            If True, count only local names. If False, count only non-local names.
+            If None, count all names.
 
         Returns
         -------
@@ -176,10 +233,10 @@ class NameResolver(object):
         if iotype is None:
             return self.num_abs('input', local) + self.num_abs('output', local)
 
-        if local:
+        if local is not None:
             count = 0
-            for _, loc in self._abs2prom[iotype].values():
-                if loc:
+            for _, info in self._abs2prom[iotype].values():
+                if info.local == local:
                     count += 1
             return count
         else:
@@ -209,7 +266,7 @@ class NameResolver(object):
                 return False
         return promname in self._prom2abs[iotype]
 
-    def is_abs(self, absname, iotype=None, local=False):
+    def is_abs(self, absname, iotype=None, local=None):
         """
         Check if an absolute name exists.
 
@@ -219,8 +276,9 @@ class NameResolver(object):
             The absolute name to check.
         iotype : str
             Either 'input', 'output', or None to check all iotypes.
-        local : bool
-            If True, check only local names.
+        local : bool or None
+            If True, check only local names. If False, check only non-local names.
+            If None, check all names.
 
         Returns
         -------
@@ -231,9 +289,10 @@ class NameResolver(object):
             iotype = self.get_abs_iotype(absname)
             if iotype is None:
                 return False
-        if local:
+
+        if local is not None:
             a2p = self._abs2prom[iotype]
-            return absname in a2p and a2p[absname][1]
+            return absname in a2p and a2p[absname][1].local == local
         else:
             return absname in self._abs2prom[iotype]
 
@@ -276,6 +335,9 @@ class NameResolver(object):
         str
             The iotype of the promoted name.
         """
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+
         if promname in self._prom2abs_in:
             return 'input'
         if promname in self._prom2abs_out:
@@ -283,7 +345,7 @@ class NameResolver(object):
         if report_error:
             raise ValueError(f"{self.msginfo}: Can't find {promname}.")
 
-    def prom2abs_iter(self, iotype, local=False):
+    def prom2abs_iter(self, iotype, local=None):
         """
         Yield promoted names and their absolute names.
 
@@ -291,8 +353,9 @@ class NameResolver(object):
         ----------
         iotype : str
             Either 'input', 'output', or None to yield all iotypes.
-        local : bool
-            If True, yield only local names.
+        local : bool or None
+            If True, yield only local names. If False, yield only non-local names.
+            If None, yield all names.
 
         Yields
         ------
@@ -308,16 +371,16 @@ class NameResolver(object):
             yield from self.prom2abs_iter('input', local)
             yield from self.prom2abs_iter('output', local)
         else:
-            if local:
+            if local is not None:
                 a2p = self._abs2prom[iotype]
                 for prom, absnames in self._prom2abs[iotype].items():
-                    absnames = [n for n in absnames if a2p[n][1]]
+                    absnames = [n for n in absnames if a2p[n][1].local == local]
                     if absnames:
                         yield prom, absnames
             else:
                 yield from self._prom2abs[iotype].items()
 
-    def abs2prom_iter(self, iotype=None, local=False):
+    def abs2prom_iter(self, iotype=None, local=None):
         """
         Yield absolute names and their promoted names.
 
@@ -325,8 +388,9 @@ class NameResolver(object):
         ----------
         iotype : str
             Either 'input', 'output', or None to yield all iotypes.
-        local : bool
-            If True, yield only local names.
+        local : bool or None
+            If True, yield only local names. If False, yield only non-local names.
+            If None, yield all names.
 
         Yields
         ------
@@ -339,12 +403,12 @@ class NameResolver(object):
             yield from self.abs2prom_iter('input', local)
             yield from self.abs2prom_iter('output', local)
         else:
-            if local:
-                for absname, (promname, loc) in self._abs2prom[iotype].items():
-                    if loc:
+            if local is not None:
+                for absname, (promname, info) in self._abs2prom[iotype].items():
+                    if info.local == local:
                         yield absname, promname
             else:
-                for absname, (promname, loc) in self._abs2prom[iotype].items():
+                for absname, (promname, _) in self._abs2prom[iotype].items():
                     yield absname, promname
 
     def prom_iter(self, iotype=None):
@@ -370,7 +434,7 @@ class NameResolver(object):
         else:
             yield from self._prom2abs[iotype]
 
-    def abs_iter(self, iotype=None, local=False):
+    def abs_iter(self, iotype=None, local=None):
         """
         Yield absolute names.
 
@@ -378,8 +442,9 @@ class NameResolver(object):
         ----------
         iotype : str
             Either 'input', 'output', or None to yield all iotypes.
-        local : bool
-            If True, yield only local names.
+        local : bool or None
+            If True, yield only local names. If False, yield only non-local names.
+            If None, yield all names.
 
         Yields
         ------
@@ -390,16 +455,16 @@ class NameResolver(object):
             yield from self.abs_iter('input', local)
             yield from self.abs_iter('output', local)
         else:
-            if local:
-                for absname, (_, loc) in self._abs2prom[iotype].items():
-                    if loc:
+            if local is not None:
+                for absname, (_, info) in self._abs2prom[iotype].items():
+                    if info.local == local:
                         yield absname
             else:
                 yield from self._abs2prom[iotype]
 
-    def locality_iter(self, iotype=None):
+    def info_iter(self, iotype=None):
         """
-        Yield absolute names and their locality.
+        Yield absolute names and their information.
 
         Parameters
         ----------
@@ -410,17 +475,51 @@ class NameResolver(object):
         ------
         absname : str
             Absolute name.
-        loc : bool
-            True if the absolute name is local, False otherwise.
+        tuple
+            Tuple of promoted name and information about the variable, including local,
+            continuous, and distributed.
         """
         if iotype is None:
-            yield from self.locality_iter('input')
-            yield from self.locality_iter('output')
+            yield from self.info_iter('input')
+            yield from self.info_iter('output')
         else:
-            for absname, (_, loc) in self._abs2prom[iotype].items():
-                yield absname, loc
+            yield from self._abs2prom[iotype].items()
 
-    def add_mapping(self, absname, promname, iotype, local=False):
+    def abs2prom_filter(self, iotype=None, local=None, continuous=None, distributed=None):
+        """
+        Yield absolute names and their promoted names that match the given criteria.
+
+        Parameters
+        ----------
+        iotype : str
+            Either 'input', 'output', or None to yield all iotypes.
+        local : bool
+            If not None, yield only names that match the local flag.
+        continuous : bool
+            If not None, yield only names that match the continuous flag.
+        distributed : bool
+            If not None, yield only names that match the distributed flag.
+
+        Yields
+        ------
+        absname : str
+            Absolute name.
+        promname : str
+            Promoted name.
+        """
+        if iotype is None:
+            yield from self.abs2prom_filter('input', continuous=continuous, distributed=distributed)
+            yield from self.abs2prom_filter('output', continuous=continuous,
+                                            distributed=distributed)
+        else:
+            if local is None and continuous is None and distributed is None:
+                yield from self.abs2prom_iter(iotype)
+            else:
+                for absname, (promname, info) in self._abs2prom[iotype].items():
+                    if info.matches(local, continuous, distributed):
+                        yield absname, promname
+
+    def add_mapping(self, absname, promname, iotype, local, continuous=True, distributed=False):
         """
         Add a mapping between an absolute name and a promoted name.
 
@@ -433,9 +532,15 @@ class NameResolver(object):
         iotype : str
             Either 'input' or 'output'.
         local : bool
-            If True, the mapping is local only.
+            If True, the variable is local.
+        continuous : bool
+            If True, the variable is continuous.
+        distributed : bool
+            If True, the variable is distributed.
         """
-        self._abs2prom[iotype][absname] = (promname, local)
+        self._abs2prom[iotype][absname] = (promname, _VarData(local, continuous, distributed))
+        if self._prom2abs is not None:
+            self._prom2abs[iotype][promname].append(absname)
 
     def source(self, name, conns):
         """
@@ -457,20 +562,20 @@ class NameResolver(object):
             The source corresponding to the name.
         """
         if conns is None:
-            raise RuntimeError(f"{self.msginfo}: Can't find source for {name} because "
+            raise RuntimeError(f"{self.msginfo}: Can't find source for '{name}' because "
                                "connections are not yet known.")
 
         if name in self._abs2prom_in:
             try:
                 return conns[name]
             except KeyError:
-                raise KeyError(f"{self.msginfo}: Can't find source for {name}.")
+                raise RuntimeError(f"{self.msginfo}: Can't find source for '{name}'.")
         elif name in self._abs2prom_out:
             return name
         else:  # promoted
             absnames = self.absnames(name, report_error=False)
             if absnames is None:
-                absname = name
+                raise KeyError(name)
             else:
                 absname = absnames[0]
 
@@ -481,7 +586,7 @@ class NameResolver(object):
                 if absname in self._abs2prom_out:
                     return absname
 
-        raise ValueError(f"{self.msginfo}: Can't find source for {name}.")
+        raise RuntimeError(f"{self.msginfo}: Can't find source for '{name}'.")
 
     def abs2rel(self, absname):
         """
@@ -552,7 +657,7 @@ class NameResolver(object):
         else:
             yield from relnames
 
-    def abs2prom(self, absname, iotype=None, local=False):
+    def abs2prom(self, absname, iotype=None, local=None):
         """
         Convert an absolute name to a promoted name.
 
@@ -562,8 +667,9 @@ class NameResolver(object):
             The absolute name to convert.
         iotype : str
             Either 'input', 'output', or None to check all iotypes.
-        local : bool
-            If True, check only local names.
+        local : bool or None
+            If True, check only local names. If False, check only non-local names.
+            If None, check all names.
 
         Returns
         -------
@@ -573,9 +679,9 @@ class NameResolver(object):
         try:
             if iotype is None:
                 iotype = self.get_abs_iotype(absname, report_error=True)
-            if local:
-                name, loc = self._abs2prom[iotype][absname]
-                if loc:
+            if local is not None:
+                name, info = self._abs2prom[iotype][absname]
+                if info.local == local:
                     return name
                 else:
                     raise ValueError(f"{self.msginfo}: {absname} is not a local {iotype}.")
@@ -614,7 +720,7 @@ class NameResolver(object):
             if report_error:
                 raise KeyError(f"{self.msginfo}: Can't find promoted {iotype} {promname}.")
 
-    def prom2abs(self, promname, iotype=None, local=False, conns=None):
+    def prom2abs(self, promname, iotype=None, local=None, conns=None):
         """
         Convert a promoted name to an unique absolute name.
 
@@ -626,8 +732,9 @@ class NameResolver(object):
             The promoted name to convert.
         iotype : str or None
             Either 'input', 'output', or None to check all iotypes.
-        local : bool
-            If True, check only local names.
+        local : bool or None
+            If True, check only local names. If False, check only non-local names.
+            If None, check all names.
         conns : dict or None
             The connections dictionary.
 
@@ -644,9 +751,9 @@ class NameResolver(object):
                 iotype = self.get_prom_iotype(promname)
 
             lst = self._prom2abs[iotype][promname]
-            if local:
+            if local is not None:
                 a2p = self._abs2prom[iotype]
-                lst = [n for n in lst if a2p[n][1]]
+                lst = [n for n in lst if a2p[n][1].local == local]
 
             if len(lst) == 1:
                 return lst[0]
@@ -681,6 +788,9 @@ class NameResolver(object):
         str
             Absolute name.
         """
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+
         if name in self._prom2abs_in:
             return self.prom2abs(name, 'input')
         elif name in self._prom2abs_out:
@@ -710,7 +820,11 @@ class NameResolver(object):
             return self._abs2prom_in[name][0]
         elif name in self._abs2prom_out:
             return self._abs2prom_out[name][0]
-        elif name in self._prom2abs_in or name in self._prom2abs_out:
+
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+
+        if name in self._prom2abs_in or name in self._prom2abs_out:
             return name
         elif report_error:
             raise KeyError(f"{self.msginfo}: Can't find variable {name}.")
@@ -748,6 +862,20 @@ class NameResolver(object):
         absname = absnames[0]
         if absname in self._abs2prom[iotype]:
             return self._abs2prom[iotype][absname][0]
+
+    def dump(self, out_stream=sys.stdout):
+        """
+        Dump the name resolver contents to a stream.
+
+        Parameters
+        ----------
+        out_stream : file-like
+            The stream to dump the contents to.
+        """
+        from pprint import pprint
+        print(self.msginfo, file=out_stream)
+        pprint(self._abs2prom, stream=out_stream)
+        pprint(self._prom2abs, stream=out_stream)
 
     # # TODO: get rid of this once all parts of code have been updated to use resolver
     # def _get_abs2prom_mapping(self, iotype=None):

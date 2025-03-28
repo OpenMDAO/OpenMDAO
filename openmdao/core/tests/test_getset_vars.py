@@ -6,6 +6,8 @@ from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, P
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.om_warnings import OpenMDAOWarning
+from openmdao.utils.testing_utils import use_tempdirs
+
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -395,6 +397,7 @@ class TestGetSetVariables(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class ParTestCase(unittest.TestCase):
     N_PROCS = 2
 
@@ -492,6 +495,8 @@ class ParTestCase(unittest.TestCase):
 
         p.record(case_name='case_1')
         p.cleanup()
+        
+        p.comm.barrier()
 
         case_1 = om.CaseReader(p.get_outputs_dir() / 'load_case_issue.sql').get_case('case_1')
         assert_near_equal(case_1.get_val('G.a.y')[-1], case_1.get_val('G.b.y'))

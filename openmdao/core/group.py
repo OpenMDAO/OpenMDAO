@@ -1382,10 +1382,10 @@ class Group(System):
             for name in resolver.absnames(absname, iotype):
                 if name != absname:
                     raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
-                                        " is masked by a matching promoted name. Try"
-                                        " promoting to a different name. This can be caused"
-                                        " by promoting '*' at group level or promoting using"
-                                        " dotted names.")
+                                       " is masked by a matching promoted name. Try"
+                                       " promoting to a different name. This can be caused"
+                                       " by promoting '*' at group level or promoting using"
+                                       " dotted names.")
 
     def _check_order(self, reorder=True, recurse=True, out_of_order=None):
         """
@@ -1735,6 +1735,7 @@ class Group(System):
         self._has_distrib_vars = False
         self._has_fd_group = self._owns_approx_jac
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
+        rank = self.comm.rank
 
         # sort the subsystems alphabetically in order to make the ordering
         # of vars in vectors and other data structures independent of the
@@ -1761,7 +1762,7 @@ class Group(System):
                                          subsys._var_discrete[io].items()})
 
                 sub_loc_proms = subsys._var_abs2prom[io]
-                for sub_prom, sub_abs in subsys._var_allprocs_prom2abs_list[io].items():
+                for sub_prom, sub_abs in subsys._resolver.prom2abs_iter(io):
                     if sub_prom in subprom2prom:
                         prom_name, _, pinfo, _ = subprom2prom[sub_prom]
                         if pinfo is not None and io == 'input':
@@ -1780,9 +1781,11 @@ class Group(System):
                     if prom_name not in allprocs_prom2abs_list[io]:
                         allprocs_prom2abs_list[io][prom_name] = []
                     allprocs_prom2abs_list[io][prom_name].extend(sub_abs)
+
                     for abs_name in sub_abs:
                         if abs_name in sub_loc_proms:
                             abs2prom[io][abs_name] = prom_name
+
                         self._resolver.add_mapping(abs_name, prom_name, io,
                                                    local=abs_name in sub_loc_proms)
 
@@ -1829,6 +1832,9 @@ class Group(System):
             for io in ['input', 'output']:
                 allprocs_prom2abs_list[io] = {}
 
+            # # reset the resolver so that resolvers on all procs will have the same order
+            # self._resolver = NameResolver(self.pathname, self.msginfo, self._resolver._check_dups)
+
             myrank = self.comm.rank
             for rank, (proc_discrete, proc_resolver, proc_prom2abs_list, proc_abs2meta,
                        oscale, oadd, rscale, ginputs, has_dist_vars,
@@ -1863,6 +1869,8 @@ class Group(System):
                     # consistent order for our dict), so that the 'size' metadata will
                     # accurately reflect this proc's var size instead of one from some other proc.
                     allprocs_abs2meta[io].update(old_abs2meta[io])
+
+        self._resolver.sort()
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
