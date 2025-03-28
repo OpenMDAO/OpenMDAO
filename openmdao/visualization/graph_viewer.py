@@ -296,10 +296,7 @@ class GraphViewer(object):
             node_info[s.pathname] = meta.copy()
 
         if group.comm.size > 1:
-            abs2prom = group._var_abs2prom
-            all_abs2prom = group._var_allprocs_abs2prom
-            if (len(all_abs2prom['input']) != len(abs2prom['input']) or
-                    len(all_abs2prom['output']) != len(abs2prom['output'])):
+            if group._resolver.has_remote:
                 # not all systems exist in all procs, so must gather info from all procs
                 if group._gather_full_data():
                     all_node_info = group.comm.allgather(node_info)

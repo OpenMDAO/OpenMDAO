@@ -229,7 +229,8 @@ class BroydenSolver(NonlinearSolver):
 
         all_states = []
         sys_recurse(system, all_states)
-        all_states = [system._var_abs2prom['output'][name] for name in all_states]
+        abs2prom = system._resolver.abs2prom
+        all_states = [abs2prom(name, 'output', local=True) for name in all_states]
 
         missing = set(all_states).difference(states)
         if len(missing) > 0:

@@ -75,10 +75,12 @@ class NameResolver(object):
         A dictionary of promoted to absolute names for inputs.
     _prom2abs_out : dict
         A dictionary of promoted to absolute names for outputs.
-    msginfo : str
-        The message information for the system.
     _check_dups : bool
         If True, check for duplicate names.
+    msginfo : str
+        The message information for the system.
+    has_remote : bool
+        If True, the name resolver has remote variables.
     """
 
     def __init__(self, pathname, msginfo='', check_dups=False):
@@ -103,8 +105,9 @@ class NameResolver(object):
         self._prom2abs = None
         self._prom2abs_in = None
         self._prom2abs_out = None
-        self.msginfo = msginfo if msginfo else pathname
         self._check_dups = check_dups
+        self.msginfo = msginfo if msginfo else pathname
+        self.has_remote = False
 
     # TODO: this will go away once all is converted to use the name resolver
     def verify(self, system):
@@ -156,6 +159,7 @@ class NameResolver(object):
         """
         for io in ('input', 'output'):
             self._abs2prom[io].update(other._abs2prom[io])
+        self.has_remote |= other.has_remote
 
     def update_from_ranks(self, myrank, others):
         """
@@ -186,6 +190,8 @@ class NameResolver(object):
                     for absname, (promname, info) in other._abs2prom[io].items():
                         if absname not in my_abs2prom:
                             info.local = absname in loc_abs2prom
+                            if not info.local:
+                                self.has_remote = True
                             my_abs2prom[absname] = (promname, info)
 
     def _populate_prom2abs(self):
@@ -575,6 +581,9 @@ class NameResolver(object):
         distributed : bool
             If True, the variable is distributed.
         """
+        if local is False:
+            self.has_remote = True
+
         self._abs2prom[iotype][absname] = (promname, _VarData(local, continuous, distributed))
         if self._prom2abs is not None:
             self._prom2abs[iotype][promname].append(absname)
