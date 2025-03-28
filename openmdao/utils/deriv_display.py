@@ -131,7 +131,8 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
 
         fd_desc = f"{fd_opts['method']}:{fd_opts['form']}"
 
-        parts.append(f"  {rich_wrap(sys_name, SYSTEM)}: {rich_wrap(of, VAR)} wrt {rich_wrap(wrt, VAR)}")
+        parts.append(f'  {rich_wrap(sys_name, SYSTEM)}: '
+                     f'{rich_wrap(of, VAR)} wrt {rich_wrap(wrt, VAR)}')
         if not isinstance(of, tuple) and lcons and of.strip("'") in lcons:
             parts[-1] += " (Linear constraint)"
         parts.append('')
@@ -144,8 +145,8 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                 if totals and tol_violations[i].forward is not None:
                     err = _format_error(tol_violations[i].forward, 0.0)
                     parts.append(f'    Max Tolerance Violation '
-                                           f'{rich_wrap("([fwd, fd] Dot Product Test)")}'
-                                           f'{stepstrs[i]} : {err}')
+                                 f'{rich_wrap("([fwd, fd] Dot Product Test)")}'
+                                 f'{stepstrs[i]} : {err}')
                     parts.append(f'      abs error: {abs_errs[i].forward:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].forward:.6e}')
                     parts.append(f'      fwd value: {vals_at_max_err[i].forward[0]:.6e}')
@@ -155,9 +156,9 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                 if ('directional_fd_rev' in derivative_info and
                         derivative_info['directional_fd_rev'][i]):
                     err = _format_error(tol_violations[i].reverse, 0.0)
-                    parts.append(rich_wrap('    Max Tolerance Violation '
-                                           f'{rich_wrap("([rev, fd] Dot Product Test)")}'
-                                           f'{stepstrs[i]} : {err}'))
+                    parts.append('    Max Tolerance Violation '
+                                 f'{rich_wrap("([rev, fd] Dot Product Test)")}'
+                                 f'{stepstrs[i]} : {err}')
                     parts.append(f'      abs error: {abs_errs[i].reverse:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].reverse:.6e}')
                     fd, rev = derivative_info['directional_fd_rev'][i]
