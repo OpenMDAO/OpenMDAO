@@ -388,22 +388,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return name in self._reports
 
-    def _get_var_abs_name(self, name):
-        if name in self.model._var_allprocs_abs2meta:
-            return name
-        elif name in self.model._var_allprocs_prom2abs_list['output']:
-            return self.model._var_allprocs_prom2abs_list['output'][name][0]
-        elif name in self.model._var_allprocs_prom2abs_list['input']:
-            abs_names = self.model._var_allprocs_prom2abs_list['input'][name]
-            if len(abs_names) == 1:
-                return abs_names[0]
-            else:
-                raise KeyError(f"{self.msginfo}: Using promoted name `{name}' is ambiguous and "
-                               f"matches unconnected inputs {sorted(abs_names)}. Use absolute name "
-                               "to disambiguate.")
-
-        raise KeyError(f'{self.msginfo}: Variable "{name}" not found.')
-
     @property
     def driver(self):
         """
@@ -481,15 +465,13 @@ class Problem(object, metaclass=ProblemMetaclass):
             raise RuntimeError(f"{self.msginfo}: is_local('{name}') was called before setup() "
                                "completed.")
 
-        try:
-            abs_name = self._get_var_abs_name(name)
-        except KeyError:
+        abs_name = self.model._resolver.any2abs(name)
+        if abs_name is None:  # no variable found
             sub = self.model._get_subsystem(name)
             return sub is not None and sub._is_local
 
         # variable exists, but may be remote
-        return abs_name in self.model._var_abs2meta['input'] or \
-            abs_name in self.model._var_abs2meta['output']
+        return self.model._resolver.is_abs(abs_name, local=True)
 
     @property
     def _recording_iter(self):
@@ -2080,7 +2062,9 @@ class Problem(object, metaclass=ProblemMetaclass):
                     return True
             return False
 
-        if isinstance(case, dict):
+        case_is_dict = isinstance(case, dict)
+
+        if case_is_dict:
             # case data comes from list_inputs/list_outputs, keyed on absolute pathname
             # we need it to be keyed on promoted name
             if 'inputs' in case:
@@ -2096,37 +2080,26 @@ class Problem(object, metaclass=ProblemMetaclass):
             outputs = case.outputs
 
         abs2idx = model._var_allprocs_abs2idx
-        prom2abs_in = model._var_allprocs_prom2abs_list['input']
-        prom2abs_out = model._var_allprocs_prom2abs_list['output']
-        abs2meta_in = model._var_allprocs_abs2meta['input']
-        abs2meta_out = model._var_allprocs_abs2meta['output']
-        abs2meta_disc_in = model._var_allprocs_discrete['input']
-        abs2meta_disc_out = model._var_allprocs_discrete['output']
+        resolver = self.model._resolver
 
         if inputs:
-            for name in inputs:
-                if set_later(name):
+            for abs_name in inputs:
+                if set_later(abs_name):
                     continue
 
-                if name in abs2meta_in or name in abs2meta_disc_in:
-                    abs_name = name
-
-                    if isinstance(case, dict):
-                        val = inputs[name]['val']
+                if resolver.is_abs(abs_name, 'input'):
+                    if case_is_dict:
+                        val = inputs[abs_name]['val']
                     else:
                         val = case.inputs[abs_name]
-                    try:
-                        varmeta = abs2meta_in[abs_name]
-                    except KeyError:
-                        # Var may be discrete
-                        varmeta = abs2meta_disc_in[abs_name]
-                    if varmeta.get('distributed') and model.comm.size > 1:
+
+                    if model.comm.size > 1 and resolver.info(abs_name, 'input')[1].distributed:
                         sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
                         model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                     else:
                         model.set_val(abs_name, val)
                 else:
-                    issue_warning(f"{model.msginfo}: Input variable, '{name}', recorded "
+                    issue_warning(f"{model.msginfo}: Input variable, '{abs_name}', recorded "
                                   "in the case is not found in the model.")
 
         if outputs:
@@ -2134,35 +2107,17 @@ class Problem(object, metaclass=ProblemMetaclass):
                 if set_later(name):
                     continue
 
-                # auto_ivc output may point to a promoted input name
-                if name in prom2abs_out:
-                    prom2abs = prom2abs_out
-                    is_output = True
-                else:
-                    prom2abs = prom2abs_in
-                    is_output = False
-
-                if name in prom2abs:
-                    if isinstance(case, dict):
+                if resolver.is_prom(name):
+                    if case_is_dict:
                         val = outputs[name]['val']
                     else:
                         val = outputs[name]
 
-                    for abs_name in prom2abs[name]:
+                    for abs_name in resolver.absnames(name):
                         if set_later(abs_name):
                             continue
 
-                        if is_output:
-                            try:
-                                varmeta = abs2meta_out[abs_name]
-                            except KeyError:
-                                varmeta = abs2meta_disc_out[abs_name]
-                        else:
-                            try:
-                                varmeta = abs2meta_in[abs_name]
-                            except KeyError:
-                                varmeta = abs2meta_disc_in[abs_name]
-                        if varmeta.get('distributed') and model.comm.size > 1:
+                        if model.comm.size > 1 and resolver.info(abs_name)[1].distributed:
                             sizes = model._var_sizes['output'][:, abs2idx[abs_name]]
                             model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                         else:

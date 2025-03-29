@@ -31,7 +31,7 @@ class _VarData(object):
             if self.distributed != distributed:
                 return False
         elif continuous is not None:
-            # if distribute is not None, that implies that continuous is True so we don't need to
+            # if distributed is not None, that implies that continuous is True so we don't need to
             # check that (and discrete variables will never be distributed)
             if self.continuous != continuous:
                 return False
@@ -360,10 +360,10 @@ class NameResolver(object):
         if self._prom2abs is None:
             self._populate_prom2abs()
 
-        if promname in self._prom2abs_in:
-            return 'input'
         if promname in self._prom2abs_out:
             return 'output'
+        if promname in self._prom2abs_in:
+            return 'input'
         if report_error:
             raise ValueError(f"{self.msginfo}: Can't find {promname}.")
 
@@ -835,6 +835,9 @@ class NameResolver(object):
         str
             Absolute name.
         """
+        if name in self._abs2prom_out or name in self._abs2prom_in:
+            return name
+
         if self._prom2abs is None:
             self._populate_prom2abs()
 
@@ -842,9 +845,8 @@ class NameResolver(object):
             return self.prom2abs(name, 'input')
         elif name in self._prom2abs_out:
             return self._prom2abs_out[name][0]
-        elif name in self._abs2prom_out or name in self._abs2prom_in:
-            return name
-        elif report_error:
+
+        if report_error:
             raise KeyError(f"{self.msginfo}: Can't find variable {name}.")
 
     def any2prom(self, name, report_error=False):

@@ -1373,13 +1373,18 @@ class Group(System):
         resolver = self._resolver
 
         for absname in chain(abs2meta['input'], abs2meta['output']):
-            iotype = resolver.get_prom_iotype(absname)
-            if iotype is None:  # it's not a promoted name
-                continue
-            for name in resolver.absnames(absname, iotype):
-                if name != absname:
-                    raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
-                                       " is masked by a matching promoted name. Try"
+            if resolver.is_prom(absname, 'input'):
+                for name in resolver.absnames(absname, 'input'):
+                    if name != absname:
+                        raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
+                                           " is masked by a matching promoted name. Try"
+                                           " promoting to a different name. This can be caused"
+                                           " by promoting '*' at group level or promoting using"
+                                           " dotted names.")
+            elif resolver.is_prom(absname, 'output') and not absname.startswith('_auto_ivc.'):
+                if absname != resolver.prom2abs(absname, 'output'):
+                    raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}' is"
+                                       " masked by a matching promoted name. Try"
                                        " promoting to a different name. This can be caused"
                                        " by promoting '*' at group level or promoting using"
                                        " dotted names.")
@@ -1784,8 +1789,11 @@ class Group(System):
                         if abs_name in sub_loc_proms:
                             abs2prom[io][abs_name] = prom_name
 
+                        _, info = subsys._resolver.info(abs_name, io)
                         self._resolver.add_mapping(abs_name, prom_name, io,
-                                                   local=abs_name in sub_loc_proms)
+                                                   local=abs_name in sub_loc_proms,
+                                                   continuous=info.continuous,
+                                                   distributed=info.distributed)
 
             if isinstance(subsys, Group):
                 # propagate any subsystem 'set_input_defaults' info up to this Group
