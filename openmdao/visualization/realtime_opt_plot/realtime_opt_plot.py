@@ -50,20 +50,25 @@ except ImportError:
         return 5000
 
 # Constants
-_time_between_callbacks_in_ms = 1000  # the time between calls to the udpate method
+# the time between calls to the udpate method
+_time_between_callbacks_in_ms = 1000  
 # Number of milliseconds for unused session lifetime
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10
-_obj_color = "black"  # color of the plot line for the objective function
-_non_active_plot_color = "black"  # color of the buttons for variables not being shown
+# color of the plot line for the objective function
+_obj_color = "black"  
+# color of the buttons for variables not being shown
+_non_active_plot_color = "black"  
 _plot_line_width = 3
-_varea_alpha = 0.3  # how transparent is the area part of the plot for desvars that are vectors
+# how transparent is the area part of the plot for desvars that are vectors
+_varea_alpha = 0.3  
 # the CSS for the toggle buttons to let user choose what variables to plot
+_variable_list_header_font_size = "14"
 toggle_styles = """
-            font-size: 22px;
-            box-shadow:
-                0 4px 6px rgba(0, 0, 0, 0.1),    /* Distant shadow */
-                0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
-                inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
+    font-size: 22px;
+    box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.1),    /* Distant shadow */
+        0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
+        inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
 
 # colors used for the plot lines and associated buttons and axes labels
@@ -71,11 +76,11 @@ toggle_styles = """
 colorPalette = Colorblind[8] + Category20[20]
 
 # This is the JavaScript code that gets run when a user clicks on
-#   one of the buttons that change what variables are plotted
+#   one of the toggle buttons that change what variables are plotted
 callback_code = f"""
-// The ColorManager provides color from a palette for plotting lines. When the
-//   user turns off the plotting of a line, the color is returned to the manager
-//   for use with a different variable plot
+// The ColorManager provides color from a palette. When the
+//   user turns off the plotting of a variable, the color is returned to the ColorManager
+//   for later use with a different variable plot
 if (typeof window.ColorManager === 'undefined') {{
     window.ColorManager = class {{
         constructor() {{
@@ -149,6 +154,7 @@ if (toggle.active) {{
     if (lines[index].glyph.type == "Line"){{
         lines[index].glyph.properties.line_color.set_value(color);
     }}
+
     // make the button background color the same as the line, just slightly transparent
     toggle.stylesheets = [`
         .bk-btn.bk-active {{
@@ -215,9 +221,9 @@ def _realtime_opt_plot_setup_parser(parser):
     )
 
     parser.add_argument('--pid', type=int, default=None,
-                        help='Process ID of calling optimization script')
+                        help='Process ID of calling optimization script, defaults to None if called by the user directly')
     parser.add_argument('--no-display', action='store_false', dest='show',
-                        help="do not launch browser showing plot. Primarily used for testing")
+                        help="Do not launch browser showing plot. Used for CI testing")
 
 
 def _realtime_opt_plot_cmd(options, user_args):
@@ -269,14 +275,14 @@ def _get_value_for_plotting(value_from_recorder, var_type):
     """
     Return the double value to be used for plotting the variable.
 
-    Need to handle variables that are vectors.
+    Handles variables that are vectors.
 
     Parameters
     ----------
-    value_from_recorder : str
-        Name of the variable.
+    value_from_recorder : numpy array
+        Value of the variable.
     var_type : str
-        String indicating of 'objs', 'desvars' or 'cons'.
+        String indicating which type of variable it is: 'objs', 'desvars' or 'cons'.
 
     Returns
     -------
@@ -290,7 +296,7 @@ def _get_value_for_plotting(value_from_recorder, var_type):
         return np.linalg.norm(value_from_recorder, ord=np.inf)
     elif var_type == 'objs':
         return value_from_recorder.item()  # get as scalar
-    else:  # for desvars, just L2 norm
+    else:  # for desvars, use L2 norm
         return np.linalg.norm(value_from_recorder)
 
 
@@ -310,12 +316,12 @@ def _make_header_text_for_variable_chooser(header_text):
     """
     header_text_div = Div(
         text=f"<b>{header_text}</b>",
-        styles={"font-size": "14"},
+        styles={"font-size": _variable_list_header_font_size},
     )
     return header_text_div
 
 
-class _CaseTracker:
+class _CaseRecorderTracker:
     """
     A class that is used to get information from a case recorder.
 
@@ -447,7 +453,7 @@ class _RealTimeOptPlot(object):
         Construct and initialize _RealTimeOptPlot instance.
         """
         self._case_recorder_filename = case_recorder_filename
-        self._case_tracker = _CaseTracker(case_recorder_filename)
+        self._case_tracker = _CaseRecorderTracker(case_recorder_filename)
         self._pid_of_calling_script = pid_of_calling_script
 
         self._source = None
@@ -457,7 +463,6 @@ class _RealTimeOptPlot(object):
         self._axes = []
         # flag to prevent updating label with units each time we get new data
         self._labels_updated_with_units = False
-        self._update_callback = None
         self._source_stream_dict = None
 
         self._setup_figure()
@@ -476,30 +481,36 @@ class _RealTimeOptPlot(object):
                 if self._pid_of_calling_script is None or not _is_process_running(
                     self._pid_of_calling_script
                 ):
-                    # Just keep sending the last data point
-                    # This is a hack to force the plot to re-draw
+                    # no more new data in the case recorder file and the 
+                    #   optimization script stopped running, so no possible way to
+                    #   get new data.
+                    # But just keep sending the last data point.
+                    # This is a hack to force the plot to re-draw.
                     # Otherwise if the user clicks on the variable buttons, the
-                    #   lines will not change color because of the hack done to get
+                    #   lines will not change color because of the set_value hack done to get
                     #   get around the bug in setting the line color from JavaScript
                     self._source.stream(self._source_stream_dict)
                 return
 
             new_data = self._case_tracker._get_data_from_case(new_case)
 
-            # See if source object is defined yet. If not, set it up
+            # See if Bokeh source object is defined yet. If not, set it up
             # since now we have data from the case recorder with info about the
             # variables to be plotted.
             if self._source is None:
                 self._setup_data_source()
 
-                # Check to make sure we have 1 and only one objective before going farther
+                # Check to make sure we have one and only one objective before going farther
                 obj_names = self._case_tracker._get_obj_names()
                 if len(obj_names) != 1:
                     raise ValueError(
-                        f"Plot assumes there is on objective but {len(obj_names)} found"
+                        f"Plot requires there to be one and only one objective \
+                            but {len(obj_names)} objectives found"
                     )
 
-                # Create CustomJS callback for toggle buttons
+                # Create CustomJS callback for toggle buttons.
+                # Pass in the data from the Python side that the JavaScript side 
+                #   needs
                 legend_item_callback = CustomJS(
                     args=dict(
                         lines=self._lines,
@@ -511,10 +522,10 @@ class _RealTimeOptPlot(object):
                     code=callback_code,
                 )
 
-                # for the variables, make lines, axes, and the button to turn on and
+                # For the variables, make lines, axes, and the buttons to turn on and
                 #   off the variable plot.
                 # All the lines and axes for the desvars and cons are created in
-                #   python but initially are not visible. They are turned on and
+                #   Python but initially are not visible. They are turned on and
                 #   off on the JavaScript side.
 
                 # objs
@@ -530,6 +541,7 @@ class _RealTimeOptPlot(object):
                                                    "solid", True)
                     value = new_data["objs"][obj_name]
                     float_value = _get_value_for_plotting(value, "objs")
+                    # just give it some non-zero initial range since we only have one point
                     self.plot_figure.y_range = Range1d(float_value - 1, float_value + 1)
 
                 # desvars
@@ -582,7 +594,7 @@ class _RealTimeOptPlot(object):
                     float_value = _get_value_for_plotting(value, "cons")
                     self._make_axis("cons", cons_name, float_value, units)
 
-                # Create a Column of the variable buttons and headers with scrolling
+                # Create a Column of the variable buttons and headers inside a scrolling window
                 toggle_column = Column(
                     children=self._column_items,
                     sizing_mode="stretch_both",
@@ -687,8 +699,9 @@ class _RealTimeOptPlot(object):
             self._labels_updated_with_units = True
             # end of _update method
 
-        self._update_callback = doc.add_periodic_callback(_update, callback_period)
-        doc.title = "OpenMDAO Optimization"
+
+        doc.add_periodic_callback(_update, callback_period)
+        doc.title = "OpenMDAO Optimization Progress Plot"
 
     def _setup_data_source(self):
         self._source_dict = {"iteration": []}
@@ -811,14 +824,14 @@ class _RealTimeOptPlot(object):
             width_policy="max",
             height_policy="max",
             sizing_mode="stretch_both",
-            title=f"Real-time Optimization Progress Plot for: {self._case_recorder_filename}",
+            title=f"Optimization Progress Plot for: {self._case_recorder_filename}",
             active_drag=None,
             active_scroll="auto",
             active_tap=None,
             output_backend="webgl",
         )
         self.plot_figure.x_range.follow = "start"
-        # self.plot_figure.title.text_font_size = "25px"
+        self.plot_figure.title.text_font_size = "14px"
         self.plot_figure.title.text_color = "black"
         self.plot_figure.title.text_font = "arial"
         self.plot_figure.title.align = "left"
