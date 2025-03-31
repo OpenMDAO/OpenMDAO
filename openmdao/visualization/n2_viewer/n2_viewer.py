@@ -535,7 +535,6 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
         'output': {k: v for k, v in root_group._resolver.abs2prom_iter('output', local=True)},
     }
 
-
     data_dict['driver'] = {
         'name': driver_name,
         'type': driver_type,

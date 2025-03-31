@@ -77,6 +77,8 @@ class NameResolver(object):
         A dictionary of promoted to absolute names for outputs.
     _check_dups : bool
         If True, check for duplicate names.
+    _conns : dict or None
+        The connections dictionary.
     msginfo : str
         The message information for the system.
     has_remote : bool
@@ -106,8 +108,34 @@ class NameResolver(object):
         self._prom2abs_in = None
         self._prom2abs_out = None
         self._check_dups = check_dups
+        self._conns = None
         self.msginfo = msginfo if msginfo else pathname
         self.has_remote = False
+
+    def contains(self, name, iotype=None):
+        """
+        Check if the name resolver contains the given name.
+
+        Parameters
+        ----------
+        name : str
+            The name to check.
+        iotype : str
+            Either 'input', 'output', or None to check all iotypes.
+
+        Returns
+        -------
+        bool
+            True if the name resolver contains the given name, False otherwise.
+        """
+        if iotype is None:
+            return self.contains(name, 'input') or self.contains(name, 'output')
+
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+
+        return name in self._prom2abs[iotype] or name in self._abs2prom[iotype] or \
+            self._prefix + name in self._abs2prom[iotype]
 
     # TODO: this will go away once all is converted to use the name resolver
     def verify(self, system):
@@ -395,14 +423,14 @@ class NameResolver(object):
             yield from self.prom2abs_iter('input', local)
             yield from self.prom2abs_iter('output', local)
         else:
-            if local is not None:
+            if local is None:
+                yield from self._prom2abs[iotype].items()
+            else:
                 a2p = self._abs2prom[iotype]
                 for prom, absnames in self._prom2abs[iotype].items():
                     absnames = [n for n in absnames if a2p[n][1].local == local]
                     if absnames:
                         yield prom, absnames
-            else:
-                yield from self._prom2abs[iotype].items()
 
     def abs2prom_iter(self, iotype=None, local=None):
         """
@@ -427,13 +455,13 @@ class NameResolver(object):
             yield from self.abs2prom_iter('input', local)
             yield from self.abs2prom_iter('output', local)
         else:
-            if local is not None:
+            if local is None:
+                for absname, (promname, _) in self._abs2prom[iotype].items():
+                    yield absname, promname
+            else:
                 for absname, (promname, info) in self._abs2prom[iotype].items():
                     if info.local == local:
                         yield absname, promname
-            else:
-                for absname, (promname, _) in self._abs2prom[iotype].items():
-                    yield absname, promname
 
     def prom_iter(self, iotype=None):
         """
@@ -479,12 +507,12 @@ class NameResolver(object):
             yield from self.abs_iter('input', local)
             yield from self.abs_iter('output', local)
         else:
-            if local is not None:
+            if local is None:
+                yield from self._abs2prom[iotype]
+            else:
                 for absname, (_, info) in self._abs2prom[iotype].items():
                     if info.local == local:
                         yield absname
-            else:
-                yield from self._abs2prom[iotype]
 
     def info(self, absname, iotype=None):
         """
@@ -733,14 +761,14 @@ class NameResolver(object):
             if iotype is None:
                 iotype = self.get_abs_iotype(absname, report_error=True)
 
-            if local is not None:
+            if local is None:
+                return self._abs2prom[iotype][absname][0]
+            else:
                 name, info = self._abs2prom[iotype][absname]
                 if info.local == local:
                     return name
                 else:
                     raise ValueError(f"{self.msginfo}: {absname} is not a local {iotype}.")
-            else:
-                return self._abs2prom[iotype][absname][0]
         except KeyError:
             raise KeyError(f"{self.msginfo}: Can't find {iotype} {absname}.")
 
@@ -812,13 +840,16 @@ class NameResolver(object):
             if len(lst) == 1:
                 return lst[0]
 
+            conns = conns or self._conns
+
             if conns is None:
                 # we can't refer to the source since we don't know the connections yet
                 raise RuntimeError(f"{self.msginfo}: The promoted name {promname} is invalid "
-                                   f"because it refers to multiple inputs: [{' ,'.join(lst)}].")
+                                   f"because it refers to multiple inputs: [{' ,'.join(lst)}]. "
+                                   "Access the value from the connected output variable instead.")
 
             # report to the user which connected output to access
-            src_name = self._abs2prom['output'][self.source(lst[0], conns)]
+            src_name = self._abs2prom['output'][self.source(lst[0], conns)][0]
             raise RuntimeError(f"{self.msginfo}: The promoted name {promname} is invalid because it"
                                f" refers to multiple inputs: [{' ,'.join(lst)}]. Access the value "
                                f"from the connected output variable {src_name} instead.")
@@ -826,7 +857,7 @@ class NameResolver(object):
         except KeyError:
             raise KeyError(f"{self.msginfo}: Can't find promoted {iotype} {promname}.")
 
-    def any2abs(self, name, report_error=False):
+    def any2abs(self, name, iotype=None, report_error=False):
         """
         Convert any name to a unique absolute name.
 
@@ -834,6 +865,8 @@ class NameResolver(object):
         ----------
         name : str
             Promoted or relative name.
+        iotype : str or None
+            Either 'input', 'output', or None to check all iotypes.
         report_error : bool
             If True, raise an error if the name is not found.
 
@@ -842,16 +875,64 @@ class NameResolver(object):
         str
             Absolute name.
         """
-        if name in self._abs2prom_out or name in self._abs2prom_in:
+        if iotype is None:
+            iotype = self.get_prom_iotype(name)
+            if iotype is None:
+                iotype = self.get_abs_iotype(name)
+                if iotype is None:
+                    if report_error:
+                        raise KeyError(f"{self.msginfo}: Can't find variable {name}.")
+                    else:
+                        return
+
+        if name in self._abs2prom[iotype]:
             return name
 
         if self._prom2abs is None:
             self._populate_prom2abs()
 
-        if name in self._prom2abs_in:
-            return self.prom2abs(name, 'input')
-        elif name in self._prom2abs_out:
-            return self._prom2abs_out[name][0]
+        if name in self._prom2abs[iotype]:
+            return self.prom2abs(name, iotype)
+
+        # try relative name
+        absname = self._prefix + name
+        if absname in self._abs2prom[iotype]:
+            return absname
+
+        if report_error:
+            raise KeyError(f"{self.msginfo}: Can't find variable {name}.")
+
+    def prom_or_rel2abs(self, name, iotype=None, report_error=False):
+        """
+        Convert any promoted or relative name to a unique absolute name.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative name.
+        iotype : str or None
+            Either 'input', 'output', or None to check all iotypes.
+        report_error : bool
+            If True, raise an error if the name is not found.
+
+        Returns
+        -------
+        str
+            Absolute name.
+        """
+        if iotype is None:
+            iotype = self.get_prom_iotype(name)
+
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+
+        if name in self._prom2abs[iotype]:
+            return self.prom2abs(name, iotype)
+
+        # try relative name
+        absname = self._prefix + name
+        if absname in self._abs2prom[iotype]:
+            return absname
 
         if report_error:
             raise KeyError(f"{self.msginfo}: Can't find variable {name}.")
@@ -1058,9 +1139,9 @@ def prom_name2abs_name(system, prom_name, iotype):
         # looks like an aliased input, which must be set via the connected output
         model = system._problem_meta['model_ref']()
         src_name = model._var_abs2prom['output'][model._conn_global_abs_in2out[abs_list[0]]]
-        raise RuntimeError(f"The promoted name {prom_name} is invalid because it refers to "
-                           f"multiple inputs: [{' ,'.join(abs_list)}]. Access the value from the "
-                           f"connected output variable {src_name} instead.")
+        raise RuntimeError(f"{system.msginfo}: The promoted name {prom_name} is invalid because it "
+                           f"refers to multiple inputs: [{' ,'.join(abs_list)}]. Access the value "
+                           f"from the connected output variable {src_name} instead.")
 
 
 def name2abs_name(system, name):

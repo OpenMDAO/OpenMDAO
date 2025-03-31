@@ -53,10 +53,6 @@ class Vector(object):
         Iterable of (name, shape) pairs for the variables in the vector.
     parent_vector : Vector
         Parent vector.
-    msginfo : str
-        Message information.
-    path : str
-        Path to the vector.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
     do_scaling : bool
@@ -70,18 +66,14 @@ class Vector(object):
     ----------
     _system : <System>
         Pointer to the owning system.
+    _resolver : <NameResolver>
+        Name resolver for the owning system.
     _name : str
         The name of the vector: 'nonlinear' or 'linear'.
     _typ : str
         Type: 'input' for input vectors; 'output' for output/residual vectors.
     _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.
-    _pathname : str
-        Path to the vector's owning system.
-    msginfo : str
-        Message information.
-    _prom2abs : dict
-        Dictionary mapping promoted variable names to absolute variable names.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
     _names : set([str, ...])
@@ -116,19 +108,17 @@ class Vector(object):
     distributed = False
 
     def __init__(self, name, kind, system, name_shape_iter, parent_vector=None,
-                 msginfo='', path='', alloc_complex=False, do_scaling=False, do_adder=False,
+                 alloc_complex=False, do_scaling=False, do_adder=False,
                  nlvec=None):
         """
         Initialize all attributes.
         """
         # TODO: remove system ref...
         self._system = weakref.ref(system)
+        self._resolver = system._resolver
         self._name = name
         self._typ = _type_map[kind]
         self._kind = kind
-        self._pathname = path
-        self.msginfo = msginfo
-        self._prom2abs = system._var_allprocs_prom2abs_list[self._typ]
         self._views = {}
 
         # self._names will either contain the same names as self._views or to the
@@ -247,8 +237,8 @@ class Vector(object):
         ndarray or float
             Value of each variable.
         """
-        if self._pathname:
-            plen = len(self._pathname) + 1
+        if self._resolver._pathname:
+            plen = len(self._resolver._pathname) + 1
         else:
             plen = 0
 
@@ -294,39 +284,39 @@ class Vector(object):
         """
         return self._views[name]
 
-    def _name2abs_name(self, name):
-        """
-        Map the given promoted or relative name to the absolute name.
+    # def _name2abs_name(self, name):
+    #     """
+    #     Map the given promoted or relative name to the absolute name.
 
-        This is only valid when the name is unique; otherwise, a KeyError is thrown.
+    #     This is only valid when the name is unique; otherwise, a KeyError is thrown.
 
-        Parameters
-        ----------
-        name : str
-            Promoted or relative variable name in the owning system's namespace.
+    #     Parameters
+    #     ----------
+    #     name : str
+    #         Promoted or relative variable name in the owning system's namespace.
 
-        Returns
-        -------
-        str or None
-            Absolute variable name if unique abs_name found or None otherwise.
-        """
-        if name in self._prom2abs:
-            lst = self._prom2abs[name]
-            if len(lst) > 1:
-                model = self._system()._problem_meta['model_ref']()
-                src_name = model._var_abs2prom['output'][model._conn_global_abs_in2out[lst[0]]]
-                raise RuntimeError(f"The promoted name {name} is invalid because it refers to "
-                                   f"multiple inputs: [{' ,'.join(lst)}]. Access the value from "
-                                   f"the connected output variable {src_name} instead.")
+    #     Returns
+    #     -------
+    #     str or None
+    #         Absolute variable name if unique abs_name found or None otherwise.
+    #     """
+    #     if name in self._prom2abs:
+    #         lst = self._prom2abs[name]
+    #         if len(lst) > 1:
+    #             model = self._system()._problem_meta['model_ref']()
+    #             src_name = model._var_abs2prom['output'][model._conn_global_abs_in2out[lst[0]]]
+    #             raise RuntimeError(f"The promoted name {name} is invalid because it refers to "
+    #                                f"multiple inputs: [{' ,'.join(lst)}]. Access the value from "
+    #                                f"the connected output variable {src_name} instead.")
 
-            for abs_name in self._prom2abs[name]:
-                if abs_name in self._views:
-                    return abs_name
+    #         for abs_name in self._prom2abs[name]:
+    #             if abs_name in self._views:
+    #                 return abs_name
 
-        # test relative name
-        abs_name = self._pathname + '.' + name if self._pathname else name
-        if abs_name in self._views:
-            return abs_name
+    #     # test relative name
+    #     abs_name = self._pathname + '.' + name if self._pathname else name
+    #     if abs_name in self._views:
+    #         return abs_name
 
     def __iter__(self):
         """
@@ -337,7 +327,7 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        idx = len(self._pathname) + 1 if self._pathname else 0
+        idx = len(self._resolver._pathname) + 1 if self._resolver._pathname else 0
         return (n[idx:] for n in self._views if n in self._names)
 
     def _abs_item_iter(self, flat=True):
@@ -401,7 +391,7 @@ class Vector(object):
         bool
             True or False.
         """
-        return self._name2abs_name(name) in self._names
+        return self._resolver.prom_or_rel2abs(name, self._typ) in self._names
 
     def _contains_abs(self, name):
         """
@@ -433,11 +423,11 @@ class Vector(object):
         float or ndarray
             variable value.
         """
-        abs_name = self._name2abs_name(name)
+        abs_name = self._resolver.prom_or_rel2abs(name, self._typ)
         if abs_name is not None:
             return self._abs_get_val(abs_name, flat=False)
         else:
-            raise KeyError(f"{self._system().msginfo}: Variable name '{name}' not found.")
+            raise KeyError(f"{self._resolver.msginfo}: Variable name '{name}' not found.")
 
     def get_val(self, name, flat=True):
         """
@@ -689,13 +679,13 @@ class Vector(object):
             If specified, the variable name to use when reporting errors. This is useful
             when setting an AutoIVC value that the user only knows by a connected input name.
         """
-        abs_name = self._name2abs_name(name)
+        abs_name = self._resolver.prom_or_rel2abs(name, self._typ)
         if abs_name is None:
-            raise KeyError(f"{self._system().msginfo}: Variable name "
+            raise KeyError(f"{self._resolver.msginfo}: Variable name "
                            f"'{var_name if var_name else name}' not found.")
 
         if self.read_only:
-            raise ValueError(f"{self._system().msginfo}: Attempt to set value of "
+            raise ValueError(f"{self._resolver.msginfo}: Attempt to set value of "
                              f"'{var_name if var_name else name}' in "
                              f"{self._kind} vector when it is read only.")
 
@@ -720,7 +710,7 @@ class Vector(object):
                 try:
                     value = value.reshape(vinfo.view[idxs()].shape)
                 except Exception:
-                    raise ValueError(f"{self._system().msginfo}: Failed to set value of "
+                    raise ValueError(f"{self._resolver.msginfo}: Failed to set value of "
                                      f"'{var_name if var_name else name}': {str(err)}.")
                 vinfo.view[idxs()] = value
 
@@ -807,11 +797,11 @@ class Vector(object):
         if arr is None:
             arr = self.asarray(copy=False)
         elif len(self) != arr.size:
-            raise RuntimeError(f"{self._system().msginfo}: can't create local view dict because "
+            raise RuntimeError(f"{self._resolver.msginfo}: can't create local view dict because "
                                f"given array is size {arr.size} but expected size is {len(self)}.")
 
         dct = {}
-        pathlen = len(self._pathname) + 1 if self._pathname else 0
+        pathlen = len(self._resolver._pathname) + 1 if self._resolver._pathname else 0
 
         start = end = 0
         for name, vinfo in self._views.items():

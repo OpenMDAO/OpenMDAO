@@ -1292,7 +1292,6 @@ class Group(System):
             rvec['nonlinear'] = nlvec = self._vector_class('nonlinear', kind, self,
                                                            self._name_shape_iter(kind),
                                                            None,
-                                                           path=self.pathname,
                                                            alloc_complex=nl_alloc_complex,
                                                            do_scaling=do_scaling[kind],
                                                            do_adder=do_adder[kind])
@@ -1301,7 +1300,6 @@ class Group(System):
                 rvec['linear'] = self._vector_class('linear', kind, self,
                                                     self._name_shape_iter(kind),
                                                     None,
-                                                    path=self.pathname,
                                                     alloc_complex=ln_alloc_complex,
                                                     do_scaling=do_scaling[kind],
                                                     do_adder=do_adder[kind],
@@ -2934,6 +2932,7 @@ class Group(System):
         pathname = self.pathname
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
+        self._resolver._conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
 
         for subsys in self._sorted_sys_iter():
             subsys._setup_connections()

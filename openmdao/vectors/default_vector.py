@@ -24,10 +24,6 @@ class DefaultVector(Vector):
         Iterable of (name, shape) pairs for the variables in the vector.
     parent_vector : <Vector>
         Parent vector.
-    msginfo : str
-        Message information.
-    path : str
-        Path to the vector.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
     do_scaling : bool
@@ -45,13 +41,13 @@ class DefaultVector(Vector):
 
     TRANSFER = DefaultTransfer
 
-    def __init__(self, name, kind, system, name_shape_iter, parent_vector=None, msginfo='', path='',
+    def __init__(self, name, kind, system, name_shape_iter, parent_vector=None,
                  alloc_complex=False, do_scaling=False, do_adder=False, nlvec=None):
         """
         Initialize all attributes.
         """
         self._views_rel = None
-        super().__init__(name, kind, system, name_shape_iter, parent_vector, msginfo, path,
+        super().__init__(name, kind, system, name_shape_iter, parent_vector,
                          alloc_complex, do_scaling, do_adder, nlvec)
 
     def __getitem__(self, name):
@@ -200,7 +196,8 @@ class DefaultVector(Vector):
 
         if rel_lookup:
             self._views_rel = views_rel = {}
-            relstart = len(self._pathname) + 1 if self._pathname else 0
+            path = self._resolver._pathname
+            relstart = len(path) + 1 if path else 0
         else:
             self._views_rel = None
 
@@ -248,26 +245,6 @@ class DefaultVector(Vector):
             start = end
 
         self._names = frozenset(views) if islinear else views
-
-    def _name2abs_name(self, name):
-        """
-        Map the given absolute or relative name to the absolute name.
-
-        Parameters
-        ----------
-        name : str
-            Promoted or relative variable name in the owning system's namespace.
-
-        Returns
-        -------
-        str or None
-            Absolute variable name if unique abs_name found or None otherwise.
-        """
-        # try relative name first
-        if self._views_rel is not None and name in self._views_rel:
-            return self._pathname + '.' + name if self._pathname else name
-
-        return super()._name2abs_name(name)
 
     def __len__(self):
         """

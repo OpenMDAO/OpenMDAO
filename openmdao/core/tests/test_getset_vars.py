@@ -216,7 +216,7 @@ class TestGetSetVariables(unittest.TestCase):
         # -------------------------------------------------------------------
 
         msg1 = "'g' <class Group>: Variable name '{}' not found."
-        msg2 = "The promoted name x is invalid because it refers to multiple inputs: " \
+        msg2 = "'g' <class Group>: The promoted name x is invalid because it refers to multiple inputs: " \
                "[g.c2.x ,g.c3.x]. Access the value from the connected output variable x instead."
 
         inputs, outputs, residuals = g.get_nonlinear_vectors()

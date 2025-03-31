@@ -2523,7 +2523,6 @@ class System(object, metaclass=SystemMetaclass):
                     parent_vector = parent_vectors[kind][vec_name]
                     vectors[kind][vec_name] = self._vector_class(
                         vec_name, kind, self, self._name_shape_iter(kind), parent_vector,
-                        msginfo=self.msginfo, path=self.pathname,
                         alloc_complex=parent_vector._alloc_complex,
                         do_scaling=do_scaling[kind],
                         do_adder=do_adder[kind],
@@ -3775,7 +3774,8 @@ class System(object, metaclass=SystemMetaclass):
             try:
                 src_name = self._resolver.source(prom_name, model._conn_global_abs_in2out)
             except RuntimeError:
-                raise RuntimeError(f"{self.msginfo}: Output not found for design variable '{prom_name}'.")
+                raise RuntimeError(f"{self.msginfo}: Output not found for design variable "
+                                   f"'{prom_name}'.")
             meta['orig'] = (None, prom_name)
 
         key = prom_name if use_prom_ivc else src_name
@@ -3899,12 +3899,15 @@ class System(object, metaclass=SystemMetaclass):
         if alias is not None:
             if self._resolver.is_prom(alias):
                 # Constraint alias should never be the same as any openmdao variable.
-                path = self._resolver.any2abs(prom)
+                path = self._resolver.any2abs(prom, 'output')
                 raise RuntimeError(f"{self.msginfo}: Constraint alias '{alias}' on '{path}'"
                                    " is the same name as an existing variable.")
         meta['parent'] = self.pathname
 
-        src_name = self._resolver.source(prom, conns)
+        try:
+            src_name = self._resolver.source(prom, conns)
+        except RuntimeError:
+            raise RuntimeError(f"{self.msginfo}: Output not found for response '{prom}'.")
 
         if alias:
             key = alias
