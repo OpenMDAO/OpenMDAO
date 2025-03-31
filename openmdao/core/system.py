@@ -3764,16 +3764,18 @@ class System(object, metaclass=SystemMetaclass):
             Determines whether return key is promoted name or source name.
         """
         model = self._problem_meta['model_ref']()
-        pro2abs_out = self._var_allprocs_prom2abs_list['output']
         abs2meta_out = model._var_allprocs_abs2meta['output']
         prom_name = meta['name']
 
-        if prom_name in pro2abs_out:  # promoted output
-            src_name = pro2abs_out[prom_name][0]
+        if self._resolver.is_prom(prom_name, 'output'):
+            src_name = self._resolver.prom2abs(prom_name, 'output')
             meta['orig'] = (prom_name, None)
 
         else:  # Design variable on an input connected to an ivc.
-            src_name = self._resolver.source(prom_name, model._conn_global_abs_in2out)
+            try:
+                src_name = self._resolver.source(prom_name, model._conn_global_abs_in2out)
+            except RuntimeError:
+                raise RuntimeError(f"{self.msginfo}: Output not found for design variable '{prom_name}'.")
             meta['orig'] = (None, prom_name)
 
         key = prom_name if use_prom_ivc else src_name
@@ -3888,8 +3890,6 @@ class System(object, metaclass=SystemMetaclass):
         use_prom_ivc : bool
             Use promoted names for inputs, else convert to absolute source names.
         """
-        prom2abs_out = self._var_allprocs_prom2abs_list['output']
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
         model = self._problem_meta['model_ref']()
         conns = model._conn_global_abs_in2out
         abs2meta_out = model._var_allprocs_abs2meta['output']
@@ -3897,21 +3897,14 @@ class System(object, metaclass=SystemMetaclass):
         alias = meta['alias']
         prom = meta['name']  # 'usually' a promoted name, but can be absolute
         if alias is not None:
-            if alias in prom2abs_out or alias in prom2abs_in:
+            if self._resolver.is_prom(alias):
                 # Constraint alias should never be the same as any openmdao variable.
-                path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
+                path = self._resolver.any2abs(prom)
                 raise RuntimeError(f"{self.msginfo}: Constraint alias '{alias}' on '{path}'"
                                    " is the same name as an existing variable.")
         meta['parent'] = self.pathname
 
-        if prom in prom2abs_out:  # promoted output
-            src_name = prom2abs_out[prom][0]
-        elif prom in abs2meta_out:
-            src_name = prom
-        elif prom in prom2abs_in:
-            src_name = conns[prom2abs_in[prom][0]]
-        else:  # abs input
-            src_name = conns[prom][0]
+        src_name = self._resolver.source(prom, conns)
 
         if alias:
             key = alias
@@ -6134,11 +6127,11 @@ class System(object, metaclass=SystemMetaclass):
         dict
             Variable values keyed on absolute name.
         """
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
-        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
         vdict = {}
         variables = filtered_vars.get(kind)
         if variables:
+            resolver = self._resolver
+            conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
             vec = self._vectors[kind][vec_name]
             rank = self.comm.rank
             discrete_vec = () if kind == 'residual' else self._var_discrete[kind]
@@ -6155,7 +6148,7 @@ class System(object, metaclass=SystemMetaclass):
                         elif n[offset:] in discrete_vec:
                             vdict[n] = discrete_vec[n[offset:]]['val']
                         else:
-                            ivc_path = conns[prom2abs_in[n][0]]
+                            ivc_path = resolver.source(n, conns)
                             if vec._contains_abs(ivc_path):
                                 vdict[ivc_path] = srcget(ivc_path, False)
                             elif ivc_path[offset:] in discrete_vec:
@@ -6167,7 +6160,7 @@ class System(object, metaclass=SystemMetaclass):
                         if vec._contains_abs(name):
                             vdict[name] = get(name, False)
                         else:
-                            ivc_path = conns[prom2abs_in[name][0]]
+                            ivc_path = resolver.source(name, conns)
                             vdict[ivc_path] = srcget(ivc_path, False)
             elif local:
                 get = self._abs_get_val
@@ -6186,8 +6179,8 @@ class System(object, metaclass=SystemMetaclass):
                         if vec._contains_abs(name):
                             vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
-                        elif name in prom2abs_in:
-                            ivc_path = conns[prom2abs_in[name][0]]
+                        elif resolver.is_prom(name, 'input'):
+                            ivc_path = resolver.source(name, conns)
                             vdict[name] = get(ivc_path, get_remote=True, rank=0,
                                               vec_name=vec_name, kind='output')
             else:
@@ -6696,19 +6689,19 @@ class System(object, metaclass=SystemMetaclass):
         if self._promotion_tree is None:
             self._promotion_tree = self._get_sys_promotion_tree()
         tree = self._promotion_tree
+        resolver = self._resolver
 
         plist_ins = plist_outs = None
-        if outprom is None and inprom in self._var_allprocs_prom2abs_list['output']:
+        if outprom is None and resolver.is_prom(inprom, 'output'):
             outprom = inprom
 
         if outprom is not None:
             try:
-                abs_outs = self._var_allprocs_prom2abs_list['output'][outprom]
+                abs_outs = resolver.prom2abs(outprom, 'output')
             except KeyError:
                 # outprom might be an inprom mapped to an auto_ivc
                 try:
-                    inabs = self._var_allprocs_prom2abs_list['input'][outprom]
-                    abs_outs = [self._conn_global_abs_in2out[inabs[0]]]
+                    abs_outs = [resolver.source(outprom, self._conn_global_abs_in2out, 'input')]
                 except KeyError:
                     raise KeyError(f"{self.msginfo}: Promoted output variable '{outprom}' was not "
                                    "found.")
@@ -6717,7 +6710,7 @@ class System(object, metaclass=SystemMetaclass):
 
         if inprom is not None:
             try:
-                abs_ins = self._var_allprocs_prom2abs_list['input'][inprom]
+                abs_ins = resolver.absnames(inprom, 'input')
             except KeyError:
                 raise KeyError(f"{self.msginfo}: Promoted input variable '{inprom}' was not "
                                "found.")

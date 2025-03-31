@@ -177,6 +177,8 @@ class NameResolver(object):
 
         # reset our abs2prom so all ranks will have the same order
         self._abs2prom = {'input': {}, 'output': {}}
+        self._abs2prom_in = self._abs2prom['input']
+        self._abs2prom_out = self._abs2prom['output']
 
         for rank, other in enumerate(others):
             for io in ('input', 'output'):
@@ -588,7 +590,7 @@ class NameResolver(object):
         if self._prom2abs is not None:
             self._prom2abs[iotype][promname].append(absname)
 
-    def source(self, name, conns):
+    def source(self, name, conns, iotype=None, report_error=True):
         """
         Get the source of a variable.
 
@@ -601,6 +603,11 @@ class NameResolver(object):
             The name to get the source of.
         conns : dict
             The connections dictionary.
+        iotype : str
+            Either 'input', 'output', or None to allow all iotypes.  If not None, the given
+            name must correspond to the specified iotype.
+        report_error : bool
+            If True, raise an error if the source is not found.
 
         Returns
         -------
@@ -611,28 +618,28 @@ class NameResolver(object):
             raise RuntimeError(f"{self.msginfo}: Can't find source for '{name}' because "
                                "connections are not yet known.")
 
-        if name in self._abs2prom_in:
+        if name in self._abs2prom_in and (iotype is None or iotype == 'input'):
             try:
                 return conns[name]
             except KeyError:
-                raise RuntimeError(f"{self.msginfo}: Can't find source for '{name}'.")
-        elif name in self._abs2prom_out:
+                pass
+        elif name in self._abs2prom_out and (iotype is None or iotype == 'output'):
             return name
         else:  # promoted
-            absnames = self.absnames(name, report_error=False)
-            if absnames is None:
-                raise KeyError(name)
-            else:
+            absnames = self.absnames(name, iotype, report_error=False)
+            if absnames is not None:
                 absname = absnames[0]
 
                 # absolute input?
-                if absname in conns:
+                if absname in conns and (iotype is None or iotype == 'input'):
                     return conns[absname]
 
-                if absname in self._abs2prom_out:
+                if absname in self._abs2prom_out and (iotype is None or iotype == 'output'):
                     return absname
 
-        raise RuntimeError(f"{self.msginfo}: Can't find source for '{name}'.")
+        if report_error:
+            io = '' if iotype is None else f'{iotype} '
+            raise RuntimeError(f"{self.msginfo}: Can't find source for {io}'{name}'.")
 
     def abs2rel(self, absname):
         """
