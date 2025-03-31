@@ -51,16 +51,16 @@ except ImportError:
 
 # Constants
 # the time between calls to the udpate method
-_time_between_callbacks_in_ms = 1000  
+_time_between_callbacks_in_ms = 1000
 # Number of milliseconds for unused session lifetime
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10
 # color of the plot line for the objective function
-_obj_color = "black"  
+_obj_color = "black"
 # color of the buttons for variables not being shown
-_non_active_plot_color = "black"  
+_non_active_plot_color = "black"
 _plot_line_width = 3
 # how transparent is the area part of the plot for desvars that are vectors
-_varea_alpha = 0.3  
+_varea_alpha = 0.3
 # the CSS for the toggle buttons to let user choose what variables to plot
 _variable_list_header_font_size = "14"
 toggle_styles = """
@@ -221,7 +221,8 @@ def _realtime_opt_plot_setup_parser(parser):
     )
 
     parser.add_argument('--pid', type=int, default=None,
-                        help='Process ID of calling optimization script, defaults to None if called by the user directly')
+                        help='Process ID of calling optimization script, '
+                        'defaults to None if called by the user directly')
     parser.add_argument('--no-display', action='store_false', dest='show',
                         help="Do not launch browser showing plot. Used for CI testing")
 
@@ -481,7 +482,7 @@ class _RealTimeOptPlot(object):
                 if self._pid_of_calling_script is None or not _is_process_running(
                     self._pid_of_calling_script
                 ):
-                    # no more new data in the case recorder file and the 
+                    # no more new data in the case recorder file and the
                     #   optimization script stopped running, so no possible way to
                     #   get new data.
                     # But just keep sending the last data point.
@@ -509,7 +510,7 @@ class _RealTimeOptPlot(object):
                     )
 
                 # Create CustomJS callback for toggle buttons.
-                # Pass in the data from the Python side that the JavaScript side 
+                # Pass in the data from the Python side that the JavaScript side
                 #   needs
                 legend_item_callback = CustomJS(
                     args=dict(
@@ -698,7 +699,6 @@ class _RealTimeOptPlot(object):
             self._source.stream(self._source_stream_dict)
             self._labels_updated_with_units = True
             # end of _update method
-
 
         doc.add_periodic_callback(_update, callback_period)
         doc.title = "OpenMDAO Optimization Progress Plot"
