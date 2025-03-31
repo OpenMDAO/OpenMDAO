@@ -3,6 +3,7 @@ import os
 import unittest
 import subprocess
 import re
+import time
 
 from openmdao.utils.testing_utils import use_tempdirs
 import openmdao.core.tests.test_coloring as coloring_test_mod
@@ -157,9 +158,15 @@ class CmdlineTestCase(unittest.TestCase):
                     proc.kill()
                     outs, errs = proc.communicate()
 
+                try_count = 0
                 subdirs = os.listdir(os.getcwd())
-                self.assertNotIn(p1_outdir, subdirs)
-                self.assertNotIn(p2_outdir, subdirs)
+                while p1_outdir in subdirs or p2_outdir in subdirs:
+                    # Handle windows sometimes taking time to actually remove files
+                    try_count += 1
+                    if try_count >= 5:
+                        self.fail(f'Did not successfully remove all files: {subdirs}')
+                    time.sleep(1.0)
+                    subdirs = os.listdir(os.getcwd())
 
     def test_outdir(self):
         env_vars = os.environ.copy()
@@ -175,6 +182,13 @@ class CmdlineTestCase(unittest.TestCase):
         except subprocess.TimeoutExpired:
             proc.kill()
             outs, errs = proc.communicate()
+
+        try_count = 0
+        while not os.path.exists('circle_opt_out'):
+            if try_count >= 5:
+                self.fail('Did not create run directory circle_opt_out')
+            try_count += 1
+            time.sleep(1.0)
 
         self.assertTrue(os.path.exists('circle_opt_out'))
 
