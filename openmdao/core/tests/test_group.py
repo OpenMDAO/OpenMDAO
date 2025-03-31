@@ -1875,7 +1875,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['a']
 
         self.assertEqual(str(cm.exception),
-                         "'<model> <class SimpleGroup>: Variable \"a\" not found.'")
+                         "\"<model> <class SimpleGroup>: Could not find 'a'. Perhaps you meant one of the following variables: ['comp2.a']\"")
 
     def test_promotes_alias(self):
         class SubGroup(om.Group):
@@ -2032,7 +2032,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['Branch1.G1.comp1.a']
 
         self.assertEqual(str(cm.exception),
-                         "'<model> <class BranchGroup>: Variable \"Branch1.G1.comp1.a\" not found.'")
+                           "\"<model> <class BranchGroup>: Could not find 'Branch1.G1.comp1.a'. Perhaps you meant one of the following variables: ['Branch1.G1.comp1.b', 'Branch1.G1.a']\"")
 
     def test_multiple_promotes_collision(self):
 
