@@ -205,11 +205,12 @@ def name2abs_names(system, name):
             return absnames
 
     guesses = get_close_matches(name, list(system._var_allprocs_prom2abs_list['output'].keys())
-                                    + list(system._var_allprocs_prom2abs_list['input'].keys())
-                                    + list(system._problem_meta['prom2abs']['output'].keys())
-                                    + list(system._problem_meta['prom2abs']['input'].keys()),
-                                    n=10, cutoff=0.15)
-    raise KeyError(f"{system.msginfo}: Could not find '{name}'. Perhaps you meant one of the following variables: {guesses}")
+                                + list(system._var_allprocs_prom2abs_list['input'].keys())
+                                + list(system._problem_meta['prom2abs']['output'].keys())
+                                + list(system._problem_meta['prom2abs']['input'].keys()),
+                                n=10, cutoff=0.15)
+    raise KeyError(f"{system.msginfo}: Could not find '{name}'. Perhaps you "
+                   f"meant one of the following variables: {guesses}")
 
 
 def prom_key2abs_key(system, prom_key):
