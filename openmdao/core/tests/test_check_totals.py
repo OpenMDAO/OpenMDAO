@@ -1217,9 +1217,6 @@ class TestProblemCheckTotals(unittest.TestCase):
         assert_check_totals(p.check_totals(out_stream=stream))
         lines = [strip_formatting(s) for s in stream.getvalue().splitlines()]
 
-        for line in lines:
-            print(line)
-
         self.assertTrue("Full Model: 'lcy' wrt 'x' (Linear constraint)" in lines[4])
         self.assertTrue("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd)" in lines[6])
 
@@ -1382,8 +1379,6 @@ class TestProblemCheckTotals(unittest.TestCase):
         self.assertEqual(content.count('fd value:'), 1)
         self.assertEqual(content.count('Directional Derivative (Jfwd)'), 1)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
-        print(content)
-        print('Max Tolerance Violation ([fwd, fd] Dot Product Test) : ')
         self.assertTrue('Max Tolerance Violation ([fwd, fd] Dot Product Test) : ' in content)
         mhatdotm, dhatdotd =  data[(('comp.out',), 'comp.in')]['directional_fd_fwd']
         assert_near_equal(mhatdotm, dhatdotd, tolerance=2e-15)
@@ -2085,7 +2080,6 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
-        print(stream.getvalue())
         contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Full Model:"), 3)
         self.assertEqual(contents.count("fd value:"), 6)
