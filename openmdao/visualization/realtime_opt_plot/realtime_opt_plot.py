@@ -67,7 +67,7 @@ _plot_line_width = 3
 _varea_alpha = 0.3
 # the CSS for the toggle buttons to let user choose what variables to plot
 _variable_list_header_font_size = "14"
-toggle_styles = """
+_toggle_styles = """
     font-size: 22px;
     box-shadow:
         0 4px 6px rgba(0, 0, 0, 0.1),    /* Distant shadow */
@@ -77,7 +77,8 @@ toggle_styles = """
 
 # colors used for the plot lines and associated buttons and axes labels
 # start with color-blind friendly colors and then use others if needed
-colorPalette = Colorblind[8] + Category20[20]
+if bokeh_available:
+    _colorPalette = Colorblind[8] + Category20[20]
 
 # This is the JavaScript code that gets run when a user clicks on
 #   one of the toggle buttons that change what variables are plotted
@@ -163,7 +164,7 @@ if (toggle.active) {{
     toggle.stylesheets = [`
         .bk-btn.bk-active {{
             background-color: rgb(from ${{color}} R G B / 0.3);
-            {toggle_styles}
+            {_toggle_styles}
         }}
     `];
 // if turning off a variable, return the color to the pool
@@ -171,7 +172,7 @@ if (toggle.active) {{
     window.colorManager.releaseColor(variable_name);
     toggle.stylesheets = [`
         .bk-btn {{
-            {toggle_styles}
+            {_toggle_styles}
         }}
     `];
 
@@ -526,7 +527,7 @@ class _RealTimeOptPlot(object):
                         lines=self._lines,
                         axes=self._axes,
                         toggles=self._toggles,
-                        colorPalette=colorPalette,
+                        colorPalette=_colorPalette,
                         plot=self.plot_figure,
                     ),
                     code=callback_code,
@@ -747,11 +748,11 @@ class _RealTimeOptPlot(object):
         toggle.stylesheets = [
             f"""
                 .bk-btn {{
-                    {toggle_styles}
+                    {_toggle_styles}
                 }}
                 .bk-btn.bk-active {{
                     background-color: rgb(from #000000 R G B / 0.3);
-                    {toggle_styles}
+                    {_toggle_styles}
                 }}
             """
         ]
