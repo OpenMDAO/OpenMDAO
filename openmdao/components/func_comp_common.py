@@ -18,7 +18,7 @@ try:
         from jax.extend import linear_util
     except ImportError:
         from jax import linear_util
-    from jax.api_util import argnums_partial
+    from jax.api_util import argnums_partial, debug_info as jax_debug_info
     from jax._src.api import _jvp, _vjp
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
@@ -92,7 +92,7 @@ def jac_forward(fun, argnums, tangents):
         rows of J and the second would contain the next 4 rows of J.  If there is only 1 output
         variable, the values returned are grouped by input variable.
     """
-    f = linear_util.wrap_init(fun)
+    f = linear_util.wrap_init(fun, debug_info=jax_debug_info('jac_forward'))
     if argnums is None:
         def jacfunf(*args):
             return vmap(partial(_jvp, f, args), out_axes=(None, -1))(tangents)[1]
@@ -128,7 +128,7 @@ def jac_reverse(fun, argnums, tangents):
         implicit systems, the function inputs will contain both inputs and outputs in the context
         of OpenMDAO.
     """
-    f = linear_util.wrap_init(fun)
+    f = linear_util.wrap_init(fun, debug_info=jax_debug_info('jac_reverse'))
     if argnums is None:
         def jacfunr(*args):
             return vmap(_vjp(f, *args)[1])(tangents)
@@ -162,7 +162,7 @@ def jacvec_prod(fun, argnums, invals, tangent):
     function
         A function to compute the jacobian vector product.
     """
-    f = linear_util.wrap_init(fun)
+    f = linear_util.wrap_init(fun, debug_info=jax_debug_info('jacvec_prod'))
     if argnums is not None:
         invals = list(argnums_partial(f, argnums, invals)[1])
 
