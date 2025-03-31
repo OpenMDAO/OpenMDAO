@@ -7,35 +7,39 @@ import sys
 from collections import defaultdict
 import sqlite3
 
-from bokeh.models import (
-    ColumnDataSource,
-    LinearAxis,
-    Range1d,
-    Toggle,
-    Button,
-    Column,
-    Row,
-    CustomJS,
-    Div,
-    ScrollBox,
-    SingleIntervalTicker
-)
+try:
+    from bokeh.models import (
+        ColumnDataSource,
+        LinearAxis,
+        Range1d,
+        Toggle,
+        Button,
+        Column,
+        Row,
+        CustomJS,
+        Div,
+        ScrollBox,
+        SingleIntervalTicker
+    )
 
-from bokeh.models.tools import (
-    BoxZoomTool,
-    ResetTool,
-    HoverTool,
-    PanTool,
-    WheelZoomTool,
-    SaveTool,
-    ZoomInTool,
-    ZoomOutTool,
-)
-from bokeh.plotting import figure
-from bokeh.server.server import Server
-from bokeh.application.application import Application
-from bokeh.application.handlers import FunctionHandler
-from bokeh.palettes import Category20, Colorblind
+    from bokeh.models.tools import (
+        BoxZoomTool,
+        ResetTool,
+        HoverTool,
+        PanTool,
+        WheelZoomTool,
+        SaveTool,
+        ZoomInTool,
+        ZoomOutTool,
+    )
+    from bokeh.plotting import figure
+    from bokeh.server.server import Server
+    from bokeh.application.application import Application
+    from bokeh.application.handlers import FunctionHandler
+    from bokeh.palettes import Category20, Colorblind
+    bokeh_available = True
+except ImportError:
+    bokeh_available = False
 
 import numpy as np
 
@@ -238,8 +242,13 @@ def _realtime_opt_plot_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms,
-                      options.pid, options.show)
+    if bokeh_available:
+        realtime_opt_plot(options.case_recorder_filename, _time_between_callbacks_in_ms,
+                          options.pid, options.show)
+    else:
+        print("The bokeh library is not installed so the real-time optimizaton "
+              "lot is not available. ")
+        return
 
 
 def _update_y_min_max(name, y, y_min, y_max):
