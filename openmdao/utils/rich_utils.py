@@ -11,7 +11,7 @@ except ImportError:
 from openmdao.utils.general_utils import env_truthy
 
 
-def use_rich(enable=None):
+def use_rich():
     """
     Determine if rich should be used for formatting output.
 
