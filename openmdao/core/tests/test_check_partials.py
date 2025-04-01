@@ -21,6 +21,7 @@ from openmdao.utils.om_warnings import DerivativesWarning, OMInvalidCheckDerivat
 from openmdao.utils.testing_utils import set_env_vars_context, compare_prob_vs_comp_check_partials,\
     snum_equal
 from openmdao.utils.array_utils import safe_norm
+from openmdao.utils.rich_utils import strip_formatting
 
 from openmdao.utils.mpi import MPI
 
@@ -193,7 +194,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         prob.check_partials(out_stream=stream)
-        lines = stream.getvalue().splitlines()
+        lines = [strip_formatting(s) for s in stream.getvalue().splitlines()]
 
         y_wrt_x1_line = lines.index("  comp: 'y' wrt 'x1'")
 
@@ -601,7 +602,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         data = prob.check_partials(out_stream=stream)
-        lines = stream.getvalue().splitlines()
+        lines = [strip_formatting(s) for s in stream.getvalue().splitlines()]
 
         self.assertTrue("  comp: 'g' wrt 'z'" not in lines)
         self.assertTrue(('g', 'z') not in data['comp'])
@@ -677,7 +678,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         data = prob.check_partials(out_stream=stream)
-        lines = stream.getvalue().splitlines()
+        lines = [strip_formatting(s) for s in stream.getvalue().splitlines()]
 
         self.assertTrue("  comp: 'g' wrt 'z'" in lines)
         self.assertTrue(('g', 'z') in data['comp'])
@@ -1231,6 +1232,9 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)
+        dz_dx1_fd = partials_data['comp'][('z', 'x1')]['J_fd']
+        dz_dx2_fd = partials_data['comp'][('z', 'x2')]['J_fd']
+
         # So for this case, they do all provide them, so rev should not be shown
         self.assertEqual(stream.getvalue().count('fwd value'), 2)
         self.assertEqual(stream.getvalue().count('rev value'), 0)
@@ -1239,8 +1243,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 0)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 2)
-        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    {partials_data['comp'][('z', 'x1')]['J_fd']}"), 1)
-        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    {partials_data['comp'][('z', 'x2')]['J_fd']}"), 1)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    [[{dz_dx1_fd[0, 0]: .12e}]]"), 1)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    [[{dz_dx2_fd[0, 0]: .12e}]]"), 1)
         # 3: Explicit comp that does not define Jacobian. It defines compute_jacvec_product
         #      For both compact and non-compact display
         prob = om.Problem()
@@ -1291,10 +1295,11 @@ class TestProblemCheckPartials(unittest.TestCase):
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 4)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 2)
         self.assertEqual(stream.getvalue().count('Raw FD Derivative'), 4)
-        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    {partials_data['c0'][('z', 'x1')]['J_fd']}"), 1)
-        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    {partials_data['c0'][('z', 'x2')]['J_fd']}"), 1)
-        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    {partials_data['comp'][('f_xy', 'x')]['J_fd']}"), 1)
-        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    {partials_data['comp'][('f_xy', 'y')]['J_fd']}"), 1)
+
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    [[{partials_data['c0'][('z', 'x1')]['J_fd'][0, 0]: .12e}]]"), 1)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    [[{partials_data['c0'][('z', 'x2')]['J_fd'][0, 0]: .12e}]]"), 1)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    [[{partials_data['comp'][('f_xy', 'x')]['J_fd'][0, 0]: .12e}]]"), 1)
+        self.assertEqual(stream.getvalue().count(f"(Jfd)\n    [[{partials_data['comp'][('f_xy', 'y')]['J_fd'][0, 0]: .12e}]]"), 1)
 
     def test_check_partials_worst_subjac(self):
         # The first is printing the worst subjac at the bottom of the output. Worst is defined by
@@ -2802,7 +2807,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(step=[1e-6], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         ncomps = 2
         nderivs = ncomps * 2
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
@@ -2817,7 +2822,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(step=[1e-6], compact_print=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
@@ -2837,7 +2842,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(method='cs', step=[1e-30], compact_print=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
@@ -2857,7 +2862,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(step=[1e-6, 1e-7], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         ncomps = 2
         nderivs = ncomps * 2
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
@@ -2870,7 +2875,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
@@ -2890,7 +2895,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model()
         stream = StringIO()
         p.check_partials(method='cs', step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
@@ -2910,7 +2915,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         p = self.setup_model(directional=True)
         stream = StringIO()
         p.check_partials(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
         self.assertEqual(contents.count("Sub Jacobian with Largest Tolerance Violation: CompBadPartials 'bad'"), 1)
