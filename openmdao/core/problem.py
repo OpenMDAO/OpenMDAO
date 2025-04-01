@@ -40,7 +40,6 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
     record_model_options
 from openmdao.utils.deriv_display import _print_deriv_table, _deriv_display, _deriv_display_compact
 from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
-from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.logger_utils import get_logger, TestLogger
@@ -521,16 +520,13 @@ class Problem(object, metaclass=ProblemMetaclass):
             The value of the requested output/input variable.
         """
         if self._metadata['setup_status'] <= _SetupStatus.POST_SETUP2:
-            abs_names = name2abs_names(self.model, name)
-            if abs_names:
-                val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
-                if not is_undefined(val):
-                    if indices is not None:
-                        val = val[indices]
-                    if units is not None:
-                        val = self.model.convert2units(name, val, simplify_unit(units))
-            else:
-                raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
+            abs_names = self.model._resolver.absnames(name)
+            val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
+            if not is_undefined(val):
+                if indices is not None:
+                    val = val[indices]
+                if units is not None:
+                    val = self.model.convert2units(name, val, simplify_unit(units))
         else:
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
@@ -961,7 +957,6 @@ class Problem(object, metaclass=ProblemMetaclass):
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,  # forces allocation of complex vectors
             'vars_to_gather': {},  # vars that are remote somewhere. does not include distrib vars
-            'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
             'static_mode': False,  # used to determine where various 'static'
                                    # and 'dynamic' data structures are stored.
                                    # Dynamic ones are added during System

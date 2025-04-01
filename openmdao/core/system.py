@@ -28,7 +28,7 @@ from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table, NA
 from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_tol_violation, \
     sparsity_diff_viz, get_sparsity_diff_array
-from openmdao.utils.name_maps import name2abs_name, name2abs_names, NameResolver
+from openmdao.utils.name_maps import NameResolver
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
@@ -1452,43 +1452,6 @@ class System(object, metaclass=SystemMetaclass):
 
         return self._approx_schemes[method]
 
-    def get_source(self, name):
-        """
-        Return the source variable connected to the given named variable.
-
-        The name can be a promoted name or an absolute name.
-        If the given variable is an input, the absolute name of the connected source will
-        be returned.  If the given variable itself is a source, its own absolute name will
-        be returned.
-
-        Parameters
-        ----------
-        name : str
-            Absolute or promoted name of the variable.
-
-        Returns
-        -------
-        str
-            The absolute name of the source variable.
-        """
-        try:
-            prom2abs = self._problem_meta['prom2abs']
-        except Exception:
-            raise RuntimeError(f"{self.msginfo}: get_source cannot be called for variable {name} "
-                               "before Problem.setup has been called.")
-
-        if name in prom2abs['output']:
-            return prom2abs['output'][name][0]
-
-        if name in prom2abs['input']:
-            name = prom2abs['input'][name][0]
-
-        model = self._problem_meta['model_ref']()
-        if name in model._conn_global_abs_in2out:
-            return model._conn_global_abs_in2out[name]
-
-        raise KeyError(f"{self.msginfo}: source for '{name}' not found.")
-
     def _get_graph_node_meta(self):
         """
         Return metadata to add to this system's graph node.
@@ -2359,6 +2322,7 @@ class System(object, metaclass=SystemMetaclass):
             abs2meta = self._var_allprocs_abs2meta['output']
 
         has_scaling = False
+        resolver = self._resolver
 
         for name, meta in self._design_vars.items():
 
@@ -2372,7 +2336,7 @@ class System(object, metaclass=SystemMetaclass):
                 try:
                     units_src = meta['source']
                 except KeyError:
-                    units_src = self.get_source(name)
+                    units_src = resolver.source(name)
 
                 var_units = abs2meta[units_src]['units']
 
@@ -2429,7 +2393,7 @@ class System(object, metaclass=SystemMetaclass):
                 try:
                     units_src = meta['source']
                 except KeyError:
-                    units_src = self.get_source(meta['name'])
+                    units_src = resolver.source(meta['name'])
 
                 src_units = abs2meta[units_src]['units']
 
@@ -3872,8 +3836,8 @@ class System(object, metaclass=SystemMetaclass):
 
                 out[key] = data
 
-        except KeyError as err:
-            raise RuntimeError(f"{self.msginfo}: Output not found for design variable {err}.")
+        except KeyError:
+            raise RuntimeError(f"{self.msginfo}: Output not found for design variable '{name}'.")
 
         return out
 
@@ -3984,8 +3948,8 @@ class System(object, metaclass=SystemMetaclass):
 
                 out[key] = meta
 
-        except KeyError as err:
-            raise RuntimeError(f"{self.msginfo}: Output not found for response {err}.")
+        except KeyError:
+            raise RuntimeError(f"{self.msginfo}: Output not found for response '{name}'.")
 
         return out
 
@@ -4156,6 +4120,8 @@ class System(object, metaclass=SystemMetaclass):
         if is_design_var is not None:
             des_vars = self.get_design_vars(get_sizes=False, use_prom_ivc=False)
 
+        resolver = self._resolver
+
         for iotype in iotypes:
             cont2meta = metadict[iotype]
             disc2meta = disc_metadict[iotype]
@@ -4234,7 +4200,7 @@ class System(object, metaclass=SystemMetaclass):
                         if iotype == 'output':
                             out_meta = meta
                         else:
-                            src_name = self.get_source(abs_name)
+                            src_name = resolver.source(abs_name)
                             try:
                                 out_meta = metadict['output'][src_name]
                             except KeyError:
@@ -4252,7 +4218,7 @@ class System(object, metaclass=SystemMetaclass):
                         if iotype == 'output':
                             out_name = abs_name
                         else:
-                            out_name = self.get_source(abs_name)
+                            out_name = resolver.source(abs_name)
                         if is_design_var:
                             if out_name not in des_vars:
                                 continue
@@ -5567,9 +5533,12 @@ class System(object, metaclass=SystemMetaclass):
         object
             The value of the requested output/input variable.
         """
-        abs_names = name2abs_names(self, name)
-        if not abs_names:
-            raise KeyError('{}: Variable "{}" not found.'.format(self.msginfo, name))
+        # typ = kind if kind is None else _type_map[kind]
+        abs_names = self._resolver.absnames(name)
+        # if self._resolver.is_prom(name, typ):
+        #     abs_names = self._resolver.absnames(name, typ)
+        # else:
+        #     abs_names = (self._resolver.any2abs(name, typ, report_error=True), )
         simp_units = simplify_unit(units)
 
         if from_src:
@@ -5594,7 +5563,7 @@ class System(object, metaclass=SystemMetaclass):
                 val = val[indices]
 
             if units is not None:
-                val = self.convert2units(abs_names[0], val, simp_units)
+                val = self.convert2units(name, val, simp_units)
 
         return val
 
@@ -5665,10 +5634,15 @@ class System(object, metaclass=SystemMetaclass):
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set.
         """
+        try:
+            ginputs = self._group_inputs
+        except AttributeError:
+            ginputs = {}  # could happen if this system is not a Group
+
         post_setup = self._problem_meta is not None and \
             self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP
         if post_setup:
-            abs_names = name2abs_names(self, name)
+            abs_names = self._resolver.absnames(name)
         else:
             raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
                                "completes.")
@@ -5683,29 +5657,21 @@ class System(object, metaclass=SystemMetaclass):
         loc_meta = model._var_abs2meta
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
-        try:
-            ginputs = self._group_inputs
-        except AttributeError:
-            ginputs = {}  # could happen if this system is not a Group
-
-        if abs_names:
-            n_proms = len(abs_names)  # for output this will never be > 1
-            if n_proms > 1 and name in ginputs:
-                abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
-            else:
-                abs_name = abs_names[0]
-
-            if not has_vectors:
-                has_dyn_shape = []
-                for n in abs_names:
-                    if n in all_meta['input']:
-                        m = all_meta['input'][n]
-                        if 'shape_by_conn' in m and m['shape_by_conn']:
-                            has_dyn_shape.append(True)
-                    else:
-                        has_dyn_shape.append(False)
+        n_proms = len(abs_names)  # for output this will never be > 1
+        if n_proms > 1 and name in ginputs:
+            abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
         else:
-            raise KeyError(f'{model.msginfo}: Variable "{name}" not found.')
+            abs_name = abs_names[0]
+
+        if not has_vectors:
+            has_dyn_shape = []
+            for n in abs_names:
+                if n in all_meta['input']:
+                    m = all_meta['input'][n]
+                    if 'shape_by_conn' in m and m['shape_by_conn']:
+                        has_dyn_shape.append(True)
+                else:
+                    has_dyn_shape.append(False)
 
         set_units = None
 
@@ -6323,7 +6289,7 @@ class System(object, metaclass=SystemMetaclass):
             meta = meta_all['input'][name]
 
         if meta is None:
-            abs_name = name2abs_name(self, name)
+            abs_name = self._resolver.any2abs(name, report_error=False)
             if abs_name is not None:
                 if abs_name in meta_all['output']:
                     meta = meta_all['output'][abs_name]

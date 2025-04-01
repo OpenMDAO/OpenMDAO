@@ -17,7 +17,7 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.utils.units import simplify_unit
-from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name, \
+from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, \
     rel_key2abs_key
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, sparsity_diff_viz
@@ -2251,6 +2251,7 @@ class Component(System):
         partials_data = defaultdict(dict)
         requested_method = method
         probmeta = self._problem_meta
+        prefix = self.pathname + '.'
 
         for mode in directions:
             jac_key = 'J_' + mode
@@ -2272,7 +2273,7 @@ class Component(System):
                         out_list = wrt_list
 
                     for inp in in_list:
-                        inp_abs = rel_name2abs_name(self, inp)
+                        inp_abs = prefix + inp
                         if mode == 'fwd':
                             directional = inp in local_opts and local_opts[inp]['directional']
                         else:
@@ -2316,7 +2317,7 @@ class Component(System):
                                 probmeta['checking'] = False
 
                             for out in out_list:
-                                out_abs = rel_name2abs_name(self, out)
+                                out_abs = prefix + out
 
                                 try:
                                     derivs = doutputs._abs_get_val(out_abs)

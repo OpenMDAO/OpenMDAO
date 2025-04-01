@@ -36,10 +36,7 @@ class _VarData(object):
             if self.continuous != continuous:
                 return False
 
-        if local is not None and self.local != local:
-            return False
-
-        return True
+        return local is None or self.local == local
 
 
 class NameResolver(object):
@@ -159,6 +156,16 @@ class NameResolver(object):
                 else:
                     assert absname not in system._var_abs2prom[io]
 
+            # strip out autoivc pseudo prom values from _var_allprocs_prom2abs_list['output']
+            # if io == 'output':
+            #     sysprom2abs = {}
+            #     for n, abslist in system._var_allprocs_prom2abs_list[io].items():
+            #         alist = [a for a in abslist if not a.startswith('_auto_ivc.')]
+            #         if alist:
+            #             sysprom2abs[n] = alist
+            # else:
+            #     sysprom2abs = system._var_allprocs_prom2abs_list[io]
+
             assert len(self._prom2abs[io]) == len(system._var_allprocs_prom2abs_list[io])
             for promname, abslist in self._prom2abs[io].items():
                 assert sorted(system._var_allprocs_prom2abs_list[io][promname]) == sorted(abslist)
@@ -230,9 +237,14 @@ class NameResolver(object):
         """
         self._prom2abs = {'input': {}, 'output': {}}
         for iotype, promdict in self._prom2abs.items():
+            skip_autoivc = iotype == 'output'
             for absname, (promname, _) in self._abs2prom[iotype].items():
                 if promname in promdict:
                     promdict[promname].append(absname)
+                elif skip_autoivc and absname.startswith('_auto_ivc.'):
+                    # don't map 'pseudo' promoted names of auto_ivcs because it will give us
+                    # unwanted matches. Instead just map the relative name.
+                    promdict[absname[self._pathlen:]] = [absname]
                 else:
                     promdict[promname] = [absname]
 
@@ -396,6 +408,38 @@ class NameResolver(object):
             return 'input'
         if report_error:
             raise ValueError(f"{self.msginfo}: Can't find {promname}.")
+
+    def get_iotype(self, name, report_error=False):
+        """
+        Get the iotype of a name.
+
+        Parameters
+        ----------
+        name : str
+            The name to get the iotype of.
+        report_error : bool
+            If True, raise an error if the name is not found.
+
+        Returns
+        -------
+        str
+            The iotype of the promoted name.
+        """
+        if name in self._abs2prom_out:
+            return 'output'
+        if name in self._abs2prom_in:
+            return 'input'
+
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+
+        if name in self._prom2abs_out:
+            return 'output'
+        if name in self._prom2abs_in:
+            return 'input'
+
+        if report_error:
+            raise ValueError(f"{self.msginfo}: Can't find {name}.")
 
     def prom2abs_iter(self, iotype, local=None):
         """
@@ -618,7 +662,7 @@ class NameResolver(object):
         if self._prom2abs is not None:
             self._prom2abs[iotype][promname].append(absname)
 
-    def source(self, name, conns, iotype=None, report_error=True):
+    def source(self, name, conns=None, iotype=None, report_error=True):
         """
         Get the source of a variable.
 
@@ -642,6 +686,9 @@ class NameResolver(object):
         str
             The source corresponding to the name.
         """
+        if conns is None:
+            conns = self._conns
+
         if conns is None:
             raise RuntimeError(f"{self.msginfo}: Can't find source for '{name}' because "
                                "connections are not yet known.")
@@ -796,11 +843,21 @@ class NameResolver(object):
         if iotype is None:
             iotype = self.get_prom_iotype(promname)
 
+            if iotype is None:  # name is not promoted, try absolute name
+                if promname in self._abs2prom_out:
+                    return (promname,)
+                if promname in self._abs2prom_in:
+                    return (promname,)
+
+                if report_error:
+                    raise KeyError(f"{self.msginfo}: Variable '{promname}' not found.")
+                return
+
         try:
             return self._prom2abs[iotype][promname]
         except KeyError:
             if report_error:
-                raise KeyError(f"{self.msginfo}: Can't find promoted {iotype} {promname}.")
+                raise KeyError(f"{self.msginfo}: {iotype} variable '{promname}' not found.")
 
     def prom2abs(self, promname, iotype=None, local=None, conns=None):
         """
@@ -818,7 +875,8 @@ class NameResolver(object):
             If True, check only local names. If False, check only non-local names.
             If None, check all names.
         conns : dict or None
-            The connections dictionary.
+            The connections dictionary if available. This allows the source of the promoted name
+            to be reported in the error message.
 
         Returns
         -------
@@ -1026,33 +1084,36 @@ class NameResolver(object):
 
 # --------- OLD FUNCTIONS - TO BE REMOVED ONCE ALL CODE USES RESOLVER ---------
 
-def rel_name2abs_name(system, rel_name):
+def rel_name2abs_name(obj, rel_name, delim='.'):
     """
     Map relative variable name to absolute variable name.
 
     Parameters
     ----------
-    system : <System>
-        System to which the given name is relative.
+    obj : object
+        Object to which the given name is relative. The object must have a `pathname` attribute
+        that is a string delimited by 'delim'.
     rel_name : str
         Given relative variable name.
+    delim : str
+        Delimiter between the parts of the object pathname.
 
     Returns
     -------
     str
         Absolute variable name.
     """
-    return system.pathname + '.' + rel_name if system.pathname else rel_name
+    return obj.pathname + delim + rel_name if obj.pathname else rel_name
 
 
-def abs_name2rel_name(system, abs_name):
+def abs_name2rel_name(obj, abs_name):
     """
     Map relative variable name to absolute variable name.
 
     Parameters
     ----------
-    system : <System>
-        System to which the given name is relative.
+    obj : object
+        Object to which the given name is relative. The object must have a `pathname` attribute.
     abs_name : str
         Given absolute variable name.
 
@@ -1061,39 +1122,42 @@ def abs_name2rel_name(system, abs_name):
     str
         Relative variable name.
     """
-    return abs_name[len(system.pathname) + 1:] if system.pathname else abs_name
+    return abs_name[len(obj.pathname) + 1:] if obj.pathname else abs_name
 
 
-def rel_key2abs_key(system, rel_key):
+def rel_key2abs_key(obj, rel_key, delim='.'):
     """
     Map relative variable name pair to absolute variable name pair.
 
     Parameters
     ----------
-    system : <System>
-        System to which the given key is relative.
+    obj : object
+        Object to which the given key is relative. The object must have a `pathname` attribute
+        that is a string delimited by 'delim'.
     rel_key : (str, str)
         Given relative variable name pair.
+    delim : str
+        Delimiter between the parts of the object pathname.
 
     Returns
     -------
     (str, str)
         Absolute variable name pair.
     """
-    if system.pathname:
+    if obj.pathname:
         of, wrt = rel_key
-        return (system.pathname + '.' + of, system.pathname + '.' + wrt)
+        return (obj.pathname + delim + of, obj.pathname + delim + wrt)
     return rel_key
 
 
-def abs_key2rel_key(system, abs_key):
+def abs_key2rel_key(obj, abs_key):
     """
     Map relative variable name pair to absolute variable name pair.
 
     Parameters
     ----------
-    system : <System>
-        System to which the given key is relative.
+    obj : object
+        Object to which the given key is relative. The object must have a `pathname` attribute.
     abs_key : (str, str)
         Given absolute variable name pair.
 
@@ -1102,9 +1166,9 @@ def abs_key2rel_key(system, abs_key):
     (str, str)
         Relative variable name pair.
     """
-    if system.pathname:
+    if obj.pathname:
         of, wrt = abs_key
-        plen = len(system.pathname) + 1
+        plen = len(obj.pathname) + 1
         return (of[plen:], wrt[plen:])
     return abs_key
 
@@ -1142,93 +1206,6 @@ def prom_name2abs_name(system, prom_name, iotype):
         raise RuntimeError(f"{system.msginfo}: The promoted name {prom_name} is invalid because it "
                            f"refers to multiple inputs: [{' ,'.join(abs_list)}]. Access the value "
                            f"from the connected output variable {src_name} instead.")
-
-
-def name2abs_name(system, name):
-    """
-    Map the given promoted or relative name to the absolute name.
-
-    This is only valid when the name is unique; otherwise, a KeyError is thrown.
-
-    Parameters
-    ----------
-    system : <System>
-        System to which name is relative.
-    name : str
-        Promoted or relative variable name in the owning system's namespace.
-
-    Returns
-    -------
-    str or None
-        Absolute variable name if unique abs_name found or None otherwise.
-    str or None
-        The type ('input' or 'output') of the corresponding variable.
-    """
-    if name in system._var_allprocs_abs2prom['output']:
-        return name
-    if name in system._var_allprocs_abs2prom['input']:
-        return name
-
-    if name in system._var_allprocs_prom2abs_list['output']:
-        return system._var_allprocs_prom2abs_list['output'][name][0]
-
-    # This may raise an exception if name is not unique
-    abs_name = prom_name2abs_name(system, name, 'input')
-    if abs_name is not None:
-        return abs_name
-
-    abs_name = rel_name2abs_name(system, name)
-    if abs_name in system._var_allprocs_abs2prom['output']:
-        return abs_name
-    elif abs_name in system._var_allprocs_abs2prom['input']:
-        return abs_name
-
-
-def name2abs_names(system, name):
-    """
-    Map the given promoted, relative, or absolute name to any matching absolute names.
-
-    This will also match any buried promotes.
-
-    Parameters
-    ----------
-    system : <System>
-        System to which name is relative.
-    name : str
-        Promoted or relative variable name in the owning system's namespace.
-
-    Returns
-    -------
-    tuple or list of str
-        Tuple or list of absolute variable names found.
-    """
-    # first check relative promoted names
-    if name in system._var_allprocs_prom2abs_list['output']:
-        return system._var_allprocs_prom2abs_list['output'][name]
-
-    if name in system._var_allprocs_prom2abs_list['input']:
-        return system._var_allprocs_prom2abs_list['input'][name]
-
-    # then check absolute names
-    if name in system._var_allprocs_abs2prom['output']:
-        return (name,)
-    if name in system._var_allprocs_abs2prom['input']:
-        return (name,)
-
-    # then check global promoted names, including buried promotes
-    if name in system._problem_meta['prom2abs']['output']:
-        absnames = system._problem_meta['prom2abs']['output'][name]
-        # reduce scope to this system
-        if absnames[0] in system._var_allprocs_abs2prom['output']:
-            return absnames
-
-    if name in system._problem_meta['prom2abs']['input']:
-        absnames = system._problem_meta['prom2abs']['input'][name]
-        # reduce scope to this system
-        if absnames[0] in system._var_allprocs_abs2prom['input']:
-            return absnames
-
-    return ()
 
 
 def prom_key2abs_key(system, prom_key):

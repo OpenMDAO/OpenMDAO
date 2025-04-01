@@ -18,7 +18,6 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning, asser
     assert_check_totals
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.om_warnings import PromotionWarning
-from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.testing_utils import set_env_vars_context
 
 try:
@@ -1834,8 +1833,8 @@ class TestGroupPromotes(unittest.TestCase):
         with self.assertRaises(KeyError) as cm:
             top['a']
 
-        self.assertEqual(str(cm.exception),
-                         "'<model> <class SimpleGroup>: Variable \"a\" not found.'")
+        self.assertEqual(cm.exception.args[0],
+                         "<model> <class SimpleGroup>: Variable 'a' not found.")
 
     def test_promotes_inputs_in_config(self):
 
@@ -1854,8 +1853,8 @@ class TestGroupPromotes(unittest.TestCase):
         with self.assertRaises(KeyError) as cm:
             top['b']
 
-        self.assertEqual(str(cm.exception),
-                         "'<model> <class SimpleGroup>: Variable \"b\" not found.'")
+        self.assertEqual(cm.exception.args[0],
+                         "<model> <class SimpleGroup>: Variable 'b' not found.")
 
     def test_promotes_any_in_config(self):
 
@@ -1874,8 +1873,8 @@ class TestGroupPromotes(unittest.TestCase):
         with self.assertRaises(KeyError) as cm:
             top['a']
 
-        self.assertEqual(str(cm.exception),
-                         "'<model> <class SimpleGroup>: Variable \"a\" not found.'")
+        self.assertEqual(cm.exception.args[0],
+                         "<model> <class SimpleGroup>: Variable 'a' not found.")
 
     def test_promotes_alias(self):
         class SubGroup(om.Group):
@@ -2031,8 +2030,8 @@ class TestGroupPromotes(unittest.TestCase):
         with self.assertRaises(KeyError) as cm:
             top['Branch1.G1.comp1.a']
 
-        self.assertEqual(str(cm.exception),
-                         "'<model> <class BranchGroup>: Variable \"Branch1.G1.comp1.a\" not found.'")
+        self.assertEqual(cm.exception.args[0],
+                         "<model> <class BranchGroup>: Variable 'Branch1.G1.comp1.a' not found.")
 
     def test_multiple_promotes_collision(self):
 
@@ -4387,174 +4386,6 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
         self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
 
         assert_near_equal(p.get_val('discipline.x'), 1.41421356, 1e-6)
-
-
-class TestNaturalNaming(unittest.TestCase):
-
-    def test_buried_proms(self):
-        p = om.Problem()
-        model = p.model
-        g1 = model.add_subsystem('g1', om.Group())
-        g2 = g1.add_subsystem('g2', om.Group(), promotes=['*'])
-        g3 = g2.add_subsystem('g3', om.Group())
-        g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
-        g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
-        p.setup()
-        p.final_setup()
-
-        full_in = 'g1.g2.g3.g4.c1.x'
-        full_out = 'g1.g2.g3.g4.c1.y'
-
-        prom_ins = ['g1.g2.g3.g4.x', 'g1.g2.g3.x', 'g1.g3.x']
-        for prom in prom_ins:
-            self.assertEqual(name2abs_names(model, prom), [full_in])
-
-        prom_outs = ['g1.g2.g3.g4.y', 'g1.g2.g3.y', 'g1.g3.y']
-        for prom in prom_outs:
-            self.assertEqual(name2abs_names(model, prom), [full_out])
-
-        # check setting/getting before final setup
-
-        for name in prom_ins + [full_in]:
-            self.assertEqual(p[name], 7.)
-
-        self.assertEqual(g3.get_val('x', get_remote=True), 7.)
-
-        # we allow 'g1.g3.x' here even though it isn't relative to g3,
-        # because it maps to an absolute name that is contained in g3.
-        self.assertEqual(g3.get_val('g1.g3.x', get_remote=True), 7.)
-
-        for name in prom_outs + [full_out]:
-            self.assertEqual(p[name], 9.)
-
-        incount = 0
-        for name in prom_ins + [full_in]:
-            incount += 1
-            p[name] = 77. + incount
-            self.assertEqual(p[name], 77. + incount)
-
-        outcount = 0
-        for name in prom_outs + [full_out]:
-            outcount += 1
-            p[name] = 99. + outcount
-            self.assertEqual(p[name], 99. + outcount)
-
-        p.final_setup()
-
-        # now check after final setup
-
-        for name in prom_ins + [full_in]:
-            self.assertEqual(p[name], 77. + incount)
-
-        self.assertEqual(g3.get_val('x', get_remote=True), 77. + incount)
-
-        for name in prom_outs + [full_out]:
-            self.assertEqual(p[name], 99. + outcount)
-
-        incount = 0
-        for name in prom_ins + [full_in]:
-            incount += 1
-            p[name] = 7. + incount
-            self.assertEqual(p[name], 7. + incount)
-
-        outcount = 0
-        for name in prom_outs + [full_out]:
-            outcount += 1
-            p[name] = 9. + outcount
-            self.assertEqual(p[name], 9. + outcount)
-
-
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestNaturalNamingMPI(unittest.TestCase):
-    N_PROCS = 2
-
-    def test_buried_proms(self):
-        p = om.Problem()
-        model = p.model
-        par = model.add_subsystem('par', om.ParallelGroup())
-        g1 = par.add_subsystem('g1', om.Group())
-        g2 = g1.add_subsystem('g2', om.Group(), promotes=['*'])
-        g3 = g2.add_subsystem('g3', om.Group())
-        g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
-        g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
-
-        g1a = par.add_subsystem('g1a', om.Group())
-        g2a = g1a.add_subsystem('g2', om.Group(), promotes=['*'])
-        g3a = g2a.add_subsystem('g3', om.Group())
-        g4a = g3a.add_subsystem('g4', om.Group(), promotes=['*'])
-        g4a.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
-
-        p.setup()
-        p.final_setup()
-
-        for gtop in ['par.g1', 'par.g1a']:
-            full_in = f'{gtop}.g2.g3.g4.c1.x'
-            full_out = f'{gtop}.g2.g3.g4.c1.y'
-
-            prom_ins = [f'{gtop}.g2.g3.g4.x', f'{gtop}.g2.g3.x', f'{gtop}.g3.x']
-            for prom in prom_ins:
-                self.assertEqual(name2abs_names(model, prom), [full_in])
-
-            prom_outs = [f'{gtop}.g2.g3.g4.y', f'{gtop}.g2.g3.y', f'{gtop}.g3.y']
-            for prom in prom_outs:
-                self.assertEqual(name2abs_names(model, prom), [full_out])
-
-            # check setting/getting before final setup
-
-            for name in prom_ins + [full_in]:
-                self.assertEqual(p.get_val(name, get_remote=True), 7.)
-
-            for name in prom_outs + [full_out]:
-                self.assertEqual(p.get_val(name, get_remote=True), 9.)
-
-            incount = 0
-            for name in prom_ins + [full_in]:
-                incount += 1
-                p[name] = 77. + incount
-                p.model.comm.barrier()
-                self.assertEqual(p.get_val(name, get_remote=True), 77. + incount)
-
-            outcount = 0
-            for name in prom_outs + [full_out]:
-                outcount += 1
-                p[name] = 99. + outcount
-                p.model.comm.barrier()
-                self.assertEqual(p.get_val(name, get_remote=True), 99. + outcount)
-
-        p.final_setup()
-
-        # now check after final setup
-
-        for gtop in ['par.g1', 'par.g1a']:
-            full_in = f'{gtop}.g2.g3.g4.c1.x'
-            full_out = f'{gtop}.g2.g3.g4.c1.y'
-
-            for name in prom_ins + [full_in]:
-                self.assertEqual(p.get_val(name, get_remote=True), 77. + incount)
-
-            for name in prom_outs + [full_out]:
-                self.assertEqual(p.get_val(name, get_remote=True), 99. + outcount)
-
-        for gtop in ['par.g1', 'par.g1a']:
-            full_in = f'{gtop}.g2.g3.g4.c1.x'
-            full_out = f'{gtop}.g2.g3.g4.c1.y'
-
-            incount = 0
-            for name in prom_ins + [full_in]:
-                incount += 1
-                p[name] = 7. + incount
-                p.model.comm.barrier()
-                self.assertEqual(p.get_val(name, get_remote=True), 7. + incount)
-
-            outcount = 0
-            for name in prom_outs + [full_out]:
-                outcount += 1
-                p[name] = 9. + outcount
-                p.model.comm.barrier()
-                self.assertEqual(p.get_val(name, get_remote=True), 9. + outcount)
-
-        self.assertEqual(set(p.model._vars_to_gather),
-                         {'par.g1.g2.g3.g4.c1.x', 'par.g1a.g2.g3.g4.c1.x', 'par.g1.g2.g3.g4.c1.y', 'par.g1a.g2.g3.g4.c1.y'})
 
 
 class TestConfigureUpdate(unittest.TestCase):

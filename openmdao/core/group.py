@@ -1099,8 +1099,6 @@ class Group(System):
 
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs()
-        self._problem_meta['prom2abs'] = self._get_all_promotes()
-        self._check_prom_masking()
         self._check_order()
 
         self._setup_var_sizes()
@@ -1360,32 +1358,6 @@ class Group(System):
                         t_prom2abs[prefix + prom] = abs_names
 
         return prom2abs
-
-    def _check_prom_masking(self):
-        """
-        Raise exception if any promoted variable name masks an absolute variable name.
-
-        Only called on the top level group.
-        """
-        abs2meta = self._var_allprocs_abs2meta
-        resolver = self._resolver
-
-        for absname in chain(abs2meta['input'], abs2meta['output']):
-            if resolver.is_prom(absname, 'input'):
-                for name in resolver.absnames(absname, 'input'):
-                    if name != absname:
-                        raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
-                                           " is masked by a matching promoted name. Try"
-                                           " promoting to a different name. This can be caused"
-                                           " by promoting '*' at group level or promoting using"
-                                           " dotted names.")
-            elif resolver.is_prom(absname, 'output') and not absname.startswith('_auto_ivc.'):
-                if absname != resolver.prom2abs(absname, 'output'):
-                    raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}' is"
-                                       " masked by a matching promoted name. Try"
-                                       " promoting to a different name. This can be caused"
-                                       " by promoting '*' at group level or promoting using"
-                                       " dotted names.")
 
     def _check_order(self, reorder=True, recurse=True, out_of_order=None):
         """

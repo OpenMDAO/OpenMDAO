@@ -284,40 +284,6 @@ class Vector(object):
         """
         return self._views[name]
 
-    # def _name2abs_name(self, name):
-    #     """
-    #     Map the given promoted or relative name to the absolute name.
-
-    #     This is only valid when the name is unique; otherwise, a KeyError is thrown.
-
-    #     Parameters
-    #     ----------
-    #     name : str
-    #         Promoted or relative variable name in the owning system's namespace.
-
-    #     Returns
-    #     -------
-    #     str or None
-    #         Absolute variable name if unique abs_name found or None otherwise.
-    #     """
-    #     if name in self._prom2abs:
-    #         lst = self._prom2abs[name]
-    #         if len(lst) > 1:
-    #             model = self._system()._problem_meta['model_ref']()
-    #             src_name = model._var_abs2prom['output'][model._conn_global_abs_in2out[lst[0]]]
-    #             raise RuntimeError(f"The promoted name {name} is invalid because it refers to "
-    #                                f"multiple inputs: [{' ,'.join(lst)}]. Access the value from "
-    #                                f"the connected output variable {src_name} instead.")
-
-    #         for abs_name in self._prom2abs[name]:
-    #             if abs_name in self._views:
-    #                 return abs_name
-
-    #     # test relative name
-    #     abs_name = self._pathname + '.' + name if self._pathname else name
-    #     if abs_name in self._views:
-    #         return abs_name
-
     def __iter__(self):
         """
         Return an iterator over variables involved in the current mat-vec product (relative names).

@@ -31,10 +31,10 @@ def index_to_varname(system, loc):
     """
     start = end = 0
     varsizes = np.sum(system._owned_sizes, axis=0)
-    for i, name in enumerate(system._var_allprocs_abs2meta['output']):
+    for i, name in enumerate(system._resolver.abs_iter('output')):
         end += varsizes[i]
         if loc < end:
-            varname = system._var_allprocs_abs2prom['output'][name]
+            varname = system._resolver.abs2prom(name, 'output')
             break
         start = end
 
@@ -161,10 +161,10 @@ def format_nan_error(system, matrix):
 
     varnames = []
     start = end = 0
-    for i, name in enumerate(system._var_allprocs_abs2meta['output']):
+    for i, name in enumerate(system._resolver.abs_iter('output')):
         end += varsizes[i]
         if np.any(nanrows[start:end]):
-            varnames.append("'%s'" % system._var_allprocs_abs2prom['output'][name])
+            varnames.append("'%s'" % system._resolver.abs2prom(name, 'output'))
         start = end
 
     msg = "NaN entries found in {} for rows associated with states/residuals [{}]."

@@ -581,7 +581,7 @@ class SubmodelComp(ExplicitComponent):
         input_ranges = []
         sub_out_ranges = []
         for inner_prom, outer_name in self._submodel_inputs.items():
-            sub_src = submod.get_source(inner_prom)
+            sub_src = submod._resolver.source(inner_prom)
             if submod._owned_size(sub_src) > 0:
                 sub_out_ranges.append(subouts.get_range(sub_src))
                 input_ranges.append(subins.get_range(prefix + outer_name))

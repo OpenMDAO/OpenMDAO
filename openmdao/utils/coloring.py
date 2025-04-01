@@ -29,7 +29,6 @@ from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning, Deri
 from openmdao.utils.reports_system import register_report
 from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.devtools.memory import mem_usage
-from openmdao.utils.name_maps import rel_name2abs_name
 
 try:
     import matplotlib as mpl
@@ -626,7 +625,8 @@ class Partial_ColoringMeta(ColoringMeta):
             self.wrt_matches = None  # None means match everything
             return
 
-        self.wrt_matches = set(rel_name2abs_name(system, n) for n in
+        prefix = system.pathname + '.' if system.pathname else ''
+        self.wrt_matches = set(prefix + n for n in
                                pattern_filter(self.wrt_patterns, system._promoted_wrt_iter()))
 
         # error if nothing matched

@@ -13,7 +13,6 @@ try:
 except ImportError:
     pyDOE3 = None
 
-from openmdao.utils.name_maps import prom_name2abs_name
 
 _LEVELS = 2  # default number of levels for pyDOE generators
 
@@ -107,7 +106,7 @@ class ListGenerator(DOEGenerator):
                 if name in design_vars:
                     name_map[name] = name
                 elif model:
-                    abs_name = prom_name2abs_name(model, name, 'output')
+                    abs_name = model._resolver.any2abs(name, 'output')
                     if abs_name in design_vars:
                         name_map[name] = abs_name
 
@@ -184,7 +183,7 @@ class CSVGenerator(DOEGenerator):
                 if name in design_vars:
                     name_map[name] = name
                 elif model:
-                    abs_name = prom_name2abs_name(model, name, 'output')
+                    abs_name = model._resolver.any2abs(name, 'output')
                     if abs_name in design_vars:
                         name_map[name] = abs_name
 

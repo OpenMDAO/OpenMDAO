@@ -760,7 +760,7 @@ class Driver(object, metaclass=DriverMetaclass):
                 match_names.update(model._resolver.prom_iter('input'))
                 for p in model._resolver.prom_iter('input'):
                     if check_path(p, incl, excl):
-                        myoutputs.add(model.get_source(p))
+                        myoutputs.add(model._resolver.source(p))
 
         # check that all exclude/include globs have at least one matching output or input name
         for pattern in excl:

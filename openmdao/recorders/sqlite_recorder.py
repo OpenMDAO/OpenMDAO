@@ -382,9 +382,9 @@ class SqliteRecorder(CaseRecorder):
                 objectives = driver._objs
 
             # merge current abs2prom and prom2abs with this system's version
-            self._abs2prom['input'].update(system._var_allprocs_abs2prom['input'])
-            self._abs2prom['output'].update(system._var_allprocs_abs2prom['output'])
-            for v, abs_names in system._var_allprocs_prom2abs_list['input'].items():
+            self._abs2prom['input'].update(system._resolver.abs2prom_iter('input'))
+            self._abs2prom['output'].update(system._resolver.abs2prom_iter('output'))
+            for v, abs_names in system._resolver.prom2abs_iter('input'):
                 if v not in self._prom2abs['input']:
                     self._prom2abs['input'][v] = abs_names
                 else:
