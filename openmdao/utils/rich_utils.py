@@ -8,12 +8,31 @@ try:
 except ImportError:
     rich = None
 
+from openmdao.utils.general_utils import env_truthy
+
+
+def use_rich(enable=None):
+    """
+    Determine if rich should be used for formatting output.
+
+    This is determined by whether or not rich is available, and by
+    whether or not the OPENMDAO_DISABLE_RICH environment variable
+    is set with a "truthy" value.
+
+    Returns
+    -------
+    bool
+        True if rich should be used for output, otherwise False.
+    """
+    return not (env_truthy('OPENMDAO_DISABLE_RICH') or rich is None)
+
 
 def rich_wrap(s, tags=None):
     """
     If rich is available, escape square brackets and wrap the given string in the provided tags.
 
-    If rich is not available, just return the string.
+    If rich is not available or the user has set the environment variable
+    OPENMDAO_DISABLE_RICH to a "truthy" value, just return the string.
 
     Parameters
     ----------
@@ -28,7 +47,7 @@ def rich_wrap(s, tags=None):
     str
         The given string wrapped in the provided rich tags.
     """
-    if rich is None:
+    if not use_rich():
         return s
 
     # Escape any open square brackets in the string.

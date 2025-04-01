@@ -7,7 +7,8 @@ try:
 except ImportError:
     rich = None
 
-from openmdao.utils.rich_utils import rich_wrap, strip_formatting, strip_tags
+from openmdao.utils.rich_utils import rich_wrap, strip_formatting, strip_tags, use_rich
+from openmdao.utils.testing_utils import set_env_vars_context
 
 
 class TestRichUtils(unittest.TestCase):
@@ -21,10 +22,18 @@ class TestRichUtils(unittest.TestCase):
         expected = s if rich is None else f'[bold bright_red]{s}[/bright_red bold]'
         self.assertEqual(rich_wrap(s, {'bold', 'bright_red'}), expected)
 
+    def test_disable_rich(self):
+        s = 'foo bar baz'
+        with set_env_vars_context(OPENMDAO_DISABLE_RICH='1'):
+            self.assertEqual(rich_wrap(s, {'bold', 'bright_red'}), s)
+        with set_env_vars_context(OPENMDAO_DISABLE_RICH='0'):
+            expected = s if rich is None else f'[bold bright_red]{s}[/bright_red bold]'
+            self.assertEqual(rich_wrap(s, {'bold', 'bright_red'}), expected)
+
     def test_strip_tags(self):
         s = 'foo bar baz'
         # Rich requires closing tag have ordering opposite of opeing tag.
-        expected = s if rich is None else f'[bold bright_red]{s}[/bright_red bold]'
+        expected = s if not use_rich() else f'[bold bright_red]{s}[/bright_red bold]'
         self.assertEqual(rich_wrap(s, {'bold', 'bright_red'}), expected)
         self.assertEqual(strip_tags(expected), s)
 

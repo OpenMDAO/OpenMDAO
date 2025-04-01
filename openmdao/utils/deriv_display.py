@@ -17,7 +17,7 @@ from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.array_utils import get_tol_violation
 from openmdao.utils.general_utils import add_border, is_undefined
 from openmdao.utils.mpi import MPI
-from openmdao.utils.rich_utils import rich_wrap
+from openmdao.utils.rich_utils import rich_wrap, use_rich
 from openmdao.visualization.tables.table_builder import generate_table
 
 
@@ -304,7 +304,7 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
         report_name = f'check_partials-{system.pathname}.html'
 
     if not show_only_incorrect or num_bad_jacs > 0:
-        if rich is not None:
+        if use_rich():
             c = Console(file=out_stream, force_terminal=True, record=True, soft_wrap=True)
             c.print(sys_buffer.getvalue(), highlight=False)
             if system.get_reports_dir().is_dir():
