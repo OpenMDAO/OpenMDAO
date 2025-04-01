@@ -2436,7 +2436,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         Compute dict of all connections owned by this system.
         """
-        pass
+        self._resolver._conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
 
     def _setup_vectors(self, parent_vectors):
         """

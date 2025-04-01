@@ -1761,7 +1761,7 @@ class Group(System):
 
                         _, info = subsys._resolver.info(abs_name, io)
                         self._resolver.add_mapping(abs_name, prom_name, io,
-                                                   local=abs_name in sub_loc_proms,
+                                                   local=info.local,
                                                    continuous=info.continuous,
                                                    distributed=info.distributed)
 

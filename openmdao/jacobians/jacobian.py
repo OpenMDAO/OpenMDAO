@@ -6,7 +6,6 @@ import numpy as np
 from scipy.sparse import issparse
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.name_maps import key2abs_key
 from openmdao.matrices.matrix import sparse_types
 
 SUBJAC_META_DEFAULTS = {
@@ -63,10 +62,18 @@ class Jacobian(object):
         try:
             return self._abs_keys[key]
         except KeyError:
-            abskey = key2abs_key(self._system(), key)
-            if abskey is not None:
+            resolver = self._system()._resolver
+            of = resolver.any2abs(key[1], 'output')
+            wrt = resolver.rel2abs(key[0], report_error=False)
+            if wrt is None:
+                wrt = resolver.any2abs(key[0])
+
+            if of is None or wrt is None:
+                return
+            else:
+                abskey = (of, wrt)
                 self._abs_keys[key] = abskey
-            return abskey
+                return abskey
 
     def _abs_key2shape(self, abs_key):
         """

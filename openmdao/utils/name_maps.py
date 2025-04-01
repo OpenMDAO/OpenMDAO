@@ -716,7 +716,7 @@ class NameResolver(object):
             io = '' if iotype is None else f'{iotype} '
             raise RuntimeError(f"{self.msginfo}: Can't find source for {io}'{name}'.")
 
-    def abs2rel(self, absname):
+    def abs2rel(self, absname, iotype=None, report_error=True):
         """
         Convert an absolute name to a relative name.
 
@@ -724,32 +724,24 @@ class NameResolver(object):
         ----------
         absname : str
             The absolute name to convert.
+        iotype : str
+            Either 'input', 'output', or None to allow all iotypes.
+        report_error : bool
+            If True, raise an error if the absolute name is not found.
 
         Returns
         -------
-        str
-            The relative name corresponding to the absolute name.
+        str or None
+            The relative name corresponding to the absolute name or None if the absolute name
+            is not found and report_error is False.
         """
-        return absname[self._pathlen:]
+        if self.is_abs(absname, iotype):
+            return absname[self._pathlen:]
 
-    def abs2rel_iter(self, absnames):
-        """
-        Yield relative names corresponding to a list of absolute names.
+        if report_error:
+            raise KeyError(f"{self.msginfo}: Variable '{absname}' not found.")
 
-        Parameters
-        ----------
-        absnames : list of str
-            The absolute names to convert.
-
-        Yields
-        ------
-        relname : str
-            The relative name corresponding to the absolute name.
-        """
-        for absname in absnames:
-            yield absname[self._pathlen:]
-
-    def rel2abs(self, relname):
+    def rel2abs(self, relname, iotype=None, report_error=True):
         """
         Convert a relative name to an absolute name.
 
@@ -757,13 +749,23 @@ class NameResolver(object):
         ----------
         relname : str
             The relative name to convert.
+        iotype : str
+            Either 'input', 'output', or None to allow all iotypes.
+        report_error : bool
+            If True, raise an error if the relative name is not found.
 
         Returns
         -------
-        str
-            The absolute name corresponding to the relative name.
+        str or None
+            The absolute name corresponding to the relative name or None if the relative name
+            is not found and report_error is False.
         """
-        return self._prefix + relname
+        absname = self._prefix + relname
+        if self.is_abs(absname, iotype):
+            return absname
+
+        if report_error:
+            raise KeyError(f"{self.msginfo}: Variable '{relname}' not found.")
 
     def rel2abs_iter(self, relnames):
         """
