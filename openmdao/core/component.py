@@ -282,9 +282,6 @@ class Component(System):
         global global_meta_names
         super()._setup_var_data()
 
-        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
-        abs2prom = self._var_allprocs_abs2prom = self._var_abs2prom
-
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.'
 
@@ -296,10 +293,6 @@ class Component(System):
             for prom_name in self._var_rel_names[io]:
                 abs_name = prefix + prom_name
                 abs2meta[abs_name] = metadata = self._var_rel2meta[prom_name]
-
-                # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[io][prom_name] = [abs_name]
-                abs2prom[io][abs_name] = prom_name
                 self._resolver.add_mapping(abs_name, prom_name, io, local=True,
                                            distributed=metadata['distributed'])
 
@@ -313,10 +306,6 @@ class Component(System):
 
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
-
-                # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[io][prom_name] = [abs_name]
-                abs2prom[io][abs_name] = prom_name
                 self._resolver.add_mapping(abs_name, prom_name, io, local=True,
                                            continuous=False)
 
@@ -354,9 +343,6 @@ class Component(System):
 
         self._serial_idxs = None
         self._inconsistent_keys = set()
-
-        # TODO: remove after debugging
-        self._resolver.verify(self)
 
     def _missing_vars_error(self, allnames):
         msg = ''

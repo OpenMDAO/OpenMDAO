@@ -1681,25 +1681,22 @@ class Group(System):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
-        if self._var_allprocs_prom2abs_list is None:
-            old_prom2abs = {}
+        if self._resolver is None:
+            old_proms = set()
         else:
-            old_prom2abs = self._var_allprocs_prom2abs_list['input']
+            old_proms = set(self._resolver.prom_iter('input'))
 
         super()._setup_var_data()
 
-        self._resolver = NameResolver(self.pathname, self.msginfo, check_dups=True)
+        self._resolver = resolver = NameResolver(self.pathname, self.msginfo, check_dups=True)
 
         var_discrete = self._var_discrete
         allprocs_discrete = self._var_allprocs_discrete
 
         abs2meta = self._var_abs2meta
-        abs2prom = self._var_abs2prom
 
         allprocs_abs2meta = {'input': {}, 'output': {}}
         self._ivcs = {}
-
-        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
         for n, lst in self._group_inputs.items():
             lst[0]['path'] = self.pathname  # used for error reporting
@@ -1734,7 +1731,6 @@ class Group(System):
                 var_discrete[io].update({sub_prefix + k: v for k, v in
                                          subsys._var_discrete[io].items()})
 
-                sub_loc_proms = subsys._var_abs2prom[io]
                 for sub_prom, sub_abs in subsys._resolver.prom2abs_iter(io):
                     if sub_prom in subprom2prom:
                         prom_name, _, pinfo, _ = subprom2prom[sub_prom]
@@ -1751,19 +1747,13 @@ class Group(System):
                                 abs_in2prom_info[abs_in][tree_level] = pinfo
                     else:
                         prom_name = sub_prefix + sub_prom
-                    if prom_name not in allprocs_prom2abs_list[io]:
-                        allprocs_prom2abs_list[io][prom_name] = []
-                    allprocs_prom2abs_list[io][prom_name].extend(sub_abs)
 
                     for abs_name in sub_abs:
-                        if abs_name in sub_loc_proms:
-                            abs2prom[io][abs_name] = prom_name
-
                         _, info = subsys._resolver.info(abs_name, io)
-                        self._resolver.add_mapping(abs_name, prom_name, io,
-                                                   local=info.local,
-                                                   continuous=info.continuous,
-                                                   distributed=info.distributed)
+                        resolver.add_mapping(abs_name, prom_name, io,
+                                             local=info.local,
+                                             continuous=info.continuous,
+                                             distributed=info.distributed)
 
             if isinstance(subsys, Group):
                 # propagate any subsystem 'set_input_defaults' info up to this Group
@@ -1782,7 +1772,7 @@ class Group(System):
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             proc_resolvers = [None] * self.comm.size
             if self._gather_full_data():
-                raw = (allprocs_discrete, self._resolver, allprocs_prom2abs_list, allprocs_abs2meta,
+                raw = (allprocs_discrete, resolver, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
                        self._has_resid_scaling, self._group_inputs, self._has_distrib_vars,
                        self._has_fd_group)
@@ -1790,7 +1780,6 @@ class Group(System):
                 raw = (
                     {'input': {}, 'output': {}},
                     None,
-                    {'input': {}, 'output': {}},
                     {'input': {}, 'output': {}},
                     False,
                     False,
@@ -1806,14 +1795,8 @@ class Group(System):
             old_abs2meta = allprocs_abs2meta
             allprocs_abs2meta = {'input': {}, 'output': {}}
 
-            for io in ['input', 'output']:
-                allprocs_prom2abs_list[io] = {}
-
-            # # reset the resolver so that resolvers on all procs will have the same order
-            # self._resolver = NameResolver(self.pathname, self.msginfo, self._resolver._check_dups)
-
             myrank = self.comm.rank
-            for rank, (proc_discrete, proc_resolver, proc_prom2abs_list, proc_abs2meta,
+            for rank, (proc_discrete, proc_resolver, proc_abs2meta,
                        oscale, oadd, rscale, ginputs, has_dist_vars,
                        has_fd_group) in enumerate(gathered):
                 self._has_output_scaling |= oscale
@@ -1834,11 +1817,6 @@ class Group(System):
                     allprocs_abs2meta[io].update(proc_abs2meta[io])
                     allprocs_discrete[io].update(proc_discrete[io])
 
-                    for prom_name, abs_names_list in proc_prom2abs_list[io].items():
-                        if prom_name not in allprocs_prom2abs_list[io]:
-                            allprocs_prom2abs_list[io][prom_name] = []
-                        allprocs_prom2abs_list[io][prom_name].extend(abs_names_list)
-
             self._resolver.update_from_ranks(myrank, proc_resolvers)
 
             for io in ('input', 'output'):
@@ -1850,27 +1828,20 @@ class Group(System):
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
-        for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
-            if len(abs_list) > 1:
-                self._collect_error("{}: Output name '{}' refers to "
-                                    "multiple outputs: {}.".format(self.msginfo, prom_name,
-                                                                   sorted(abs_list)))
-
-        for io in ('input', 'output'):
-            a2p = self._var_allprocs_abs2prom[io]
-            for prom, abslist in self._var_allprocs_prom2abs_list[io].items():
-                for abs_name in abslist:
-                    a2p[abs_name] = prom
+        # for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
+        #     if len(abs_list) > 1:
+        #         self._collect_error("{}: Output name '{}' refers to "
+        #                             "multiple outputs: {}.".format(self.msginfo, prom_name,
+        #                                                            sorted(abs_list)))
 
         if self._group_inputs:
-            p2abs_in = self._var_allprocs_prom2abs_list['input']
-            extra = [gin for gin in self._group_inputs if gin not in p2abs_in]
+            extra = [gin for gin in self._group_inputs if not resolver.is_prom(gin, 'input')]
             if extra:
                 # make sure that we don't have a leftover group input default entry from a previous
                 # execution of _setup_var_data before promoted names were updated.
                 ex = set()
                 for e in extra:
-                    if e in old_prom2abs:
+                    if e in old_proms:
                         del self._group_inputs[e]  # clean up old key using old promoted name
                     else:
                         ex.add(e)
@@ -1888,9 +1859,6 @@ class Group(System):
 
         # create mapping of indep var names to their metadata
         self._ivcs = self.get_indep_vars(local=False)
-
-        # TODO: remove after debugging
-        self._resolver.verify(self)
 
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
@@ -4625,10 +4593,10 @@ class Group(System):
         prom2auto = {}
         count = 0
         auto2tgt = {}
-        abs2prom = self._var_allprocs_abs2prom['input']
         all_abs2meta = self._var_allprocs_abs2meta['input']
         conns = self._conn_global_abs_in2out
         auto_conns = {}
+        resolver = self._resolver
 
         for tgt in all_abs2meta:
             if tgt in conns or tgt in self._bad_conn_vars:
@@ -4639,12 +4607,12 @@ class Group(System):
                 # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
                 # distributed components.
                 if tgt not in self._bad_conn_vars:
-                    prom_name = abs2prom[tgt]
+                    prom_name = resolver.abs2prom(tgt, 'input')
                     promoted_as = f', promoted as "{prom_name}",' if prom_name != tgt else ''
                     raise RuntimeError(f'Distributed component input "{tgt}"'
                                        f'{promoted_as} is not connected.')
 
-            prom = abs2prom[tgt]
+            prom = resolver.abs2prom(tgt, 'input')
             if prom in prom2auto:
                 # multiple connected inputs w/o a src. Connect them to the same IVC
                 src = prom2auto[prom][0]
@@ -4666,12 +4634,12 @@ class Group(System):
         vars2gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
-            prom = self._var_allprocs_abs2prom['input'][tgts[0]]
+            prom = resolver.abs2prom(tgts[0], 'input')
             ret = self._get_auto_ivc_out_val(tgts, vars2gather)
             if ret is None:  # setup error occurred. Try to continue
                 continue
             tgt, val, remote = ret
-            prom = abs2prom[tgt]
+            prom = resolver.abs2prom(tgt, 'input')
             if prom not in self._group_inputs:
                 self._group_inputs[prom] = [{'use_tgt': tgt, 'auto': True, 'path': self.pathname,
                                              'prom': prom}]
@@ -4717,7 +4685,7 @@ class Group(System):
         # have to sort to keep vars in sync because we may be doing bcasts
         for abs_in in sorted(self._var_allprocs_discrete['input']):
             if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
-                prom = abs2prom[abs_in]
+                prom = resolver.abs2prom(abs_in, 'input')
                 val = _UNDEFINED
 
                 if prom in prom2auto:
@@ -4732,7 +4700,7 @@ class Group(System):
                     prom2auto[prom] = (ivc_name, abs_in)
                     conns[abs_in] = ivc_name
 
-                    if abs_in in self._var_abs2prom['input']:  # var is local
+                    if resolver.is_abs(abs_in, 'input', local=True):  # var is local
                         val = self._var_discrete['input'][abs_in]['val']
                     else:
                         val = None
@@ -4768,28 +4736,10 @@ class Group(System):
         self._subsystems_myproc = [auto_ivc] + self._subsystems_myproc
 
         io = 'output'  # auto_ivc has only output vars
-        old = self._var_allprocs_prom2abs_list[io]
-        p2abs = {}
-        for name in auto_ivc._var_allprocs_abs2meta[io]:
-            p2abs[name] = [name]
-        p2abs.update(old)
-        self._var_allprocs_prom2abs_list[io] = p2abs
-
         old = self._resolver
         self._resolver = NameResolver('', self.msginfo)
         self._resolver.update(auto_ivc._resolver)
         self._resolver.update(old)
-
-        # set up auto_ivc abs2prom such that promoted name of the auto_ivc output is the same
-        # as the promoted name of the input that it is connected to
-        abs2prom = self._var_abs2prom[io]
-        abs2prom_in = self._var_allprocs_abs2prom['input']
-        for n in auto_ivc._var_abs2prom[io]:
-            abs2prom[n] = abs2prom_in[auto2tgt[n][0]]
-
-        all_abs2prom = self._var_allprocs_abs2prom[io]
-        for n in auto_ivc._var_allprocs_abs2prom[io]:
-            all_abs2prom[n] = abs2prom_in[auto2tgt[n][0]]
 
         resolver = self._resolver
         abs2prom_out = resolver._abs2prom_out

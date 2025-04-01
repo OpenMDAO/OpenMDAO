@@ -134,42 +134,6 @@ class NameResolver(object):
         return name in self._prom2abs[iotype] or name in self._abs2prom[iotype] or \
             self._prefix + name in self._abs2prom[iotype]
 
-    # TODO: this will go away once all is converted to use the name resolver
-    def verify(self, system):
-        """
-        Verify the name resolver.
-
-        Parameters
-        ----------
-        system : System
-            The system to verify the name resolver against.
-        """
-        if self._prom2abs is None:
-            self._populate_prom2abs()
-
-        for io in ('input', 'output'):
-            assert len(self._abs2prom[io]) == len(system._var_allprocs_abs2prom[io])
-            for absname, (promname, info) in self._abs2prom[io].items():
-                assert system._var_allprocs_abs2prom[io][absname] == promname
-                if info.local:
-                    assert system._var_abs2prom[io][absname] == promname
-                else:
-                    assert absname not in system._var_abs2prom[io]
-
-            # strip out autoivc pseudo prom values from _var_allprocs_prom2abs_list['output']
-            # if io == 'output':
-            #     sysprom2abs = {}
-            #     for n, abslist in system._var_allprocs_prom2abs_list[io].items():
-            #         alist = [a for a in abslist if not a.startswith('_auto_ivc.')]
-            #         if alist:
-            #             sysprom2abs[n] = alist
-            # else:
-            #     sysprom2abs = system._var_allprocs_prom2abs_list[io]
-
-            assert len(self._prom2abs[io]) == len(system._var_allprocs_prom2abs_list[io])
-            for promname, abslist in self._prom2abs[io].items():
-                assert sorted(system._var_allprocs_prom2abs_list[io][promname]) == sorted(abslist)
-
     def sort(self):
         """
         Sort the name resolver.
@@ -1078,58 +1042,8 @@ class NameResolver(object):
         pprint(self._abs2prom, stream=out_stream)
         pprint(self._prom2abs, stream=out_stream)
 
-    # # TODO: get rid of this once all parts of code have been updated to use resolver
-    # def _get_abs2prom_mapping(self, iotype=None):
-    #     if iotype is None:
-    #         return {
-    #             'input': {k: v[0] for k, v in self._abs2prom['input'].items()},
-    #             'output': {k: v[0] for k, v in self._abs2prom['output'].items()}
-    #         }
-    #     return {k: v[0] for k, v in self._abs2prom[iotype].items()}
-
 
 # --------- OLD FUNCTIONS - TO BE REMOVED ONCE ALL CODE USES RESOLVER ---------
-
-def rel_name2abs_name(obj, rel_name, delim='.'):
-    """
-    Map relative variable name to absolute variable name.
-
-    Parameters
-    ----------
-    obj : object
-        Object to which the given name is relative. The object must have a `pathname` attribute
-        that is a string delimited by 'delim'.
-    rel_name : str
-        Given relative variable name.
-    delim : str
-        Delimiter between the parts of the object pathname.
-
-    Returns
-    -------
-    str
-        Absolute variable name.
-    """
-    return obj.pathname + delim + rel_name if obj.pathname else rel_name
-
-
-def abs_name2rel_name(obj, abs_name):
-    """
-    Map relative variable name to absolute variable name.
-
-    Parameters
-    ----------
-    obj : object
-        Object to which the given name is relative. The object must have a `pathname` attribute.
-    abs_name : str
-        Given absolute variable name.
-
-    Returns
-    -------
-    str
-        Relative variable name.
-    """
-    return abs_name[len(obj.pathname) + 1:] if obj.pathname else abs_name
-
 
 def rel_key2abs_key(obj, rel_key, delim='.'):
     """
@@ -1177,104 +1091,6 @@ def abs_key2rel_key(obj, abs_key):
         plen = len(obj.pathname) + 1
         return (of[plen:], wrt[plen:])
     return abs_key
-
-
-def prom_name2abs_name(system, prom_name, iotype):
-    """
-    Map the given promoted name to the absolute name.
-
-    This is only valid when the name is unique; otherwise, a KeyError is thrown.
-
-    Parameters
-    ----------
-    system : <System>
-        System to which prom_name is relative.
-    prom_name : str
-        Promoted variable name in the owning system's namespace.
-    iotype : str
-        Either 'input' or 'output'.
-
-    Returns
-    -------
-    str or None
-        Absolute variable name or None if prom_name is invalid.
-    """
-    prom2abs_lists = system._var_allprocs_prom2abs_list[iotype]
-
-    if prom_name in prom2abs_lists:
-        abs_list = prom2abs_lists[prom_name]
-        if len(abs_list) == 1:
-            return abs_list[0]
-
-        # looks like an aliased input, which must be set via the connected output
-        model = system._problem_meta['model_ref']()
-        src_name = model._var_abs2prom['output'][model._conn_global_abs_in2out[abs_list[0]]]
-        raise RuntimeError(f"{system.msginfo}: The promoted name {prom_name} is invalid because it "
-                           f"refers to multiple inputs: [{' ,'.join(abs_list)}]. Access the value "
-                           f"from the connected output variable {src_name} instead.")
-
-
-def prom_key2abs_key(system, prom_key):
-    """
-    Map the given promoted name pair to the absolute name pair.
-
-    The first name is a continuous output, and the second name can be an output or an input.
-    If the second name is non-unique, a KeyError is thrown.
-
-    Parameters
-    ----------
-    system : <System>
-        System to which prom_key is relative.
-    prom_key : (str, str)
-        Promoted name pair of sub-Jacobian.
-
-    Returns
-    -------
-    (str, str) or None
-        Absolute name pair of sub-Jacobian or None is prom_key is invalid.
-    """
-    of, wrt = prom_key
-    abs_wrt = prom_name2abs_name(system, wrt, 'input')
-    if abs_wrt is None:
-        abs_wrt = prom_name2abs_name(system, wrt, 'output')
-        if abs_wrt is None:
-            return None
-
-    abs_of = prom_name2abs_name(system, of, 'output')
-    if abs_of is not None:
-        return (abs_of, abs_wrt)
-
-
-def key2abs_key(system, key):
-    """
-    Map the given absolute, promoted or relative name pair to the absolute name pair.
-
-    The first name is an output, and the second name can be an output or an input.
-    If the second name is non-unique, a KeyError is thrown.
-
-    Parameters
-    ----------
-    system : <System>
-        System to which prom_key is relative.
-    key : (str, str)
-        Promoted or relative name pair of sub-Jacobian.
-
-    Returns
-    -------
-    (str, str) or None
-        Absolute name pair of sub-Jacobian if unique abs_key found or None otherwise.
-    """
-    abs_key = rel_key2abs_key(system, key)
-    of, wrt = abs_key
-    if of in system._var_allprocs_abs2idx and wrt in system._var_allprocs_abs2idx:
-        return abs_key
-
-    abs_key = prom_key2abs_key(system, key)
-    if abs_key is not None:
-        return abs_key
-
-    if key in system._subjacs_info:
-        return key
 
 
 def abs_key_iter(system, rel_ofs, rel_wrts):

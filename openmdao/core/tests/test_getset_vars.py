@@ -194,14 +194,10 @@ class TestGetSetVariables(unittest.TestCase):
         """
         Tests for error-handling for invalid variable names and keys.
         """
-        c1 = IndepVarComp('x')
-        c2 = ExecComp('y=2*x')
-        c3 = ExecComp('z=3*x')
-
         g = Group(assembled_jac_type='dense')
-        g.add_subsystem('c1', c1, promotes=['*'])
-        g.add_subsystem('c2', c2, promotes=['*'])
-        g.add_subsystem('c3', c3, promotes=['*'])
+        g.add_subsystem('c1', IndepVarComp('x'), promotes=['*'])
+        g.add_subsystem('c2', ExecComp('y=2*x'), promotes=['*'])
+        g.add_subsystem('c3', ExecComp('z=3*x'), promotes=['*'])
         g.linear_solver = DirectSolver(assemble_jac=True)
 
         model = Group()
@@ -253,7 +249,7 @@ class TestGetSetVariables(unittest.TestCase):
         # d(outputs)/d(inputs)
         with self.assertRaises(Exception) as context:
             jac['y', 'x'] = 5.0
-        self.assertEqual(str(context.exception), msg2)
+        self.assertEqual(context.exception.args[0], msg2)
 
         with self.assertRaises(Exception) as context:
             self.assertEqual(jac['y', 'x'], 5.0)

@@ -236,15 +236,6 @@ class System(object, metaclass=SystemMetaclass):
         (used to calculate promoted names)
     _var_prom2inds : dict
         Maps promoted name to src_indices in scope of system.
-    _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
-        Dictionary mapping promoted names (continuous and discrete) to list of all absolute names.
-        For outputs, the list will have length one since promoted output names are unique.
-    _var_abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names, on current proc. Contains continuous
-        and discrete variables.
-    _var_allprocs_abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names, on all procs.  Contains continuous
-        and discrete variables.
     _var_allprocs_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for allprocs continuous
         variables.
@@ -457,10 +448,7 @@ class System(object, metaclass=SystemMetaclass):
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
         self._resolver = NameResolver(self.pathname, self.msginfo)
-        self._var_allprocs_prom2abs_list = None
         self._var_prom2inds = {}
-        self._var_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
         self._var_discrete = {'input': {}, 'output': {}}
@@ -2272,9 +2260,6 @@ class System(object, metaclass=SystemMetaclass):
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
         self._var_prom2inds = {}
-        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        self._var_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
         self._var_allprocs_discrete = {'input': {}, 'output': {}}
