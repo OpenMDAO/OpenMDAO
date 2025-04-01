@@ -64,7 +64,7 @@ class Jacobian(object):
         except KeyError:
             resolver = self._system()._resolver
             of = resolver.any2abs(key[0], 'output')
-            wrt = resolver.rel2abs(key[1], report_error=False)
+            wrt = resolver.rel2abs(key[1], check=True)
             if wrt is None:
                 wrt = resolver.any2abs(key[1], 'input')
                 if wrt is None:

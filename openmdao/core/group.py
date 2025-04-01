@@ -875,7 +875,7 @@ class Group(System):
 
         # locate any components that don't have any inputs or outputs and add them to the graph
         for subsys in self.system_iter(recurse=True, typ=Component):
-            if not subsys._var_abs2meta['input'] and not subsys._var_abs2meta['output']:
+            if subsys._resolver.num_abs(local=True) == 0:
                 graph.add_node(subsys.pathname, local=True)
                 empty_comps.add(subsys.pathname)
 
@@ -5281,6 +5281,7 @@ class Group(System):
                     active_dvs[meta['source']] = meta.copy()
 
         is_prom = self._resolver.is_prom
+        is_abs = self._resolver.is_abs
 
         for name, meta in active_dvs.items():
             if meta is None:
@@ -5299,7 +5300,7 @@ class Group(System):
 
                 active_dvs[name] = meta
 
-            meta['remote'] = meta['source'] not in self._var_abs2meta['output']
+            meta['remote'] = not is_abs(meta['source'], 'output', local=True)
 
         return active_dvs
 
@@ -5335,6 +5336,8 @@ class Group(System):
                 if name in active_resps:
                     active_resps[name] = meta.copy()
 
+        is_abs = self._resolver.is_abs
+
         for name, meta in active_resps.items():
             if meta is None:
                 # no response exists for this name, so create metadata with default values and
@@ -5350,7 +5353,7 @@ class Group(System):
                 self._update_response_meta(meta, get_size=True)
                 active_resps[name] = meta
 
-            meta['remote'] = meta['source'] not in self._var_abs2meta['output']
+            meta['remote'] = not is_abs(meta['source'], 'output', local=True)
 
         return active_resps
 

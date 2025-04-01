@@ -87,11 +87,9 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     vals = {}
 
-    prefix = system.pathname + '.' if system.pathname else ''
     all_vars = {}
     for io in ('input', 'output'):
-        all_vars[io] = chain(system._var_abs2meta[io],
-                             [prefix + n for n in system._var_discrete[io]])
+        all_vars[io] = chain(system._resolver.abs_iter(io, local=True))
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 

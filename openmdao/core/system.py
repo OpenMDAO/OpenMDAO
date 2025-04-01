@@ -624,42 +624,6 @@ class System(object, metaclass=SystemMetaclass):
     def _get_inst_id(self):
         return self.pathname if self.pathname is not None else ''
 
-    def abs_name_iter(self, iotype, local=True, cont=True, discrete=False):
-        """
-        Iterate over absolute variable names for this System.
-
-        By setting appropriate values for 'cont' and 'discrete', yielded variable
-        names can be continuous only, discrete only, or both.
-
-        Parameters
-        ----------
-        iotype : str
-            Either 'input' or 'output'.
-        local : bool
-            If True, include only names of local variables. Default is True.
-        cont : bool
-            If True, include names of continuous variables.  Default is True.
-        discrete : bool
-            If True, include names of discrete variables.  Default is False.
-
-        Yields
-        ------
-        str
-        """
-        if cont:
-            if local:
-                yield from self._var_abs2meta[iotype]
-            else:
-                yield from self._var_allprocs_abs2meta[iotype]
-
-        if discrete:
-            if local:
-                prefix = self.pathname + '.' if self.pathname else ''
-                for name in self._var_discrete[iotype]:
-                    yield prefix + name
-            else:
-                yield from self._var_allprocs_discrete[iotype]
-
     def abs_meta_iter(self, iotype, local=True, cont=True, discrete=False):
         """
         Iterate over absolute variable names and their metadata for this System.
@@ -2719,8 +2683,7 @@ class System(object, metaclass=SystemMetaclass):
 
             not_found = set(n for n, _ in to_match) - found
             if not_found:
-                if (not self._var_abs2meta['input'] and not self._var_abs2meta['output'] and
-                        isinstance(self, Group)):
+                if (self._resolver.num_abs(local=True) == 0 and isinstance(self, Group)):
                     empty_group_msg = ' Group contains no variables.'
                 else:
                     empty_group_msg = ''
@@ -6638,6 +6601,7 @@ class System(object, metaclass=SystemMetaclass):
 
         if self._promotion_tree is None:
             self._promotion_tree = self._get_sys_promotion_tree()
+
         tree = self._promotion_tree
         resolver = self._resolver
 
@@ -6763,10 +6727,9 @@ class System(object, metaclass=SystemMetaclass):
         tuple
             A tuple of the form (abs_name, start, end).
         """
-        vmeta = self._var_allprocs_abs2meta
-
         offset = 0
-        for vname, size in zip(vmeta[io], self._var_sizes[io][self.comm.rank]):
+        for vname, size in zip(self._var_allprocs_abs2meta[io],
+                               self._var_sizes[io][self.comm.rank]):
             if size > 0:
                 yield vname, offset, offset + size
             offset += size

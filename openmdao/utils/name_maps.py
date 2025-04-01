@@ -651,7 +651,7 @@ class NameResolver(object):
             The source corresponding to the name.
         """
         if conns is None:
-            conns = self._conns
+            conns = self._conns  # self._conns are the model level connections
 
         if conns is None:
             raise RuntimeError(f"{self.msginfo}: Can't find source for '{name}' because "
@@ -680,7 +680,7 @@ class NameResolver(object):
             io = '' if iotype is None else f'{iotype} '
             raise RuntimeError(f"{self.msginfo}: Can't find source for {io}'{name}'.")
 
-    def abs2rel(self, absname, iotype=None, report_error=True):
+    def abs2rel(self, absname, iotype=None, check=False):
         """
         Convert an absolute name to a relative name.
 
@@ -690,22 +690,19 @@ class NameResolver(object):
             The absolute name to convert.
         iotype : str
             Either 'input', 'output', or None to allow all iotypes.
-        report_error : bool
-            If True, raise an error if the absolute name is not found.
+        check : bool
+            If True, check if the absolute name is found.
 
         Returns
         -------
         str or None
-            The relative name corresponding to the absolute name or None if the absolute name
-            is not found and report_error is False.
+            The relative name corresponding to the absolute name or None if check is True and
+            the absolute name is not found.
         """
-        if self.is_abs(absname, iotype):
+        if not check or self.is_abs(absname, iotype):
             return absname[self._pathlen:]
 
-        if report_error:
-            raise KeyError(f"{self.msginfo}: Variable '{absname}' not found.")
-
-    def rel2abs(self, relname, iotype=None, report_error=True):
+    def rel2abs(self, relname, iotype=None, check=False):
         """
         Convert a relative name to an absolute name.
 
@@ -715,21 +712,21 @@ class NameResolver(object):
             The relative name to convert.
         iotype : str
             Either 'input', 'output', or None to allow all iotypes.
-        report_error : bool
-            If True, raise an error if the relative name is not found.
+        check : bool
+            If True, check if the relative name is found.
 
         Returns
         -------
         str or None
-            The absolute name corresponding to the relative name or None if the relative name
-            is not found and report_error is False.
+            The absolute name corresponding to the relative name or None if check is True and
+            the absolute name is not found.
         """
-        absname = self._prefix + relname
-        if self.is_abs(absname, iotype):
-            return absname
-
-        if report_error:
-            raise KeyError(f"{self.msginfo}: Variable '{relname}' not found.")
+        if check:
+            absname = self._prefix + relname
+            if self.is_abs(absname, iotype):
+                return absname
+        else:
+            return self._prefix + relname
 
     def rel2abs_iter(self, relnames):
         """
@@ -800,8 +797,9 @@ class NameResolver(object):
 
         Returns
         -------
-        list of str
-            The absolute names corresponding to the promoted name.
+        list of str or None
+            The absolute names corresponding to the promoted name, or None if report_error is
+            False and the promoted name is not found.
         """
         if self._prom2abs is None:
             self._populate_prom2abs()
@@ -1043,8 +1041,6 @@ class NameResolver(object):
         pprint(self._prom2abs, stream=out_stream)
 
 
-# --------- OLD FUNCTIONS - TO BE REMOVED ONCE ALL CODE USES RESOLVER ---------
-
 def rel_key2abs_key(obj, rel_key, delim='.'):
     """
     Map relative variable name pair to absolute variable name pair.
@@ -1114,10 +1110,10 @@ def abs_key_iter(system, rel_ofs, rel_wrts):
         Absolute 'wrt' name.
     """
     if system.pathname:
-        pname = system.pathname + '.'
-        abs_wrts = [pname + r for r in rel_wrts]
+        prefix = system.pathname + '.'
+        abs_wrts = [prefix + r for r in rel_wrts]
         for rel_of in rel_ofs:
-            abs_of = pname + rel_of
+            abs_of = prefix + rel_of
             for abs_wrt in abs_wrts:
                 yield abs_of, abs_wrt
     else:
