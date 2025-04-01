@@ -212,7 +212,7 @@ def _is_process_running(pid):
 
 def _realtime_opt_plot_setup_parser(parser):
     """
-    Set up the realtime plot subparser for the 'openmdao realtime_opt_plot' command.
+    Set up the realtime plot subparser for the 'openmdao opt_plot' command.
 
     Parameters
     ----------
@@ -234,7 +234,7 @@ def _realtime_opt_plot_setup_parser(parser):
 
 def _realtime_opt_plot_cmd(options, user_args):
     """
-    Run the realtime_opt_plot command.
+    Run the opt_plot command.
 
     Parameters
     ----------
