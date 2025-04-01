@@ -297,14 +297,14 @@ class NameResolver(object):
         if iotype is None:
             return self.num_abs('input', local) + self.num_abs('output', local)
 
-        if local is not None:
+        if local is None:
+            return len(self._abs2prom[iotype])
+        else:
             count = 0
             for _, info in self._abs2prom[iotype].values():
                 if info.local == local:
                     count += 1
             return count
-        else:
-            return len(self._abs2prom[iotype])
 
     def is_prom(self, promname, iotype=None):
         """
@@ -354,11 +354,11 @@ class NameResolver(object):
             if iotype is None:
                 return False
 
-        if local is not None:
+        if local is None:
+            return absname in self._abs2prom[iotype]
+        else:
             a2p = self._abs2prom[iotype]
             return absname in a2p and a2p[absname][1].local == local
-        else:
-            return absname in self._abs2prom[iotype]
 
     def get_abs_iotype(self, absname, report_error=False):
         """
@@ -915,7 +915,7 @@ class NameResolver(object):
         except KeyError:
             raise KeyError(f"{self.msginfo}: Can't find promoted {iotype} {promname}.")
 
-    def any2abs(self, name, iotype=None, report_error=False):
+    def any2abs(self, name, iotype=None, default=None):
         """
         Convert any name to a unique absolute name.
 
@@ -925,8 +925,8 @@ class NameResolver(object):
             Promoted or relative name.
         iotype : str or None
             Either 'input', 'output', or None to check all iotypes.
-        report_error : bool
-            If True, raise an error if the name is not found.
+        default : str or None
+            The value to return if the name is not found.  Default is None.
 
         Returns
         -------
@@ -938,10 +938,7 @@ class NameResolver(object):
             if iotype is None:
                 iotype = self.get_abs_iotype(name)
                 if iotype is None:
-                    if report_error:
-                        raise KeyError(f"{self.msginfo}: Can't find variable {name}.")
-                    else:
-                        return
+                    return default
 
         if name in self._abs2prom[iotype]:
             return name
@@ -957,8 +954,44 @@ class NameResolver(object):
         if absname in self._abs2prom[iotype]:
             return absname
 
-        if report_error:
-            raise KeyError(f"{self.msginfo}: Can't find variable {name}.")
+        return default
+
+    def any2prom(self, name, iotype=None, default=None):
+        """
+        Convert any name to a promoted name.
+
+        Parameters
+        ----------
+        name : str
+            Promoted or relative name.
+        iotype : str or None
+            Either 'input', 'output', or None to check all iotypes.
+        default : str or None
+            The value to return if the name is not found.  Default is None.
+
+        Returns
+        -------
+        str
+            Promoted name.
+        """
+        if iotype is None:
+            iotype = self.get_abs_iotype(name)
+            if iotype is None:
+                iotype = self.get_prom_iotype(name)
+                if iotype is None:
+                    return default
+
+        a2p = self._abs2prom[iotype]
+        if name in a2p:
+            return a2p[name][0]
+
+        if self._prom2abs is None:
+            self._populate_prom2abs()
+
+        if name in self._prom2abs[iotype]:
+            return name
+
+        return default
 
     def prom_or_rel2abs(self, name, iotype=None, report_error=False):
         """
@@ -993,35 +1026,6 @@ class NameResolver(object):
             return absname
 
         if report_error:
-            raise KeyError(f"{self.msginfo}: Can't find variable {name}.")
-
-    def any2prom(self, name, report_error=False):
-        """
-        Convert any name to a promoted name.
-
-        Parameters
-        ----------
-        name : str
-            Promoted or relative name.
-        report_error : bool
-            If True, raise an error if the name is not found.
-
-        Returns
-        -------
-        str
-            Promoted name.
-        """
-        if name in self._abs2prom_in:
-            return self._abs2prom_in[name][0]
-        elif name in self._abs2prom_out:
-            return self._abs2prom_out[name][0]
-
-        if self._prom2abs is None:
-            self._populate_prom2abs()
-
-        if name in self._prom2abs_in or name in self._prom2abs_out:
-            return name
-        elif report_error:
             raise KeyError(f"{self.msginfo}: Can't find variable {name}.")
 
     def prom2prom(self, promname, other, iotype=None):

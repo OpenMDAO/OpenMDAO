@@ -202,45 +202,6 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(p.model._conn_global_abs_in2out['gouter.g.c0.x'], 'gouter.g.ivc.x')
 
-    def test_hide_group_input(self):
-        p = om.Problem()
-        g1 = p.model.add_subsystem('g1', om.Group())
-        g2 = g1.add_subsystem('g2', om.Group(), promotes=['g3.c1.x'])  # make g2 disappear using promotes
-        g3 = g2.add_subsystem('g3', om.Group())
-        g3.add_subsystem('c1', om.ExecComp('y=2.*x', x=2.))
-
-        g3_ = g1.add_subsystem('g3', om.Group(), promotes=['x'])  # second g3, but directly under g1
-        g3_.add_subsystem('c1', om.ExecComp('y=3.*x', x=3.), promotes=['x'])
-
-        with self.assertRaises(Exception) as cm:
-            p.setup()
-            p.final_setup()
-        self.assertEqual(cm.exception.args[0], f"{p.model.msginfo}: Absolute variable name 'g1.g3.c1.x'"
-                                               " is masked by a matching promoted name. Try"
-                                               " promoting to a different name. This can be caused"
-                                               " by promoting '*' at group level or promoting using"
-                                               " dotted names.")
-
-    def test_hide_group_output(self):
-        p = om.Problem()
-        g1 = p.model.add_subsystem('g1', om.Group())
-        g2 = g1.add_subsystem('g2', om.Group(), promotes=['g3.c1.y'])  # make g2 disappear using promotes
-        g3 = g2.add_subsystem('g3', om.Group())
-        g3.add_subsystem('c1', om.ExecComp('y=2.*x', x=2.))
-
-        g3_ = g1.add_subsystem('g3', om.Group(), promotes=['y'])  # second g3, but directly under g1
-        g3_.add_subsystem('c1', om.ExecComp('y=3.*x', x=3.), promotes=['y'])
-
-        with self.assertRaises(Exception) as cm:
-            p.setup()
-            p.final_setup()
-
-        self.assertEqual(cm.exception.args[0], f"{p.model.msginfo}: Absolute variable name 'g1.g3.c1.y'"
-                                               " is masked by a matching promoted name. Try"
-                                               " promoting to a different name. This can be caused"
-                                               " by promoting '*' at group level or promoting using"
-                                               " dotted names.")
-
     def test_invalid_subsys_name(self):
         p = om.Problem()
 

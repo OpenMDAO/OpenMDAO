@@ -1260,16 +1260,16 @@ def get_connection_owner(system, tgt):
 
     model = system._problem_meta['model_ref']()
     src = model._conn_global_abs_in2out[tgt]
-    abs2prom = model._var_allprocs_abs2prom
+    resolver = model._resolver
 
-    if src in abs2prom['output'] and tgt in abs2prom['input'][tgt]:
-        if abs2prom['input'][tgt] != abs2prom['output'][src]:
+    if resolver.is_abs(src, 'output') and resolver.is_abs(tgt, 'input'):
+        if resolver.abs2prom(tgt, 'input') != resolver.abs2prom(src, 'output'):
             # connection is explicit
             for g in model.system_iter(include_self=True, recurse=True, typ=Group):
                 if g._manual_connections:
-                    tprom = g._var_allprocs_abs2prom['input'][tgt]
+                    tprom = g._resolver.abs2prom(tgt, 'input')
                     if tprom in g._manual_connections:
-                        return g, g._var_allprocs_abs2prom['output'][src], tprom
+                        return g, g._resolver.abs2prom(src, 'output'), tprom
 
     return system, src, tgt
 

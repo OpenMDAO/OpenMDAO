@@ -395,7 +395,7 @@ class SqliteRecorder(CaseRecorder):
                             lst.append(name)
 
             # for outputs, there can be only one abs name per promoted name
-            for v, abs_names in system._var_allprocs_prom2abs_list['output'].items():
+            for v, abs_names in system._resolver.prom2abs_iter('output'):
                 self._prom2abs['output'][v] = abs_names
 
             for name, meta in system.abs_meta_iter('output', local=False, discrete=True):

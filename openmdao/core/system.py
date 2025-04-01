@@ -1989,6 +1989,7 @@ class System(object, metaclass=SystemMetaclass):
             direction = self.best_partial_deriv_direction()
 
         coloring = _compute_coloring(sparsity, direction)
+        coloring._resolver = self._resolver
 
         if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
             return [None]
@@ -5533,12 +5534,7 @@ class System(object, metaclass=SystemMetaclass):
         object
             The value of the requested output/input variable.
         """
-        # typ = kind if kind is None else _type_map[kind]
         abs_names = self._resolver.absnames(name)
-        # if self._resolver.is_prom(name, typ):
-        #     abs_names = self._resolver.absnames(name, typ)
-        # else:
-        #     abs_names = (self._resolver.any2abs(name, typ, report_error=True), )
         simp_units = simplify_unit(units)
 
         if from_src:
@@ -6289,7 +6285,7 @@ class System(object, metaclass=SystemMetaclass):
             meta = meta_all['input'][name]
 
         if meta is None:
-            abs_name = self._resolver.any2abs(name, report_error=False)
+            abs_name = self._resolver.any2abs(name)
             if abs_name is not None:
                 if abs_name in meta_all['output']:
                     meta = meta_all['output'][abs_name]
