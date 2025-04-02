@@ -3685,7 +3685,7 @@ class System(object, metaclass=SystemMetaclass):
 
         else:  # Design variable on an input connected to an ivc.
             try:
-                src_name = self._resolver.source(prom_name, model._conn_global_abs_in2out)
+                src_name = self._resolver.source(prom_name)
             except RuntimeError:
                 raise RuntimeError(f"{self.msginfo}: Output not found for design variable "
                                    f"'{prom_name}'.")
@@ -3804,7 +3804,6 @@ class System(object, metaclass=SystemMetaclass):
             Use promoted names for inputs, else convert to absolute source names.
         """
         model = self._problem_meta['model_ref']()
-        conns = model._conn_global_abs_in2out
         abs2meta_out = model._var_allprocs_abs2meta['output']
 
         alias = meta['alias']
@@ -3818,7 +3817,7 @@ class System(object, metaclass=SystemMetaclass):
         meta['parent'] = self.pathname
 
         try:
-            src_name = self._resolver.source(prom, conns)
+            src_name = self._resolver.source(prom)
         except RuntimeError:
             raise RuntimeError(f"{self.msginfo}: Output not found for response '{prom}'.")
 
@@ -6044,7 +6043,6 @@ class System(object, metaclass=SystemMetaclass):
         variables = filtered_vars.get(kind)
         if variables:
             resolver = self._resolver
-            conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
             vec = self._vectors[kind][vec_name]
             rank = self.comm.rank
             discrete_vec = () if kind == 'residual' else self._var_discrete[kind]
@@ -6061,7 +6059,7 @@ class System(object, metaclass=SystemMetaclass):
                         elif n[offset:] in discrete_vec:
                             vdict[n] = discrete_vec[n[offset:]]['val']
                         else:
-                            ivc_path = resolver.source(n, conns)
+                            ivc_path = resolver.source(n)
                             if vec._contains_abs(ivc_path):
                                 vdict[ivc_path] = srcget(ivc_path, False)
                             elif ivc_path[offset:] in discrete_vec:
@@ -6073,7 +6071,7 @@ class System(object, metaclass=SystemMetaclass):
                         if vec._contains_abs(name):
                             vdict[name] = get(name, False)
                         else:
-                            ivc_path = resolver.source(name, conns)
+                            ivc_path = resolver.source(name)
                             vdict[ivc_path] = srcget(ivc_path, False)
             elif local:
                 get = self._abs_get_val
@@ -6093,7 +6091,7 @@ class System(object, metaclass=SystemMetaclass):
                             vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
                         elif resolver.is_prom(name, 'input'):
-                            ivc_path = resolver.source(name, conns)
+                            ivc_path = resolver.source(name)
                             vdict[name] = get(ivc_path, get_remote=True, rank=0,
                                               vec_name=vec_name, kind='output')
             else:
@@ -6615,7 +6613,7 @@ class System(object, metaclass=SystemMetaclass):
             except KeyError:
                 # outprom might be an inprom mapped to an auto_ivc
                 try:
-                    abs_outs = [resolver.source(outprom, self._conn_global_abs_in2out, 'input')]
+                    abs_outs = [resolver.source(outprom, iotype='input')]
                 except KeyError:
                     raise KeyError(f"{self.msginfo}: Promoted output variable '{outprom}' was not "
                                    "found.")

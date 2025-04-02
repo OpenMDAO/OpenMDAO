@@ -566,40 +566,6 @@ class NameResolver(object):
         else:
             yield from self._abs2prom[iotype].items()
 
-    def abs2prom_filter(self, iotype=None, local=None, continuous=None, distributed=None):
-        """
-        Yield absolute names and their promoted names that match the given criteria.
-
-        Parameters
-        ----------
-        iotype : str
-            Either 'input', 'output', or None to yield all iotypes.
-        local : bool
-            If not None, yield only names that match the local flag.
-        continuous : bool
-            If not None, yield only names that match the continuous flag.
-        distributed : bool
-            If not None, yield only names that match the distributed flag.
-
-        Yields
-        ------
-        absname : str
-            Absolute name.
-        promname : str
-            Promoted name.
-        """
-        if iotype is None:
-            yield from self.abs2prom_filter('input', continuous=continuous, distributed=distributed)
-            yield from self.abs2prom_filter('output', continuous=continuous,
-                                            distributed=distributed)
-        else:
-            if local is None and continuous is None and distributed is None:
-                yield from self.abs2prom_iter(iotype)
-            else:
-                for absname, (promname, info) in self._abs2prom[iotype].items():
-                    if info.matches(local, continuous, distributed):
-                        yield absname, promname
-
     def add_mapping(self, absname, promname, iotype, local, continuous=True, distributed=False):
         """
         Add a mapping between an absolute name and a promoted name.
@@ -626,7 +592,7 @@ class NameResolver(object):
         if self._prom2abs is not None:
             self._prom2abs[iotype][promname].append(absname)
 
-    def source(self, name, conns=None, iotype=None, report_error=True):
+    def source(self, name, iotype=None, report_error=True):
         """
         Get the source of a variable.
 
@@ -637,8 +603,6 @@ class NameResolver(object):
         ----------
         name : str
             The name to get the source of.
-        conns : dict
-            The connections dictionary.
         iotype : str
             Either 'input', 'output', or None to allow all iotypes.  If not None, the given
             name must correspond to the specified iotype.
@@ -650,31 +614,32 @@ class NameResolver(object):
         str
             The source corresponding to the name.
         """
-        if conns is None:
-            conns = self._conns  # self._conns are the model level connections
-
-        if conns is None:
+        if self._conns is None:
             raise RuntimeError(f"{self.msginfo}: Can't find source for '{name}' because "
                                "connections are not yet known.")
 
-        if name in self._abs2prom_in and (iotype is None or iotype == 'input'):
-            try:
-                return conns[name]
-            except KeyError:
-                pass
-        elif name in self._abs2prom_out and (iotype is None or iotype == 'output'):
-            return name
+        if name in self._abs2prom_in:
+            if iotype is None or iotype == 'input':
+                try:
+                    return self._conns[name]
+                except KeyError:
+                    pass
+        elif name in self._abs2prom_out:
+            if iotype is None or iotype == 'output':
+                return name
         else:  # promoted
             absnames = self.absnames(name, iotype, report_error=False)
             if absnames is not None:
                 absname = absnames[0]
 
                 # absolute input?
-                if absname in conns and (iotype is None or iotype == 'input'):
-                    return conns[absname]
+                if absname in self._conns:
+                    if iotype is None or iotype == 'input':
+                        return self._conns[absname]
 
-                if absname in self._abs2prom_out and (iotype is None or iotype == 'output'):
-                    return absname
+                if absname in self._abs2prom_out:
+                    if iotype is None or iotype == 'output':
+                        return absname
 
         if report_error:
             io = '' if iotype is None else f'{iotype} '
@@ -823,7 +788,7 @@ class NameResolver(object):
             if report_error:
                 raise KeyError(f"{self.msginfo}: {iotype} variable '{promname}' not found.")
 
-    def prom2abs(self, promname, iotype=None, local=None, conns=None):
+    def prom2abs(self, promname, iotype=None, local=None):
         """
         Convert a promoted name to an unique absolute name.
 
@@ -838,9 +803,6 @@ class NameResolver(object):
         local : bool or None
             If True, check only local names. If False, check only non-local names.
             If None, check all names.
-        conns : dict or None
-            The connections dictionary if available. This allows the source of the promoted name
-            to be reported in the error message.
 
         Returns
         -------
@@ -862,16 +824,14 @@ class NameResolver(object):
             if len(lst) == 1:
                 return lst[0]
 
-            conns = conns or self._conns
-
-            if conns is None:
+            if self._conns is None:
                 # we can't refer to the source since we don't know the connections yet
                 raise RuntimeError(f"{self.msginfo}: The promoted name {promname} is invalid "
                                    f"because it refers to multiple inputs: [{' ,'.join(lst)}]. "
                                    "Access the value from the connected output variable instead.")
 
             # report to the user which connected output to access
-            src_name = self._abs2prom['output'][self.source(lst[0], conns)][0]
+            src_name = self._abs2prom['output'][self.source(lst[0])][0]
             raise RuntimeError(f"{self.msginfo}: The promoted name {promname} is invalid because it"
                                f" refers to multiple inputs: [{' ,'.join(lst)}]. Access the value "
                                f"from the connected output variable {src_name} instead.")
