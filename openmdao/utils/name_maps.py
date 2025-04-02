@@ -72,6 +72,8 @@ class NameResolver(object):
         A dictionary of promoted to absolute names for inputs.
     _prom2abs_out : dict
         A dictionary of promoted to absolute names for outputs.
+    _prom_no_multi_abs : bool
+        If True, all promoted names map to a single absolute name.
     _check_dups : bool
         If True, check for duplicate names.
     _conns : dict or None
@@ -104,10 +106,41 @@ class NameResolver(object):
         self._prom2abs = {'input': {}, 'output': {}}
         self._prom2abs_in = self._prom2abs['input']
         self._prom2abs_out = self._prom2abs['output']
+        self._prom_no_multi_abs = True
         self._check_dups = check_dups
         self._conns = None
         self.msginfo = msginfo if msginfo else pathname
         self.has_remote = False
+
+    def add_mapping(self, absname, promname, iotype, local, continuous=True, distributed=False):
+        """
+        Add a mapping between an absolute name and a promoted name.
+
+        Parameters
+        ----------
+        absname : str
+            Absolute name.
+        promname : str
+            Promoted name.
+        iotype : str
+            Either 'input' or 'output'.
+        local : bool
+            If True, the variable is local.
+        continuous : bool
+            If True, the variable is continuous.
+        distributed : bool
+            If True, the variable is distributed.
+        """
+        if local is False:
+            self.has_remote = True
+
+        self._abs2prom[iotype][absname] = (promname, _VarData(local, continuous, distributed))
+        p2a = self._prom2abs[iotype]
+        if promname in p2a:
+            self._prom_no_multi_abs = False
+            p2a[promname].append(absname)
+        else:
+            p2a[promname] = [absname]
 
     def contains(self, name, iotype=None):
         """
@@ -206,16 +239,11 @@ class NameResolver(object):
         Populate the _prom2abs dictionary based on the _abs2prom dictionary.
         """
         self._prom2abs = {'input': {}, 'output': {}}
-        pathlen = self._pathlen
         for iotype, promdict in self._prom2abs.items():
-            skip_autoivc = iotype == 'output'
             for absname, (promname, _) in self._abs2prom[iotype].items():
                 if promname in promdict:
+                    self._prom_no_multi_abs = False
                     promdict[promname].append(absname)
-                elif skip_autoivc and absname.startswith('_auto_ivc.'):
-                    # don't map 'pseudo' promoted names of auto_ivcs because it will give us
-                    # unwanted matches. Instead just map the relative name.
-                    promdict[absname[pathlen:]] = [absname]
                 else:
                     promdict[promname] = [absname]
 
@@ -349,7 +377,7 @@ class NameResolver(object):
         if absname in self._abs2prom_in:
             return 'input'
         if report_error:
-            raise ValueError(f"{self.msginfo}: Can't find {absname}.")
+            raise ValueError(f"{self.msginfo}: Variable name '{absname}' not found.")
 
     def get_prom_iotype(self, promname, report_error=False):
         """
@@ -372,7 +400,7 @@ class NameResolver(object):
         if promname in self._prom2abs_in:
             return 'input'
         if report_error:
-            raise ValueError(f"{self.msginfo}: Can't find {promname}.")
+            raise ValueError(f"{self.msginfo}: Variable name '{promname}' not found.")
 
     def get_iotype(self, name, report_error=False):
         """
@@ -401,7 +429,7 @@ class NameResolver(object):
             return 'input'
 
         if report_error:
-            raise ValueError(f"{self.msginfo}: Can't find {name}.")
+            raise ValueError(f"{self.msginfo}: Variable name '{name}' not found.")
 
     def prom2abs_iter(self, iotype, local=None):
         """
@@ -558,35 +586,6 @@ class NameResolver(object):
         else:
             yield from self._abs2prom[iotype].items()
 
-    def add_mapping(self, absname, promname, iotype, local, continuous=True, distributed=False):
-        """
-        Add a mapping between an absolute name and a promoted name.
-
-        Parameters
-        ----------
-        absname : str
-            Absolute name.
-        promname : str
-            Promoted name.
-        iotype : str
-            Either 'input' or 'output'.
-        local : bool
-            If True, the variable is local.
-        continuous : bool
-            If True, the variable is continuous.
-        distributed : bool
-            If True, the variable is distributed.
-        """
-        if local is False:
-            self.has_remote = True
-
-        self._abs2prom[iotype][absname] = (promname, _VarData(local, continuous, distributed))
-        p2a = self._prom2abs[iotype]
-        if promname in p2a:
-            p2a[promname].append(absname)
-        else:
-            p2a[promname] = [absname]
-
     def source(self, name, iotype=None, report_error=True):
         """
         Get the source of a variable.
@@ -740,7 +739,7 @@ class NameResolver(object):
                 else:
                     raise ValueError(f"{self.msginfo}: {absname} is not a local {iotype}.")
         except KeyError:
-            raise KeyError(f"{self.msginfo}: Can't find {iotype} {absname}.")
+            raise KeyError(f"{self.msginfo}: Variable name '{absname}' not found.")
 
     def absnames(self, promname, iotype=None, report_error=True):
         """
@@ -826,7 +825,7 @@ class NameResolver(object):
                                f"from the connected output variable {src_name} instead.")
 
         except KeyError:
-            raise KeyError(f"{self.msginfo}: Can't find promoted {iotype} {promname}.")
+            raise KeyError(f"{self.msginfo}: Variable name '{promname}' not found.")
 
     def any2abs(self, name, iotype=None, default=None):
         """
@@ -918,6 +917,14 @@ class NameResolver(object):
         str
             Absolute name.
         """
+        # try a faster lookup first. This is typically called from within Component Vectors using
+        # the local name.
+        if self._prom_no_multi_abs:
+            try:
+                return self._prom2abs[iotype][name][0]
+            except KeyError:
+                pass
+
         if iotype is None:
             iotype = self.get_prom_iotype(name)
 
@@ -930,7 +937,7 @@ class NameResolver(object):
             return absname
 
         if report_error:
-            raise KeyError(f"{self.msginfo}: Can't find variable {name}.")
+            raise KeyError(f"{self.msginfo}: Variable name '{name}' not found.")
 
     def prom2prom(self, promname, other, iotype=None):
         """

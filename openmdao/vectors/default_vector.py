@@ -54,10 +54,9 @@ class DefaultVector(Vector):
         system : <System>
             The owning system.
         """
-        name_shape_iter = system._name_shape_iter(self._kind)
         self._views = {}
         start = end = 0
-        for name, shape in name_shape_iter:
+        for name, shape in system._name_shape_iter(self._kind):
             end += shape_to_len(shape)
             self._views[name] = _VecData(shape, (start, end))
             start = end

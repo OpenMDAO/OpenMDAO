@@ -57,6 +57,8 @@ class Vector(object):
     ----------
     _resolver : <NameResolver>
         Name resolver for the owning system.
+    _lookup : function
+        Function to lookup a name in the name resolver.
     _name : str
         The name of the vector: 'nonlinear' or 'linear'.
     _typ : str
@@ -97,6 +99,7 @@ class Vector(object):
         Initialize all attributes.
         """
         self._resolver = system._resolver
+        self._lookup = self._resolver.prom_or_rel2abs
         self._name = name
         self._typ = _type_map[kind]
         self._kind = kind
@@ -334,7 +337,7 @@ class Vector(object):
         bool
             True or False.
         """
-        return self._resolver.prom_or_rel2abs(name, self._typ) in self._names
+        return self._lookup(name, self._typ) in self._names
 
     def _contains_abs(self, name):
         """
@@ -366,11 +369,7 @@ class Vector(object):
         float or ndarray
             variable value.
         """
-        abs_name = self._resolver.prom_or_rel2abs(name, self._typ)
-        if abs_name is not None:
-            return self._abs_get_val(abs_name, flat=False)
-        else:
-            raise KeyError(f"{self._resolver.msginfo}: Variable name '{name}' not found.")
+        return self._abs_get_val(self._lookup(name, self._typ, True), flat=False)
 
     def get_val(self, name, flat=True):
         """
@@ -624,7 +623,7 @@ class Vector(object):
             If specified, the variable name to use when reporting errors. This is useful
             when setting an AutoIVC value that the user only knows by a connected input name.
         """
-        abs_name = self._resolver.prom_or_rel2abs(name, self._typ)
+        abs_name = self._lookup(name, self._typ)
         if abs_name is None:
             raise KeyError(f"{self._resolver.msginfo}: Variable name "
                            f"'{var_name if var_name else name}' not found.")
