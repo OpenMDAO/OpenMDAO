@@ -1287,21 +1287,17 @@ class Group(System):
 
         for kind in ['input', 'output', 'residual']:
             rvec = root_vectors[kind]
-            rvec['nonlinear'] = nlvec = self._vector_class('nonlinear', kind, self,
-                                                           self._name_shape_iter(kind),
-                                                           None,
-                                                           alloc_complex=nl_alloc_complex,
-                                                           do_scaling=do_scaling[kind],
-                                                           do_adder=do_adder[kind])
+            rvec['nonlinear'] = nlvec = self._vector_class('nonlinear', kind, self, None,
+                                                           alloc_complex=nl_alloc_complex)
 
             if self._use_derivatives:
-                rvec['linear'] = self._vector_class('linear', kind, self,
-                                                    self._name_shape_iter(kind),
-                                                    None,
-                                                    alloc_complex=ln_alloc_complex,
-                                                    do_scaling=do_scaling[kind],
-                                                    do_adder=do_adder[kind],
-                                                    nlvec=nlvec)
+                rvec['linear'] = self._vector_class('linear', kind, self, None,
+                                                    alloc_complex=ln_alloc_complex)
+
+            if do_scaling[kind] or do_adder[kind]:
+                nlvec._set_scaling(self, do_adder[kind])
+                if self._use_derivatives:
+                    rvec['linear']._set_scaling(self, do_adder[kind], nlvec)
 
         return root_vectors
 

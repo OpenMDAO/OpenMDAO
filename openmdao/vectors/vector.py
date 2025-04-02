@@ -1,5 +1,4 @@
 """Define the base Vector and Transfer classes."""
-import weakref
 import hashlib
 
 import numpy as np
@@ -48,24 +47,14 @@ class Vector(object):
     kind : str
         The kind of vector, 'input', 'output', or 'residual'.
     system : <System>
-        Pointer to the owning system.
-    name_shape_iter : iterable of (str, shape)
-        Iterable of (name, shape) pairs for the variables in the vector.
+        The owning system.
     parent_vector : Vector
         Parent vector.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
-    do_scaling : bool
-        Whether to do scaling.
-    do_adder : bool
-        Whether to do adder.
-    nlvec : Vector or None
-        Nonlinear vector.
 
     Attributes
     ----------
-    _system : <System>
-        Pointer to the owning system.
     _resolver : <NameResolver>
         Name resolver for the owning system.
     _name : str
@@ -90,10 +79,6 @@ class Vector(object):
         When True, this vector is under complex step, and data is swapped with the complex data.
     _scaling : tuple
         If scaling is active, this is a tuple of (scale_factor, adder) for _data.
-    _do_scaling : bool
-        Whether scaling is active.
-    _do_adder : bool
-        Whether adder is active.
     _has_solver_ref : bool
         This is set to True only when a ref is defined on a solver.
     _nlvec : Vector or None
@@ -107,14 +92,10 @@ class Vector(object):
     # Indicator whether a vector class is MPI-distributed
     distributed = False
 
-    def __init__(self, name, kind, system, name_shape_iter, parent_vector=None,
-                 alloc_complex=False, do_scaling=False, do_adder=False,
-                 nlvec=None):
+    def __init__(self, name, kind, system, parent_vector=None, alloc_complex=False):
         """
         Initialize all attributes.
         """
-        # TODO: remove system ref...
-        self._system = weakref.ref(system)
         self._resolver = system._resolver
         self._name = name
         self._typ = _type_map[kind]
@@ -134,15 +115,11 @@ class Vector(object):
         self._under_complex_step = False
 
         self._scaling = None
-        self._do_scaling = do_scaling
-        self._do_adder = do_adder
 
-        # If we define 'ref' on an output, then we will need to allocate a separate scaling ndarray
-        # for the linear and nonlinear input vectors.
-        self._has_solver_ref = system._has_output_scaling and kind == 'input' and name == 'linear'
-        self._nlvec = nlvec
+        self._has_solver_ref = False
+        self._nlvec = None
 
-        self._initialize_data(parent_vector, name_shape_iter)
+        self._initialize_data(parent_vector, system)
         self._initialize_views(parent_vector, system)
 
         self.read_only = False
@@ -474,7 +451,7 @@ class Vector(object):
         """
         self.set_var(name, value)
 
-    def _initialize_data(self, parent_vectors):
+    def _initialize_data(self, parent_vector, system):
         """
         Internally allocate vectors.
 
@@ -482,8 +459,10 @@ class Vector(object):
 
         Parameters
         ----------
-        parent_vectors : dict of dict of Vector
-            Parent vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vector : <Vector>
+            Parent vector.
+        system : <System>
+            The owning system.
         """
         raise NotImplementedError('_initialize_data not defined for vector type '
                                   f'{type(self).__name__}')

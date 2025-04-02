@@ -134,19 +134,6 @@ class NameResolver(object):
         return name in self._prom2abs[iotype] or name in self._abs2prom[iotype] or \
             self._prefix + name in self._abs2prom[iotype]
 
-    def sort(self):
-        """
-        Sort the name resolver.
-        """
-        for io in ('input', 'output'):
-            self._abs2prom[io] = {n: v for n, v in sorted(self._abs2prom[io].items(),
-                                                          key=lambda x: x[0])}
-        self._abs2prom_in = self._abs2prom['input']
-        self._abs2prom_out = self._abs2prom['output']
-
-        # these will be recomputed when needed
-        self._prom2abs = self._prom2abs_in = self._prom2abs_out = None
-
     def update(self, other):
         """
         Update the name resolver with another name resolver on the same rank.
@@ -200,6 +187,7 @@ class NameResolver(object):
         Populate the _prom2abs dictionary based on the _abs2prom dictionary.
         """
         self._prom2abs = {'input': {}, 'output': {}}
+        pathlen = self._pathlen
         for iotype, promdict in self._prom2abs.items():
             skip_autoivc = iotype == 'output'
             for absname, (promname, _) in self._abs2prom[iotype].items():
@@ -208,7 +196,7 @@ class NameResolver(object):
                 elif skip_autoivc and absname.startswith('_auto_ivc.'):
                     # don't map 'pseudo' promoted names of auto_ivcs because it will give us
                     # unwanted matches. Instead just map the relative name.
-                    promdict[absname[self._pathlen:]] = [absname]
+                    promdict[absname[pathlen:]] = [absname]
                 else:
                     promdict[promname] = [absname]
 
@@ -1022,7 +1010,8 @@ def rel_key2abs_key(obj, rel_key, delim='.'):
     """
     if obj.pathname:
         of, wrt = rel_key
-        return (obj.pathname + delim + of, obj.pathname + delim + wrt)
+        pre = obj.pathname + delim
+        return (pre + of, pre + wrt)
     return rel_key
 
 

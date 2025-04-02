@@ -2427,20 +2427,19 @@ class System(object, metaclass=SystemMetaclass):
                 'residual': self._has_resid_scaling
             }
 
-            for vec_name in vectypes:
+            for kind in ['input', 'output', 'residual']:
                 # Only allocate complex in the vectors we need.
-                for kind in ['input', 'output', 'residual']:
-                    if vec_name == 'linear':
-                        nlvec = vectors['input']['nonlinear']
-                    else:
-                        nlvec = None
+                for vec_name in vectypes:
                     parent_vector = parent_vectors[kind][vec_name]
                     vectors[kind][vec_name] = self._vector_class(
-                        vec_name, kind, self, self._name_shape_iter(kind), parent_vector,
-                        alloc_complex=parent_vector._alloc_complex,
-                        do_scaling=do_scaling[kind],
-                        do_adder=do_adder[kind],
-                        nlvec=nlvec)
+                        vec_name, kind, self, parent_vector,
+                        alloc_complex=parent_vector._alloc_complex)
+
+                if do_scaling[kind] or do_adder[kind]:
+                    vectors[kind]['nonlinear']._set_scaling(self, do_adder[kind])
+                    if self._use_derivatives:
+                        vectors[kind]['linear']._set_scaling(self, do_adder[kind],
+                                                             vectors[kind]['nonlinear'])
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']

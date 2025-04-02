@@ -386,7 +386,7 @@ class SqliteRecorder(CaseRecorder):
             self._abs2prom['output'].update(system._resolver.abs2prom_iter('output'))
             for v, abs_names in system._resolver.prom2abs_iter('input'):
                 if v not in self._prom2abs['input']:
-                    self._prom2abs['input'][v] = abs_names
+                    self._prom2abs['input'][v] = abs_names.copy()
                 else:
                     lst = self._prom2abs['input'][v]
                     old = set(lst)

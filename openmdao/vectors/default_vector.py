@@ -20,81 +20,13 @@ class DefaultVector(Vector):
         The kind of vector, 'input', 'output', or 'residual'.
     system : <System>
         Pointer to the owning system.
-    name_shape_iter : iterable of (str, shape)
-        Iterable of (name, shape) pairs for the variables in the vector.
     parent_vector : <Vector>
         Parent vector.
     alloc_complex : bool
         Whether to allocate any imaginary storage to perform complex step. Default is False.
-    do_scaling : bool
-        Whether to do scaling.
-    do_adder : bool
-        Whether to do adder.
-    nlvec : <Vector> or None
-        Nonlinear vector.
-
-    Attributes
-    ----------
-    _views_rel : dict or None
-        If owning system is a component, this will contain a mapping of relative names to views.
     """
 
     TRANSFER = DefaultTransfer
-
-    def __init__(self, name, kind, system, name_shape_iter, parent_vector=None,
-                 alloc_complex=False, do_scaling=False, do_adder=False, nlvec=None):
-        """
-        Initialize all attributes.
-        """
-        self._views_rel = None
-        super().__init__(name, kind, system, name_shape_iter, parent_vector,
-                         alloc_complex, do_scaling, do_adder, nlvec)
-
-    def __getitem__(self, name):
-        """
-        Get the variable value.
-
-        Parameters
-        ----------
-        name : str
-            Promoted or relative variable name in the owning system's namespace.
-
-        Returns
-        -------
-        float or ndarray
-            variable value.
-        """
-        if self._views_rel is not None:
-            try:
-                vinfo = self._views_rel[name]
-                val = vinfo.view[0] if vinfo.is_scalar else vinfo.view
-                if self._under_complex_step:
-                    return val
-                return val.real
-            except KeyError:
-                pass  # try normal lookup after rel lookup failed
-
-        return super().__getitem__(name)
-
-    def __setitem__(self, name, value):
-        """
-        Set the variable value.
-
-        Parameters
-        ----------
-        name : str
-            Promoted or relative variable name in the owning system's namespace.
-        value : float or list or tuple or ndarray
-            variable value to set
-        """
-        if self._views_rel is not None and not self.read_only:
-            try:
-                self._views_rel[name].view[:] = value
-                return
-            except Exception:
-                pass  # fall through to normal set if fast one failed in any way
-
-        self.set_var(name, value)
 
     def _get_data(self):
         """
@@ -111,7 +43,7 @@ class DefaultVector(Vector):
         """
         return self._data if self._under_complex_step else self._data.real
 
-    def _initialize_data(self, parent_vector, name_shape_iter):
+    def _initialize_data(self, parent_vector, system):
         """
         Set up internal data structures.
 
@@ -119,9 +51,10 @@ class DefaultVector(Vector):
         ----------
         parent_vector : <Vector> or None
             Parent vector.
-        name_shape_iter : iterator of (str, tuple)
-            Iterator of (name, shape) tuples.
+        system : <System>
+            The owning system.
         """
+        name_shape_iter = system._name_shape_iter(self._kind)
         self._views = {}
         start = end = 0
         for name, shape in name_shape_iter:
@@ -143,26 +76,84 @@ class DefaultVector(Vector):
                 self._parent_slice = slice(0, 0)
                 self._data = np.zeros(0, dtype=complex if self._alloc_complex else float)
 
-            if self._do_scaling:
+            if parent_vector._scaling:
                 ps0, ps1 = parent_vector._scaling
                 if ps0 is not None:
                     ps0 = ps0[self._parent_slice]
                 self._scaling = (ps0, ps1[self._parent_slice])
 
-        # print(self._kind, self._name, 'scaling', self._scaling)
-
-    def _initialize_scaling(self):
+    def _set_scaling(self, system, do_adder, nlvec=None):
         """
-        Initialize root scaling vectors.
+        Set the scaling vectors.
+
+        Parameters
+        ----------
+        system : <System>
+            The system to set the scaling for.
+        do_adder : bool
+            Whether to initialize with an additive term.
+        nlvec : <Vector> or None
+            Nonlinear vector if this is a linear vector.
+        """
+        kind = self._kind
+        islinear = self._name == 'linear'
+        isinput = kind == 'input'
+        factors = system._scale_factors
+
+        # If we define 'ref' on an output, then we will need to allocate a separate scaling ndarray
+        # for the linear and nonlinear input vectors.
+        self._has_solver_ref = system._has_output_scaling and isinput and islinear
+        self._nlvec = nlvec
+
+        # if root, allocate space for scaling vectors
+        if system.pathname == '':  # root system
+            self._allocate_scaling_data(do_adder, nlvec)
+
+        scaling = self._scaling
+
+        start = end = 0
+        for abs_name, vinfo in self._views.items():
+            end += vinfo.size
+            factor_tuple = factors[abs_name][kind]
+
+            if len(factor_tuple) == 4:
+                # Only input vectors can have 4 factors. Linear input vectors need to be able
+                # to handle the unit and solver scaling in opposite directions in reverse mode.
+                a0, a1, factor, offset = factor_tuple
+
+                if islinear:
+                    scale0 = None
+                    scale1 = factor / a1
+                else:
+                    scale0 = (a0 + offset) * factor
+                    scale1 = a1 * factor
+            else:
+                if islinear and isinput:
+                    scale0 = None
+                    scale1 = 1.0 / factor_tuple[1]
+                else:
+                    scale0, scale1 = factor_tuple
+
+            if scaling[0] is not None:
+                scaling[0][start:end] = scale0
+            scaling[1][start:end] = scale1
+
+            start = end
+
+    def _allocate_scaling_data(self, do_adder, nlvec):
+        """
+        Allocate root scaling arrays.
 
         Parameters
         ----------
         do_adder : bool
             Whether to initialize with an additive term.
+        nlvec : <Vector> or None
+            Nonlinear vector if this is a linear vector.
         """
         data = self._data
         if self._name == 'nonlinear':
-            if self._do_adder:
+            if do_adder:
                 self._scaling = (np.zeros(data.size), np.ones(data.size))
             else:
                 self._scaling = (None, np.ones(data.size))
@@ -174,7 +165,7 @@ class DefaultVector(Vector):
             else:
                 # Reuse the nonlinear scaling vecs since they're the same as ours.
                 # The nonlinear vectors are created before the linear vectors
-                self._scaling = (None, self._nlvec._scaling[1])
+                self._scaling = (None, nlvec._scaling[1])
         else:
             self._scaling = (None, np.ones(data.size))
 
@@ -182,65 +173,18 @@ class DefaultVector(Vector):
         """
         Internally assemble views onto the vectors.
         """
-        kind = self._kind
         islinear = self._name == 'linear'
-        isinput = kind == 'input'
-        rel_lookup = system._has_fast_rel_lookup()
-
-        if parent_vector is None and self._do_scaling:
-            self._initialize_scaling()
-
-        scaling = self._scaling
-        if self._do_scaling:
-            factors = system._scale_factors
-
-        if rel_lookup:
-            self._views_rel = views_rel = {}
-            path = self._resolver._pathname
-            relstart = len(path) + 1 if path else 0
-        else:
-            self._views_rel = None
 
         views = self._views
         start = end = 0
-        for abs_name, vinfo in self._views.items():
+        for vinfo in self._views.values():
             end += vinfo.size
             vflat = v = self._data[start:end]
             if vinfo.shape != vflat.shape and vinfo.shape != ():
                 v = vflat.view().reshape(vinfo.shape)
 
-            # print(abs_name, v.shape, vflat.shape)
-
             vinfo.view = v
             vinfo.flat = vflat
-
-            if rel_lookup:
-                views_rel[abs_name[relstart:]] = vinfo
-
-            if self._do_scaling:
-                factor_tuple = factors[abs_name][kind]
-
-                if len(factor_tuple) == 4:
-                    # Only input vectors can have 4 factors. Linear input vectors need to be able
-                    # to handle the unit and solver scaling in opposite directions in reverse mode.
-                    a0, a1, factor, offset = factor_tuple
-
-                    if islinear:
-                        scale0 = None
-                        scale1 = factor / a1
-                    else:
-                        scale0 = (a0 + offset) * factor
-                        scale1 = a1 * factor
-                else:
-                    if islinear and isinput:
-                        scale0 = None
-                        scale1 = 1.0 / factor_tuple[1]
-                    else:
-                        scale0, scale1 = factor_tuple
-
-                if scaling[0] is not None:
-                    scaling[0][start:end] = scale0
-                scaling[1][start:end] = scale1
 
             start = end
 
@@ -590,23 +534,23 @@ class DefaultVector(Vector):
 
         return name2inds
 
-    def __getstate__(self):
-        """
-        Return state as a dict.
+    # def __getstate__(self):
+    #     """
+    #     Return state as a dict.
 
-        For pickling vectors in case recording, we want to get rid of
-        the system contained within Vectors, because MPI Comm objects cannot
-        be pickled using Python3's pickle module.
+    #     For pickling vectors in case recording, we want to get rid of
+    #     the system contained within Vectors, because MPI Comm objects cannot
+    #     be pickled using Python3's pickle module.
 
-        Returns
-        -------
-        dict
-            state minus system member.
-        """
-        state = self.__dict__.copy()
-        if '_system' in state:
-            del state['_system']
-        return state
+    #     Returns
+    #     -------
+    #     dict
+    #         state minus system member.
+    #     """
+    #     state = self.__dict__.copy()
+    #     if '_system' in state:
+    #         del state['_system']
+    #     return state
 
     def get_hash(self, alg=hashlib.sha1):
         """
