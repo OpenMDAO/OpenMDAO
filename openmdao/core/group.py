@@ -420,7 +420,7 @@ class Group(System):
         """
         # make this a defaultdict to handle the case of access using unconnected inputs
         scale_factors = defaultdict(lambda: {
-            'input': (0.0, 1.0),
+            'input': (0.0, 1.0, None, None),
         })
 
         for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
@@ -431,8 +431,8 @@ class Group(System):
             a0 = ref0
             a1 = meta['ref'] - ref0
             scale_factors[abs_name] = {
-                'output': (a0, a1),
-                'residual': (0.0, res_ref),
+                'output': (a0, a1, None, None),
+                'residual': (0.0, res_ref, None, None),
             }
 
         # Input scaling for connected inputs is added here.
@@ -441,11 +441,11 @@ class Group(System):
         if self._has_input_scaling:
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
             for abs_in, meta_in in self._var_abs2meta['input'].items():
-                abs_out = self._conn_global_abs_in2out[abs_in]
+                src = self._conn_global_abs_in2out[abs_in]
 
-                meta_out = allprocs_meta_out[abs_out]
-                ref = meta_out['ref']
-                ref0 = meta_out['ref0']
+                src_meta = allprocs_meta_out[src]
+                ref = src_meta['ref']
+                ref0 = src_meta['ref0']
 
                 scalar_ref = np.ndim(ref) == 0
                 scalar_ref0 = np.ndim(ref0) == 0
@@ -453,10 +453,11 @@ class Group(System):
                 has_scaling = not scalar_ref or not scalar_ref0 or ref != 1.0 or ref0 != 0.0
 
                 units_in = meta_in['units']
-                units_out = meta_out['units']
+                units_out = src_meta['units']
 
                 has_unit_conv = \
                     units_in is not None and units_out is not None and units_in != units_out
+
                 if has_unit_conv:
                     factor, offset = unit_conversion(units_out, units_in)
                     if factor == 1.0 and offset == 0.0:
@@ -475,15 +476,15 @@ class Group(System):
                         # TODO: if either ref or ref0 are not scalar and the output is
                         # distributed, we need to do a scatter
                         # to obtain the values needed due to global src_indices
-                        if meta_out['distributed']:
+                        if src_meta['distributed']:
                             raise RuntimeError("{}: vector scalers with distrib vars "
                                                "not supported yet.".format(self.msginfo))
 
                         if not src_indices._flat_src:
                             src_indices = _flatten_src_indices(src_indices.as_array(),
                                                                meta_in['shape'],
-                                                               meta_out['global_shape'],
-                                                               meta_out['global_size'])
+                                                               src_meta['global_shape'],
+                                                               src_meta['global_size'])
 
                         if not scalar_ref:
                             ref = ref[src_indices]
@@ -522,7 +523,7 @@ class Group(System):
                     a1 = ref - ref0
 
                     # No unit conversion, only scaling. Just send the scale factors.
-                    scale_factors[abs_in] = {'input': (a0, a1)}
+                    scale_factors[abs_in] = {'input': (a0, a1, None, None)}
 
                 # Check whether we need to allocate an adder for the input vector.
                 self._has_input_adder |= np.any(np.asarray(a0))

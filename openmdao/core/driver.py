@@ -1032,8 +1032,8 @@ class Driver(object, metaclass=DriverMetaclass):
 
             problem.model._discrete_outputs[src_name] = value
 
-        elif src_name in problem.model._outputs:
-            desvar = problem.model._outputs.get_val(src_name)
+        elif problem.model._outputs._contains_abs(src_name):
+            desvar = problem.model._outputs._abs_get_val(src_name)
             if name in self._dist_driver_vars:
                 loc_idxs, _, dist_idxs = self._dist_driver_vars[name]
                 loc_idxs = loc_idxs()  # don't use indexer here

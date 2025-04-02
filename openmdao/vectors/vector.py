@@ -273,7 +273,7 @@ class Vector(object):
         listiterator
             iterator over the variable names.
         """
-        idx = len(self._resolver._pathname) + 1 if self._resolver._pathname else 0
+        idx = self._resolver._pathlen
         return (n[idx:] for n in self._views if n in self._names)
 
     def _abs_item_iter(self, flat=True):

@@ -108,17 +108,16 @@ class DefaultVector(Vector):
         if system.pathname == '':  # root system
             self._allocate_scaling_data(do_adder, nlvec)
 
-        scaling = self._scaling
+        adder_array, scaler_array = self._scaling
 
         start = end = 0
         for abs_name, vinfo in self._views.items():
             end += vinfo.size
-            factor_tuple = factors[abs_name][kind]
+            a0, a1, factor, offset = factors[abs_name][kind]
 
-            if len(factor_tuple) == 4:
-                # Only input vectors can have 4 factors. Linear input vectors need to be able
-                # to handle the unit and solver scaling in opposite directions in reverse mode.
-                a0, a1, factor, offset = factor_tuple
+            if factor is not None:
+                # Linear input vectors need to be able to handle the unit and solver scaling in
+                # opposite directions in reverse mode.
 
                 if islinear:
                     scale0 = None
@@ -129,13 +128,14 @@ class DefaultVector(Vector):
             else:
                 if islinear and isinput:
                     scale0 = None
-                    scale1 = 1.0 / factor_tuple[1]
+                    scale1 = 1.0 / a1
                 else:
-                    scale0, scale1 = factor_tuple
+                    scale0 = a0
+                    scale1 = a1
 
-            if scaling[0] is not None:
-                scaling[0][start:end] = scale0
-            scaling[1][start:end] = scale1
+            if adder_array is not None:
+                adder_array[start:end] = scale0
+            scaler_array[start:end] = scale1
 
             start = end
 
