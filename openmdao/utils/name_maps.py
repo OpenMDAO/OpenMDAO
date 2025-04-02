@@ -101,9 +101,9 @@ class NameResolver(object):
         self._abs2prom = {'input': {}, 'output': {}}
         self._abs2prom_in = self._abs2prom['input']
         self._abs2prom_out = self._abs2prom['output']
-        self._prom2abs = None
-        self._prom2abs_in = None
-        self._prom2abs_out = None
+        self._prom2abs = {'input': {}, 'output': {}}
+        self._prom2abs_in = self._prom2abs['input']
+        self._prom2abs_out = self._prom2abs['output']
         self._check_dups = check_dups
         self._conns = None
         self.msginfo = msginfo if msginfo else pathname
@@ -128,24 +128,41 @@ class NameResolver(object):
         if iotype is None:
             return self.contains(name, 'input') or self.contains(name, 'output')
 
-        if self._prom2abs is None:
-            self._populate_prom2abs()
-
         return name in self._prom2abs[iotype] or name in self._abs2prom[iotype] or \
             self._prefix + name in self._abs2prom[iotype]
 
-    def update(self, other):
+    def _auto_ivc_update(self, auto_ivc_resolver, auto2tgt):
         """
-        Update the name resolver with another name resolver on the same rank.
+        Update the name resolver with the auto_ivc component's name resolver.
 
         Parameters
         ----------
-        other : NameResolver
-            The name resolver to update with.
+        auto_ivc_resolver : NameResolver
+            The name resolver of the auto_ivc component.
+        auto2tgt : dict
+            A dictionary of auto_ivc outputs to their targets.
         """
-        for io in ('input', 'output'):
-            self._abs2prom[io].update(other._abs2prom[io])
-        self.has_remote |= other.has_remote
+        old_abs2prom_out = self._abs2prom_out
+        old_prom2abs_out = self._prom2abs_out
+
+        self._abs2prom = {'input': self._abs2prom_in, 'output': {}}
+        self._prom2abs = {'input': self._prom2abs_in, 'output': {}}
+
+        self._abs2prom_out = self._abs2prom['output']
+        self._prom2abs_out = self._prom2abs['output']
+
+        # set promoted name of auto_ivc outputs to the promoted name of the input they connect to
+        for absname, (_, info) in auto_ivc_resolver.info_iter('output'):
+            pname = self._abs2prom_in[auto2tgt[absname][0]][0]
+            self._abs2prom_out[absname] = (pname, info)
+            # don't add target prom name to our prom2abs because it causes undesired matches. Just
+            # map the absname (since we're at the top level absname is same as relative name).
+            self._prom2abs_out[absname] = [absname]
+
+        self._abs2prom_out.update(old_abs2prom_out)
+        self._prom2abs_out.update(old_prom2abs_out)
+
+        self.has_remote |= auto_ivc_resolver.has_remote
 
     def update_from_ranks(self, myrank, others):
         """
@@ -182,6 +199,8 @@ class NameResolver(object):
                                 self.has_remote = True
                             my_abs2prom[absname] = (promname, info)
 
+        self._populate_prom2abs()
+
     def _populate_prom2abs(self):
         """
         Populate the _prom2abs dictionary based on the _abs2prom dictionary.
@@ -203,6 +222,7 @@ class NameResolver(object):
         self._prom2abs_in = self._prom2abs['input']
         self._prom2abs_out = self._prom2abs['output']
 
+    def _check_dup_prom_outs(self):
         if self._check_dups:
             for promname, abslist in self._prom2abs_out.items():
                 if len(abslist) > 1:
@@ -223,8 +243,6 @@ class NameResolver(object):
         int
             The number of promoted names of the specified iotype.
         """
-        if self._prom2abs is None:
-            self._populate_prom2abs()
         if iotype is None:
             return len(self._prom2abs_in) + len(self._prom2abs_out)
         return len(self._prom2abs[iotype])
@@ -274,8 +292,6 @@ class NameResolver(object):
         bool
             True if the promoted name exists, False otherwise.
         """
-        if self._prom2abs is None:
-            self._populate_prom2abs()
         if iotype is None:
             iotype = self.get_prom_iotype(promname)
             if iotype is None:
@@ -351,9 +367,6 @@ class NameResolver(object):
         str
             The iotype of the promoted name.
         """
-        if self._prom2abs is None:
-            self._populate_prom2abs()
-
         if promname in self._prom2abs_out:
             return 'output'
         if promname in self._prom2abs_in:
@@ -382,9 +395,6 @@ class NameResolver(object):
         if name in self._abs2prom_in:
             return 'input'
 
-        if self._prom2abs is None:
-            self._populate_prom2abs()
-
         if name in self._prom2abs_out:
             return 'output'
         if name in self._prom2abs_in:
@@ -412,9 +422,6 @@ class NameResolver(object):
         absnames : list of str
             Absolute names corresponding to the promoted name.
         """
-        if self._prom2abs is None:
-            self._populate_prom2abs()
-
         if iotype is None:
             yield from self.prom2abs_iter('input', local)
             yield from self.prom2abs_iter('output', local)
@@ -473,9 +480,6 @@ class NameResolver(object):
         promname : str
             Promoted name.
         """
-        if self._prom2abs is None:
-            self._populate_prom2abs()
-
         if iotype is None:
             yield from self.prom_iter('input')
             yield from self.prom_iter('output')
@@ -577,8 +581,11 @@ class NameResolver(object):
             self.has_remote = True
 
         self._abs2prom[iotype][absname] = (promname, _VarData(local, continuous, distributed))
-        if self._prom2abs is not None:
-            self._prom2abs[iotype][promname].append(absname)
+        p2a = self._prom2abs[iotype]
+        if promname in p2a:
+            p2a[promname].append(absname)
+        else:
+            p2a[promname] = [absname]
 
     def source(self, name, iotype=None, report_error=True):
         """
@@ -754,9 +761,6 @@ class NameResolver(object):
             The absolute names corresponding to the promoted name, or None if report_error is
             False and the promoted name is not found.
         """
-        if self._prom2abs is None:
-            self._populate_prom2abs()
-
         if iotype is None:
             iotype = self.get_prom_iotype(promname)
 
@@ -797,9 +801,6 @@ class NameResolver(object):
         str
             The absolute name corresponding to the promoted name.
         """
-        if self._prom2abs is None:
-            self._populate_prom2abs()
-
         try:
             if iotype is None:
                 iotype = self.get_prom_iotype(promname)
@@ -855,9 +856,6 @@ class NameResolver(object):
         if name in self._abs2prom[iotype]:
             return name
 
-        if self._prom2abs is None:
-            self._populate_prom2abs()
-
         if name in self._prom2abs[iotype]:
             return self.prom2abs(name, iotype)
 
@@ -897,9 +895,6 @@ class NameResolver(object):
         if name in a2p:
             return a2p[name][0]
 
-        if self._prom2abs is None:
-            self._populate_prom2abs()
-
         if name in self._prom2abs[iotype]:
             return name
 
@@ -925,9 +920,6 @@ class NameResolver(object):
         """
         if iotype is None:
             iotype = self.get_prom_iotype(name)
-
-        if self._prom2abs is None:
-            self._populate_prom2abs()
 
         if name in self._prom2abs[iotype]:
             return self.prom2abs(name, iotype)

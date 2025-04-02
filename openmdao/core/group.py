@@ -1100,6 +1100,7 @@ class Group(System):
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs()
         self._check_order()
+        self._resolver._check_dup_prom_outs()
 
         self._setup_var_sizes()
 
@@ -4731,19 +4732,9 @@ class Group(System):
 
         self._subsystems_myproc = [auto_ivc] + self._subsystems_myproc
 
+        self._resolver._auto_ivc_update(auto_ivc._resolver, auto2tgt)
+
         io = 'output'  # auto_ivc has only output vars
-        old = self._resolver
-        self._resolver = NameResolver('', self.msginfo)
-        self._resolver.update(auto_ivc._resolver)
-        self._resolver.update(old)
-
-        resolver = self._resolver
-        abs2prom_out = resolver._abs2prom_out
-        abs2prom_in = resolver._abs2prom_in
-        for n in auto_ivc._resolver.abs_iter('output'):
-            _, loc = abs2prom_out[n]  # use locality of the output
-            abs2prom_out[n] = (abs2prom_in[auto2tgt[n][0]][0], loc)
-
         self._var_discrete[io].update({'_auto_ivc.' + k: v for k, v in
                                        auto_ivc._var_discrete[io].items()})
         self._var_allprocs_discrete[io].update(auto_ivc._var_allprocs_discrete[io])

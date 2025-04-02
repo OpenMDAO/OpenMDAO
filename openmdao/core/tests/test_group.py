@@ -450,10 +450,12 @@ class TestGroup(unittest.TestCase):
         G1 = prob.model.add_subsystem('G1', om.Group())
         G1.add_subsystem("C1", om.ExecComp("y=2.0*x"), promotes=['y'])
         G1.add_subsystem("C2", om.ExecComp("y=2.0*x"), promotes=['y'])
-        msg = r"Output name 'y' refers to multiple outputs: \['G1.C1.y', 'G1.C2.y'\]."
-        with self.assertRaisesRegex(Exception, msg):
-            prob.setup()
+        msg = "<model> <class Group>: Output name 'G1.y' refers to multiple outputs: ['G1.C1.y', 'G1.C2.y']."
+        prob.setup()
+        with self.assertRaises(Exception) as cm:
             prob.final_setup()
+            
+        self.assertEqual(cm.exception.args[0], msg)
 
     def test_required_connection_input_unconnected(self):
         class RequiredConnComp(om.ExplicitComponent):
