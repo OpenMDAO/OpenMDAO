@@ -1,6 +1,7 @@
 """ Testing for Problem.check_partials and check_totals."""
 
 from io import StringIO
+import os
 from itertools import zip_longest
 
 import unittest
@@ -2802,6 +2803,19 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
                 tables.append(tlines)
                 tlines = []
         return tables
+
+    def test_report_generation(self):
+        for use_rich in ('1', '0'):
+            for compact in (True, False):
+                with self.subTest(f'{use_rich=} {compact=}'):
+                    with set_env_vars_context(OPENMDAO_USE_RICH=use_rich,
+                                            TESTFLOW_RUNNING='0',
+                                            OPENMDAO_REPORTS='1'):
+                        p = self.setup_model()
+                        stream = StringIO()
+                        p.check_partials(step=[1e-6], out_stream=stream, compact_print=compact)
+                        self.assertIn('check_partials-bad.html', os.listdir(p.get_reports_dir()))
+                        self.assertIn('check_partials-good.html', os.listdir(p.get_reports_dir()))
 
     def test_single_fd_step_fwd(self):
         p = self.setup_model()
