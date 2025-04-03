@@ -20,7 +20,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning, asser
      assert_check_partials, assert_check_totals
 from openmdao.utils.om_warnings import DerivativesWarning, OMInvalidCheckDerivativesOptionsWarning
 from openmdao.utils.testing_utils import set_env_vars_context, compare_prob_vs_comp_check_partials,\
-    snum_equal
+    snum_equal, use_tempdirs
 from openmdao.utils.array_utils import safe_norm
 from openmdao.utils.rich_utils import strip_formatting
 
@@ -181,6 +181,7 @@ class DirectionalVectorizedMatFreeComp(om.ExplicitComponent):
                     self.n_rev += 1
 
 
+@use_tempdirs
 class TestProblemCheckPartials(unittest.TestCase):
 
     def test_incorrect_jacobian(self):
@@ -1995,6 +1996,7 @@ y wrt x                     | abs         | fd-fwd | 2.000000000279556
             prob.check_partials(out_stream=None, compact_print=True)
 
 
+@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestCheckPartialsDistribDirectional(unittest.TestCase):
 
@@ -2029,6 +2031,7 @@ class TestCheckPartialsDistribDirectional(unittest.TestCase):
         prob.check_partials(compact_print=True, method='cs')
 
 
+@use_tempdirs
 class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
     # Ensure check_partials options differs from the compute partials options
 
@@ -2322,6 +2325,7 @@ class TestCheckDerivativesOptionsDifferentFromComputeOptions(unittest.TestCase):
         assert_check_totals(prob.check_totals())
 
 
+@use_tempdirs
 class TestCheckPartialsFeature(unittest.TestCase):
 
     def test_feature_incorrect_jacobian(self):
@@ -2699,6 +2703,7 @@ class TestCheckPartialsFeature(unittest.TestCase):
         assert_check_partials(J, atol=1e-5, rtol=1e-5)
 
 
+@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestCheckPartialsDistrib(unittest.TestCase):
 
@@ -2736,6 +2741,7 @@ class TestCheckPartialsDistrib(unittest.TestCase):
         prob.check_partials(compact_print=True, method='cs')
 
 
+@use_tempdirs
 class TestCheckPartialsMultipleSteps(unittest.TestCase):
     def setup_model(self, directional=False):
         class CompGoodPartials(om.ExplicitComponent):
@@ -2809,8 +2815,8 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
             for compact in (True, False):
                 with self.subTest(f'{disable_rich=} {compact=}'):
                     with set_env_vars_context(OPENMDAO_DISABLE_RICH=disable_rich,
-                                            TESTFLOW_RUNNING='0',
-                                            OPENMDAO_REPORTS='1'):
+                                              TESTFLO_RUNNING='0',
+                                              OPENMDAO_REPORTS='1'):
                         p = self.setup_model()
                         stream = StringIO()
                         p.check_partials(step=[1e-6], out_stream=stream, compact_print=compact)
