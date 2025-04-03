@@ -1,4 +1,5 @@
 """Maps between promoted/relative/absolute names and name pairs."""
+from difflib import get_close_matches
 
 
 def rel_name2abs_name(system, rel_name):
@@ -203,7 +204,13 @@ def name2abs_names(system, name):
         if absnames[0] in system._var_allprocs_abs2prom['input']:
             return absnames
 
-    return ()
+    guesses = get_close_matches(name, list(system._var_allprocs_prom2abs_list['output'].keys())
+                                + list(system._var_allprocs_prom2abs_list['input'].keys())
+                                + list(system._problem_meta['prom2abs']['output'].keys())
+                                + list(system._problem_meta['prom2abs']['input'].keys()),
+                                n=10, cutoff=0.15)
+    raise KeyError(f"{system.msginfo}: Could not find '{name}'. Perhaps you "
+                   f"meant one of the following variables: {guesses}")
 
 
 def prom_key2abs_key(system, prom_key):
