@@ -315,7 +315,9 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             if system.get_reports_dir().is_dir():
                 report = system.get_reports_dir() / report_name
                 with open(report, mode='w', encoding="utf-8") as file:
-                    file.write(f'<html><body>\n{sys_buffer.getvalue()}\n</body></html>')
+                    file.write('<html><body><pre>'
+                               f'\n{sys_buffer.getvalue()}'
+                               '\n</pre></body></html>')
 
 
 def _print_tv(tol_violation):
@@ -517,7 +519,9 @@ def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=Fal
             if system.get_reports_dir().is_dir():
                 report = system.get_reports_dir() / f'check_partials-{system.pathname}.html'
                 with open(report, mode='w', encoding="utf-8") as file:
-                    file.write(f'<html><body>\n{sys_buffer.getvalue()}\n</body></html>')
+                    file.write('<html><body><pre>'
+                               f'\n{sys_buffer.getvalue()}'
+                               '\n</pre></body></html>')
 
     if worst_subjac is None:
         return None

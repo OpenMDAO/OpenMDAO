@@ -2805,10 +2805,10 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         return tables
 
     def test_report_generation(self):
-        for use_rich in ('1', '0'):
+        for disable_rich in ('1', '0'):
             for compact in (True, False):
-                with self.subTest(f'{use_rich=} {compact=}'):
-                    with set_env_vars_context(OPENMDAO_USE_RICH=use_rich,
+                with self.subTest(f'{disable_rich=} {compact=}'):
+                    with set_env_vars_context(OPENMDAO_DISABLE_RICH=disable_rich,
                                             TESTFLOW_RUNNING='0',
                                             OPENMDAO_REPORTS='1'):
                         p = self.setup_model()
