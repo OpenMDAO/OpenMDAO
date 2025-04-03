@@ -699,6 +699,8 @@ class Coloring(object):
         Dictionary mapping absolute names to promoted names.
     _subtractions : list
         List of subtraction tuples. Only used for the substitution method of bidirectional coloring.
+    _color_array : dict
+        Dictionary of color arrays for each direction.
     """
 
     def __init__(self, sparsity, row_vars=None, row_var_sizes=None, col_vars=None,
@@ -735,6 +737,7 @@ class Coloring(object):
 
         self._abs2prom = None
         self._subtractions = None
+        self._color_array = {}
 
     def get_renamed_copy(self, row_translate, col_translate):
         """
@@ -786,6 +789,40 @@ class Coloring(object):
             raise RuntimeError("Invalid direction '%s' in color_iter" % direction)
 
         yield from colors
+
+    def get_color_array(self, direction):
+        """
+        Return the color array for the given direction.
+
+        In fwd mode, this will be an array of length ncols with the color for each column.
+        In rev mode, this will be an array of length nrows with the color for each row.
+
+        Parameters
+        ----------
+        direction : str
+            Derivative direction ('fwd' or 'rev').
+
+        Returns
+        -------
+        ndarray
+            Color array for the given direction.
+        """
+        if direction not in self._color_array:
+            if direction == 'fwd':
+                color_array = np.zeros(self._shape[1], dtype=int)
+                it = self._fwd[0]
+            elif direction == 'rev':
+                color_array = np.zeros(self._shape[0], dtype=int)
+                it = self._rev[0]
+            else:
+                raise RuntimeError(f"Invalid direction '{direction}' in get_color_array.")
+
+            for i, color_list in enumerate(it):
+                color_array[color_list] = i
+
+            self._color_array[direction] = color_array
+
+        return self._color_array[direction]
 
     def color_nonzero_iter(self, direction):
         """
@@ -857,8 +894,18 @@ class Coloring(object):
         ndarray
             The full jacobian.
         """
-        sparsity = self.get_sparsity_of_type(bool).toarray()
-        return colored2full_jac(compressed_j, sparsity, self.color_iter(direction), direction)
+        if direction == 'fwd':
+            C = self.get_color_array(direction)
+            colors_coo = C[self._nzcols]
+            data = compressed_j[self._nzrows, colors_coo]
+        elif direction == 'rev':
+            R = self.get_color_array(direction)
+            colors_coo = R[self._nzrows]
+            data = compressed_j[colors_coo, self._nzcols]
+        else:
+            raise RuntimeError(f"Invalid direction '{direction}' in expand_jac.")
+
+        return coo_matrix((data, (self._nzrows, self._nzcols)), shape=self._shape).toarray()
 
     def get_row_col_map(self, direction):
         """
@@ -2231,81 +2278,83 @@ def _get_colormap(color_array):
     return colmap
 
 
-def _get_expander_matrix(sparsity_shape, color_iter, direction):
-    """
-    Get a matrix to expand a colored jacobian to an expanded colored jacobian.
+# def _get_expander_matrix(sparsity_shape, color_iter, direction):
+#     """
+#     Get a matrix to expand a colored jacobian to an expanded colored jacobian.
 
-    The expanded colored jacobian is the shape of the full jacobian but columns sharing
-    the same color are summed together.
+#     The expanded colored jacobian is the shape of the full jacobian but columns sharing
+#     the same color are summed together.  It's a CSC matrix in the forward direction and
+#     a CSR matrix in the reverse direction.
 
-    Parameters
-    ----------
-    sparsity_shape : tuple
-        Shape of the sparsity pattern of the jacobian.
-    color_iter : iterator
-        Iterator over columns for each color.
-    direction : str
-        Direction of the jacobian to expand.
+#     Parameters
+#     ----------
+#     sparsity_shape : tuple
+#         Shape of the sparsity pattern of the jacobian.
+#     color_iter : iterator
+#         Iterator over columns for each color.
+#     direction : str
+#         Direction of the jacobian to expand.
 
-    Returns
-    -------
-    csc_matrix
-        Matrix to expand a colored jacobian to an expanded colored jacobian.
-    """
-    # Ic looks like an identity matrix (ncols x nncols for fwd) with all columns corresponding
-    # to the same color being summed together and combined into a single column.
-    # Ic = csc_matrix((np.array([]), (np.array([], dtype=np.int), np.array([], dtype=np.int))),
-    #                 shape=(I.shape[1], np.unique(color_array).size))
-    Ic_rows = []
-    Ic_cols = []
-    ncolors = 0
-    for c, cols in enumerate(color_iter):
-        ncolors += 1
-        for col in cols:
-            Ic_cols.append(c)
-            Ic_rows.append(col)
+#     Returns
+#     -------
+#     csc_matrix
+#         Matrix to expand a colored jacobian to an expanded colored jacobian.
+#     """
+#     # Ic looks like an identity matrix (ncols x ncols for fwd) with all columns corresponding
+#     # to the same color being summed together and combined into a single column.
+#     # Ic = csc_matrix((np.array([]), (np.array([], dtype=np.int), np.array([], dtype=np.int))),
+#     #                 shape=(I.shape[1], np.unique(color_array).size))
+#     Ic_rows = []
+#     Ic_cols = []
+#     ncolors = 0
+#     for c, cols in enumerate(color_iter):
+#         ncolors += 1
+#         for col in cols:
+#             Ic_cols.append(c)
+#             Ic_rows.append(col)
 
-    if direction == 'rev':
-        Ic_cols, Ic_rows = Ic_rows, Ic_cols
-        nrows = ncolors
-        ncolors = sparsity_shape[0]
-    else:
-        nrows = sparsity_shape[1]
+#     if direction == 'rev':
+#         Ic_cols, Ic_rows = Ic_rows, Ic_cols
+#         nrows = ncolors
+#         ncolors = sparsity_shape[0]
+#     else:
+#         nrows = sparsity_shape[1]
 
-    Ic = coo_matrix((np.ones(len(Ic_rows)), (Ic_rows, Ic_cols)),
-                    shape=(nrows, ncolors)).T
+#     Ic = coo_matrix((np.ones(len(Ic_rows)), (Ic_rows, Ic_cols)),
+#                     shape=(nrows, ncolors)).T
 
-    if direction == 'fwd':
-        return Ic.tocsc()
-    else:
-        return Ic.tocsr()
+#     if direction == 'fwd':
+#         return Ic.tocsc()
+#     else:
+#         return Ic.tocsr()
 
 
-def colored2full_jac(Jc, sparsity, color_iter, direction):
-    """
-    Expand a colored jacobian to a full jacobian.
+# def colored2full_jac(Jc, sparsity, color_array, direction):
+#     """
+#     Expand a colored jacobian to a full jacobian.
 
-    Parameters
-    ----------
-    Jc : csc_matrix
-        Colored jacobian.
-    sparsity : csc_matrix
-        Sparsity pattern of the jacobian.
-    color_iter : iterator
-        Iterator over columns for each color.
-    direction : str
-        Direction of the jacobian to expand.
+#     Parameters
+#     ----------
+#     Jc : csc_matrix
+#         Colored jacobian.
+#     sparsity : csc_matrix
+#         Sparsity pattern of the jacobian.
+#     color_array : ndarray
+#         Array of colors. In fwd mode, this will be an array of length ncols with the color for
+#         each column. In rev mode, this will be an array of length nrows with the color for each row.
+#     direction : str
+#         Direction of the jacobian to expand.
 
-    Returns
-    -------
-    csc_matrix
-        Full jacobian.
-    """
-    X = _get_expander_matrix(sparsity.shape, color_iter, direction).toarray()
-    if direction == 'fwd':
-        return np.where(sparsity, Jc @ X, 0.)
-    else:
-        return np.where(sparsity, X @ Jc, 0.)
+#     Returns
+#     -------
+#     csc_matrix
+#         Full jacobian.
+#     """
+    # X = _get_expander_matrix(sparsity.shape, color_iter, direction).toarray()
+    # if direction == 'fwd':
+    #     return np.where(sparsity, Jc @ X, 0.)
+    # else:
+    #     return np.where(sparsity, X @ Jc, 0.)
 
 
 def _order_by_ID(col_adj_matrix):
@@ -2335,7 +2384,7 @@ def _order_by_ID(col_adj_matrix):
     colored_degrees = np.zeros(ncols, dtype=INT_DTYPE)
     colored_degrees[col_adj_matrix.indices] = 1  # make sure zero cols aren't considered
 
-    for i in range(np.nonzero(colored_degrees)[0].size):
+    for _ in range(np.nonzero(colored_degrees)[0].size):
         col = colored_degrees.argmax()
         colnzrows = col_adj_matrix.getcol(col).indices
         colored_degrees[colnzrows] += 1
@@ -2599,7 +2648,8 @@ def _color_partition(J, Jprows, Jpcols, direct=True, overlap=None):
     Jpcols : ndarray
         Nonzero columns of a partition of the matrix being colored.
     direct : bool
-        If True, use the direct method to compute the column adjacency matrix.
+        If True, use the direct method to compute the column adjacency matrix. Otherwise, use the
+        substitution method.
     overlap : set or None
         Nonzero entries indicate overlapping columns.
 

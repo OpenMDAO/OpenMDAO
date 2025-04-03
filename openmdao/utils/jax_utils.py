@@ -1169,7 +1169,7 @@ def _jax2np(J):
         return np.asarray(J).reshape(-1, J.shape[-1])
 
 
-def _uncompress_jac(self, J, direction):
+def _uncompress_jac(self, Jc, direction):
     """
     Uncompress the Jacobian using the coloring information.
 
@@ -1177,8 +1177,8 @@ def _uncompress_jac(self, J, direction):
     ----------
     self : Component
         The component to uncompress the Jacobian for.
-    J : ndarray
-        The Jacobian to uncompress.
+    Jc : ndarray
+        The compressedJacobian.
     direction : str
         The direction to uncompress the Jacobian in.
 
@@ -1188,8 +1188,8 @@ def _uncompress_jac(self, J, direction):
         The uncompressed Jacobian.
     """
     if self._coloring_info.coloring is not None:
-        return self._coloring_info.coloring.expand_jac(J, direction)
-    return J
+        return self._coloring_info.coloring.expand_jac(Jc, direction)
+    return Jc
 
 
 def _jax_derivs2partials(self, deriv_vals, partials, ofnames, wrtnames):
