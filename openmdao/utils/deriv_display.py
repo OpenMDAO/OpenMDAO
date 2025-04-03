@@ -315,7 +315,9 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
             if system.get_reports_dir().is_dir():
                 report = system.get_reports_dir() / report_name
                 with open(report, mode='w', encoding="utf-8") as file:
-                    file.write(f'<html><body>\n{sys_buffer.getvalue()}\n</body></html>')
+                    file.write('<html><body><pre>'
+                               f'\n{sys_buffer.getvalue()}'
+                               '\n</pre></body></html>')
 
 
 def _print_tv(tol_violation):
@@ -506,7 +508,7 @@ def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=Fal
                 _print_deriv_table([worst_subjac[1]], headers, sys_buffer, col_meta=column_meta)
 
     if not show_only_incorrect or num_bad_jacs > 0:
-        if rich is not None:
+        if use_rich():
             c = Console(file=out_stream, force_terminal=True, record=True, soft_wrap=True)
             c.print(sys_buffer.getvalue(), highlight=False)
             if system.get_reports_dir().is_dir():
@@ -516,8 +518,10 @@ def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=Fal
             out_stream.write(sys_buffer.getvalue())
             if system.get_reports_dir().is_dir():
                 report = system.get_reports_dir() / f'check_partials-{system.pathname}.html'
-                with open(report, encoding="utf-8") as file:
-                    file.write(f'<html><body>\n{sys_buffer.getvalue()}\n</body></html>')
+                with open(report, mode='w', encoding="utf-8") as file:
+                    file.write('<html><body><pre>'
+                               f'\n{sys_buffer.getvalue()}'
+                               '\n</pre></body></html>')
 
     if worst_subjac is None:
         return None
@@ -686,7 +690,7 @@ class _JacFormatter:
         # Default output, no format.
         s = f'{x: .12e}'
 
-        if self._shape is not None and rich is not None:
+        if self._shape is not None and use_rich():
             rich_fmt = set()
             if (Jref is not None and atol is not None and rtol is not None):
                 _, _, tol_viol, _, _ = get_tol_violation(x, Jref[i, j], atol, rtol)
