@@ -794,8 +794,7 @@ class Coloring(object):
         """
         Return the color array for the given direction.
 
-        In fwd mode, this will be an array of length ncols with the color for each column.
-        In rev mode, this will be an array of length nrows with the color for each row.
+        The size of the array is the number of nonzero values in the sparsity matrix.
 
         Parameters
         ----------
@@ -810,17 +809,18 @@ class Coloring(object):
         if direction not in self._color_array:
             if direction == 'fwd':
                 color_array = np.zeros(self._shape[1], dtype=int)
-                it = self._fwd[0]
+                for i, color_list in enumerate(self._fwd[0]):
+                    color_array[color_list] = i
+                colors_nz = color_array[self._nzcols]
             elif direction == 'rev':
                 color_array = np.zeros(self._shape[0], dtype=int)
-                it = self._rev[0]
+                for i, color_list in enumerate(self._rev[0]):
+                    color_array[color_list] = i
+                colors_nz = color_array[self._nzrows]
             else:
                 raise RuntimeError(f"Invalid direction '{direction}' in get_color_array.")
 
-            for i, color_list in enumerate(it):
-                color_array[color_list] = i
-
-            self._color_array[direction] = color_array
+            self._color_array[direction] = colors_nz
 
         return self._color_array[direction]
 
@@ -894,16 +894,11 @@ class Coloring(object):
         ndarray
             The full jacobian.
         """
+        colors_coo = self.get_color_array(direction)
         if direction == 'fwd':
-            C = self.get_color_array(direction)
-            colors_coo = C[self._nzcols]
             data = compressed_j[self._nzrows, colors_coo]
         elif direction == 'rev':
-            R = self.get_color_array(direction)
-            colors_coo = R[self._nzrows]
             data = compressed_j[colors_coo, self._nzcols]
-        else:
-            raise RuntimeError(f"Invalid direction '{direction}' in expand_jac.")
 
         return coo_matrix((data, (self._nzrows, self._nzcols)), shape=self._shape).toarray()
 
