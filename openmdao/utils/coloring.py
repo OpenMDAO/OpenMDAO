@@ -701,8 +701,6 @@ class Coloring(object):
         List of subtraction tuples. Only used for the substitution method of bidirectional coloring.
     _color_arrays : dict
         Dictionary of color arrays for each direction.
-    _expanded_cscs : dict
-        Dictionary of expanded csc matrices for each direction.
     """
 
     def __init__(self, sparsity, row_vars=None, row_var_sizes=None, col_vars=None,
@@ -740,7 +738,6 @@ class Coloring(object):
         self._abs2prom = None
         self._subtractions = None
         self._color_arrays = {}
-        self._expanded_cscs = {}
 
     def get_renamed_copy(self, row_translate, col_translate):
         """
