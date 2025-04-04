@@ -11,7 +11,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.jax_utils import jax, jit, \
     _jax_register_pytree_class, _compute_sparsity, get_vmap_tangents, \
-    _update_subjac_sparsity, _jax_derivs2partials, _uncompress_jac, _jax2np, \
+    _update_subjac_sparsity, _jax_derivs2partials, _jax2np, \
     _ensure_returns_tuple, _compute_output_shapes, _update_add_input_kwargs, \
     _update_add_output_kwargs, _get_differentiable_compute_primal, _re_init
 from openmdao.utils.code_utils import get_return_names, get_function_deps
@@ -385,7 +385,12 @@ class JaxExplicitComponent(ExplicitComponent):
             The partials to compute.
         """
         J = self._jac_func_(self._tangents['fwd'], tuple(inputs.values()))
-        partials.set_dense_jac(self, _uncompress_jac(self, _jax2np(J), 'fwd'))
+        J = _jax2np(J)
+        if self._coloring_info.coloring is not None:
+            J = self._coloring_info.coloring._expand_jac(J, 'fwd')
+            partials.set_csc_jac(self, J)
+        else:
+            partials.set_dense_jac(self, J)
 
     def _jacrev_colored(self, inputs, partials):
         """
@@ -399,7 +404,12 @@ class JaxExplicitComponent(ExplicitComponent):
             The partials to compute.
         """
         J = self._jac_func_(self._tangents['rev'], tuple(inputs.values()))
-        partials.set_dense_jac(self, _uncompress_jac(self, _jax2np(J).T, 'rev'))
+        J = _jax2np(J).T
+        if self._coloring_info.coloring is not None:
+            J = self._coloring_info.coloring._expand_jac(J, 'rev')
+            partials.set_csc_jac(self, J)
+        else:
+            partials.set_dense_jac(self, J)
 
     def compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9):
         """
