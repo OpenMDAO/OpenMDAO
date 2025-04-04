@@ -387,7 +387,7 @@ class JaxExplicitComponent(ExplicitComponent):
         J = self._jac_func_(self._tangents['fwd'], tuple(inputs.values()))
         J = _jax2np(J)
         if self._coloring_info.coloring is not None:
-            J = self._coloring_info.coloring.expand_jac(J, 'fwd')
+            J = self._coloring_info.coloring._expand_jac(J, 'fwd')
             partials.set_csc_jac(self, J)
         else:
             partials.set_dense_jac(self, J)
@@ -406,7 +406,7 @@ class JaxExplicitComponent(ExplicitComponent):
         J = self._jac_func_(self._tangents['rev'], tuple(inputs.values()))
         J = _jax2np(J).T
         if self._coloring_info.coloring is not None:
-            J = self._coloring_info.coloring.expand_jac(J, 'rev')
+            J = self._coloring_info.coloring._expand_jac(J, 'rev')
             partials.set_csc_jac(self, J)
         else:
             partials.set_dense_jac(self, J)

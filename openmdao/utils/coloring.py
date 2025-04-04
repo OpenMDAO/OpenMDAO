@@ -790,7 +790,7 @@ class Coloring(object):
 
         yield from colors
 
-    def get_color_array(self, direction):
+    def _get_color_array(self, direction):
         """
         Return the color array for the given direction.
 
@@ -818,7 +818,7 @@ class Coloring(object):
                     color_array[color_list] = i
                 colors_nz = color_array[self._nzrows]
             else:
-                raise RuntimeError(f"Invalid direction '{direction}' in get_color_array.")
+                raise RuntimeError(f"Invalid direction '{direction}' in _get_color_array.")
 
             self._color_arrays[direction] = colors_nz
 
@@ -878,7 +878,7 @@ class Coloring(object):
                 for jac_irow, nzpart in zip(nzs, nzparts):
                     yield compressed_j[i, nzpart], nzpart, jac_irow
 
-    def expand_jac(self, compressed_j, direction):
+    def _expand_jac(self, compressed_j, direction):
         """
         Expand the given compressed dense jacobian into a full CSC jacobian.
 
@@ -894,7 +894,7 @@ class Coloring(object):
         csc_matrix
             The full jacobian.
         """
-        colors_coo = self.get_color_array(direction)
+        colors_coo = self._get_color_array(direction)
         if direction == 'fwd':
             data = compressed_j[self._nzrows, colors_coo]
         elif direction == 'rev':
