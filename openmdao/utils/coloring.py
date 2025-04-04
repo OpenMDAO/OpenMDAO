@@ -699,8 +699,10 @@ class Coloring(object):
         Dictionary mapping absolute names to promoted names.
     _subtractions : list
         List of subtraction tuples. Only used for the substitution method of bidirectional coloring.
-    _color_array : dict
+    _color_arrays : dict
         Dictionary of color arrays for each direction.
+    _expanded_cscs : dict
+        Dictionary of expanded csc matrices for each direction.
     """
 
     def __init__(self, sparsity, row_vars=None, row_var_sizes=None, col_vars=None,
@@ -737,7 +739,8 @@ class Coloring(object):
 
         self._abs2prom = None
         self._subtractions = None
-        self._color_array = {}
+        self._color_arrays = {}
+        self._expanded_cscs = {}
 
     def get_renamed_copy(self, row_translate, col_translate):
         """
@@ -806,7 +809,7 @@ class Coloring(object):
         ndarray
             Color array for the given direction.
         """
-        if direction not in self._color_array:
+        if direction not in self._color_arrays:
             if direction == 'fwd':
                 color_array = np.zeros(self._shape[1], dtype=int)
                 for i, color_list in enumerate(self._fwd[0]):
@@ -820,9 +823,9 @@ class Coloring(object):
             else:
                 raise RuntimeError(f"Invalid direction '{direction}' in get_color_array.")
 
-            self._color_array[direction] = colors_nz
+            self._color_arrays[direction] = colors_nz
 
-        return self._color_array[direction]
+        return self._color_arrays[direction]
 
     def color_nonzero_iter(self, direction):
         """
@@ -880,7 +883,7 @@ class Coloring(object):
 
     def expand_jac(self, compressed_j, direction):
         """
-        Expand the given compressed jacobian into a full jacobian.
+        Expand the given compressed dense jacobian into a full CSC jacobian.
 
         Parameters
         ----------
@@ -891,7 +894,7 @@ class Coloring(object):
 
         Returns
         -------
-        ndarray
+        csc_matrix
             The full jacobian.
         """
         colors_coo = self.get_color_array(direction)
@@ -900,7 +903,10 @@ class Coloring(object):
         elif direction == 'rev':
             data = compressed_j[colors_coo, self._nzcols]
 
-        return coo_matrix((data, (self._nzrows, self._nzcols)), shape=self._shape).toarray()
+        # I tried caching the csc matrix and just swapping out .data, but it caused
+        # check_partials failures in our tests.  I'm not sure why, because _nzrows, _nzcols,
+        # _shape, and coo_colors shouldn't change for a given direction.
+        return csc_matrix((data, (self._nzrows, self._nzcols)), shape=self._shape)
 
     def get_row_col_map(self, direction):
         """
