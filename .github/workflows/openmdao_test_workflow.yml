@@ -1,4 +1,3 @@
-# Run OpenMDAO Tests
 name: OpenMDAO Tests
 
 on:
