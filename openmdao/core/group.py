@@ -40,7 +40,7 @@ from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOption
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.utils.name_maps import NameResolver
+from openmdao.utils.name_maps import NameResolver, LOCAL, CONTINUOUS, DISTRIBUTED
 
 # regex to check for valid names.
 import re
@@ -891,12 +891,12 @@ class Group(System):
         resolver = self._resolver
         for direction in ('input', 'output'):
             isout = direction == 'output'
-            for vname, (_, info) in resolver.info_iter(direction):
-                graph.add_node(vname, type_=direction, local=info.local)
+            for vname, flags in resolver.flags_iter(direction):
+                graph.add_node(vname, type_=direction, local=bool(flags & LOCAL))
 
                 comp = vname.rpartition('.')[0]
                 if comp not in empty_comps:
-                    graph.add_node(comp, local=info.local)
+                    graph.add_node(comp, local=bool(flags & LOCAL))
                     empty_comps.add(comp)
 
                 if isout:
@@ -1747,11 +1747,11 @@ class Group(System):
                         prom_name = sub_prefix + sub_prom
 
                     for abs_name in sub_abs:
-                        _, info = subsys._resolver.info(abs_name, io)
+                        flags = subsys._resolver.flags(abs_name, io)
                         resolver.add_mapping(abs_name, prom_name, io,
-                                             local=info.local,
-                                             continuous=info.continuous,
-                                             distributed=info.distributed)
+                                             local=flags & LOCAL,
+                                             continuous=flags & CONTINUOUS,
+                                             distributed=flags & DISTRIBUTED)
 
             if isinstance(subsys, Group):
                 # propagate any subsystem 'set_input_defaults' info up to this Group
@@ -1935,9 +1935,8 @@ class Group(System):
                                         sub = self._get_subsystem(common)
                                         if sub is not None:
                                             for a in resolver.absnames(prom, 'input'):
-                                                if sub._resolver.is_abs(a, 'input', local=True):
-                                                    prom = sub._resolver.abs2prom(a, 'input',
-                                                                                  local=True)
+                                                if sub._resolver.is_local(a, 'input'):
+                                                    prom = sub._resolver.abs2prom(a, 'input')
                                                     break
 
                                     gname = f"Group named '{common}'" if common else 'model'
@@ -2017,7 +2016,7 @@ class Group(System):
             myproc = self.comm.rank
             nprocs = self.comm.size
 
-            respinfo = self._resolver.info
+            respflags = self._resolver.flags
             for io in ('input', 'output'):
                 abs2meta = self._var_allprocs_abs2meta[io]
 
@@ -2025,8 +2024,7 @@ class Group(System):
                 sorted_names = sorted(self._resolver.abs_iter(io))
                 locality = np.zeros((nprocs, len(sorted_names)), dtype=bool)
                 for i, name in enumerate(sorted_names):
-                    _, info = respinfo(name, io)
-                    if info.local:
+                    if respflags(name, io) & LOCAL:
                         locality[myproc, i] = True
 
                 my_loc = locality[myproc, :].copy()
@@ -4698,7 +4696,7 @@ class Group(System):
                     prom2auto[prom] = (ivc_name, abs_in)
                     conns[abs_in] = ivc_name
 
-                    if resolver.is_abs(abs_in, 'input', local=True):  # var is local
+                    if resolver.is_local(abs_in, 'input'):  # var is local
                         val = self._var_discrete['input'][abs_in]['val']
                     else:
                         val = None
@@ -5269,7 +5267,7 @@ class Group(System):
                     active_dvs[meta['source']] = meta.copy()
 
         is_prom = self._resolver.is_prom
-        is_abs = self._resolver.is_abs
+        is_local = self._resolver.is_local
 
         for name, meta in active_dvs.items():
             if meta is None:
@@ -5288,7 +5286,7 @@ class Group(System):
 
                 active_dvs[name] = meta
 
-            meta['remote'] = not is_abs(meta['source'], 'output', local=True)
+            meta['remote'] = not is_local(meta['source'], 'output')
 
         return active_dvs
 
@@ -5324,7 +5322,7 @@ class Group(System):
                 if name in active_resps:
                     active_resps[name] = meta.copy()
 
-        is_abs = self._resolver.is_abs
+        is_local = self._resolver.is_local
 
         for name, meta in active_resps.items():
             if meta is None:
@@ -5341,7 +5339,7 @@ class Group(System):
                 self._update_response_meta(meta, get_size=True)
                 active_resps[name] = meta
 
-            meta['remote'] = not is_abs(meta['source'], 'output', local=True)
+            meta['remote'] = not is_local(meta['source'], 'output')
 
         return active_resps
 

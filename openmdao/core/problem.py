@@ -56,6 +56,7 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_d
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.file_utils import _get_outputs_dir, text2html, _get_work_dir
 from openmdao.utils.testing_utils import _fix_comp_check_data
+from openmdao.utils.name_maps import DISTRIBUTED
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -469,8 +470,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             sub = self.model._get_subsystem(name)
             return sub is not None and sub._is_local
 
-        # variable exists, but may be remote
-        return self.model._resolver.is_abs(abs_name, local=True)
+        return self.model._resolver.is_local(abs_name)
 
     @property
     def _recording_iter(self):
@@ -1951,9 +1951,9 @@ class Problem(object, metaclass=ProblemMetaclass):
             for col_name in col_names:
                 if col_name == 'name':
                     if show_promoted_name:
-                        if resolver.is_abs(vname, 'input', local=True):
+                        if resolver.is_local(vname, 'input'):
                             row[col_name] = resolver.abs2prom(vname, 'input')
-                        elif resolver.is_abs(vname, 'output', local=True):
+                        elif resolver.is_local(vname, 'output'):
                             row[col_name] = resolver.abs2prom(vname, 'output')
                         else:
                             # Promoted auto_ivc name. Keep it promoted
@@ -2088,7 +2088,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                     else:
                         val = case.inputs[abs_name]
 
-                    if model.comm.size > 1 and resolver.info(abs_name, 'input')[1].distributed:
+                    if model.comm.size > 1 and resolver.flags(abs_name, 'input') & DISTRIBUTED:
                         sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
                         model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                     else:
@@ -2112,7 +2112,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                         if set_later(abs_name):
                             continue
 
-                        if model.comm.size > 1 and resolver.info(abs_name)[1].distributed:
+                        if model.comm.size > 1 and resolver.flags(abs_name) & DISTRIBUTED:
                             sizes = model._var_sizes['output'][:, abs2idx[abs_name]]
                             model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                         else:

@@ -17,8 +17,7 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.utils.units import simplify_unit
-from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, \
-    rel_key2abs_key
+from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_key2abs_key
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, sparsity_diff_viz
 from openmdao.utils.deriv_display import _deriv_display, _deriv_display_compact
@@ -293,8 +292,8 @@ class Component(System):
             for prom_name in self._var_rel_names[io]:
                 abs_name = prefix + prom_name
                 abs2meta[abs_name] = metadata = self._var_rel2meta[prom_name]
-                self._resolver.add_mapping(abs_name, prom_name, io, local=True,
-                                           distributed=metadata['distributed'])
+                self._resolver.add_mapping(abs_name, prom_name, io,
+                                           local=True, distributed=metadata['distributed'])
 
                 allprocs_abs2meta[abs_name] = {
                     meta_name: metadata[meta_name]
@@ -306,8 +305,8 @@ class Component(System):
 
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
-                self._resolver.add_mapping(abs_name, prom_name, io, local=True,
-                                           continuous=False)
+                self._resolver.add_mapping(abs_name, prom_name, io,
+                                           local=True, continuous=False)
 
                 # Compute allprocs_discrete (metadata for discrete vars)
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
@@ -1834,7 +1833,7 @@ class Component(System):
                             else:
                                 meta['src_indices'] = inds = inds.copy()
                                 inds.set_src_shape(shape)
-                                self._var_prom2inds[abs2prom(tgt, iotype='input', local=True)] = \
+                                self._var_prom2inds[abs2prom(tgt, iotype='input')] = \
                                     [shape, inds, flat]
                         except Exception:
                             type_exc, exc, tb = sys.exc_info()

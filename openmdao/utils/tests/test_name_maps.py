@@ -1,5 +1,5 @@
 import unittest
-from openmdao.utils.name_maps import NameResolver, _VarData
+from openmdao.utils.name_maps import NameResolver, _get_flags
 
 
 class TestNameResolver(unittest.TestCase):
@@ -25,27 +25,28 @@ class TestNameResolver(unittest.TestCase):
         self.assertEqual(resolver.msginfo, 'custom_msg')
 
     def test_add_mapping(self):
+        _, locflags = _get_flags(local=True, continuous=True, distributed=False)
         # Test adding input mapping
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.assertEqual(self.resolver._abs2prom['input']['test_system.x'], ('x', _VarData(True, True, False)))
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.assertEqual(self.resolver._abs2prom['input']['test_system.x'], ('x', locflags))
 
         # Test adding output mapping
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
-        self.assertEqual(self.resolver._abs2prom['output']['test_system.y'], ('y', _VarData(True, True, False)))
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
+        self.assertEqual(self.resolver._abs2prom['output']['test_system.y'], ('y', locflags))
 
         # Test adding distributed mapping
-        self.resolver.add_mapping('test_system.z', 'z', 'output', True, distributed=True)
-        self.assertEqual(self.resolver._abs2prom['output']['test_system.z'], ('z', _VarData(True, True, True)))
+        self.resolver.add_mapping('test_system.z', 'z', 'output', local=True, distributed=True)
+        self.assertEqual(self.resolver._abs2prom['output']['test_system.z'], ('z', _get_flags(local=True, continuous=True, distributed=True)[1]))
 
         # Test adding non-continuous mapping
-        self.resolver.add_mapping('test_system.w', 'w', 'input', True, continuous=False)
-        self.assertEqual(self.resolver._abs2prom['input']['test_system.w'], ('w', _VarData(True, False, False)))
+        self.resolver.add_mapping('test_system.w', 'w', 'input', local=True, continuous=False)
+        self.assertEqual(self.resolver._abs2prom['input']['test_system.w'], ('w', _get_flags(local=True, continuous=False)[1]))
 
     def test_populate_prom2abs(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
-        self.resolver.add_mapping('test_system.z', 'z', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
+        self.resolver.add_mapping('test_system.z', 'z', 'output', local=True)
 
         # Call _populate_prom2abs
         self.resolver._populate_prom2abs()
@@ -56,9 +57,9 @@ class TestNameResolver(unittest.TestCase):
 
     def test_abs2prom_iter_multiple(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x1', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.x2', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x1', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.x2', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test iterating over multiple absolute names
         abs2prom = list(self.resolver.abs2prom_iter('input'))
@@ -75,8 +76,8 @@ class TestNameResolver(unittest.TestCase):
         resolver = NameResolver('test_system', check_dups=True)
 
         # Add mappings with duplicate promoted names
-        resolver.add_mapping('test_system.x1', 'x', 'output', True)
-        resolver.add_mapping('test_system.x2', 'x', 'output', True)
+        resolver.add_mapping('test_system.x1', 'x', 'output', local=True)
+        resolver.add_mapping('test_system.x2', 'x', 'output', local=True)
         resolver._populate_prom2abs()
 
         # This should raise ValueError due to duplicate output names
@@ -84,8 +85,8 @@ class TestNameResolver(unittest.TestCase):
             resolver._check_dup_prom_outs()
     def test_source_with_connections(self):
         # Setup some mappings and connections
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test error for no connections
         with self.assertRaises(RuntimeError):
@@ -108,18 +109,22 @@ class TestNameResolver(unittest.TestCase):
 
     def test_prom2abs(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.v', 'v', 'input', True)
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.xx', 'x', 'input', False)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
-        self.resolver.add_mapping('test_system.z', 'z', 'output', True)
+        self.resolver.add_mapping('test_system.v', 'v', 'input', local=True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.xx', 'x', 'input', local=False)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
+        self.resolver.add_mapping('test_system.z', 'z', 'output', local=True)
 
         # Test basic conversion
         self.assertEqual(self.resolver.prom2abs('v', 'input'), 'test_system.v')
         self.assertEqual(self.resolver.prom2abs('y', 'output'), 'test_system.y')
 
-        # Test with local=False
-        self.assertEqual(self.resolver.prom2abs('x', 'input', local=False), 'test_system.xx')
+        # Test with ambiguity
+        with self.assertRaises(Exception) as ctx:
+            self.assertEqual(self.resolver.prom2abs('x', 'input'), 'test_system.xx')
+            
+        self.assertEqual(ctx.exception.args[0],
+                         "test_system: The promoted name x is invalid because it refers to multiple inputs: [test_system.x ,test_system.xx]. Access the value from the connected output variable instead.")
 
         # Test error for non-existent name
         with self.assertRaises(KeyError):
@@ -127,15 +132,15 @@ class TestNameResolver(unittest.TestCase):
 
     def test_abs2prom(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test basic conversion
         self.assertEqual(self.resolver.abs2prom('test_system.x', 'input'), 'x')
         self.assertEqual(self.resolver.abs2prom('test_system.y', 'output'), 'y')
 
         # Test with local=True
-        self.assertEqual(self.resolver.abs2prom('test_system.x', 'input', local=True), 'x')
+        self.assertEqual(self.resolver.abs2prom('test_system.x', 'input'), 'x')
 
         # Test error for non-existent name
         with self.assertRaises(KeyError):
@@ -143,24 +148,24 @@ class TestNameResolver(unittest.TestCase):
 
     def test_abs2rel(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         self.assertEqual(self.resolver.abs2rel('test_system.x'), 'x')
         self.assertEqual(self.resolver.abs2rel('test_system.y'), 'y')
 
     def test_rel2abs(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         self.assertEqual(self.resolver.rel2abs('x'), 'test_system.x')
         self.assertEqual(self.resolver.rel2abs('y'), 'test_system.y')
 
     def test_absnames(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test getting absolute names
         self.assertEqual(self.resolver.absnames('x', 'input'), ['test_system.x'])
@@ -172,8 +177,8 @@ class TestNameResolver(unittest.TestCase):
 
     def test_any2abs(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test converting various name types
         self.assertEqual(self.resolver.any2abs('x'), 'test_system.x')
@@ -187,8 +192,8 @@ class TestNameResolver(unittest.TestCase):
 
     def test_any2prom(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test converting various name types
         self.assertEqual(self.resolver.any2prom('x'), 'x')
@@ -205,8 +210,8 @@ class TestNameResolver(unittest.TestCase):
         resolver2 = NameResolver('system2')
 
         # Add mappings to both resolvers
-        resolver1.add_mapping('system1.x', 'x', 'input', True)
-        resolver2.add_mapping('system1.x', 'x', 'input', True)
+        resolver1.add_mapping('system1.x', 'x', 'input', local=True)
+        resolver2.add_mapping('system1.x', 'x', 'input', local=True)
 
         # Test converting between resolvers
         self.assertEqual(resolver1.prom2prom('x', resolver2), 'x')
@@ -216,8 +221,8 @@ class TestNameResolver(unittest.TestCase):
 
     def test_source(self):
         # Setup some mappings and connections
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test error for no connections
         with self.assertRaises(Exception):
@@ -237,8 +242,8 @@ class TestNameResolver(unittest.TestCase):
 
     def test_num_proms(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test counting promoted names
         self.assertEqual(self.resolver.num_proms(), 2)
@@ -247,8 +252,8 @@ class TestNameResolver(unittest.TestCase):
 
     def test_num_abs(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test counting absolute names
         self.assertEqual(self.resolver.num_abs(), 2)
@@ -258,8 +263,8 @@ class TestNameResolver(unittest.TestCase):
 
     def test_is_prom(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test checking promoted names
         self.assertTrue(self.resolver.is_prom('x', 'input'))
@@ -268,19 +273,19 @@ class TestNameResolver(unittest.TestCase):
 
     def test_is_abs(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test checking absolute names
         self.assertTrue(self.resolver.is_abs('test_system.x', 'input'))
         self.assertTrue(self.resolver.is_abs('test_system.y', 'output'))
         self.assertFalse(self.resolver.is_abs('nonexistent', 'input'))
-        self.assertTrue(self.resolver.is_abs('test_system.x', 'input', local=True))
+        self.assertTrue(self.resolver.is_local('test_system.x', 'input'))
 
     def test_get_abs_iotype(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test getting iotype for absolute names
         self.assertEqual(self.resolver.get_abs_iotype('test_system.x'), 'input')
@@ -293,8 +298,8 @@ class TestNameResolver(unittest.TestCase):
 
     def test_get_prom_iotype(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test getting iotype for promoted names
         self.assertEqual(self.resolver.get_prom_iotype('x'), 'input')
@@ -307,8 +312,8 @@ class TestNameResolver(unittest.TestCase):
 
     def test_iterators(self):
         # Setup some mappings
-        self.resolver.add_mapping('test_system.x', 'x', 'input', True)
-        self.resolver.add_mapping('test_system.y', 'y', 'output', True)
+        self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
+        self.resolver.add_mapping('test_system.y', 'y', 'output', local=True)
 
         # Test prom2abs_iter
         prom2abs = list(self.resolver.prom2abs_iter('input'))
@@ -326,9 +331,10 @@ class TestNameResolver(unittest.TestCase):
         abs_names = list(self.resolver.abs_iter('input'))
         self.assertEqual(abs_names, ['test_system.x'])
 
+        _, locflags = _get_flags(local=True, continuous=True, distributed=False)
         # Test info_iter
-        info = list(self.resolver.info_iter('input'))
-        self.assertEqual(info, [('test_system.x', ('x', _VarData(True, True, False)))])
+        flags = list(self.resolver.flags_iter('input'))
+        self.assertEqual(flags, [('test_system.x', locflags)])
 
 
 if __name__ == '__main__':
