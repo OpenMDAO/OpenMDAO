@@ -2950,7 +2950,7 @@ class Group(System):
 
                 # if units are defined and different, or if a connected output has any scaling,
                 # we need input scaling.
-                self._has_input_scaling = self._has_output_scaling or self._has_resid_scaling or \
+                self._has_input_scaling = self._has_output_scaling or \
                     (in_units and out_units and in_units != out_units)
 
         # check compatability for any discrete connections
