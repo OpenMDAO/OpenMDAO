@@ -422,15 +422,16 @@ class Group(System):
             'input': (0.0, 1.0),
         })
 
-        for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
-            ref0 = meta['ref0']
-            res_ref = meta['res_ref']
-            a0 = ref0
-            a1 = meta['ref'] - ref0
-            scale_factors[abs_name] = {
-                'output': (a0, a1),
-                'residual': (0.0, 1.0 if res_ref is None else res_ref),
-            }
+        if self._has_output_scaling or self._has_resid_scaling:
+            for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
+                ref0 = meta['ref0']
+                res_ref = meta['res_ref']
+                a0 = ref0
+                a1 = meta['ref'] - ref0
+                scale_factors[abs_name] = {
+                    'output': (a0, a1),
+                    'residual': (0.0, 1.0 if res_ref is None else res_ref),
+                }
 
         # Input scaling for connected inputs is added here.
         # This is a combined scale factor that includes the scaling of the connected source
