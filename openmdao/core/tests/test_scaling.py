@@ -15,6 +15,12 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 
 from openmdao.test_suite.components.unit_conv import SrcComp, TgtCompF
 
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
+from openmdao.utils.testing_utils import parameterized_name
+
 
 class PassThroughLength(om.ExplicitComponent):
     """Units/scaling test component taking length in cm and passing it through in km."""
@@ -604,7 +610,8 @@ class TestScaling(unittest.TestCase):
         prob.setup()
         prob.final_setup()
 
-    def test_scale_and_add_array_with_array(self):
+    @parameterized.expand(['fwd', 'rev'], name_func=parameterized_name)
+    def test_scale_and_add_array_with_array(self, mode):
 
         class ExpCompArrayScale(TestExplCompArrayDense):
 
@@ -635,7 +642,7 @@ class TestScaling(unittest.TestCase):
         model.add_subsystem('comp', ExpCompArrayScale())
         model.connect('p1.x', 'comp.lengths')
 
-        prob.setup()
+        prob.setup(mode=mode)
         prob['comp.widths'] = np.ones((2, 2))
         prob.run_model()
 

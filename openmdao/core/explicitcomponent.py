@@ -302,8 +302,8 @@ class ExplicitComponent(Component):
         Compute outputs. The model is assumed to be in a scaled state.
         """
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
-            with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-                self._residuals.set_val(0.0)
+            self._residuals.set_val(0.0)
+            with self._unscaled_context(outputs=[self._outputs]):
                 self._compute_wrapper()
 
             # Iteration counter is incremented in the Recording context manager at exit.
