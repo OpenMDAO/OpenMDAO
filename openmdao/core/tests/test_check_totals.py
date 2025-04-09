@@ -22,6 +22,7 @@ from openmdao.core.constants import _UNDEFINED
 import openmdao.core.total_jac as tot_jac_mod
 
 from openmdao.utils.mpi import MPI
+from openmdao.utils.rich_utils import strip_formatting
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -1214,7 +1215,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         stream = StringIO()
         assert_check_totals(p.check_totals(out_stream=stream))
-        lines = stream.getvalue().splitlines()
+        lines = [strip_formatting(s) for s in stream.getvalue().splitlines()]
 
         self.assertTrue("Full Model: 'lcy' wrt 'x' (Linear constraint)" in lines[4])
         self.assertTrue("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd)" in lines[6])
@@ -1371,7 +1372,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         stream = StringIO()
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
-        content = stream.getvalue()
+        content = strip_formatting(stream.getvalue())
 
         self.assertEqual(content.count('rev value:'), 0)
         self.assertEqual(content.count('fwd value:'), 1)
@@ -1418,7 +1419,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         stream = StringIO()
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
-        content = stream.getvalue()
+        content = strip_formatting(stream.getvalue())
 
         self.assertEqual(content.count("'comp.out' wrt (d)('comp.in',)"), 1)
         self.assertEqual(content.count('rev value:'), 1)
@@ -1444,7 +1445,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         stream = StringIO()
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
-        content = stream.getvalue()
+        content = strip_formatting(stream.getvalue())
 
         self.assertEqual(content.count("'comp.out1' wrt (d)('comp.in1', 'comp.in2')"), 1)
         self.assertEqual(content.count("'comp.out2' wrt (d)('comp.in1', 'comp.in2')"), 1)
@@ -1495,6 +1496,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         stream = StringIO()
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
         content = stream.getvalue()
+        content = strip_formatting(content)
 
         self.assertEqual(content.count("('comp.out1', 'comp.out2') wrt (d)'comp.in1'"), 1)
         self.assertEqual(content.count("('comp.out1', 'comp.out2') wrt (d)'comp.in2'"), 1)
@@ -2007,7 +2009,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
         self.assertEqual(contents.count("fd value:"), nsubjacs)
@@ -2022,7 +2024,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
         self.assertEqual(contents.count("fd value:"), nsubjacs)
@@ -2065,7 +2067,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6, 1e-7], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
         self.assertEqual(contents.count("fd value:"), nsubjacs * 2)
@@ -2078,7 +2080,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Full Model:"), 3)
         self.assertEqual(contents.count("fd value:"), 6)
         self.assertEqual(contents.count("Max Tolerance Violation ([fwd, fd] Dot Product Test), step="), 6)
@@ -2090,7 +2092,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6, 1e-7], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
         self.assertEqual(contents.count("fd value:"), nsubjacs * 2)
@@ -2103,7 +2105,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Full Model:"), 6)
         self.assertEqual(contents.count("fd value:"), 12)
         self.assertEqual(contents.count("Max Tolerance Violation ([rev, fd] Dot Product Test), step="), 12)
@@ -2117,7 +2119,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 p.run_model()
                 stream = StringIO()
                 p.check_totals(step=[1e-6, 1e-7], compact_print=True, out_stream=stream, abs_err_tol=2e-6, rel_err_tol=3e-6)
-                contents = stream.getvalue()
+                contents = strip_formatting(stream.getvalue())
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
