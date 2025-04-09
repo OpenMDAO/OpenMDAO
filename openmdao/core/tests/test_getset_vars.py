@@ -119,25 +119,25 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg = '\'<model> <class Group>: Variable "{}" not found.\''
+        msg = "\"<model> <class Group>: Could not find '{}'. Perhaps you meant one of the following variables: ['g.c.{}']\""
 
         # inputs
         with self.assertRaises(KeyError) as ctx:
             p['x'] = 5.0
-        self.assertEqual(str(ctx.exception), msg.format('x'))
+        self.assertEqual(str(ctx.exception), msg.format('x', 'x'))
 
         with self.assertRaises(KeyError) as ctx:
             p['x']
-        self.assertEqual(str(ctx.exception), msg.format('x'))
+        self.assertEqual(str(ctx.exception), msg.format('x', 'x'))
 
         # outputs
         with self.assertRaises(KeyError) as ctx:
             p['y'] = 5.0
-        self.assertEqual(str(ctx.exception), msg.format('y'))
+        self.assertEqual(str(ctx.exception), msg.format('y', 'y'))
 
         with self.assertRaises(KeyError) as ctx:
             p['y']
-        self.assertEqual(str(ctx.exception), msg.format('y'))
+        self.assertEqual(str(ctx.exception), msg.format('y', 'y'))
 
         p.final_setup()
 

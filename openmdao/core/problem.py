@@ -540,15 +540,12 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         if self._metadata['setup_status'] <= _SetupStatus.POST_SETUP2:
             abs_names = name2abs_names(self.model, name)
-            if abs_names:
-                val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
-                if not is_undefined(val):
-                    if indices is not None:
-                        val = val[indices]
-                    if units is not None:
-                        val = self.model.convert2units(name, val, simplify_unit(units))
-            else:
-                raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
+            val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
+            if not is_undefined(val):
+                if indices is not None:
+                    val = val[indices]
+                if units is not None:
+                    val = self.model.convert2units(name, val, simplify_unit(units))
         else:
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
