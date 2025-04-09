@@ -136,6 +136,15 @@ class _PromotesInfo(object):
         return mismatches
 
 
+def _chk_scale_factor(factor):
+    try:
+        if factor == (0.0, 1.0):
+            return None
+    except ValueError:
+        pass
+    return factor
+
+
 class Group(System):
     """
     Class used to group systems together; instantiate or inherit.
@@ -418,22 +427,28 @@ class Group(System):
         dict
             Mapping of each absolute var name to its corresponding scaling factor tuple.
         """
-        # make this a defaultdict to handle the case of access using unconnected inputs
-        scale_factors = defaultdict(lambda: {
-            'input': (0.0, 1.0, None, None),
-        })
+        scale_factors = {}
 
-        for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
-            ref0 = meta['ref0']
-            res_ref = meta['res_ref']
-            if res_ref is None:
-                res_ref = 1.0
-            a0 = ref0
-            a1 = meta['ref'] - ref0
-            scale_factors[abs_name] = {
-                'output': (a0, a1, None, None),
-                'residual': (0.0, res_ref, None, None),
-            }
+        if self._has_output_scaling or self._has_resid_scaling:
+            for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
+                ref0 = meta['ref0']
+                a0 = ref0
+                a1 = meta['ref'] - ref0
+                if _chk_scale_factor((a0, a1)) is not None:
+                    scale_factors[abs_name] = {'output': (a0, a1, None, None)}
+
+                res_ref = meta['res_ref']
+                try:
+                    if res_ref == 1.0:
+                        res_ref = None
+                except ValueError:
+                    pass
+
+                if res_ref is not None:
+                    if abs_name not in scale_factors:
+                        scale_factors[abs_name] = {'residual': (0.0, res_ref, None, None)}
+                    else:
+                        scale_factors[abs_name]['residual'] = (0.0, res_ref, None, None)
 
         # Input scaling for connected inputs is added here.
         # This is a combined scale factor that includes the scaling of the connected source
@@ -468,6 +483,9 @@ class Group(System):
 
                 if not has_scaling and not has_unit_conv:
                     continue
+
+                units_in = meta_in['units']
+                units_out = src_meta['units']
 
                 src_indices = meta_in['src_indices']
 
@@ -508,9 +526,16 @@ class Group(System):
                 #   b1 = d0 + d1 a1 - d0
                 #   b1 = g(a1) - g(0)
 
-                if has_unit_conv:
-                    a0 = ref0
-                    a1 = ref - ref0
+                a0 = ref0
+                a1 = ref - ref0
+
+                if units_in is None or units_out is None or units_in == units_out:
+                    if _chk_scale_factor((a0, a1)) is None:
+                        continue
+                    # No unit conversion, only scaling. Just send the scale factors.
+                    scale_factors[abs_in] = {'input': (a0, a1, None, None)}
+                else:
+                    factor, offset = unit_conversion(units_out, units_in)
 
                     # Send both unit scaling and solver scaling. Linear input vectors need to
                     # treat them differently in reverse mode.
@@ -518,12 +543,6 @@ class Group(System):
 
                     # For adder allocation check.
                     a0 = (ref0 + offset) * factor
-                else:
-                    a0 = ref0
-                    a1 = ref - ref0
-
-                    # No unit conversion, only scaling. Just send the scale factors.
-                    scale_factors[abs_in] = {'input': (a0, a1, None, None)}
 
                 # Check whether we need to allocate an adder for the input vector.
                 self._has_input_adder |= np.any(np.asarray(a0))
@@ -2917,7 +2936,7 @@ class Group(System):
 
                 # if units are defined and different, or if a connected output has any scaling,
                 # we need input scaling.
-                self._has_input_scaling = self._has_output_scaling or self._has_resid_scaling or \
+                self._has_input_scaling = self._has_output_scaling or \
                     (in_units and out_units and in_units != out_units)
 
         # check compatability for any discrete connections
@@ -3070,18 +3089,19 @@ class Group(System):
 
         if mode == 'fwd':
             if xfer is not None:
-                if self._has_input_scaling:
+                if xfer._has_input_scaling:
                     vec_inputs.scale_to_norm()
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
                     vec_inputs.scale_to_phys()
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(sub)
 
         else:  # rev
             if xfer is not None:
-                if self._has_input_scaling:
+                if xfer._has_input_scaling:
                     vec_inputs.scale_to_norm(mode='rev')
 
                 xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
@@ -3092,7 +3112,7 @@ class Group(System):
                         xfer = self._transfers['rev'][key]
                         xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
-                if self._has_input_scaling:
+                if xfer._has_input_scaling:
                     vec_inputs.scale_to_phys(mode='rev')
 
     def _discrete_transfer(self, sub):

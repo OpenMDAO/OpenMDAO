@@ -357,7 +357,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
             "self.declare_partials(of='g', wrt='x', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
             "self.declare_partials(of='g', wrt='y', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
         ]
-        decl_partials_calls = partial_coloring.get_declare_partials_calls().strip()
+        with printoptions(legacy="1.13"):
+            decl_partials_calls = partial_coloring.get_declare_partials_calls().strip()
         for i, d in enumerate(decl_partials_calls.split('\n')):
             self.assertEqual(d.strip(), expected[i])
 
@@ -569,7 +570,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False,
                           dynamic_total_coloring=True, debug_print=['totals'])
 
-        failed, output = run_driver(p_color)
+        with printoptions(legacy="1.13"):
+            failed, output = run_driver(p_color)
 
         self.assertFalse(failed, "Optimization failed.")
 
@@ -587,7 +589,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
                           dynamic_total_coloring=True, debug_print=['totals'])
 
-        failed, output = run_driver(p_color)
+        with printoptions(legacy="1.13"):
+            failed, output = run_driver(p_color)
 
         self.assertFalse(failed, "Optimization failed.")
 

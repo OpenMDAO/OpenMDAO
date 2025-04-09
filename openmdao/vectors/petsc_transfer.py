@@ -37,6 +37,8 @@ else:
             Input indices for the transfer.
         out_inds : int ndarray
             Output indices for the transfer.
+        has_input_scaling : bool
+            Whether any of the inputs has scaling.
         comm : MPI.Comm or <FakeComm>
             Communicator of the system that owns this transfer.
 
@@ -46,11 +48,11 @@ else:
             Method that performs a PETSc scatter.
         """
 
-        def __init__(self, in_vec, out_vec, in_inds, out_inds, comm):
+        def __init__(self, in_vec, out_vec, in_inds, out_inds, has_input_scaling, comm):
             """
             Initialize all attributes.
             """
-            super().__init__(in_vec, out_vec, in_inds, out_inds)
+            super().__init__(in_vec, out_vec, in_inds, out_inds, has_input_scaling)
             in_indexset = PETSc.IS().createGeneral(self._in_inds, comm=comm)
             out_indexset = PETSc.IS().createGeneral(self._out_inds, comm=comm)
 
@@ -97,6 +99,9 @@ else:
 
             total_len = 0
 
+            scaled_in_set = set()
+            scale_factors = group._problem_meta['model_ref']()._scale_factors
+
             # Loop through all connections owned by this system
             for abs_in, abs_out in group._conn_abs_in2out.items():
                 sub_in = abs_in[mypathlen:].partition('.')[0]
@@ -111,6 +116,11 @@ else:
 
                     total_len += len(input_inds)
 
+                    if scale_factors is not None and abs_in in scale_factors:
+                        factors = scale_factors[abs_in]
+                        if 'input' in factors:
+                            scaled_in_set.add(sub_in)
+
                     xfer_in[sub_in].append(input_inds)
                     xfer_out[sub_in].append(output_inds)
                 else:
@@ -124,13 +134,15 @@ else:
                 # full transfer (transfer to all subsystems at once)
                 transfers[None] = PETScTransfer(group._vectors['input']['nonlinear'],
                                                 group._vectors['output']['nonlinear'],
-                                                full_xfer_in, full_xfer_out, group._comm)
+                                                full_xfer_in, full_xfer_out, len(scaled_in_set) > 0,
+                                                group._comm)
 
                 # transfers to individual subsystems
                 for sname, inds in xfer_in.items():
                     transfers[sname] = PETScTransfer(group._vectors['input']['nonlinear'],
                                                      group._vectors['output']['nonlinear'],
-                                                     inds, xfer_out[sname], group._comm)
+                                                     inds, xfer_out[sname],
+                                                     sname in scaled_in_set, group._comm)
 
             return transfers
 
@@ -196,12 +208,20 @@ else:
 
             total_size = total_size_nocolor = 0
 
+            scaled_in_set = set()
+            scale_factors = group._problem_meta['model_ref']()._scale_factors
+
             # Loop through all connections owned by this system
             for abs_in, abs_out in group._conn_abs_in2out.items():
                 sub_out = abs_out[mypathlen:].partition('.')[0]
 
                 # Only continue if the input exists on this processor
                 if abs_in in abs2meta_in:
+                    if scale_factors is not None and abs_in in scale_factors:
+                        factors = scale_factors[abs_in]
+                        if 'input' in factors:
+                            scaled_in_set.add(sub_out)
+
                     meta_in = abs2meta_in[abs_in]
                     idx_in = allprocs_abs2idx[abs_in]
                     idx_out = allprocs_abs2idx[abs_out]
@@ -311,13 +331,15 @@ else:
             transfers = {
                 None: PETScTransfer(vectors['input']['nonlinear'],
                                     vectors['output']['nonlinear'],
-                                    full_xfer_in, full_xfer_out, group._comm)
+                                    full_xfer_in, full_xfer_out, len(scaled_in_set) > 0,
+                                    group._comm)
             }
 
             for sname, inds in xfer_out.items():
                 transfers[sname] = PETScTransfer(vectors['input']['nonlinear'],
                                                  vectors['output']['nonlinear'],
-                                                 xfer_in[sname], inds, group._comm)
+                                                 xfer_in[sname], inds, sname in scaled_in_set,
+                                                 group._comm)
 
             if has_par_coloring:
                 has_nocolor_xfers = group._comm.allreduce(has_nocolor_xfers)
@@ -329,13 +351,15 @@ else:
                     transfers[(None, '@nocolor')] = PETScTransfer(vectors['input']['nonlinear'],
                                                                   vectors['output']['nonlinear'],
                                                                   full_xfer_in, full_xfer_out,
+                                                                  len(scaled_in_set) > 0,
                                                                   group._comm)
 
                     for sname, inds in xfer_out_nocolor.items():
                         transfers[(sname, '@nocolor')] = \
                             PETScTransfer(vectors['input']['nonlinear'],
                                           vectors['output']['nonlinear'],
-                                          xfer_in_nocolor[sname], inds, group._comm)
+                                          xfer_in_nocolor[sname], inds,
+                                          sname in scaled_in_set, group._comm)
 
             return transfers
 

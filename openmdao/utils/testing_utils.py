@@ -369,6 +369,11 @@ def compare_prob_vs_comp_check_partials(probdata, compdata, comp):
 
             if key2 in ('J_fd', 'J_fwd', 'denom_idx'):
                 assert_near_equal(probval2, compval2, 1e-6, 1e-6)
+            elif key2 in ('rows', 'cols'):
+                if probval2 is None:
+                    assert probval2 is compval2
+                else:
+                    assert np.all(probval2 == compval2)
             else:
                 for i in range(3):
                     p = probval2[i]

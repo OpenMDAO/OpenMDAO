@@ -302,8 +302,8 @@ class ExplicitComponent(Component):
         Compute outputs. The model is assumed to be in a scaled state.
         """
         with Recording(self.pathname + '._solve_nonlinear', self.iter_count, self):
-            with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-                self._residuals.set_val(0.0)
+            self._residuals.set_val(0.0)
+            with self._unscaled_context(outputs=[self._outputs]):
                 self._compute_wrapper()
 
             # Iteration counter is incremented in the Recording context manager at exit.
@@ -529,17 +529,16 @@ class ExplicitComponent(Component):
         if self.compute_primal is None:
             return
 
-        returns = \
-            self.compute_primal(*self._get_compute_primal_invals(inputs, discrete_inputs))
+        returns = self.compute_primal(*self._get_compute_primal_invals(inputs, discrete_inputs))
 
         if not isinstance(returns, _tuplist):
             returns = (returns,)
 
-        if not discrete_outputs:
-            outputs.set_vals(returns)
-        else:
+        if discrete_outputs:
             outputs.set_vals(returns[:outputs.nvars()])
             self._discrete_outputs.set_vals(returns[outputs.nvars():])
+        else:
+            outputs.set_vals(returns)
 
     def compute_partials(self, inputs, partials, discrete_inputs=None):
         """

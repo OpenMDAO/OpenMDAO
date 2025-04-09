@@ -168,7 +168,7 @@ class Component(System):
                              'some other AD package capable of jitting is active.')
         self.options.declare('default_shape', types=tuple, default=(1,),
                              desc='Default shape for variables that do not set val to a non-scalar '
-                             'value or set shape, set shape_by_conn, copy_shape, or compute_shape.'
+                             'value or set shape, shape_by_conn, copy_shape, or compute_shape.'
                              ' Default is (1,).')
 
     def setup(self):
@@ -410,7 +410,7 @@ class Component(System):
                     raise RuntimeError(f"{self.msginfo}: compute_primal must be defined if using "
                                        "a derivs_method option of 'cs' or 'fd'")
                 # declare all partials as 'cs' or 'fd'
-                for of, wrt in get_function_deps(self.compute_primal,
+                for of, wrt in get_function_deps(self._orig_compute_primal,
                                                  self._var_rel_names['output']):
                     if of in self._discrete_outputs or wrt in self._discrete_inputs:
                         continue
@@ -867,10 +867,11 @@ class Component(System):
             self._has_output_scaling |= np.any(ref0)
             self._has_output_adder |= np.any(ref0)
 
-        if isscalar(res_ref):
-            self._has_resid_scaling |= res_ref != 1.0
-        else:
-            self._has_resid_scaling |= np.any(res_ref != 1.0)
+        if res_ref is not None:
+            if isscalar(res_ref):
+                self._has_resid_scaling |= res_ref != 1.0
+            else:
+                self._has_resid_scaling |= np.any(res_ref != 1.0)
 
         # until we get rid of component level distributed option, handle the case where
         # component distributed has been set to True but variable distributed has been set
@@ -2503,6 +2504,8 @@ class Component(System):
                     deriv['steps'] = []
                 deriv['J_fd'].append(partial)
                 deriv['steps'] = actual_steps[rel_key]
+                deriv['rows'] = subjacs_info['rows']
+                deriv['cols'] = subjacs_info['cols']
 
                 if 'uncovered_nz' in subjacs_info:
                     deriv['uncovered_nz'] = subjacs_info['uncovered_nz']

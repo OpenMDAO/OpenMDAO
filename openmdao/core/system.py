@@ -907,10 +907,11 @@ class System(object, metaclass=SystemMetaclass):
                     subsys._has_output_adder |= np.any(ref0)
 
                 res_ref = metadata['res_ref']
-                if np.isscalar(res_ref):
-                    subsys._has_resid_scaling |= res_ref != 1.0
-                else:
-                    subsys._has_resid_scaling |= np.any(res_ref != 1.0)
+                if res_ref is not None:
+                    if np.isscalar(res_ref):
+                        subsys._has_resid_scaling |= res_ref != 1.0
+                    else:
+                        subsys._has_resid_scaling |= np.any(res_ref != 1.0)
 
                 if metadata['lower'] is not None or metadata['upper'] is not None:
                     subsys._has_bounds = True
@@ -2304,7 +2305,7 @@ class System(object, metaclass=SystemMetaclass):
                     raise RuntimeError(msg.format(self.msginfo, name, var_units, units))
 
                 # Derivation of the total scaler and total adder for design variables:
-                # Given based design variable value y
+                # Given base design variable value y
                 # First we apply the desired unit conversion
                 # y_in_desired_units = unit_scaler * (y + unit_adder)
                 # Then we apply the user-declared scaling

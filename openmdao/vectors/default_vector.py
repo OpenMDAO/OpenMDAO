@@ -113,29 +113,32 @@ class DefaultVector(Vector):
         start = end = 0
         for abs_name, vinfo in self._views.items():
             end += vinfo.size
-            a0, a1, factor, offset = factors[abs_name][kind]
+            if abs_name in factors:
+                factor = factors[abs_name]
+                if kind in factor:
+                    a0, a1, factor, offset = factor[kind]
 
-            if factor is not None:
-                # Linear input vectors need to be able to handle the unit and solver scaling in
-                # opposite directions in reverse mode.
+                    if factor is not None:
+                        # Linear input vectors need to be able to handle the unit and solver scaling
+                        # in opposite directions in reverse mode.
 
-                if islinear:
-                    scale0 = None
-                    scale1 = factor / a1
-                else:
-                    scale0 = (a0 + offset) * factor
-                    scale1 = a1 * factor
-            else:
-                if islinear and isinput:
-                    scale0 = None
-                    scale1 = 1.0 / a1
-                else:
-                    scale0 = a0
-                    scale1 = a1
+                        if islinear:
+                            scale0 = None
+                            scale1 = factor / a1
+                        else:
+                            scale0 = (a0 + offset) * factor
+                            scale1 = a1 * factor
+                    else:
+                        if islinear and isinput:
+                            scale0 = None
+                            scale1 = 1.0 / a1
+                        else:
+                            scale0 = a0
+                            scale1 = a1
 
-            if adder_array is not None:
-                adder_array[start:end] = scale0
-            scaler_array[start:end] = scale1
+                    if adder_array is not None:
+                        adder_array[start:end] = scale0
+                    scaler_array[start:end] = scale1
 
             start = end
 
