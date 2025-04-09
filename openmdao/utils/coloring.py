@@ -900,9 +900,6 @@ class Coloring(object):
         elif direction == 'rev':
             data = compressed_j[colors_coo, self._nzcols]
 
-        # I tried caching the csc matrix and just swapping out .data, but it caused
-        # check_partials failures in our tests.  I'm not sure why, because _nzrows, _nzcols,
-        # _shape, and coo_colors shouldn't change for a given direction.
         return csc_matrix((data, (self._nzrows, self._nzcols)), shape=self._shape)
 
     def get_row_col_map(self, direction):
