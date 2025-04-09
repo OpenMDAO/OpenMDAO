@@ -875,10 +875,11 @@ class Component(System):
             self._has_output_scaling |= np.any(ref0)
             self._has_output_adder |= np.any(ref0)
 
-        if isscalar(res_ref):
-            self._has_resid_scaling |= res_ref != 1.0
-        else:
-            self._has_resid_scaling |= np.any(res_ref != 1.0)
+        if res_ref is not None:
+            if isscalar(res_ref):
+                self._has_resid_scaling |= res_ref != 1.0
+            else:
+                self._has_resid_scaling |= np.any(res_ref != 1.0)
 
         # until we get rid of component level distributed option, handle the case where
         # component distributed has been set to True but variable distributed has been set
