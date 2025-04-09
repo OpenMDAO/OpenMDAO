@@ -231,30 +231,33 @@ class DefaultVector(Vector):
             if rel_lookup:
                 views_rel[abs_name[relstart:]] = (v, shape == ())
 
-            if do_scaling:
-                factor_tuple = factors[abs_name][kind]
+            if do_scaling and abs_name in factors:
+                factor = factors[abs_name]
+                if kind in factor:
+                    factor_tuple = factor[kind]
 
-                if len(factor_tuple) == 4:
-                    # Only input vectors can have 4 factors. Linear input vectors need to be able
-                    # to handle the unit and solver scaling in opposite directions in reverse mode.
-                    a0, a1, factor, offset = factor_tuple
+                    if len(factor_tuple) == 4:
+                        # Only input vectors can have 4 factors. Linear input vectors need to be
+                        # able to handle the unit and solver scaling in opposite directions in
+                        # reverse mode.
+                        a0, a1, factor, offset = factor_tuple
 
-                    if islinear:
-                        scale0 = None
-                        scale1 = factor / a1
+                        if islinear:
+                            scale0 = None
+                            scale1 = factor / a1
+                        else:
+                            scale0 = (a0 + offset) * factor
+                            scale1 = a1 * factor
                     else:
-                        scale0 = (a0 + offset) * factor
-                        scale1 = a1 * factor
-                else:
-                    if self._name == 'linear' and self._typ == 'input':
-                        scale0 = None
-                        scale1 = 1.0 / factor_tuple[1]
-                    else:
-                        scale0, scale1 = factor_tuple
+                        if self._name == 'linear' and self._typ == 'input':
+                            scale0 = None
+                            scale1 = 1.0 / factor_tuple[1]
+                        else:
+                            scale0, scale1 = factor_tuple
 
-                if scaling[0] is not None:
-                    scaling[0][start:end] = scale0
-                scaling[1][start:end] = scale1
+                    if scaling[0] is not None:
+                        scaling[0][start:end] = scale0
+                    scaling[1][start:end] = scale1
 
             start = end
 

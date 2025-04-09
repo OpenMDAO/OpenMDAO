@@ -15,6 +15,8 @@ class Transfer(object):
         Input indices for the transfer.
     out_inds : int ndarray
         Output indices for the transfer.
+    has_input_scaling : bool
+        Whether any of the inputs has scaling.
 
     Attributes
     ----------
@@ -22,14 +24,17 @@ class Transfer(object):
         input indices for the transfer.
     _out_inds : int ndarray
         output indices for the transfer.
+    _has_input_scaling : bool
+        Whether any of the inputs has scaling.
     """
 
-    def __init__(self, in_vec, out_vec, in_inds, out_inds):
+    def __init__(self, in_vec, out_vec, in_inds, out_inds, has_input_scaling):
         """
         Initialize all attributes.
         """
         self._in_inds = in_inds
         self._out_inds = out_inds
+        self._has_input_scaling = has_input_scaling
 
     def __str__(self):
         """
