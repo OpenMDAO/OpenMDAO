@@ -251,7 +251,7 @@ class ImplicitFuncComp(ImplicitComponent):
                 j = [np.asarray(a).reshape((a.shape[0], shape_to_len(a.shape[1:])))
                      for a in jac_reverse(self._apply_nonlinear_func_jax, argnums,
                                           tangents)(*invals)]
-                j = coloring.expand_jac(np.hstack(self._reorder_col_chunks(j)), 'rev')
+                j = coloring._expand_jac(np.hstack(self._reorder_col_chunks(j)), 'rev').toarray()
             else:
                 j = []
                 for a in jac_reverse(self._apply_nonlinear_func_jax, argnums, tangents)(*invals):
@@ -270,7 +270,7 @@ class ImplicitFuncComp(ImplicitComponent):
                 j = [np.asarray(a).reshape((shape_to_len(a.shape[:-1]), a.shape[-1]))
                      for a in jac_forward(self._apply_nonlinear_func_jax, argnums,
                                           tangents)(*invals)]
-                j = coloring.expand_jac(np.vstack(j), 'fwd')
+                j = coloring._expand_jac(np.vstack(j), 'fwd').toarray()
             else:
                 tangents = self._get_tangents(invals, 'fwd', coloring, argnums)
                 j = []
