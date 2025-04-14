@@ -261,7 +261,7 @@ class TestScaling(unittest.TestCase):
         assert_near_equal(prob.model._outputs['sys2.new_length'], 3.e-1)
 
         # Make sure we don't allocate an adder for the inputs vector.
-        self.assertTrue(prob.model._inputs._scaling[0] is None)
+        self.assertTrue(prob.model._inputs._scaling[1] is None)
 
     def test_speed(self):
         comp = om.IndepVarComp()
@@ -1012,7 +1012,7 @@ class TestScaling(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p.get_val('sub1.sub2.sub3.tgt.x3'), 77.0)
-        assert_near_equal(p.model.sub1.sub2._inputs._scaling[0],
+        assert_near_equal(p.model.sub1.sub2._inputs._scaling[1],
                           np.array([0, 32]), tolerance=1e-12)
 
     def test_totals_with_solver_scaling(self):

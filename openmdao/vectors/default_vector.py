@@ -76,10 +76,10 @@ class DefaultVector(Vector):
                 self._data = np.zeros(0, dtype=complex if self._alloc_complex else float)
 
             if parent_vector._scaling:
-                ps0, ps1 = parent_vector._scaling
-                if ps0 is not None:
-                    ps0 = ps0[self._parent_slice]
-                self._scaling = (ps0, ps1[self._parent_slice])
+                parent_scaler, parent_adder = parent_vector._scaling
+                if parent_adder is not None:
+                    parent_adder = parent_adder[self._parent_slice]
+                self._scaling = (parent_scaler[self._parent_slice], parent_adder)
 
     def _set_scaling(self, system, do_adder, nlvec=None):
         """
@@ -108,7 +108,7 @@ class DefaultVector(Vector):
         if system.pathname == '':  # root system
             self._allocate_scaling_data(do_adder, nlvec)
 
-        adder_array, scaler_array = self._scaling
+        scaler_array, adder_array = self._scaling
 
         start = end = 0
         for abs_name, vinfo in self._views.items():
@@ -156,20 +156,20 @@ class DefaultVector(Vector):
         data = self._data
         if self._name == 'nonlinear':
             if do_adder:
-                self._scaling = (np.zeros(data.size), np.ones(data.size))
+                self._scaling = (np.ones(data.size), np.zeros(data.size))
             else:
-                self._scaling = (None, np.ones(data.size))
+                self._scaling = (np.ones(data.size), None)
         elif self._name == 'linear':
             if self._has_solver_ref:
                 # We only allocate an extra scaling vector when we have output scaling
                 # somewhere in the model.
-                self._scaling = (None, np.ones(data.size))
+                self._scaling = (np.ones(data.size), None)
             else:
                 # Reuse the nonlinear scaling vecs since they're the same as ours.
                 # The nonlinear vectors are created before the linear vectors
-                self._scaling = (None, nlvec._scaling[1])
+                self._scaling = (nlvec._scaling[0], None)
         else:
-            self._scaling = (None, np.ones(data.size))
+            raise NameError(f"Invalid vector name: {self._name}.")
 
     def _initialize_views(self, parent_vector, system):
         """
@@ -327,13 +327,12 @@ class DefaultVector(Vector):
             Derivative direction.
         """
         if mode == 'rev':
-            self._scale_reverse(self._scaling[1], self._scaling[0])
+            self._scale_reverse(*self._scaling)
         else:
             if self._has_solver_ref:
-                self._scale_forward(self._nlvec._scaling[1], None)
+                self._scale_forward(self._nlvec._scaling[0], None)
             else:
-                adder, scaler = self._scaling
-                self._scale_forward(scaler, adder)
+                self._scale_forward(*self._scaling)
 
     def scale_to_phys(self, mode='fwd'):
         """
@@ -345,13 +344,12 @@ class DefaultVector(Vector):
             Derivative direction.
         """
         if mode == 'rev':
-            self._scale_forward(self._scaling[1], self._scaling[0])
+            self._scale_forward(*self._scaling)
         else:
             if self._has_solver_ref:
-                self._scale_reverse(self._nlvec._scaling[1], None)
+                self._scale_reverse(self._nlvec._scaling[0], None)
             else:
-                adder, scaler = self._scaling
-                self._scale_reverse(scaler, adder)
+                self._scale_reverse(*self._scaling)
 
     def _scale_forward(self, scaler, adder):
         """
