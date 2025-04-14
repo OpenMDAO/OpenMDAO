@@ -2165,6 +2165,7 @@ class Group(System):
         allprocs_discrete_out = self._var_allprocs_discrete['output']
 
         resolver = self._resolver
+        is_prom = self._resolver.is_prom
 
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
@@ -2194,7 +2195,7 @@ class Group(System):
 
         # Add implicit connections (only ones owned by this group)
         for prom_name, out_list in resolver.prom2abs_iter('output'):
-            if resolver.is_prom(prom_name, 'input'):  # names match ==> a connection
+            if is_prom(prom_name, 'input'):  # names match ==> a connection
                 abs_out = out_list[0]
                 out_subsys, _, _ = abs_out[path_len:].partition('.')
                 for abs_in in resolver.absnames(prom_name, 'input'):
@@ -2224,8 +2225,8 @@ class Group(System):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
-            if not (resolver.is_prom(prom_out, 'output') or prom_out in allprocs_discrete_out):
-                if (resolver.is_prom(prom_out, 'input') or prom_out in allprocs_discrete_in):
+            if not (is_prom(prom_out, 'output') or prom_out in allprocs_discrete_out):
+                if (is_prom(prom_out, 'input') or prom_out in allprocs_discrete_in):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' is an input. " + \
                           "All connections must be from an output to an input."
@@ -2240,8 +2241,8 @@ class Group(System):
                 self._collect_error(msg)
                 continue
 
-            if not (resolver.is_prom(prom_in, 'input') or prom_in in allprocs_discrete_in):
-                if (resolver.is_prom(prom_in, 'output') or prom_in in allprocs_discrete_out):
+            if not (is_prom(prom_in, 'input') or prom_in in allprocs_discrete_in):
+                if (is_prom(prom_in, 'output') or prom_in in allprocs_discrete_out):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' is an output. " + \
                           "All connections must be from an output to an input."

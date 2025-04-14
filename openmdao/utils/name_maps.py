@@ -1,7 +1,5 @@
 """Maps between promoted/relative/absolute names."""
 
-import sys
-from pprint import pprint
 from difflib import get_close_matches
 from itertools import chain
 
@@ -49,24 +47,6 @@ def _get_flags(local=None, continuous=None, distributed=None):
             expected |= DISTRIBUTED
 
     return mask, expected
-
-
-def _flags2kwargs(flags):
-    """
-    Convert a flags value to a dictionary of keyword arguments.
-
-    Parameters
-    ----------
-    flags : int
-        The flags value.
-
-    Returns
-    -------
-    dict
-        A dictionary of keyword arguments.
-    """
-    return {'local': flags & LOCAL, 'continuous': flags & CONTINUOUS,
-            'distributed': flags & DISTRIBUTED}
 
 
 class NameResolver(object):
@@ -410,8 +390,10 @@ class NameResolver(object):
                 return False
 
         a2p = self._abs2prom[iotype]
-        mask, expected = _get_flags(local=local, continuous=continuous, distributed=distributed)
-        return absname in a2p and a2p[absname][1] & mask == expected
+        if absname in a2p:
+            mask, expected = _get_flags(local=local, continuous=continuous, distributed=distributed)
+            return a2p[absname][1] & mask == expected
+        return False
 
     def is_local(self, absname, iotype=None):
         """
@@ -444,8 +426,8 @@ class NameResolver(object):
 
         Returns
         -------
-        str
-            The iotype of the absolute name.
+        str or None
+            The iotype of the absolute name or None if the absolute name is not found.
         """
         if absname in self._abs2prom_out:
             return 'output'
@@ -469,8 +451,8 @@ class NameResolver(object):
 
         Returns
         -------
-        str
-            The iotype of the promoted name.
+        str or None
+            The iotype of the promoted name or None if the promoted name is not found.
         """
         if promname in self._prom2abs_out:
             return 'output'
@@ -539,8 +521,8 @@ class NameResolver(object):
             Absolute names corresponding to the promoted name.
         """
         if iotype is None:
-            yield from self.prom2abs_iter('input', local)
-            yield from self.prom2abs_iter('output', local)
+            yield from self.prom2abs_iter('input', local, continuous, distributed)
+            yield from self.prom2abs_iter('output', local, continuous, distributed)
         else:
             if local is None and continuous is None and distributed is None:
                 yield from self._prom2abs[iotype].items()
@@ -579,8 +561,8 @@ class NameResolver(object):
             Promoted name.
         """
         if iotype is None:
-            yield from self.abs2prom_iter('input', local)
-            yield from self.abs2prom_iter('output', local)
+            yield from self.abs2prom_iter('input', local, continuous, distributed)
+            yield from self.abs2prom_iter('output', local, continuous, distributed)
         else:
             if local is None and continuous is None and distributed is None:
                 for absname, (promname, _) in self._abs2prom[iotype].items():
@@ -616,19 +598,19 @@ class NameResolver(object):
             Promoted name.
         """
         if iotype is None:
-            yield from self.prom_iter('input')
-            yield from self.prom_iter('output')
+            yield from self.prom_iter('input', local, continuous, distributed)
+            yield from self.prom_iter('output', local, continuous, distributed)
         elif local is None and continuous is None and distributed is None:
             yield from self._prom2abs[iotype]
         else:
             mask, expected = _get_flags(local=local, continuous=continuous,
                                         distributed=distributed)
             a2p = self._abs2prom[iotype]
-            for absnames in self._prom2abs[iotype].values():
+            for promname, absnames in self._prom2abs[iotype].items():
                 for absname in absnames:
-                    promname, flags = a2p[absname]
+                    _, flags = a2p[absname]
                     if flags & mask == expected:
-                        yield promname
+                        yield promname  # yield promoted name if any absname matches the flags
 
     def abs_iter(self, iotype=None, local=None, continuous=None, distributed=None):
         """
@@ -654,8 +636,8 @@ class NameResolver(object):
             Absolute name.
         """
         if iotype is None:
-            yield from self.abs_iter('input', local)
-            yield from self.abs_iter('output', local)
+            yield from self.abs_iter('input', local, continuous, distributed)
+            yield from self.abs_iter('output', local, continuous, distributed)
         else:
             if local is None and continuous is None and distributed is None:
                 yield from self._abs2prom[iotype]
@@ -925,8 +907,10 @@ class NameResolver(object):
             if iotype is None:
                 iotype = self.get_prom_iotype(promname)
 
-            lst = self._prom2abs[iotype][promname]
+            if self._prom_no_multi_abs:
+                return self._prom2abs[iotype][promname][0]
 
+            lst = self._prom2abs[iotype][promname]
             if len(lst) == 1:
                 return lst[0]
 
@@ -1093,19 +1077,6 @@ class NameResolver(object):
                 return self._abs2prom[iotype][absname][0]
 
         return promname
-
-    def dump(self, out_stream=sys.stdout):
-        """
-        Dump the name resolver contents to a stream.
-
-        Parameters
-        ----------
-        out_stream : file-like
-            The stream to dump the contents to.
-        """
-        print(self.msginfo, file=out_stream)
-        pprint(self._abs2prom, stream=out_stream)
-        pprint(self._prom2abs, stream=out_stream)
 
     def _add_guesses(self, name, msg, n=10, cutoff=0.15, include_prom=True, include_abs=False):
         """

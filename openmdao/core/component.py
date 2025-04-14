@@ -1919,17 +1919,6 @@ class Component(System):
         self.comm.gather(nzresids, root=0)
         return nzresids
 
-    def _has_fast_rel_lookup(self):
-        """
-        Return True if this System should have fast relative variable name lookup in vectors.
-
-        Returns
-        -------
-        bool
-            True if this System should have fast relative variable name lookup in vectors.
-        """
-        return True
-
     def _get_graph_node_meta(self):
         """
         Return metadata to add to this system's graph node.
@@ -1967,13 +1956,13 @@ class Component(System):
             raise ValueError(f"Method '{method}' is not a recognized finite difference method.")
 
         # these are relative names
-        of = self._get_partials_ofs()
-        wrt = self._get_partials_wrts()
+        ofs = self._get_partials_ofs()
+        wrts = self._get_partials_wrts()
 
         local_opts = self._get_check_partial_options()
         added_wrts = set()
 
-        for rel_key in product(of, wrt):
+        for rel_key in product(ofs, wrts):
             fd_options = self._get_approx_partial_options(rel_key, method=method,
                                                           checkopts=local_opts)
             abs_key = rel_key2abs_key(self, rel_key)
