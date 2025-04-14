@@ -82,7 +82,7 @@ test = [
 ]
 visualization = [
     "panel",
-    "bokeh>=2.4.0",
+    "bokeh>=3.4.0",
     "colorama",
     "matplotlib",
     "rich"

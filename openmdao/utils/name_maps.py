@@ -1,7 +1,9 @@
 """Maps between promoted/relative/absolute names."""
 
 import sys
-
+from pprint import pprint
+from difflib import get_close_matches
+from itertools import chain
 
 LOCAL = 1 << 0
 CONTINUOUS = 1 << 1
@@ -450,7 +452,9 @@ class NameResolver(object):
         if absname in self._abs2prom_in:
             return 'input'
         if report_error:
-            raise ValueError(f"{self.msginfo}: Variable name '{absname}' not found.")
+            raise KeyError(
+                self._add_guesses(absname, f"{self.msginfo}: Variable name '{absname}' not found.",
+                                  include_prom=False, include_abs=True))
 
     def get_prom_iotype(self, promname, report_error=False):
         """
@@ -473,7 +477,9 @@ class NameResolver(object):
         if promname in self._prom2abs_in:
             return 'input'
         if report_error:
-            raise ValueError(f"{self.msginfo}: Variable name '{promname}' not found.")
+            raise KeyError(
+                self._add_guesses(promname,
+                                  f"{self.msginfo}: Variable name '{promname}' not found."))
 
     def get_iotype(self, name, report_error=False):
         """
@@ -502,7 +508,10 @@ class NameResolver(object):
             return 'input'
 
         if report_error:
-            raise ValueError(f"{self.msginfo}: Variable name '{name}' not found.")
+            raise KeyError(
+                self._add_guesses(name,
+                                  f"{self.msginfo}: Variable name '{name}' not found."),
+                                  include_abs=True)
 
     def prom2abs_iter(self, iotype, local=None, continuous=None, distributed=None):
         """
@@ -752,7 +761,9 @@ class NameResolver(object):
 
         if report_error:
             io = '' if iotype is None else f'{iotype} '
-            raise RuntimeError(f"{self.msginfo}: Can't find source for {io}'{name}'.")
+            raise RuntimeError(self._add_guesses(name,
+                                                 f"{self.msginfo}: Can't find source for {io}"
+                                                 f"'{name}'.", include_abs=True))
 
     def abs2rel(self, absname, iotype=None, check=False):
         """
@@ -844,7 +855,10 @@ class NameResolver(object):
 
             return self._abs2prom[iotype][absname][0]
         except KeyError:
-            raise KeyError(f"{self.msginfo}: Variable name '{absname}' not found.")
+            raise KeyError(
+                self._add_guesses(absname,
+                                  f"{self.msginfo}: Variable name '{absname}' not found.",
+                                  include_prom=False, include_abs=True))
 
     def absnames(self, promname, iotype=None, report_error=True):
         """
@@ -875,14 +889,19 @@ class NameResolver(object):
                     return (promname,)
 
                 if report_error:
-                    raise KeyError(f"{self.msginfo}: Variable '{promname}' not found.")
+                    raise KeyError(
+                        self._add_guesses(promname,
+                                          f"{self.msginfo}: Variable '{promname}' "
+                                          "not found."))
                 return
 
         try:
             return self._prom2abs[iotype][promname]
         except KeyError:
             if report_error:
-                raise KeyError(f"{self.msginfo}: {iotype} variable '{promname}' not found.")
+                raise KeyError(self._add_guesses(promname,
+                                                 f"{self.msginfo}: {iotype} variable "
+                                                 f"'{promname}' not found."))
 
     def prom2abs(self, promname, iotype=None):
         """
@@ -924,7 +943,9 @@ class NameResolver(object):
                                f"from the connected output variable {src_name} instead.")
 
         except KeyError:
-            raise KeyError(f"{self.msginfo}: Variable name '{promname}' not found.")
+            raise KeyError(self._add_guesses(promname,
+                                             f"{self.msginfo}: Variable name '{promname}' "
+                                             "not found."))
 
     def any2abs(self, name, iotype=None, default=None):
         """
@@ -1036,7 +1057,8 @@ class NameResolver(object):
             return absname
 
         if report_error:
-            raise KeyError(f"{self.msginfo}: Variable name '{name}' not found.")
+            raise KeyError(self._add_guesses(name,
+                                             f"{self.msginfo}: Variable name '{name}' not found."))
 
     def prom2prom(self, promname, other, iotype=None):
         """
@@ -1081,10 +1103,39 @@ class NameResolver(object):
         out_stream : file-like
             The stream to dump the contents to.
         """
-        from pprint import pprint
         print(self.msginfo, file=out_stream)
         pprint(self._abs2prom, stream=out_stream)
         pprint(self._prom2abs, stream=out_stream)
+
+    def _add_guesses(self, name, msg, n=10, cutoff=0.15, include_prom=True, include_abs=False):
+        """
+        Add guess information to a message.
+
+        Parameters
+        ----------
+        name : str
+            The name to report an error for.
+        msg : str
+            The message to report.
+        n : int
+            The number of close matches to return.
+        cutoff : float
+            The cutoff for the close matches.
+        include_prom : bool
+            If True, include promoted names in the guess list.
+        include_abs : bool
+            If True, include absolute names in the guess list.
+        """
+        names = []
+        if include_prom:
+            names.append(self.prom_iter())
+        if include_abs:
+            names.append(self.abs_iter())
+
+        guesses = sorted(set(get_close_matches(name, chain(*names), n=n, cutoff=cutoff)))
+        if guesses:
+            msg = f"{msg} Perhaps you meant one of the following variables: {guesses}."
+        return msg
 
 
 def rel_key2abs_key(obj, rel_key, delim='.'):

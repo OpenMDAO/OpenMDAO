@@ -293,7 +293,7 @@ class TestNameResolver(unittest.TestCase):
         self.assertIsNone(self.resolver.get_abs_iotype('nonexistent'))
 
         # Test with report_error=True
-        with self.assertRaises(ValueError):
+        with self.assertRaises(KeyError):
             self.resolver.get_abs_iotype('nonexistent', report_error=True)
 
     def test_get_prom_iotype(self):
@@ -307,7 +307,7 @@ class TestNameResolver(unittest.TestCase):
         self.assertIsNone(self.resolver.get_prom_iotype('nonexistent'))
 
         # Test with report_error=True
-        with self.assertRaises(ValueError):
+        with self.assertRaises(KeyError):
             self.resolver.get_prom_iotype('nonexistent', report_error=True)
 
     def test_iterators(self):

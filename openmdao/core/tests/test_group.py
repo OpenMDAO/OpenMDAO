@@ -36,7 +36,7 @@ class SimpleGroup(om.Group):
 
     def setup(self):
         self.add_subsystem('comp1', om.IndepVarComp('x', 5.0))
-        self.add_subsystem('comp2', om.ExecComp('b=2*a'))
+        self.add_subsystem('comp2', om.ExecComp(['b=2*a', 'c=5*arg']))
         self.connect('comp1.x', 'comp2.a')
 
 
@@ -454,7 +454,7 @@ class TestGroup(unittest.TestCase):
         prob.setup()
         with self.assertRaises(Exception) as cm:
             prob.final_setup()
-            
+
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_required_connection_input_unconnected(self):
@@ -1797,7 +1797,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['a']
 
         self.assertEqual(cm.exception.args[0],
-                         "<model> <class SimpleGroup>: Variable 'a' not found.")
+                         "<model> <class SimpleGroup>: Variable 'a' not found. Perhaps you meant one of the following variables: ['comp2.a'].")
 
     def test_promotes_inputs_in_config(self):
 
@@ -1817,7 +1817,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['b']
 
         self.assertEqual(cm.exception.args[0],
-                         "<model> <class SimpleGroup>: Variable 'b' not found.")
+                         "<model> <class SimpleGroup>: Variable 'b' not found. Perhaps you meant one of the following variables: ['comp2.b'].")
 
     def test_promotes_any_in_config(self):
 
@@ -1837,7 +1837,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['a']
 
         self.assertEqual(cm.exception.args[0],
-                         "<model> <class SimpleGroup>: Variable 'a' not found.")
+                         "<model> <class SimpleGroup>: Variable 'a' not found. Perhaps you meant one of the following variables: ['comp2.a'].")
 
     def test_promotes_alias(self):
         class SubGroup(om.Group):
@@ -1994,7 +1994,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['Branch1.G1.comp1.a']
 
         self.assertEqual(cm.exception.args[0],
-                         "<model> <class BranchGroup>: Variable 'Branch1.G1.comp1.a' not found.")
+                         "<model> <class BranchGroup>: Variable 'Branch1.G1.comp1.a' not found. Perhaps you meant one of the following variables: ['Branch1.G1.a', 'Branch1.G1.comp1.b'].")
 
     def test_multiple_promotes_collision(self):
 

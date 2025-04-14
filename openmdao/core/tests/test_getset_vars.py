@@ -119,25 +119,25 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg = "<model> <class Group>: Variable '{}' not found."
+        msg = "<model> <class Group>: Variable '{}' not found. Perhaps you meant one of the following variables: ['g.c.{}']."
 
         # inputs
         with self.assertRaises(KeyError) as ctx:
             p['x'] = 5.0
-        self.assertEqual(ctx.exception.args[0], msg.format('x'))
+        self.assertEqual(ctx.exception.args[0], msg.format('x', 'x'))
 
         with self.assertRaises(KeyError) as ctx:
             p['x']
-        self.assertEqual(ctx.exception.args[0], msg.format('x'))
+        self.assertEqual(ctx.exception.args[0], msg.format('x', 'x'))
 
         # outputs
         with self.assertRaises(KeyError) as ctx:
             p['y'] = 5.0
-        self.assertEqual(ctx.exception.args[0], msg.format('y'))
+        self.assertEqual(ctx.exception.args[0], msg.format('y', 'y'))
 
         with self.assertRaises(KeyError) as ctx:
             p['y']
-        self.assertEqual(ctx.exception.args[0], msg.format('y'))
+        self.assertEqual(ctx.exception.args[0], msg.format('y', 'y'))
 
         p.final_setup()
 
@@ -145,25 +145,39 @@ class TestGetSetVariables(unittest.TestCase):
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
-        for vname in ['x', 'g.c.x']:
-            with self.assertRaises(KeyError) as cm:
-               inputs[vname] = 5.0
-            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
+        with self.assertRaises(KeyError) as cm:
+           inputs['x'] = 5.0
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'x' not found.")
 
-            with self.assertRaises(KeyError) as cm:
-               inputs[vname]
-            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
+        with self.assertRaises(KeyError) as cm:
+           inputs['x']
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'x' not found. Perhaps you meant one of the following variables: ['c.x'].")
+
+        with self.assertRaises(KeyError) as cm:
+           inputs['g.c.x'] = 5.0
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c.x' not found.")
+
+        with self.assertRaises(KeyError) as cm:
+           inputs['g.c.x']
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c.x' not found. Perhaps you meant one of the following variables: ['c.x', 'c.y'].")
 
 
         # outputs
-        for vname in ['y', 'g.c.y']:
-            with self.assertRaises(KeyError) as cm:
-               outputs[vname] = 5.0
-            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
+        with self.assertRaises(KeyError) as cm:
+           outputs['y'] = 5.0
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'y' not found.")
 
-            with self.assertRaises(KeyError) as cm:
-               outputs[vname]
-            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
+        with self.assertRaises(KeyError) as cm:
+           outputs['y']
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'y' not found. Perhaps you meant one of the following variables: ['c.y'].")
+
+        with self.assertRaises(KeyError) as cm:
+           outputs['g.c.y'] = 5.0
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c.y' not found.")
+
+        with self.assertRaises(KeyError) as cm:
+           outputs['g.c.y']
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c.y' not found. Perhaps you meant one of the following variables: ['c.x', 'c.y'].")
 
         msg = r'Variable name pair \("{}", "{}"\) not found.'
         jac = g.linear_solver._assembled_jac
@@ -231,7 +245,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         with self.assertRaises(KeyError) as cm:
             inputs['g.c2.x']
-        self.assertEqual(cm.exception.args[0], msg1.format('g.c2.x'))
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c2.x' not found. Perhaps you meant one of the following variables: ['x'].")
 
         # outputs
         with self.assertRaises(KeyError) as cm:
@@ -240,7 +254,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         with self.assertRaises(KeyError) as cm:
             outputs['g.c2.y']
-        self.assertEqual(cm.exception.args[0], msg1.format('g.c2.y'))
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c2.y' not found. Perhaps you meant one of the following variables: ['y'].")
 
         msg1 = r'Variable name pair \("{}", "{}"\) not found.'
 
@@ -491,7 +505,7 @@ class ParTestCase(unittest.TestCase):
 
         p.record(case_name='case_1')
         p.cleanup()
-        
+
         p.comm.barrier()
 
         case_1 = om.CaseReader(p.get_outputs_dir() / 'load_case_issue.sql').get_case('case_1')
