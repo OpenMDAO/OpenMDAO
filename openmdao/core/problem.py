@@ -1085,8 +1085,9 @@ class Problem(object, metaclass=ProblemMetaclass):
             first = True
             self._metadata['static_mode'] = False
             try:
-                model._setup_part2()
-                self._check_collected_errors()
+                if self._metadata['setup_status'] < _SetupStatus.POST_SETUP2:
+                    model._setup_part2()
+                    self._check_collected_errors()
 
                 responses = model.get_responses(recurse=True, use_prom_ivc=True)
                 designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
@@ -1180,24 +1181,23 @@ class Problem(object, metaclass=ProblemMetaclass):
         **setup_kwargs : dict
             Keyword arguments to pass to the setup method if it hasn't already been called.
         """
-        current_status = self._metadata['setup_status']
-        if current_status >= status:
+        if self._metadata['setup_status'] >= status:
             return
 
         if status >= _SetupStatus.POST_SETUP:
-            if current_status < _SetupStatus.POST_SETUP:
+            if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
                 self.setup(**setup_kwargs)
-                current_status = _SetupStatus.POST_SETUP
+                self._metadata['setup_status'] = _SetupStatus.POST_SETUP
 
         if status >= _SetupStatus.POST_SETUP2:
-            if current_status < _SetupStatus.POST_SETUP2:
+            if self._metadata['setup_status'] < _SetupStatus.POST_SETUP2:
                 self.model._setup_part2()
-                current_status = _SetupStatus.POST_SETUP2
+                self._metadata['setup_status'] = _SetupStatus.POST_SETUP2
 
         if status >= _SetupStatus.POST_FINAL_SETUP:
-            if current_status < _SetupStatus.POST_FINAL_SETUP:
+            if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
                 self.final_setup()
-                current_status = _SetupStatus.POST_FINAL_SETUP
+                self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=0.0, rel_err_tol=1e-6,
