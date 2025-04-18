@@ -4,7 +4,7 @@ import sys
 import inspect
 from collections import defaultdict
 from collections.abc import Iterable
-from itertools import product
+from itertools import product, chain
 from io import StringIO
 
 from numbers import Integral
@@ -78,7 +78,7 @@ class Component(System):
     _var_rel2meta : dict
         Dictionary mapping relative names to metadata.
         This is only needed while adding inputs and outputs. During setup, these are used to
-        build the dictionaries of metadata.
+        build the dictionaries of metadata.  This contains both continuous and discrete variables.
     _static_var_rel2meta : dict
         Static version of above - stores data for variables added outside of setup.
     _var_rel_names : {'input': [str, ...], 'output': [str, ...]}
@@ -1638,6 +1638,17 @@ class Component(System):
 
             self._subjacs_info[abs_key] = meta
 
+    def _column_iotypes(self):
+        """
+        Return a tuple of the iotypes that make up columns of the jacobian.
+
+        Returns
+        -------
+        tuple of the form ('input',)
+            The iotypes that make up columns of the jacobian.
+        """
+        return ('input',)
+
     def _get_partials_wrts(self):
         """
         Get list of 'wrt' variables that form the partial jacobian.
@@ -1647,11 +1658,8 @@ class Component(System):
         list
             List of 'wrt' relative variable names.
         """
-        # filter out any discrete inputs or outputs
-        if self._discrete_inputs:
-            return [n for n in self._var_rel_names['input'] if n not in self._discrete_inputs]
-
-        return list(self._var_rel_names['input'])
+        namelists = [self._var_rel_names[io] for io in self._column_iotypes()]
+        return [n for n in chain(*namelists)]
 
     def _get_partials_ofs(self, use_resname=False):
         """
@@ -1667,10 +1675,6 @@ class Component(System):
         list
             List of 'of' relative variable names.
         """
-        # filter out any discrete inputs or outputs
-        if self._discrete_outputs:
-            return [n for n in self._var_rel_names['output'] if n not in self._discrete_outputs]
-
         return list(self._var_rel_names['output'])
 
     def _matching_key_iter(self, of_patterns, wrt_patterns, use_resname=False):
@@ -1740,8 +1744,8 @@ class Component(System):
             List of tuples of the form (abs_name, meta) where abs_name is the absolute name of the
             matching variable and meta is the metadata for that variable.
         """
-        wrt_list = [pattern] if isinstance(pattern, str) else pattern
-        return [(pattern, find_matches(pattern, self._get_partials_wrts())) for pattern in wrt_list]
+        patterns = [pattern] if isinstance(pattern, str) else pattern
+        return [(pattern, find_matches(pattern, self._get_partials_wrts())) for pattern in patterns]
 
     def _check_partials_meta(self, abs_key, val, shape):
         """
