@@ -16,6 +16,49 @@ SUBJAC_META_DEFAULTS = {
 }
 
 
+class DenseSubjac(object):
+    """
+    Dense subjacobian.
+    """
+    def __init__(self, val, dependent):
+        self.val = val
+        self.dependent = dependent
+
+    def __getitem__(self, key):
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            raise KeyError(f"Subjac does not have attribute '{key}'.")
+
+
+class SparseSubjac(object):
+    """
+    Sparse subjacobian.
+    """
+    pass
+
+
+class OmCOOSubjac(object):
+    """
+    OpenMDAO's internal COO representation of a subjacobian.
+    """
+    pass
+
+
+def create_subjac(val=None, rows=None, cols=None, dependent=True):
+    """
+    Factory function to create a subjacobian.
+    """
+    if rows is None:
+        assert cols is None
+        if issparse(val):
+            return SparseSubjac(val, dependent)
+        else:
+            return DenseSubjac(val, dependent)
+    else:
+        return OmCOOSubjac(val, rows, cols, dependent)
+
+
 class Jacobian(object):
     """
     Base Jacobian class.
