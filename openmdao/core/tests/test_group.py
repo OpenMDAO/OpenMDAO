@@ -2034,6 +2034,35 @@ class TestGroupPromotes(unittest.TestCase):
         self.assertEqual(str(cm.exception),
                            "\"<model> <class BranchGroup>: Could not find 'Branch1.G1.comp1.a'. Perhaps you meant one of the following variables: ['Branch1.G1.comp1.b', 'Branch1.G1.a']\"")
 
+    def test_promotes_ivc_bug(self):
+        # This used to fail with an index error
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem("ivc", om.IndepVarComp(), promotes=["*"])
+        model.ivc.add_output("in1", [1.,1.])
+        model.add_subsystem("comp1", om.ExecComp("out1 = in1 * 2.0"))
+        model.add_subsystem("comp2", om.ExecComp("out1 = in1 * 3.0"))
+
+        model.connect("in1", "comp1.in1", src_indices=[0])
+        model.connect("in1", "comp2.in1", src_indices=[1])
+
+        prob.setup(mode='rev')
+        om.n2(prob, show_browser=False, outfile='n2.html')
+        prob.run_model()
+
+    def test_promotes_auto_ivc_bug(self):
+        # This used to fail with an index error
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem("comp1", om.ExecComp("out1 = in1 * 2.0"))
+        model.add_subsystem("comp2", om.ExecComp("out1 = in1 * 3.0"))
+
+        prob.setup(mode='rev')
+        om.n2(prob, show_browser=False, outfile='n2.html')
+        prob.run_model()
+
     def test_multiple_promotes_collision(self):
 
         class SubGroup(om.Group):
