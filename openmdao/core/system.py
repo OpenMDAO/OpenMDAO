@@ -20,7 +20,7 @@ from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, 
 from openmdao.jacobians.dictionary_jacobian import Jacobian, DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.vectors.vector import _full_slice, _type_map
+from openmdao.vectors.vector import _full_slice
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
@@ -2451,15 +2451,20 @@ class System(object, metaclass=SystemMetaclass):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-    def _name_shape_iter(self, vectype, subset=None):
+    def _name_shape_iter(self, iotype, local=True, subset=None):
         """
         Yield variable names and shapes for a given iotype of vector.
         """
+        if local:
+            abs2meta = self._var_abs2meta[iotype]
+        else:
+            abs2meta = self._var_allprocs_abs2meta[iotype]
+
         if subset is None:
-            for name, meta in self._var_abs2meta[_type_map[vectype]].items():
+            for name, meta in abs2meta.items():
                 yield name, meta['shape']
         else:
-            for name, meta in self._var_abs2meta[_type_map[vectype]].items():
+            for name, meta in abs2meta.items():
                 if name in subset:
                     yield name, meta['shape']
 

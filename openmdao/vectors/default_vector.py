@@ -56,7 +56,7 @@ class DefaultVector(Vector):
         """
         self._views = {}
         start = end = 0
-        for name, shape in system._name_shape_iter(self._kind):
+        for name, shape in system._name_shape_iter(self._iotype):
             end += shape_to_len(shape)
             self._views[name] = _VecData(shape, (start, end))
             start = end
