@@ -155,7 +155,7 @@ class ApproximationScheme(object):
         wrt_ranges = []
 
         wrt_matches = system._coloring_info._update_wrt_matches(system)
-        out_slices = system._outputs.get_slice_dict()
+        outvec = system._outputs
 
         # this maps column indices into colored jac into indices into full jac
         if wrt_matches is not None:
@@ -172,19 +172,19 @@ class ApproximationScheme(object):
                     colored_end += cend - cstart
                     if wrt_matches is not None:
                         ccol2jcol[colored_start:colored_end] = range(cstart, cend)
-                    if is_total and abs_wrt in out_slices:
-                        slc = out_slices[abs_wrt]
+                    if is_total and outvec._contains_abs(abs_wrt):
+                        start, stop = outvec.get_range(abs_wrt)
                         if cinds is not None:
-                            rng = np.arange(slc.start, slc.stop)[cinds]
+                            rng = np.arange(start, stop)[cinds]
                         else:
-                            rng = range(slc.start, slc.stop)
-                        wrt_ranges.append((abs_wrt, slc.stop - slc.start))
+                            rng = range(start, stop)
+                        wrt_ranges.append((abs_wrt, stop - start))
                         ccol2outvec[colored_start:colored_end] = rng
                     colored_start = colored_end
 
         row_var_sizes = {v: sz for v, sz in zip(coloring._row_vars, coloring._row_var_sizes)}
         row_map = np.empty(coloring._shape[0], dtype=INT_DTYPE)
-        abs2prom = system._var_allprocs_abs2prom['output']
+        abs2prom = system._resolver.abs2prom
 
         if is_total:
             it = ((of, end - start) for of, start, end, _, _ in system._jac_of_iter())
@@ -195,7 +195,7 @@ class ApproximationScheme(object):
         start = end = colorstart = colorend = 0
         for name, sz in it:
             end += sz
-            prom = name if is_total else abs2prom[name]
+            prom = name if is_total else abs2prom(name, 'output')
             if prom in row_var_sizes:
                 colorend += row_var_sizes[prom]
                 row_map[colorstart:colorend] = range(start, end)
@@ -236,10 +236,6 @@ class ApproximationScheme(object):
             The system having its derivs approximated.
         """
         total = system.pathname == ''
-
-        in_slices = system._inputs.get_slice_dict()
-        out_slices = system._outputs.get_slice_dict()
-
         coloring = system._get_static_coloring()
 
         self._approx_groups = []
@@ -261,10 +257,6 @@ class ApproximationScheme(object):
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:
                     continue
-                if vec is system._inputs:
-                    slices = in_slices
-                else:
-                    slices = out_slices
 
                 data = self._get_approx_data(system, wrt, meta)
                 directional = meta['directional'] or self._totals_directions
@@ -278,7 +270,7 @@ class ApproximationScheme(object):
                         # local index into var
                         vec_idx = sinds.copy()
                         # convert into index into input or output vector
-                        vec_idx += slices[wrt].start
+                        vec_idx += vec.get_range(wrt)[0]
                         # Directional derivatives for quick deriv checking.
                         # Place the indices in a list so that they are all stepped at the same time.
                         if directional:
@@ -507,6 +499,7 @@ class ApproximationScheme(object):
         tosend = None
         fd_count = 0
         mycomm = system._full_comm if use_parallel_fd else system.comm
+        abs2prom = system._resolver.abs2prom
 
         # now do uncolored solves
         for group_i, tup in enumerate(approx_groups):
@@ -552,10 +545,7 @@ class ApproximationScheme(object):
 
                     if self._progress_out:
                         end_time = time.perf_counter()
-                        if wrt in system._var_allprocs_abs2prom['output']:
-                            prom_name = system._var_allprocs_abs2prom['output'][wrt]
-                        else:
-                            prom_name = system._var_allprocs_abs2prom['input'][wrt]
+                        prom_name = abs2prom(wrt)
                         self._progress_out.write(f"{fd_count + 1}/{len(result)}: Checking "
                                                  f"derivatives with respect to: "
                                                  f"'{prom_name} [{vecidxs}]' ... "

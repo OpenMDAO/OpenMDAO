@@ -736,7 +736,7 @@ class ExecComp(ExplicitComponent):
                               f"declared so they are assumed to be zero: [{undeclared}].",
                               prefix=self.msginfo, category=DerivativesWarning)
 
-    def _setup_vectors(self, root_vectors):
+    def _setup_vectors(self, parent_vectors=None):
         """
         Compute all vectors for all vec names.
 
@@ -744,8 +744,10 @@ class ExecComp(ExplicitComponent):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vectors : dict or None
+            Parent vectors.  Same structure as root_vectors.
         """
-        super()._setup_vectors(root_vectors)
+        super()._setup_vectors(parent_vectors)
 
         if not self._use_derivatives:
             self._manual_decl_partials = True  # prevents attempts to use _viewdict in compute
@@ -1001,14 +1003,16 @@ class ExecComp(ExplicitComponent):
         # compute mapping of col index to wrt varname
         self._col_idx2name = idxnames = [None] * len(self._inputs)
         plen = len(self.pathname) + 1
-        for name, slc in self._inputs.get_slice_dict().items():
+        for name, start, stop in self._inputs.ranges():
             name = name[plen:]
-            for i in range(slc.start, slc.stop):
+            for i in range(start, stop):
                 idxnames[i] = name
 
         # get slice dicts using relative name keys
-        self._out_slices = {n[plen:]: slc for n, slc in self._outputs.get_slice_dict().items()}
-        self._in_slices = {n[plen:]: slc for n, slc in self._inputs.get_slice_dict().items()}
+        self._out_slices = {
+            n[plen:]: slice(start, stop) for n, start, stop in self._outputs.ranges()
+        }
+        self._in_slices = {n[plen:]: slice(start, stop) for n, start, stop in self._inputs.ranges()}
 
         return [coloring]
 

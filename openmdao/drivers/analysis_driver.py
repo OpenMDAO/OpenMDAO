@@ -390,13 +390,13 @@ class AnalysisDriver(Driver):
         rec_includes = self.recording_options['includes']
         implicit_outputs = {meta['prom_name'] for _, meta in
                             model.list_outputs(explicit=False, implicit=True, out_stream=None)}
-        prom2abs_in = model._var_allprocs_prom2abs_list['input']
+        resolver = model._resolver
 
         # Responses are recorded by default, add the inputs to be recorded.
         for prom_name in self._get_sampled_vars():
             if prom_name in implicit_outputs and prom_name not in rec_includes:
                 self.recording_options['includes'].append(prom_name)
-            elif prom_name in prom2abs_in.keys():
+            elif resolver.is_prom(prom_name, 'input'):
                 self.recording_options['includes'].append(prom_name)
 
         if MPI:

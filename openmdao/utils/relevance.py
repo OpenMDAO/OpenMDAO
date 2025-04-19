@@ -1340,7 +1340,7 @@ class Relevance(object):
         rev_conns = get_rev_conns(model._conn_global_abs_in2out)
         if '_auto_ivc' not in pre:
             in_pre = False
-            for vname in auto_ivc._var_abs2prom['output']:
+            for vname in auto_ivc._resolver.abs_iter('output'):
                 if vname not in auto_dvs:
                     for tgt in rev_conns[vname]:
                         tgtcomp = tgt.rpartition('.')[0]

@@ -168,22 +168,23 @@ class BroydenSolver(NonlinearSolver):
         # self._disallow_distrib_solve()
 
         states = self.options['state_vars']
-        prom2abs = system._var_allprocs_prom2abs_list['output']
+        is_prom = system._resolver.is_prom
 
         # Check names of states.
-        bad_names = [name for name in states if name not in prom2abs]
+        bad_names = [name for name in states if not is_prom(name, 'output')]
         if len(bad_names) > 0:
             msg = "{}: The following variable names were not found: {}"
             raise ValueError(msg.format(self.msginfo, ', '.join(bad_names)))
 
         # Size linear system
         if len(states) > 0:
+            prom2abs = system._resolver.prom2abs
             # User has specified states, so we must size them.
             n = 0
             meta = system._var_allprocs_abs2meta['output']
 
             for name in states:
-                size = meta[prom2abs[name][0]]['global_size']
+                size = meta[prom2abs(name, 'output')]['global_size']
                 self._idx[name] = (n, n + size)
                 n += size
         else:
@@ -229,7 +230,9 @@ class BroydenSolver(NonlinearSolver):
 
         all_states = []
         sys_recurse(system, all_states)
-        all_states = [system._var_abs2prom['output'][name] for name in all_states]
+        abs2prom = system._resolver.abs2prom
+        is_local = system._resolver.is_local
+        all_states = [abs2prom(name, 'output') for name in all_states if is_local(name, 'output')]
 
         missing = set(all_states).difference(states)
         if len(missing) > 0:

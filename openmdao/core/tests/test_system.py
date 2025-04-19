@@ -385,10 +385,10 @@ class TestSystem(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(KeyError) as cm:
-            root.get_source('f')
+        with self.assertRaises(Exception) as cm:
+            root._resolver.source('f')
 
-        self.assertEqual(cm.exception.args[0], "<model> <class Group>: source for 'f' not found.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: Can't find source for 'f' because connections are not yet known.")
 
     def test_list_inputs_before_final_setup(self):
         class SpeedComp(ExplicitComponent):

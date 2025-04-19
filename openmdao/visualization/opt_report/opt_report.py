@@ -124,8 +124,6 @@ def opt_report(prob, outfile=None):
 
     driver_scaling = True
 
-    get_prom_name = prob.model._get_prom_name
-
     # Collect the entire array of array valued desvars and constraints (ignore indices)
     objs_vals = {}
     desvars_vals = {}
@@ -136,26 +134,20 @@ def opt_report(prob, outfile=None):
     cons_meta = {}
 
     with prob.model._scaled_context_all():
-        for abs_name, meta in driver._objs.items():
-            prom_name = get_prom_name(abs_name)
+        for prom_name, meta in driver._objs.items():
             objs_meta[prom_name] = meta
             objs_vals[prom_name] = \
-                driver.get_objective_values(driver_scaling=driver_scaling)[abs_name]
+                driver.get_objective_values(driver_scaling=driver_scaling)[prom_name]
 
-        for abs_name, meta in driver._designvars.items():
-            prom_name = get_prom_name(abs_name)
+        for prom_name, meta in driver._designvars.items():
             desvars_meta[prom_name] = meta
             desvars_vals[prom_name] = \
-                driver.get_design_var_values(driver_scaling=driver_scaling)[abs_name]
+                driver.get_design_var_values(driver_scaling=driver_scaling)[prom_name]
 
-        for abs_name, meta in prob.driver._cons.items():
-            if meta.get('alias') is not None:
-                prom_name = abs_name
-            else:
-                prom_name = get_prom_name(abs_name)
+        for prom_name, meta in prob.driver._cons.items():
             cons_meta[prom_name] = meta
             cons_vals[prom_name] = \
-                driver.get_constraint_values(driver_scaling=driver_scaling)[abs_name]
+                driver.get_constraint_values(driver_scaling=driver_scaling)[prom_name]
 
     header_html = _make_header_table(prob)
 
