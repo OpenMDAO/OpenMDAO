@@ -191,7 +191,7 @@ class pyOptSparseDriver(Driver):
         """
         if pyoptsparse is None:
             # pyoptsparse is not installed
-            raise RuntimeError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
+            raise ImportError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
 
         if isinstance(pyoptsparse, Exception):
             # there is some other issue with the pyoptsparse installation
