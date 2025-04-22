@@ -385,6 +385,30 @@ class Jacobian(object):
                     if match_inds.size > 0:
                         subjac['val'][match_inds] = column[start:end][subjac['rows'][match_inds]]
 
+    def set_csc_jac(self, system, jac):
+        """
+        Assign a CSC jacobian to this jacobian.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        jac : csc_matrix
+            CSC jacobian.
+        """
+        ofiter = list(system._jac_of_iter())
+        for wrt, wstart, wend, _, _, _ in system._jac_wrt_iter():
+            wjac = jac[:, wstart:wend]
+            for of, start, end, _, _ in ofiter:
+                key = (of, wrt)
+                if key in self._subjacs_info:
+                    subjac = self.get_metadata(key)
+                    if subjac['cols'] is None:  # dense
+                        subjac['val'][:, :] = wjac[start:end, :]
+                    else:  # our COO format
+                        subj = wjac[start:end, :]
+                        subjac['val'][:] = subj[subjac['rows'], subjac['cols']]
+
     def set_dense_jac(self, system, jac):
         """
         Assign a dense jacobian to this jacobian.
