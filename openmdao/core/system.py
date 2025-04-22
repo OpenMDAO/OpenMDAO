@@ -4954,6 +4954,73 @@ class System(object, metaclass=SystemMetaclass):
 
         return var_list
 
+    def list_options(self,
+                     include_default=True,
+                     out_stream=_DEFAULT_OUT_STREAM):
+        """
+        Write a list of output names and other optional information to a specified stream.
+
+        Parameters
+        ----------
+        out_stream : file-like
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+        include_default : bool
+            When True, include the built-in openmdao system options. Default is True.
+        """
+        name = self.pathname
+        default_options = ['always_opt', 'default_shape', 'derivs_method', 'distributed',
+                           'run_root_only', 'use_jit', 'assembled_jac_type',
+                           'auto_order']
+        core_types = (int, float, tuple, list, np.ndarray, str, bool)
+
+        opt_list = []
+        opts = {}
+        for opt_name, opt_value in self.options.items():
+
+            if not include_default and opt_name in default_options:
+                continue
+
+            opt_meta = self.options._dict[opt_name]
+
+            if opt_meta['recordable']:
+                opts[opt_name] = opt_value
+
+        opt_list.append((name, opts))
+
+        # For components, self._subsystems_allprocs is empty.
+        if self._subsystems_allprocs:
+            for subsys in self.system_iter(include_self=False, recurse=True):
+
+                if subsys.pathname != '_auto_ivc':
+                    sub_opts = subsys.list_options(out_stream=None,
+                                                   include_default=include_default)
+                    opt_list.extend(sub_opts)
+
+        if out_stream is not None:
+
+            print('')
+            print("Options in Model")
+            print('')
+
+            for key, opt_dict in opt_list:
+                if key == '':
+                    print('[model]')
+                else:
+                    print(key)
+                print('-'*len(key))
+                for opt_name, opt_val in opt_dict.items():
+
+                    if isinstance(opt_val, core_types):
+                        print(f'{opt_name}: {opt_val}')
+
+                    else:
+                        print(f'{opt_name}: {type(opt_val)}')
+
+                print('')
+
+        return opt_list
+
     def run_solve_nonlinear(self):
         """
         Compute outputs.
