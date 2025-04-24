@@ -162,8 +162,6 @@ class JaxExplicitComponent(ExplicitComponent):
             if not self.matrix_free and self._coloring_info.use_coloring() and \
                     coloring_mod._use_partial_sparsity:
                 self._get_coloring()
-                if self._jacobian is not None:
-                    self._jacobian._restore_approx_sparsity()
             elif self._do_sparsity and self.options['derivs_method'] == 'jax':
                 self.compute_sparsity()
 
@@ -441,6 +439,8 @@ class JaxExplicitComponent(ExplicitComponent):
     def _update_subjac_sparsity(self, sparsity_iter):
         if self.options['derivs_method'] == 'jax':
             _update_subjac_sparsity(sparsity_iter, self.pathname, self._subjacs_info)
+            if self._jacobian is not None:
+                self._jacobian._update_subjacs(self)
         else:
             super()._update_subjac_sparsity(sparsity_iter)
 

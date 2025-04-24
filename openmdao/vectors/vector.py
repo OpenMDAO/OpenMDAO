@@ -226,10 +226,14 @@ class Vector(object):
             for n, vinfo in self._views.items():
                 if n in self._names:
                     yield n[plen:], vinfo.view[0] if vinfo.is_scalar else vinfo.view
+                else:
+                    yield n[plen:], 0.0j if vinfo.is_scalar else np.zeros_like(vinfo.view)
         else:
             for n, vinfo in self._views.items():
                 if n in self._names:
                     yield n[plen:], vinfo.view[0].real if vinfo.is_scalar else vinfo.view.real
+                else:
+                    yield n[plen:], 0.0 if vinfo.is_scalar else np.zeros_like(vinfo.view.real)
 
     def ranges(self):
         """
@@ -370,6 +374,35 @@ class Vector(object):
             variable value.
         """
         return self._abs_get_val(self._lookup(name, self._iotype, True), flat=False)
+
+    def get_slice(self, slc):
+        """
+        Get a slice of the vector.
+
+        Parameters
+        ----------
+        slc : slice
+            Slice of the vector.
+
+        Returns
+        -------
+        ndarray
+            Slice of the vector.
+        """
+        return self.asarray()[slc]
+
+    def add_to_slice(self, slc, val):
+        """
+        Add a value to a slice of the vector.
+
+        Parameters
+        ----------
+        slc : slice
+            Slice of the vector.
+        val : float or ndarray
+            Value to add.
+        """
+        self.asarray()[slc] += val.flat
 
     def get_val(self, name, flat=True):
         """

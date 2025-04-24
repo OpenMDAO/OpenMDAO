@@ -526,8 +526,6 @@ class ImplicitComponent(Component):
             Parent vectors.  Same structure as root_vectors.
         """
         super()._setup_vectors(parent_vectors)
-        if self._jacobian is None:
-            self._init_jacobian()
 
         if self._declared_residuals:
             name2slcshape = _get_slice_shape_dict(self._resid_name_shape_iter())

@@ -4,6 +4,7 @@ import numpy as np
 from itertools import chain
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.jacobians.block_jacobian import BlockJacobian
 from openmdao.utils.coloring import _ColSparsityJac
 from openmdao.core.component import Component
 from openmdao.vectors.vector import _full_slice
@@ -141,17 +142,26 @@ class ExplicitComponent(Component):
 
             size = meta['size']
             if size > 0:
-
                 # ExplicitComponent jacobians have -1 on the diagonal.
                 arange = np.arange(size, dtype=INT_DTYPE)
 
-                self._subjacs_info[out_abs, out_abs] = {
+                self._subjacs_info[out_abs, out_abs] = meta = {
                     'rows': arange,
                     'cols': arange,
+                    'diagonal': False,
                     'shape': (size, size),
                     'val': np.full(size, -1.),
                     'dependent': True,
                 }
+                # self._subjacs_info[out_abs, out_abs] = {
+                #     'rows': None,
+                #     'cols': None,
+                #     'diagonal': True,
+                #     'shape': (size, size),
+                #     'val': np.full(size, -1.),
+                #     'dependent': True,
+                # }
+                self._jacobian.add_subjac_info(self, (out_abs, out_abs), meta)
 
     def _setup_jacobians(self, recurse=True):
         """
@@ -395,7 +405,7 @@ class ExplicitComponent(Component):
 
                 try:
                     # handle identity subjacs (output_or_resid wrt itself)
-                    if J is None or isinstance(J, DictionaryJacobian):
+                    if J is None or isinstance(J, (DictionaryJacobian, BlockJacobian)):
                         if d_outputs._names:
                             rflat = d_residuals._abs_get_val
                             oflat = d_outputs._abs_get_val

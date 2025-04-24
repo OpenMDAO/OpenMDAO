@@ -9,7 +9,6 @@ from numpy import ndarray, imag
 
 from openmdao.core.system import _DEFAULT_COLORING_META
 from openmdao.utils.coloring import _ColSparsityJac, _compute_coloring
-from openmdao.core.constants import INT_DTYPE
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
 from openmdao.utils import cs_safe
@@ -709,10 +708,10 @@ class ExecComp(ExplicitComponent):
                                         "is not square (shape=(%d, %d))." %
                                         (self.msginfo, out, inp, oval.size, ival.size))
                                 # partial will be declared as diagonal
-                                inds = np.arange(oval.size, dtype=INT_DTYPE)
+                                diag = True
                             else:
-                                inds = None
-                            decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
+                                diag = None
+                            decl_partials(of=out, wrt=inp, val=oval.copy(), diagonal=diag)
                         else:
                             decl_partials(of=out, wrt=inp)
 
@@ -1105,7 +1104,7 @@ class ExecComp(ExplicitComponent):
 
                 for u in out_names:
                     if (u, inp) in partials:
-                        partials[u, inp] = imag(vdict[u] * inv_stepsize).flat
+                        partials[u, inp] = imag(vdict[u] * inv_stepsize)
 
                 # restore old input value
                 ival -= step

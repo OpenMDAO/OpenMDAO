@@ -256,6 +256,7 @@ class Group(System):
         self._ivcs = {}
         self._bad_conn_vars = None
         self._sys_graph_cache = None
+        self._key_owner = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -5380,6 +5381,72 @@ class Group(System):
         meta['base'] = 'Group'
         return meta
 
+    def _column_iotypes(self):
+        """
+        Return a tuple of the iotypes that make up columns of the jacobian.
+
+        Returns
+        -------
+        tuple of the form ('input',)
+            The iotypes that make up columns of the jacobian.
+        """
+        return ('input',)
+
+    def _get_subjac_owners(self):
+        """
+        Return a dictionary of owning rank keyed by subjac key.
+
+        This only applies to groups approximating a jacobian using FD or CS, and is empty unless
+        there are of or wrt variables that are not local in at least one rank.
+
+        It is also empty in the top level group, because when computing total jacobians, the
+        subjacobians exist locally on each process.
+
+        The return value is cached in self._key_owner.
+
+        Returns
+        -------
+        dict
+            Dictionary of owning rank keyed by subjac key.
+        """
+        if self._key_owner is None:
+            if self.pathname and self.comm.size > 1 and self._owns_approx_jac:
+                allouts = self._var_allprocs_abs2meta['output']
+                local_out = self._var_abs2meta['output']
+                local_in = self._var_abs2meta['input']
+                subjac_keys = self._jacobian._get_ordered_subjac_keys(self)
+                remote_keys = []
+                for key in subjac_keys:
+                    of, wrt = key
+                    if of not in local_out or (wrt not in local_in and wrt not in local_out):
+                        remote_keys.append(key)
+
+                abs2idx = self._var_allprocs_abs2idx
+                sizes_out = self._var_sizes['output']
+                sizes_in = self._var_sizes['input']
+                owner_dict = {}
+                for keys in self.comm.allgather(remote_keys):
+                    for key in keys:
+                        if key not in owner_dict:
+                            of, wrt = key
+                            ofsizes = sizes_out[:, abs2idx[of]]
+                            if wrt in allouts:
+                                wrtsizes = sizes_out[:, abs2idx[wrt]]
+                            else:
+                                wrtsizes = sizes_in[:, abs2idx[wrt]]
+                            for rank, (ofsz, wrtsz) in enumerate(zip(ofsizes, wrtsizes)):
+                                # find first rank where both of and wrt are local
+                                if ofsz and wrtsz:
+                                    owner_dict[key] = rank
+                                    break
+                            else:  # no rank was found where both were local. Use 'of' local rank
+                                owner_dict[key] = np.min(np.nonzero(ofsizes)[0])
+
+                self._key_owner = owner_dict
+            else:
+                self._key_owner = {}
+
+        return self._key_owner
 
 def iter_solver_info(system):
     """

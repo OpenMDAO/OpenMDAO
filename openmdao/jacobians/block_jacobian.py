@@ -1,81 +1,134 @@
-import numpy as np
+
 
 from openmdao.jacobians.jacobian import Jacobian
 
 
 class BlockJacobian(Jacobian):
     def __init__(self, system):
+        """
+        Initialize block-sparse Jacobian with sub-jacobian information.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+        """
         super().__init__(system)
+        self._ordered = False
 
-        # def __init__(self, M: List[int], N: List[int], blocks: List[Tuple[int, int, Union[np.ndarray, sparse.csr_matrix, None], str]]):
+    def __getitem__(self, key):
         """
-        Initialize block-sparse Jacobian with caller-provided block types.
+        Get sub-Jacobian.
 
-        Args:
-            M: List of row variable sizes [M_1, ..., M_m]
-            N: List of column variable sizes [N_1, ..., N_n]
-            blocks: List of (i, j, J_ij, block_type) for non-zero sub-Jacobians
-                    - J_ij: None (identity), 1D array (diagonal), np.ndarray (dense), or sparse.csr_matrix (sparse)
-                    - block_type: "identity", "diagonal", "dense", or "sparse"
+        Parameters
+        ----------
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
+
+        Returns
+        -------
+        ndarray or spmatrix or list[3]
+            sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
-        rowvars = {}
-        colvars = {}
-        for i, v in enumerate(self.system.get_var_names('input')):
-            rowvars[v] = i
-        for i, v in enumerate(self.system.get_var_names('output')):
-            colvars[v] = i
+        try:
+            return self._subjacs[self._get_abs_key(key)].get_val()
+        except KeyError:
+            msg = '{}: Variable name pair ("{}", "{}") not found.'
+            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
 
-        self.M = np.array(M, dtype=np.int64)
-        self.N = np.array(N, dtype=np.int64)
-        self.m, self.n = len(M), len(N)
-
-        self.blocks = blocks
-
-        # Validate inputs
-        self._validate()
-
-        # Compute offsets
-        self.R = np.cumsum([0] + list(M))
-        self.C = np.cumsum([0] + list(N))
-
-    def matvec(self, v):
+    def __setitem__(self, key, subjac):
         """
-        Compute y = J * v.
+        Set sub-Jacobian.
 
-        Args:
-            v: Input vector of size sum(N_j)
-
-        Returns:
-            y: Output vector of size sum(M_i)
+        Parameters
+        ----------
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
+        subjac : int or float or ndarray or sparse matrix
+            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
-        if v.size != self.C[-1]:
-            raise ValueError(f"Input vector size {v.size} does not match expected {self.C[-1]}")
+        abs_key = self._get_abs_key(key)
+        if abs_key is None:
+            raise KeyError(f'{self.msginfo}: Variable name pair {key} not found.')
 
-        y = np.zeros(self.R[-1], dtype=v.dtype)
+        # You can only set declared subjacobians.
+        try:
+            self._subjacs[abs_key].set_val(subjac)
+        except KeyError:
+            raise KeyError(f'{self.msginfo}: Variable name pair {key} must first be declared.')
+        except ValueError as err:
+            raise ValueError(f"{self.msginfo}: for subjacobian {key}: {err}")
 
-        for i, j, J_ij, block_type in self.blocks:
-            v_j = v[self.C[j] : self.C[j] + self.N[j]]
-            if block_type == "identity":
-                y[self.R[i] : self.R[i] + self.M[i]] += v_j
-            elif block_type == "diagonal":
-                k = min(self.M[i], self.N[j])
-                y[self.R[i] : self.R[i] + k] += J_ij * v_j[:k]
-            else:  # dense or sparse
-                y[self.R[i] : self.R[i] + self.M[i]] += J_ij @ v_j
+    def _get_subjacs(self, system):
+        if not self._ordered:
+            # determine the set of remote keys (keys where either of or wrt is remote somewhere)
+            # only if we're under MPI with comm size > 1 and the given system is a Group that
+            # computes its derivatives using finite difference or complex step.
+            include_remotes = system.pathname and \
+                system.comm.size > 1 and system._owns_approx_jac and system._subsystems_allprocs
 
-        return y
+            subjacs = self._subjacs
 
-# Example usage
-M = [3, 2]  # Row sizes
-N = [2, 3, 3]  # Column sizes
-v = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=np.float64)  # Input vector: size 2+3+3=8
+            if include_remotes:
+                ofnames = system._var_allprocs_abs2meta['output']
+                wrtnames = system._var_allprocs_abs2meta
+            else:
+                ofnames = system._var_abs2meta['output']
+                wrtnames = system._var_abs2meta
 
-# Caller-provided blocks: J_00 = diag([2, 3]), J_10 = I, J_01 = dense
-blocks = [
-    (0, 1, np.array([[1, 3, 0], [0, 1, 0], [4, -1, 0]], dtype=np.float64), "dense"),  # J_01: 3x3
-    (1, 0, None, "identity"),  # J_10 = I (2x2)
-    (0, 2, np.array([2, 3, 1], dtype=np.float64), "diagonal"),  # J_00 = diag([2, 3, 1]) (3x3)
-]
-jac = BlockJacobian(M, N, blocks)
-y = jac.matvec(v)
-print(y)  # Output: [5, 8, 0, 1, 2]
+            self._subjacs = {}
+            for res_name in ofnames:
+                for type_ in ('output', 'input'):
+                    for name in wrtnames[type_]:
+                        key = (res_name, name)
+                        if key in subjacs:
+                            self._subjacs[key] = subjacs[key]
+
+            self._ordered = True
+
+        return self._subjacs
+
+    def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
+        """
+        Compute matrix-vector product.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+        d_inputs : Vector
+            inputs linear vector.
+        d_outputs : Vector
+            outputs linear vector.
+        d_residuals : Vector
+            residuals linear vector.
+        mode : str
+            'fwd' or 'rev'.
+        """
+        randgen = self._randgen
+        d_out_names = d_outputs._names
+        d_inp_names = d_inputs._names
+
+        with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+            if randgen is None:
+                if mode == 'fwd':
+                    for key, subjac in self._get_subjacs(system).items():
+                        of, wrt = key
+                        if wrt in d_inp_names or wrt in d_out_names:
+                            subjac.apply_fwd(d_inputs, d_outputs, d_residuals)
+                else:  # rev
+                    for key, subjac in self._get_subjacs(system).items():
+                        of, wrt = key
+                        if wrt in d_inp_names or wrt in d_out_names:
+                            subjac.apply_rev(d_inputs, d_outputs, d_residuals)
+            else:
+                if mode == 'fwd':
+                    for key, subjac in self._get_subjacs(system).items():
+                        of, wrt = key
+                        if wrt in d_inp_names or wrt in d_out_names:
+                            subjac.apply_rand_fwd(d_inputs, d_outputs, d_residuals, randgen)
+                else:  # rev
+                    for key, subjac in self._get_subjacs(system).items():
+                        of, wrt = key
+                        if wrt in d_inp_names or wrt in d_out_names:
+                            subjac.apply_rand_rev(d_inputs, d_outputs, d_residuals, randgen)

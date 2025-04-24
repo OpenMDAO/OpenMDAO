@@ -867,10 +867,29 @@ def _update_subjac_sparsity(sparsity_iter, pathname, subjacs_info):
                 'dependent': True,
                 'rows': rows,
                 'cols': cols,
+                'diagonal': False,
             }
+            diag = False
+        else:
+            diag = subjacs_info[abs_key]['diagonal']
+            if diag:
+                assert shape[0] == shape[1]
+                if rows is None:
+                    raise RuntimeError(f"Subjacobian ({of}, {wrt}) is labeled as diagonal but is "
+                                       "dense.")
+                elif len(rows) > shape[0]:
+                    raise RuntimeError(f"Subjacobian ({of}, {wrt}) is labeled as diagonal but the "
+                                       f"number of row/cols > diag size ({len(rows)} > {shape[0]}).")
+                elif len(rows) < shape[0]:
+                    subjacs_info[abs_key]['diagonal'] = diag = False
+                    issue_warning(f"Subjacobian ({of}, {wrt}) is labeled as diagonal but is actually "
+                                  f"more sparse than that, row/cols < diag size ({len(rows)} < {shape[0]}).")
 
         if rows is None:
-            subjacs_info[abs_key]['val'] = np.zeros(shape)
+            if diag:
+                assert shape[0] == shape[1]
+            else:
+                subjacs_info[abs_key]['val'] = np.zeros(shape)
         else:
             if len(rows) == 0:
                 del subjacs_info[abs_key]

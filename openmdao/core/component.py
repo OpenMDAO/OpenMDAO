@@ -31,6 +31,7 @@ from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper, get_functi
     get_return_names
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.jacobians.block_jacobian import BlockJacobian, SUBJAC_META_DEFAULTS
 
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
@@ -416,7 +417,7 @@ class Component(System):
                         continue
                     self.declare_partials(of, wrt, method=method)
             else:
-                # declare only those partials that have been declared
+                # update only those partials that have been declared
                 for meta in self._declared_partials_patterns.values():
                     meta['method'] = method
 
@@ -1120,7 +1121,8 @@ class Component(System):
             meta.update(kwargs)
 
     def declare_partials(self, of, wrt, dependent=True, rows=None, cols=None, val=None,
-                         method='exact', step=None, form=None, step_calc=None, minimum_step=None):
+                         method='exact', step=None, form=None, step_calc=None, minimum_step=None,
+                         diagonal=None):
         """
         Declare information about this component's subjacobians.
 
@@ -1168,6 +1170,8 @@ class Component(System):
             in which case the approximation method provides its default value.
         minimum_step : float
             Minimum step size allowed when using one of the relative step_calc options.
+        diagonal : bool
+            If True, the subjacobian is a diagonal matrix.
 
         Returns
         -------
@@ -1192,7 +1196,7 @@ class Component(System):
 
         key = (of, wrt)
         if key not in self._declared_partials_patterns:
-            self._declared_partials_patterns[key] = {}
+            self._declared_partials_patterns[key] = SUBJAC_META_DEFAULTS.copy()
         meta = self._declared_partials_patterns[key]
         meta['dependent'] = dependent
 
@@ -1203,6 +1207,7 @@ class Component(System):
 
         if dependent:
             meta['val'] = val
+            meta['diagonal'] = diagonal
 
             _val = val.data if issparse(val) else val
             if np.all(_val == 0):
@@ -1565,12 +1570,13 @@ class Component(System):
             if abs_key in self._subjacs_info:
                 meta = self._subjacs_info[abs_key]
                 meta.update(patmeta_not_none)
-                if 'rows' in meta and meta['rows'] is not None:
+                if meta['rows'] is not None:
                     rows = meta['rows']
-                if 'cols' in meta and meta['cols'] is not None:
+                if meta['cols'] is not None:
                     cols = meta['cols']
             else:
-                meta = patmeta.copy()
+                meta = SUBJAC_META_DEFAULTS.copy()
+                meta.update(patmeta)
 
             of, wrt = abs_key
             meta['rows'] = rows
@@ -1580,8 +1586,10 @@ class Component(System):
             dist_out = abs2meta_out[of]['distributed']
             if wrt in abs2meta_in:
                 dist_in = abs2meta_in[wrt]['distributed']
+                src_indices = abs2meta_in[wrt]['src_indices']
             else:
                 dist_in = abs2meta_out[wrt]['distributed']
+                src_indices = None
 
             if dist_in and not dist_out and not matfree:
                 rel_key = abs_key2rel_key(self, abs_key)
@@ -1628,7 +1636,18 @@ class Component(System):
             self._check_partials_meta(abs_key, meta['val'],
                                       shape if rows is None else (rows.shape[0], 1))
 
+            if self._jacobian is not None:
+                self._jacobian.add_subjac_info(self, abs_key, meta, src_indices=src_indices)
             self._subjacs_info[abs_key] = meta
+
+    def _init_jacobian(self):
+        """
+        Initialize the jacobian.
+
+        Override this in a subclass to use a different jacobian type than DictionaryJacobian.
+        """
+        self._jacobian = BlockJacobian(system=self)
+        # self._jacobian = DictionaryJacobian(system=self)
 
     def _column_iotypes(self):
         """
@@ -1807,8 +1826,6 @@ class Component(System):
             self._first_call_to_linearize = False  # only do this once
             if coloring_mod._use_partial_sparsity:
                 self._get_coloring()
-                if self._jacobian is not None:
-                    self._jacobian._restore_approx_sparsity()
 
     def _resolve_src_inds(self):
         abs2prom = self._resolver.abs2prom

@@ -694,7 +694,7 @@ class System(object, metaclass=SystemMetaclass):
         Parameters
         ----------
         wrt_matches : set or None
-            Only include row vars that are contained in this set.  This will determine what
+            Only include column vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
 
@@ -1741,11 +1741,6 @@ class System(object, metaclass=SystemMetaclass):
 
         self._coloring_info._update_wrt_matches(self)
 
-        save_jac = self._jacobian
-
-        # use special sparse jacobian to collect sparsity info
-        self._jacobian = _ColSparsityJac(self)
-
         if self.is_explicit():
             pvecs = (self._inputs,)
             save_vecs = (self._outputs, self._residuals)
@@ -1754,6 +1749,10 @@ class System(object, metaclass=SystemMetaclass):
             save_vecs = (self._residuals,)
 
         from openmdao.core.group import Group
+
+        # use special sparse jacobian to collect sparsity info
+        save_jac = self._jacobian
+        self._jacobian = _ColSparsityJac(self)
 
         if isinstance(self, Group):
             for _ in self._perturbation_iter(num_iters, perturb_size, pvecs, save_vecs):
@@ -1798,6 +1797,9 @@ class System(object, metaclass=SystemMetaclass):
             abs_key = (prefix + of, prefix + wrt)
             if abs_key in self._subjacs_info:
                 self._subjacs_info[abs_key]['sparsity'] = (rows, cols, shape)
+
+        if isinstance(self._jacobian, Jacobian):
+            self._jacobian._update_subjacs(self)
 
     def subjac_sparsity_iter(self, sparsity, wrt_matches=None):
         """
@@ -6879,6 +6881,9 @@ class System(object, metaclass=SystemMetaclass):
             if path not in seen:
                 seen.add(path)
                 yield path
+
+    def _get_subjac_owners(self):
+        return {}
 
 
 class _ErrorData(object):

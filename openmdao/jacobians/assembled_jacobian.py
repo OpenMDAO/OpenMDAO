@@ -263,8 +263,8 @@ class AssembledJacobian(Jacobian):
             else:
                 global_conns = system._conn_global_abs_in2out
 
-            output_names = set(system._var_abs2meta['output'])
-            input_names = set(system._var_abs2meta['input'])
+            output_names = system._var_abs2meta['output']
+            input_names = system._var_abs2meta['input']
 
             rev_conns = defaultdict(list)
             for tgt, src in global_conns.items():
@@ -276,28 +276,25 @@ class AssembledJacobian(Jacobian):
 
             iters = []
             iters_in_ext = []
-            resolver = system._resolver
 
             for abs_key in subjacs:
                 _, wrtname = abs_key
-                if resolver.is_abs(wrtname, 'output'):
-                    if wrtname in output_names:
-                        if abs_key in int_mtx._submats:
-                            iters.append(abs_key)
-                        else:
-                            # This happens when the src is an indepvarcomp that is
-                            # contained in the system.
-                            of, wrt = abs_key
-                            if wrt in rev_conns:
-                                for tgt in rev_conns[wrt]:
-                                    if (of, tgt) in int_mtx._submats:
-                                        iters.append(abs_key)
-                                        break
-                elif resolver.is_abs(wrtname, 'input'):
-                    if wrtname in input_names:  # wrt is an input
-                        if wrtname in global_conns:
-                            iters.append(abs_key)
-                        elif ext_mtx is not None:
+                if wrtname in output_names:
+                    if abs_key in int_mtx._submats:
+                        iters.append(abs_key)
+                    else:
+                        # This happens when the src is an indepvarcomp that is
+                        # contained in the system.
+                        of, wrt = abs_key
+                        if wrt in rev_conns:
+                            for tgt in rev_conns[wrt]:
+                                if (of, tgt) in int_mtx._submats:
+                                    iters.append(abs_key)
+                                    break
+                elif wrtname in input_names:  # wrt is an input
+                    if wrtname in global_conns:
+                        iters.append(abs_key)
+                    elif ext_mtx is not None:
                             iters_in_ext.append(abs_key)
 
             self._subjac_iters[system.pathname] = subjac_iters = (iters, iters_in_ext)
