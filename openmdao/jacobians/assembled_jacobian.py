@@ -4,7 +4,7 @@ from collections import defaultdict
 
 import numpy as np
 
-from openmdao.jacobians.jacobian import Jacobian
+from openmdao.jacobians.jacobian import SplitJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
@@ -15,7 +15,7 @@ from openmdao.utils.iter_utils import meta2range_iter
 _empty_dict = {}
 
 
-class AssembledJacobian(Jacobian):
+class AssembledJacobian(SplitJacobian):
     """
     Assemble a global <Jacobian>.
 
@@ -158,7 +158,7 @@ class AssembledJacobian(Jacobian):
                         abs_key2 = (res_abs_name, out_abs_name)
                         shape = abs_key2shape(abs_key2)
 
-                    print(abs_key, abs_key2, src_indices, shape)
+                    # print(abs_key, abs_key2, src_indices, shape)
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
                                         src_indices, shape, factor)
 
@@ -320,29 +320,30 @@ class AssembledJacobian(Jacobian):
 
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
-        subjacs = system._subjacs_info
+        int_subjacs, ext_subjacs = self._get_split_subjacs(system)
 
-        iters, iters_in_ext = self._get_subjac_iters(system)
+        # iters, iters_in_ext = self._get_subjac_iters(system)
 
         int_mtx._pre_update()
         if ext_mtx is not None:
             ext_mtx._pre_update()
 
         if self._randgen and system._problem_meta['randomize_subjacs']:
-            for key in iters:
-                int_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['val'], key))
+            for key, subjac in int_subjacs.items():
+                int_mtx._update_submat(key, self._randomize_subjac(subjac.get_val(), key))
 
-            for key in iters_in_ext:
-                ext_mtx._update_submat(key, self._randomize_subjac(subjacs[key]['val'], key))
+            for key, subjac in ext_subjacs.items():
+                ext_mtx._update_submat(key, self._randomize_subjac(subjac.get_val(), key))
         else:
 
-            for key in iters:
-                print(f"update int {key} to {subjacs[key]['val']}")
-                int_mtx._update_submat(key, subjacs[key]['val'])
+            for key, subjac in int_subjacs.items():
+                print(f"update int {key} to {subjac.get_val()}")
+                int_mtx._update_submat(key, subjac.get_val())
 
-            for key in iters_in_ext:
-                print(f"update ext {key} to {subjacs[key]['val']}")
-                ext_mtx._update_submat(key, subjacs[key]['val'])
+            if ext_subjacs:
+                for key, subjac in ext_subjacs.items():
+                    print(f"update ext {key} to {subjac.get_val()}")
+                    ext_mtx._update_submat(key, subjac.get_val())
 
         int_mtx._post_update()
 

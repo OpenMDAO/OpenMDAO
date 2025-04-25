@@ -56,7 +56,6 @@ class MyExplicitComp(ExplicitComponent):
         if isinstance(jac1, list):
             jac1 = jac1[0]
 
-
         print(f'jac1: {jac1}')
         partials['f', 'x'] = jac1
 

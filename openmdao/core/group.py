@@ -4317,25 +4317,25 @@ class Group(System):
             # and _owns_approx_wrt so we can use the same approx code for totals and
             # semi-totals.  Also, the order must match order of vars in the output and
             # input vectors.
-            abs_outs = self._var_allprocs_abs2meta['output']
-            abs_ins = self._var_allprocs_abs2meta['input']
-
             resolver = self._resolver
+
             self._owns_approx_of = {}
-            for n, m in abs_outs.items():
+            for n, m in self._var_allprocs_abs2meta['output'].items():
                 self._owns_approx_of[n] = dct = m.copy()
                 dct['name'] = resolver.abs2prom(n, 'output')
                 dct['source'] = n
                 dct['indices'] = None
 
-            wrtset = set([k[1] for k in approx_keys])
+            wrtset = set([wrt for _, wrt in approx_keys])
+
             self._owns_approx_wrt = {}
-            for n, m in abs_ins.items():
+            for n, m in self._var_allprocs_abs2meta['input'].items():
                 if n in wrtset:
-                    self._owns_approx_wrt[n] = dct = m.copy()
-                    dct['name'] = resolver.abs2prom(n, 'input')
-                    dct['source'] = n
-                    dct['indices'] = None
+                    # self._owns_approx_wrt[n] = dct = m.copy()
+                    self._owns_approx_wrt[n] = {'distributed': m['distributed']}
+                    # dct['name'] = resolver.abs2prom(n, 'input')
+                    # dct['source'] = n
+                    # dct['indices'] = None
 
             self._owns_approx_jac = True
 

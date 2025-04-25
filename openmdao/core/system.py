@@ -2540,6 +2540,9 @@ class System(object, metaclass=SystemMetaclass):
             for subsys in self._subsystems_myproc:
                 subsys._setup_jacobians()
 
+        if isinstance(self._jacobian, Jacobian):
+            self._jacobian._setup()
+
     def _get_promotion_maps(self):
         """
         Define variable maps based on promotes lists.

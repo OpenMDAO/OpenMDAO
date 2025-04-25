@@ -161,7 +161,7 @@ class ExplicitComponent(Component):
                 #     'val': np.full(size, -1.),
                 #     'dependent': True,
                 # }
-                self._jacobian._add_subjac_info(self, (out_abs, out_abs), meta)
+                # self._jacobian._add_subjac_info(self, (out_abs, out_abs), meta)
 
     def _setup_jacobians(self, recurse=True):
         """
@@ -174,6 +174,9 @@ class ExplicitComponent(Component):
         """
         if self._has_approx and self._use_derivatives:
             self._set_approx_partials_meta()
+
+        if self._jacobian is not None:
+            self._jacobian._setup()
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,

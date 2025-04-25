@@ -58,21 +58,21 @@ class Jacobian(object):
         """
         self._system = weakref.ref(system)
         self._subjacs_info = system._subjacs_info
-        self._subjacs = {}
-        self._int_subjacs = None
-        self._ext_subjacs = {}
+        self._subjacs = None
         self._under_complex_step = False
         self._abs_keys = {}
         self._col_var_offset = None
         self._col_varnames = None
         self._col2name_ind = None
-        self._output_slices = None
-        self._input_slices = None
+        self._vec_slices = {'input': None, 'output': None}
 
-    def _add_subjac_info(self, system, abs_key, meta, src_indices=None, factor=None):
-        self._subjacs[abs_key] = self.create_subjac(system, abs_key, meta, src_indices, factor)
+    # def _add_subjac_info(self, system, abs_key, meta, src_indices=None, factor=None):
+    #     self._subjacs[abs_key] = self.create_subjac(system, abs_key, meta, src_indices, factor)
 
-    def create_subjac(self, system, abs_key, meta, src_indices=None, factor=None):
+    def _setup(self):
+        self._get_subjacs(self._system())
+
+    def create_subjac(self, system, abs_key, meta):
         """
         Create a subjacobian.
 
@@ -84,10 +84,6 @@ class Jacobian(object):
             The absolute key for the subjacobian.
         meta : dict
             Metadata for the subjacobian.
-        src_indices : array or None
-            Source indices for the subjacobian.
-        factor : float or None
-            Factor for the subjacobian.
 
         Returns
         -------
@@ -95,34 +91,33 @@ class Jacobian(object):
             The created subjacobian, or None if meta['dependent'] is False.
         """
         if meta['dependent']:
-            output_slices, input_slices = self._get_jac_slices(system)
+            output_slices = self._get_vec_slices(system, 'output')
+            input_slices = self._get_vec_slices(system, 'input')
             of, wrt = abs_key
 
-            wrt_is_input = wrt in input_slices or src_indices is not None
-
             row_slice = output_slices[of]
+
+            wrt_is_input = wrt in input_slices
             if wrt_is_input:
                 col_slice = input_slices[wrt]
             else:
-                if src_indices is None:
-                    col_slice = output_slices[wrt]
-                else:
-                    # use the shape of the source variable to determine the shape of the subjac
-                    src = system._conn_global_abs_in2out[wrt]
-                    col_slice = output_slices[src]
-                    wrt_is_input = False
+                col_slice = output_slices[wrt]
 
-            if meta['diagonal']:
-                return DiagonalSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
-            elif meta['rows'] is None:
-                assert meta['cols'] is None
-                if issparse(meta['val']):
-                    return SparseSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices,
-                                        factor)
-                else:
-                    return Subjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
+            return self._subjac_from_meta(meta, row_slice, col_slice, wrt_is_input)
+
+    def _subjac_from_meta(self, meta, row_slice, col_slice, wrt_is_input, src_indices=None,
+                          factor=None):
+        if meta['diagonal']:
+            return DiagonalSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
+        elif meta['rows'] is None:
+            assert meta['cols'] is None
+            if issparse(meta['val']):
+                return SparseSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices,
+                                    factor)
             else:
-                return OMCOOSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
+                return Subjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
+        else:
+            return OMCOOSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
 
     def _get_subjacs(self, system):
         if self._subjacs is None:
@@ -130,71 +125,13 @@ class Jacobian(object):
                              for key, meta in self._subjacs_info.items()}
         return self._subjacs
 
-    def _get_jac_slices(self, system):
-        if self._output_slices is None:
-            row_iter = system._var_abs2meta['output'].items()
-            self._output_slices = {n: slice(start, end)
-                                   for n, start, end in meta2range_iter(row_iter)}
-
-            col_iter = system._var_abs2meta['input'].items()
-            self._input_slices = {n: slice(start, end)
-                                  for n, start, end in meta2range_iter(col_iter)}
-
-        return self._output_slices, self._input_slices
-
-    def _get_split_subjacs(self, system):
-        if self._int_subjacs is None or system.pathname not in self._ext_subjacs:
-            self._int_subjacs = {}
-            ext_subjacs = {}
-            abs2meta_out = system._var_abs2meta['output']
-            abs2meta_in = system._var_abs2meta['input']
-            try:
-                conns = system._conn_global_abs_in2out
-            except AttributeError:
-                conns = {}
-            row_slices, col_slices = self._get_jac_slices(system)
-
-            for abs_key, meta in self._subjacs_info.items():
-                of, wrt = abs_key
-                factor = None
-                if wrt in row_slices:
-                    self._int_subjacs[abs_key] = self.create_subjac(system, abs_key, meta)
-                elif wrt in col_slices:
-                    if wrt in conns:  # connected input
-                        # For the int_subjacs that make up the 'internal' jacobian, both the row
-                        # and column entries correspond to outputs/residuals, so we need to map
-                        # derivatives wrt inputs into the corresponding derivative wrt the source,
-                        # so d(output)/d(source) instead of d(output)/d(input).
-                        src = conns[wrt]
-                        if src not in row_slices:
-                            # I don't think we ever get here.  Let's find out.
-                            raise RuntimeError("FOO OUTSIDE SRC")
-                            continue  # src outside current system
-
-                        meta_in = abs2meta_in[wrt]
-                        meta_out = abs2meta_out[src]
-
-                        # calculate unit conversion if any between the input and its source
-                        in_units = meta_in['units']
-                        out_units = meta_out['units']
-                        if in_units and out_units and in_units != out_units:
-                            factor, _ = unit_conversion(out_units, in_units)
-                            if factor == 1.0:
-                                factor = None
-
-                        src_indices = abs2meta_in[wrt]['src_indices']
-
-                        self._int_subjacs[abs_key] = self.create_subjac(system, abs_key, meta,
-                                                                        src_indices, factor)
-                    else:  # input is connected to something outside current system
-                        ext_subjacs[abs_key] = self.create_subjac(system, abs_key, meta)
-
-            if not ext_subjacs:
-                ext_subjacs = None
-
-            self._ext_subjacs[system.pathname] = ext_subjacs
-
-        return self._int_subjacs, ext_subjacs
+    def _get_vec_slices(self, system, iotype):
+        slices = self._vec_slices[iotype]
+        if slices is None:
+            it = system._var_abs2meta[iotype].items()
+            self._vec_slices[iotype] = slices = \
+                {n: slice(start, end) for n, start, end in meta2range_iter(it)}
+        return slices
 
     def _get_abs_key(self, key):
         try:
@@ -591,16 +528,133 @@ class Jacobian(object):
         """
         Revert all subjacs back to the way they were as declared by the user.
         """
-        old_subjacs = self._subjacs
-        self._subjacs_info = system._subjacs_info
-        self._subjacs = {}
-        for key, meta in self._subjacs_info.items():
-            if key in old_subjacs:
-                old_subjac = old_subjacs[key]
-                self._subjacs[key] = self.create_subjac(system, key, meta,
-                                                        src_indices=old_subjac.src_indices,
-                                                        factor=old_subjac.factor)
-            else:
-                self._subjacs[key] = self.create_subjac(system, key, meta)
+        self._subjacs = None
+        self._get_subjacs(system)
+        # old_subjacs = self._subjacs
+        # self._subjacs_info = system._subjacs_info
+        # self._subjacs = {}
+        # for key, meta in self._subjacs_info.items():
+        #     if key in old_subjacs:
+        #         old_subjac = old_subjacs[key]
+        #         self._subjacs[key] = self.create_subjac(system, key, meta,
+        #                                                 src_indices=old_subjac.src_indices,
+        #                                                 factor=old_subjac.factor)
+        #     else:
+        #         self._subjacs[key] = self.create_subjac(system, key, meta)
 
         self._col_varnames = None  # force recompute of internal index maps on next set_col
+
+
+class SplitJacobian(Jacobian):
+    """
+    A Jacobian that is split into internal and external parts.
+    """
+    def __init__(self, system):
+        super().__init__(system)
+        self._int_subjacs = None
+        self._ext_subjacs = {}
+
+    def _setup(self):
+        self._get_split_subjacs(self._system())
+
+    def _get_split_subjacs(self, system):
+        if self._int_subjacs is None or system.pathname not in self._ext_subjacs:
+            self._int_subjacs = {}
+            ext_subjacs = {}
+            abs2meta_out = system._var_abs2meta['output']
+            abs2meta_in = system._var_abs2meta['input']
+            try:
+                conns = system._conn_global_abs_in2out
+            except AttributeError:
+                conns = {}
+            output_slices = self._get_vec_slices(system, 'output')
+            input_slices = self._get_vec_slices(system, 'input')
+
+            for abs_key, meta in self._subjacs_info.items():
+                of, wrt = abs_key
+                factor = None
+                if wrt in output_slices:
+                    self._int_subjacs[abs_key] = self.create_internal_subjac(system, abs_key, meta)
+                elif wrt in input_slices:
+                    if wrt in conns:  # connected input
+                        # For the int_subjacs that make up the 'internal' jacobian, both the row
+                        # and column entries correspond to outputs/residuals, so we need to map
+                        # derivatives wrt inputs into the corresponding derivative wrt the source,
+                        # so d(residual)/d(source) instead of d(residual)/d(input).
+                        src = conns[wrt]
+                        if src not in output_slices:
+                            # I don't think we ever get here.  Let's find out.
+                            raise RuntimeError("FOO OUTSIDE SRC")
+                            continue  # src outside current system
+
+                        meta_in = abs2meta_in[wrt]
+                        meta_out = abs2meta_out[src]
+
+                        # calculate unit conversion if any between the input and its source
+                        in_units = meta_in['units']
+                        out_units = meta_out['units']
+                        if in_units and out_units and in_units != out_units:
+                            factor, _ = unit_conversion(out_units, in_units)
+                            if factor == 1.0:
+                                factor = None
+
+                        src_indices = abs2meta_in[wrt]['src_indices']
+
+                        self._int_subjacs[abs_key] = \
+                            self.create_internal_subjac(system, abs_key, meta, src_indices, factor)
+                    else:  # input is connected to something outside current system
+                        ext_subjacs[abs_key] = self.create_subjac(system, abs_key, meta)
+
+            if not ext_subjacs:
+                ext_subjacs = None
+
+            self._ext_subjacs[system.pathname] = ext_subjacs
+        else:
+            ext_subjacs = self._ext_subjacs[system.pathname]
+
+        return self._int_subjacs, ext_subjacs
+
+    def _update_subjacs(self, system):
+        """
+        Revert all subjacs back to the way they were as declared by the user.
+        """
+        self._int_subjacs = None
+        self._ext_subjacs = {}
+        self._get_split_subjacs(system)
+
+        self._col_varnames = None  # force recompute of internal index maps on next set_col
+
+    def create_internal_subjac(self, system, abs_key, meta, src_indices=None, factor=None):
+        """
+        Create a subjacobian for a square internal jacobian (d(residual)/d(source)).
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        abs_key : tuple
+            The absolute key for the subjacobian.
+        meta : dict
+            Metadata for the subjacobian.
+        src_indices : array or None
+            Source indices for the subjacobian.
+        factor : float or None
+            Factor for the subjacobian.
+
+        Returns
+        -------
+        Subjac
+            The created subjacobian, or None if meta['dependent'] is False.
+        """
+        if meta['dependent']:
+            output_slices = self._get_vec_slices(system, 'output')
+            of, wrt = abs_key
+
+            if wrt in output_slices:
+                col_slice = output_slices[wrt]
+            else:
+                src = system._conn_global_abs_in2out[wrt]
+                col_slice = output_slices[src]
+
+            return self._subjac_from_meta(meta, output_slices[of], col_slice, False,
+                                          src_indices, factor)

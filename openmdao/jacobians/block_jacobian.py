@@ -79,47 +79,47 @@ class BlockJacobian(Jacobian):
         except ValueError as err:
             raise ValueError(f"{self.msginfo}: for subjacobian {key}: {err}")
 
-    def _get_subjacs(self, system):
-        """
-        Get the sub-Jacobians.
+    # def _get_subjacs(self, system):
+    #     """
+    #     Get the sub-Jacobians.
 
-        Parameters
-        ----------
-        system : System
-            System that is updating this jacobian.
+    #     Parameters
+    #     ----------
+    #     system : System
+    #         System that is updating this jacobian.
 
-        Returns
-        -------
-        dict
-            Dictionary of sub-Jacobians.
-        """
-        if not self._ordered:
-            # determine the set of remote keys (keys where either of or wrt is remote somewhere)
-            # only if we're under MPI with comm size > 1 and the given system is a Group that
-            # computes its derivatives using finite difference or complex step.
-            include_remotes = system.pathname and \
-                system.comm.size > 1 and system._owns_approx_jac and system._subsystems_allprocs
+    #     Returns
+    #     -------
+    #     dict
+    #         Dictionary of sub-Jacobians.
+    #     """
+    #     if not self._ordered:
+    #         # determine the set of remote keys (keys where either of or wrt is remote somewhere)
+    #         # only if we're under MPI with comm size > 1 and the given system is a Group that
+    #         # computes its derivatives using finite difference or complex step.
+    #         include_remotes = system.pathname and \
+    #             system.comm.size > 1 and system._owns_approx_jac and system._subsystems_allprocs
 
-            subjacs = self._subjacs
+    #         subjacs = self._subjacs
 
-            if include_remotes:
-                ofnames = system._var_allprocs_abs2meta['output']
-                wrtnames = system._var_allprocs_abs2meta
-            else:
-                ofnames = system._var_abs2meta['output']
-                wrtnames = system._var_abs2meta
+    #         if include_remotes:
+    #             ofnames = system._var_allprocs_abs2meta['output']
+    #             wrtnames = system._var_allprocs_abs2meta
+    #         else:
+    #             ofnames = system._var_abs2meta['output']
+    #             wrtnames = system._var_abs2meta
 
-            self._subjacs = {}
-            for res_name in ofnames:
-                for type_ in ('output', 'input'):
-                    for name in wrtnames[type_]:
-                        key = (res_name, name)
-                        if key in subjacs:
-                            self._subjacs[key] = subjacs[key]
+    #         self._subjacs = {}
+    #         for res_name in ofnames:
+    #             for type_ in ('output', 'input'):
+    #                 for name in wrtnames[type_]:
+    #                     key = (res_name, name)
+    #                     if key in subjacs:
+    #                         self._subjacs[key] = subjacs[key]
 
-            self._ordered = True
+    #         self._ordered = True
 
-        return self._subjacs
+    #     return self._subjacs
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """

@@ -1587,10 +1587,8 @@ class Component(System):
             dist_out = abs2meta_out[of]['distributed']
             if wrt in abs2meta_in:
                 dist_in = abs2meta_in[wrt]['distributed']
-                src_indices = abs2meta_in[wrt]['src_indices']
             else:
                 dist_in = abs2meta_out[wrt]['distributed']
-                src_indices = None
 
             if dist_in and not dist_out and not matfree:
                 rel_key = abs_key2rel_key(self, abs_key)
@@ -1637,8 +1635,6 @@ class Component(System):
             self._check_partials_meta(abs_key, meta['val'],
                                       shape if rows is None else (rows.shape[0], 1))
 
-            if self._jacobian is not None:
-                self._jacobian._add_subjac_info(self, abs_key, meta, src_indices=src_indices)
             self._subjacs_info[abs_key] = meta
 
     def _init_jacobian(self):
@@ -1801,8 +1797,9 @@ class Component(System):
         # (this prevents warnings that could confuse users)
         for i in range(len(subjac_keys) - 1, -1, -1):
             key = subjac_keys[i]
-            if key[1] not in wrtset:
-                wrtset.add(key[1])
+            wrt = key[1]
+            if wrt not in wrtset:
+                wrtset.add(wrt)
                 meta = subjacs[key]
                 self._approx_schemes[meta['method']].add_approximation(key, self, meta)
 
