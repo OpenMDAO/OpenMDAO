@@ -1844,12 +1844,6 @@ class Group(System):
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
-        # for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
-        #     if len(abs_list) > 1:
-        #         self._collect_error("{}: Output name '{}' refers to "
-        #                             "multiple outputs: {}.".format(self.msginfo, prom_name,
-        #                                                            sorted(abs_list)))
-
         if self._group_inputs:
             extra = [gin for gin in self._group_inputs if not resolver.is_prom(gin, 'input')]
             if extra:
