@@ -56,7 +56,6 @@ class MyExplicitComp(ExplicitComponent):
         if isinstance(jac1, list):
             jac1 = jac1[0]
 
-        print(f'jac1: {jac1}')
         partials['f', 'x'] = jac1
 
         jac2 = self._jac_type(np.array([
@@ -67,7 +66,6 @@ class MyExplicitComp(ExplicitComponent):
         if isinstance(jac2, list):
             jac2 = jac2[0]
 
-        print(f'jac2: {jac2}')
         partials['f', 'y'] = jac2
 
 

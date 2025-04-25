@@ -9,7 +9,6 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
-from openmdao.utils.units import unit_conversion
 from openmdao.utils.iter_utils import meta2range_iter
 
 _empty_dict = {}
@@ -98,77 +97,91 @@ class AssembledJacobian(SplitJacobian):
             Parent system to this jacobian.
         """
         # var_indices are the *global* indices for variables on this proc
-        is_top = system.pathname == ''
-
-        abs2meta_in = system._var_abs2meta['input']
-        all_meta = system._var_allprocs_abs2meta
-
+        # is_top = system.pathname == ''
         self._int_mtx = int_mtx = self._matrix_class(system.comm, True)
         ext_mtx = self._matrix_class(system.comm, False)
 
-        out_ranges = self._out_ranges
-        in_ranges = self._in_ranges
-        resolver = system._resolver
+        int_subjacs, ext_subjacs = self._get_split_subjacs(system)
+        for key, subjac in int_subjacs.items():
+            int_mtx._add_submat(key, subjac.info, subjac.row_slice.start, subjac.col_slice.start,
+                                subjac.src_indices, subjac.shape, subjac.factor)
 
-        conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
-        abs_key2shape = self._abs_key2shape
+        if ext_subjacs:
+            for key, subjac in ext_subjacs.items():
+                ext_mtx._add_submat(key, subjac.info, subjac.row_slice.start, subjac.col_slice.start,
+                                    None, subjac.shape)
 
-        # create the matrix subjacs
-        for abs_key, info in self._subjacs_info.items():
-            res_abs_name, wrt_abs_name = abs_key
-            # because self._subjacs_info is shared among all 'related' assembled jacs,
-            # we use out_ranges (and later in_ranges) to weed out keys outside of this jac
-            if res_abs_name not in out_ranges:
-                continue
-            res_offset, res_end = out_ranges[res_abs_name]
-            res_size = res_end - res_offset
+        #abs2meta_in = system._var_abs2meta['input']
+        #all_meta = system._var_allprocs_abs2meta
 
-            if resolver.is_abs(wrt_abs_name, 'output'):
-                out_offset, out_end = out_ranges[wrt_abs_name]
-                out_size = out_end - out_offset
-                shape = (res_size, out_size)
-                int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
-            elif wrt_abs_name in in_ranges:
-                if wrt_abs_name in conns:  # connected input
-                    out_abs_name = conns[wrt_abs_name]
-                    if out_abs_name not in out_ranges:
-                        continue
+        #self._int_mtx = int_mtx = self._matrix_class(system.comm, True)
+        #ext_mtx = self._matrix_class(system.comm, False)
 
-                    meta_in = abs2meta_in[wrt_abs_name]
-                    all_out_meta = all_meta['output'][out_abs_name]
-                    # calculate unit conversion
-                    in_units = meta_in['units']
-                    out_units = all_out_meta['units']
-                    if in_units and out_units and in_units != out_units:
-                        factor, _ = unit_conversion(out_units, in_units)
-                        if factor == 1.0:
-                            factor = None
-                    else:
-                        factor = None
+        #out_ranges = self._out_ranges
+        #in_ranges = self._in_ranges
+        #resolver = system._resolver
 
-                    out_offset, out_end = out_ranges[out_abs_name]
-                    out_size = out_end - out_offset
-                    shape = (res_size, out_size)
-                    src_indices = abs2meta_in[wrt_abs_name]['src_indices']
+        #conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
+        #abs_key2shape = self._abs_key2shape
 
-                    if src_indices is not None:
-                        # need to add an entry for d(output)/d(source)
-                        # instead of d(output)/d(input).  int_mtx is a square matrix whose
-                        # rows and columns map to output/resid vars only.
-                        abs_key2 = (res_abs_name, out_abs_name)
-                        shape = abs_key2shape(abs_key2)
+        ## create the matrix subjacs
+        #for abs_key, info in self._subjacs_info.items():
+            #res_abs_name, wrt_abs_name = abs_key
+            ## because self._subjacs_info is shared among all 'related' assembled jacs,
+            ## we use out_ranges (and later in_ranges) to weed out keys outside of this jac
+            #if res_abs_name not in out_ranges:
+                #continue
+            #res_offset, res_end = out_ranges[res_abs_name]
+            #res_size = res_end - res_offset
 
-                    # print(abs_key, abs_key2, src_indices, shape)
-                    int_mtx._add_submat(abs_key, info, res_offset, out_offset,
-                                        src_indices, shape, factor)
+            #if resolver.is_abs(wrt_abs_name, 'output'):
+                #out_offset, out_end = out_ranges[wrt_abs_name]
+                #out_size = out_end - out_offset
+                #shape = (res_size, out_size)
+                #int_mtx._add_submat(abs_key, info, res_offset, out_offset, None, shape)
+            #elif wrt_abs_name in in_ranges:
+                #if wrt_abs_name in conns:  # connected input
+                    #out_abs_name = conns[wrt_abs_name]
+                    #if out_abs_name not in out_ranges:
+                        #continue
 
-                elif not is_top:  # input is connected to something outside current system
-                    in_offset, in_end = in_ranges[wrt_abs_name]
-                    # don't use global offsets for ext_mtx
-                    res_offset, res_end = out_ranges[res_abs_name]
-                    res_size = res_end - res_offset
-                    shape = (res_size, in_end - in_offset)
-                    ext_mtx._add_submat(abs_key, info, res_offset, in_offset, None, shape)
+                    #meta_in = abs2meta_in[wrt_abs_name]
+                    #all_out_meta = all_meta['output'][out_abs_name]
+                    ## calculate unit conversion
+                    #in_units = meta_in['units']
+                    #out_units = all_out_meta['units']
+                    #if in_units and out_units and in_units != out_units:
+                        #factor, _ = unit_conversion(out_units, in_units)
+                        #if factor == 1.0:
+                            #factor = None
+                    #else:
+                        #factor = None
+
+                    #out_offset, out_end = out_ranges[out_abs_name]
+                    #out_size = out_end - out_offset
+                    #shape = (res_size, out_size)
+                    #src_indices = abs2meta_in[wrt_abs_name]['src_indices']
+
+                    #if src_indices is not None:
+                        ## need to add an entry for d(output)/d(source)
+                        ## instead of d(output)/d(input).  int_mtx is a square matrix whose
+                        ## rows and columns map to output/resid vars only.
+                        #abs_key2 = (res_abs_name, out_abs_name)
+                        #shape = abs_key2shape(abs_key2)
+
+                        #print(abs_key, abs_key2, src_indices, shape)
+                    #else:
+                        #print(abs_key, None, None, shape)
+                    #int_mtx._add_submat(abs_key, info, res_offset, out_offset,
+                                        #src_indices, shape, factor)
+
+                #elif not is_top:  # input is connected to something outside current system
+                    #in_offset, in_end = in_ranges[wrt_abs_name]
+                    ## don't use global offsets for ext_mtx
+                    #res_offset, res_end = out_ranges[res_abs_name]
+                    #res_size = res_end - res_offset
+                    #shape = (res_size, in_end - in_offset)
+                    #ext_mtx._add_submat(abs_key, info, res_offset, in_offset, None, shape)
 
         out_size = len(system._outputs)
         int_mtx._build(out_size, out_size, system)
@@ -314,9 +327,9 @@ class AssembledJacobian(SplitJacobian):
         # _initialize has been delayed until the first _update call
         if self._int_mtx is None:
             self._initialize(system)
-            self._init_ranges(system)
-            if system.pathname:
-                self._init_view(system)
+            #self._init_ranges(system)
+            #if system.pathname:
+                #self._init_view(system)
 
         int_mtx = self._int_mtx
         ext_mtx = self._ext_mtx[system.pathname]
@@ -337,7 +350,7 @@ class AssembledJacobian(SplitJacobian):
         else:
 
             for key, subjac in int_subjacs.items():
-                print(f"update int {key} to {subjac.get_val()}")
+                print(f"update int {key} to {subjac.get_val()}, row:{subjac.row_slice}, col:{subjac.col_slice}")
                 int_mtx._update_submat(key, subjac.get_val())
 
             if ext_subjacs:

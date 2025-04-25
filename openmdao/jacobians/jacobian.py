@@ -558,6 +558,8 @@ class SplitJacobian(Jacobian):
         self._get_split_subjacs(self._system())
 
     def _get_split_subjacs(self, system):
+        is_top = system.pathname == ''
+
         if self._int_subjacs is None or system.pathname not in self._ext_subjacs:
             self._int_subjacs = {}
             ext_subjacs = {}
@@ -602,7 +604,7 @@ class SplitJacobian(Jacobian):
 
                         self._int_subjacs[abs_key] = \
                             self.create_internal_subjac(system, abs_key, meta, src_indices, factor)
-                    else:  # input is connected to something outside current system
+                    elif not is_top:  # input is connected to something outside current system
                         ext_subjacs[abs_key] = self.create_subjac(system, abs_key, meta)
 
             if not ext_subjacs:
