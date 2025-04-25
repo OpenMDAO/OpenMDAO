@@ -1894,8 +1894,9 @@ class Group(System):
                 continue
             try:
                 paths = [(i, m['path']) for i, m in enumerate(metalist) if not m['auto']]
-                top_origin = paths[0][1]
-                top_prom = metalist[paths[0][0]]['prom']
+                if paths:
+                    top_origin = paths[0][1]
+                    top_prom = metalist[paths[0][0]]['prom']
             except KeyError:
                 issue_warning("No auto IVCs found", prefix=self.msginfo, category=PromotionWarning)
             allmeta = set()
