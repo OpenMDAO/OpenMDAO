@@ -2969,8 +2969,7 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
             if needs_scaling:
                 J = driver._compute_totals(of=of, wrt=wrt, return_format='array')
             else:
-                J = prob.compute_totals(of=of, wrt=wrt, return_format='array',
-                                           coloring_info=False)
+                J = prob.compute_totals(of=of, wrt=wrt, return_format='array', coloring_info=False)
             if fullJ is None:
                 fullJ = np.abs(J)
             else:

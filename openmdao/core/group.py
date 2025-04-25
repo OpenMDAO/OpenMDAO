@@ -18,7 +18,7 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
-from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.subjac import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
@@ -5447,6 +5447,7 @@ class Group(System):
                 self._key_owner = {}
 
         return self._key_owner
+
 
 def iter_solver_info(system):
     """

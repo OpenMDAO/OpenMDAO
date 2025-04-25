@@ -161,7 +161,7 @@ class ExplicitComponent(Component):
                 #     'val': np.full(size, -1.),
                 #     'dependent': True,
                 # }
-                self._jacobian.add_subjac_info(self, (out_abs, out_abs), meta)
+                self._jacobian._add_subjac_info(self, (out_abs, out_abs), meta)
 
     def _setup_jacobians(self, recurse=True):
         """

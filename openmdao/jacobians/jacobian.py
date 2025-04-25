@@ -30,6 +30,12 @@ class Jacobian(object):
         Pointer to the system that is currently operating on this Jacobian.
     _subjacs_info : dict
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
+    _subjacs : dict
+        Dictionary of the sub-Jacobian objects keyed by absolute names.
+    _int_subjacs : dict
+        Dictionary of the internal sub-Jacobian objects keyed by absolute names.
+    _ext_subjacs : dict
+        Dictionary of the external sub-Jacobian objects keyed by system pathname.
     _under_complex_step : bool
         When True, this Jacobian is under complex step, using a complex jacobian.
     _abs_keys : dict
@@ -40,6 +46,10 @@ class Jacobian(object):
         List of column var names.
     _col2name_ind : ndarray
         Array that maps jac col index to index of column name.
+    _output_slices : dict
+        Maps output name to slice of the output vector.
+    _input_slices : dict
+        Maps input name to slice of the input vector.
     """
 
     def __init__(self, system):
@@ -59,7 +69,7 @@ class Jacobian(object):
         self._output_slices = None
         self._input_slices = None
 
-    def add_subjac_info(self, system, abs_key, meta, src_indices=None, factor=None):
+    def _add_subjac_info(self, system, abs_key, meta, src_indices=None, factor=None):
         self._subjacs[abs_key] = self.create_subjac(system, abs_key, meta, src_indices, factor)
 
     def create_subjac(self, system, abs_key, meta, src_indices=None, factor=None):
@@ -107,7 +117,8 @@ class Jacobian(object):
             elif meta['rows'] is None:
                 assert meta['cols'] is None
                 if issparse(meta['val']):
-                    return SparseSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
+                    return SparseSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices,
+                                        factor)
                 else:
                     return Subjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
             else:
@@ -122,10 +133,12 @@ class Jacobian(object):
     def _get_jac_slices(self, system):
         if self._output_slices is None:
             row_iter = system._var_abs2meta['output'].items()
-            self._output_slices = {n: slice(start, end) for n, start, end in meta2range_iter(row_iter)}
+            self._output_slices = {n: slice(start, end)
+                                   for n, start, end in meta2range_iter(row_iter)}
 
             col_iter = system._var_abs2meta['input'].items()
-            self._input_slices = {n: slice(start, end) for n, start, end in meta2range_iter(col_iter)}
+            self._input_slices = {n: slice(start, end)
+                                  for n, start, end in meta2range_iter(col_iter)}
 
         return self._output_slices, self._input_slices
 

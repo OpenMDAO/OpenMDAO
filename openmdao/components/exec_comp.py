@@ -711,7 +711,7 @@ class ExecComp(ExplicitComponent):
                                 diag = True
                             else:
                                 diag = None
-                            decl_partials(of=out, wrt=inp, val=oval.copy(), diagonal=diag)
+                            decl_partials(of=out, wrt=inp, diagonal=diag)
                         else:
                             decl_partials(of=out, wrt=inp)
 
@@ -1104,7 +1104,7 @@ class ExecComp(ExplicitComponent):
 
                 for u in out_names:
                     if (u, inp) in partials:
-                        partials[u, inp] = imag(vdict[u] * inv_stepsize)
+                        partials[u, inp] = imag(vdict[u] * inv_stepsize).flat
 
                 # restore old input value
                 ival -= step

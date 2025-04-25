@@ -879,11 +879,13 @@ def _update_subjac_sparsity(sparsity_iter, pathname, subjacs_info):
                                        "dense.")
                 elif len(rows) > shape[0]:
                     raise RuntimeError(f"Subjacobian ({of}, {wrt}) is labeled as diagonal but the "
-                                       f"number of row/cols > diag size ({len(rows)} > {shape[0]}).")
+                                       "number of row/cols > diag size "
+                                       f"({len(rows)} > {shape[0]}).")
                 elif len(rows) < shape[0]:
                     subjacs_info[abs_key]['diagonal'] = diag = False
-                    issue_warning(f"Subjacobian ({of}, {wrt}) is labeled as diagonal but is actually "
-                                  f"more sparse than that, row/cols < diag size ({len(rows)} < {shape[0]}).")
+                    issue_warning(f"Subjacobian ({of}, {wrt}) is labeled as diagonal but is "
+                                  "actually more sparse than that, row/cols < diag size "
+                                  f"({len(rows)} < {shape[0]}).")
 
         if rows is None:
             if diag:

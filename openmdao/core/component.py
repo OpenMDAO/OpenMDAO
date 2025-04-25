@@ -15,6 +15,8 @@ from scipy.sparse import issparse, coo_matrix, csr_matrix
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
     global_meta_names, collect_errors, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
+from openmdao.jacobians.subjac import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.block_jacobian import BlockJacobian
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_key2abs_key
@@ -31,7 +33,6 @@ from openmdao.utils.code_utils import is_lambda, LambdaPickleWrapper, get_functi
     get_return_names
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
-from openmdao.jacobians.block_jacobian import BlockJacobian, SUBJAC_META_DEFAULTS
 
 
 _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
@@ -1637,7 +1638,7 @@ class Component(System):
                                       shape if rows is None else (rows.shape[0], 1))
 
             if self._jacobian is not None:
-                self._jacobian.add_subjac_info(self, abs_key, meta, src_indices=src_indices)
+                self._jacobian._add_subjac_info(self, abs_key, meta, src_indices=src_indices)
             self._subjacs_info[abs_key] = meta
 
     def _init_jacobian(self):

@@ -1,9 +1,28 @@
+"""
+BlockJacobian is a Jacobian that is a collection of sub-Jacobians.
 
+"""
 
 from openmdao.jacobians.jacobian import Jacobian
 
 
 class BlockJacobian(Jacobian):
+    """
+    A BlockJacobian is a Jacobian that is a collection of sub-Jacobians.
+
+    Parameters
+    ----------
+    system : System
+        System that is updating this jacobian.
+
+    Attributes
+    ----------
+    _subjacs : dict
+        Dictionary of sub-Jacobians.
+    _ordered : bool
+        Whether the sub-Jacobians are ordered.
+    """
+
     def __init__(self, system):
         """
         Initialize block-sparse Jacobian with sub-jacobian information.
@@ -60,6 +79,19 @@ class BlockJacobian(Jacobian):
             raise ValueError(f"{self.msginfo}: for subjacobian {key}: {err}")
 
     def _get_subjacs(self, system):
+        """
+        Get the sub-Jacobians.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+
+        Returns
+        -------
+        dict
+            Dictionary of sub-Jacobians.
+        """
         if not self._ordered:
             # determine the set of remote keys (keys where either of or wrt is remote somewhere)
             # only if we're under MPI with comm size > 1 and the given system is a Group that

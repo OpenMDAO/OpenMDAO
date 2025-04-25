@@ -133,11 +133,11 @@ class DictionaryJacobian(Jacobian):
                     continue
 
                 if abs_key in system._cross_keys and abs_key in key_owners:
-                        wrtowner = key_owners[abs_key]
-                        if system.comm.rank == wrtowner:
-                            system.comm.bcast(wrtvec, root=wrtowner)
-                        else:
-                            wrtvec = system.comm.bcast(None, root=wrtowner)
+                    wrtowner = key_owners[abs_key]
+                    if system.comm.rank == wrtowner:
+                        system.comm.bcast(wrtvec, root=wrtowner)
+                    else:
+                        wrtvec = system.comm.bcast(None, root=wrtowner)
 
                 if fwd:
                     left_vec = ofvec

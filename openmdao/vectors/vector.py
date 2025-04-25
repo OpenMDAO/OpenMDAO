@@ -61,7 +61,7 @@ class Vector(object):
         Function to lookup a name in the name resolver.
     _name : str
         The name of the vector: 'nonlinear' or 'linear'.
-    _typ : str
+    _iotype : str
         Type: 'input' for input vectors; 'output' for output/residual vectors.
     _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.

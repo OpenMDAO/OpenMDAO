@@ -295,7 +295,7 @@ class AssembledJacobian(Jacobian):
                     if wrtname in global_conns:
                         iters.append(abs_key)
                     elif ext_mtx is not None:
-                            iters_in_ext.append(abs_key)
+                        iters_in_ext.append(abs_key)
 
             self._subjac_iters[system.pathname] = subjac_iters = (iters, iters_in_ext)
 

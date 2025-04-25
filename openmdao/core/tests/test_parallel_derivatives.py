@@ -583,7 +583,7 @@ class SlowComp(om.ExplicitComponent):
         outputs['y'] = inputs['x'] * self.mult
 
     def compute_partials(self, inputs, partials):
-        partials['y', 'x'] = self.mult
+        partials['y', 'x'] = np.ones(self.size) * self.mult
 
     def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
         time.sleep(self.delay)
