@@ -318,6 +318,8 @@ class Jacobian(object):
 
         subjacs_info = self._subjacs_info[abs_key]
 
+        print(f'setting {key} to {subjac}')
+
         if issparse(subjac):
             subjacs_info['val'] = subjac
         else:

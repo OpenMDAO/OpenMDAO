@@ -158,6 +158,7 @@ class AssembledJacobian(Jacobian):
                         abs_key2 = (res_abs_name, out_abs_name)
                         shape = abs_key2shape(abs_key2)
 
+                    print(abs_key, abs_key2, src_indices, shape)
                     int_mtx._add_submat(abs_key, info, res_offset, out_offset,
                                         src_indices, shape, factor)
 
