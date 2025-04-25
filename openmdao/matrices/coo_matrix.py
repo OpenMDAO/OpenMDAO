@@ -70,6 +70,10 @@ class COOMatrix(Matrix):
             key_ranges[key] = (start, end, dense, rows)
             start = end
 
+        import pprint
+        print("key_ranges:")
+        pprint.pprint(key_ranges)
+
         if system is not None and system.under_complex_step:
             data = np.zeros(end, dtype=complex)
         else:
@@ -127,6 +131,10 @@ class COOMatrix(Matrix):
                     cols[start:end] = icols
 
             metadata[key] = (start, end, idxs, jac_type, factor)
+
+        import pprint
+        print("metadata:")
+        pprint.pprint(metadata)
 
         return data, rows, cols
 
