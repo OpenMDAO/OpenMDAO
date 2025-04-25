@@ -40,7 +40,7 @@ from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOption
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.utils.name_maps import NameResolver, LOCAL, CONTINUOUS, DISTRIBUTED
+from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
 
 # regex to check for valid names.
 import re
@@ -1705,8 +1705,7 @@ class Group(System):
 
         super()._setup_var_data()
 
-        self._resolver = resolver = NameResolver(self.pathname, self.msginfo, check_dups=True)
-
+        resolver = self._resolver
         var_discrete = self._var_discrete
         allprocs_discrete = self._var_allprocs_discrete
 
