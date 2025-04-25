@@ -25,7 +25,7 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
-from openmdao.utils.variable_table import write_var_table, NA
+from openmdao.utils.variable_table import write_var_table, write_options, NA
 from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_tol_violation, \
     sparsity_diff_viz, get_sparsity_diff_array
 from openmdao.utils.name_maps import name2abs_name, name2abs_names
@@ -4956,6 +4956,7 @@ class System(object, metaclass=SystemMetaclass):
 
     def list_options(self,
                      include_default=True,
+                     include_solvers=True,
                      out_stream=_DEFAULT_OUT_STREAM):
         """
         Write a list of output names and other optional information to a specified stream.
@@ -4967,15 +4968,18 @@ class System(object, metaclass=SystemMetaclass):
             Set to None to suppress.
         include_default : bool
             When True, include the built-in openmdao system options. Default is True.
+        include_solvers : bool
+            When True, include options from linear_solver and nonlinear_solver.
         """
         name = self.pathname
         default_options = ['always_opt', 'default_shape', 'derivs_method', 'distributed',
                            'run_root_only', 'use_jit', 'assembled_jac_type',
                            'auto_order']
-        core_types = (int, float, tuple, list, np.ndarray, str, bool)
 
         opt_list = []
         opts = {}
+        nl_opts = None
+        ln_opts = None
         for opt_name, opt_value in self.options.items():
 
             if not include_default and opt_name in default_options:
@@ -4986,7 +4990,28 @@ class System(object, metaclass=SystemMetaclass):
             if opt_meta['recordable']:
                 opts[opt_name] = opt_value
 
-        opt_list.append((name, opts))
+        if include_solvers:
+            nl = self.nonlinear_solver
+            if nl is not None:
+                nl_opts = {}
+                for opt_name, opt_value in nl.options.items():
+
+                    opt_meta = nl.options._dict[opt_name]
+
+                    if opt_meta['recordable']:
+                        nl_opts[opt_name] = opt_value
+
+            ln = self.linear_solver
+            if ln is not None:
+                ln_opts = {}
+                for opt_name, opt_value in ln.options.items():
+
+                    opt_meta = ln.options._dict[opt_name]
+
+                    if opt_meta['recordable']:
+                        ln_opts[opt_name] = opt_value
+
+        opt_list.append((name, opts, nl_opts, ln_opts))
 
         # For components, self._subsystems_allprocs is empty.
         if self._subsystems_allprocs:
@@ -4994,30 +5019,11 @@ class System(object, metaclass=SystemMetaclass):
 
                 if subsys.pathname != '_auto_ivc':
                     sub_opts = subsys.list_options(out_stream=None,
+                                                   include_solvers=include_solvers,
                                                    include_default=include_default)
                     opt_list.extend(sub_opts)
 
-        if out_stream is not None:
-
-            print('')
-            print("Options in Model")
-            print('')
-
-            for key, opt_dict in opt_list:
-                if key == '':
-                    print('[model]')
-                else:
-                    print(key)
-                print('-'*len(key))
-                for opt_name, opt_val in opt_dict.items():
-
-                    if isinstance(opt_val, core_types):
-                        print(f'{opt_name}: {opt_val}')
-
-                    else:
-                        print(f'{opt_name}: {type(opt_val)}')
-
-                print('')
+        write_options(self.pathname, opt_list, out_stream=out_stream)
 
         return opt_list
 

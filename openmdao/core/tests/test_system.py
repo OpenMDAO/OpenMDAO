@@ -328,6 +328,31 @@ class TestSystem(unittest.TestCase):
         self.assertEqual(sorted([name for name, _ in nonDV_indeps]),
                          ['_auto_ivc.v1'])
 
+    def test_list_options(self):
+        from openmdao.test_suite.components.sellar_feature import SellarMDA
+
+        model = SellarMDA()
+
+        prob = Problem(model)
+        prob.setup()
+        prob.final_setup()
+
+        opt_list = prob.model.list_options(out_stream=None)
+
+        self.assertEqual(len(opt_list), 9)
+        self.assertTrue(opt_list[1][0] == 'cycle')
+        self.assertTrue(opt_list[1][2]['maxiter'] == 10)
+        self.assertTrue(opt_list[3][1]['use_jit'] is True)
+
+        opt_list = prob.model.list_options(out_stream=None, include_solvers=False)
+        self.assertTrue(opt_list[1][2] is None)
+        self.assertTrue(opt_list[1][3] is None)
+
+        opt_list = prob.model.list_options(out_stream=None, include_solvers=False, include_default=False)
+        self.assertEqual(len(opt_list[1][1]), 0)
+
+        print('done')
+
     def test_setup_check_group(self):
 
         class CustomGroup(Group):
