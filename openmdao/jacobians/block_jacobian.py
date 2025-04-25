@@ -70,6 +70,7 @@ class BlockJacobian(Jacobian):
         if abs_key is None:
             raise KeyError(f'{self.msginfo}: Variable name pair {key} not found.')
 
+        print(f"setting {key} to {subjac}")
         # You can only set declared subjacobians.
         try:
             self._subjacs[abs_key].set_val(subjac)

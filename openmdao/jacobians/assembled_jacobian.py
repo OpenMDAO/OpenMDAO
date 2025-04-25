@@ -337,9 +337,11 @@ class AssembledJacobian(Jacobian):
         else:
 
             for key in iters:
+                print(f"update int {key} to {subjacs[key]['val']}")
                 int_mtx._update_submat(key, subjacs[key]['val'])
 
             for key in iters_in_ext:
+                print(f"update ext {key} to {subjacs[key]['val']}")
                 ext_mtx._update_submat(key, subjacs[key]['val'])
 
         int_mtx._post_update()

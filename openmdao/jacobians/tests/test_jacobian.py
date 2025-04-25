@@ -57,6 +57,7 @@ class MyExplicitComp(ExplicitComponent):
             jac1 = jac1[0]
 
 
+        print(f'jac1: {jac1}')
         partials['f', 'x'] = jac1
 
         jac2 = self._jac_type(np.array([
@@ -67,6 +68,7 @@ class MyExplicitComp(ExplicitComponent):
         if isinstance(jac2, list):
             jac2 = jac2[0]
 
+        print(f'jac2: {jac2}')
         partials['f', 'y'] = jac2
 
 
@@ -774,7 +776,7 @@ class TestJacobian(unittest.TestCase):
 
         with self.assertRaises(KeyError) as ctx:
             prob.compute_totals(of=['comp.y'], wrt=['p1.x'])
-            
+
         self.assertEqual(ctx.exception.args[0], '\'comp\' <class Undeclared>: Error calling compute_partials(), "BlockJacobian in \'comp\' <class Undeclared>: Variable name pair (\'y\', \'x\') must first be declared."')
 
     def test_one_src_2_tgts_with_src_indices_densejac(self):
@@ -1039,7 +1041,7 @@ class TestJacobian(unittest.TestCase):
         msg = "'comp' <class MyComp>: Error calling compute_partials(), BlockJacobian in 'comp' <class MyComp>: for subjacobian ('y', 'x'): could not broadcast input array from shape (3,) into shape (2,)"
         with self.assertRaises(ValueError) as ctx:
             prob.compute_totals(of=['comp.y'], wrt=['comp.x'])
-            
+
         self.assertEqual(ctx.exception.args[0], msg)
 
 
@@ -1215,7 +1217,7 @@ class CCBladeResidualComp(ImplicitComponent):
 
         partials['Tp', 'chord'] = np.array([9., 10, 11, 12])
         partials['Tp', 'phi'] = np.array([13., 14, 15, 16])
-        
+
 
 class MaskingTestCase(unittest.TestCase):
     def run_asjac_type_test(self, asjac_type):
@@ -1247,7 +1249,7 @@ class MaskingTestCase(unittest.TestCase):
 
     def test_csc_masking(self):
         self.run_asjac_type_test('csc')
-        
+
     def test_dense_masking(self):
         self.run_asjac_type_test('dense')
 
