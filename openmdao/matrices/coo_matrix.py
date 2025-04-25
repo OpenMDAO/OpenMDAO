@@ -205,6 +205,9 @@ class COOMatrix(Matrix):
         # system.
         mat = self._matrix
 
+        with np.printoptions(threshold=9999, linewidth=9999):
+            print(mat.toarray())
+
         # NOTE: mask applies only to ext_mtx.
 
         if mode == 'fwd':
@@ -248,14 +251,15 @@ class COOMatrix(Matrix):
 
             mask = None
             for key, val in self._key_ranges.items():
-                if key[1] in input_names:
+                _, wrt = key
+                if wrt in input_names:
                     if mask is None:
                         mask = np.ones(self._matrix.data.size, dtype=bool)
                     start, stop, _, _ = val
                     mask[start:stop] = False
 
             if mask is not None and np.any(mask):
-                # convert the mask indices (if necessary) base on sparse matrix type
+                # convert the mask indices (if necessary) based on sparse matrix type
                 # (CSC, CSR, etc.)
                 return self._convert_mask(mask)
 

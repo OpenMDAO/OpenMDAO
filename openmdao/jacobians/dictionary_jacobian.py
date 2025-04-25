@@ -118,10 +118,10 @@ class DictionaryJacobian(Jacobian):
 
                 res_name, other_name = abs_key
 
-                if other_name in d_inp_names:
-                    wrtvec = iflat(other_name)
-                elif other_name in d_out_names:
+                if other_name in d_out_names:
                     wrtvec = oflat(other_name)
+                elif other_name in d_inp_names:
+                    wrtvec = iflat(other_name)
                 else:
                     wrtvec = None
 
