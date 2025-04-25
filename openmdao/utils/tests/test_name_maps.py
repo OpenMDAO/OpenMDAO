@@ -14,11 +14,6 @@ class TestNameResolver(unittest.TestCase):
         self.assertEqual(resolver._abs2prom, {'input': {}, 'output': {}})
         self.assertEqual(resolver.msginfo, 'test_system')
         self.assertEqual(resolver._prom2abs, {'input': {}, 'output': {}})
-        self.assertFalse(resolver._check_dups)
-
-        # Test with check_dups=True
-        resolver = NameResolver('test_system', check_dups=True)
-        self.assertTrue(resolver._check_dups)
 
         # Test with msginfo
         resolver = NameResolver('test_system', msginfo='custom_msg')
@@ -83,6 +78,7 @@ class TestNameResolver(unittest.TestCase):
         # This should raise ValueError due to duplicate output names
         with self.assertRaises(ValueError):
             resolver._check_dup_prom_outs()
+
     def test_source_with_connections(self):
         # Setup some mappings and connections
         self.resolver.add_mapping('test_system.x', 'x', 'input', local=True)
@@ -122,7 +118,7 @@ class TestNameResolver(unittest.TestCase):
         # Test with ambiguity
         with self.assertRaises(Exception) as ctx:
             self.assertEqual(self.resolver.prom2abs('x', 'input'), 'test_system.xx')
-            
+
         self.assertEqual(ctx.exception.args[0],
                          "test_system: The promoted name x is invalid because it refers to multiple inputs: [test_system.x ,test_system.xx]. Access the value from the connected output variable instead.")
 

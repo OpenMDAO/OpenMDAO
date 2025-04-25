@@ -62,20 +62,10 @@ class Jacobian(object):
         try:
             return self._abs_keys[key]
         except KeyError:
-            resolver = self._system()._resolver
-            of = resolver.any2abs(key[0], 'output')
-            wrt = resolver.rel2abs(key[1], check=True)
-            if wrt is None:
-                wrt = resolver.any2abs(key[1], 'input')
-                if wrt is None:
-                    wrt = resolver.any2abs(key[1], 'output')
-
-            if of is None or wrt is None:
-                return
-            else:
-                abskey = (of, wrt)
+            abskey = self._system()._resolver.any2abs_key(key)
+            if abskey is not None:
                 self._abs_keys[key] = abskey
-                return abskey
+            return abskey
 
     def _abs_key2shape(self, abs_key):
         """
