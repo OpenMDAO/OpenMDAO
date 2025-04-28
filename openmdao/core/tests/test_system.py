@@ -351,8 +351,6 @@ class TestSystem(unittest.TestCase):
         opt_list = prob.model.list_options(out_stream=None, include_solvers=False, include_default=False)
         self.assertEqual(len(opt_list[1][1]), 0)
 
-        print('done')
-
     def test_setup_check_group(self):
 
         class CustomGroup(Group):

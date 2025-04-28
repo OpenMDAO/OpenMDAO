@@ -327,11 +327,6 @@ def write_options(pathname, opt_list, out_stream=_DEFAULT_OUT_STREAM):
     if out_stream is None:
         return
 
-    if notebook and out_stream is _DEFAULT_OUT_STREAM:
-        use_html = True
-    else:
-        use_html = False
-
     if out_stream is _DEFAULT_OUT_STREAM:
         out_stream = sys.stdout
     elif not isinstance(out_stream, TextIOBase):
@@ -370,10 +365,6 @@ def write_options(pathname, opt_list, out_stream=_DEFAULT_OUT_STREAM):
             for opt_name in ln_dict:
                 total_len = stem_size + len(opt_name) + 2
                 max_varname_len = max(max_varname_len, total_len)
-
-    if use_html:
-        # TODO: how to do this
-        return
 
     # Write out the column headers
     opt_val_width = 30
