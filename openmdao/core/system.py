@@ -102,6 +102,10 @@ resp_size_checks = {
 }
 resp_types = {'con': 'constraint', 'obj': 'objective'}
 
+default_options = ['always_opt', 'default_shape', 'derivs_method', 'distributed',
+                   'run_root_only', 'use_jit', 'assembled_jac_type',
+                   'auto_order']
+
 
 class _MatchType(IntEnum):
     """
@@ -4957,19 +4961,24 @@ class System(object, metaclass=SystemMetaclass):
     def list_options(self,
                      include_default=True,
                      include_solvers=True,
-                     out_stream=_DEFAULT_OUT_STREAM):
+                     out_stream=_DEFAULT_OUT_STREAM,
+                     return_format='list'):
         """
         Write a list of output names and other optional information to a specified stream.
 
         Parameters
         ----------
-        out_stream : file-like
-            Where to send human readable output. Default is sys.stdout.
-            Set to None to suppress.
         include_default : bool
             When True, include the built-in openmdao system options. Default is True.
         include_solvers : bool
             When True, include options from nonlinear_solver and linear_solver.
+        out_stream : file-like
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+        return_format : str
+            Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
+            If 'list', the return value is a list of (name, metadata) tuples.
+            if 'dict', the return value is a dictionary mapping {name: metadata}.
 
         Returns
         -------
@@ -4980,9 +4989,6 @@ class System(object, metaclass=SystemMetaclass):
             options (only if include_solvers is True) or None.
         """
         name = self.pathname
-        default_options = ['always_opt', 'default_shape', 'derivs_method', 'distributed',
-                           'run_root_only', 'use_jit', 'assembled_jac_type',
-                           'auto_order']
 
         opt_list = []
         opts = {}
@@ -5032,6 +5038,12 @@ class System(object, metaclass=SystemMetaclass):
                     opt_list.extend(sub_opts)
 
         write_options(self.pathname, opt_list, out_stream=out_stream)
+
+        if return_format == 'dict':
+            opt_dict = {}
+            for name, opts, nl_opts, ln_opts in opt_list:
+                opt_dict[name] = (opts, nl_opts, ln_opts)
+            return opt_dict
 
         return opt_list
 

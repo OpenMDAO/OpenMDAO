@@ -309,6 +309,7 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
                               s for s in out_str.splitlines()]
             out_stream.write('\n'.join(indented_lines) + '\n')
 
+
 def write_options(pathname, opt_list, out_stream=_DEFAULT_OUT_STREAM):
     """
     Write table of options and values for a model.
@@ -319,7 +320,7 @@ def write_options(pathname, opt_list, out_stream=_DEFAULT_OUT_STREAM):
     ----------
     pathname : str
         Pathname to be printed. If None, defaults to 'model'.
-    options : list of dict
+    opt_list : list
         List of systems options dictionaries.
     out_stream : file-like object
         Where to send human readable output.
