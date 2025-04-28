@@ -4969,7 +4969,7 @@ class System(object, metaclass=SystemMetaclass):
         include_default : bool
             When True, include the built-in openmdao system options. Default is True.
         include_solvers : bool
-            When True, include options from linear_solver and nonlinear_solver.
+            When True, include options from nonlinear_solver and linear_solver.
         """
         name = self.pathname
         default_options = ['always_opt', 'default_shape', 'derivs_method', 'distributed',
