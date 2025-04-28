@@ -4970,6 +4970,14 @@ class System(object, metaclass=SystemMetaclass):
             When True, include the built-in openmdao system options. Default is True.
         include_solvers : bool
             When True, include options from nonlinear_solver and linear_solver.
+
+        Returns
+        -------
+        list of tuple
+            List of tuples, one for each subsystem sorted by execution order. Each tuple contains
+            the pathname string, a dictionary of system options, a dictionary of nonlinear solver
+            options (only if include_solvers is True), and a dictionary of nonlinear solver
+            options (only if include_solvers is True).
         """
         name = self.pathname
         default_options = ['always_opt', 'default_shape', 'derivs_method', 'distributed',
