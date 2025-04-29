@@ -127,6 +127,14 @@ class NameResolver(object):
         self._has_remote = False
         self.msginfo = msginfo if msginfo else pathname
 
+    def reset_prom_maps(self):
+        """
+        Reset the _prom2abs dictionary.
+        """
+        self._prom2abs = {'input': {}, 'output': {}}
+        self._prom2abs_in = self._prom2abs['input']
+        self._prom2abs_out = self._prom2abs['output']
+
     def add_mapping(self, absname, promname, iotype, local=True, continuous=True,
                     distributed=False):
         """

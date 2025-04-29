@@ -1738,6 +1738,7 @@ class Group(System):
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             proc_resolvers = [None] * self.comm.size
+            resolver.reset_prom_maps()  # no use sending prom2abs to other procs
             if self._gather_full_data():
                 raw = (allprocs_discrete, resolver, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
