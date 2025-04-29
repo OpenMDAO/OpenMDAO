@@ -4977,8 +4977,10 @@ class System(object, metaclass=SystemMetaclass):
             Set to None to suppress.
         return_format : str
             Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
-            If 'list', the return value is a list of (name, metadata) tuples.
-            if 'dict', the return value is a dictionary mapping {name: metadata}.
+            If 'list', the return value is a list of tuples of the form: (system options, nonlinear
+            solver options, linear solver options)
+            if 'dict', the return value is a dictionary of tuples of the form: (system options,
+            nonlinear solver options, linear solver options)
 
         Returns
         -------
@@ -5042,7 +5044,13 @@ class System(object, metaclass=SystemMetaclass):
         if return_format == 'dict':
             opt_dict = {}
             for name, opts, nl_opts, ln_opts in opt_list:
-                opt_dict[name] = (opts, nl_opts, ln_opts)
+                opt_dict[name] = {
+                    'options' : opts,
+                }
+                if include_solvers:
+                    opt_dict[name]['nonlinear_solver'] = nl_opts
+                    opt_dict[name]['linear_solver'] = ln_opts
+
             return opt_dict
 
         return opt_list
