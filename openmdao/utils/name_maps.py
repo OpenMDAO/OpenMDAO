@@ -89,8 +89,6 @@ class NameResolver(object):
         A dictionary of promoted to absolute names for outputs.
     _prom_no_multi_abs : bool
         If True, all promoted names map to a single absolute name.
-    _check_dups : bool
-        If True, check for duplicate names.
     _conns : dict or None
         The connections dictionary.
     _has_remote : bool
@@ -122,7 +120,6 @@ class NameResolver(object):
         self._prom2abs_in = self._prom2abs['input']
         self._prom2abs_out = self._prom2abs['output']
         self._prom_no_multi_abs = True
-        self._check_dups = check_dups
         self._conns = None
         self._has_remote = False
         self.msginfo = msginfo if msginfo else pathname
@@ -277,11 +274,10 @@ class NameResolver(object):
         self._prom2abs_out = self._prom2abs['output']
 
     def _check_dup_prom_outs(self):
-        if self._check_dups:
-            for promname, abslist in self._prom2abs_out.items():
-                if len(abslist) > 1:
-                    raise ValueError(f"{self.msginfo}: Output name '{promname}' refers to "
-                                     f"multiple outputs: {sorted(abslist)}.")
+        for promname, abslist in self._prom2abs_out.items():
+            if len(abslist) > 1:
+                raise ValueError(f"{self.msginfo}: Output name '{promname}' refers to "
+                                 f"multiple outputs: {sorted(abslist)}.")
 
     def num_proms(self, iotype=None):
         """
@@ -454,6 +450,9 @@ class NameResolver(object):
     def get_prom_iotype(self, promname, report_error=False):
         """
         Get the iotype of a promoted name.
+
+        If the promoted name is both an input and an output, the returned iotype will be 'output',
+        which is always unambiguous.
 
         Parameters
         ----------
@@ -934,7 +933,12 @@ class NameResolver(object):
                                    "Access the value from the connected output variable instead.")
 
             # report to the user which connected output to access
-            src_name = self._abs2prom['output'][self.source(lst[0])][0]
+            src_name = self.source(lst[0])
+            try:
+                # find the promoted source name if we can (may not be in the scope of our System)
+                src_name = self._abs2prom['output'][src_name][0]
+            except KeyError:
+                pass
             raise RuntimeError(f"{self.msginfo}: The promoted name {promname} is invalid because it"
                                f" refers to multiple inputs: [{' ,'.join(lst)}]. Access the value "
                                f"from the connected output variable {src_name} instead.")
@@ -981,6 +985,34 @@ class NameResolver(object):
             return absname
 
         return default
+
+    def any2abs_key(self, key):
+        """
+        Convert any jacobian key to an absolute key.
+
+        Parameters
+        ----------
+        key : (str, str)
+            The jacobian key to convert.
+
+        Returns
+        -------
+        (str, str) or None
+            The absolute key or None if the key is not found.
+        """
+        of = self.any2abs(key[0], 'output')
+        if of is None:
+            return
+
+        # try the input first in order to mimic the old behavior where an exception
+        # is raised if the input is ambiguous.
+        wrt = self.any2abs(key[1], 'input')
+        if wrt is None:
+            wrt = self.any2abs(key[1], 'output')
+            if wrt is None:
+                return
+
+        return (of, wrt)
 
     def any2prom(self, name, iotype=None, default=None):
         """

@@ -2198,7 +2198,6 @@ class System(object, metaclass=SystemMetaclass):
         self._responses = {}
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
-        self._resolver = NameResolver(self.pathname, self.msginfo)
 
     def _setup_procs(self, pathname, comm, prob_meta):
         """
@@ -5513,7 +5512,7 @@ class System(object, metaclass=SystemMetaclass):
                 val = val[indices]
 
             if units is not None:
-                val = self.convert2units(name, val, simp_units)
+                val = self.convert2units(abs_names[0], val, simp_units)
 
         return val
 

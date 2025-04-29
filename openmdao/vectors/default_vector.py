@@ -534,24 +534,6 @@ class DefaultVector(Vector):
 
         return name2inds
 
-    # def __getstate__(self):
-    #     """
-    #     Return state as a dict.
-
-    #     For pickling vectors in case recording, we want to get rid of
-    #     the system contained within Vectors, because MPI Comm objects cannot
-    #     be pickled using Python3's pickle module.
-
-    #     Returns
-    #     -------
-    #     dict
-    #         state minus system member.
-    #     """
-    #     state = self.__dict__.copy()
-    #     if '_system' in state:
-    #         del state['_system']
-    #     return state
-
     def get_hash(self, alg=hashlib.sha1):
         """
         Return a hash string for the array contained in this Vector.
