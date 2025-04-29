@@ -1383,11 +1383,6 @@ class _TotalJacInfo(object):
                 return self._compute_totals_approx(progress_out_stream=progress_out_stream)
             finally:
                 self.model._recording_iter.pop()
-        elif self.model.options['derivs_method'] == 'jax':
-            try:
-                return self._compute_totals_jax(progress_out_stream=progress_out_stream)
-            finally:
-                self.model._recording_iter.pop()
 
         try:
             debug_print = self.debug_print
@@ -1875,6 +1870,17 @@ class _TotalJacInfo(object):
 
         finally:
             self.model._recording_iter.pop()
+
+    def _setup(self, system):
+        """
+        Set up the total jacobian.
+
+        Parameters
+        ----------
+        system : System
+            System that is setting up the total jacobian.
+        """
+        pass
 
     def set_col(self, system, icol, column):
         """

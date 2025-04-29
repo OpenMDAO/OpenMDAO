@@ -153,6 +153,9 @@ class JaxImplicitComponent(ImplicitComponent):
                 self._get_coloring()
             elif self._do_sparsity and self.options['derivs_method'] == 'jax':
                 self.compute_sparsity()
+            if self._jacobian is None:
+                self._init_jacobian()
+            self._jacobian._setup(self)
 
     def _setup_partials(self):
         """

@@ -222,6 +222,8 @@ class Group(System):
         Set of variables involved in invalid connections.
     _sys_graph_cache : dict
         Cache for the system graph.
+    _key_owner : dict
+        The owning rank keyed by absolute jacobian key.
     """
 
     def __init__(self, **kwargs):
@@ -1323,60 +1325,6 @@ class Group(System):
 
         return root_vectors
 
-    def _get_all_promotes(self):
-        """
-        Create the top level mapping of all promoted names to absolute names for all local systems.
-
-        This includes all buried promoted names.
-
-        Returns
-        -------
-        dict
-            Mapping of all promoted names to absolute names.
-        """
-        iotypes = ('input', 'output')
-        if self.comm.size > 1:
-            prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
-            rem_prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
-            myrank = self.comm.rank
-            vars_to_gather = self._vars_to_gather
-
-            for s in self.system_iter(recurse=True, include_self=True):
-                prefix = s.pathname + '.' if s.pathname else ''
-                for typ in iotypes:
-                    t_remprom2abs = rem_prom2abs[typ]
-                    t_prom2abs = prom2abs[typ]
-                    for prom, abs_names in s._resolver.prom2abs_iter(typ, local=True):
-                        t_prom2abs[prefix + prom].update(abs_names)
-                        t_remprom2abs[prefix + prom].update(n for n in abs_names
-                                                            if n in vars_to_gather
-                                                            and vars_to_gather[n] == myrank)
-
-            all_proms = self.comm.gather(rem_prom2abs, root=0)
-            if myrank == 0:
-                for typ in iotypes:
-                    t_prom2abs = prom2abs[typ]
-                    for rankproms in all_proms:
-                        for prom, absnames in rankproms[typ].items():
-                            t_prom2abs[prom].update(absnames)
-
-                    for prom, absnames in t_prom2abs.items():
-                        t_prom2abs[prom] = sorted(absnames)  # sort to keep order same on all procs
-
-                self.comm.bcast(prom2abs, root=0)
-            else:
-                prom2abs = self.comm.bcast(None, root=0)
-        else:  # serial
-            prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
-            for s in self.system_iter(recurse=True, include_self=True):
-                prefix = s.pathname + '.' if s.pathname else ''
-                for typ in iotypes:
-                    t_prom2abs = prom2abs[typ]
-                    for prom, abs_names in s._resolver.prom2abs_iter(typ):
-                        t_prom2abs[prefix + prom] = abs_names
-
-        return prom2abs
-
     def _check_order(self, reorder=True, recurse=True, out_of_order=None):
         """
         Check if auto ordering is needed, optionally reordering subsystems if appropriate.
@@ -1707,6 +1655,7 @@ class Group(System):
         super()._setup_var_data()
 
         self._resolver = resolver = NameResolver(self.pathname, self.msginfo, check_dups=True)
+        self._cross_keys = set()
 
         var_discrete = self._var_discrete
         allprocs_discrete = self._var_allprocs_discrete
@@ -1845,12 +1794,6 @@ class Group(System):
                     allprocs_abs2meta[io].update(old_abs2meta[io])
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
-
-        # for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
-        #     if len(abs_list) > 1:
-        #         self._collect_error("{}: Output name '{}' refers to "
-        #                             "multiple outputs: {}.".format(self.msginfo, prom_name,
-        #                                                            sorted(abs_list)))
 
         if self._group_inputs:
             extra = [gin for gin in self._group_inputs if not resolver.is_prom(gin, 'input')]
@@ -2037,7 +1980,7 @@ class Group(System):
             myproc = self.comm.rank
             nprocs = self.comm.size
 
-            respflags = self._resolver.flags
+            resflags = self._resolver.flags
             for io in ('input', 'output'):
                 abs2meta = self._var_allprocs_abs2meta[io]
 
@@ -2045,7 +1988,7 @@ class Group(System):
                 sorted_names = sorted(self._resolver.abs_iter(io))
                 locality = np.zeros((nprocs, len(sorted_names)), dtype=bool)
                 for i, name in enumerate(sorted_names):
-                    if respflags(name, io) & LOCAL:
+                    if resflags(name, io) & LOCAL:
                         locality[myproc, i] = True
 
                 my_loc = locality[myproc, :].copy()
@@ -2053,9 +1996,7 @@ class Group(System):
 
                 for i, name in enumerate(sorted_names):
                     nzs = np.nonzero(locality[:, i])[0]
-                    if name in abs2meta and abs2meta[name]['distributed']:
-                        pass
-                    elif 0 < nzs.size < nprocs:
+                    if not abs2meta[name]['distributed'] and 0 < nzs.size < nprocs:
                         remote_vars[name] = nzs[0]
 
         return remote_vars
@@ -3869,8 +3810,6 @@ class Group(System):
         if (self._tot_jac is not None and self._owns_approx_jac and
                 not isinstance(self._jacobian, coloring_mod._ColSparsityJac)):
             self._jacobian = self._tot_jac
-        elif self._jacobian is None:
-            self._init_jacobian()
 
         self._check_first_linearize()
 
@@ -3916,14 +3855,20 @@ class Group(System):
             self._first_call_to_linearize = False  # only do this once
             coloring = self._get_coloring() if coloring_mod._use_partial_sparsity else None
 
-            if coloring is not None:
+            if coloring is None:
+                if self._approx_schemes:
+                    if self._jacobian is None:
+                        self._init_jacobian()
+                    # TODO: for top level FD, call below is unnecessary, but we need this
+                    # for some tests that just call run_linearize directly without calling
+                    # compute_totals.
+                    self._setup_approx_derivs(),
+                    self._jacobian._setup(self)
+            else:
                 self._setup_approx_coloring()
 
-            # TODO: for top level FD, call below is unnecessary, but we need this
-            # for some tests that just call run_linearize directly without calling
-            # compute_totals.
-            elif self._approx_schemes:
-                self._setup_approx_derivs()
+            if self._jacobian is not None:
+                self._jacobian._setup(self)
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
@@ -4117,6 +4062,7 @@ class Group(System):
                 else:
                     src = name
 
+                # for semi-totals, only include outputs that are local
                 if not total and src not in self._var_abs2meta['output']:
                     continue
 
@@ -4186,10 +4132,10 @@ class Group(System):
                         yield of, start, end, vec, _full_slice, dist_sizes
                         start = end
 
-            for wrt, wrtmeta in self._owns_approx_wrt.items():
+            for wrt, approx_meta in self._owns_approx_wrt.items():
                 if total:
-                    wrt = wrtmeta['source']
-                    if wrtmeta['remote']:
+                    wrt = approx_meta['source']
+                    if approx_meta['remote']:
                         vec = None
                     else:
                         vec = self._outputs
@@ -4204,10 +4150,9 @@ class Group(System):
                 if (wrt_matches is None or wrt in wrt_matches) and wrt not in seen:
                     io = 'input' if wrt in abs2meta['input'] else 'output'
                     meta = abs2meta[io][wrt]
-                    if total and wrtmeta['indices'] is not None:
-                        sub_wrt_idx = wrtmeta['indices'].as_array()
+                    if total and approx_meta['indices'] is not None:
+                        sub_wrt_idx = approx_meta['indices'].as_array()
                         size = sub_wrt_idx.size
-                        sub_wrt_idx = sub_wrt_idx
                     else:
                         sub_wrt_idx = _full_slice
                         size = abs2meta[io][wrt][szname]
@@ -4262,7 +4207,6 @@ class Group(System):
         sizes_in = self._var_sizes['input']
         abs2idx = self._var_allprocs_abs2idx
 
-        self._cross_keys = set()
         approx_keys = self._get_approx_subjac_keys()
         for key in approx_keys:
             left, right = key
@@ -4650,11 +4594,11 @@ class Group(System):
         conns.update(auto_conns)
         auto_ivc.auto2tgt = auto2tgt
 
-        vars2gather = self._vars_to_gather
+        vars_to_gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
             prom = resolver.abs2prom(tgts[0], 'input')
-            ret = self._get_auto_ivc_out_val(tgts, vars2gather)
+            ret = self._get_auto_ivc_out_val(tgts, vars_to_gather)
             if ret is None:  # setup error occurred. Try to continue
                 continue
             tgt, val, remote = ret
@@ -4678,16 +4622,16 @@ class Group(System):
                 tgt_local_procs = set()
                 # do a preliminary check to avoid the allgather if we can
                 for t in tgts:
-                    if t in vars2gather:
-                        tgt_local_procs.add(vars2gather[t])
+                    if t in vars_to_gather:
+                        tgt_local_procs.add(vars_to_gather[t])
                     else:   # t is duplicated in all procs
                         break
                 else:
                     if len(tgt_local_procs) < self.comm.size:  # don't have a local var in each proc
                         tgt_local_procs = set()
                         for t in self.comm.allgather(tgt):
-                            if t in vars2gather:
-                                tgt_local_procs.add(vars2gather[t])
+                            if t in vars_to_gather:
+                                tgt_local_procs.add(vars_to_gather[t])
                         if len(tgt_local_procs) > 1:
                             # the 'local' val can only exist on 1 proc (distrib auto_ivcs not
                             # allowed), so must consolidate onto one proc
@@ -4723,11 +4667,11 @@ class Group(System):
                         val = self._var_discrete['input'][abs_in]['val']
                     else:
                         val = None
-                    if abs_in in vars2gather:
-                        if vars2gather[abs_in] == self.comm.rank:
-                            self.comm.bcast(val, root=vars2gather[abs_in])
+                    if abs_in in vars_to_gather:
+                        if vars_to_gather[abs_in] == self.comm.rank:
+                            self.comm.bcast(val, root=vars_to_gather[abs_in])
                         else:
-                            val = self.comm.bcast(None, root=vars2gather[abs_in])
+                            val = self.comm.bcast(None, root=vars_to_gather[abs_in])
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
                 src = conns[abs_in]
@@ -4761,15 +4705,15 @@ class Group(System):
                                        auto_ivc._var_discrete[io].items()})
         self._var_allprocs_discrete[io].update(auto_ivc._var_allprocs_discrete[io])
 
-        old = self._var_abs2meta[io]
         self._var_abs2meta[io] = {}
-        self._var_abs2meta[io].update(auto_ivc._var_abs2meta[io])
-        self._var_abs2meta[io].update(old)
+        # rebuild _var_abs2meta in the correct order
+        for s in self._sorted_sys_iter():
+            self._var_abs2meta[io].update(s._var_abs2meta[io])
 
-        old = self._var_allprocs_abs2meta[io]
         self._var_allprocs_abs2meta[io] = {}
-        self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
-        self._var_allprocs_abs2meta[io].update(old)
+        for sysname in self._sorted_sys_iter_all_procs():
+            self._var_allprocs_abs2meta[io].update(
+                self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
 
         # add all auto_ivc vars to our _loc_ivcs
         self._ivcs.update(auto_ivc._var_abs2meta[io])

@@ -53,26 +53,32 @@ class COOMatrix(Matrix):
         for key, (info, loc, src_indices, shape, factor) in submats.items():
 
             val = info['val']
-            rows = info['rows']
-            dense = (rows is None and (val is None or isinstance(val, ndarray)))
+            diag = info['diagonal']
+            if diag:
+                end += val.size
+                dense = False
+                rows = None
+            else:
+                rows = info['rows']
+                dense = (rows is None and (val is None or isinstance(val, ndarray)))
 
-            if dense:
-                if src_indices is None:
-                    end += val.size
-                else:
-                    end += shape[0] * src_indices.indexed_src_size
+                if dense:
+                    if src_indices is None:
+                        end += val.size
+                    else:
+                        end += shape[0] * src_indices.indexed_src_size
 
-            elif rows is None:  # sparse matrix
-                end += val.data.size
-            else:  # list sparse format
-                end += len(rows)
+                elif rows is None:  # sparse matrix
+                    end += val.data.size
+                else:  # list sparse format
+                    end += len(rows)
 
             key_ranges[key] = (start, end, dense, rows)
             start = end
 
-        import pprint
-        print("key_ranges:")
-        pprint.pprint(key_ranges)
+        # import pprint
+        # print("key_ranges:")
+        # pprint.pprint(key_ranges)
 
         if system is not None and system.under_complex_step:
             data = np.zeros(end, dtype=complex)
@@ -87,6 +93,7 @@ class COOMatrix(Matrix):
             info, loc, src_indices, shape, factor = submats[key]
             irow, icol = loc
             val = info['val']
+            diag = info['diagonal']
             idxs = None
 
             col_offset = row_offset = 0
@@ -111,8 +118,10 @@ class COOMatrix(Matrix):
                 subcols += icol
 
             else:  # sparse
-                if jrows is None:
-                    jac_type = type(val)
+                jac_type = type(val)
+                if diag:
+                    jrows = jcols = np.arange(val.size)
+                elif jrows is None:
                     jac = val.tocoo()
                     jrows = jac.row
                     jcols = jac.col
@@ -132,9 +141,9 @@ class COOMatrix(Matrix):
 
             metadata[key] = (start, end, idxs, jac_type, factor)
 
-        import pprint
-        print("metadata:")
-        pprint.pprint(metadata)
+        # import pprint
+        # print("metadata:")
+        # pprint.pprint(metadata)
 
         return data, rows, cols
 
@@ -213,8 +222,8 @@ class COOMatrix(Matrix):
         # system.
         mat = self._matrix
 
-        with np.printoptions(threshold=9999, linewidth=9999):
-            print(mat.toarray())
+        # with np.printoptions(threshold=9999, linewidth=9999):
+        #     print(mat.toarray())
 
         # NOTE: mask applies only to ext_mtx.
 

@@ -2,7 +2,7 @@
 
 import unittest
 import numpy as np
-from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup
+from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup, NewtonSolver
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.om_warnings import OpenMDAOWarning
@@ -114,6 +114,8 @@ class TestGetSetVariables(unittest.TestCase):
         model = p.model
         g = model.add_subsystem('g', Group(assembled_jac_type='dense'))
         g.linear_solver = DirectSolver(assemble_jac=True)
+        # add a NewtonSolver so run_model will initialize Group g's jacobian.
+        g.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         g.add_subsystem('c', ExecComp('y=2*x'))
         p.setup()
 
@@ -161,6 +163,7 @@ class TestGetSetVariables(unittest.TestCase):
            inputs['g.c.x']
         self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c.x' not found. Perhaps you meant one of the following variables: ['c.x', 'c.y'].")
 
+        p.run_model()
 
         # outputs
         with self.assertRaises(KeyError) as cm:

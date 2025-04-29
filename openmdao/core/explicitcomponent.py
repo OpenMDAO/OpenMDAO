@@ -145,7 +145,7 @@ class ExplicitComponent(Component):
                 # ExplicitComponent jacobians have -1 on the diagonal.
                 arange = np.arange(size, dtype=INT_DTYPE)
 
-                self._subjacs_info[out_abs, out_abs] = meta = {
+                self._subjacs_info[out_abs, out_abs] = {
                     'rows': arange,
                     'cols': arange,
                     'diagonal': False,
@@ -175,8 +175,8 @@ class ExplicitComponent(Component):
         if self._has_approx and self._use_derivatives:
             self._set_approx_partials_meta()
 
-        if self._jacobian is not None:
-            self._jacobian._setup()
+        # if self._jacobian is not None:
+        #     self._jacobian._setup(self)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,

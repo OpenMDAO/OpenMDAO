@@ -926,8 +926,8 @@ def tim_test_problem(psize):
             outputs['y'] = self.mult * inputs['x'] + inputs['c']
 
         def compute_partials(self, inputs, partials):
-            partials['y', 'x'] = self.mult
-            partials['y', 'c'] = 1.0
+            partials['y', 'x'] = np.ones(self.size) * self.mult
+            partials['y', 'c'] = np.ones(self.size)
 
         def _apply_linear(self, *args, **kwargs):
             super()._apply_linear(*args, **kwargs)

@@ -32,10 +32,6 @@ class Jacobian(object):
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
     _subjacs : dict
         Dictionary of the sub-Jacobian objects keyed by absolute names.
-    _int_subjacs : dict
-        Dictionary of the internal sub-Jacobian objects keyed by absolute names.
-    _ext_subjacs : dict
-        Dictionary of the external sub-Jacobian objects keyed by system pathname.
     _under_complex_step : bool
         When True, this Jacobian is under complex step, using a complex jacobian.
     _abs_keys : dict
@@ -46,10 +42,8 @@ class Jacobian(object):
         List of column var names.
     _col2name_ind : ndarray
         Array that maps jac col index to index of column name.
-    _output_slices : dict
-        Maps output name to slice of the output vector.
-    _input_slices : dict
-        Maps input name to slice of the input vector.
+    _vec_slices : dict
+        Maps iotype to slice of the vector.
     """
 
     def __init__(self, system):
@@ -64,13 +58,10 @@ class Jacobian(object):
         self._col_var_offset = None
         self._col_varnames = None
         self._col2name_ind = None
-        self._vec_slices = {'input': None, 'output': None}
+        self._vec_slices = {'output': None, 'input': None}
 
-    # def _add_subjac_info(self, system, abs_key, meta, src_indices=None, factor=None):
-    #     self._subjacs[abs_key] = self.create_subjac(system, abs_key, meta, src_indices, factor)
-
-    def _setup(self):
-        self._get_subjacs(self._system())
+    def _setup(self, system):
+        self._get_subjacs(system)
 
     def create_subjac(self, system, abs_key, meta):
         """
@@ -128,9 +119,8 @@ class Jacobian(object):
     def _get_vec_slices(self, system, iotype):
         slices = self._vec_slices[iotype]
         if slices is None:
-            it = system._var_abs2meta[iotype].items()
-            self._vec_slices[iotype] = slices = \
-                {n: slice(start, end) for n, start, end in meta2range_iter(it)}
+            it = meta2range_iter(system._var_abs2meta[iotype].items())
+            self._vec_slices[iotype] = slices = {n: slice(start, end) for n, start, end in it}
         return slices
 
     def _get_abs_key(self, key):
@@ -191,7 +181,7 @@ class Jacobian(object):
             Metadata dict for the given key.
         """
         try:
-            return self._subjacs_info[self._get_abs_key(key)]
+            return self._subjacs[self._get_abs_key(key)].info
         except KeyError:
             msg = '{}: Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(self.msginfo, key[0], key[1]))
@@ -210,7 +200,7 @@ class Jacobian(object):
         bool
             return whether sub-Jacobian has been defined.
         """
-        return self._get_abs_key(key) in self._subjacs_info
+        return self._get_abs_key(key) in self._subjacs
 
     def __getitem__(self, key):
         """
@@ -227,7 +217,7 @@ class Jacobian(object):
             sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
         """
         try:
-            return self._subjacs_info[self._get_abs_key(key)]['val']
+            return self._subjacs[self._get_abs_key(key)].get_val()
         except KeyError:
             msg = '{}: Variable name pair ("{}", "{}") not found.'
             raise KeyError(msg.format(self.msginfo, key[0], key[1]))
@@ -253,32 +243,7 @@ class Jacobian(object):
             msg = '{}: Variable name pair ("{}", "{}") must first be declared.'
             raise KeyError(msg.format(self.msginfo, key[0], key[1]))
 
-        subjacs_info = self._subjacs_info[abs_key]
-
-        print(f'setting {key} to {subjac}')
-
-        if issparse(subjac):
-            subjacs_info['val'] = subjac
-        else:
-            rows = subjacs_info['rows']
-
-            if rows is None:
-                # Dense subjac
-                subjac = np.atleast_2d(subjac)
-                if subjac.shape != (1, 1):
-                    shape = self._abs_key2shape(abs_key)
-                    subjac = subjac.reshape(shape)
-
-                subjacs_info['val'][:] = subjac
-
-            else:
-                try:
-                    subjacs_info['val'][:] = subjac
-                except ValueError:
-                    subjac = np.atleast_1d(subjac)
-                    msg = '{}: Sub-jacobian for key {} has the wrong shape ({}), expected ({}).'
-                    raise ValueError(msg.format(self.msginfo, abs_key,
-                                                subjac.shape, rows.shape))
+        self._subjacs[abs_key].set_val(subjac)
 
     def __iter__(self):
         """
@@ -288,7 +253,7 @@ class Jacobian(object):
         ------
         str
         """
-        yield from self._subjacs_info.keys()
+        yield from self._subjacs.keys()
 
     def keys(self):
         """
@@ -298,7 +263,7 @@ class Jacobian(object):
         ------
         str
         """
-        yield from self._subjacs_info.keys()
+        yield from self._subjacs.keys()
 
     def items(self):
         """
@@ -308,8 +273,8 @@ class Jacobian(object):
         ------
         str
         """
-        for key, meta in self._subjacs_info.items():
-            yield key, meta['val']
+        for key, meta in self._subjacs.items():
+            yield key, meta.get_val()
 
     @property
     def msginfo(self):
@@ -340,7 +305,7 @@ class Jacobian(object):
         system : System
             System that is updating this jacobian.
         """
-        pass
+        self._get_subjacs(system)
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -548,14 +513,43 @@ class Jacobian(object):
 class SplitJacobian(Jacobian):
     """
     A Jacobian that is split into internal and external parts.
+
+    Parameters
+    ----------
+    system : System
+        System that is updating this jacobian.
+
+    Attributes
+    ----------
+    _int_subjacs : dict
+        Dictionary of the internal sub-Jacobian objects keyed by absolute names.
+    _ext_subjacs : dict
+        Dictionary of the external sub-Jacobian objects keyed by system pathname.
     """
+
     def __init__(self, system):
+        """
+        Initialize the SplitJacobian.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        """
         super().__init__(system)
         self._int_subjacs = None
         self._ext_subjacs = {}
 
-    def _setup(self):
-        self._get_split_subjacs(self._system())
+    def _setup(self, system):
+        """
+        Initialize the Subjacs in the SplitJacobian.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        """
+        self._get_split_subjacs(system)
 
     def _get_split_subjacs(self, system):
         is_top = system.pathname == ''
@@ -573,8 +567,10 @@ class SplitJacobian(Jacobian):
             input_slices = self._get_vec_slices(system, 'input')
 
             for abs_key, meta in self._subjacs_info.items():
-                of, wrt = abs_key
+                wrt = abs_key[1]
                 factor = None
+                if not meta['dependent']:
+                    continue
                 if wrt in output_slices:
                     self._int_subjacs[abs_key] = self.create_internal_subjac(system, abs_key, meta)
                 elif wrt in input_slices:
@@ -584,10 +580,6 @@ class SplitJacobian(Jacobian):
                         # derivatives wrt inputs into the corresponding derivative wrt the source,
                         # so d(residual)/d(source) instead of d(residual)/d(input).
                         src = conns[wrt]
-                        if src not in output_slices:
-                            # I don't think we ever get here.  Let's find out.
-                            raise RuntimeError("FOO OUTSIDE SRC")
-                            continue  # src outside current system
 
                         meta_in = abs2meta_in[wrt]
                         meta_out = abs2meta_out[src]
@@ -611,6 +603,11 @@ class SplitJacobian(Jacobian):
                 ext_subjacs = None
 
             self._ext_subjacs[system.pathname] = ext_subjacs
+
+            # also populate regular subjacs dict for use with Jacobian class methods
+            self._subjacs = self._int_subjacs.copy()
+            if ext_subjacs is not None:
+                self._subjacs.update(ext_subjacs)
         else:
             ext_subjacs = self._ext_subjacs[system.pathname]
 
@@ -620,6 +617,7 @@ class SplitJacobian(Jacobian):
         """
         Revert all subjacs back to the way they were as declared by the user.
         """
+        self._subjacs = None
         self._int_subjacs = None
         self._ext_subjacs = {}
         self._get_split_subjacs(system)

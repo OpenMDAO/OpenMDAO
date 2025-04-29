@@ -14,26 +14,7 @@ class BlockJacobian(Jacobian):
     ----------
     system : System
         System that is updating this jacobian.
-
-    Attributes
-    ----------
-    _subjacs : dict
-        Dictionary of sub-Jacobians.
-    _ordered : bool
-        Whether the sub-Jacobians are ordered.
     """
-
-    def __init__(self, system):
-        """
-        Initialize block-sparse Jacobian with sub-jacobian information.
-
-        Parameters
-        ----------
-        system : System
-            System that is updating this jacobian.
-        """
-        super().__init__(system)
-        self._ordered = False
 
     def __getitem__(self, key):
         """
@@ -70,7 +51,6 @@ class BlockJacobian(Jacobian):
         if abs_key is None:
             raise KeyError(f'{self.msginfo}: Variable name pair {key} not found.')
 
-        print(f"setting {key} to {subjac}, row:{self._subjacs[abs_key].row_slice}, col:{self._subjacs[abs_key].col_slice}")
         # You can only set declared subjacobians.
         try:
             self._subjacs[abs_key].set_val(subjac)
@@ -78,48 +58,6 @@ class BlockJacobian(Jacobian):
             raise KeyError(f'{self.msginfo}: Variable name pair {key} must first be declared.')
         except ValueError as err:
             raise ValueError(f"{self.msginfo}: for subjacobian {key}: {err}")
-
-    # def _get_subjacs(self, system):
-    #     """
-    #     Get the sub-Jacobians.
-
-    #     Parameters
-    #     ----------
-    #     system : System
-    #         System that is updating this jacobian.
-
-    #     Returns
-    #     -------
-    #     dict
-    #         Dictionary of sub-Jacobians.
-    #     """
-    #     if not self._ordered:
-    #         # determine the set of remote keys (keys where either of or wrt is remote somewhere)
-    #         # only if we're under MPI with comm size > 1 and the given system is a Group that
-    #         # computes its derivatives using finite difference or complex step.
-    #         include_remotes = system.pathname and \
-    #             system.comm.size > 1 and system._owns_approx_jac and system._subsystems_allprocs
-
-    #         subjacs = self._subjacs
-
-    #         if include_remotes:
-    #             ofnames = system._var_allprocs_abs2meta['output']
-    #             wrtnames = system._var_allprocs_abs2meta
-    #         else:
-    #             ofnames = system._var_abs2meta['output']
-    #             wrtnames = system._var_abs2meta
-
-    #         self._subjacs = {}
-    #         for res_name in ofnames:
-    #             for type_ in ('output', 'input'):
-    #                 for name in wrtnames[type_]:
-    #                     key = (res_name, name)
-    #                     if key in subjacs:
-    #                         self._subjacs[key] = subjacs[key]
-
-    #         self._ordered = True
-
-    #     return self._subjacs
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """

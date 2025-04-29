@@ -1210,12 +1210,13 @@ class Component(System):
             meta['val'] = val
             meta['diagonal'] = diagonal
 
-            _val = val.data if issparse(val) else val
-            if np.all(_val == 0):
-                warn_deprecation(f'{self.msginfo}: d({of})/d({wrt}): Partial was declared to be '
-                                 f'exactly zero. This is inefficient and the declaration should '
-                                 f'be removed. In a future version of OpenMDAO this behavior '
-                                 f'will raise an error.')
+            if val is not None:
+                _val = val.data if issparse(val) else val
+                if np.all(_val == 0):
+                    warn_deprecation(f'{self.msginfo}: d({of})/d({wrt}): Partial was declared to be'
+                                     ' exactly zero. This is inefficient and the declaration '
+                                     'should be removed. In a future version of OpenMDAO this '
+                                     'behavior will raise an error.')
 
             if rows is not None:
                 rows = np.asarray(rows, dtype=INT_DTYPE)
@@ -1518,9 +1519,14 @@ class Component(System):
         is_scalar = isscalar(val)
         dependent = pattern_meta['dependent']
         matfree = self.matrix_free
+        diag = pattern_meta.get('diagonal')
 
         if dependent:
-            if 'rows' in pattern_meta and pattern_meta['rows'] is not None:  # sparse list format
+            if diag:
+                rows = cols = None
+                rows_max = cols_max = 0
+
+            elif 'rows' in pattern_meta and pattern_meta['rows'] is not None:  # sparse list format
                 rows = pattern_meta['rows']
                 cols = pattern_meta['cols']
 
@@ -1577,7 +1583,7 @@ class Component(System):
                     cols = meta['cols']
             else:
                 meta = SUBJAC_META_DEFAULTS.copy()
-                meta.update(patmeta)
+                meta.update(patmeta.copy())
 
             of, wrt = abs_key
             meta['rows'] = rows
@@ -1613,24 +1619,27 @@ class Component(System):
                         # distributed vars are allowed to have zero size outputs on some procs
                         cols_max = -1
 
-            if val is None and not matfree:
-                # we can only get here if rows is None  (we're not sparse list format)
-                meta['val'] = np.zeros(shape)
-            elif is_array:
-                if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
-                    meta['val'] = val = val.copy().reshape(shape)
-                else:
-                    meta['val'] = val.copy()
-            elif is_scalar:
-                meta['val'] = np.full(shape, val, dtype=float)
-            else:
-                meta['val'] = val
-
             if rows_max >= shape[0] or cols_max >= shape[1]:
                 of, wrt = abs_key2rel_key(self, abs_key)
                 raise ValueError(f"{self.msginfo}: d({of})/d({wrt}): Expected {shape[0]}x"
                                  f"{shape[1]} but declared at least {rows_max + 1}x"
                                  f"{cols_max + 1}")
+
+            if not matfree:
+                if diag:
+                    meta['val'] = np.zeros(csz)
+                elif val is None:
+                    # we can only get here if rows is None  (we're not sparse list format)
+                    meta['val'] = np.zeros(shape)
+                elif is_array:
+                    if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
+                        meta['val'] = val = val.copy().reshape(shape)
+                    else:
+                        meta['val'] = val.copy()
+                elif is_scalar:
+                    meta['val'] = np.full(shape, val, dtype=float)
+                else:  # sparse
+                    meta['val'] = val.copy()
 
             self._check_partials_meta(abs_key, meta['val'],
                                       shape if rows is None else (rows.shape[0], 1))
@@ -1644,7 +1653,6 @@ class Component(System):
         Override this in a subclass to use a different jacobian type than DictionaryJacobian.
         """
         self._jacobian = BlockJacobian(system=self)
-        # self._jacobian = DictionaryJacobian(system=self)
 
     def _column_iotypes(self):
         """
@@ -1824,6 +1832,9 @@ class Component(System):
             self._first_call_to_linearize = False  # only do this once
             if coloring_mod._use_partial_sparsity:
                 self._get_coloring()
+            if self._jacobian is None:
+                self._init_jacobian()
+            self._jacobian._setup(self)
 
     def _resolve_src_inds(self):
         abs2prom = self._resolver.abs2prom
