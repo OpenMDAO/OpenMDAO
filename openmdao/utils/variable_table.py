@@ -319,7 +319,7 @@ def write_options_table(pathname, opt_list, out_stream=_DEFAULT_OUT_STREAM):
     ----------
     pathname : str
         Pathname to be printed. If None, defaults to 'model'.
-    options : list of dict
+    opt_list : list
         List of systems options dictionaries.
     out_stream : file-like object
         Where to send human readable output.

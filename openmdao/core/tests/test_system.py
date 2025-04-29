@@ -344,6 +344,10 @@ class TestSystem(unittest.TestCase):
         self.assertTrue(opt_list[1][2]['maxiter'] == 10)
         self.assertTrue(opt_list[3][1]['use_jit'] is True)
 
+        opt_dict = prob.model.list_options(out_stream=None, return_format='dict')
+        self.assertTrue(opt_dict['cycle'][1]['maxiter'] == 10)
+
+        opt_list = prob.model.list_options(out_stream=None, include_solvers=False)
         opt_list = prob.model.list_options(out_stream=None, include_solvers=False)
         self.assertTrue(opt_list[1][2] is None)
         self.assertTrue(opt_list[1][3] is None)
