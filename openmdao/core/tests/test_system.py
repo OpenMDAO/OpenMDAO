@@ -346,8 +346,8 @@ class TestSystem(unittest.TestCase):
 
         opt_dict = prob.model.list_options(out_stream=None, return_format='dict')
         self.assertTrue(opt_dict['cycle']['nonlinear_solver']['maxiter'] == 10)
-        self.assertTrue(opt_dict['cycle']['linear_solver']['use_aitken'] == False)
-        self.assertTrue(opt_dict['cycle']['options']['auto_order'] == False)
+        self.assertTrue(opt_dict['cycle']['linear_solver']['use_aitken'] is False)
+        self.assertTrue(opt_dict['cycle']['options']['auto_order'] is False)
 
         opt_list = prob.model.list_options(out_stream=None, include_solvers=False)
         opt_list = prob.model.list_options(out_stream=None, include_solvers=False)
