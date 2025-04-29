@@ -5505,7 +5505,7 @@ class System(object, metaclass=SystemMetaclass):
                 val = val[indices]
 
             if units is not None:
-                val = self.convert2units(name, val, simp_units)
+                val = self.convert2units(abs_names[0], val, simp_units)
 
         return val
 
