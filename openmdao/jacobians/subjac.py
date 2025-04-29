@@ -10,6 +10,8 @@ OpenMDAO's internal COO format.
 import numpy as np
 from scipy.sparse import coo_matrix, issparse
 
+from openmdao.matrices.matrix import _compute_index_map
+
 
 class Subjac(object):
     """
@@ -87,7 +89,7 @@ class Subjac(object):
             self.shape = (row_slice.stop - row_slice.start, col_slice.stop - col_slice.start)
         else:
             self.shape = src_shape
-
+            
         self._map_functions(wrt_is_input)
 
     def _map_functions(self, wrt_is_input):
@@ -345,6 +347,13 @@ class OMCOOSubjac(Subjac):
             Shape of the subjacobian of the row var with respect to wrt's source.
         """
         super().__init__(meta, row_slice, col_slice, wrt_is_input, src_indices, factor, src_shape)
+        self.rows = meta['rows']
+        self.cols = meta['cols']
+        
+        if meta['rows'] is not None and src_indices is not None:
+            self.rows, self.cols, idxs = _compute_index_map(self.rows, self.cols,
+                                                            src_indices=src_indices)
+
         self.set_val(meta['val'])
 
     def get_random_subjac(self, randgen):
@@ -361,9 +370,8 @@ class OMCOOSubjac(Subjac):
         ndarray
             Random subjacobian.
         """
-        val = randgen.random(len(self.info['rows'])) + 1.0
-        return coo_matrix((val, (self.info['rows'], self.info['cols'])),
-                          shape=self.shape)
+        val = randgen.random(len(self.rows)) + 1.0
+        return coo_matrix((val, (self.rows, self.cols)), shape=self.shape)
 
     def set_val(self, val):
         """
@@ -375,8 +383,8 @@ class OMCOOSubjac(Subjac):
             Value to set the subjacobian to.
         """
         self.info['val'][:] = val
-        self.coo = coo_matrix((self.info['val'], (self.info['rows'], self.info['cols'])),
-                              shape=(self.shape))
+        self.coo = coo_matrix((self.info['val'], (self.rows, self.cols)),
+                              shape=self.shape)
 
     def get_coo_size(self):
         """
@@ -388,9 +396,9 @@ class OMCOOSubjac(Subjac):
             Size of the subjacobian in COO format.
         """
         if self.src_indices is None:
-            return len(self.info['cols'])
+            return len(self.cols)
         else:
-            cols = np.asarray(self.info['cols'])
+            cols = np.asarray(self.cols)
             return cols[np.isin(cols, self.src_indices.asarray())].size
 
     def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals):
