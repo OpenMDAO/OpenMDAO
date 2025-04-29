@@ -4977,10 +4977,11 @@ class System(object, metaclass=SystemMetaclass):
             Set to None to suppress.
         return_format : str
             Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
-            If 'list', the return value is a list of tuples of the form: (system options, nonlinear
+            If 'list', the return value is a list of tuples of the form: (pathname, system options, nonlinear
             solver options, linear solver options)
-            if 'dict', the return value is a dictionary of tuples of the form: (system options,
-            nonlinear solver options, linear solver options)
+            if 'dict', the return value is a dictionary with the pathname as key, and a dictionary as the value.
+            The dictionary contains 'options', 'nonlinear_solver', and 'linear_solver' keys, each of which is
+            a dictionary of options.
 
         Returns
         -------
