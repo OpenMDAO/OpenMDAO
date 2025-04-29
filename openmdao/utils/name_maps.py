@@ -920,7 +920,7 @@ class NameResolver(object):
                                    "Access the value from the connected output variable instead.")
 
             # report to the user which connected output to access
-            src_name =  self.source(lst[0])
+            src_name = self.source(lst[0])
             try:
                 # find the promoted source name if we can (may not be in the scope of our System)
                 src_name = self._abs2prom['output'][src_name][0]
