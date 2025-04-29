@@ -112,8 +112,15 @@ class Jacobian(object):
 
     def _get_subjacs(self, system):
         if self._subjacs is None:
-            self._subjacs = {key: self.create_subjac(system, key, meta)
-                             for key, meta in self._subjacs_info.items()}
+            self._subjacs = {}
+            out_slices = self._get_vec_slices(system, 'output')
+            in_slices = self._get_vec_slices(system, 'input')
+            for key, meta in self._subjacs_info.items():
+                of, wrt = key
+                if of in out_slices:
+                    if wrt in in_slices or wrt in out_slices:
+                        self._subjacs[key] = self.create_subjac(system, key, meta)
+
         return self._subjacs
 
     def _get_vec_slices(self, system, iotype):

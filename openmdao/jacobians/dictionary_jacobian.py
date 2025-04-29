@@ -247,7 +247,7 @@ class _CheckingJacobian(DictionaryJacobian):
 
         for of, start, end, _, _ in system._jac_of_iter():
             nrows = end - start
-            for wrt, wstart, wend, _, _, _ in system._jac_wrt_iter():
+            for wrt, wstart, wend, vec, _, _ in system._jac_wrt_iter():
                 if local_opts:
                     loc_wrt = wrt.rsplit('.', 1)[-1]
                     directional = (loc_wrt in local_opts and
@@ -255,7 +255,7 @@ class _CheckingJacobian(DictionaryJacobian):
                 else:
                     directional = False
                 key = (of, wrt)
-                if key not in self._subjacs_info:
+                if vec is not None and key not in self._subjacs_info:
                     ncols = wend - wstart
                     # create subjacs_info objects for matrix_free systems that don't have them
                     self._subjacs_info[key] = {
