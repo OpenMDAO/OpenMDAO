@@ -10,8 +10,6 @@ OpenMDAO's internal COO format.
 import numpy as np
 from scipy.sparse import coo_matrix, issparse
 
-from openmdao.matrices.matrix import _compute_index_map
-
 
 class Subjac(object):
     """
@@ -89,7 +87,7 @@ class Subjac(object):
             self.shape = (row_slice.stop - row_slice.start, col_slice.stop - col_slice.start)
         else:
             self.shape = src_shape
-            
+
         self._map_functions(wrt_is_input)
 
     def _map_functions(self, wrt_is_input):
@@ -322,6 +320,16 @@ class OMCOOSubjac(Subjac):
         Unit conversion factor for the subjacobian.
     src_shape : tuple
         Shape of the subjacobian of the row var with respect to wrt's source.
+
+    Attributes
+    ----------
+    mask : slice or array
+        Mask to apply to the rows and columns when src_indices is not None.
+        If None, no mask is applied.
+    rows : array or None
+        Rows of the subjacobian after applying the mask.
+    cols : array or None
+        Columns of the subjacobian after applying the mask.
     """
 
     def __init__(self, meta, row_slice, col_slice, wrt_is_input, src_indices=None, factor=None,
@@ -349,10 +357,13 @@ class OMCOOSubjac(Subjac):
         super().__init__(meta, row_slice, col_slice, wrt_is_input, src_indices, factor, src_shape)
         self.rows = meta['rows']
         self.cols = meta['cols']
-        
+        self.mask = slice(None)
+
         if meta['rows'] is not None and src_indices is not None:
-            self.rows, self.cols, idxs = _compute_index_map(self.rows, self.cols,
-                                                            src_indices=src_indices)
+            colset = set(src_indices.shaped_array())
+            self.mask = np.isin(self.cols, colset)
+            self.rows = self.rows[self.mask]
+            self.cols = self.cols[self.mask]
 
         self.set_val(meta['val'])
 
@@ -383,7 +394,7 @@ class OMCOOSubjac(Subjac):
             Value to set the subjacobian to.
         """
         self.info['val'][:] = val
-        self.coo = coo_matrix((self.info['val'], (self.rows, self.cols)),
+        self.coo = coo_matrix((self.info['val'][self.mask], (self.rows, self.cols)),
                               shape=self.shape)
 
     def get_coo_size(self):

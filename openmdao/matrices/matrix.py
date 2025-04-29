@@ -141,14 +141,9 @@ class Matrix(object):
         pass
 
 
-def _compute_index_map(jrows, jcols, irow=None, icol=None, src_indices=None):
+def _compute_index_map(jrows, jcols, irow, icol, src_indices):
     """
-    Return row/column indices to map jrows and jcols into the sub-jacobian or global jac.
-
-    If irow and icol are not None, the returned row and column indices are offset by irow and icol,
-    so they apply to the global jacobian.  Otherwise, the returned row and column indices are
-    modified versions of jrows and jcols that map into the sub-jacobian after the src_indices
-    are applied.
+    Return row/column indices to map sub-jacobian to global jac.
 
     Parameters
     ----------
@@ -170,9 +165,6 @@ def _compute_index_map(jrows, jcols, irow=None, icol=None, src_indices=None):
         Row indices, column indices, and indices of columns matching
         src_indices.
     """
-    if src_indices is None:
-        return (jrows, jcols, jcols)
-
     icols = []
     idxs = []
 
@@ -183,11 +175,7 @@ def _compute_index_map(jrows, jcols, irow=None, icol=None, src_indices=None):
         icols.append(np.full(idxarr.shape, idx, dtype=INT_DTYPE))
 
     idxs = np.hstack(idxs)
-    icols = np.hstack(icols)
-    if icol is not None:
-        icols += icol
-    irows = jrows[idxs]
-    if irow is not None:
-        irows += irow
+    icols = np.hstack(icols) + icol
+    irows = jrows[idxs] + irow
 
     return (irows, icols, idxs)

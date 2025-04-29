@@ -1530,7 +1530,9 @@ class Component(System):
                 rows = pattern_meta['rows']
                 cols = pattern_meta['cols']
 
-                if is_scalar:
+                if matfree:
+                    val = None
+                elif is_scalar:
                     val = np.full(rows.size, val, dtype=float)
                     is_scalar = False
                 elif val is not None:
@@ -1545,7 +1547,7 @@ class Component(System):
                                          'must be a scalar or have the same shape, val: {}, '
                                          'rows/cols: {}'.format(self.msginfo, of, wrt,
                                                                 val.shape, rows.shape))
-                elif not matfree:
+                else:
                     val = np.zeros_like(rows, dtype=float)
 
                 if rows.size > 0:
@@ -1554,6 +1556,8 @@ class Component(System):
                 else:
                     rows_max = cols_max = 0
             else:
+                if matfree:
+                    val = None
                 if val is not None and not is_scalar and not issparse(val):
                     val = atleast_2d(val)
                     val = val.astype(promote_types(val.dtype, float), copy=False)
@@ -1625,7 +1629,9 @@ class Component(System):
                                  f"{shape[1]} but declared at least {rows_max + 1}x"
                                  f"{cols_max + 1}")
 
-            if not matfree:
+            if matfree:
+                meta['val'] = None
+            else:
                 if diag:
                     meta['val'] = np.zeros(csz)
                 elif val is None:
