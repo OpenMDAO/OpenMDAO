@@ -1413,20 +1413,19 @@ class Group(System):
         abs2idx = self._var_allprocs_abs2idx
         for io in ('input', 'output'):
             sizes = self._var_sizes[io]
-            for abs_name, meta in self._var_allprocs_abs2meta[io].items():
-                if not meta['distributed']:
-                    vsizes = sizes[:, abs2idx[abs_name]]
-                    unique = set(vsizes)
-                    unique.discard(0)
-                    if len(unique) > 1:
-                        # sizes differ, now find which procs don't agree
-                        rnklist = []
-                        for sz in unique:
-                            rnklist.append((sz, [i for i, s in enumerate(vsizes) if s == sz]))
-                        msg = ', '.join([f"rank(s) {r} have size {s}" for s, r in rnklist])
-                        self._collect_error(f"{self.msginfo}: Size of {io} '{abs_name}' "
-                                            f"differs between processes ({msg}).",
-                                            ident=('size', abs_name))
+            for abs_name in self._resolver.abs_iter(io, continuous=True, distributed=False):
+                vsizes = sizes[:, abs2idx[abs_name]]
+                unique = set(vsizes)
+                unique.discard(0)
+                if len(unique) > 1:
+                    # sizes differ, now find which procs don't agree
+                    rnklist = []
+                    for sz in unique:
+                        rnklist.append((sz, [i for i, s in enumerate(vsizes) if s == sz]))
+                    msg = ', '.join([f"rank(s) {r} have size {s}" for s, r in rnklist])
+                    self._collect_error(f"{self.msginfo}: Size of {io} '{abs_name}' "
+                                        f"differs between processes ({msg}).",
+                                        ident=('size', abs_name))
 
     def _top_level_post_sizes(self):
         # this runs after the variable sizes are known
@@ -1983,10 +1982,9 @@ class Group(System):
 
             resflags = self._resolver.flags
             for io in ('input', 'output'):
-                abs2meta = self._var_allprocs_abs2meta[io]
 
                 # var order must be same on all procs
-                sorted_names = sorted(self._resolver.abs_iter(io))
+                sorted_names = sorted(self._resolver.abs_iter(io, distributed=False))
                 locality = np.zeros((nprocs, len(sorted_names)), dtype=bool)
                 for i, name in enumerate(sorted_names):
                     if resflags(name, io) & LOCAL:
@@ -1997,7 +1995,7 @@ class Group(System):
 
                 for i, name in enumerate(sorted_names):
                     nzs = np.nonzero(locality[:, i])[0]
-                    if not abs2meta[name]['distributed'] and 0 < nzs.size < nprocs:
+                    if 0 < nzs.size < nprocs:
                         remote_vars[name] = nzs[0]
 
         return remote_vars

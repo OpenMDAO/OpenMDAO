@@ -649,7 +649,7 @@ class Component(System):
         }
 
         # this will get reset later if comm size is 1
-        self._has_distrib_vars |= metadata['distributed']
+        self._has_distrib_vars |= distributed
 
         if self._static_mode:
             var_rel2meta = self._static_var_rel2meta
@@ -923,8 +923,8 @@ class Component(System):
         }
 
         # this will get reset later if comm size is 1
-        self._has_distrib_vars |= metadata['distributed']
-        self._has_distrib_outputs |= metadata['distributed']
+        self._has_distrib_vars |= distributed
+        self._has_distrib_outputs |= distributed
 
         # We may not know the pathname yet, so we have to use name for now, instead of abs_name.
         if self._static_mode:

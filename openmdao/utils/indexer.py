@@ -109,7 +109,7 @@ def ranges2indexer(ranges, src_shape=None):
     elif len(ranges) == 0:
         idx = slice(0, 0)
     else:
-        idx = np.concatenate([np.arange(start, end) for start, end in ranges])
+        idx = np.concatenate([range(start, end) for start, end in ranges])
 
     if src_shape is None:
         src_shape = (ranges[-1][1] - ranges[0][0],)
