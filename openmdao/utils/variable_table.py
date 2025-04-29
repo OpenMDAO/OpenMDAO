@@ -309,6 +309,7 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
                               s for s in out_str.splitlines()]
             out_stream.write('\n'.join(indented_lines) + '\n')
 
+
 def write_options_table(pathname, opt_list, out_stream=_DEFAULT_OUT_STREAM):
     """
     Write table of options and values for a model.
