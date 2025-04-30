@@ -87,11 +87,9 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
     vals = {}
 
-    prefix = system.pathname + '.' if system.pathname else ''
     all_vars = {}
     for io in ('input', 'output'):
-        all_vars[io] = chain(system._var_abs2meta[io],
-                             [prefix + n for n in system._var_discrete[io]])
+        all_vars[io] = chain(system._resolver.abs_iter(io, local=True))
 
     with printoptions(precision=precision, suppress=True, threshold=10000):
 
@@ -116,8 +114,7 @@ def view_connections(root, outfile='connections.html', show_browser=True,
 
             vals[t] = val
 
-    tprom = system._var_allprocs_abs2prom['input']
-    sprom = system._var_allprocs_abs2prom['output']
+    resolver = system._resolver
 
     table = []
     prom_trees = {}
@@ -132,8 +129,8 @@ def view_connections(root, outfile='connections.html', show_browser=True,
             if utgt:
                 utgt = '!' + units[tgt]
 
-        tgtprom = tprom[tgt]
-        srcprom = sprom[src]
+        tgtprom = resolver.abs2prom(tgt, 'input')
+        srcprom = resolver.abs2prom(src, 'output')
 
         if (tgtprom, srcprom) in prom_trees:
             sys_prom_map = prom_trees[(tgtprom, srcprom)]

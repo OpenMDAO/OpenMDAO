@@ -516,16 +516,16 @@ class ImplicitComponent(Component):
         """
         self.setup_residuals()
 
-    def _setup_vectors(self, root_vectors):
+    def _setup_vectors(self, parent_vectors=None):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
         Parameters
         ----------
-        root_vectors : dict of dict of Vector
-            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vectors : dict or None
+            Parent vectors.  Same structure as root_vectors.
         """
-        super()._setup_vectors(root_vectors)
+        super()._setup_vectors(parent_vectors)
         if self._jacobian is None:
             self._init_jacobian()
 
@@ -917,7 +917,7 @@ class ImplicitComponent(Component):
 
     def _list_states(self):
         """
-        Return list of all states at and below this system.
+        Return list of all states in this system.
 
         If final setup has not been performed yet, return relative names for this system only.
 
@@ -926,9 +926,7 @@ class ImplicitComponent(Component):
         list
             List of all states.
         """
-        prefix = self.pathname + '.'
-        return list(self._var_abs2meta['output']) + \
-            [prefix + n for n in self._var_discrete['output']]
+        return list(self._resolver.abs_iter('output', local=True))
 
     def _list_states_allprocs(self):
         """

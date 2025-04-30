@@ -182,9 +182,9 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        with self.assertRaises(KeyError) as cm:
+        with self.assertRaises(Exception) as cm:
             prob.compute_totals(of='comp.f_xy', wrt="p1.x, p2.y")
-        self.assertEqual(str(cm.exception), "'p1.x, p2.y'")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: Output not found for design variable 'p1.x, p2.y'.")
 
     def test_compute_totals_cleanup(self):
         p = om.Problem()
@@ -1137,7 +1137,7 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        msg = "Can't express variable 'comp.x' with units of 'cm' in units of 'degK'."
+        msg = "<model> <class Group>: Can't express variable 'comp.x' with units of 'cm' in units of 'degK'."
         with self.assertRaisesRegex(TypeError, msg):
             prob.get_val('comp.x', 'degK')
 

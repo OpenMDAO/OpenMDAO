@@ -150,7 +150,7 @@ else:
         def _setup_transfers_rev(group):
             abs2meta_in = group._var_abs2meta['input']
             abs2meta_out = group._var_abs2meta['output']
-            allprocs_abs2prom = group._var_allprocs_abs2prom
+            resolver = group._resolver
 
             # for an FD group, we use the relevance graph to determine which inputs on the
             # boundary of the group are upstream of responses within the group so
@@ -167,7 +167,12 @@ else:
 
                     if inp_boundary_set:
                         for dv, resp, rel in group._relevance.iter_seed_pair_relevance(inputs=True):
-                            if resp in all_abs2meta_out and dv not in allprocs_abs2prom:
+                            # FIXME: the previous code was doing 'dv not in allprocs_abs2prom'
+                            # which is not correct because the top level keys of allprocs_abs2prom
+                            # are 'input' and 'output' so dv would never match.  Was this being
+                            # tested?  Will doing the dv check correctly now actually break
+                            # something?
+                            if resp in all_abs2meta_out and not resolver.is_abs(dv):
                                 # response is continuous and inside this group and
                                 # dv is outside this group
                                 if all_abs2meta_out[resp]['distributed']:  # a distributed response

@@ -108,15 +108,13 @@ class ExplicitComponent(Component):
             Distributed sizes if var is distributed else None
         """
         start = end = 0
-        local_ins = self._var_abs2meta['input']
         toidx = self._var_allprocs_abs2idx
         sizes = self._var_sizes['input']
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
                 end += meta['size']
-                vec = self._inputs if wrt in local_ins else None
                 dist_sizes = sizes[:, toidx[wrt]] if meta['distributed'] else None
-                yield wrt, start, end, vec, _full_slice, dist_sizes
+                yield wrt, start, end, self._inputs, _full_slice, dist_sizes
                 start = end
 
     def _setup_residuals(self):

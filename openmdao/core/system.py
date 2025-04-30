@@ -20,7 +20,7 @@ from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, 
 from openmdao.jacobians.dictionary_jacobian import Jacobian, DictionaryJacobian
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.vectors.vector import _full_slice
+from openmdao.vectors.vector import _full_slice, _type_map
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
@@ -28,7 +28,7 @@ from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
 from openmdao.utils.variable_table import write_var_table, NA
 from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_tol_violation, \
     sparsity_diff_viz, get_sparsity_diff_array
-from openmdao.utils.name_maps import name2abs_name, name2abs_names
+from openmdao.utils.name_maps import NameResolver
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
@@ -236,15 +236,6 @@ class System(object, metaclass=SystemMetaclass):
         (used to calculate promoted names)
     _var_prom2inds : dict
         Maps promoted name to src_indices in scope of system.
-    _var_allprocs_prom2abs_list : {'input': dict, 'output': dict}
-        Dictionary mapping promoted names (continuous and discrete) to list of all absolute names.
-        For outputs, the list will have length one since promoted output names are unique.
-    _var_abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names, on current proc. Contains continuous
-        and discrete variables.
-    _var_allprocs_abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names, on all procs.  Contains continuous
-        and discrete variables.
     _var_allprocs_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for allprocs continuous
         variables.
@@ -400,6 +391,8 @@ class System(object, metaclass=SystemMetaclass):
         Function that computes the primal for the given system.
     _jac_func_ : function or None
         Function that computes the jacobian using AD (jax).  Not used if jax is not active.
+    _resolver : NameResolver
+        Resolves names to absolute names, promoted names, and iotypes.
     """
 
     def __init__(self, num_par_fd=1, **kwargs):
@@ -454,10 +447,8 @@ class System(object, metaclass=SystemMetaclass):
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
-        self._var_allprocs_prom2abs_list = None
+        self._resolver = NameResolver(self.pathname, self.msginfo)
         self._var_prom2inds = {}
-        self._var_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
         self._var_discrete = {'input': {}, 'output': {}}
@@ -632,42 +623,6 @@ class System(object, metaclass=SystemMetaclass):
 
     def _get_inst_id(self):
         return self.pathname if self.pathname is not None else ''
-
-    def abs_name_iter(self, iotype, local=True, cont=True, discrete=False):
-        """
-        Iterate over absolute variable names for this System.
-
-        By setting appropriate values for 'cont' and 'discrete', yielded variable
-        names can be continuous only, discrete only, or both.
-
-        Parameters
-        ----------
-        iotype : str
-            Either 'input' or 'output'.
-        local : bool
-            If True, include only names of local variables. Default is True.
-        cont : bool
-            If True, include names of continuous variables.  Default is True.
-        discrete : bool
-            If True, include names of discrete variables.  Default is False.
-
-        Yields
-        ------
-        str
-        """
-        if cont:
-            if local:
-                yield from self._var_abs2meta[iotype]
-            else:
-                yield from self._var_allprocs_abs2meta[iotype]
-
-        if discrete:
-            if local:
-                prefix = self.pathname + '.' if self.pathname else ''
-                for name in self._var_discrete[iotype]:
-                    yield prefix + name
-            else:
-                yield from self._var_allprocs_discrete[iotype]
 
     def abs_meta_iter(self, iotype, local=True, cont=True, discrete=False):
         """
@@ -1450,43 +1405,6 @@ class System(object, metaclass=SystemMetaclass):
 
         return self._approx_schemes[method]
 
-    def get_source(self, name):
-        """
-        Return the source variable connected to the given named variable.
-
-        The name can be a promoted name or an absolute name.
-        If the given variable is an input, the absolute name of the connected source will
-        be returned.  If the given variable itself is a source, its own absolute name will
-        be returned.
-
-        Parameters
-        ----------
-        name : str
-            Absolute or promoted name of the variable.
-
-        Returns
-        -------
-        str
-            The absolute name of the source variable.
-        """
-        try:
-            prom2abs = self._problem_meta['prom2abs']
-        except Exception:
-            raise RuntimeError(f"{self.msginfo}: get_source cannot be called for variable {name} "
-                               "before Problem.setup has been called.")
-
-        if name in prom2abs['output']:
-            return prom2abs['output'][name][0]
-
-        if name in prom2abs['input']:
-            name = prom2abs['input'][name][0]
-
-        model = self._problem_meta['model_ref']()
-        if name in model._conn_global_abs_in2out:
-            return model._conn_global_abs_in2out[name]
-
-        raise KeyError(f"{self.msginfo}: source for '{name}' not found.")
-
     def _get_graph_node_meta(self):
         """
         Return metadata to add to this system's graph node.
@@ -2024,6 +1942,7 @@ class System(object, metaclass=SystemMetaclass):
             direction = self.best_partial_deriv_direction()
 
         coloring = _compute_coloring(sparsity, direction)
+        coloring._resolver = self._resolver
 
         if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
             return [None]
@@ -2207,7 +2126,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # includes and excludes for outputs are specified using promoted names
             # includes and excludes for inputs are specified using _absolute_ names
-            abs2prom_output = self._var_allprocs_abs2prom['output']
+            resolver = self._resolver
 
             # set of promoted output names and absolute input and residual names
             # used for matching includes/excludes
@@ -2216,15 +2135,15 @@ class System(object, metaclass=SystemMetaclass):
             # includes and excludes for inputs are specified using _absolute_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_inputs']:
-                abs2prom_inputs = self._var_allprocs_abs2prom['input']
-                match_names.update(abs2prom_inputs)
-                myinputs = sorted([n for n in abs2prom_inputs if check_path(n, incl, excl)])
+                match_names.update(resolver.abs_iter('input'))
+                myinputs = sorted([n for n in resolver.abs_iter('input')
+                                   if check_path(n, incl, excl)])
 
             # includes and excludes for outputs are specified using _promoted_ names
             # vectors are keyed on absolute name, discretes on relative/promoted name
             if options['record_outputs']:
-                match_names.update(abs2prom_output.values())
-                myoutputs = sorted([n for n, prom in abs2prom_output.items()
+                match_names.update(resolver.prom_iter('output'))
+                myoutputs = sorted([n for n, prom in resolver.abs2prom_iter('output')
                                     if check_path(prom, incl, excl)])
 
                 if self._var_discrete['output']:
@@ -2238,7 +2157,7 @@ class System(object, metaclass=SystemMetaclass):
             elif options['record_residuals']:
                 match_names.update(self._residuals)
                 myresiduals = [n for n in self._residuals._abs_iter()
-                               if check_path(abs2prom_output[n], incl, excl)]
+                               if check_path(resolver.abs2prom(n, 'output'), incl, excl)]
 
             # check that all exclude/include globs have at least one matching output or input name
             for pattern in excl:
@@ -2305,9 +2224,6 @@ class System(object, metaclass=SystemMetaclass):
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
         self._var_prom2inds = {}
-        self._var_allprocs_prom2abs_list = {'input': {}, 'output': {}}
-        self._var_abs2prom = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2prom = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
         self._var_allprocs_discrete = {'input': {}, 'output': {}}
@@ -2315,6 +2231,7 @@ class System(object, metaclass=SystemMetaclass):
         self._owning_rank = defaultdict(int)
         self._var_sizes = {}
         self._owned_sizes = None
+        self._resolver = NameResolver(self.pathname, self.msginfo)
 
         cfginfo = self._problem_meta['config_info']
         if cfginfo and self.pathname in cfginfo._modified_systems:
@@ -2355,6 +2272,7 @@ class System(object, metaclass=SystemMetaclass):
             abs2meta = self._var_allprocs_abs2meta['output']
 
         has_scaling = False
+        resolver = self._resolver
 
         for name, meta in self._design_vars.items():
 
@@ -2368,7 +2286,7 @@ class System(object, metaclass=SystemMetaclass):
                 try:
                     units_src = meta['source']
                 except KeyError:
-                    units_src = self.get_source(name)
+                    units_src = resolver.source(name)
 
                 var_units = abs2meta[units_src]['units']
 
@@ -2425,7 +2343,7 @@ class System(object, metaclass=SystemMetaclass):
                 try:
                     units_src = meta['source']
                 except KeyError:
-                    units_src = self.get_source(meta['name'])
+                    units_src = resolver.source(meta['name'])
 
                 src_units = abs2meta[units_src]['units']
 
@@ -2467,47 +2385,61 @@ class System(object, metaclass=SystemMetaclass):
         """
         Compute dict of all connections owned by this system.
         """
-        pass
+        self._resolver._conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
 
-    def _setup_vectors(self, root_vectors):
+    def _setup_vectors(self, parent_vectors):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
         Parameters
         ----------
-        root_vectors : dict of dict of Vector
-            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vectors : dict of dict of Vector or None
+            Parent vectors.  Same structure as root_vectors.
         """
-        self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
+        if parent_vectors is None:
+            self._vectors = vectors = self._get_root_vectors()
+        else:
+            self._vectors = vectors = {'input': {}, 'output': {}, 'residual': {}}
 
-        # Allocate complex if root vector was allocated complex.
-        alloc_complex = root_vectors['output']['nonlinear']._alloc_complex
+            # Allocate complex if root vector was allocated complex.
+            alloc_complex = parent_vectors['output']['nonlinear']._alloc_complex
 
-        # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
-        # initially allocated as complex.
-        if not alloc_complex and 'cs' in self._approx_schemes:
-            raise RuntimeError("{}: In order to activate complex step during reconfiguration, "
-                               "you need to set 'force_alloc_complex' to True during setup. e.g. "
-                               "'problem.setup(force_alloc_complex=True)'".format(self.msginfo))
+            # This happens if you reconfigure and switch to 'cs' without forcing the vectors to be
+            # initially allocated as complex.
+            if not alloc_complex and 'cs' in self._approx_schemes:
+                raise RuntimeError(f"{self.msginfo}: In order to activate complex step during "
+                                   "reconfiguration, you need to set 'force_alloc_complex' to True "
+                                   "during setup. e.g. 'problem.setup(force_alloc_complex=True)'")
 
-        if self._vector_class is None:
-            self._vector_class = self._local_vector_class
+            if self._vector_class is None:
+                self._vector_class = self._local_vector_class
 
-        vector_class = self._vector_class
-        vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
+            vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
 
-        for vec_name in vectypes:
-
-            # Only allocate complex in the vectors we need.
-            vec_alloc_complex = root_vectors['output'][vec_name]._alloc_complex
+            do_scaling = {
+                'input': self._has_input_scaling,
+                'output': self._has_output_scaling,
+                'residual': self._has_resid_scaling
+            }
+            do_adder = {
+                'input': self._has_input_adder,
+                'output': self._has_output_adder,
+                'residual': self._has_resid_scaling
+            }
 
             for kind in ['input', 'output', 'residual']:
-                rootvec = root_vectors[kind][vec_name]
-                vectors[kind][vec_name] = vector_class(
-                    vec_name, kind, self, rootvec, alloc_complex=vec_alloc_complex)
+                # Only allocate complex in the vectors we need.
+                for vec_name in vectypes:
+                    parent_vector = parent_vectors[kind][vec_name]
+                    vectors[kind][vec_name] = self._vector_class(
+                        vec_name, kind, self, parent_vector,
+                        alloc_complex=parent_vector._alloc_complex)
 
-        if self._use_derivatives:
-            vectors['input']['linear']._scaling_nl_vec = vectors['input']['nonlinear']._scaling
+                if do_scaling[kind] or do_adder[kind]:
+                    vectors[kind]['nonlinear']._set_scaling(self, do_adder[kind])
+                    if self._use_derivatives:
+                        vectors[kind]['linear']._set_scaling(self, do_adder[kind],
+                                                             vectors[kind]['nonlinear'])
 
         self._inputs = vectors['input']['nonlinear']
         self._outputs = vectors['output']['nonlinear']
@@ -2518,9 +2450,17 @@ class System(object, metaclass=SystemMetaclass):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-        for subsys in self._sorted_sys_iter():
-            subsys._scale_factors = self._scale_factors
-            subsys._setup_vectors(root_vectors)
+    def _name_shape_iter(self, vectype, subset=None):
+        """
+        Yield variable names and shapes for a given iotype of vector.
+        """
+        if subset is None:
+            for name, meta in self._var_abs2meta[_type_map[vectype]].items():
+                yield name, meta['shape']
+        else:
+            for name, meta in self._var_abs2meta[_type_map[vectype]].items():
+                if name in subset:
+                    yield name, meta['shape']
 
     def _setup_transfers(self):
         """
@@ -2694,7 +2634,7 @@ class System(object, metaclass=SystemMetaclass):
 
             return match_type == _MatchType.PATTERN
 
-        def resolve(to_match, io_types, matches, proms):
+        def resolve(to_match, io_types, matches, resolver):
             """
             Determine the mapping of promoted names to the parent scope for a promotion type.
 
@@ -2714,11 +2654,12 @@ class System(object, metaclass=SystemMetaclass):
                         if io == 'output':
                             pinfo = None
                         if key == '*' and not matches[io]:  # special case. add everything
-                            matches[io] = pmap = {n: (n, key, pinfo, match_type) for n in proms[io]}
+                            matches[io] = pmap = {n: (n, key, pinfo, match_type)
+                                                  for n in resolver.prom_iter(io)}
                         else:
                             pmap = matches[io]
                             nmatch = len(pmap)
-                            for n in proms[io]:
+                            for n in resolver.prom_iter(io):
                                 if fnmatchcase(n, key):
                                     if not (n in pmap and _check_dup(io, matches, match_type, n,
                                                                      tup)):
@@ -2730,7 +2671,7 @@ class System(object, metaclass=SystemMetaclass):
                         if io == 'output':
                             pinfo = None
                         pmap = matches[io]
-                        if key in proms[io]:
+                        if resolver.is_prom(key, io):
                             if key in pmap:
                                 _check_dup(io, matches, match_type, key, tup)
                             pmap[key] = (s, key, pinfo, match_type)
@@ -2741,8 +2682,7 @@ class System(object, metaclass=SystemMetaclass):
 
             not_found = set(n for n, _ in to_match) - found
             if not_found:
-                if (not self._var_abs2meta['input'] and not self._var_abs2meta['output'] and
-                        isinstance(self, Group)):
+                if (self._resolver.num_abs(local=True) == 0 and isinstance(self, Group)):
                     empty_group_msg = ' Group contains no variables.'
                 else:
                     empty_group_msg = ''
@@ -2755,17 +2695,16 @@ class System(object, metaclass=SystemMetaclass):
                 raise RuntimeError(f"{self.msginfo}: '{call}' failed to find any matches for the "
                                    f"following names or patterns: {not_found}.{empty_group_msg}")
 
-        prom2abs_list = self._var_allprocs_prom2abs_list
         maps = {'input': {}, 'output': {}}
 
         if self._var_promotes['input'] or self._var_promotes['output']:
             if self._var_promotes['any']:
                 raise RuntimeError("%s: 'promotes' cannot be used at the same time as "
                                    "'promotes_inputs' or 'promotes_outputs'." % self.msginfo)
-            resolve(self._var_promotes['input'], ('input',), maps, prom2abs_list)
-            resolve(self._var_promotes['output'], ('output',), maps, prom2abs_list)
+            resolve(self._var_promotes['input'], ('input',), maps, self._resolver)
+            resolve(self._var_promotes['output'], ('output',), maps, self._resolver)
         else:
-            resolve(self._var_promotes['any'], ('input', 'output'), maps, prom2abs_list)
+            resolve(self._var_promotes['any'], ('input', 'output'), maps, self._resolver)
 
         return maps
 
@@ -3736,17 +3675,19 @@ class System(object, metaclass=SystemMetaclass):
             Determines whether return key is promoted name or source name.
         """
         model = self._problem_meta['model_ref']()
-        pro2abs_out = self._var_allprocs_prom2abs_list['output']
         abs2meta_out = model._var_allprocs_abs2meta['output']
         prom_name = meta['name']
 
-        if prom_name in pro2abs_out:  # promoted output
-            src_name = pro2abs_out[prom_name][0]
+        if self._resolver.is_prom(prom_name, 'output'):
+            src_name = self._resolver.prom2abs(prom_name, 'output')
             meta['orig'] = (prom_name, None)
 
         else:  # Design variable on an input connected to an ivc.
-            pro2abs_in = self._var_allprocs_prom2abs_list['input']
-            src_name = model._conn_global_abs_in2out[pro2abs_in[prom_name][0]]
+            try:
+                src_name = self._resolver.source(prom_name)
+            except RuntimeError:
+                raise RuntimeError(f"{self.msginfo}: Output not found for design variable "
+                                   f"'{prom_name}'.")
             meta['orig'] = (None, prom_name)
 
         key = prom_name if use_prom_ivc else src_name
@@ -3843,8 +3784,8 @@ class System(object, metaclass=SystemMetaclass):
 
                 out[key] = data
 
-        except KeyError as err:
-            raise RuntimeError(f"{self.msginfo}: Output not found for design variable {err}.")
+        except KeyError:
+            raise RuntimeError(f"{self.msginfo}: Output not found for design variable '{name}'.")
 
         return out
 
@@ -3861,30 +3802,23 @@ class System(object, metaclass=SystemMetaclass):
         use_prom_ivc : bool
             Use promoted names for inputs, else convert to absolute source names.
         """
-        prom2abs_out = self._var_allprocs_prom2abs_list['output']
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
         model = self._problem_meta['model_ref']()
-        conns = model._conn_global_abs_in2out
         abs2meta_out = model._var_allprocs_abs2meta['output']
 
         alias = meta['alias']
         prom = meta['name']  # 'usually' a promoted name, but can be absolute
         if alias is not None:
-            if alias in prom2abs_out or alias in prom2abs_in:
+            if self._resolver.is_prom(alias):
                 # Constraint alias should never be the same as any openmdao variable.
-                path = prom2abs_out[prom][0] if prom in prom2abs_out else prom
+                path = self._resolver.any2abs(prom, 'output')
                 raise RuntimeError(f"{self.msginfo}: Constraint alias '{alias}' on '{path}'"
                                    " is the same name as an existing variable.")
         meta['parent'] = self.pathname
 
-        if prom in prom2abs_out:  # promoted output
-            src_name = prom2abs_out[prom][0]
-        elif prom in abs2meta_out:
-            src_name = prom
-        elif prom in prom2abs_in:
-            src_name = conns[prom2abs_in[prom][0]]
-        else:  # abs input
-            src_name = conns[prom][0]
+        try:
+            src_name = self._resolver.source(prom)
+        except RuntimeError:
+            raise RuntimeError(f"{self.msginfo}: Output not found for response '{prom}'.")
 
         if alias:
             key = alias
@@ -3961,8 +3895,8 @@ class System(object, metaclass=SystemMetaclass):
 
                 out[key] = meta
 
-        except KeyError as err:
-            raise RuntimeError(f"{self.msginfo}: Output not found for response {err}.")
+        except KeyError:
+            raise RuntimeError(f"{self.msginfo}: Output not found for response '{name}'.")
 
         return out
 
@@ -4126,17 +4060,20 @@ class System(object, metaclass=SystemMetaclass):
             need_gather = False  # we can get everything from 'allprocs' dict without gathering
 
         result = {}
+        abs2prom_iter = self._resolver.abs2prom_iter
 
-        it = self._var_allprocs_abs2prom if get_remote else self._var_abs2prom
+        local = None if get_remote else True
 
         if is_design_var is not None:
             des_vars = self.get_design_vars(get_sizes=False, use_prom_ivc=False)
+
+        resolver = self._resolver
 
         for iotype in iotypes:
             cont2meta = metadict[iotype]
             disc2meta = disc_metadict[iotype]
 
-            for abs_name, prom in it[iotype].items():
+            for abs_name, prom in abs2prom_iter(iotype, local=local):
                 if abs_name.startswith('_auto_ivc.'):
                     if not match_prom_or_abs(abs_name, abs_name, includes, excludes):
                         continue
@@ -4210,7 +4147,7 @@ class System(object, metaclass=SystemMetaclass):
                         if iotype == 'output':
                             out_meta = meta
                         else:
-                            src_name = self.get_source(abs_name)
+                            src_name = resolver.source(abs_name)
                             try:
                                 out_meta = metadict['output'][src_name]
                             except KeyError:
@@ -4228,7 +4165,7 @@ class System(object, metaclass=SystemMetaclass):
                         if iotype == 'output':
                             out_name = abs_name
                         else:
-                            out_name = self.get_source(abs_name)
+                            out_name = resolver.source(abs_name)
                         if is_design_var:
                             if out_name not in des_vars:
                                 continue
@@ -5342,15 +5279,13 @@ class System(object, metaclass=SystemMetaclass):
             The new list with promoted names.
         """
         new_list = []
-        abs2prom_in = self._var_allprocs_abs2prom['input']
-        abs2prom_out = self._var_allprocs_abs2prom['output']
+        abs2prom = self._resolver.abs2prom
+
         for tup in var_info:
             lst = list(tup)
-            if tup[0] in abs2prom_out:
-                lst[0] = abs2prom_out[tup[0]]
-            else:
-                lst[0] = abs2prom_in[tup[0]]
+            lst[0] = abs2prom(tup[0])
             new_list.append(lst)
+
         return new_list
 
     def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,
@@ -5436,7 +5371,8 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 return _UNDEFINED
 
-        typ = 'output' if abs_name in self._var_allprocs_abs2prom['output'] else 'input'
+        resolver = self._resolver
+        typ = resolver.get_abs_iotype(abs_name)
         if kind is None:
             kind = typ
         if vec_name is None:
@@ -5454,7 +5390,7 @@ class System(object, metaclass=SystemMetaclass):
                     val = my_meta[abs_name]['val']
             else:
                 if from_root:
-                    vec = vec._root_vector
+                    vec = self._problem_meta['model_ref']()._vectors[kind][vec_name]
                 if vec._contains_abs(abs_name):
                     val = vec._abs_get_val(abs_name, flat)
 
@@ -5544,16 +5480,17 @@ class System(object, metaclass=SystemMetaclass):
         object
             The value of the requested output/input variable.
         """
-        abs_names = name2abs_names(self, name)
+        abs_names = self._resolver.absnames(name)
         simp_units = simplify_unit(units)
 
         if from_src:
             conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
         else:
-            conns = []
+            conns = ()
+
         if from_src and abs_names[0] in conns:  # pull input from source
             src = conns[abs_names[0]]
-            if src in self._var_allprocs_abs2prom['output']:
+            if self._resolver.is_abs(src, 'output'):
                 caller = self
             else:
                 # src is outside of this system so get the value from the model
@@ -5639,10 +5576,15 @@ class System(object, metaclass=SystemMetaclass):
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set.
         """
+        try:
+            ginputs = self._group_inputs
+        except AttributeError:
+            ginputs = {}  # could happen if this system is not a Group
+
         post_setup = self._problem_meta is not None and \
             self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP
         if post_setup:
-            abs_names = name2abs_names(self, name)
+            abs_names = self._resolver.absnames(name)
         else:
             raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
                                "completes.")
@@ -5656,11 +5598,6 @@ class System(object, metaclass=SystemMetaclass):
         all_meta = model._var_allprocs_abs2meta
         loc_meta = model._var_abs2meta
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
-
-        try:
-            ginputs = self._group_inputs
-        except AttributeError:
-            ginputs = {}  # could happen if this system is not a Group
 
         n_proms = len(abs_names)  # for output this will never be > 1
         if n_proms > 1 and name in ginputs:
@@ -6101,11 +6038,10 @@ class System(object, metaclass=SystemMetaclass):
         dict
             Variable values keyed on absolute name.
         """
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
-        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
         vdict = {}
         variables = filtered_vars.get(kind)
         if variables:
+            resolver = self._resolver
             vec = self._vectors[kind][vec_name]
             rank = self.comm.rank
             discrete_vec = () if kind == 'residual' else self._var_discrete[kind]
@@ -6122,7 +6058,7 @@ class System(object, metaclass=SystemMetaclass):
                         elif n[offset:] in discrete_vec:
                             vdict[n] = discrete_vec[n[offset:]]['val']
                         else:
-                            ivc_path = conns[prom2abs_in[n][0]]
+                            ivc_path = resolver.source(n)
                             if vec._contains_abs(ivc_path):
                                 vdict[ivc_path] = srcget(ivc_path, False)
                             elif ivc_path[offset:] in discrete_vec:
@@ -6134,7 +6070,7 @@ class System(object, metaclass=SystemMetaclass):
                         if vec._contains_abs(name):
                             vdict[name] = get(name, False)
                         else:
-                            ivc_path = conns[prom2abs_in[name][0]]
+                            ivc_path = resolver.source(name)
                             vdict[ivc_path] = srcget(ivc_path, False)
             elif local:
                 get = self._abs_get_val
@@ -6153,8 +6089,8 @@ class System(object, metaclass=SystemMetaclass):
                         if vec._contains_abs(name):
                             vdict[name] = get(name, get_remote=True, rank=0,
                                               vec_name=vec_name, kind=kind)
-                        elif name in prom2abs_in:
-                            ivc_path = conns[prom2abs_in[name][0]]
+                        elif resolver.is_prom(name, 'input'):
+                            ivc_path = resolver.source(name)
                             vdict[name] = get(ivc_path, get_remote=True, rank=0,
                                               vec_name=vec_name, kind='output')
             else:
@@ -6294,7 +6230,7 @@ class System(object, metaclass=SystemMetaclass):
             meta = meta_all['input'][name]
 
         if meta is None:
-            abs_name = name2abs_name(self, name)
+            abs_name = self._resolver.any2abs(name)
             if abs_name is not None:
                 if abs_name in meta_all['output']:
                     meta = meta_all['output'][abs_name]
@@ -6462,17 +6398,6 @@ class System(object, metaclass=SystemMetaclass):
                 return tuple([dim1] + list(high_dims))
 
         return (global_size,)
-
-    def _has_fast_rel_lookup(self):
-        """
-        Return True if this System should have fast relative variable name lookup in vectors.
-
-        Returns
-        -------
-        bool
-            True if this System should have fast relative variable name lookup in vectors.
-        """
-        return False
 
     def _collect_error(self, msg, exc_type=None, tback=None, ident=None):
         """
@@ -6662,20 +6587,21 @@ class System(object, metaclass=SystemMetaclass):
 
         if self._promotion_tree is None:
             self._promotion_tree = self._get_sys_promotion_tree()
+
         tree = self._promotion_tree
+        resolver = self._resolver
 
         plist_ins = plist_outs = None
-        if outprom is None and inprom in self._var_allprocs_prom2abs_list['output']:
+        if outprom is None and resolver.is_prom(inprom, 'output'):
             outprom = inprom
 
         if outprom is not None:
             try:
-                abs_outs = self._var_allprocs_prom2abs_list['output'][outprom]
+                abs_outs = resolver.prom2abs(outprom, 'output')
             except KeyError:
                 # outprom might be an inprom mapped to an auto_ivc
                 try:
-                    inabs = self._var_allprocs_prom2abs_list['input'][outprom]
-                    abs_outs = [self._conn_global_abs_in2out[inabs[0]]]
+                    abs_outs = [resolver.source(outprom, iotype='input')]
                 except KeyError:
                     raise KeyError(f"{self.msginfo}: Promoted output variable '{outprom}' was not "
                                    "found.")
@@ -6684,7 +6610,7 @@ class System(object, metaclass=SystemMetaclass):
 
         if inprom is not None:
             try:
-                abs_ins = self._var_allprocs_prom2abs_list['input'][inprom]
+                abs_ins = resolver.absnames(inprom, 'input')
             except KeyError:
                 raise KeyError(f"{self.msginfo}: Promoted input variable '{inprom}' was not "
                                "found.")
@@ -6787,10 +6713,9 @@ class System(object, metaclass=SystemMetaclass):
         tuple
             A tuple of the form (abs_name, start, end).
         """
-        vmeta = self._var_allprocs_abs2meta
-
         offset = 0
-        for vname, size in zip(vmeta[io], self._var_sizes[io][self.comm.rank]):
+        for vname, size in zip(self._var_allprocs_abs2meta[io],
+                               self._var_sizes[io][self.comm.rank]):
             if size > 0:
                 yield vname, offset, offset + size
             offset += size

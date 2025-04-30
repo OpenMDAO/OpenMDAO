@@ -10,7 +10,6 @@ from openmdao.test_suite.components.distributed_components import DistribCompDer
 from openmdao.test_suite.components.paraboloid_distributed import DistParab, DistParabFeature, \
     DistParabDeprecated
 from openmdao.utils.mpi import MPI
-from openmdao.utils.name_maps import rel_name2abs_name
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
     assert_check_totals
@@ -2326,7 +2325,7 @@ class Distrib_Derivs_Prod_Matfree(Distrib_Derivs_Prod):
         size = len(Is)
         local_size = len(Id)
 
-        idx = self._var_allprocs_abs2idx[rel_name2abs_name(self, 'in_dist')]
+        idx = self._var_allprocs_abs2idx[self.pathname + '.' + 'in_dist']
         sizes = self._var_sizes['input'][:, idx]
         start = np.sum(sizes[:self.comm.rank])
         end = start + sizes[self.comm.rank]

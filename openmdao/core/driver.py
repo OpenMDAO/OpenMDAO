@@ -467,7 +467,7 @@ class Driver(object, metaclass=DriverMetaclass):
 
                 # For Auto-ivcs, we need to check the distributed metadata on the target instead.
                 if meta['source'].startswith('_auto_ivc.'):
-                    for abs_name in model._var_allprocs_prom2abs_list['input'][dv]:
+                    for abs_name in model._resolver.absnames(dv, 'input'):
                         # we can use abs name to check for discrete vars here because
                         # relative names are absolute names at the model level.
                         if abs_name in discrete_in:
@@ -712,14 +712,12 @@ class Driver(object, metaclass=DriverMetaclass):
 
         problem = self._problem()
         model = problem.model
-
+        resolver = model._resolver
         incl = recording_options['includes']
         excl = recording_options['excludes']
 
         # includes and excludes for outputs are specified using promoted names
         # includes and excludes for inputs are specified using _absolute_ names
-        abs2prom_output = model._var_allprocs_abs2prom['output']
-        abs2prom_inputs = model._var_allprocs_abs2prom['input']
 
         # set of promoted output names and absolute input and residual names
         # used for matching includes/excludes
@@ -737,13 +735,14 @@ class Driver(object, metaclass=DriverMetaclass):
         myresiduals = set()
 
         if recording_options['record_outputs']:
-            match_names.update(abs2prom_output.values())
-            myoutputs = {n for n, prom in abs2prom_output.items() if check_path(prom, incl, excl)}
+            match_names.update(resolver.prom_iter('output'))
+            myoutputs = {n for n, prom in resolver.abs2prom_iter('output')
+                         if check_path(prom, incl, excl)}
 
         if recording_options['record_residuals']:
             match_names.update(model._residuals)
             myresiduals = [n for n in model._residuals
-                           if check_path(abs2prom_output[n], incl, excl)]
+                           if check_path(resolver.abs2prom(n, 'output'), incl, excl)]
 
         if recording_options['record_desvars']:
             myoutputs.update(_src_name_iter(self._designvars))
@@ -755,13 +754,13 @@ class Driver(object, metaclass=DriverMetaclass):
         # inputs (if in options). inputs use _absolute_ names for includes/excludes
         if 'record_inputs' in recording_options:
             if recording_options['record_inputs']:
-                match_names.update(abs2prom_inputs)
-                myinputs = {n for n in abs2prom_inputs if check_path(n, incl, excl)}
+                match_names.update(resolver.abs_iter('input'))
+                myinputs = {n for n in resolver.abs_iter('input') if check_path(n, incl, excl)}
 
-                match_names.update(model._var_allprocs_prom2abs_list['input'])
-                for p in model._var_allprocs_prom2abs_list['input']:
+                match_names.update(model._resolver.prom_iter('input'))
+                for p in model._resolver.prom_iter('input'):
                     if check_path(p, incl, excl):
-                        myoutputs.add(model.get_source(p))
+                        myoutputs.add(model._resolver.source(p))
 
         # check that all exclude/include globs have at least one matching output or input name
         for pattern in excl:
