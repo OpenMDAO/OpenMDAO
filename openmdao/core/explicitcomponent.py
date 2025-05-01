@@ -10,7 +10,7 @@ from openmdao.core.component import Component
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.core.constants import INT_DTYPE, _UNDEFINED
+from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import is_undefined
 
 
@@ -143,25 +143,14 @@ class ExplicitComponent(Component):
             size = meta['size']
             if size > 0:
                 # ExplicitComponent jacobians have -1 on the diagonal.
-                arange = np.arange(size, dtype=INT_DTYPE)
-
                 self._subjacs_info[out_abs, out_abs] = {
-                    'rows': arange,
-                    'cols': arange,
-                    'diagonal': False,
+                    'rows': None,
+                    'cols': None,
+                    'diagonal': True,
                     'shape': (size, size),
                     'val': np.full(size, -1.),
                     'dependent': True,
                 }
-                # self._subjacs_info[out_abs, out_abs] = {
-                #     'rows': None,
-                #     'cols': None,
-                #     'diagonal': True,
-                #     'shape': (size, size),
-                #     'val': np.full(size, -1.),
-                #     'dependent': True,
-                # }
-                # self._jacobian._add_subjac_info(self, (out_abs, out_abs), meta)
 
     def _setup_jacobians(self, recurse=True):
         """
@@ -174,9 +163,6 @@ class ExplicitComponent(Component):
         """
         if self._has_approx and self._use_derivatives:
             self._set_approx_partials_meta()
-
-        # if self._jacobian is not None:
-        #     self._jacobian._setup(self)
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,

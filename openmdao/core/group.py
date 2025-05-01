@@ -4220,7 +4220,7 @@ class Group(System):
 
                 if left == right:
                     size = abs2meta['output'][left]['size']
-                    meta['rows'] = meta['cols'] = np.arange(size)
+                    meta['diagonal'] = True
                     # All group approximations are treated as explicit components, so we
                     # have a -1 on the diagonal.
                     meta['val'] = np.full(size, -1.0)

@@ -10,6 +10,8 @@ class BlockJacobian(Jacobian):
     """
     A BlockJacobian is a Jacobian that is a collection of sub-Jacobians.
 
+    This is currently intended to be used with Components but not with Groups.
+
     Parameters
     ----------
     system : System

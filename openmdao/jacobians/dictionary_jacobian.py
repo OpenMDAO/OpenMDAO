@@ -3,7 +3,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from openmdao.jacobians.jacobian import Jacobian
-from openmdao.core.constants import INT_DTYPE
+from openmdao.jacobians.subjac import SUBJAC_META_DEFAULTS
 
 
 class DictionaryJacobian(Jacobian):
@@ -223,18 +223,16 @@ class _CheckingJacobian(DictionaryJacobian):
         from openmdao.core.explicitcomponent import ExplicitComponent
         explicit = isinstance(self._system(), ExplicitComponent)
 
-        for key, meta in self._subjacs_info.items():
+        self._get_subjacs(self._system())
+
+        for key, subjac in self._subjacs.items():
+            meta = subjac.info
             if explicit and key[0] == key[1]:
                 continue
-            rows = meta['rows']
-            if rows is None:
-                yield key, meta['val']
-            elif 'directional' in meta:
+            if 'directional' in meta:
                 yield key, np.atleast_2d(meta['val']).T
             else:
-                dense = np.zeros(meta['shape'])
-                dense[rows, meta['cols']] = meta['val']
-                yield key, dense
+                yield key, subjac.as_2d()
 
     def _setup_index_maps(self, system):
         super()._setup_index_maps(system)
@@ -257,12 +255,12 @@ class _CheckingJacobian(DictionaryJacobian):
                 key = (of, wrt)
                 if vec is not None and key not in self._subjacs_info:
                     ncols = wend - wstart
-                    # create subjacs_info objects for matrix_free systems that don't have them
-                    self._subjacs_info[key] = {
-                        'rows': None,
-                        'cols': None,
-                        'val': np.zeros((nrows, 1 if directional else ncols)),
-                    }
+                    # create subjacs_info objects for matrix_free systems that don't have them.
+                    # Note that this is our own copy of _subjacs_info so when this instance is
+                    # destroyed, any extra allocated subjacs will be garbage collected.
+                    self._subjacs_info[key] = subjac = SUBJAC_META_DEFAULTS.copy()
+                    subjac['val'] = np.zeros((nrows, 1 if directional else ncols))
+
                 elif directional:
                     shape = self._subjacs_info[key]['val'].shape
                     if shape[-1] != 1:
@@ -291,13 +289,10 @@ class _CheckingJacobian(DictionaryJacobian):
         column : ndarray
             Column value.
         """
-        if self._col_varnames is None:
+        if self._col_mapper is None:
             self._setup_index_maps(system)
 
-        wrt = self._col_varnames[self._col2name_ind[icol]]
-        loc_idx = icol - self._col_var_offset[wrt]  # local col index into subjacs
-
-        scratch = np.zeros(column.shape)
+        wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
 
         # If we are doing a directional derivative, then the sparsity will be violated.
         # Skip sparsity check if that is the case.
@@ -306,34 +301,22 @@ class _CheckingJacobian(DictionaryJacobian):
         directional = (options is not None and loc_wrt in options and
                        options[loc_wrt]['directional'])
 
+        system = self._system()
+        subjacs = self._get_subjacs(system)
+
         for of, start, end, _, _ in system._jac_of_iter():
             key = (of, wrt)
-            if key in self._subjacs_info:
-                subjac = self._subjacs_info[key]
-                if subjac['cols'] is None:
-                    if subjac['val'] is None:  # can happen for matrix free comp
-                        subjac['val'] = np.zeros(subjac['shape'])
-                    subjac['val'][:, loc_idx] = column[start:end]
-                else:
-                    match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
-                    if match_inds.size > 0:
-                        row_inds = subjac['rows'][match_inds]
-                        if subjac['val'] is None:
-                            subjac['val'] = np.zeros(len(subjac['rows']))
-                        subjac['val'][match_inds] = column[start:end][row_inds]
-                    else:
-                        row_inds = np.zeros(0, dtype=INT_DTYPE)
-
+            if key in subjacs:
+                subjac = subjacs[key]
+                info = subjac.info
+                if info['diagonal']:
+                    subjac.set_col(loc_idx, column[start:end], self._uncovered_threshold)
                     if directional:
-                        subjac['directional'] = True
+                        info['directional'] = True
+                elif info['cols'] is not None:
+                    subjac.set_col(loc_idx, column[start:end], self._uncovered_threshold)
+                    if directional:
+                        info['directional'] = True
                         continue
-
-                    arr = scratch[start:end]
-                    arr[:] = column[start:end]
-                    arr[row_inds] = 0.  # zero out the rows that are covered by sparsity
-                    nzs = np.where(np.abs(arr) > self._uncovered_threshold)[0]
-                    if nzs.size > 0:
-                        if 'uncovered_nz' not in subjac:
-                            subjac['uncovered_nz'] = []
-                            subjac['uncovered_threshold'] = self._uncovered_threshold
-                        subjac['uncovered_nz'].extend(list(zip(nzs, loc_idx * np.ones_like(nzs))))
+                else:
+                    subjac.set_col(loc_idx, column[start:end], self._uncovered_threshold)

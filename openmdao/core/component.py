@@ -9,7 +9,7 @@ from io import StringIO
 
 from numbers import Integral
 import numpy as np
-from numpy import ndarray, isscalar, ndim, atleast_1d, atleast_2d, promote_types
+from numpy import ndarray, isscalar, ndim, atleast_1d, promote_types
 from scipy.sparse import issparse, coo_matrix, csr_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
@@ -1519,51 +1519,44 @@ class Component(System):
         is_scalar = isscalar(val)
         dependent = pattern_meta['dependent']
         matfree = self.matrix_free
+        if matfree:
+            val = None
+        elif isinstance(val, list):
+            val = np.asarray(val, dtype=float)
         diag = pattern_meta.get('diagonal')
+
+        rows_max = cols_max = 0
+        rows = cols = None
 
         if dependent:
             if diag:
-                rows = cols = None
-                rows_max = cols_max = 0
+                pattern_meta['rows'] = pattern_meta['cols'] = None
 
             elif 'rows' in pattern_meta and pattern_meta['rows'] is not None:  # sparse list format
                 rows = pattern_meta['rows']
                 cols = pattern_meta['cols']
-
-                if matfree:
-                    val = None
-                elif is_scalar:
-                    val = np.full(rows.size, val, dtype=float)
-                    is_scalar = False
-                elif val is not None:
-                    # np.promote_types will choose the smallest dtype that can contain
-                    # both arguments
-                    val = atleast_1d(val)
-                    safe_dtype = promote_types(val.dtype, float)
-                    val = val.astype(safe_dtype, copy=False)
-
-                    if rows.shape != val.shape:
-                        raise ValueError('{}: d({})/d({}): If rows and cols are specified, val '
-                                         'must be a scalar or have the same shape, val: {}, '
-                                         'rows/cols: {}'.format(self.msginfo, of, wrt,
-                                                                val.shape, rows.shape))
-                else:
-                    val = np.zeros_like(rows, dtype=float)
-
                 if rows.size > 0:
                     rows_max = rows.max()
                     cols_max = cols.max()
-                else:
-                    rows_max = cols_max = 0
-            else:
-                if matfree:
-                    val = None
-                if val is not None and not is_scalar and not issparse(val):
-                    val = atleast_2d(val)
-                    val = val.astype(promote_types(val.dtype, float), copy=False)
-                rows_max = cols_max = 0
-                rows = None
-                cols = None
+
+                if not matfree:
+                    if is_scalar:
+                        val = np.full(rows.size, val, dtype=float)
+                        is_scalar = False
+                    elif val is not None:
+                        # np.promote_types will choose the smallest dtype that can contain
+                        # both arguments
+                        val = atleast_1d(val)
+                        safe_dtype = promote_types(val.dtype, float)
+                        val = val.astype(safe_dtype, copy=False)
+
+                        if rows.shape != val.shape:
+                            raise ValueError('{}: d({})/d({}): If rows and cols are specified, val '
+                                             'must be a scalar or have the same shape, val: {}, '
+                                             'rows/cols: {}'.format(self.msginfo, of, wrt,
+                                                                    val.shape, rows.shape))
+                    else:
+                        val = np.zeros_like(rows, dtype=float)
 
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
@@ -1581,24 +1574,25 @@ class Component(System):
             if abs_key in self._subjacs_info:
                 meta = self._subjacs_info[abs_key]
                 meta.update(patmeta_not_none)
-                if meta['rows'] is not None:
-                    rows = meta['rows']
-                if meta['cols'] is not None:
-                    cols = meta['cols']
+                if diag:
+                    meta['rows'] = meta['cols'] = None
+                else:
+                    if meta['rows'] is not None:
+                        rows = meta['rows']
+                    if meta['cols'] is not None:
+                        cols = meta['cols']
             else:
                 meta = SUBJAC_META_DEFAULTS.copy()
+                meta['dependent'] = False
                 meta.update(patmeta.copy())
 
             of, wrt = abs_key
             meta['rows'] = rows
             meta['cols'] = cols
-            csz = abs2meta_in[wrt]['size'] if wrt in abs2meta_in else abs2meta_out[wrt]['size']
-            meta['shape'] = shape = (abs2meta_out[of]['size'], csz)
+            wrtmeta = abs2meta_in[wrt] if wrt in abs2meta_in else abs2meta_out[wrt]
+            meta['shape'] = shape = (abs2meta_out[of]['size'], wrtmeta['size'])
             dist_out = abs2meta_out[of]['distributed']
-            if wrt in abs2meta_in:
-                dist_in = abs2meta_in[wrt]['distributed']
-            else:
-                dist_in = abs2meta_out[wrt]['distributed']
+            dist_in = wrtmeta['distributed']
 
             if dist_in and not dist_out and not matfree:
                 rel_key = abs_key2rel_key(self, abs_key)
@@ -1631,21 +1625,25 @@ class Component(System):
 
             if matfree:
                 meta['val'] = None
-            else:
-                if diag:
-                    meta['val'] = np.zeros(csz)
-                elif val is None:
-                    # we can only get here if rows is None  (we're not sparse list format)
-                    meta['val'] = np.zeros(shape)
-                elif is_array:
-                    if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
-                        meta['val'] = val = val.copy().reshape(shape)
-                    else:
-                        meta['val'] = val.copy()
+            elif diag:
+                if val is None:
+                    meta['val'] = np.zeros(wrtmeta['size'])
                 elif is_scalar:
-                    meta['val'] = np.full(shape, val, dtype=float)
-                else:  # sparse
+                    meta['val'] = np.full(wrtmeta['size'], val, dtype=float)
+                else:
                     meta['val'] = val.copy()
+            elif val is None:
+                # we can only get here if rows is None  (we're not sparse list format)
+                meta['val'] = np.zeros(shape)
+            elif is_array:
+                if rows is None and val.shape != shape and val.size == shape[0] * shape[1]:
+                    meta['val'] = val = val.copy().reshape(shape)
+                else:
+                    meta['val'] = val.copy()
+            elif is_scalar:
+                meta['val'] = np.full(shape, val, dtype=float)
+            else:  # sparse
+                meta['val'] = val.copy()
 
             self._check_partials_meta(abs_key, meta['val'],
                                       shape if rows is None else (rows.shape[0], 1))
@@ -2378,7 +2376,7 @@ class Component(System):
                 # This component already has a Jacobian with calculated derivatives.
                 else:
 
-                    subjacs = self._jacobian._subjacs_info
+                    subjacs = self._jacobian._get_subjacs(self)
 
                     for rel_key in product(of_list, wrt_list):
                         abs_key = rel_key2abs_key(self, rel_key)
@@ -2399,8 +2397,12 @@ class Component(System):
 
                         # No need to calculate partials; they are already stored
                         try:
-                            deriv_value = subjacs[abs_key]['val']
-                            rows = subjacs[abs_key]['rows']
+                            subjac = subjacs[abs_key]
+                            if force_dense and not directional:
+                                deriv_value = subjac.as_2d()
+                            else:
+                                deriv_value = subjac.get_val()
+                            rows = subjac.info['rows']
                         except KeyError:
                             rows = None
                             # Missing derivatives are assumed 0.
@@ -2408,49 +2410,50 @@ class Component(System):
                             out_size = self._var_abs2meta['output'][of]['size']
                             deriv_value = None
                             copy = False
-
-                        # Testing for pairs that are not dependent so that we suppress printing them
-                        # unless the fd is non zero.
-                        # Note: subjacs_info is empty for undeclared partials, which is the default
-                        # behavior now.
-                        try:
-                            if not subjacs[abs_key]['dependent']:
-                                nondep_derivs.add(rel_key)
-                        except KeyError:
                             nondep_derivs.add(rel_key)
+                        else:
+                            # Testing for pairs that are not dependent so that we suppress printing
+                            # them unless the fd is non zero.
+                            # Note: subjacs_info is empty for undeclared partials, which is the
+                            # default behavior now.
+                            try:
+                                if not subjac.info['dependent']:
+                                    nondep_derivs.add(rel_key)
+                            except KeyError:
+                                nondep_derivs.add(rel_key)
 
                         if force_dense:
-                            if rows is not None:
-                                in_size = wrt_meta['size']
-                                out_size = self._var_abs2meta['output'][of]['size']
-                                # if a scalar value is provided (in declare_partials),
-                                # expand to the correct size array value for zipping
-                                if deriv_value.size == 1:
-                                    deriv_value *= np.ones(rows.size)
-                                deriv_value = \
-                                    coo_matrix((deriv_value, (rows, subjacs[abs_key]['cols'])),
-                                               shape=(out_size, in_size))
-                                if directional:
+                            if directional:
+                                if rows is not None:
+                                    in_size = wrt_meta['size']
+                                    out_size = self._var_abs2meta['output'][of]['size']
+                                    # if a scalar value is provided (in declare_partials),
+                                    # expand to the correct size array value for zipping
+                                    if deriv_value.size == 1:
+                                        deriv_value *= np.ones(rows.size)
+                                    deriv_value = \
+                                        coo_matrix((deriv_value,
+                                                    (rows, subjacs[abs_key].info['cols'])),
+                                                   shape=(out_size, in_size))
                                     deriv_value = \
                                         np.atleast_2d(deriv_value.sum(axis=axis[mode]))
                                     if deriv_value.shape[0] < deriv_value.shape[1]:
                                         deriv_value = deriv_value.T
-                                else:
-                                    deriv_value = deriv_value.toarray()
-                                copy = False
+                                    copy = False
 
-                            elif issparse(deriv_value):
-                                if directional:
-                                    deriv_value = \
-                                        np.atleast_2d(deriv_value.sum(axis=axis[mode])).T
-                                    if deriv_value.shape[0] < deriv_value.shape[1]:
-                                        deriv_value = deriv_value.T
+                                elif issparse(deriv_value):
+                                    if directional:
+                                        deriv_value = \
+                                            np.atleast_2d(deriv_value.sum(axis=axis[mode])).T
+                                        if deriv_value.shape[0] < deriv_value.shape[1]:
+                                            deriv_value = deriv_value.T
+                                    copy = False
                                 else:
-                                    deriv_value = deriv_value.toarray()
-                                copy = False
-                            elif directional:
-                                deriv_value = \
-                                    np.atleast_2d(np.sum(deriv_value, axis=axis[mode])).T
+                                    deriv_value = \
+                                        np.atleast_2d(np.sum(deriv_value, axis=axis[mode])).T
+                            else:
+                                if rows is not None or issparse(deriv_value):
+                                    copy = False
 
                         if copy:
                             deriv_value = deriv_value.copy()
@@ -2521,7 +2524,7 @@ class Component(System):
             for abs_key, partial in approx_jac.items():
                 rel_key = abs_key2rel_key(self, abs_key)
                 deriv = partials_data[rel_key]
-                subjacs_info = approx_jac._subjacs_info[abs_key]
+                subjacs_info = approx_jac._subjacs[abs_key].info
                 _of, _wrt = rel_key
 
                 if 'J_fd' not in deriv:

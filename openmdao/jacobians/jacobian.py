@@ -5,11 +5,19 @@ import numpy as np
 
 from scipy.sparse import issparse
 
-from openmdao.core.constants import INT_DTYPE
 from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.iter_utils import meta2range_iter
-from openmdao.jacobians.subjac import DiagonalSubjac, Subjac, OMCOOSubjac, SparseSubjac
+from openmdao.jacobians.subjac import DiagonalSubjac, DenseSubjac, OMCOOSubjac, COOSubjac, \
+    ZeroSubjac, CSRSubjac, CSCSubjac
 from openmdao.utils.units import unit_conversion
+from openmdao.utils.rangemapper import RangeMapper
+
+
+_sparse_subjac_types = {
+    'coo': COOSubjac,
+    'csr': CSRSubjac,
+    'csc': CSCSubjac
+}
 
 
 class Jacobian(object):
@@ -36,14 +44,10 @@ class Jacobian(object):
         When True, this Jacobian is under complex step, using a complex jacobian.
     _abs_keys : dict
         A cache dict for key to absolute key.
-    _col_var_offset : dict
-        Maps column name to offset into the result array.
-    _col_varnames : list
-        List of column var names.
-    _col2name_ind : ndarray
-        Array that maps jac col index to index of column name.
     _vec_slices : dict
         Maps iotype to slice of the vector.
+    _col_mapper : RangeMapper
+        Maps variable names to column indices and vice versa.
     """
 
     def __init__(self, system):
@@ -55,9 +59,7 @@ class Jacobian(object):
         self._subjacs = None
         self._under_complex_step = False
         self._abs_keys = {}
-        self._col_var_offset = None
-        self._col_varnames = None
-        self._col2name_ind = None
+        self._col_mapper = None
         self._vec_slices = {'output': None, 'input': None}
 
     def _setup(self, system):
@@ -81,32 +83,41 @@ class Jacobian(object):
         Subjac
             The created subjacobian, or None if meta['dependent'] is False.
         """
+        output_slices = self._get_vec_slices(system, 'output')
+        input_slices = self._get_vec_slices(system, 'input')
+        of, wrt = abs_key
+
+        row_slice = output_slices[of]
+
+        wrt_is_input = wrt in input_slices
+        if wrt_is_input:
+            col_slice = input_slices[wrt]
+        else:
+            col_slice = output_slices[wrt]
+
         if meta['dependent']:
-            output_slices = self._get_vec_slices(system, 'output')
-            input_slices = self._get_vec_slices(system, 'input')
-            of, wrt = abs_key
-
-            row_slice = output_slices[of]
-
-            wrt_is_input = wrt in input_slices
-            if wrt_is_input:
-                col_slice = input_slices[wrt]
-            else:
-                col_slice = output_slices[wrt]
-
             return self._subjac_from_meta(meta, row_slice, col_slice, wrt_is_input)
+        else:
+            return ZeroSubjac(meta, row_slice, col_slice, wrt_is_input)
 
     def _subjac_from_meta(self, meta, row_slice, col_slice, wrt_is_input, src_indices=None,
                           factor=None):
-        if meta['diagonal']:
+        if not meta['dependent']:
+            return ZeroSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
+        elif meta['diagonal']:
             return DiagonalSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
         elif meta['rows'] is None:
             assert meta['cols'] is None
             if issparse(meta['val']):
-                return SparseSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices,
-                                    factor)
+                try:
+                    return _sparse_subjac_types[meta['val'].format](meta, row_slice, col_slice,
+                                                                    wrt_is_input, src_indices,
+                                                                    factor)
+                except KeyError:
+                    raise NotImplementedError(f"Subjac format {meta['val'].format} not "
+                                              "supported yet.")
             else:
-                return Subjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
+                return DenseSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
         else:
             return OMCOOSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
 
@@ -385,18 +396,8 @@ class Jacobian(object):
         self._under_complex_step = active
 
     def _setup_index_maps(self, system):
-        self._col_var_offset = {}
-        col_var_info = []
-        for wrt, start, end, _, _, _ in system._jac_wrt_iter():
-            self._col_var_offset[wrt] = start
-            col_var_info.append(end)
-
-        self._col_varnames = list(self._col_var_offset)
-        self._col2name_ind = np.empty(end, dtype=INT_DTYPE)  # jac col to var id
-        start = 0
-        for i, end in enumerate(col_var_info):
-            self._col2name_ind[start:end] = i
-            start = end
+        namesize_iter = [(n, end - start) for n, start, end, _, _, _ in system._jac_wrt_iter()]
+        self._col_mapper = RangeMapper.create(namesize_iter)
 
     def set_col(self, system, icol, column):
         """
@@ -416,11 +417,10 @@ class Jacobian(object):
         column : ndarray
             Column value.
         """
-        if self._col_varnames is None:
+        if self._col_mapper is None:
             self._setup_index_maps(system)
 
-        wrt = self._col_varnames[self._col2name_ind[icol]]
-        loc_idx = icol - self._col_var_offset[wrt]  # local col index into subjacs
+        wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
 
         for of, start, end, _, _ in system._jac_of_iter():
             key = (of, wrt)
@@ -471,7 +471,7 @@ class Jacobian(object):
         jac : ndarray
             Dense jacobian.
         """
-        if self._col_varnames is None:
+        if self._col_mapper is None:
             self._setup_index_maps(system)
 
         wrtiter = list(system._jac_wrt_iter())
@@ -492,19 +492,7 @@ class Jacobian(object):
         """
         self._subjacs = None
         self._get_subjacs(system)
-        # old_subjacs = self._subjacs
-        # self._subjacs_info = system._subjacs_info
-        # self._subjacs = {}
-        # for key, meta in self._subjacs_info.items():
-        #     if key in old_subjacs:
-        #         old_subjac = old_subjacs[key]
-        #         self._subjacs[key] = self.create_subjac(system, key, meta,
-        #                                                 src_indices=old_subjac.src_indices,
-        #                                                 factor=old_subjac.factor)
-        #     else:
-        #         self._subjacs[key] = self.create_subjac(system, key, meta)
-
-        self._col_varnames = None  # force recompute of internal index maps on next set_col
+        self._col_mapper = None  # force recompute of internal index maps on next set_col
 
 
 class SplitJacobian(Jacobian):
@@ -619,7 +607,7 @@ class SplitJacobian(Jacobian):
         self._ext_subjacs = {}
         self._get_split_subjacs(system)
 
-        self._col_varnames = None  # force recompute of internal index maps on next set_col
+        self._col_mapper = None  # force recompute of internal index maps on next set_col
 
     def create_internal_subjac(self, system, abs_key, meta, src_indices=None, factor=None):
         """
