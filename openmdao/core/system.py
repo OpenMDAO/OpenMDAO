@@ -25,7 +25,7 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
-from openmdao.utils.variable_table import write_var_table, NA
+from openmdao.utils.variable_table import write_var_table, write_options_table, NA
 from openmdao.utils.array_utils import evenly_distrib_idxs, shape_to_len, get_tol_violation, \
     sparsity_diff_viz, get_sparsity_diff_array
 from openmdao.utils.name_maps import NameResolver
@@ -101,6 +101,10 @@ resp_size_checks = {
     'obj': ['ref', 'ref0', 'scaler', 'adder']
 }
 resp_types = {'con': 'constraint', 'obj': 'objective'}
+
+default_options = ['always_opt', 'default_shape', 'derivs_method', 'distributed',
+                   'run_root_only', 'use_jit', 'assembled_jac_type',
+                   'auto_order']
 
 
 class _MatchType(IntEnum):
@@ -4890,6 +4894,104 @@ class System(object, metaclass=SystemMetaclass):
                     var_list.append(var_name)
 
         return var_list
+
+    def list_options(self,
+                     include_default=True,
+                     include_solvers=True,
+                     out_stream=_DEFAULT_OUT_STREAM,
+                     return_format='list'):
+        """
+        Write a list of output names and other optional information to a specified stream.
+
+        Parameters
+        ----------
+        include_default : bool
+            When True, include the built-in openmdao system options. Default is True.
+        include_solvers : bool
+            When True, include options from nonlinear_solver and linear_solver.
+        out_stream : file-like
+            Where to send human readable output. Default is sys.stdout.
+            Set to None to suppress.
+        return_format : str
+            Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
+            If 'list', the return value is a list of tuples of the form: (pathname, system options
+            , nonlinear solver options, linear solver options)
+            if 'dict', the return value is a dictionary with the pathname as key, and a dictionary
+            as the value. The dictionary contains 'options', 'nonlinear_solver', and
+            'linear_solver' keys, each of which isa dictionary of options.
+
+        Returns
+        -------
+        list of tuple
+            List of tuples, one for each subsystem sorted by execution order. Each tuple contains
+            the pathname string, a dictionary of system options, a dictionary of nonlinear solver
+            options (only if include_solvers is True) or None, and a dictionary of nonlinear solver
+            options (only if include_solvers is True) or None.
+        """
+        name = self.pathname
+
+        opt_list = []
+        opts = {}
+        nl_opts = None
+        ln_opts = None
+        for opt_name, opt_value in self.options.items():
+
+            if not include_default and opt_name in default_options:
+                continue
+
+            opt_meta = self.options._dict[opt_name]
+
+            if opt_meta['recordable']:
+                opts[opt_name] = opt_value
+
+        if include_solvers:
+            nl = self.nonlinear_solver
+            if nl is not None:
+                nl_opts = {}
+                for opt_name, opt_value in nl.options.items():
+
+                    opt_meta = nl.options._dict[opt_name]
+
+                    if opt_meta['recordable']:
+                        nl_opts[opt_name] = opt_value
+
+            ln = self.linear_solver
+            if ln is not None:
+                ln_opts = {}
+                for opt_name, opt_value in ln.options.items():
+
+                    opt_meta = ln.options._dict[opt_name]
+
+                    if opt_meta['recordable']:
+                        ln_opts[opt_name] = opt_value
+
+        opt_list.append((name, opts, nl_opts, ln_opts))
+
+        # For components, self._subsystems_allprocs is empty.
+        if self._subsystems_allprocs:
+            for subsys in self.system_iter(include_self=False, recurse=True):
+
+                if subsys.pathname != '_auto_ivc':
+                    sub_opts = subsys.list_options(out_stream=None,
+                                                   include_solvers=include_solvers,
+                                                   include_default=include_default)
+                    opt_list.extend(sub_opts)
+
+        write_options_table(self.pathname, opt_list, out_stream=out_stream)
+
+        if return_format == 'dict':
+            opt_dict = {}
+            for name, opts, nl_opts, ln_opts in opt_list:
+                opt_dict[name] = {
+                    'options': opts,
+                }
+                if include_solvers:
+                    opt_dict[name]['nonlinear_solver'] = nl_opts
+                    opt_dict[name]['linear_solver'] = ln_opts
+
+            return opt_dict
+
+        return opt_list
 
     def run_solve_nonlinear(self):
         """
