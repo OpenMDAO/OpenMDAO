@@ -232,7 +232,7 @@ class _CheckingJacobian(DictionaryJacobian):
             if 'directional' in meta:
                 yield key, np.atleast_2d(meta['val']).T
             else:
-                yield key, subjac.as_2d()
+                yield key, subjac.todense()
 
     def _setup_index_maps(self, system):
         super()._setup_index_maps(system)

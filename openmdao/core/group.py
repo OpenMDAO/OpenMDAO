@@ -3862,7 +3862,6 @@ class Group(System):
                     # for some tests that just call run_linearize directly without calling
                     # compute_totals.
                     self._setup_approx_derivs(),
-                    self._jacobian._setup(self)
             else:
                 self._setup_approx_coloring()
 

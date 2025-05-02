@@ -486,7 +486,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.run_driver()
         self.assertEqual(str(context.exception),
-                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.g' is an array of size 0")
+                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.g' is an array of size 0.")
 
     def test_size_zero_array_declare_partials(self):
         class DynamicPartialsComp(om.ExplicitComponent):
@@ -527,7 +527,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.run_driver()
         self.assertEqual(str(context.exception),
-                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.y' is an array of size 0")
+                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.y' is an array of size 0.")
 
 
     def test_dynamic_total_coloring_pyoptsparse_slsqp_auto(self):

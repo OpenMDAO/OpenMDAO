@@ -1104,7 +1104,7 @@ class ExecComp(ExplicitComponent):
 
                 for u in out_names:
                     if (u, inp) in partials:
-                        partials[u, inp] = imag(vdict[u] * inv_stepsize).flat
+                        partials[u, inp] = imag(vdict[u] * inv_stepsize).ravel()
 
                 # restore old input value
                 ival -= step

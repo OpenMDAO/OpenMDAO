@@ -91,8 +91,83 @@ class Subjac(object):
         self._map_functions(wrt_is_input)
         self._init_val()
 
+    @staticmethod
+    def get_subjac_class(pattern_meta):
+        """
+        Get the subjacobian class for the given pattern metadata.
+
+        Parameters
+        ----------
+        pattern_meta : dict
+            Pattern metadata.
+
+        Returns
+        -------
+        Subjac
+            The subjacobian class.
+        """
+        if not pattern_meta['dependent']:
+            return ZeroSubjac
+        elif pattern_meta.get('diagonal'):
+            return DiagonalSubjac
+        elif pattern_meta.get('rows') is None:
+            if issparse(pattern_meta.get('val')):
+                try:
+                    return _sparse_subjac_types[pattern_meta['val'].format]
+                except KeyError:
+                    raise NotImplementedError(f"Subjac format {pattern_meta['val'].format} not "
+                                              "supported.")
+            else:
+                return DenseSubjac
+        else:
+            return OMCOOSubjac
+
+    @staticmethod
+    def get_instance_metadata(pattern_meta, prev_inst_meta, shape, system, key):
+        """
+        Get the instance metadata for the given pattern metadata.
+
+        Parameters
+        ----------
+        pattern_meta : dict
+            Pattern metadata.
+        prev_inst_meta : dict
+            Previous instance metadata, if any.
+        shape : tuple
+            Shape of the subjacobian.
+        system : System
+            The system containing the subjac.
+        key : str
+            The (of, wrt) key indicating which subjac is being updated.
+
+        Returns
+        -------
+        dict
+            Instance metadata.
+        """
+        if prev_inst_meta:
+            print(system.msginfo, key, f"prev_inst_meta: {prev_inst_meta}")
+        subjac_class = Subjac.get_subjac_class(pattern_meta)
+        meta = _init_meta(pattern_meta, prev_inst_meta)
+        pat_val = pattern_meta.get('val')
+        if pat_val is None:
+            meta['val'] = None
+        meta['shape'] = shape
+        return subjac_class._update_instance_meta(meta, system, key)
+
     def _init_val(self):
         pass
+
+    def set_dtype(self, dtype):
+        """
+        Set the dtype of the subjacobian.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The type to set the subjacobian to.
+        """
+        self.info['val'] = np.asarray(self.info['val'], dtype=dtype)
 
     def _map_functions(self, wrt_is_input):
         if wrt_is_input:
@@ -110,8 +185,8 @@ class Subjac(object):
         """
         Get the value of the subjacobian.
 
-        This is the value set by a System and it may not be a 2D array. For example, if the subjac
-        is a diagonal subjac, the value will be a 1D array of the diagonal values.
+        This is the value set by a System and it may not be a dense array. For example, if the
+        subjac is a diagonal subjac, the value will be a 1D array of the diagonal values.
 
         Returns
         -------
@@ -120,14 +195,14 @@ class Subjac(object):
         """
         return self.info['val']
 
-    def as_2d(self):
+    def todense(self):
         """
-        Return the subjacobian as a 2D array.
+        Return the subjacobian as a dense array.
 
         Returns
         -------
         ndarray
-            Subjacobian as a 2D array.
+            Subjacobian as a dense array.
         """
         return self.info['val']
 
@@ -276,6 +351,42 @@ class DenseSubjac(Subjac):
         if self.info['val'] is None:
             self.info['val'] = np.zeros(self.shape)
 
+    @classmethod
+    def _update_instance_meta(cls, meta, system, key):
+        """
+        Update the given instance metadata.
+
+        Parameters
+        ----------
+        meta : dict
+            Instance metadata.
+        system : System
+            The system containing the subjac.
+        key : str
+            The (of, wrt) key indicating which subjac is being updated.
+
+        Returns
+        -------
+        dict
+            Updated instance metadata.
+        """
+        val = meta['val']
+        if val is None:
+            meta['val'] = np.zeros(meta['shape'])
+        elif np.isscalar(val):
+            meta['val'] = np.full(meta['shape'], val, dtype=float)
+        else:
+            if val.shape == meta['shape']:
+                meta['val'] = val.copy()
+            else:
+                pathlen = len(system.pathname) + 1 if system.pathname else 0
+                relkey = (key[0][pathlen:], key[1][pathlen:])
+                of, wrt = relkey
+                raise ValueError(f"{system.msginfo}: d({of})/d({wrt}), Expected shape "
+                                 f"{meta['shape']} but got {val.shape}.")
+
+        return meta
+
 
 class SparseSubjac(Subjac):
     """
@@ -299,14 +410,47 @@ class SparseSubjac(Subjac):
         Shape of the subjacobian of the row var with respect to wrt's source.
     """
 
-    def as_2d(self):
+    @classmethod
+    def _update_instance_meta(cls, meta, system, key):
         """
-        Return the subjacobian as a 2D array.
+        Update the given instance metadata.
+
+        Parameters
+        ----------
+        meta : dict
+            Instance metadata.
+        system : System
+            The system containing the subjac.
+        key : str
+            The (of, wrt) key indicating which subjac is being updated.
+
+        Returns
+        -------
+        dict
+            Updated instance metadata.
+        """
+        meta['val'] = meta['val'].copy()
+        return meta
+
+    def set_dtype(self, dtype):
+        """
+        Set the dtype of the subjacobian.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The type to set the subjacobian to.
+        """
+        self.info['val'].data = np.asarray(self.info['val'].data, dtype=dtype)
+
+    def todense(self):
+        """
+        Return the subjacobian as a dense array.
 
         Returns
         -------
         ndarray
-            Subjacobian as a 2D array.
+            Subjacobian as a dense array.
         """
         return self.info['val'].toarray()
 
@@ -585,14 +729,46 @@ class OMCOOSubjac(COOSubjac):
 
         self.set_val(info['val'])
 
-    def as_2d(self):
+    @classmethod
+    def _update_instance_meta(cls, meta, system, key):
         """
-        Return the subjacobian as a 2D array.
+        Update the given instance metadata.
+
+        Parameters
+        ----------
+        meta : dict
+            Instance metadata.
+        system : System
+            The system containing the subjac.
+        key : str
+            The (of, wrt) key indicating which subjac is being updated.
+
+        Returns
+        -------
+        dict
+            Updated instance metadata.
+        """
+        val = meta['val']
+        rows = meta['rows']
+        if val is None:
+            val = np.zeros(rows.size)
+        elif np.isscalar(val):
+            val = np.full(rows.size, val, dtype=float)
+        else:
+            val = val.copy().reshape(rows.size)
+
+        meta['val'] = val
+
+        return meta
+
+    def todense(self):
+        """
+        Return the subjacobian as a dense array.
 
         Returns
         -------
         ndarray
-            Subjacobian as a 2D array.
+            Subjacobian as a dense array.
         """
         return self.coo.toarray()
 
@@ -696,14 +872,52 @@ class DiagonalSubjac(Subjac):
         Shape of the subjacobian of the row var with respect to wrt's source.
     """
 
-    def as_2d(self):
+    def _init_val(self):
+        if self.info['val'] is None:
+            self.info['val'] = np.zeros(self.shape[0])
+        elif np.isscalar(self.info['val']):
+            self.info['val'] = np.full(self.shape[0], self.info['val'])
+
+    @classmethod
+    def _update_instance_meta(cls, meta, system, key):
         """
-        Return the subjacobian as a 2D array.
+        Update the given instance metadata.
+
+        Parameters
+        ----------
+        meta : dict
+            Instance metadata.
+        system : System
+            The system containing the subjac.
+        key : str
+            The (of, wrt) key indicating which subjac is being updated.
+
+        Returns
+        -------
+        dict
+            Updated instance metadata.
+        """
+        val = meta['val']
+        meta['rows'] = meta['cols'] = None
+        if val is None:
+            val = np.zeros(meta['shape'][0])
+        elif np.isscalar(val):
+            val = np.full(meta['shape'][0], val, dtype=float)
+        else:
+            val = val.copy().reshape(meta['shape'][0])
+
+        meta['val'] = val
+
+        return meta
+
+    def todense(self):
+        """
+        Return the subjacobian as a dense array.
 
         Returns
         -------
         ndarray
-            Subjacobian as a 2D array.
+            Subjacobian as a dense array.
         """
         return np.diag(self.info['val'])
 
@@ -771,7 +985,7 @@ class DiagonalSubjac(Subjac):
         """
         size = self.info['val'].size
         return coo_matrix((randgen.random(size) + 1.0, (range(size), range(size))),
-                          shape=(size, size))
+                          shape=self.shape)
 
     def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals):
         d_residuals.add_to_slice(self.row_slice,
@@ -812,14 +1026,52 @@ class ZeroSubjac(Subjac):
         Shape of the subjacobian of the row var with respect to wrt's source.
     """
 
-    def as_2d(self):
+    @classmethod
+    def _update_instance_meta(cls, meta, system, key):
         """
-        Return the subjacobian as a 2D array.
+        Update the given instance metadata.
+
+        Parameters
+        ----------
+        meta : dict
+            Instance metadata.
+        system : System
+            The system containing the subjac.
+        key : str
+            The (of, wrt) key indicating which subjac is being updated.
+
+        Returns
+        -------
+        dict
+            Updated instance metadata.
+        """
+        meta['val'] = None
+        meta['rows'] = meta['cols'] = None
+        return meta
+
+    def get_val(self):
+        """
+        Get the value of the subjacobian.
+
+        This is the value set by a System and it may not be a dense array. For example, if the
+        subjac is a diagonal subjac, the value will be a 1D array of the diagonal values.
 
         Returns
         -------
         ndarray
-            Subjacobian as a 2D array.
+            Value of the subjacobian.
+        """
+        zro = np.zeros(0)
+        return coo_matrix((zro, (zro, zro)), shape=self.shape)
+
+    def todense(self):
+        """
+        Return the subjacobian as a dense array.
+
+        Returns
+        -------
+        ndarray
+            Subjacobian as a dense array.
         """
         return np.zeros(self.shape)
 
@@ -893,6 +1145,35 @@ class ZeroSubjac(Subjac):
         pass
 
 
+def _init_meta(pattern_meta, prev_inst_meta):
+    """
+    Initialize the instance metadata for the subjacobian.
+
+    Parameters
+    ----------
+    pattern_meta : dict
+        Pattern metadata.
+    prev_inst_meta : dict or None
+        Previous instance metadata, if any.
+
+    Returns
+    -------
+    dict
+        Instance metadata.
+    """
+    if prev_inst_meta is not None:
+        meta = prev_inst_meta.copy()
+        for key, val in pattern_meta.items():
+            if val is not None:
+                meta[key] = val
+    else:
+        meta = SUBJAC_META_DEFAULTS.copy()
+        meta['dependent'] = False
+        meta.update(pattern_meta)
+
+    return meta
+
+
 SUBJAC_META_DEFAULTS = {
     'rows': None,
     'cols': None,
@@ -900,4 +1181,10 @@ SUBJAC_META_DEFAULTS = {
     'dependent': True,
     'diagonal': False,
     'sparsity': None,
+}
+
+_sparse_subjac_types = {
+    'coo': COOSubjac,
+    'csr': CSRSubjac,
+    'csc': CSCSubjac
 }

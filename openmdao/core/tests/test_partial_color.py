@@ -368,11 +368,11 @@ class TestColoringExplicit(unittest.TestCase):
                                                                          [1,2,5,11],
                                                                          [True, False]):
 
-            with self.subTest(msg=f'{method=} {isplit=} {osplit=} {sparse_partials=}'):
+            if True: # with self.subTest(msg=f'{method=} {isplit=} {osplit=} {sparse_partials=}'):
                 prob = Problem(name=f'test_partials_explicit_{method}_'
                                f'{isplit}_{osplit}_{sparse_partials}')
                 model = prob.model
-
+    
                 sparsity = setup_sparsity(_BIGMASK)
                 indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'comp')
                 model.add_subsystem('indeps', indeps)
@@ -380,14 +380,14 @@ class TestColoringExplicit(unittest.TestCase):
                                                                     isplit=isplit, osplit=osplit,
                                                                     sparse_partials=sparse_partials))
                 comp.declare_coloring('x*', method=method)
-
+    
                 for conn in conns:
                     model.connect(*conn)
-
+    
                 prob.setup(mode='fwd')
                 prob.set_solver_print(level=0)
                 prob.run_model()
-
+    
                 comp.run_linearize()
                 prob.run_model()
                 start_nruns = comp._nruns

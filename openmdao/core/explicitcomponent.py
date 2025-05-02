@@ -1,6 +1,5 @@
 """Define the ExplicitComponent class."""
 
-import numpy as np
 from itertools import chain
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
@@ -148,7 +147,7 @@ class ExplicitComponent(Component):
                     'cols': None,
                     'diagonal': True,
                     'shape': (size, size),
-                    'val': np.full(size, -1.),
+                    'val': -1.0,
                     'dependent': True,
                 }
 

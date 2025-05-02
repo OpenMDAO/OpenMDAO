@@ -3,21 +3,11 @@ import weakref
 
 import numpy as np
 
-from scipy.sparse import issparse
-
 from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.iter_utils import meta2range_iter
-from openmdao.jacobians.subjac import DiagonalSubjac, DenseSubjac, OMCOOSubjac, COOSubjac, \
-    ZeroSubjac, CSRSubjac, CSCSubjac
+from openmdao.jacobians.subjac import Subjac
 from openmdao.utils.units import unit_conversion
 from openmdao.utils.rangemapper import RangeMapper
-
-
-_sparse_subjac_types = {
-    'coo': COOSubjac,
-    'csr': CSRSubjac,
-    'csc': CSCSubjac
-}
 
 
 class Jacobian(object):
@@ -95,31 +85,12 @@ class Jacobian(object):
         else:
             col_slice = output_slices[wrt]
 
-        if meta['dependent']:
-            return self._subjac_from_meta(meta, row_slice, col_slice, wrt_is_input)
-        else:
-            return ZeroSubjac(meta, row_slice, col_slice, wrt_is_input)
+        return self._subjac_from_meta(meta, row_slice, col_slice, wrt_is_input)
 
     def _subjac_from_meta(self, meta, row_slice, col_slice, wrt_is_input, src_indices=None,
                           factor=None):
-        if not meta['dependent']:
-            return ZeroSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
-        elif meta['diagonal']:
-            return DiagonalSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
-        elif meta['rows'] is None:
-            assert meta['cols'] is None
-            if issparse(meta['val']):
-                try:
-                    return _sparse_subjac_types[meta['val'].format](meta, row_slice, col_slice,
-                                                                    wrt_is_input, src_indices,
-                                                                    factor)
-                except KeyError:
-                    raise NotImplementedError(f"Subjac format {meta['val'].format} not "
-                                              "supported yet.")
-            else:
-                return DenseSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
-        else:
-            return OMCOOSubjac(meta, row_slice, col_slice, wrt_is_input, src_indices, factor)
+        return Subjac.get_subjac_class(meta)(meta, row_slice, col_slice, wrt_is_input, src_indices,
+                                             factor)
 
     def _get_subjacs(self, system):
         if self._subjacs is None:
@@ -387,13 +358,15 @@ class Jacobian(object):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
-        for meta in self._subjacs_info.values():
-            if active:
-                meta['val'] = meta['val'].astype(complex)
-            else:
-                meta['val'] = meta['val'].real
+        # if _subjacs is None, our system hasn't been linearized
+        if self._subjacs is not None:
+            for subjac in self._subjacs.values():
+                if active:
+                    subjac.set_dtype(complex)
+                else:
+                    subjac.set_dtype(float)
 
-        self._under_complex_step = active
+            self._under_complex_step = active
 
     def _setup_index_maps(self, system):
         namesize_iter = [(n, end - start) for n, start, end, _, _, _ in system._jac_wrt_iter()]
