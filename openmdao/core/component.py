@@ -1195,8 +1195,6 @@ class Component(System):
         of = of if isinstance(of, str) else tuple(of)
         wrt = wrt if isinstance(wrt, str) else tuple(wrt)
 
-        if 'seg_initial_states:x' in self._var_rel2meta:
-            print(self.msginfo, sorted(self._var_rel2meta))
         key = (of, wrt)
         if key not in self._declared_partials_patterns:
             self._declared_partials_patterns[key] = {}   # SUBJAC_META_DEFAULTS.copy()
@@ -1241,6 +1239,9 @@ class Component(System):
 
                 meta['rows'] = rows
                 meta['cols'] = cols
+
+                # if ':x' in of or ':x' in wrt:
+                #     print(self.msginfo, 'of', of, 'wrt', wrt, 'rows', rows, 'cols', cols)
 
                 # Check for repeated rows/cols indices.
                 size = len(rows)
