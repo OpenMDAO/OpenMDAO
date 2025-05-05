@@ -542,10 +542,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                                    "other processes using `get_val(<name>, get_remote=True)`.")
 
         if copy:
-            if isinstance(val, np.ndarray):
-                return val.copy()
-            else:
-                return deepcopy(val)
+            return deepcopy(val)
         else:
             return val
 

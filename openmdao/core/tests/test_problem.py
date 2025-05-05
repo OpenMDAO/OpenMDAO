@@ -39,6 +39,8 @@ class TestProblem(unittest.TestCase):
                 self.add_discrete_input('mul', val=1)
 
                 self.add_output('bar', shape=(3,))
+                # add a mutable NumPy array as an output
+                self.add_discrete_output('obj', val=np.array([1, 'm', [2, 3, 4]], dtype=object))
 
             def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
                 outputs['bar'] = discrete_inputs['mul']*inputs['foo']
@@ -54,6 +56,7 @@ class TestProblem(unittest.TestCase):
         foo = p.get_val('foo')
         mul = p.get_val('mul')
         bar = p.get_val('bar')
+        obj = p.get_val('obj')
 
         self.assertTrue(np.array_equal(foo, np.array([5., 5., 5.])))
         self.assertEqual(mul, 100)
@@ -62,6 +65,7 @@ class TestProblem(unittest.TestCase):
         foo_copy = p.get_val('foo', copy=True)
         mul_copy = p.get_val('mul', copy=True)
         bar_copy = p.get_val('bar', copy=True)
+        obj_copy = p.get_val('obj', copy=True)
 
         self.assertTrue(np.array_equal(foo_copy, np.array([5., 5., 5.])))
         self.assertEqual(mul_copy, 100)
@@ -69,7 +73,13 @@ class TestProblem(unittest.TestCase):
 
         self.assertTrue(id(foo) != id(foo_copy), f"'foo' is not a copy, {id(foo)=} {id(foo_copy)=}")
         self.assertTrue(id(mul) == id(mul_copy), f"'mul' is a copy, {id(foo)=} {id(foo_copy)=}")  # mul is a scalar
-        self.assertTrue(id(bar) != id(bar_copy), f"'foo' is not a copy, {id(bar)=} {id(bar_copy)=}")
+        self.assertTrue(id(bar) != id(bar_copy), f"'bar' is not a copy, {id(bar)=} {id(bar_copy)=}")
+        self.assertTrue(id(obj) != id(obj_copy), f"'obj' is not a copy, {id(obj)=} {id(obj_copy)=}")
+
+        obj[2][0] = 10
+        self.assertEqual(obj[2][0], 10)
+        self.assertEqual(p.get_val('obj')[2][0], 10)  # the value in the problem was modified
+        self.assertEqual(obj_copy[2][0], 2)           # the value in the copy was not modified
 
     def test_simple_component_model_with_units(self):
         class TestComp(om.ExplicitComponent):

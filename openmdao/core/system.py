@@ -5613,10 +5613,7 @@ class System(object, metaclass=SystemMetaclass):
                 val = self.convert2units(abs_names[0], val, simp_units)
 
         if copy:
-            if isinstance(val, np.ndarray):
-                return val.copy()
-            else:
-                return deepcopy(val)
+            return deepcopy(val)
         else:
             return val
 
