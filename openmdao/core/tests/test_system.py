@@ -61,8 +61,8 @@ class TestSystem(unittest.TestCase):
 
         obj[2][0] = 10
         self.assertEqual(obj[2][0], 10)
-        self.assertEqual(p.get_val('obj')[2][0], 10)  # the value in the system was modified
-        self.assertEqual(obj_copy[2][0], 2)           # the value in the copy was not modified
+        self.assertEqual(comp.get_val('obj')[2][0], 10)  # the value in the system was modified
+        self.assertEqual(obj_copy[2][0], 2)              # the value in the copy was not modified
 
     def test_vector_context_managers(self):
         g1 = Group()
