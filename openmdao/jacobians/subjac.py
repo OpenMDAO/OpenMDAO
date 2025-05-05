@@ -17,6 +17,8 @@ class Subjac(object):
 
     Parameters
     ----------
+    key : tuple
+        The (of, wrt) key.
     info : dict
         Metadata for the subjacobian.
     row_slice : slice
@@ -39,6 +41,8 @@ class Subjac(object):
 
     Attributes
     ----------
+    key : tuple
+        The (of, wrt) key.
     info : dict
         Metadata for the subjacobian.
     row_slice : slice
@@ -55,13 +59,15 @@ class Subjac(object):
         Shape of the subjacobian.
     """
 
-    def __init__(self, info, row_slice, col_slice, wrt_is_input, src_indices=None, factor=None,
+    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None, factor=None,
                  src_shape=None):
         """
         Initialize the subjacobian.
 
         Parameters
         ----------
+        key : tuple
+            The (of, wrt) key.
         info : dict
             Metadata for the subjacobian.
         row_slice : slice
@@ -77,6 +83,7 @@ class Subjac(object):
         src_shape : tuple
             Shape of the subjacobian of the row var with respect to wrt's source.
         """
+        self.key = key
         self.info = info
         self.row_slice = row_slice
         self.col_slice = col_slice
@@ -167,7 +174,15 @@ class Subjac(object):
         dtype : dtype
             The type to set the subjacobian to.
         """
-        self.info['val'] = np.asarray(self.info['val'], dtype=dtype)
+        if dtype is self.info['val'].dtype:
+            return
+
+        if dtype is float:
+            self.info['val'] = self.info['val'].real
+        elif dtype is complex:
+            self.info['val'] = np.asarray(self.info['val'], dtype=dtype)
+        else:
+            raise ValueError(f"Subjacobian {self.key}: Unsupported dtype: {dtype}")
 
     def _map_functions(self, wrt_is_input):
         if wrt_is_input:
@@ -331,6 +346,8 @@ class DenseSubjac(Subjac):
 
     Parameters
     ----------
+    key : tuple
+        The (of, wrt) key.
     info : dict
         Metadata for the subjacobian.
     row_slice : slice
@@ -394,6 +411,8 @@ class SparseSubjac(Subjac):
 
     Parameters
     ----------
+    key : tuple
+        The (of, wrt) key.
     info : dict
         Metadata for the subjacobian.
     row_slice : slice
@@ -441,7 +460,15 @@ class SparseSubjac(Subjac):
         dtype : dtype
             The type to set the subjacobian to.
         """
-        self.info['val'].data = np.asarray(self.info['val'].data, dtype=dtype)
+        if dtype is self.info['val'].dtype:
+            return
+
+        if dtype is float:
+            self.info['val'].data = self.info['val'].data.real
+        elif dtype is complex:
+            self.info['val'].data = np.asarray(self.info['val'].data, dtype=dtype)
+        else:
+            raise ValueError(f"Subjacobian {self.key}: Unsupported dtype: {dtype}")
 
     def todense(self):
         """
@@ -512,6 +539,8 @@ class COOSubjac(SparseSubjac):
 
     Parameters
     ----------
+    key : tuple
+        The (of, wrt) key.
     info : dict
         Metadata for the subjacobian.
     row_slice : slice
@@ -566,6 +595,8 @@ class CSRSubjac(SparseSubjac):
 
     Parameters
     ----------
+    key : tuple
+        The (of, wrt) key.
     info : dict
         Metadata for the subjacobian.
     row_slice : slice
@@ -618,6 +649,8 @@ class CSCSubjac(SparseSubjac):
 
     Parameters
     ----------
+    key : tuple
+        The (of, wrt) key.
     info : dict
         Metadata for the subjacobian.
     row_slice : slice
@@ -668,6 +701,8 @@ class OMCOOSubjac(COOSubjac):
 
     Parameters
     ----------
+    key : tuple
+        The (of, wrt) key.
     info : dict
         Metadata for the subjacobian.
     row_slice : slice
@@ -694,13 +729,15 @@ class OMCOOSubjac(COOSubjac):
         Columns of the subjacobian after applying the mask.
     """
 
-    def __init__(self, info, row_slice, col_slice, wrt_is_input, src_indices=None, factor=None,
+    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None, factor=None,
                  src_shape=None):
         """
         Initialize the subjacobian.
 
         Parameters
         ----------
+        key : tuple
+            The (of, wrt) key.
         info : dict
             Metadata for the subjacobian.
         row_slice : slice
@@ -716,7 +753,8 @@ class OMCOOSubjac(COOSubjac):
         src_shape : tuple
             Shape of the subjacobian of the row var with respect to wrt's source.
         """
-        super().__init__(info, row_slice, col_slice, wrt_is_input, src_indices, factor, src_shape)
+        super().__init__(key, info, row_slice, col_slice, wrt_is_input, src_indices, factor,
+                         src_shape)
         self.rows = info['rows']
         self.cols = info['cols']
         self.mask = slice(None)
@@ -856,6 +894,8 @@ class DiagonalSubjac(Subjac):
 
     Parameters
     ----------
+    key : tuple
+        The (of, wrt) key.
     info : dict
         Metadata for the subjacobian.
     row_slice : slice
@@ -1010,6 +1050,8 @@ class ZeroSubjac(Subjac):
 
     Parameters
     ----------
+    key : tuple
+        The (of, wrt) key.
     info : dict
         Metadata for the subjacobian.
     row_slice : slice

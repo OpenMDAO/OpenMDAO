@@ -1240,9 +1240,6 @@ class Component(System):
                 meta['rows'] = rows
                 meta['cols'] = cols
 
-                # if ':x' in of or ':x' in wrt:
-                #     print(self.msginfo, 'of', of, 'wrt', wrt, 'rows', rows, 'cols', cols)
-
                 # Check for repeated rows/cols indices.
                 size = len(rows)
                 if size > 0:
@@ -1556,7 +1553,6 @@ class Component(System):
                 if abs_key in self._subjacs_info:
                     del self._subjacs_info[abs_key]
                 continue
-
 
             of, wrt = abs_key
             wrtmeta = abs2meta_in[wrt] if wrt in abs2meta_in else abs2meta_out[wrt]

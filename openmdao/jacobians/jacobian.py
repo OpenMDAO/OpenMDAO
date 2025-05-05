@@ -85,12 +85,12 @@ class Jacobian(object):
         else:
             col_slice = output_slices[wrt]
 
-        return self._subjac_from_meta(meta, row_slice, col_slice, wrt_is_input)
+        return self._subjac_from_meta(abs_key, meta, row_slice, col_slice, wrt_is_input)
 
-    def _subjac_from_meta(self, meta, row_slice, col_slice, wrt_is_input, src_indices=None,
+    def _subjac_from_meta(self, key, meta, row_slice, col_slice, wrt_is_input, src_indices=None,
                           factor=None):
-        return Subjac.get_subjac_class(meta)(meta, row_slice, col_slice, wrt_is_input, src_indices,
-                                             factor)
+        return Subjac.get_subjac_class(meta)(key, meta, row_slice, col_slice, wrt_is_input,
+                                             src_indices, factor)
 
     def _get_subjacs(self, system):
         if self._subjacs is None:
@@ -614,5 +614,5 @@ class SplitJacobian(Jacobian):
                 src = system._conn_global_abs_in2out[wrt]
                 col_slice = output_slices[src]
 
-            return self._subjac_from_meta(meta, output_slices[of], col_slice, False,
+            return self._subjac_from_meta(abs_key, meta, output_slices[of], col_slice, False,
                                           src_indices, factor)
