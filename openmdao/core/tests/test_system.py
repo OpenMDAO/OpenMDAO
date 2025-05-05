@@ -13,6 +13,48 @@ from openmdao.utils.file_utils import _get_work_dir
 @use_tempdirs
 class TestSystem(unittest.TestCase):
 
+    def test_get_val(self):
+        import openmdao.api as om
+
+        class TestComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('foo', shape=(3,))
+                self.add_discrete_input('mul', val=1)
+
+                self.add_output('bar', shape=(3,))
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                outputs['bar'] = discrete_inputs['mul']*inputs['foo']
+
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', TestComp(), promotes=['*'])
+        p.setup()
+
+        p.set_val('foo', np.array([5., 5., 5.]))
+        p.set_val('mul', 100)
+        p.run_model()
+
+        foo = comp.get_val('foo')
+        mul = comp.get_val('mul')
+        bar = comp.get_val('bar')
+
+        self.assertTrue(np.array_equal(foo, np.array([5., 5., 5.])))
+        self.assertEqual(mul, 100)
+        self.assertTrue(np.array_equal(bar, np.array([500., 500., 500.])))
+
+        foo_copy = comp.get_val('foo', copy=True)
+        mul_copy = comp.get_val('mul', copy=True)
+        bar_copy = comp.get_val('bar', copy=True)
+
+        self.assertTrue(np.array_equal(foo_copy, np.array([5., 5., 5.])))
+        self.assertEqual(mul_copy, 100)
+        self.assertTrue(np.array_equal(bar_copy, np.array([500., 500., 500.])))
+
+        self.assertTrue(id(foo) != id(foo_copy), f"'foo' is not a copy, {id(foo)=} {id(foo_copy)=}")
+        self.assertTrue(id(mul) == id(mul_copy), f"'mul' is a copy, {id(foo)=} {id(foo_copy)=}")  # mul is a scalar
+        self.assertTrue(id(bar) != id(bar_copy), f"'foo' is not a copy, {id(bar)=} {id(bar_copy)=}")
+
+
     def test_vector_context_managers(self):
         g1 = Group()
         g1.add_subsystem('Indep', IndepVarComp('a', 5.0), promotes=['a'])

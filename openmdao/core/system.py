@@ -5,6 +5,7 @@ import hashlib
 import pathlib
 import time
 import functools
+from copy import deepcopy
 from contextlib import contextmanager
 from collections import defaultdict
 from itertools import chain
@@ -5544,7 +5545,7 @@ class System(object, metaclass=SystemMetaclass):
         return val
 
     def get_val(self, name, units=None, indices=None, get_remote=False, rank=None,
-                vec_name='nonlinear', kind=None, flat=False, from_src=True):
+                vec_name='nonlinear', kind=None, flat=False, from_src=True, copy=False):
         """
         Get an output/input/residual variable.
 
@@ -5576,6 +5577,8 @@ class System(object, metaclass=SystemMetaclass):
             If True, return the flattened version of the value.
         from_src : bool
             If True, retrieve value of an input variable from its connected source.
+        copy : bool, optional
+            If True, return a copy of the value.  If False, return a reference to the value.
 
         Returns
         -------
@@ -5597,9 +5600,9 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 # src is outside of this system so get the value from the model
                 caller = self._problem_meta['model_ref']()
-            return caller._get_input_from_src(name, abs_names, conns, units=simp_units,
-                                              indices=indices, get_remote=get_remote, rank=rank,
-                                              vec_name=vec_name, flat=flat, scope_sys=self)
+            val = caller._get_input_from_src(name, abs_names, conns, units=simp_units,
+                                             indices=indices, get_remote=get_remote, rank=rank,
+                                             vec_name=vec_name, flat=flat, scope_sys=self)
         else:
             val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
 
@@ -5609,7 +5612,13 @@ class System(object, metaclass=SystemMetaclass):
             if units is not None:
                 val = self.convert2units(abs_names[0], val, simp_units)
 
-        return val
+        if copy:
+            if isinstance(val, np.ndarray):
+                return val.copy()
+            else:
+                return deepcopy(val)
+        else:
+            return val
 
     def _get_cached_val(self, name, abs_names, get_remote=False):
         # We have set and cached already
