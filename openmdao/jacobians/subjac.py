@@ -913,6 +913,9 @@ class DiagonalSubjac(Subjac):
     """
 
     def _init_val(self):
+        """
+        Initialize the val in the subjacobian's metadata, converting to correct shape if necessary.
+        """
         if self.info['val'] is None:
             self.info['val'] = np.zeros(self.shape[0])
         elif np.isscalar(self.info['val']):
