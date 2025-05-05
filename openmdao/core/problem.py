@@ -492,7 +492,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return self.get_val(name, get_remote=None)
 
-    def get_val(self, name, units=None, indices=None, get_remote=False):
+    def get_val(self, name, units=None, indices=None, get_remote=False, copy=False):
         """
         Get an output/input variable.
 
@@ -513,6 +513,8 @@ class Problem(object, metaclass=ProblemMetaclass):
             If False, only retrieve the value if it is on the current process, or only the part
             of the value that's on the current process for a distributed variable.
             If None and the variable is remote or distributed, a RuntimeError will be raised.
+        copy : bool, optional
+            If True, return a copy of the value.  If False, return a reference to the value.
 
         Returns
         -------
@@ -539,7 +541,10 @@ class Problem(object, metaclass=ProblemMetaclass):
                                    f"rank {self.comm.rank}. You can retrieve values from "
                                    "other processes using `get_val(<name>, get_remote=True)`.")
 
-        return val
+        if copy:
+            return deepcopy(val)
+        else:
+            return val
 
     def __setitem__(self, name, value):
         """
