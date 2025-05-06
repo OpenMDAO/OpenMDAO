@@ -383,7 +383,7 @@ class DefaultVector(Vector):
         if adder is not None:  # nonlinear only
             data += adder
 
-    def asarray(self, copy=False):
+    def asarray(self, copy=False, mask=None):
         """
         Return an array representation of this vector.
 
@@ -393,6 +393,9 @@ class DefaultVector(Vector):
         ----------
         copy : bool
             If True, return a copy of the array.
+        mask : ndarray of type bool, or None
+            Array used to mask out part of the vector.  If mask is not None then a copy
+            of the vector is returned with the masked values set to 0.0.
 
         Returns
         -------
@@ -403,6 +406,10 @@ class DefaultVector(Vector):
             arr = self._data
         else:
             arr = self._data.real
+
+        if mask is not None:
+            arr[mask] = 0.0
+            return arr
 
         if copy:
             return arr.copy()

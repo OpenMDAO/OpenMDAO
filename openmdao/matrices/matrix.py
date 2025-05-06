@@ -18,8 +18,6 @@ class Matrix(object):
     ----------
     comm : MPI.Comm or <FakeComm>
         Communicator of the top-level system that owns the <Jacobian>.
-    is_internal : bool
-        If True, this is the int_mtx of an AssembledJacobian.
 
     Attributes
     ----------
@@ -33,7 +31,7 @@ class Matrix(object):
         implementation-specific data for the sub-jacobians.
     """
 
-    def __init__(self, comm, is_internal):
+    def __init__(self, comm):
         """
         Initialize all attributes.
         """

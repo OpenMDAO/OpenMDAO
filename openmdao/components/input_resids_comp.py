@@ -1,5 +1,7 @@
 """InputResidsComp provides a simple implicit component with minimal boilerplate."""
 
+import numpy as np
+
 from openmdao.core.implicitcomponent import ImplicitComponent
 
 
@@ -97,7 +99,10 @@ class InputResidsComp(ImplicitComponent):
         may not be known until final setup.
         """
         for name in self._var_rel_names['input']:
-            self.declare_partials(of='resid_' + name, wrt=name, diagonal=True, val=1.0)
+            resid_name = 'resid_' + name
+            size = self._var_rel2meta[name]['size']
+            ar = np.arange(size, dtype=int)
+            self.declare_partials(of=resid_name, wrt=name, rows=ar, cols=ar, val=1.0)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """

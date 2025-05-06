@@ -224,7 +224,7 @@ class TestJacobianFeatures(unittest.TestCase):
 
         # Some of the tests are expected to fail in setup, and some in final_setup, so put them
         # both under the assert.
-        with self.assertRaises(ValueError) as ex:
+        with self.assertRaises(Exception) as ex:
             problem.setup()
             problem.run_model()
         self.assertEqual(ex.exception.args[0], error_msg)

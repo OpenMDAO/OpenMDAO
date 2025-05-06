@@ -394,13 +394,23 @@ class DenseSubjac(Subjac):
             meta['val'] = np.full(meta['shape'], val, dtype=float)
         else:
             if val.shape == meta['shape']:
-                meta['val'] = val.copy()
+                meta['val'] = np.asarray(val, dtype=float).copy()
             else:
-                pathlen = len(system.pathname) + 1 if system.pathname else 0
-                relkey = (key[0][pathlen:], key[1][pathlen:])
-                of, wrt = relkey
-                raise ValueError(f"{system.msginfo}: d({of})/d({wrt}), Expected shape "
-                                 f"{meta['shape']} but got {val.shape}.")
+                if meta['shape'] != val.shape:
+                    if len(meta['shape']) != len(val.shape):
+                        if meta['shape'] == (1, ) + val.shape:
+                            val.reshape((1, ) + val.shape)
+                        elif meta['shape'] == val.shape + (1, ):
+                            val.reshape(val.shape + (1, ))
+
+                    if len(meta['shape']) == val.shape:
+                        meta['val'] = np.asarray(val, dtype=float).copy().reshape(meta['shape'])
+                    else:
+                        pathlen = len(system.pathname) + 1 if system.pathname else 0
+                        relkey = (key[0][pathlen:], key[1][pathlen:])
+                        of, wrt = relkey
+                        raise ValueError(f"{system.msginfo}: d({of})/d({wrt}), Expected shape "
+                                         f"{meta['shape']} but got {val.shape}.")
 
         return meta
 
@@ -449,6 +459,7 @@ class SparseSubjac(Subjac):
             Updated instance metadata.
         """
         meta['val'] = meta['val'].copy()
+        meta['val'].data = np.asarray(meta['val'].data, dtype=float)
         return meta
 
     def set_dtype(self, dtype):
@@ -587,6 +598,25 @@ class COOSubjac(SparseSubjac):
                     self.info['uncovered_nz'] = []
                     self.info['uncovered_threshold'] = uncovered_threshold
                     self.info['uncovered_nz'].extend(list(zip(nzs, icol * np.ones_like(nzs))))
+
+    def set_dtype(self, dtype):
+        """
+        Set the dtype of the subjacobian.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The type to set the subjacobian to.
+        """
+        if dtype is self.info['val'].dtype:
+            return
+
+        if dtype is float:
+            self.info['val'] = self.info['val'].real
+        elif dtype is complex:
+            self.info['val'] = np.asarray(self.info['val'], dtype=dtype)
+        else:
+            raise ValueError(f"Subjacobian {self.key}: Unsupported dtype: {dtype}")
 
 
 class CSRSubjac(SparseSubjac):
@@ -793,7 +823,7 @@ class OMCOOSubjac(COOSubjac):
         elif np.isscalar(val):
             val = np.full(rows.size, val, dtype=float)
         else:
-            val = val.copy().reshape(rows.size)
+            val = np.asarray(val, dtype=float).copy().reshape(rows.size)
 
         meta['val'] = val
 
@@ -947,7 +977,7 @@ class DiagonalSubjac(Subjac):
         elif np.isscalar(val):
             val = np.full(meta['shape'][0], val, dtype=float)
         else:
-            val = val.copy().reshape(meta['shape'][0])
+            val = np.asarray(val, dtype=float).copy().reshape(meta['shape'][0])
 
         meta['val'] = val
 

@@ -563,7 +563,7 @@ class Vector(object):
         raise NotImplementedError('add_scale_vec not defined for vector type '
                                   f'{type(self).__name__}')
 
-    def asarray(self, copy=False):
+    def asarray(self, copy=False, mask=None):
         """
         Return a flat array representation of this vector.
 
@@ -573,6 +573,8 @@ class Vector(object):
         ----------
         copy : bool
             If True, return a copy of the array.
+        mask : ndarray of type bool, or None
+            Array used to mask out part of the vector.
 
         Returns
         -------
@@ -581,6 +583,26 @@ class Vector(object):
         """
         raise NotImplementedError(f'asarray not defined for vector type {type(self).__name__}')
         return None  # silence lint warning
+
+    def get_mask(self):
+        """
+        Return a mask for the vector based on the current matvec context.
+
+        Returns
+        -------
+        ndarray of type bool
+            Mask for the vector.  True values indicate that the corresponding value should be
+            zeroed out.
+        """
+        if self._in_matvec_context():
+            return slice(0)
+
+        arr = np.ones(len(self), dtype=bool)
+        for name in self._names:
+            vinfo = self._views[name]
+            arr[vinfo.range[0]:vinfo.range[1]] = False
+
+        return arr
 
     def iscomplex(self):
         """

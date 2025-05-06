@@ -16,8 +16,6 @@ class COOMatrix(Matrix):
     ----------
     comm : MPI.Comm or <FakeComm>
         Communicator of the top-level system that owns the <Jacobian>.
-    is_internal : bool
-        If True, this is the int_mtx of an AssembledJacobian.
 
     Attributes
     ----------
@@ -25,11 +23,11 @@ class COOMatrix(Matrix):
         COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
     """
 
-    def __init__(self, comm, is_internal):
+    def __init__(self, comm):
         """
         Initialize all attributes.
         """
-        super().__init__(comm, is_internal)
+        super().__init__(comm)
         self._coo = None
 
     def _build_coo(self, system):
@@ -190,7 +188,7 @@ class COOMatrix(Matrix):
         if factor is not None:
             self._matrix.data[idxs] *= factor
 
-    def _prod(self, in_vec, mode, mask=None):
+    def _prod(self, in_vec, mode):
         """
         Perform a matrix vector product.
 
@@ -200,77 +198,16 @@ class COOMatrix(Matrix):
             incoming vector to multiply.
         mode : str
             'fwd' or 'rev'.
-        mask : ndarray of type bool, or None
-            Array used to zero out part of the matrix data.
 
         Returns
         -------
         ndarray[:]
             vector resulting from the product.
         """
-        # when we have a derivative based solver at a level below the
-        # group that owns the AssembledJacobian, we need to use only
-        # the part of the matrix that is relevant to the lower level
-        # system.
-        mat = self._matrix
-
-        # with np.printoptions(threshold=9999, linewidth=9999):
-        #     print(mat.toarray())
-
-        # NOTE: mask applies only to ext_mtx.
-
         if mode == 'fwd':
-            if mask is None:
-                return mat.dot(in_vec)
-            else:
-                save = mat.data[mask]
-                mat.data[mask] = 0.0
-                val = mat.dot(in_vec)
-                mat.data[mask] = save
-                return val
+            return self._matrix.dot(in_vec)
         else:  # rev
-            if mask is None:
-                return mat.T.dot(in_vec)
-            else:
-                save = mat.data[mask]
-                mat.data[mask] = 0.0
-                val = mat.T.dot(in_vec)
-                mat.data[mask] = save
-                return val
-
-    def _create_mask_cache(self, d_inputs):
-        """
-        Create masking array for this matrix.
-
-        Note : this only applies when this Matrix is an 'ext_mtx' inside of a
-        Jacobian object.
-
-        Parameters
-        ----------
-        d_inputs : Vector
-            The inputs linear vector.
-
-        Returns
-        -------
-        ndarray or None
-            The mask array or None.
-        """
-        if d_inputs._in_matvec_context():
-            input_names = d_inputs._names
-
-            mask = None
-            for key, val in self._key_ranges.items():
-                _, wrt = key
-                if wrt in input_names:
-                    if mask is None:
-                        mask = np.ones(self._matrix.data.size, dtype=bool)
-                    start, stop, _, _ = val
-                    mask[start:stop] = False
-
-            if mask is not None and np.any(mask):
-                # convert the mask indices (if necessary) based on sparse matrix type
-                # (CSC, CSR, etc.)
-                return self._convert_mask(mask)
+            return self._matrix.T.dot(in_vec)
 
     def set_complex_step_mode(self, active):
         """

@@ -98,8 +98,8 @@ class AssembledJacobian(SplitJacobian):
         """
         # var_indices are the *global* indices for variables on this proc
         # is_top = system.pathname == ''
-        self._int_mtx = int_mtx = self._matrix_class(system.comm, True)
-        ext_mtx = self._matrix_class(system.comm, False)
+        self._int_mtx = int_mtx = self._matrix_class(system.comm)
+        ext_mtx = self._matrix_class(system.comm)
 
         int_subjacs, ext_subjacs = self._get_split_subjacs(system)
         for key, subjac in int_subjacs.items():
@@ -319,7 +319,7 @@ class AssembledJacobian(SplitJacobian):
                 try:
                     mask = self._mask_caches[(d_inputs._names, mode)]
                 except KeyError:
-                    mask = ext_mtx._create_mask_cache(d_inputs)
+                    mask = d_inputs.get_mask()
                     self._mask_caches[(d_inputs._names, mode)] = mask
 
             dresids = d_residuals.asarray()
@@ -328,13 +328,15 @@ class AssembledJacobian(SplitJacobian):
                 if d_outputs._names:
                     dresids += int_mtx._prod(d_outputs.asarray(), mode)
                 if do_mask:
-                    dresids += ext_mtx._prod(d_inputs.asarray(), mode, mask=mask)
+                    dresids += ext_mtx._prod(d_inputs.asarray(mask=mask), mode)  # , mask=mask)
 
             else:  # rev
                 if d_outputs._names:
                     d_outputs += int_mtx._prod(dresids, mode)
                 if do_mask:
-                    d_inputs += ext_mtx._prod(dresids, mode, mask=mask)
+                    arr = ext_mtx._prod(dresids, mode)  # , mask=mask)
+                    arr[mask] = 0.0
+                    d_inputs += arr
 
     def set_complex_step_mode(self, active):
         """
