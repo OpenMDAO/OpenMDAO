@@ -152,8 +152,6 @@ class Subjac(object):
         dict
             Instance metadata.
         """
-        if prev_inst_meta:
-            print(system.msginfo, key, f"prev_inst_meta: {prev_inst_meta}")
         subjac_class = Subjac.get_subjac_class(pattern_meta)
         meta = _init_meta(pattern_meta, prev_inst_meta)
         pat_val = pattern_meta.get('val')
@@ -257,10 +255,16 @@ class Subjac(object):
             Value to set the subjacobian to.
         """
         myval = self.info['val']
-        if issparse(val):
-            myval[:] = val.toarray()
+        if np.isscalar(val):
+            myval[:] = val
         else:
-            myval[:] = np.atleast_2d(val).reshape(myval.shape)
+            try:
+                myval[:] = np.atleast_2d(val).reshape(myval.shape)
+            except ValueError as err:
+                if val.size == 1:  # allow for backwards compatability
+                    myval[:] = val[0]
+                else:
+                    raise err
 
     def set_col(self, icol, column, uncovered_threshold=None):
         """
