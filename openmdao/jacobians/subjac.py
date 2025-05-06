@@ -399,11 +399,11 @@ class DenseSubjac(Subjac):
                 if meta['shape'] != val.shape:
                     if len(meta['shape']) != len(val.shape):
                         if meta['shape'] == (1, ) + val.shape:
-                            val.reshape((1, ) + val.shape)
+                            val = val.reshape((1, ) + val.shape)
                         elif meta['shape'] == val.shape + (1, ):
-                            val.reshape(val.shape + (1, ))
+                            val = val.reshape(val.shape + (1, ))
 
-                    if len(meta['shape']) == val.shape:
+                    if meta['shape'] == val.shape:
                         meta['val'] = np.asarray(val, dtype=float).copy().reshape(meta['shape'])
                     else:
                         pathlen = len(system.pathname) + 1 if system.pathname else 0
