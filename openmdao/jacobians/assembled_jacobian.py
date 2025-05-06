@@ -1,17 +1,11 @@
 """Define the AssembledJacobian class."""
-import sys
 from collections import defaultdict
-
-import numpy as np
 
 from openmdao.jacobians.jacobian import SplitJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
-from openmdao.utils.iter_utils import meta2range_iter
-
-_empty_dict = {}
 
 
 class AssembledJacobian(SplitJacobian):
@@ -27,8 +21,6 @@ class AssembledJacobian(SplitJacobian):
 
     Attributes
     ----------
-    _view_ranges : dict
-        Maps system pathnames to jacobian sub-view ranges
     _int_mtx : <Matrix>
         Global internal Jacobian.
     _ext_mtx : {str: <Matrix>, ...}
@@ -41,10 +33,6 @@ class AssembledJacobian(SplitJacobian):
     _subjac_iters : dict
         Mapping of system pathname to tuple of lists of absolute key tuples used to index into
         the jacobian.
-    _in_ranges : dict
-        Column ranges for inputs.
-    _out_ranges : dict
-        Row ranges for outputs.
     """
 
     def __init__(self, matrix_class, system):
@@ -56,36 +44,11 @@ class AssembledJacobian(SplitJacobian):
         from openmdao.core.component import Component
 
         super().__init__(system)
-        self._view_ranges = {}
         self._int_mtx = None
         self._ext_mtx = {}
         self._mask_caches = {}
         self._matrix_class = matrix_class
-        self._out_ranges = self._get_ranges(system, 'output')
-        self._in_ranges = self._get_ranges(system, 'input')
         self._subjac_iters = defaultdict(lambda: None)
-
-    def _get_ranges(self, system, vtype):
-        """
-        Return an ordered dict of ranges for each var of a particular type (input or output).
-
-        Parameters
-        ----------
-        system : System
-            System owning this jacobian.
-        vtype : str
-            Type of variable, must be one of ('input', 'output').
-
-        Returns
-        -------
-        dict
-            Tuples of the form (start, end) keyed on variable name.
-        """
-        return {
-            name: (start, end)
-            for name, start, end in meta2range_iter(system._var_abs2meta[vtype].items(),
-                                                    size_name='size')
-        }
 
     def _initialize(self, system):
         """
@@ -96,152 +59,28 @@ class AssembledJacobian(SplitJacobian):
         system : System
             Parent system to this jacobian.
         """
-        # var_indices are the *global* indices for variables on this proc
-        # is_top = system.pathname == ''
         self._int_mtx = int_mtx = self._matrix_class(system.comm)
-        ext_mtx = self._matrix_class(system.comm)
 
         int_subjacs, ext_subjacs = self._get_split_subjacs(system)
+
         for key, subjac in int_subjacs.items():
             int_mtx._add_submat(key, subjac.info, subjac.row_slice.start, subjac.col_slice.start,
                                 subjac.src_indices, subjac.shape, subjac.factor)
 
+        out_size = len(system._outputs)
+        int_mtx._build(out_size, out_size, system)
+
         if ext_subjacs:
+            ext_mtx = self._matrix_class(system.comm)
             for key, subjac in ext_subjacs.items():
                 ext_mtx._add_submat(key, subjac.info, subjac.row_slice.start,
                                     subjac.col_slice.start, None, subjac.shape)
 
-        out_size = len(system._outputs)
-        int_mtx._build(out_size, out_size, system)
-
-        if ext_mtx._submats:
             ext_mtx._build(out_size, len(system._dinputs))
         else:
             ext_mtx = None
 
         self._ext_mtx[system.pathname] = ext_mtx
-
-    def _init_ranges(self, system):
-        in_ranges = self._in_ranges
-        out_ranges = self._out_ranges
-
-        input_names = list(system._var_abs2meta['input'])
-        if input_names:
-            min_in_offset = in_ranges[input_names[0]][0]
-            max_in_offset = in_ranges[input_names[-1]][1]
-        else:
-            min_in_offset = sys.maxsize
-            max_in_offset = 0
-
-        output_names = list(system._var_abs2meta['output'])
-        if output_names:
-            min_res_offset = out_ranges[output_names[0]][0]
-            max_res_offset = out_ranges[output_names[-1]][1]
-        else:
-            min_res_offset = sys.maxsize
-            max_res_offset = 0
-
-        self._view_ranges[system.pathname] = (min_res_offset, max_res_offset,
-                                              min_in_offset, max_in_offset)
-
-    def _init_view(self, system):
-        """
-        Determine the _ext_mtx for a sub-view of the assembled jacobian.
-
-        Parameters
-        ----------
-        system : <System>
-            The system being solved using a sub-view of the jacobian.
-        """
-        ranges = self._view_ranges[system.pathname]
-
-        ext_mtx = self._matrix_class(system.comm, False)
-        conns = {} if isinstance(system, Component) else system._conn_global_abs_in2out
-
-        iproc = system.comm.rank
-        sizes = system._var_sizes['input']
-        abs2idx = system._var_allprocs_abs2idx
-        in_offset = {n: np.sum(sizes[iproc, :abs2idx[n]]) for n in
-                     system._var_abs2meta['input'] if n not in conns}
-
-        subjacs_info = self._subjacs_info
-
-        sizes = system._var_sizes['output']
-        for s in system.system_iter(recurse=True, include_self=True, typ=Component):
-            for res_abs_name in s._var_abs2meta['output']:
-                res_offset = np.sum(sizes[iproc, :abs2idx[res_abs_name]])
-
-                for in_abs_name in s._var_abs2meta['input']:
-                    if in_abs_name not in conns:  # unconnected input
-                        abs_key = (res_abs_name, in_abs_name)
-
-                        if abs_key not in subjacs_info:
-                            continue
-
-                        info = subjacs_info[abs_key]
-                        ext_mtx._add_submat(abs_key, info, res_offset - ranges[0],
-                                            in_offset[in_abs_name] - ranges[2], None, info['shape'])
-
-        if ext_mtx._submats:
-            ext_mtx._build(len(system._doutputs), len(system._dinputs))
-        else:
-            ext_mtx = None
-
-        self._ext_mtx[system.pathname] = ext_mtx
-
-    def _get_subjac_iters(self, system):
-        # this determines the subjacs that get updated during _update()
-
-        global _empty_dict
-
-        subjac_iters = self._subjac_iters[system.pathname]
-        if subjac_iters is None:
-            int_mtx = self._int_mtx
-            ext_mtx = self._ext_mtx[system.pathname]
-            subjacs = system._subjacs_info
-
-            if isinstance(system, Component):
-                global_conns = _empty_dict
-            else:
-                global_conns = system._conn_global_abs_in2out
-
-            output_names = system._var_abs2meta['output']
-            input_names = system._var_abs2meta['input']
-
-            rev_conns = defaultdict(list)
-            for tgt, src in global_conns.items():
-                rev_conns[src].append(tgt)
-
-            # This is the level where the AssembledJacobian is slotted.
-            # The of and wrt are the inputs and outputs that it sees, if they are in the subjacs.
-            # TODO - For top level FD, the subjacs might not contain all derivs.
-
-            iters = []
-            iters_in_ext = []
-
-            for abs_key in subjacs:
-                _, wrtname = abs_key
-                if wrtname in output_names:
-                    if abs_key in int_mtx._submats:
-                        iters.append(abs_key)
-                    else:
-                        # This happens when the src is an indepvarcomp that is
-                        # contained in the system.
-                        of, wrt = abs_key
-                        if wrt in rev_conns:
-                            for tgt in rev_conns[wrt]:
-                                if (of, tgt) in int_mtx._submats:
-                                    iters.append(abs_key)
-                                    break
-                elif wrtname in input_names:  # wrt is an input
-                    if wrtname in global_conns:
-                        iters.append(abs_key)
-                    elif ext_mtx is not None:
-                        iters_in_ext.append(abs_key)
-
-            self._subjac_iters[system.pathname] = subjac_iters = (iters, iters_in_ext)
-
-        return subjac_iters
 
     def _update(self, system):
         """
@@ -315,7 +154,6 @@ class AssembledJacobian(SplitJacobian):
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             do_mask = ext_mtx is not None and d_inputs._names
             if do_mask:
-                # Masking
                 try:
                     mask = self._mask_caches[(d_inputs._names, mode)]
                 except KeyError:
