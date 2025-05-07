@@ -36,8 +36,6 @@ class Subjac(object):
         Unit conversion factor for the subjacobian if, as with src_indices, we have a square
         part of the jacobian requiring a mapping of inputs to their source outputs for the
         jacobian columns where the input and output have different units.
-    src_shape : tuple
-        Shape of the subjacobian of the row var with respect to wrt's source.
 
     Attributes
     ----------
@@ -59,8 +57,8 @@ class Subjac(object):
         Shape of the subjacobian.
     """
 
-    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None, factor=None,
-                 src_shape=None):
+    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None,
+                 factor=None):
         """
         Initialize the subjacobian.
 
@@ -80,8 +78,6 @@ class Subjac(object):
             Source indices for the subjacobian.
         factor : float or None
             Unit conversion factor for the subjacobian.
-        src_shape : tuple
-            Shape of the subjacobian of the row var with respect to wrt's source.
         """
         self.key = key
         self.info = info
@@ -90,10 +86,7 @@ class Subjac(object):
         self.src_indices = src_indices
         self.factor = factor
         self.randval = None
-        if src_shape is None:
-            self.shape = (row_slice.stop - row_slice.start, col_slice.stop - col_slice.start)
-        else:
-            self.shape = src_shape
+        self.shape = (row_slice.stop - row_slice.start, col_slice.stop - col_slice.start)
 
         self._map_functions(wrt_is_input)
         self._init_val()
@@ -290,7 +283,7 @@ class Subjac(object):
         int
             Full dense size of the subjacobian.
         """
-        return self._shape[0] * self._shape[1]
+        return self.shape[0] * self.shape[1]
 
     def get_sparse_data_size(self):
         """
@@ -301,13 +294,8 @@ class Subjac(object):
         int
             Size of the subjacobian in COO format.
         """
-        # for dense, this is the same as get_full_size if src_indices is None
-        if self.src_indices is None:
-            return self.get_full_size()
-        else:
-            # each src_ind is a column in the subjac, so the full subjac size is
-            # the number of rows times the number of matching columns
-            return self.shape[0] * self.src_indices.indexed_src_size
+        shape = self.info['shape']  # this is shape of dr/di subjac, not dr/do subjac
+        return shape[0] * shape[1]
 
     def _apply_rand_fwd_input(self, d_inputs, d_outputs, d_residuals, randgen):
         d_residuals.add_to_slice(
@@ -364,8 +352,6 @@ class DenseSubjac(Subjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
-    src_shape : tuple
-        Shape of the subjacobian of the row var with respect to wrt's source.
     """
 
     def _init_val(self):
@@ -432,16 +418,35 @@ class SparseSubjac(Subjac):
     row_slice : slice
         Slice of the row indices.
     col_slice : slice
-        Slice of the column indices.
+        Slice of the column indices.  Note that this is the slice into either the input or output
+        vector, not the absolute indices with respect to the full jacobian columns.
     wrt_is_input : bool
         Whether the wrt variable is an input.
     src_indices : array or None
-        Source indices for the subjacobian.
+        Source indices for the subjacobian.  None unless the jacobian is split into a square
+        and non-square part where the square part has outputs as rows and columns, requiring
+        a mapping of inputs to their source outputs via the src_indices array.
     factor : float or None
-        Unit conversion factor for the subjacobian.
-    src_shape : tuple
-        Shape of the subjacobian of the row var with respect to wrt's source.
+        Unit conversion factor for the subjacobian if, as with src_indices, we have a square
+        part of the jacobian requiring a mapping of inputs to their source outputs for the
+        jacobian columns where the input and output have different units.
+
+    Attributes
+    ----------
+    mask : array or None
+        Mask to apply to the subjacobian rows/cols/data for an 'internal' matrix.
+    nnz_src_inds : array or None
+        Number of nonzero elements when only including
     """
+
+    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None,
+                 factor=None):
+        """
+        Initialize the sparse subjac.
+        """
+        super().__init__(key, info, row_slice, col_slice, wrt_is_input, src_indices, factor)
+        self.mask = None
+        self.nnz_src_inds = None
 
     @classmethod
     def _update_instance_meta(cls, meta, system, key):
@@ -505,11 +510,7 @@ class SparseSubjac(Subjac):
         int
             Size of the subjacobian in COO format.
         """
-        if self.src_indices is None:
-            return self.info['val'].data.size
-        else:
-            coo = self.info['val'].tocoo()
-            return coo.col[np.isin(coo.col, self.src_indices.asarray())].size
+        return self.info['val'].data.size
 
     def get_random_subjac(self, randgen):
         """
@@ -568,9 +569,29 @@ class COOSubjac(SparseSubjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
-    src_shape : tuple
-        Shape of the subjacobian of the row var with respect to wrt's source.
     """
+
+    def tocoo(self, mask=None):
+        """
+        Convert the subjac to a COO matrix.
+
+        Parameters
+        ----------
+        mask : array or None
+            Mask to apply to the nonzero elements so only those corresponding to src_indices columns
+            are included.
+
+        Returns
+        -------
+        coo_matrix
+            Subjacobian in COO format.
+        """
+        if mask is None:
+            return self.get_val()
+        else:
+            return coo_matrix((self.info['val'].data[mask], (self.info['val'].row[mask],
+                                                             self.info['val'].col[mask])),
+                              shape=self.shape)
 
     def set_col(self, icol, column, uncovered_threshold=None):
         """
@@ -643,8 +664,6 @@ class CSRSubjac(SparseSubjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
-    src_shape : tuple
-        Shape of the subjacobian of the row var with respect to wrt's source.
     """
 
     def set_col(self, icol, column, uncovered_threshold=None):
@@ -697,8 +716,6 @@ class CSCSubjac(SparseSubjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
-    src_shape : tuple
-        Shape of the subjacobian of the row var with respect to wrt's source.
     """
 
     def set_col(self, icol, column, uncovered_threshold=None):
@@ -749,8 +766,6 @@ class OMCOOSubjac(COOSubjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
-    src_shape : tuple
-        Shape of the subjacobian of the row var with respect to wrt's source.
 
     Attributes
     ----------
@@ -763,8 +778,8 @@ class OMCOOSubjac(COOSubjac):
         Columns of the subjacobian after applying the mask.
     """
 
-    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None, factor=None,
-                 src_shape=None):
+    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None,
+                 factor=None):
         """
         Initialize the subjacobian.
 
@@ -784,22 +799,31 @@ class OMCOOSubjac(COOSubjac):
             Source indices for the subjacobian.
         factor : float or None
             Unit conversion factor for the subjacobian.
-        src_shape : tuple
-            Shape of the subjacobian of the row var with respect to wrt's source.
         """
-        super().__init__(key, info, row_slice, col_slice, wrt_is_input, src_indices, factor,
-                         src_shape)
+        super().__init__(key, info, row_slice, col_slice, wrt_is_input, src_indices, factor)
         self.rows = info['rows']
         self.cols = info['cols']
         self.mask = slice(None)
 
         if info['rows'] is not None and src_indices is not None:
-            colset = set(src_indices.shaped_array())
-            self.mask = np.isin(self.cols, colset)
+            self.mask = np.isin(self.cols, src_indices.shaped_array(flat=True))
             self.rows = self.rows[self.mask]
             self.cols = self.cols[self.mask]
 
         self.set_val(info['val'])
+
+    def get_col_inds(self):
+        """
+        Get the column indices of the subjacobian.
+
+        Repeated entries are allowed.
+
+        Returns
+        -------
+        array
+            Column indices of the subjacobian.
+        """
+        return self.info['cols']
 
     @classmethod
     def _update_instance_meta(cls, meta, system, key):
@@ -899,11 +923,7 @@ class OMCOOSubjac(COOSubjac):
         int
             Size of the subjacobian in COO format.
         """
-        if self.src_indices is None:
-            return len(self.cols)
-        else:
-            cols = np.asarray(self.cols)
-            return cols[np.isin(cols, self.src_indices.asarray())].size
+        return self.info['val'].size
 
     def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals):
         self.coo.data[:] = self.get_val()
@@ -942,8 +962,6 @@ class DiagonalSubjac(Subjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
-    src_shape : tuple
-        Shape of the subjacobian of the row var with respect to wrt's source.
     """
 
     def _init_val(self):
@@ -1007,11 +1025,7 @@ class DiagonalSubjac(Subjac):
         int
             Size of the subjacobian in COO format.
         """
-        if self.src_indices is None:
-            return self.info['val'].size
-        else:
-            cols = np.arange(self.info['val'].size)
-            return cols[np.isin(cols, self.src_indices.asarray())].size
+        return self.info['val'].size
 
     def set_val(self, val):
         """
@@ -1101,8 +1115,6 @@ class ZeroSubjac(Subjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
-    src_shape : tuple
-        Shape of the subjacobian of the row var with respect to wrt's source.
     """
 
     @classmethod
@@ -1137,7 +1149,7 @@ class ZeroSubjac(Subjac):
 
         Returns
         -------
-        ndarray
+        coo_matrix
             Value of the subjacobian.
         """
         zro = np.zeros(0)

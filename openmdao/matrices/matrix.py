@@ -1,8 +1,6 @@
 """Define the base Matrix class."""
-import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
 
-from openmdao.core.constants import INT_DTYPE
 
 # scipy sparse types allowed to be subjacs
 sparse_types = (csr_matrix, csc_matrix, coo_matrix)
@@ -16,53 +14,26 @@ class Matrix(object):
 
     Parameters
     ----------
-    comm : MPI.Comm or <FakeComm>
-        Communicator of the top-level system that owns the <Jacobian>.
+    submats : dict
+        Dictionary of sub-matrix data keyed by (row_name, col_name).
 
     Attributes
     ----------
-    _comm : MPI.Comm or <FakeComm>
-        Communicator of the top-level system that owns the <Jacobian>.
     _matrix : object
         implementation-specific representation of the actual matrix.
     _submats : dict
-        dictionary of sub-jacobian data keyed by (out_name, in_name).
+        dictionary of sub-matrix data keyed by (out_name, in_name).
     _metadata : dict
-        implementation-specific data for the sub-jacobians.
+        implementation-specific data for the sub-matrices.
     """
 
-    def __init__(self, comm):
+    def __init__(self, submats):
         """
         Initialize all attributes.
         """
-        self._comm = comm
         self._matrix = None
-        self._submats = {}
+        self._submats = submats
         self._metadata = {}
-
-    def _add_submat(self, key, info, irow, icol, src_indices, shape, factor=None):
-        """
-        Declare a sub-jacobian.
-
-        Parameters
-        ----------
-        key : (str, str)
-            Tuple of the form (output_var_name, input_var_name).
-        info : dict
-            sub-jacobian metadata.
-        irow : int
-            the starting row index (offset) for this sub-jacobian.
-        icol : int
-            the starting col index (offset) for this sub-jacobian.
-        src_indices : ndarray
-            indices from the source variable that an input variable
-            connects to.
-        shape : tuple
-            Shape of the specified submatrix.
-        factor : float or None
-            Unit conversion factor.
-        """
-        self._submats[key] = (info, (irow, icol), src_indices, shape, factor)
 
     def _build(self, num_rows, num_cols, system=None):
         """
@@ -110,7 +81,18 @@ class Matrix(object):
         ndarray[:]
             vector resulting from the product.
         """
-        pass
+        raise NotImplementedError("Matrix._prod")
+
+    def transpose(self):
+        """
+        Transpose the matrix.
+
+        Returns
+        -------
+        sparse_matrix
+            Transposed matrix.
+        """
+        raise NotImplementedError("Matrix.transpose")
 
     def _pre_update(self):
         """
@@ -137,43 +119,3 @@ class Matrix(object):
             Complex mode flag; set to True prior to commencing complex step.
         """
         pass
-
-
-def _compute_index_map(jrows, jcols, irow, icol, src_indices):
-    """
-    Return row/column indices to map sub-jacobian to global jac.
-
-    Parameters
-    ----------
-    jrows : index array
-        Array of row indices.
-    jcols : index array
-        Array of column indices.
-    irow : int
-        Row index for start of sub-jacobian.
-    icol : int
-        Column index for start of sub-jacobian.
-    src_indices : index array
-        Index array of which values to pull from a source into an input
-        variable.
-
-    Returns
-    -------
-    tuple of (ndarray, ndarray, ndarray)
-        Row indices, column indices, and indices of columns matching
-        src_indices.
-    """
-    icols = []
-    idxs = []
-
-    for i, idx in enumerate(src_indices.shaped_array()):
-        # pull out columns that match each index
-        idxarr = np.nonzero(jcols == i)[0]
-        idxs.append(idxarr)
-        icols.append(np.full(idxarr.shape, idx, dtype=INT_DTYPE))
-
-    idxs = np.hstack(idxs)
-    icols = np.hstack(icols) + icol
-    irows = jrows[idxs] + irow
-
-    return (irows, icols, idxs)

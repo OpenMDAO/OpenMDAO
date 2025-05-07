@@ -11,8 +11,8 @@ class CSCMatrix(COOMatrix):
 
     Parameters
     ----------
-    comm : MPI.Comm or <FakeComm>
-        Communicator of the top-level system that owns the <Jacobian>.
+    submats : dict
+        Dictionary of sub-jacobian data keyed by (row_name, col_name).
     """
 
     def _build(self, num_rows, num_cols, system=None):
@@ -47,6 +47,20 @@ class CSCMatrix(COOMatrix):
         # because on older versions of scipy, self._coo.tocsc() reuses the row/col arrays and the
         # result is that self._coo.row and self._coo.col get scrambled after csc conversion.
         self._matrix = csc_matrix((coo.data, (coo.row, coo.col)), shape=coo.shape)
+        self._matrix_T = None
+
+    def transpose(self):
+        """
+        Transpose the matrix.
+
+        Returns
+        -------
+        csr_matrix
+            Transposed matrix.
+        """
+        if self._matrix_T is None:
+            self._matrix_T = self._matrix.T
+        return self._matrix_T
 
     def _convert_mask(self, mask):
         """

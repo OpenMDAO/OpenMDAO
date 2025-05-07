@@ -1,11 +1,11 @@
 """Define the COOmatrix class."""
 import numpy as np
 from numpy import ndarray
-from scipy.sparse import coo_matrix
+from scipy.sparse import coo_matrix, issparse
 
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.matrices.matrix import Matrix, _compute_index_map
+from openmdao.matrices.matrix import Matrix
 
 
 class COOMatrix(Matrix):
@@ -14,21 +14,25 @@ class COOMatrix(Matrix):
 
     Parameters
     ----------
-    comm : MPI.Comm or <FakeComm>
-        Communicator of the top-level system that owns the <Jacobian>.
+    submats : dict
+        Dictionary of sub-jacobian data keyed by (row_name, col_name).
 
     Attributes
     ----------
     _coo : coo_matrix
         COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
+    _matrix_T : coo_matrix
+        Transpose of the COO matrix.  Only computed if needed for reverse mode for CSC or CSR
+        matrices.
     """
 
-    def __init__(self, comm):
+    def __init__(self, submats):
         """
         Initialize all attributes.
         """
-        super().__init__(comm)
+        super().__init__(submats)
         self._coo = None
+        self._matrix_T = None
 
     def _build_coo(self, system):
         """
@@ -45,95 +49,79 @@ class COOMatrix(Matrix):
             data, rows, cols that can be used to construct a COO matrix.
         """
         submats = self._submats
-        key_ranges = self._key_ranges = {}
+        key_ranges = {}
 
         start = end = 0
-        for key, (info, loc, src_indices, shape, factor) in submats.items():
-
-            val = info['val']
-            diag = info['diagonal']
-            if diag:
-                end += val.size
-                dense = False
-                rows = None
-            else:
-                rows = info['rows']
-                dense = (rows is None and (val is None or isinstance(val, ndarray)))
-
-                if dense:
-                    if src_indices is None:
-                        end += val.size
-                    else:
-                        end += shape[0] * src_indices.indexed_src_size
-
-                elif rows is None:  # sparse matrix
-                    end += val.data.size
-                else:  # list sparse format
-                    end += len(rows)
-
-            key_ranges[key] = (start, end, dense, rows)
+        for key, submat in submats.items():
+            size = submat.get_sparse_data_size()
+            end += size
+            key_ranges[key] = (start, end, submat)
             start = end
 
-        if system is not None and system.under_complex_step:
-            data = np.zeros(end, dtype=complex)
-        else:
-            data = np.zeros(end)
+        data_size = end
 
         rows = np.empty(end, dtype=INT_DTYPE)
         cols = np.empty(end, dtype=INT_DTYPE)
 
         metadata = self._metadata
-        for key, (start, end, dense, jrows) in key_ranges.items():
-            info, loc, src_indices, shape, factor = submats[key]
-            irow, icol = loc
-            val = info['val']
-            diag = info['diagonal']
-            idxs = None
+        for key, (start, end, submat) in key_ranges.items():
+            irow = submat.row_slice.start
+            icol = submat.col_slice.start
+            val = submat.get_val()
+            jac_type = type(val)
+            idxs = slice(start, end)
 
-            col_offset = row_offset = 0
+            if not issparse(val) and len(val.shape) == 2:  # dense
 
-            if dense:
-                jac_type = ndarray
-
-                if src_indices is None:
-                    colrange = range(col_offset, col_offset + shape[1])
+                if submat.src_indices is None:
+                    colrange = range(icol, icol + submat.shape[1])
                 else:
-                    colrange = src_indices.shaped_array()
+                    colrange = submat.src_indices.shaped_array() + icol
+
                 ncols = len(colrange)
 
                 subrows = rows[start:end]
                 subcols = cols[start:end]
 
-                for i in range(shape[0]):
-                    subrows[i * ncols: (i + 1) * ncols] = i + row_offset
-                    subcols[i * ncols: (i + 1) * ncols] = colrange
-
-                subrows += irow
-                subcols += icol
+                substart = subend = 0
+                for row in range(irow, irow + submat.shape[0]):
+                    subend += ncols
+                    subrows[substart:subend] = row
+                    subcols[substart:subend] = colrange
+                    substart = subend
 
             else:  # sparse
-                jac_type = type(val)
-                if diag:
+                if submat.info['diagonal']:
                     jrows = jcols = np.arange(val.size)
-                elif jrows is None:
+                elif submat.info['rows'] is None:
                     jac = val.tocoo()
                     jrows = jac.row
                     jcols = jac.col
                 else:
                     jac_type = list
-                    jcols = info['cols']
+                    jrows = submat.info['rows']
+                    jcols = submat.info['cols']
 
-                if src_indices is None:
-                    rows[start:end] = jrows + (irow + row_offset)
-                    cols[start:end] = jcols + (icol + col_offset)
+                if submat.src_indices is None:
+                    rows[start:end] = jrows + irow
+                    cols[start:end] = jcols + icol
                 else:
                     irows, icols, idxs = _compute_index_map(jrows, jcols,
-                                                            irow, icol,
-                                                            src_indices)
-                    rows[start:end] = irows
-                    cols[start:end] = icols
+                                                            submat.src_indices)
 
-            metadata[key] = (start, end, idxs, jac_type, factor)
+                    rows[start:end] = irows + irow
+                    cols[start:end] = icols + icol
+
+                    # store reverse indices to avoid copying subjac data during
+                    # update_submat.
+                    idxs = np.argsort(idxs) + start
+
+            metadata[key] = (idxs, jac_type, submat.factor)
+
+        if system is not None and system.under_complex_step:
+            data = np.zeros(data_size, dtype=complex)
+        else:
+            data = np.zeros(data_size)
 
         return data, rows, cols
 
@@ -151,16 +139,6 @@ class COOMatrix(Matrix):
             owning system.
         """
         data, rows, cols = self._build_coo(system)
-
-        metadata = self._metadata
-        for key, (start, end, idxs, jac_type, factor) in metadata.items():
-            if idxs is None:
-                metadata[key] = (slice(start, end), jac_type, factor)
-            else:
-                # store reverse indices to avoid copying subjac data during
-                # update_submat.
-                metadata[key] = (np.argsort(idxs) + start, jac_type, factor)
-
         self._matrix = self._coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
 
     def _update_submat(self, key, jac):
@@ -171,7 +149,7 @@ class COOMatrix(Matrix):
         ----------
         key : (str, str)
             the global output and input variable names.
-        jac : ndarray or scipy.sparse or tuple
+        jac : ndarray or scipy.sparse
             the sub-jacobian, the same format with which it was declared.
         """
         idxs, jac_type, factor = self._metadata[key]
@@ -187,6 +165,17 @@ class COOMatrix(Matrix):
 
         if factor is not None:
             self._matrix.data[idxs] *= factor
+
+    def transpose(self):
+        """
+        Transpose the matrix.
+
+        Returns
+        -------
+        coo_matrix
+            Transposed matrix.
+        """
+        return self._matrix.T
 
     def _prod(self, in_vec, mode):
         """
@@ -207,7 +196,7 @@ class COOMatrix(Matrix):
         if mode == 'fwd':
             return self._matrix.dot(in_vec)
         else:  # rev
-            return self._matrix.T.dot(in_vec)
+            return self._matrix.transpose().dot(in_vec)
 
     def set_complex_step_mode(self, active):
         """
@@ -244,3 +233,30 @@ class COOMatrix(Matrix):
             The converted mask array.
         """
         return mask
+
+
+def _compute_index_map(jrows, jcols, src_indices):
+    """
+    Return row/column indices and coo indicesto map sub-jacobian to an 'internal' subjac.
+
+    For a given subjac which is the partial of the residual wrt the input, the 'internal' subjac
+    is the partial of the residual wrt the source of that input.
+
+    Parameters
+    ----------
+    jrows : index array
+        Array of row indices.
+    jcols : index array
+        Array of column indices.
+    src_indices : index array
+        Index array of which values to pull from a source into an input
+        variable.
+
+    Returns
+    -------
+    tuple of (ndarray, ndarray, ndarray)
+        Row indices, column indices, and indices of columns matching
+        src_indices.
+    """
+    icols = src_indices.shaped_array()[jcols]
+    return (jrows, icols, np.arange(icols.size))

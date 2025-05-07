@@ -14,8 +14,8 @@ class DenseMatrix(COOMatrix):
 
     Parameters
     ----------
-    comm : MPI.Comm or <FakeComm>
-        Communicator of the top-level system that owns the <Jacobian>.
+    submats : dict
+        Dictionary of sub-jacobian data keyed by (row_name, col_name).
     """
 
     def _build(self, num_rows, num_cols, system=None):

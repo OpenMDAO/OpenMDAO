@@ -59,23 +59,15 @@ class AssembledJacobian(SplitJacobian):
         system : System
             Parent system to this jacobian.
         """
-        self._int_mtx = int_mtx = self._matrix_class(system.comm)
-
         int_subjacs, ext_subjacs = self._get_split_subjacs(system)
 
-        for key, subjac in int_subjacs.items():
-            int_mtx._add_submat(key, subjac.info, subjac.row_slice.start, subjac.col_slice.start,
-                                subjac.src_indices, subjac.shape, subjac.factor)
+        self._int_mtx = int_mtx = self._matrix_class(int_subjacs)
 
         out_size = len(system._outputs)
         int_mtx._build(out_size, out_size, system)
 
         if ext_subjacs:
-            ext_mtx = self._matrix_class(system.comm)
-            for key, subjac in ext_subjacs.items():
-                ext_mtx._add_submat(key, subjac.info, subjac.row_slice.start,
-                                    subjac.col_slice.start, None, subjac.shape)
-
+            ext_mtx = self._matrix_class(ext_subjacs)
             ext_mtx._build(out_size, len(system._dinputs))
         else:
             ext_mtx = None
@@ -150,7 +142,6 @@ class AssembledJacobian(SplitJacobian):
         if ext_mtx is None and not d_outputs._names:  # avoid unnecessary unscaling
             return
 
-        int_mtx = self._int_mtx
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             do_mask = ext_mtx is not None and d_inputs._names
             if do_mask:
@@ -164,15 +155,15 @@ class AssembledJacobian(SplitJacobian):
 
             if mode == 'fwd':
                 if d_outputs._names:
-                    dresids += int_mtx._prod(d_outputs.asarray(), mode)
+                    dresids += self._int_mtx._prod(d_outputs.asarray(), mode)
                 if do_mask:
-                    dresids += ext_mtx._prod(d_inputs.asarray(mask=mask), mode)  # , mask=mask)
+                    dresids += ext_mtx._prod(d_inputs.asarray(mask=mask), mode)
 
             else:  # rev
                 if d_outputs._names:
-                    d_outputs += int_mtx._prod(dresids, mode)
+                    d_outputs += self._int_mtx._prod(dresids, mode)
                 if do_mask:
-                    arr = ext_mtx._prod(dresids, mode)  # , mask=mask)
+                    arr = ext_mtx._prod(dresids, mode)
                     arr[mask] = 0.0
                     d_inputs += arr
 
