@@ -571,28 +571,6 @@ class COOSubjac(SparseSubjac):
         Unit conversion factor for the subjacobian.
     """
 
-    def tocoo(self, mask=None):
-        """
-        Convert the subjac to a COO matrix.
-
-        Parameters
-        ----------
-        mask : array or None
-            Mask to apply to the nonzero elements so only those corresponding to src_indices columns
-            are included.
-
-        Returns
-        -------
-        coo_matrix
-            Subjacobian in COO format.
-        """
-        if mask is None:
-            return self.get_val()
-        else:
-            return coo_matrix((self.info['val'].data[mask], (self.info['val'].row[mask],
-                                                             self.info['val'].col[mask])),
-                              shape=self.shape)
-
     def set_col(self, icol, column, uncovered_threshold=None):
         """
         Set a column of the subjacobian.
@@ -811,19 +789,6 @@ class OMCOOSubjac(COOSubjac):
             self.cols = self.cols[self.mask]
 
         self.set_val(info['val'])
-
-    def get_col_inds(self):
-        """
-        Get the column indices of the subjacobian.
-
-        Repeated entries are allowed.
-
-        Returns
-        -------
-        array
-            Column indices of the subjacobian.
-        """
-        return self.info['cols']
 
     @classmethod
     def _update_instance_meta(cls, meta, system, key):
