@@ -1089,7 +1089,7 @@ class ExecComp(ExplicitComponent):
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
         inarr = self._inarray
-        vdict = self._viewdict
+        vdict = self._viewdict.dct
 
         inarr[:] = self._inputs.asarray(copy=False)
 
@@ -1105,7 +1105,11 @@ class ExecComp(ExplicitComponent):
 
                 for u in out_names:
                     if (u, inp) in partials:
-                        partials[u, inp] = imag(vdict[u] * inv_stepsize).flat
+                        subval, subval_is_scalar = vdict[u]
+                        if subval_is_scalar:
+                            partials[u, inp] = imag(subval * inv_stepsize)
+                        else:
+                            partials[u, inp] = imag(subval * inv_stepsize).flat
 
                 # restore old input value
                 ival -= step
@@ -1120,7 +1124,11 @@ class ExecComp(ExplicitComponent):
                     for u in out_names:
                         if (u, inp) in partials:
                             # set the column in the Jacobian entry
-                            partials[u, inp][:, i] = imag(vdict[u] * inv_stepsize).flat
+                            subval, subval_is_scalar = vdict[u]
+                            if subval_is_scalar:
+                                partials[u, inp][:, i] = imag(subval * inv_stepsize)
+                            else:
+                                partials[u, inp][:, i] = imag(subval * inv_stepsize).flat
 
                     # restore old input value
                     ival[idx] -= step
@@ -1132,7 +1140,7 @@ class _ViewDict(object):
 
     def __getitem__(self, name):
         val, is_scalar = self.dct[name]
-        return val[0] if is_scalar else val
+        return val.item() if is_scalar else val
 
     def __setitem__(self, name, value):
         val, _ = self.dct[name]
