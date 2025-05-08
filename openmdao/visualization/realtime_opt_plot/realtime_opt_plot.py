@@ -613,6 +613,9 @@ class _RealTimeOptPlot(object):
                     'right': edges[1:],            # right edge of each bin
                 })
 
+
+                units = self._case_tracker._get_units(x)
+
                 # Create the figure
                 p = figure(
                     title=f"Histogram of {x} Values",
@@ -621,7 +624,7 @@ class _RealTimeOptPlot(object):
                         # so need to add 40. TODO do this better
                         width=240, height=240,
                         # tools="pan,wheel_zoom,box_zoom,reset,save",
-                        x_axis_label=f'{x} Values',
+                        x_axis_label=f'{x} ({units})',
                         y_axis_label='Frequency')
 
                 # Add the histogram bars using quad glyphs
@@ -649,9 +652,10 @@ class _RealTimeOptPlot(object):
 
             plots.append(p)
 
-        gp = gridplot(plots, ncols=N, toolbar_location="right",
+        gp = gridplot(plots, ncols=N, toolbar_location=None,
                     
                                 #  tools="pan,wheel_zoom,box_zoom,reset,save",  # 'save' is included here
+                                #  toolbar_location=None,  # 'save' is included here
 
                     
                     )
@@ -663,7 +667,7 @@ class _RealTimeOptPlot(object):
         #                     min_border=10,
         #                     outline_line_color=None)
 
-        print(f"{plots[0].height=}")
+        # print(f"{plots[0].height=}")
         # p = figure(title="Simple Line Example", x_axis_label='x', y_axis_label='y', height=500, width=0)
         p = figure(height=2 * plots[0].height, width=0, toolbar_location=None)
 
@@ -678,7 +682,7 @@ class _RealTimeOptPlot(object):
 
         # Add the color bar to this figure
         color_bar = ColorBar(color_mapper=self._color_mapper, 
-                            title="Response value",
+                            title=f"Response variable: '{self._prom_response}'",
                             border_line_color=None,
                             width=20,
                      label_standoff = 14,
