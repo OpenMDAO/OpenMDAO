@@ -7,6 +7,9 @@ import sys
 from collections import defaultdict
 import sqlite3
 from itertools import product
+import time
+from datetime import datetime, timedelta
+
 
 try:
     from bokeh.models import (BasicTicker, ColumnDataSource, DataRange1d,
@@ -92,7 +95,8 @@ except ImportError:
 
 # Constants
 # the time between calls to the udpate method
-_time_between_callbacks_in_ms = 1000
+# _time_between_callbacks_in_ms = 1000
+_time_between_callbacks_in_ms = 100
 # Number of milliseconds for unused session lifetime
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10
 # color of the plot line for the objective function
@@ -320,17 +324,27 @@ class _RealTimeOptPlot(object):
         self._sampled_variables = None
         self._prom_response = None
 
+        self._num_samples_plotted = 0
+
         self._source = None
         self._lines = []
         # flag to prevent updating label with units each time we get new data
         self._labels_updated_with_units = False
         self._source_stream_dict = None
 
+        self._hist_source = {}
 
         # used to keep track of the y min and max of the data so that
         # the axes ranges can be adjusted as data comes in
         self._y_min = defaultdict(lambda: float("inf"))
         self._y_max = defaultdict(lambda: float("-inf"))
+
+        self._prom_response_min = float("inf")
+        self._prom_response_max = float("-inf")
+
+        self._start_time = time.time()
+
+        self._hist_figures = {}
 
         def _update():
             # this is the main method of the class. It gets called periodically by Bokeh
@@ -367,14 +381,14 @@ class _RealTimeOptPlot(object):
                 #             but {len(obj_names)} objectives found"
                 #     )
 
-                quit_button = Button(label="Quit Application", button_type="danger")
+                # quit_button = Button(label="Quit Application", button_type="danger")
 
-                # Define callback function for the quit button
-                def quit_app():
-                    raise KeyboardInterrupt("Quit button pressed")
+                # # Define callback function for the quit button
+                # def quit_app():
+                #     raise KeyboardInterrupt("Quit button pressed")
 
-                # Attach the callback to the button
-                quit_button.on_click(quit_app)
+                # # Attach the callback to the button
+                # quit_button.on_click(quit_app)
 
                 graph = Row(self.plot_figure, sizing_mode="stretch_both")
                 doc.add_root(graph)
@@ -390,11 +404,58 @@ class _RealTimeOptPlot(object):
                 self._source_stream_dict[sampled_variable] = new_case.get_val(sampled_variable)[:1]
 
             self._source.stream(self._source_stream_dict)
+            self._num_samples_plotted += 1
+
+            self._prom_response_min = min(self._prom_response_min, new_case.get_val(self._prom_response)[:1][0])
+            self._prom_response_max = max(self._prom_response_max, new_case.get_val(self._prom_response)[:1][0])
+
+            self._color_mapper.low = self._prom_response_min
+            self._color_mapper.high = self._prom_response_max
+
+            # Get current date and time
+            now = datetime.now()
+            formatted_time = now.strftime("%H:%M:%S on %B %d, %Y")
+
+            # Format it as requested
+
+            current_time = time.time()
+            elapsed_total = current_time - self._start_time
+            elapsed_formatted = str(timedelta(seconds=int(elapsed_total))
+)
+
+            stats_text = f"""<div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
+                            <h3>Analysis Progress</h3>
+                            <p>Number of samples: {self._num_samples_plotted}</p>
+                            <p>Last updated: {formatted_time}</p>
+                            <p>Elapsed time: {elapsed_formatted}</p>
+                            </div>"""
+
+            self._text_box.text = stats_text
+
+            self._update_histograms()
 
             # end of _update method
 
         doc.add_periodic_callback(_update, callback_period)
-        doc.title = "OpenMDAO Optimization Progress Plot"
+        doc.title = "OpenMDAO Analysis Progress Plot"
+
+    def _update_histograms(self):
+        for sampled_variable in self._sampled_variables:
+            x_data = self._source.data[sampled_variable]
+
+            # Compute histogram with 30 bins
+            # TODO make 30 a variable
+            hist, edges = np.histogram(x_data, bins=30, range=(np.min(x_data), np.max(x_data)))
+
+            self._hist_source[sampled_variable].data.update(
+                {
+                    'top':hist,
+                    'left': edges[:-1],            # left edge of each bin
+                    'right': edges[1:],            # right edge of each bin
+                 }
+                )
+
+            self._hist_figures[sampled_variable].x_range = Range1d(np.min(x_data), np.max(x_data))
 
     def _setup_data_source(self):
         self._source_dict = {}
@@ -417,6 +478,8 @@ class _RealTimeOptPlot(object):
         self._prom_response = prom_responses[0]
         self._source_dict[self._prom_response] = []
 
+
+
         self._sampled_variables = [varname for varname in outputs if varname not in prom_responses]
         for sampled_variable in self._sampled_variables:
             self._source_dict[sampled_variable] = []
@@ -436,10 +499,9 @@ class _RealTimeOptPlot(object):
 
         # Create a color mapper using Viridis (colorblind-friendly)
 
-
         # color_mapper = LinearColorMapper(palette=Viridis256, low=min(self._source.data['obj']), high=max(self._source.data['obj']))
-        
-        color_mapper = LinearColorMapper(palette=Viridis256)
+
+        self._color_mapper = LinearColorMapper(palette=Viridis256, low =0 , high=200)
 
         # For alpha values, we need to handle it differently
         # Instead of creating a LinearColorMapper for alpha, use a different approach:
@@ -464,34 +526,49 @@ class _RealTimeOptPlot(object):
             row = i//N
 
             if x != y:
+
+                x_units = self._case_tracker._get_units(x)
+                y_units = self._case_tracker._get_units(y)
+
+
                 # p = Plot(x_range=xdrs[i%N], y_range=ydrs[i//N],
                 #         background_fill_color="#fafafa",
                 #         border_fill_color="white", width=200, height=200, min_border=5)
                 p = figure(x_range=xdrs[i%N], y_range=ydrs[i//N],
                         background_fill_color="#fafafa",
-                        border_fill_color="white", width=200, height=200, min_border=5)
+                        # border_fill_color="white", width=200, height=200, min_border=5)
+                        border_fill_color="white", width=240, height=240)
+
+                p.xaxis.axis_label = f"{x} ({x_units})"
+                p.yaxis.axis_label = f"{y} ({y_units})"
 
 
-                if i % N == 0:  # first column
-                    p.min_border_left = p.min_border + 4
-                    p.width += 40
-                    yaxis = LinearAxis(axis_label=y)
-                    yaxis.major_label_orientation = "vertical"
-                    p.add_layout(yaxis, "left")
-                    yticker = yaxis.ticker
-                else:
-                    yticker = BasicTicker()
-                p.add_layout(Grid(dimension=1, ticker=yticker))
 
-                if i >= N*(N-1):  # last row
-                    p.min_border_bottom = p.min_border + 40
-                    p.height += 40
-                    xaxis = LinearAxis(axis_label=x)
-                    p.add_layout(xaxis, "below")
-                    xticker = xaxis.ticker
-                else:
-                    xticker = BasicTicker()
-                p.add_layout(Grid(dimension=0, ticker=xticker))
+                # p.xaxis.axis_label = x
+                # p.yaxis.axis_label = y
+
+                p.axis.visible = True
+
+                # if i % N == 0:  # first column
+                #     p.min_border_left = p.min_border + 4
+                #     p.width += 40
+                #     yaxis = LinearAxis(axis_label=y)
+                #     yaxis.major_label_orientation = "vertical"
+                #     p.add_layout(yaxis, "left")
+                #     yticker = yaxis.ticker
+                # else:
+                #     yticker = BasicTicker()
+                # p.add_layout(Grid(dimension=1, ticker=yticker))
+
+                # if i >= N*(N-1):  # last row
+                #     p.min_border_bottom = p.min_border + 40
+                #     p.height += 40
+                #     xaxis = LinearAxis(axis_label=x)
+                #     p.add_layout(xaxis, "below")
+                #     xticker = xaxis.ticker
+                # else:
+                #     xticker = BasicTicker()
+                # p.add_layout(Grid(dimension=0, ticker=xticker))
 
                 # scatter = Scatter(
                 #     x=x,
@@ -511,21 +588,25 @@ class _RealTimeOptPlot(object):
                     y=y,
                     size=5,
                     line_color=None,
-                    # fill_color=transform(self._prom_response, color_mapper),  # This maps f to colors
+                    fill_color=transform(self._prom_response, self._color_mapper),  # This maps f to colors
                     # fill_alpha="alpha",
                 )
 
-
-
-            else:  # on the diagnonal
+            else:  # on the diagonal
                 # Extract the x column data for the histogram
                 x_data = self._source.data[x]
 
                 # Compute histogram with 30 bins
-                hist, edges = np.histogram(x_data, bins=30)
+
+                # DO I EVEN NEED THIS HERE? OR JUST in update?
+                if x_data:
+                    hist, edges = np.histogram(x_data, bins=30, range=(np.min(x_data), np.max(x_data)))
+                else:
+                    hist, edges = np.histogram(x_data, bins=30)
 
                 # Create a new ColumnDataSource for the histogram data
-                hist_source = ColumnDataSource(data={
+                # hist_source = ColumnDataSource(data={
+                self._hist_source[x] = ColumnDataSource(data={
                     'top': hist,                   # height of each bin
                     'bottom': np.zeros(len(hist)), # bottom of each bin starts at 0
                     'left': edges[:-1],            # left edge of each bin
@@ -540,11 +621,11 @@ class _RealTimeOptPlot(object):
                         # so need to add 40. TODO do this better
                         width=240, height=240,
                         # tools="pan,wheel_zoom,box_zoom,reset,save",
-                        x_axis_label=f'{x} Value',
+                        x_axis_label=f'{x} Values',
                         y_axis_label='Frequency')
 
                 # Add the histogram bars using quad glyphs
-                p.quad(source=hist_source,
+                p.quad(source=self._hist_source[x],
                     top='top',
                     bottom='bottom',
                     left='left',
@@ -553,6 +634,7 @@ class _RealTimeOptPlot(object):
                     line_color="white",
                     alpha=0.7)
 
+                self._hist_figures[x] = p
 
             # suppress the diagonal
             # if (i%N) + (i//N) == N-1:
@@ -562,7 +644,8 @@ class _RealTimeOptPlot(object):
                 # p.grid.grid_line_color = None
                 p.visible = False
 
-            p.add_tools(PanTool(), WheelZoomTool(), ResetTool(), LassoSelectTool())
+            # TODO needed?
+            # p.add_tools(PanTool(), WheelZoomTool(), ResetTool(), LassoSelectTool())
 
             plots.append(p)
 
@@ -594,10 +677,13 @@ class _RealTimeOptPlot(object):
         p.grid.grid_line_color = None
 
         # Add the color bar to this figure
-        color_bar = ColorBar(color_mapper=color_mapper, 
-                            title="obj Value",
+        color_bar = ColorBar(color_mapper=self._color_mapper, 
+                            title="Response value",
                             border_line_color=None,
-                            # location=(0,0)
+                            width=20,
+                     label_standoff = 14,
+        ticker=BasicTicker(),  # This is the key part you're missing
+                        location=(0,0)
                             )
 
         p.add_layout(color_bar, 'right')
@@ -618,11 +704,64 @@ class _RealTimeOptPlot(object):
         p.outline_line_alpha = 0
         # p.toolbar.logo = None
 
-        from bokeh.layouts import row, column
+        # show number of samples plotted
+        self._text_box = Div(
+            text="""<div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
+                    <h3>Analysys Progress</h3>
+                    <p>Waiting for data...</p>
+                    </div>""",
+            width=600,
+            height=100,
+        )
 
-        final_layout = row(gp, p)
+        # p.add_layout(self._text_box,'right')
+
+        from bokeh.layouts import row, column, Spacer
+
+        # final_layout = row(gp, p)
+
+        # final_layout = row(gp, p, self._text_box)
+
+        p.min_border_right = 100
 
 
+        spacer2 = Spacer(width=100, height=300)  # Between plot 2 (with colorbar) and text box
+
+        script_name = self._case_recorder_filename
+
+        title_div = Div(
+                    text=f"Analysis Progress for {script_name}",
+                    styles={"font-size": "20px", "font-weight": "bold"},
+                )
+
+
+
+        quit_button = Button(label="Quit Application", button_type="danger")
+
+        # Define callback function for the quit button
+        def quit_app():
+            raise KeyboardInterrupt("Quit button pressed")
+
+        # Attach the callback to the button
+        quit_button.on_click(quit_app)
+
+
+        # Add the text box after the grid in a row
+        # final_layout = row(gp, p, spacer2, self._text_box, sizing_mode='fixed')
+        final_layout = row(column(title_div, gp), p, spacer2, column(self._text_box, quit_button), sizing_mode='fixed')
+
+        # col1 = column(gp)
+        # col2 = column(p)
+        # col3 = column(self._text_box)
+
+        # final_layout = row(col1, col2, col3)
+
+
+        # from bokeh.layouts import layout
+
+        # final_layout = layout(
+        #     [[gp, p, self._text_box]], spacing=25
+        # )  # Add explicit spacing between elements
 
         self.plot_figure = final_layout
 
@@ -633,9 +772,6 @@ class _RealTimeOptPlot(object):
 
         # show(final_layout)
         # show(gp)
-
-
-
 
         # # Make the figure and all the settings for it
         # self.plot_figure = figure(
