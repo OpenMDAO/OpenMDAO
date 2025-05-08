@@ -97,11 +97,11 @@ class AssembledJacobian(SplitJacobian):
 
         if self._randgen and system._problem_meta['randomize_subjacs']:
             for key, subjac in int_subjacs.items():
-                int_mtx._update_submat(key, self._randomize_subjac(subjac.get_val(), key))
+                int_mtx._update_submat(key, subjac.get_random(self._randgen))
 
             if ext_subjacs:
                 for key, subjac in ext_subjacs.items():
-                    ext_mtx._update_submat(key, self._randomize_subjac(subjac.get_val(), key))
+                    ext_mtx._update_submat(key, subjac.get_random(self._randgen))
         else:
 
             for key, subjac in int_subjacs.items():

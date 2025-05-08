@@ -47,14 +47,13 @@ class DictionaryJacobian(Jacobian):
             List of keys matching this jacobian for the current system.
         """
         if self._iter_keys is None:
+            subjacs = self._subjacs_info
+            keys = []
             # determine the set of remote keys (keys where either of or wrt is remote somewhere)
             # only if we're under MPI with comm size > 1 and the given system is a Group that
             # computes its derivatives using finite difference or complex step.
-            include_remotes = system.pathname and \
-                system.comm.size > 1 and system._owns_approx_jac and system._subsystems_allprocs
-            subjacs = self._subjacs_info
-            keys = []
-            if include_remotes:
+            if system.pathname and system.comm.size > 1 and system._owns_approx_jac and \
+                    system._subsystems_allprocs:
                 ofnames = system._var_allprocs_abs2meta['output']
                 wrtnames = system._var_allprocs_abs2meta
             else:
@@ -101,7 +100,8 @@ class DictionaryJacobian(Jacobian):
         oflat = d_outputs._abs_get_val
         iflat = d_inputs._abs_get_val
         subjacs_info = self._subjacs_info
-        is_explicit = system.is_explicit()
+        subjacs = self._get_subjacs(system)
+        # is_explicit = system.is_explicit()
         do_randomize = self._randgen is not None and system._problem_meta['randomize_subjacs']
 
         do_reset = False
@@ -118,19 +118,18 @@ class DictionaryJacobian(Jacobian):
 
                 res_name, other_name = abs_key
 
+                ofvec = rflat(res_name) if res_name in d_res_names else None
+
                 if other_name in d_out_names:
                     wrtvec = oflat(other_name)
+                    # if fwd and is_explicit and res_name is other_name:
+                    #     # skip the matvec mult completely for identity subjacs
+                    #     ofvec -= wrtvec
+                    #     continue
                 elif other_name in d_inp_names:
                     wrtvec = iflat(other_name)
                 else:
                     wrtvec = None
-
-                ofvec = rflat(res_name) if res_name in d_res_names else None
-
-                if fwd and is_explicit and res_name is other_name and wrtvec is not None:
-                    # skip the matvec mult completely for identity subjacs
-                    ofvec -= wrtvec
-                    continue
 
                 if abs_key in system._cross_keys and abs_key in key_owners:
                     wrtowner = key_owners[abs_key]
@@ -147,32 +146,42 @@ class DictionaryJacobian(Jacobian):
                     right_vec = ofvec
 
                 if left_vec is not None and right_vec is not None:
-                    subjac_info = subjacs_info[abs_key]
+                    # subjac_info = subjacs_info[abs_key]
                     if do_randomize:
-                        subjac = self._randomize_subjac(subjac_info['val'], abs_key)
-                    else:
-                        subjac = subjac_info['val']
-                    rows = subjac_info['rows']
-                    if rows is not None:  # our homegrown COO format
-                        linds, rinds = rows, subjac_info['cols']
-                        if not fwd:
-                            linds, rinds = rinds, linds
-                        if self._under_complex_step:
-                            # bincount only works with float, so split into parts
-                            prod = right_vec[rinds] * subjac
-                            left_vec[:].real += np.bincount(linds, prod.real,
-                                                            minlength=left_vec.size)
-                            left_vec[:].imag += np.bincount(linds, prod.imag,
-                                                            minlength=left_vec.size)
-                        else:
-                            left_vec[:] += np.bincount(linds, right_vec[rinds] * subjac,
-                                                       minlength=left_vec.size)
-
-                    else:
+                        # subjac = subjacs[abs_key].get_random(self._randgen)
                         if fwd:
-                            left_vec += subjac.dot(right_vec)
-                        else:  # rev
-                            left_vec += subjac.T.dot(right_vec)
+                            subjacs[abs_key].apply_rand_fwd(left_vec, right_vec, ofvec,
+                                                            self._randgen)
+                        else:
+                            subjacs[abs_key].apply_rand_rev(left_vec, right_vec, ofvec,
+                                                            self._randgen)
+                    else:
+                        # subjac = subjac_info['val']
+                        if fwd:
+                            subjacs[abs_key].apply_fwd(left_vec, right_vec, ofvec)
+                        else:
+                            subjacs[abs_key].apply_rev(left_vec, right_vec, ofvec)
+                    # rows = subjac_info['rows']
+                    # if rows is not None:  # our homegrown COO format
+                    #     linds, rinds = rows, subjac_info['cols']
+                    #     if not fwd:
+                    #         linds, rinds = rinds, linds
+                    #     if self._under_complex_step:
+                    #         # bincount only works with float, so split into parts
+                    #         prod = right_vec[rinds] * subjac
+                    #         left_vec[:].real += np.bincount(linds, prod.real,
+                    #                                         minlength=left_vec.size)
+                    #         left_vec[:].imag += np.bincount(linds, prod.imag,
+                    #                                         minlength=left_vec.size)
+                    #     else:
+                    #         left_vec[:] += np.bincount(linds, right_vec[rinds] * subjac,
+                    #                                    minlength=left_vec.size)
+
+                    # else:
+                    #     if fwd:
+                    #         left_vec += subjac.dot(right_vec)
+                    #     else:  # rev
+                    #         left_vec += subjac.T.dot(right_vec)
 
                 if abs_key in key_owners:
                     owner = key_owners[abs_key]

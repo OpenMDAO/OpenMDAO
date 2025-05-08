@@ -83,7 +83,7 @@ class BlockJacobian(Jacobian):
         d_inp_names = d_inputs._names
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-            if randgen is None:
+            if randgen is None or not system._problem_meta['randomize_subjacs']:
                 if mode == 'fwd':
                     for key, subjac in self._get_subjacs(system).items():
                         of, wrt = key

@@ -58,17 +58,18 @@ class COOMatrix(Matrix):
             key_ranges[key] = (start, end, submat)
             start = end
 
-        data_size = end
-
         rows = np.empty(end, dtype=INT_DTYPE)
         cols = np.empty(end, dtype=INT_DTYPE)
+        if system is not None and system.under_complex_step:
+            data = np.zeros(end, dtype=complex)
+        else:
+            data = np.zeros(end)
 
         metadata = self._metadata
         for key, (start, end, submat) in key_ranges.items():
             irow = submat.row_slice.start
             icol = submat.col_slice.start
             val = submat.get_val()
-            jac_type = type(val)
             idxs = slice(start, end)
 
             if not issparse(val) and len(val.shape) == 2:  # dense
@@ -98,7 +99,6 @@ class COOMatrix(Matrix):
                     jrows = jac.row
                     jcols = jac.col
                 else:
-                    jac_type = list
                     jrows = submat.info['rows']
                     jcols = submat.info['cols']
 
@@ -116,12 +116,7 @@ class COOMatrix(Matrix):
                     # update_submat.
                     idxs = np.argsort(idxs) + start
 
-            metadata[key] = (idxs, jac_type, submat.factor)
-
-        if system is not None and system.under_complex_step:
-            data = np.zeros(data_size, dtype=complex)
-        else:
-            data = np.zeros(data_size)
+            metadata[key] = (idxs, submat.factor)
 
         return data, rows, cols
 
@@ -152,19 +147,17 @@ class COOMatrix(Matrix):
         jac : ndarray or scipy.sparse
             the sub-jacobian, the same format with which it was declared.
         """
-        idxs, jac_type, factor = self._metadata[key]
-        if not isinstance(jac, jac_type) and (jac_type is list and not isinstance(jac, ndarray)):
-            raise TypeError("Jacobian entry for %s is of different type (%s) than "
-                            "the type (%s) used at init time." % (key,
-                                                                  type(jac).__name__,
-                                                                  jac_type.__name__))
+        idxs, factor = self._metadata[key]
         if isinstance(jac, ndarray):
-            self._matrix.data[idxs] = jac.flat
+            if factor is None:
+                self._matrix.data[idxs] = jac.flat
+            else:
+                self._matrix.data[idxs] = jac.ravel() * factor
         else:  # sparse
-            self._matrix.data[idxs] = jac.data
-
-        if factor is not None:
-            self._matrix.data[idxs] *= factor
+            if factor is None:
+                self._matrix.data[idxs] = jac.data
+            else:
+                self._matrix.data[idxs] = jac.data * factor
 
     def transpose(self):
         """
