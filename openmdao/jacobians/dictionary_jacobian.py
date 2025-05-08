@@ -102,7 +102,10 @@ class DictionaryJacobian(Jacobian):
         subjacs_info = self._subjacs_info
         subjacs = self._get_subjacs(system)
         # is_explicit = system.is_explicit()
-        do_randomize = self._randgen is not None and system._problem_meta['randomize_subjacs']
+        if self._randgen is not None and system._problem_meta['randomize_subjacs']:
+            randgen = self._randgen
+        else:
+            randgen = None
 
         do_reset = False
         key_owners = system._get_subjac_owners()
@@ -146,42 +149,10 @@ class DictionaryJacobian(Jacobian):
                     right_vec = ofvec
 
                 if left_vec is not None and right_vec is not None:
-                    # subjac_info = subjacs_info[abs_key]
-                    if do_randomize:
-                        # subjac = subjacs[abs_key].get_random(self._randgen)
-                        if fwd:
-                            subjacs[abs_key].apply_rand_fwd(left_vec, right_vec, ofvec,
-                                                            self._randgen)
-                        else:
-                            subjacs[abs_key].apply_rand_rev(left_vec, right_vec, ofvec,
-                                                            self._randgen)
+                    if fwd:
+                        subjacs[abs_key].apply_fwd(d_inputs, d_outputs, d_residuals, randgen)
                     else:
-                        # subjac = subjac_info['val']
-                        if fwd:
-                            subjacs[abs_key].apply_fwd(left_vec, right_vec, ofvec)
-                        else:
-                            subjacs[abs_key].apply_rev(left_vec, right_vec, ofvec)
-                    # rows = subjac_info['rows']
-                    # if rows is not None:  # our homegrown COO format
-                    #     linds, rinds = rows, subjac_info['cols']
-                    #     if not fwd:
-                    #         linds, rinds = rinds, linds
-                    #     if self._under_complex_step:
-                    #         # bincount only works with float, so split into parts
-                    #         prod = right_vec[rinds] * subjac
-                    #         left_vec[:].real += np.bincount(linds, prod.real,
-                    #                                         minlength=left_vec.size)
-                    #         left_vec[:].imag += np.bincount(linds, prod.imag,
-                    #                                         minlength=left_vec.size)
-                    #     else:
-                    #         left_vec[:] += np.bincount(linds, right_vec[rinds] * subjac,
-                    #                                    minlength=left_vec.size)
-
-                    # else:
-                    #     if fwd:
-                    #         left_vec += subjac.dot(right_vec)
-                    #     else:  # rev
-                    #         left_vec += subjac.T.dot(right_vec)
+                        subjacs[abs_key].apply_rev(d_inputs, d_outputs, d_residuals, randgen)
 
                 if abs_key in key_owners:
                     owner = key_owners[abs_key]

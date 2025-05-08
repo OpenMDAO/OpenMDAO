@@ -179,13 +179,9 @@ class Subjac(object):
         if wrt_is_input:
             self.apply_fwd = self._apply_fwd_input
             self.apply_rev = self._apply_rev_input
-            self.apply_rand_fwd = self._apply_rand_fwd_input
-            self.apply_rand_rev = self._apply_rand_rev_input
         else:
             self.apply_fwd = self._apply_fwd_output
             self.apply_rev = self._apply_rev_output
-            self.apply_rand_fwd = self._apply_rand_fwd_output
-            self.apply_rand_rev = self._apply_rand_rev_output
 
     def get_val(self):
         """
@@ -211,33 +207,6 @@ class Subjac(object):
             Subjacobian as a dense array.
         """
         return self.info['val']
-
-    def get_random(self, randgen):
-        """
-        Get a random subjacobian.
-
-        Parameters
-        ----------
-        randgen : RandomNumberGenerator
-            Random number generator.
-
-        Returns
-        -------
-        ndarray or coo_matrix
-            Random subjacobian.
-        """
-        if self.info['sparsity'] is not None:
-            rows, cols, shape = self.info['sparsity']
-            val = randgen.random(len(rows))
-            val += 1.0
-            # since the subjac is dense, we need to create a dense random array
-            r = np.zeros(shape)
-            r[rows, cols] = val
-        else:
-            r = randgen.random(self.shape)
-            r += 1.0
-
-        return r
 
     def set_val(self, val):
         """
@@ -275,17 +244,6 @@ class Subjac(object):
         """
         self.get_val()[:, icol] = column
 
-    def get_full_size(self):
-        """
-        Get the full dense size of the subjacobian.
-
-        Returns
-        -------
-        int
-            Full dense size of the subjacobian.
-        """
-        return self.shape[0] * self.shape[1]
-
     def get_sparse_data_size(self):
         """
         Get the size of the subjacobian in COO format.
@@ -295,48 +253,30 @@ class Subjac(object):
         int
             Size of the subjacobian in COO format.
         """
-        shape = self.info['shape']  # this is shape of dr/di subjac, not dr/do subjac
+        shape = self.info['shape']  # this is shape of dr/dinp subjac, not dr/dsrc subjac
         return shape[0] * shape[1]
 
-    def mult_fwd(self, vec):
-        return self.get_val() @ vec
+    def _matvec_fwd(self, vec, randgen=None):
+        return self.get_val(randgen) @ vec
 
-    def mult_rev(self, vec):
-        return self.get_val().T @ vec
+    def _matvec_rev(self, vec, randgen=None):
+        return self.get_val(randgen).T @ vec
 
-    def _apply_rand_fwd_input(self, d_inputs, d_outputs, d_residuals, randgen):
-        d_residuals.add_to_slice(
-            self.row_slice, self.get_random(randgen) @ d_inputs.get_slice(self.col_slice))
-
-    def _apply_rand_fwd_output(self, d_inputs, d_outputs, d_residuals, randgen):
-        d_residuals.add_to_slice(
-            self.row_slice, self.get_random(randgen) @ d_outputs.get_slice(self.col_slice))
-
-    def _apply_rand_rev_input(self, d_inputs, d_outputs, d_residuals, randgen):
-        d_inputs.add_to_slice(
-            self.col_slice,
-            self.get_random(randgen).T @ d_residuals.get_slice(self.row_slice))
-
-    def _apply_rand_rev_output(self, d_inputs, d_outputs, d_residuals, randgen):
-        d_outputs.add_to_slice(
-            self.col_slice,
-            self.get_random(randgen).T @ d_residuals.get_slice(self.row_slice))
-
-    def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals):
+    def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
         d_residuals.add_to_slice(self.row_slice,
-                                 self.get_val() @ d_inputs.get_slice(self.col_slice))
+                                 self._matvec_fwd(d_inputs.get_slice(self.col_slice), randgen))
 
-    def _apply_fwd_output(self, d_inputs, d_outputs, d_residuals):
+    def _apply_fwd_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
         d_residuals.add_to_slice(self.row_slice,
-                                 self.get_val() @ d_outputs.get_slice(self.col_slice))
+                                 self._matvec_fwd(d_outputs.get_slice(self.col_slice), randgen))
 
-    def _apply_rev_input(self, d_inputs, d_outputs, d_residuals):
+    def _apply_rev_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
         d_inputs.add_to_slice(self.col_slice,
-                              self.get_val().T @ d_residuals.get_slice(self.row_slice))
+                              self._matvec_rev(d_residuals.get_slice(self.row_slice), randgen))
 
-    def _apply_rev_output(self, d_inputs, d_outputs, d_residuals):
+    def _apply_rev_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
         d_outputs.add_to_slice(self.col_slice,
-                               self.get_val().T @ d_residuals.get_slice(self.row_slice))
+                               self._matvec_rev(d_residuals.get_slice(self.row_slice), randgen))
 
 
 class DenseSubjac(Subjac):
@@ -410,6 +350,39 @@ class DenseSubjac(Subjac):
                                          f"{meta['shape']} but got {val.shape}.")
 
         return meta
+
+    def get_val(self, randgen=None):
+        """
+        Get the value of the subjacobian.
+
+        This is the value set by a System and it may not be a dense array. For example, if the
+        subjac is a diagonal subjac, the value will be a 1D array of the diagonal values.
+
+        Parameters
+        ----------
+        randgen : RandomNumberGenerator or None
+            Random number generator.
+
+        Returns
+        -------
+        ndarray
+            Value of the subjacobian.
+        """
+        if randgen is None:
+            return self.info['val']
+
+        if self.info['sparsity'] is not None:
+            rows, cols, shape = self.info['sparsity']
+            val = randgen.random(len(rows))
+            val += 1.0
+            # since the subjac is dense, we need to create a dense random array
+            r = np.zeros(shape)
+            r[rows, cols] = val
+        else:
+            r = randgen.random(self.shape)
+            r += 1.0
+
+        return r
 
 
 class SparseSubjac(Subjac):
@@ -519,13 +492,13 @@ class SparseSubjac(Subjac):
         """
         return self.info['val'].data.size
 
-    def get_random(self, randgen):
+    def get_val(self, randgen=None):
         """
-        Get a random subjacobian with the same sparsity pattern as this one.
+        Get the value of the subjacobian.
 
         Parameters
         ----------
-        randgen : RandomNumberGenerator
+        randgen : RandomNumberGenerator or None
             Random number generator.
 
         Returns
@@ -533,6 +506,9 @@ class SparseSubjac(Subjac):
         coo_matrix
             Random subjacobian.
         """
+        if randgen is None:
+            return self.info['val']
+
         coo = self.info['val'].tocoo()
         data = randgen.random(coo.data.size) + 1.0
         return coo_matrix((data, (coo.row, coo.col)), shape=coo.shape)
@@ -840,9 +816,9 @@ class OMCOOSubjac(COOSubjac):
         """
         return self.coo.toarray()
 
-    def get_random(self, randgen):
+    def get_val(self, randgen=None):
         """
-        Get a random subjacobian with the same sparsity pattern as this one.
+        Get the value of the subjacobian.
 
         Parameters
         ----------
@@ -854,8 +830,10 @@ class OMCOOSubjac(COOSubjac):
         coo_matrix
             Random subjacobian.
         """
-        val = randgen.random(len(self.info['rows'])) + 1.0
-        return coo_matrix((val, (self.info['rows'], self.info['cols'])), shape=self.shape)
+        if randgen is None:
+            return self.info['val']
+
+        return randgen.random(len(self.info['rows'])) + 1.0
 
     def set_val(self, val):
         """
@@ -897,21 +875,13 @@ class OMCOOSubjac(COOSubjac):
         """
         return self.info['val'].size
 
-    def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals):
-        self.coo.data[:] = self.get_val()
-        d_residuals.add_to_slice(self.row_slice, self.coo @ d_inputs.get_slice(self.col_slice))
+    def _matvec_fwd(self, vec, randgen=None):
+        self.coo.data[:] = self.get_val(randgen)
+        return self.coo @ vec
 
-    def _apply_fwd_output(self, d_inputs, d_outputs, d_residuals):
-        self.coo.data[:] = self.get_val()
-        d_residuals.add_to_slice(self.row_slice, self.coo @ d_outputs.get_slice(self.col_slice))
-
-    def _apply_rev_input(self, d_inputs, d_outputs, d_residuals):
-        self.coo.data[:] = self.get_val()
-        d_inputs.add_to_slice(self.col_slice, self.coo.T @ d_residuals.get_slice(self.row_slice))
-
-    def _apply_rev_output(self, d_inputs, d_outputs, d_residuals):
-        self.coo.data[:] = self.get_val()
-        d_outputs.add_to_slice(self.col_slice, self.coo.T @ d_residuals.get_slice(self.row_slice))
+    def _matvec_rev(self, vec, randgen=None):
+        self.coo.data[:] = self.get_val(randgen)
+        return self.coo.T @ vec
 
 
 class DiagonalSubjac(Subjac):
@@ -1032,13 +1002,13 @@ class DiagonalSubjac(Subjac):
                 self.info['uncovered_nz'].extend(list(zip(nzs, icol * np.ones_like(nzs))))
             column[icol] = save
 
-    def get_random(self, randgen):
+    def get_val(self, randgen=None):
         """
-        Get a random subjacobian with the same sparsity pattern as this one.
+        Get the value of the subjacobian.
 
         Parameters
         ----------
-        randgen : RandomNumberGenerator
+        randgen : RandomNumberGenerator or None
             Random number generator.
 
         Returns
@@ -1046,25 +1016,15 @@ class DiagonalSubjac(Subjac):
         ndarray
             Random subjacobian.
         """
-        size = self.info['val'].size
-        return coo_matrix((randgen.random(size) + 1.0, (range(size), range(size))),
-                          shape=self.shape)
+        if randgen is None:
+            return self.info['val']
 
-    def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals):
-        d_residuals.add_to_slice(self.row_slice,
-                                 self.get_val() * d_inputs.get_slice(self.col_slice))
+        return randgen.random(self.info['val'].size) + 1.0
 
-    def _apply_fwd_output(self, d_inputs, d_outputs, d_residuals):
-        d_residuals.add_to_slice(self.row_slice,
-                                 self.get_val() * d_outputs.get_slice(self.col_slice))
+    def _matvec_fwd(self, vec, randgen=None):
+        return self.get_val(randgen) * vec
 
-    def _apply_rev_input(self, d_inputs, d_outputs, d_residuals):
-        d_inputs.add_to_slice(self.col_slice,
-                              self.get_val() * d_residuals.get_slice(self.row_slice))
-
-    def _apply_rev_output(self, d_inputs, d_outputs, d_residuals):
-        d_outputs.add_to_slice(self.col_slice,
-                               self.get_val() * d_residuals.get_slice(self.row_slice))
+    _matvec_rev = _matvec_fwd
 
 
 class ZeroSubjac(Subjac):
@@ -1179,32 +1139,23 @@ class ZeroSubjac(Subjac):
             if nzs.size > 0:
                 self.info['uncovered_nz'].extend(list(zip(nzs, icol * np.ones_like(nzs))))
 
-    def get_random(self, randgen):
-        """
-        Get a random subjacobian.
+    def _matvec_fwd(self, vec, randgen=None):
+        return np.zeros_like(vec)
 
-        Parameters
-        ----------
-        randgen : RandomNumberGenerator
-            Random number generator.
+    def _matvec_rev(self, vec, randgen=None):
+        return np.zeros_like(vec)
 
-        Returns
-        -------
-        ndarray
-            Random subjacobian.
-        """
-        return self.get_val()
-
-    def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals):
+    # override these to avoid doing *any* operations on the subjac
+    def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
         pass
 
-    def _apply_fwd_output(self, d_inputs, d_outputs, d_residuals):
+    def _apply_fwd_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
         pass
 
-    def _apply_rev_input(self, d_inputs, d_outputs, d_residuals):
+    def _apply_rev_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
         pass
 
-    def _apply_rev_output(self, d_inputs, d_outputs, d_residuals):
+    def _apply_rev_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
         pass
 
 

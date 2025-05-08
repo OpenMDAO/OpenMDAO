@@ -78,30 +78,22 @@ class BlockJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        randgen = self._randgen
+        if self._randgen is not None and system._problem_meta['randomize_subjacs']:
+            randgen = self._randgen
+        else:
+            randgen = None
+
         d_out_names = d_outputs._names
         d_inp_names = d_inputs._names
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-            if randgen is None or not system._problem_meta['randomize_subjacs']:
-                if mode == 'fwd':
-                    for key, subjac in self._get_subjacs(system).items():
-                        of, wrt = key
-                        if wrt in d_inp_names or wrt in d_out_names:
-                            subjac.apply_fwd(d_inputs, d_outputs, d_residuals)
-                else:  # rev
-                    for key, subjac in self._get_subjacs(system).items():
-                        of, wrt = key
-                        if wrt in d_inp_names or wrt in d_out_names:
-                            subjac.apply_rev(d_inputs, d_outputs, d_residuals)
-            else:
-                if mode == 'fwd':
-                    for key, subjac in self._get_subjacs(system).items():
-                        of, wrt = key
-                        if wrt in d_inp_names or wrt in d_out_names:
-                            subjac.apply_rand_fwd(d_inputs, d_outputs, d_residuals, randgen)
-                else:  # rev
-                    for key, subjac in self._get_subjacs(system).items():
-                        of, wrt = key
-                        if wrt in d_inp_names or wrt in d_out_names:
-                            subjac.apply_rand_rev(d_inputs, d_outputs, d_residuals, randgen)
+            if mode == 'fwd':
+                for key, subjac in self._get_subjacs(system).items():
+                    _, wrt = key
+                    if wrt in d_inp_names or wrt in d_out_names:
+                        subjac.apply_fwd(d_inputs, d_outputs, d_residuals, randgen)
+            else:  # rev
+                for key, subjac in self._get_subjacs(system).items():
+                    _, wrt = key
+                    if wrt in d_inp_names or wrt in d_out_names:
+                        subjac.apply_rev(d_inputs, d_outputs, d_residuals, randgen)
