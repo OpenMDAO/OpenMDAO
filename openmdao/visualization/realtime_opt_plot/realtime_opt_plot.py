@@ -474,6 +474,13 @@ class _RealTimeOptPlot(object):
             else:
                 raise RuntimeError(f"No prom for abs variable {response}")
 
+        # Look to see if there is an objective. If yes, that is the response to show
+        # Case.get_objectives
+        # cr = self._case_tracker.get_case_reader()
+        # driver_cases = cr.list_cases('driver')
+
+        driver_case = self._case_tracker._get_case_by_counter(1)
+        objs = driver_case.get_objectives()
         # for now assume one response
         self._prom_response = prom_responses[0]
         self._source_dict[self._prom_response] = []
@@ -686,6 +693,7 @@ class _RealTimeOptPlot(object):
                             border_line_color=None,
                             width=20,
                      label_standoff = 14,
+                     title_text_font_size = '20px',
         ticker=BasicTicker(),  # This is the key part you're missing
                         location=(0,0)
                             )
@@ -729,7 +737,9 @@ class _RealTimeOptPlot(object):
         p.min_border_right = 100
 
 
-        spacer2 = Spacer(width=100, height=300)  # Between plot 2 (with colorbar) and text box
+        spacer2 = Spacer(width=200, height=300)  # Between plot 2 (with colorbar) and text box
+        spacer3 = Spacer(width=100, height=20)
+        spacer4 = Spacer(width=10, height=10)
 
         script_name = self._case_recorder_filename
 
@@ -737,8 +747,6 @@ class _RealTimeOptPlot(object):
                     text=f"Analysis Progress for {script_name}",
                     styles={"font-size": "20px", "font-weight": "bold"},
                 )
-
-
 
         quit_button = Button(label="Quit Application", button_type="danger")
 
@@ -752,7 +760,8 @@ class _RealTimeOptPlot(object):
 
         # Add the text box after the grid in a row
         # final_layout = row(gp, p, spacer2, self._text_box, sizing_mode='fixed')
-        final_layout = row(column(title_div, gp), p, spacer2, column(self._text_box, quit_button), sizing_mode='fixed')
+        final_layout = row(column(title_div, gp), p, spacer2, 
+                           column(self._text_box, spacer3, quit_button), sizing_mode='fixed')
 
         # col1 = column(gp)
         # col2 = column(p)
