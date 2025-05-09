@@ -392,7 +392,7 @@ class DenseSubjac(Subjac):
             r = np.zeros(shape)
             r[rows, cols] = val
         else:
-            r = randgen.random(self.shape)
+            r = randgen.random(self.info['shape'])
             r += 1.0
 
         return r
