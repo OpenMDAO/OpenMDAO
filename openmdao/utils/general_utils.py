@@ -89,7 +89,10 @@ def ensure_compatible(name, value, shape=None, indices=None, default_shape=(1,))
     else:
         # shape is determined, if value is scalar assign it to array of shape
         # otherwise make sure value is an array of the determined shape
-        if np.ndim(value) == 0 or value.shape == (1,):
+        if np.ndim(value) == 0:
+            if shape != ():
+                value = np.full(shape, value)
+        elif value.shape == (1,):
             value = np.full(shape, value)
         else:
             value = np.atleast_1d(value).astype(np.float64)
