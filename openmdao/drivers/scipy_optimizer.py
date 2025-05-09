@@ -38,6 +38,12 @@ if Version(scipy_version) >= Version("1.4"):
     _constraint_optimizers.add('differential_evolution')
     _constraint_grad_optimizers.add('differential_evolution')
 
+if Version(scipy_version) >= Version("1.14"):
+    # COBYLA supports bounds starting with SciPy Version 1.14
+    _optimizers.add('COBYQA')
+    _bounds_optimizers |= {'COBYQA'}
+    _constraint_optimizers |= {'COBYQA'}
+
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
 _global_optimizers = {'differential_evolution', 'basinhopping'}
 if Version(scipy_version) >= Version("1.2"):  # Only available in newer versions
