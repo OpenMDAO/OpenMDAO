@@ -2008,13 +2008,19 @@ class Component(System):
                 meta = self._subjacs_info[key]
                 computed = sorted(zip(nzrows, nzcols))
                 if meta['rows'] is None:
-                    rows = []
-                    cols = []
-                    declared = []
+                    if meta['diagonal']:
+                        rows = np.arange(shape[0])
+                        cols = np.arange(shape[1])
+                        declared = sorted(zip(rows, cols))
+                    else:
+                        rows = []
+                        cols = []
+                        declared = []
                 else:
                     rows = meta['rows']
                     cols = meta['cols']
                     declared = sorted(zip(rows, cols))
+
                 if declared != computed:
                     pct_nonzero = 100. * len(nzrows) / (shape[0] * shape[1])
                     if pct_nonzero > max_nz:
@@ -2031,7 +2037,7 @@ class Component(System):
                                           val_map=val_map,
                                           stream=stream)
                         mstr = stream.getvalue()
-                    wrn = (f"{self.msginfo}:\n(D)eclared sparsity pattern != (c)omputed sparsity "
+                    wrn = (f"{self.msginfo}:\n(D)eclared sparsity pattern != (C)omputed sparsity "
                            f"pattern for sub-jacobian ({of[plen:]}, {wrt[plen:]}) with shape "
                            f"{shape} and {pct_nonzero:.2f}% nonzeros:\n{mstr}\n")
                     ret.append((of, wrt, nzrows, nzcols, rows, cols, shape, pct_nonzero, wrn))
@@ -2349,7 +2355,6 @@ class Component(System):
                                 deriv_value = subjac.todense()
                             else:
                                 deriv_value = subjac.get_val()
-                            rows = subjac.info['rows']
                         except KeyError:
                             rows = None
                             # Missing derivatives are assumed 0.
@@ -2359,6 +2364,11 @@ class Component(System):
                             copy = False
                             nondep_derivs.add(rel_key)
                         else:
+                            if subjac.info['diagonal']:
+                                rows = cols = np.arange(subjac.shape[0])
+                            else:
+                                rows = subjac.info['rows']
+                                cols = subjac.info['cols']
                             # Testing for pairs that are not dependent so that we suppress printing
                             # them unless the fd is nonzero.
                             # Note: subjacs_info is empty for undeclared partials, which is the
@@ -2378,12 +2388,9 @@ class Component(System):
                                     # expand to the correct size array value for zipping
                                     if deriv_value.size == 1:
                                         deriv_value *= np.ones(rows.size)
-                                    deriv_value = \
-                                        coo_matrix((deriv_value,
-                                                    (rows, subjacs[abs_key].info['cols'])),
-                                                   shape=(out_size, in_size))
-                                    deriv_value = \
-                                        np.atleast_2d(deriv_value.sum(axis=axis[mode]))
+                                    deriv_value = coo_matrix((deriv_value, (rows, cols)),
+                                                             shape=(out_size, in_size))
+                                    deriv_value = np.atleast_2d(deriv_value.sum(axis=axis[mode]))
                                     if deriv_value.shape[0] < deriv_value.shape[1]:
                                         deriv_value = deriv_value.T
                                     copy = False

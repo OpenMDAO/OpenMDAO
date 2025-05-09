@@ -25,7 +25,7 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder, check_sparsity_tot_coloring
 from openmdao.utils.general_utils import run_driver, printoptions
-from openmdao.utils.assert_utils import assert_check_totals
+from openmdao.utils.assert_utils import assert_check_totals, assert_check_partials
 
 import openmdao.test_suite
 
@@ -755,6 +755,8 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         p = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False, con_alias=True)
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False,
                           dynamic_total_coloring=True, con_alias=True)
+
+        assert_check_partials(p_color.model.mux.check_partials())
 
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)

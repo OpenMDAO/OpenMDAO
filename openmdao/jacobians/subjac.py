@@ -7,6 +7,8 @@ OpenMDAO's internal COO format.
 
 """
 
+from pprint import pformat
+
 import numpy as np
 from scipy.sparse import coo_matrix, issparse
 
@@ -51,8 +53,6 @@ class Subjac(object):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
-    randval : ndarray or None
-        Random value for the subjacobian.
     shape : tuple
         Shape of the subjacobian.
     """
@@ -85,11 +85,24 @@ class Subjac(object):
         self.col_slice = col_slice
         self.src_indices = src_indices
         self.factor = factor
-        self.randval = None
         self.shape = (row_slice.stop - row_slice.start, col_slice.stop - col_slice.start)
 
         self._map_functions(wrt_is_input)
         self._init_val()
+
+    def __repr__(self):
+        """
+        Return a string representation of the subjacobian.
+
+        Returns
+        -------
+        str
+            String representation of the subjacobian.
+        """
+        return (f"{type(self).__name__}(key={self.key}, shape={self.shape}, "
+                f"row_slice={self.row_slice}, col_slice={self.col_slice}, "
+                f"src_indices={self.src_indices}, factor={self.factor}, "
+                f"info:\n{pformat(self.info)})")
 
     @staticmethod
     def get_subjac_class(pattern_meta):
@@ -876,12 +889,22 @@ class OMCOOSubjac(COOSubjac):
         return self.info['val'].size
 
     def _matvec_fwd(self, vec, randgen=None):
-        self.coo.data[:] = self.get_val(randgen)
-        return self.coo @ vec
+        if randgen is None:
+            self.coo.data[:] = self.get_val(randgen)
+            return self.coo @ vec
+        else:
+            # don't update self.coo with random values
+            return coo_matrix((self.get_val(randgen), (self.info['rows'], self.info['cols'])),
+                              shape=self.shape) @ vec
 
     def _matvec_rev(self, vec, randgen=None):
-        self.coo.data[:] = self.get_val(randgen)
-        return self.coo.T @ vec
+        if randgen is None:
+            self.coo.data[:] = self.get_val(randgen)
+            return self.coo.T @ vec
+        else:
+            # don't update self.coo with random values
+            return coo_matrix((self.get_val(randgen),
+                               (self.info['rows'], self.info['cols'])), shape=self.shape).T @ vec
 
 
 class DiagonalSubjac(Subjac):
