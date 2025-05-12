@@ -170,7 +170,7 @@ class Vector(object):
         dict
             Dictionary containing the variable values.
         """
-        return {n: vinfo.view[0] if vinfo.is_scalar else vinfo.view.copy()
+        return {n: vinfo.view.item() if vinfo.is_scalar else vinfo.view.copy()
                 for n, vinfo in self._views.items()}
 
     def keys(self):
@@ -196,13 +196,13 @@ class Vector(object):
         if self._under_complex_step:
             for n, vinfo in self._views.items():
                 if n in self._names:
-                    yield vinfo.view[0] if vinfo.is_scalar else vinfo.view
+                    yield vinfo.view.item() if vinfo.is_scalar else vinfo.view
                 else:
                     yield 0.0j if vinfo.is_scalar else np.zeros_like(vinfo.view)
         else:
             for n, vinfo in self._views.items():
                 if n in self._names:
-                    yield vinfo.view[0].real if vinfo.is_scalar else vinfo.view.real
+                    yield vinfo.view.item().real if vinfo.is_scalar else vinfo.view.real
                 else:
                     yield 0.0 if vinfo.is_scalar else np.zeros_like(vinfo.view.real)
 
@@ -225,11 +225,11 @@ class Vector(object):
         if self._under_complex_step:
             for n, vinfo in self._views.items():
                 if n in self._names:
-                    yield n[plen:], vinfo.view[0] if vinfo.is_scalar else vinfo.view
+                    yield n[plen:], vinfo.view.item() if vinfo.is_scalar else vinfo.view
         else:
             for n, vinfo in self._views.items():
                 if n in self._names:
-                    yield n[plen:], vinfo.view[0].real if vinfo.is_scalar else vinfo.view.real
+                    yield n[plen:], vinfo.view.item().real if vinfo.is_scalar else vinfo.view.real
 
     def ranges(self):
         """
@@ -303,9 +303,9 @@ class Vector(object):
             for name, vinfo in self._views.items():
                 if vinfo.is_scalar:
                     if self._under_complex_step:
-                        yield name, vinfo.view[0]
+                        yield name, vinfo.view.item()
                     else:
-                        yield name, vinfo.view[0].real
+                        yield name, vinfo.view.item().real
                 else:
                     if self._under_complex_step:
                         yield name, vinfo.view
@@ -415,7 +415,7 @@ class Vector(object):
 
         vinfo = self._views[name]
         if vinfo.is_scalar:
-            return vinfo.view[0]
+            return vinfo.view.item() if self._under_complex_step else vinfo.view.item().real
 
         return vinfo.view if self._under_complex_step else vinfo.view.real
 
