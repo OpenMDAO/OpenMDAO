@@ -38,6 +38,8 @@ class Subjac(object):
         Unit conversion factor for the subjacobian if, as with src_indices, we have a square
         part of the jacobian requiring a mapping of inputs to their source outputs for the
         jacobian columns where the input and output have different units.
+    src : str or None
+        Source name for the subjacobian.
 
     Attributes
     ----------
@@ -53,12 +55,14 @@ class Subjac(object):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
+    src : str or None
+        Source name for the subjacobian.
     shape : tuple
         Shape of the subjacobian.
     """
 
     def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None,
-                 factor=None):
+                 factor=None, src=None):
         """
         Initialize the subjacobian.
 
@@ -78,6 +82,8 @@ class Subjac(object):
             Source indices for the subjacobian.
         factor : float or None
             Unit conversion factor for the subjacobian.
+        src : str or None
+            Source name for the subjacobian.
         """
         self.key = key
         self.info = info
@@ -85,6 +91,7 @@ class Subjac(object):
         self.col_slice = col_slice
         self.src_indices = src_indices
         self.factor = factor
+        self.src = src
         self.shape = (row_slice.stop - row_slice.start, col_slice.stop - col_slice.start)
 
         self._map_functions(wrt_is_input)
@@ -101,7 +108,7 @@ class Subjac(object):
         """
         return (f"{type(self).__name__}(key={self.key}, shape={self.shape}, "
                 f"row_slice={self.row_slice}, col_slice={self.col_slice}, "
-                f"src_indices={self.src_indices}, factor={self.factor}, "
+                f"src_indices={self.src_indices}, factor={self.factor}, src={self.src}, "
                 f"info:\n{pformat(self.info)})")
 
     @staticmethod
@@ -312,6 +319,8 @@ class DenseSubjac(Subjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
+    src : str or None
+        Source name for the subjacobian.
     """
 
     def _init_val(self):
@@ -423,6 +432,8 @@ class SparseSubjac(Subjac):
         Unit conversion factor for the subjacobian if, as with src_indices, we have a square
         part of the jacobian requiring a mapping of inputs to their source outputs for the
         jacobian columns where the input and output have different units.
+    src : str or None
+        Source name for the subjacobian.
 
     Attributes
     ----------
@@ -433,11 +444,11 @@ class SparseSubjac(Subjac):
     """
 
     def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None,
-                 factor=None):
+                 factor=None, src=None):
         """
         Initialize the sparse subjac.
         """
-        super().__init__(key, info, row_slice, col_slice, wrt_is_input, src_indices, factor)
+        super().__init__(key, info, row_slice, col_slice, wrt_is_input, src_indices, factor, src)
         self.mask = None
         self.nnz_src_inds = None
 
@@ -565,6 +576,8 @@ class COOSubjac(SparseSubjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
+    src : str or None
+        Source name for the subjacobian.
     """
 
     def set_col(self, icol, column, uncovered_threshold=None):
@@ -638,6 +651,8 @@ class CSRSubjac(SparseSubjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
+    src : str or None
+        Source name for the subjacobian.
     """
 
     def set_col(self, icol, column, uncovered_threshold=None):
@@ -690,6 +705,8 @@ class CSCSubjac(SparseSubjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
+    src : str or None
+        Source name for the subjacobian.
     """
 
     def set_col(self, icol, column, uncovered_threshold=None):
@@ -740,6 +757,8 @@ class OMCOOSubjac(COOSubjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
+    src : str or None
+        Source name for the subjacobian.
 
     Attributes
     ----------
@@ -753,7 +772,7 @@ class OMCOOSubjac(COOSubjac):
     """
 
     def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None,
-                 factor=None):
+                 factor=None, src=None):
         """
         Initialize the subjacobian.
 
@@ -773,8 +792,10 @@ class OMCOOSubjac(COOSubjac):
             Source indices for the subjacobian.
         factor : float or None
             Unit conversion factor for the subjacobian.
+        src : str or None
+            Source name for the subjacobian.
         """
-        super().__init__(key, info, row_slice, col_slice, wrt_is_input, src_indices, factor)
+        super().__init__(key, info, row_slice, col_slice, wrt_is_input, src_indices, factor, src)
         self.rows = info['rows']
         self.cols = info['cols']
         self.mask = slice(None)
@@ -927,6 +948,8 @@ class DiagonalSubjac(Subjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
+    src : str or None
+        Source name for the subjacobian.
     """
 
     def _init_val(self):
@@ -1070,6 +1093,8 @@ class ZeroSubjac(Subjac):
         Source indices for the subjacobian.
     factor : float or None
         Unit conversion factor for the subjacobian.
+    src : str or None
+        Source name for the subjacobian.
     """
 
     @classmethod

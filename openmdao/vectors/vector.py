@@ -4,7 +4,6 @@ import hashlib
 import numpy as np
 
 from openmdao.utils.indexer import Indexer, indexer
-from openmdao.utils.array_utils import shape_to_len
 
 _full_slice = slice(None)
 _flat_full_indexer = indexer(_full_slice, flat_src=True)
@@ -26,11 +25,20 @@ class _VecData(object):
 
     def __init__(self, shape, rng):
         self.shape = shape
-        self.size = shape_to_len(shape)
+        self.size = rng[1] - rng[0]
         self.is_scalar = shape == ()
         self.range = rng
         self.view = None
         self.flat = None
+
+    def set_view(self, data):
+        start, end = self.range
+        vflat = v = data[start:end]
+        if self.shape != vflat.shape and self.shape != ():
+            v = vflat.view().reshape(self.shape)
+
+        self.view = v
+        self.flat = vflat
 
 
 class Vector(object):
@@ -67,14 +75,14 @@ class Vector(object):
         Specific kind of vector, either 'input', 'output', or 'residual'.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
+    _isroot : bool
+        Whether this vector is the root vector.
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
     _alloc_complex : bool
         If True, then space for the complex vector is also allocated.
     _data : ndarray
         Actual allocated data.
-    _slices : dict
-        Dictionary mapping absolute variable names to slices into the data array.
     _parent_slice : slice
         Slice of the parent vector that this vector represents.
     _under_complex_step : bool
@@ -104,13 +112,13 @@ class Vector(object):
         self._iotype = _type_map[kind]
         self._kind = kind
         self._views = {}
+        self._isroot = parent_vector is None
 
         # self._names will either contain the same names as self._views or to the
         # set of variables relevant to the current matvec product.
         self._names = self._views
 
         self._data = None
-        self._slices = None
         self._parent_slice = None
 
         # Support for Complex Step
@@ -123,7 +131,6 @@ class Vector(object):
         self._nlvec = None
 
         self._initialize_data(parent_vector, system)
-        self._initialize_views(parent_vector, system)
 
         self.read_only = False
 
@@ -497,15 +504,6 @@ class Vector(object):
             The owning system.
         """
         raise NotImplementedError('_initialize_data not defined for vector type '
-                                  f'{type(self).__name__}')
-
-    def _initialize_views(self, parent_vector, system):
-        """
-        Internally assemble views onto the vectors.
-
-        Must be implemented by the subclass.
-        """
-        raise NotImplementedError('_initialize_views not defined for vector type '
                                   f'{type(self).__name__}')
 
     def __iadd__(self, vec):

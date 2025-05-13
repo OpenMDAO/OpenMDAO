@@ -88,9 +88,9 @@ class Jacobian(object):
         return self._subjac_from_meta(abs_key, meta, row_slice, col_slice, wrt_is_input)
 
     def _subjac_from_meta(self, key, meta, row_slice, col_slice, wrt_is_input, src_indices=None,
-                          factor=None):
+                          factor=None, src=None):
         return Subjac.get_subjac_class(meta)(key, meta, row_slice, col_slice, wrt_is_input,
-                                             src_indices, factor)
+                                             src_indices, factor, src)
 
     def _get_subjacs(self, system):
         if self._subjacs is None:
@@ -530,7 +530,8 @@ class SplitJacobian(Jacobian):
                 if not meta['dependent']:
                     continue
                 if wrt in output_slices:
-                    self._int_subjacs[abs_key] = self.create_internal_subjac(system, abs_key, meta)
+                    self._int_subjacs[abs_key] = self.create_internal_subjac(system, abs_key, wrt,
+                                                                             meta)
                 elif wrt in input_slices:
                     if wrt in conns:  # connected input
                         # For the int_subjacs that make up the 'internal' jacobian, both the row
@@ -553,7 +554,8 @@ class SplitJacobian(Jacobian):
                         src_indices = abs2meta_in[wrt]['src_indices']
 
                         self._int_subjacs[abs_key] = \
-                            self.create_internal_subjac(system, abs_key, meta, src_indices, factor)
+                            self.create_internal_subjac(system, abs_key, src, meta, src_indices,
+                                                        factor)
                     elif not is_top:  # input is connected to something outside current system
                         ext_subjacs[abs_key] = self.create_subjac(system, abs_key, meta)
 
@@ -582,7 +584,7 @@ class SplitJacobian(Jacobian):
 
         self._col_mapper = None  # force recompute of internal index maps on next set_col
 
-    def create_internal_subjac(self, system, abs_key, meta, src_indices=None, factor=None):
+    def create_internal_subjac(self, system, abs_key, src, meta, src_indices=None, factor=None):
         """
         Create a subjacobian for a square internal jacobian (d(residual)/d(source)).
 
@@ -592,6 +594,8 @@ class SplitJacobian(Jacobian):
             The system that owns this jacobian.
         abs_key : tuple
             The absolute key for the subjacobian.
+        src : str or None
+            Source name for the subjacobian.
         meta : dict
             Metadata for the subjacobian.
         src_indices : array or None
@@ -615,4 +619,4 @@ class SplitJacobian(Jacobian):
                 col_slice = output_slices[src]
 
             return self._subjac_from_meta(abs_key, meta, output_slices[of], col_slice, False,
-                                          src_indices, factor)
+                                          src_indices, factor, src)
