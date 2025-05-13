@@ -227,6 +227,11 @@ class COOMatrix(Matrix):
         """
         return mask
 
+    def toarray(self):
+        return self._matrix.toarray()
+
+
+
 
 def _compute_index_map(jrows, jcols, src_indices):
     """

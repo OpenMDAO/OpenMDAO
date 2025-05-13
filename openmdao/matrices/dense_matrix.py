@@ -46,3 +46,6 @@ class DenseMatrix(COOMatrix):
         """
         # this will add any repeated entries together
         self._matrix = self._coo.toarray()
+
+    def toarray(self):
+        return self._matrix

@@ -1,6 +1,7 @@
 """Define the AssembledJacobian class."""
 from collections import defaultdict
 
+import numpy as np
 from openmdao.jacobians.jacobian import SplitJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
@@ -108,6 +109,12 @@ class AssembledJacobian(SplitJacobian):
                 ext_mtx._update_submat(key, subjac.get_val(randgen))
 
         int_mtx._post_update()
+
+        with np.printoptions(linewidth=1000, threshold=100000):
+            for key, subjac in int_subjacs.items():
+                print(f"int_subjac {key}({subjac.src}): r({subjac.row_slice.start}:{subjac.row_slice.stop}) c({subjac.col_slice.start}:{subjac.col_slice.stop})")
+            print("int_mtx")
+            print(int_mtx.toarray())
 
         if ext_mtx is not None:
             ext_mtx._post_update()
