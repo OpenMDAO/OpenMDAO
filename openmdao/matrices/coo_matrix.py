@@ -1,7 +1,7 @@
 """Define the COOmatrix class."""
 import numpy as np
 from numpy import ndarray
-from scipy.sparse import coo_matrix, issparse
+from scipy.sparse import coo_matrix
 
 
 from openmdao.core.constants import INT_DTYPE
@@ -61,6 +61,7 @@ class COOMatrix(Matrix):
 
         rows = np.empty(end, dtype=INT_DTYPE)
         cols = np.empty(end, dtype=INT_DTYPE)
+
         if system is not None and system.under_complex_step:
             data = np.zeros(end, dtype=complex)
         else:
@@ -70,54 +71,9 @@ class COOMatrix(Matrix):
         for key, (start, end, submat) in key_ranges.items():
             irow = submat.row_slice.start
             icol = submat.col_slice.start
-            val = submat.get_val()
-            idxs = slice(start, end)
-
-            if not issparse(val) and len(val.shape) == 2:  # dense
-
-                if submat.src_indices is None:
-                    colrange = range(icol, icol + submat.shape[1])
-                else:
-                    colrange = submat.src_indices.shaped_array() + icol
-
-                ncols = len(colrange)
-
-                subrows = rows[start:end]
-                subcols = cols[start:end]
-
-                substart = subend = 0
-                for row in range(irow, irow + submat.shape[0]):
-                    subend += ncols
-                    subrows[substart:subend] = row
-                    subcols[substart:subend] = colrange
-                    substart = subend
-
-            else:  # sparse
-                if submat.info['diagonal']:
-                    jrows = jcols = np.arange(val.size)
-                elif submat.info['rows'] is None:
-                    jac = val.tocoo()
-                    jrows = jac.row
-                    jcols = jac.col
-                else:
-                    jrows = submat.info['rows']
-                    jcols = submat.info['cols']
-
-                if submat.src_indices is None:
-                    rows[start:end] = jrows + irow
-                    cols[start:end] = jcols + icol
-                else:
-                    irows, icols, idxs = _compute_index_map(jrows, jcols,
-                                                            submat.src_indices)
-
-                    rows[start:end] = irows + irow
-                    cols[start:end] = icols + icol
-
-                    # store reverse indices to avoid copying subjac data during
-                    # update_submat.
-                    idxs = np.argsort(idxs) + start
-
-            metadata[key] = (idxs, submat.factor)
+            rows[start:end] = submat.rows() + irow
+            cols[start:end] = submat.cols() + icol
+            metadata[key] = (slice(start, end), submat.factor)
 
         return data, rows, cols
 

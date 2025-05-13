@@ -203,27 +203,6 @@ class Subjac(object):
             self.apply_fwd = self._apply_fwd_output
             self.apply_rev = self._apply_rev_output
 
-    def set_val(self, val):
-        """
-        Set the value of the subjacobian.
-
-        Parameters
-        ----------
-        val : ndarray
-            Value to set the subjacobian to.
-        """
-        myval = self.info['val']
-        if np.isscalar(val):
-            myval[:] = val
-        else:
-            try:
-                myval[:] = np.atleast_2d(val).reshape(myval.shape)
-            except ValueError as err:
-                if val.size == 1:  # allow for backwards compatability
-                    myval[:] = val[0]
-                else:
-                    raise err
-
     def _matvec_fwd(self, vec, randgen=None):
         return self.get_val(randgen) @ vec
 
@@ -273,7 +252,7 @@ class DenseSubjac(Subjac):
 
     def _init_val(self):
         if self.info['val'] is None:
-            self.info['val'] = np.zeros(self.shape)
+            self.info['val'] = np.zeros(self.info['shape'])
 
     @classmethod
     def _update_instance_meta(cls, meta, system, key):
@@ -342,27 +321,36 @@ class DenseSubjac(Subjac):
         if self.info['sparsity'] is not None:
             rows, cols, _ = self.info['sparsity']
             # since the subjac is dense, we need to create a dense random array
-            r = np.zeros(self.shape)
+            r = np.zeros(self.info['shape'])
             val = randgen.random(rows.size)
             val += 1.0
-            if self.src_indices is None:
-                r[rows, cols] = val
-            else:
-                # if src_indices is not None, we are part of the 'int_mtx' of an assembled jac, so
-                # columns correspond to source variables and we have to convert columns using
-                # src_indices.
-                r[rows, self.src_indices.shaped_array(flat=True)[cols]] = val
+            r[rows, cols] = val
         else:
-            if self.src_indices is None:
-                r = randgen.random(self.shape)
-                r += 1.0
-            else:
-                r = np.zeros(self.shape)
-                randmat = randgen.random(self.info['shape'])
-                randmat += 1.0
-                r[:, self.src_indices.shaped_array(flat=True)] = randmat
+            r = randgen.random(self.info['shape'])
+            r += 1.0
 
         return r
+
+    def set_val(self, val):
+        """
+        Set the value of the subjacobian.
+
+        Parameters
+        ----------
+        val : ndarray
+            Value to set the subjacobian to.
+        """
+        myval = self.info['val']
+        if np.isscalar(val):
+            myval[:] = val
+        else:
+            try:
+                myval[:] = np.atleast_2d(val).reshape(myval.shape)
+            except ValueError as err:
+                if val.size == 1:  # allow for backwards compatability
+                    myval[:] = val.item()
+                else:
+                    raise err
 
     def set_col(self, icol, column, uncovered_threshold=None):
         """
@@ -404,10 +392,11 @@ class DenseSubjac(Subjac):
         ndarray
             Subjac data.
         """
-        if randgen is None:
-            return self.info['val'].ravel()
-
         return self.get_val(randgen).ravel()
+        # if randgen is None:
+        #     return self.info['val'].ravel()
+
+        # return self.get_val(randgen).ravel()
 
     def get_coo_data_size(self):
         """
@@ -418,7 +407,11 @@ class DenseSubjac(Subjac):
         int
             Size of the subjacobian in COO format.
         """
-        return self.info['val'].size
+        if self.src_indices is None:
+            ncols = self.shape[1]
+        else:
+            ncols = self.src_indices.indexed_src_size
+        return self.shape[0] * ncols
 
     def cols(self):
         """
@@ -669,9 +662,9 @@ class COOSubjac(SparseSubjac):
             return self.info['val']
 
         submat = self.info['val']
-        return coo_matrix((randgen.random(submat.data.size),
+        return coo_matrix((randgen.random(submat.data.size) + 1.,
                            (submat.row, submat.col)),
-                          shape=self.shape)
+                          shape=self.info['shape'])
 
     def as_coo_info(self):
         """
@@ -784,8 +777,8 @@ class CSRSubjac(SparseSubjac):
             return self.info['val']
 
         submat = self.info['val']
-        return csr_matrix((randgen.random(submat.data.size), submat.indices, submat.indptr),
-                          shape=self.shape)
+        return csr_matrix((randgen.random(submat.data.size) + 1., submat.indices, submat.indptr),
+                          shape=self.info['shape'])
 
     def set_col(self, icol, column, uncovered_threshold=None):
         """
@@ -859,8 +852,8 @@ class CSCSubjac(SparseSubjac):
             return self.info['val']
 
         submat = self.info['val']
-        return csc_matrix((randgen.random(submat.data.size), submat.indices, submat.indptr),
-                          shape=self.shape)
+        return csc_matrix((randgen.random(submat.data.size) + 1., submat.indices, submat.indptr),
+                          shape=self.info['shape'])
 
     def set_col(self, icol, column, uncovered_threshold=None):
         """
@@ -1031,7 +1024,7 @@ class OMCOOSubjac(COOSubjac):
             return self.info['val']
 
         rnd = randgen.random(self.info['val'].size)
-        rnd += 1
+        rnd += 1.
         return rnd
 
     def set_val(self, val):
@@ -1044,8 +1037,12 @@ class OMCOOSubjac(COOSubjac):
             Value to set the subjacobian to.
         """
         self.info['val'][:] = val
+        # note that if we have src_indices, then self.shape may differ from self.info['shape'].
+        # self.shape in that case will be the shape of this subjac in an int_mtx of an assembled
+        # jacobian (with columns corresponding to a source variable), while self.info['shape']
+        # will be the shape of the subjac that the Component sees.
         self.coo = coo_matrix((self.info['val'], (self.info['rows'], self.info['cols'])),
-                              shape=self.shape)
+                              shape=self.info['shape'])
 
     def set_col(self, icol, column, uncovered_threshold=None):
         """
@@ -1074,7 +1071,7 @@ class OMCOOSubjac(COOSubjac):
 
     def _matvec_rev(self, vec, randgen=None):
         if randgen is None:
-            self.coo.data[:] = self.get_val(randgen)
+            self.coo.data[:] = self.get_val()
             return self.coo.T @ vec
         else:
             # don't update self.coo with random values
@@ -1199,10 +1196,7 @@ class DiagonalSubjac(SparseSubjac):
         ndarray
             Row indices of the subjacobian.
         """
-        if self.src_indices is None:
-            return np.arange(self.shape[0])
-        else:
-            return self.src_indices.shaped_array(flat=True)
+        return np.arange(self.shape[0])
 
     def cols(self):
         """
@@ -1236,7 +1230,7 @@ class DiagonalSubjac(SparseSubjac):
             return self.info['val']
 
         rnd = randgen.random(self.info['val'].size)
-        rnd += 1
+        rnd += 1.
         return rnd
 
     def set_val(self, val):
