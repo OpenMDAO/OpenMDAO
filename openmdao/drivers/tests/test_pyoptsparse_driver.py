@@ -3499,7 +3499,7 @@ class TestLinearOnlyDVs(unittest.TestCase):
         driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
         driver.opt_settings['print_level'] = 0
         driver.opt_settings['max_iter'] = 1000
-        driver.declare_coloring()
+        driver.declare_coloring(show_sparsity=True)
         p = self.setup_lin_only_dv_problem(driver=driver, shape=shape)
         p.run_model()
         p.run_driver()
