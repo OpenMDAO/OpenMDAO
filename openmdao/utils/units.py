@@ -612,7 +612,7 @@ def _new_unit(name, factor, powers):
 
 def add_offset_unit(name, baseunit, factor, offset, comment=''):
     """
-    Adding Offset Unit.
+    Add Offset Unit.
 
     Parameters
     ----------
@@ -646,7 +646,7 @@ def add_offset_unit(name, baseunit, factor, offset, comment=''):
 
 def add_unit(name, unit, comment=''):
     """
-    Adding Unit.
+    Add Unit.
 
     Parameters
     ----------
