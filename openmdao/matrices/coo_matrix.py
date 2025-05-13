@@ -229,9 +229,15 @@ class COOMatrix(Matrix):
         return mask
 
     def toarray(self):
+        """
+        Return the matrix as a dense array.
+
+        Returns
+        -------
+        ndarray
+            Dense array representation of the matrix.
+        """
         return self._matrix.toarray()
-
-
 
 
 def _compute_index_map(jrows, jcols, src_indices):

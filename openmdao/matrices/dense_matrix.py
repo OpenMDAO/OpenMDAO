@@ -48,4 +48,12 @@ class DenseMatrix(COOMatrix):
         self._matrix = self._coo.toarray()
 
     def toarray(self):
+        """
+        Return the matrix as a dense array.
+
+        Returns
+        -------
+        ndarray
+            Dense array representation of the matrix.
+        """
         return self._matrix
