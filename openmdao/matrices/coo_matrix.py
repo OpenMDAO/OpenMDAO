@@ -51,9 +51,10 @@ class COOMatrix(Matrix):
         submats = self._submats
         key_ranges = {}
 
+        # compute the ranges of the subjacs within the COO data/rows/cols arrays
         start = end = 0
         for key, submat in submats.items():
-            size = submat.get_sparse_data_size()
+            size = submat.get_coo_data_size()
             end += size
             key_ranges[key] = (start, end, submat)
             start = end

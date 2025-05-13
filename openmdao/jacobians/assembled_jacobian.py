@@ -101,11 +101,11 @@ class AssembledJacobian(SplitJacobian):
             randgen = None
 
         for key, subjac in int_subjacs.items():
-            int_mtx._update_submat(key, subjac.get_val(randgen))
+            int_mtx._update_submat(key, subjac.get_as_coo_data(randgen))
 
         if ext_subjacs:
             for key, subjac in ext_subjacs.items():
-                ext_mtx._update_submat(key, subjac.get_val(randgen))
+                ext_mtx._update_submat(key, subjac.get_as_coo_data(randgen))
 
         int_mtx._post_update()
 
