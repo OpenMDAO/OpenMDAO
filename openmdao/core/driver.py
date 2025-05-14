@@ -1724,7 +1724,7 @@ class Driver(object, metaclass=DriverMetaclass):
         constraints = self._cons
 
         for constraint, con_options in constraints.items():
-            constraint_value = np.copy(prob.get_val(constraint)).ravel()
+            constraint_value = prob.get_val(constraint).ravel()
             con_size = con_options['size']
             if con_options.get('equals', None) is not None:
                 active_cons[constraint] = {'indices': np.arange(con_size, dtype=int),
@@ -1733,14 +1733,21 @@ class Driver(object, metaclass=DriverMetaclass):
                 constraint_upper = con_options.get("upper", np.inf)
                 constraint_lower = con_options.get("lower", -np.inf)
 
-                upper_mask = np.logical_or(constraint_value > constraint_upper,
-                                           np.isclose(constraint_value, constraint_upper,
-                                                      atol=feas_atol, rtol=feas_rtol))
-                upper_idxs = np.where(upper_mask)[0]
-                lower_mask = np.logical_or(constraint_value < constraint_lower,
-                                           np.isclose(constraint_value, constraint_lower,
-                                                      atol=feas_atol, rtol=feas_rtol))
-                lower_idxs = np.where(lower_mask)[0]
+                if np.all(np.isinf(constraint_upper)):
+                    upper_idxs = np.empty()
+                else:
+                    upper_mask = np.logical_or(constraint_value > constraint_upper,
+                                            np.isclose(constraint_value, constraint_upper,
+                                                        atol=feas_atol, rtol=feas_rtol))
+                    upper_idxs = np.where(upper_mask)[0]
+
+                if np.all(np.isinf(constraint_lower)):
+                    lower_idxs = np.empty()
+                else:
+                    lower_mask = np.logical_or(constraint_value < constraint_lower,
+                                            np.isclose(constraint_value, constraint_lower,
+                                                        atol=feas_atol, rtol=feas_rtol))
+                    lower_idxs = np.where(lower_mask)[0]
 
                 active_idxs = sorted(np.concatenate((upper_idxs, lower_idxs)))
                 active_bounds = [1 if idx in upper_idxs else -1 for idx in active_idxs]
@@ -1749,7 +1756,7 @@ class Driver(object, metaclass=DriverMetaclass):
                                                'active_bounds': active_bounds}
 
         for des_var, des_var_options in des_vars.items():
-            des_var_value = np.copy(prob.get_val(des_var)).ravel()
+            des_var_value = prob.get_val(des_var).ravel()
             des_var_upper = np.ravel(des_var_options.get("upper", np.inf))
             des_var_lower = np.ravel(des_var_options.get("lower", -np.inf))
             des_var_size = des_var_options['size']
@@ -1870,13 +1877,12 @@ class Driver(object, metaclass=DriverMetaclass):
         des_vars = self._designvars
 
         of_totals = {objective, *constraints.keys()}
-        wrt_totals = {*des_vars.keys()}
 
         active_cons, active_dvs = self._get_active_cons_and_dvs(feas_atol=feas_tol,
                                                                 feas_rtol=feas_tol)
 
         totals = prob.compute_totals(list(of_totals),
-                                     list(wrt_totals),
+                                     list(des_vars),
                                      driver_scaling=True)
 
         grad_f = {inp: totals[objective, inp] for inp in des_vars.keys()}
