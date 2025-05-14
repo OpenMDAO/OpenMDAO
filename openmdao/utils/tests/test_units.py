@@ -276,7 +276,7 @@ class TestPhysicalUnit(unittest.TestCase):
 
     def test_MMBtu(self):
         fact = unit_conversion('MMBtu', 'Btu')
-        assert_near_equal(fact[0], 1000.)
+        assert_near_equal(fact[0], 1.0E6)
 
     def test_suggest_units(self):
         with self.assertRaises(ValueError) as cm:
