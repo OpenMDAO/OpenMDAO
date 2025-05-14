@@ -1204,6 +1204,9 @@ class Group(System):
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(self._vectors)
 
+    def _add_approximations(self):
+        pass
+
     def _update_dataflow_graph(self, responses):
         """
         Update the dataflow graph based on missing partials.
@@ -3863,6 +3866,8 @@ class Group(System):
                     self._setup_approx_derivs(),
             else:
                 self._setup_approx_coloring()
+                if self._jacobian is None:
+                    self._init_jacobian()
 
             if self._jacobian is not None:
                 self._jacobian._setup(self)

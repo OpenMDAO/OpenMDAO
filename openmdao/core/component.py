@@ -395,8 +395,6 @@ class Component(System):
         Process all partials and approximations that the user declared.
         """
         self._subjacs_info = {}
-        if not self.matrix_free:
-            self._init_jacobian()
 
         self.setup_partials()  # hook for component writers to specify sparsity patterns
 
@@ -435,6 +433,9 @@ class Component(System):
         for key, pattern_meta in self._declared_partials_patterns.items():
             of, wrt = key
             self._resolve_partials_patterns(of, wrt, pattern_meta)
+
+        if not self.matrix_free:
+            self._init_jacobian()
 
     def setup_partials(self):
         """
@@ -1602,8 +1603,14 @@ class Component(System):
         Initialize the jacobian.
 
         Override this in a subclass to use a different jacobian type than DictionaryJacobian.
+
+        Returns
+        -------
+        Jacobian
+            The initialized jacobian.
         """
         self._jacobian = BlockJacobian(system=self)
+        return self._jacobian
 
     def _column_iotypes(self):
         """
@@ -1714,41 +1721,10 @@ class Component(System):
         patterns = [pattern] if isinstance(pattern, str) else pattern
         return [(pattern, find_matches(pattern, self._get_partials_wrts())) for pattern in patterns]
 
-    # def _check_partials_meta(self, abs_key, val, shape):
-    #     """
-    #     Check a given partial derivative and metadata for the correct shapes.
-
-    #     Parameters
-    #     ----------
-    #     abs_key : tuple(str, str)
-    #         The of/wrt pair (given absolute names) defining the partial derivative.
-    #     val : ndarray
-    #         Subjac value.
-    #     shape : tuple
-    #         Expected shape of val.
-    #     """
-    #     out_size, in_size = shape
-
-    #     if in_size == 0 and self.comm.rank != 0:  # 'inactive' component
-    #         return
-
-    #     if val is not None:
-    #         val_shape = val.shape
-    #         if len(val_shape) == 1:
-    #             val_out, val_in = val_shape[0], 1
-    #         else:
-    #             val_out, val_in = val.shape
-    #         if val_out > out_size or val_in > in_size:
-    #             of, wrt = abs_key2rel_key(self, abs_key)
-    #             msg = '{}: d({})/d({}): Expected {}x{} but val is {}x{}'
-    #             raise ValueError(msg.format(self.msginfo, of, wrt, out_size, in_size,
-    #                                         val_out, val_in))
-
-    def _set_approx_partials_meta(self):
+    def _add_approximations(self):
         """
         Add approximations for those partials registered with method=fd or method=cs.
         """
-        self._get_static_wrt_matches()
         subjacs = self._subjacs_info
         wrtset = set()
         subjac_keys = self._get_approx_subjac_keys()

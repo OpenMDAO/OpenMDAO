@@ -3617,6 +3617,7 @@ class _ColSparsityJac(object):
         self._ncols = end
         self.shape = (nrows, end)
         self._col_list = [None] * self._ncols
+        self._scratch = np.zeros(nrows)
 
     def set_col(self, system, i, column):
         # record only the nonzero part of the column.
@@ -3627,14 +3628,11 @@ class _ColSparsityJac(object):
                 self._col_list[i] = [nzs, np.abs(column[nzs])]
             else:
                 oldnzs, olddata = self._col_list[i]
-                if oldnzs.size == nzs.size and np.all(nzs == oldnzs):
-                    olddata += np.abs(column[nzs])
-                else:  # nonzeros don't match
-                    scratch = np.zeros(column.size)
-                    scratch[oldnzs] = olddata
-                    scratch[nzs] += np.abs(column[nzs])
-                    newnzs = np.nonzero(scratch)[0]
-                    self._col_list[i] = [newnzs, scratch[newnzs]]
+                self._scratch[:] = 0.0
+                self._scratch[oldnzs] = olddata
+                self._scratch[nzs] += np.abs(column[nzs])
+                newnzs = np.nonzero(self._scratch)[0]
+                self._col_list[i] = [newnzs, self._scratch[newnzs]]
 
     def set_dense_jac(self, system, jac):
         """
@@ -3678,9 +3676,9 @@ class _ColSparsityJac(object):
             data.append(d)
 
         if rows:
-            rows = np.hstack(rows)
-            cols = np.hstack(cols)
-            data = np.hstack(data)
+            rows = np.concatenate(rows)
+            cols = np.concatenate(cols)
+            data = np.concatenate(data)
 
             # scale the data
             data *= (1. / np.max(data))

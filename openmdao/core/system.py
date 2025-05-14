@@ -750,8 +750,14 @@ class System(object, metaclass=SystemMetaclass):
         Initialize the jacobian.
 
         Override this in a subclass to use a different jacobian type than DictionaryJacobian.
+
+        Returns
+        -------
+        Jacobian
+            The initialized jacobian.
         """
         self._jacobian = DictionaryJacobian(system=self)
+        return self._jacobian
 
     def _declare_options(self):
         """
@@ -2531,7 +2537,8 @@ class System(object, metaclass=SystemMetaclass):
                 s._assembled_jac = asm_jac
 
         if self._has_approx:
-            self._set_approx_partials_meta()
+            self._get_static_wrt_matches()
+            self._add_approximations()  # this does nothing for a Group
 
         # At present, we don't support a AssembledJacobian in a group
         # if any subcomponents are matrix-free.
@@ -3086,11 +3093,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         if (level, depth, type_) not in self._solver_print_cache:
             self._solver_print_cache.append((level, depth, type_))
-
-    def _set_approx_partials_meta(self):
-        # this will load a static coloring (if any) and will populate wrt_matches if
-        # there is any coloring (static or dynamic).
-        self._get_static_wrt_matches()
 
     def _get_static_wrt_matches(self):
         """
