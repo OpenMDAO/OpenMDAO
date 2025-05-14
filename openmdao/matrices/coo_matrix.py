@@ -21,8 +21,8 @@ class COOMatrix(Matrix):
     ----------
     _coo : coo_matrix
         COO matrix. Used as a basis for conversion to CSC, CSR, Dense in inherited classes.
-    _matrix_T : coo_matrix
-        Transpose of the COO matrix.  Only computed if needed for reverse mode for CSC or CSR
+    _matrix_T : sparse matrix
+        Transpose of the matrix.  Only computed if needed for reverse mode for CSC or CSR
         matrices.
     """
 
@@ -34,14 +34,14 @@ class COOMatrix(Matrix):
         self._coo = None
         self._matrix_T = None
 
-    def _build_coo(self, system):
+    def _build_coo(self, dtype=float):
         """
         Allocate the data, rows, and cols for the COO matrix.
 
         Parameters
         ----------
-        system : <System>
-            Parent system of this matrix.
+        dtype : dtype
+            The dtype of the matrix.
 
         Returns
         -------
@@ -54,30 +54,25 @@ class COOMatrix(Matrix):
         # compute the ranges of the subjacs within the COO data/rows/cols arrays
         start = end = 0
         for key, submat in submats.items():
-            size = submat.get_coo_data_size()
-            end += size
+            end += submat.get_coo_data_size()
             key_ranges[key] = (start, end, submat)
             start = end
 
         rows = np.empty(end, dtype=INT_DTYPE)
         cols = np.empty(end, dtype=INT_DTYPE)
-
-        if system is not None and system.under_complex_step:
-            data = np.zeros(end, dtype=complex)
-        else:
-            data = np.zeros(end)
+        data = np.zeros(end, dtype=dtype)
 
         metadata = self._metadata
         for key, (start, end, submat) in key_ranges.items():
-            irow = submat.row_slice.start
-            icol = submat.col_slice.start
-            rows[start:end] = submat.rows() + irow
-            cols[start:end] = submat.cols() + icol
+            row_offset = submat.row_slice.start
+            col_offset = submat.col_slice.start
+            rows[start:end] = submat.rows() + row_offset
+            cols[start:end] = submat.cols() + col_offset
             metadata[key] = (slice(start, end), submat.factor)
 
         return data, rows, cols
 
-    def _build(self, num_rows, num_cols, system=None):
+    def _build(self, num_rows, num_cols, dtype=float):
         """
         Allocate the matrix.
 
@@ -87,10 +82,10 @@ class COOMatrix(Matrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
-        system : <System>
-            owning system.
+        dtype : dtype
+            The dtype of the matrix.
         """
-        data, rows, cols = self._build_coo(system)
+        data, rows, cols = self._build_coo(dtype)
         self._matrix = self._coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
 
     def _update_submat(self, key, jac):

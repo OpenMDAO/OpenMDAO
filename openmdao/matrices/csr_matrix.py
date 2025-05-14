@@ -15,7 +15,7 @@ class CSRMatrix(COOMatrix):
         Dictionary of sub-jacobian data keyed by (row_name, col_name).
     """
 
-    def _build(self, num_rows, num_cols, in_ranges, out_ranges):
+    def _build(self, num_rows, num_cols, dtype=float):
         """
         Allocate the matrix.
 
@@ -25,12 +25,10 @@ class CSRMatrix(COOMatrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
-        in_ranges : dict
-            Maps input var name to column range.
-        out_ranges : dict
-            Maps output var name to row range.
+        dtype : dtype
+            The dtype of the matrix.
         """
-        super()._build(num_rows, num_cols, in_ranges, out_ranges)
+        super()._build(num_rows, num_cols, dtype)
         self._coo = self._matrix
 
     def _pre_update(self):
@@ -50,7 +48,7 @@ class CSRMatrix(COOMatrix):
         # because on older versions of scipy, self._coo.tocsr() reuses the row/col arrays and the
         # result is that self._coo.row and self._coo.col get scrambled after csr conversion.
         self._matrix = csr_matrix((coo.data, (coo.row, coo.col)), shape=coo.shape)
-        self._matrix_T = None
+        self._matrix_T = None  # reset the transpose
 
     def transpose(self):
         """

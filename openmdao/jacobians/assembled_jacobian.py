@@ -64,11 +64,16 @@ class AssembledJacobian(SplitJacobian):
         self._int_mtx = int_mtx = self._matrix_class(int_subjacs)
 
         out_size = len(system._outputs)
-        int_mtx._build(out_size, out_size, system)
+        if system.under_complex_step:
+            dtype = complex
+        else:
+            dtype = float
+
+        int_mtx._build(out_size, out_size, dtype)
 
         if ext_subjacs:
             ext_mtx = self._matrix_class(ext_subjacs)
-            ext_mtx._build(out_size, len(system._dinputs))
+            ext_mtx._build(out_size, len(system._dinputs), dtype)
         else:
             ext_mtx = None
 

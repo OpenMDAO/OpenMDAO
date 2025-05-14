@@ -15,7 +15,7 @@ class CSCMatrix(COOMatrix):
         Dictionary of sub-jacobian data keyed by (row_name, col_name).
     """
 
-    def _build(self, num_rows, num_cols, system=None):
+    def _build(self, num_rows, num_cols, dtype=float):
         """
         Allocate the matrix.
 
@@ -25,10 +25,10 @@ class CSCMatrix(COOMatrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
-        system : <System>
-            owning system.
+        dtype : dtype
+            The dtype of the matrix.
         """
-        super()._build(num_rows, num_cols, system)
+        super()._build(num_rows, num_cols, dtype)
         self._coo = self._matrix
 
     def _pre_update(self):
@@ -47,7 +47,7 @@ class CSCMatrix(COOMatrix):
         # because on older versions of scipy, self._coo.tocsc() reuses the row/col arrays and the
         # result is that self._coo.row and self._coo.col get scrambled after csc conversion.
         self._matrix = csc_matrix((coo.data, (coo.row, coo.col)), shape=coo.shape)
-        self._matrix_T = None
+        self._matrix_T = None  # reset the transpose
 
     def transpose(self):
         """

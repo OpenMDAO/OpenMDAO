@@ -105,10 +105,10 @@ class Jacobian(object):
 
         return self._subjacs
 
-    def _get_vec_slices(self, system, iotype):
+    def _get_vec_slices(self, system, iotype, subset=None):
         slices = self._vec_slices[iotype]
         if slices is None:
-            it = meta2range_iter(system._var_abs2meta[iotype].items())
+            it = meta2range_iter(system._var_abs2meta[iotype].items(), subset=subset)
             self._vec_slices[iotype] = slices = {n: slice(start, end) for n, start, end in it}
         return slices
 
@@ -120,30 +120,6 @@ class Jacobian(object):
             if abskey is not None:
                 self._abs_keys[key] = abskey
             return abskey
-
-    def _abs_key2shape(self, abs_key):
-        """
-        Return shape of sub-jacobian for variables making up the key tuple.
-
-        Parameters
-        ----------
-        abs_key : (str, str)
-            Absolute name pair of sub-Jacobian.
-
-        Returns
-        -------
-        out_size : int
-            local size of the output variable.
-        in_size : int
-            local size of the input variable.
-        """
-        abs2meta = self._system()._var_allprocs_abs2meta
-        of, wrt = abs_key
-        if wrt in abs2meta['input']:
-            sz = abs2meta['input'][wrt]['size']
-        else:
-            sz = abs2meta['output'][wrt]['size']
-        return (abs2meta['output'][of]['size'], sz)
 
     def get_metadata(self, key):
         """

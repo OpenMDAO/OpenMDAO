@@ -18,7 +18,7 @@ class DenseMatrix(COOMatrix):
         Dictionary of sub-jacobian data keyed by (row_name, col_name).
     """
 
-    def _build(self, num_rows, num_cols, system=None):
+    def _build(self, num_rows, num_cols, dtype=float):
         """
         Allocate the matrix.
 
@@ -28,10 +28,10 @@ class DenseMatrix(COOMatrix):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
-        system : <System>
-            owning system.
+        dtype : dtype
+            The dtype of the matrix.
         """
-        super()._build(num_rows, num_cols)
+        super()._build(num_rows, num_cols, dtype)
         self._coo = self._matrix
 
     def _pre_update(self):

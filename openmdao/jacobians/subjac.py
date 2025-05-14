@@ -393,10 +393,6 @@ class DenseSubjac(Subjac):
             Subjac data.
         """
         return self.get_val(randgen).ravel()
-        # if randgen is None:
-        #     return self.info['val'].ravel()
-
-        # return self.get_val(randgen).ravel()
 
     def get_coo_data_size(self):
         """
@@ -415,12 +411,12 @@ class DenseSubjac(Subjac):
 
     def cols(self):
         """
-        Get the column indices of the subjacobian.
+        Get the COO column indices of the subjacobian.
 
         Returns
         -------
         ndarray
-            Column indices of the subjacobian.
+            COO column indices of the subjacobian.
         """
         if self.src_indices is None:
             colrange = range(self.col_slice.stop - self.col_slice.start)
@@ -431,12 +427,12 @@ class DenseSubjac(Subjac):
 
     def rows(self):
         """
-        Get the row indices of the subjacobian.
+        Get the COO row indices of the subjacobian.
 
         Returns
         -------
         ndarray
-            Row indices of the subjacobian.
+            COO row indices of the subjacobian.
         """
         nrows = self.shape[0]
         a = np.arange(self.row_slice.stop - self.row_slice.start).reshape((nrows, 1))
@@ -528,24 +524,24 @@ class SparseSubjac(Subjac):
 
     def rows(self):
         """
-        Get the row indices of the subjacobian.
+        Get the COO row indices of the subjacobian.
 
         Returns
         -------
         ndarray
-            Row indices of the subjacobian.
+            COO row indices of the subjacobian.
         """
         _, rows, _ = self.as_coo_info()
         return rows
 
     def cols(self):
         """
-        Get the column indices of the subjacobian.
+        Get the COO column indices of the subjacobian.
 
         Returns
         -------
         ndarray
-            Column indices of the subjacobian.
+            COO column indices of the subjacobian.
         """
         _, _, cols = self.as_coo_info()
         return cols
@@ -1189,23 +1185,23 @@ class DiagonalSubjac(SparseSubjac):
 
     def rows(self):
         """
-        Get the row indices of the subjacobian.
+        Get the COO row indices of the subjacobian.
 
         Returns
         -------
         ndarray
-            Row indices of the subjacobian.
+            COO row indices of the subjacobian.
         """
         return np.arange(self.shape[0])
 
     def cols(self):
         """
-        Get the column indices of the subjacobian.
+        Get the COO column indices of the subjacobian.
 
         Returns
         -------
         ndarray
-            Column indices of the subjacobian.
+            COO column indices of the subjacobian.
         """
         if self.src_indices is None:
             return np.arange(self.shape[1])
@@ -1380,23 +1376,23 @@ class ZeroSubjac(Subjac):
 
     def rows(self):
         """
-        Get the row indices of the subjacobian.
+        Get the COO row indices of the subjacobian.
 
         Returns
         -------
         ndarray
-            Row indices of the subjacobian.
+            COO row indices of the subjacobian.
         """
         return np.zeros(0)
 
     def cols(self):
         """
-        Get the column indices of the subjacobian.
+        Get the COO column indices of the subjacobian.
 
         Returns
         -------
         ndarray
-            Column indices of the subjacobian.
+            COO column indices of the subjacobian.
         """
         return np.zeros(0)
 

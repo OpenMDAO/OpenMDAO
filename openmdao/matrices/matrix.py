@@ -35,7 +35,7 @@ class Matrix(object):
         self._submats = submats
         self._metadata = {}
 
-    def _build(self, num_rows, num_cols, system=None):
+    def _build(self, num_rows, num_cols, dtype=float):
         """
         Allocate the matrix.
 
@@ -45,8 +45,8 @@ class Matrix(object):
             number of rows in the matrix.
         num_cols : int
             number of cols in the matrix.
-        system : <System>
-            owning system.
+        dtype : dtype
+            The dtype of the matrix.
         """
         pass
 
@@ -61,7 +61,7 @@ class Matrix(object):
         jac : ndarray or scipy.sparse or tuple
             the sub-jacobian, the same format with which it was declared.
         """
-        pass
+        raise NotImplementedError("Matrix._update_submat")
 
     def _prod(self, vec, mode, mask=None):
         """
