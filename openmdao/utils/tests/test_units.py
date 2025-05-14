@@ -274,6 +274,17 @@ class TestPhysicalUnit(unittest.TestCase):
             simplified_str = simplify_unit(test_str)
             self.assertEqual(simplified_str, correct_str)
 
+    def test_MMBtu(self):
+        fact = unit_conversion('MMBtu', 'Btu')
+        assert_near_equal(fact[0], 1000.)
+
+    def test_suggest_units(self):
+        with self.assertRaises(ValueError) as cm:
+            unit_conversion('lbm', 'kgg')
+        expected = ("The units 'kgg' are invalid. Perhaps "
+                    "you meant one of the following units?: ['kg', 'g']")
+        self.assertEqual(expected, str(cm.exception))
+
     def test_atto_seconds(self):
         # The unit 'as' was bugged because it is a python keyword.
 
