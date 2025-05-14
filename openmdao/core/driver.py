@@ -1703,7 +1703,8 @@ class Driver(object, metaclass=DriverMetaclass):
         assume_dvs_active : bool
             Override to force design variables to be treated as active.
 
-        Returns:
+        Returns
+        -------
         active_cons : dict[str: dict
             The names of the active constraints. For each active constraint,
             a dict of the active indices and the active bound (0='equals',
