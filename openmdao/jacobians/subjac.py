@@ -926,8 +926,14 @@ class OMCOOSubjac(COOSubjac):
             Unit conversion factor for the subjacobian.
         src : str or None
             Source name for the subjacobian.
+
+        Attributes
+        ----------
+        _saved_val : ndarray or None
+            Saved subjacobian value.
         """
         super().__init__(key, info, row_slice, col_slice, wrt_is_input, src_indices, factor, src)
+        self._saved_val = None
         self.set_val(info['val'])
 
     @classmethod
@@ -1062,8 +1068,14 @@ class OMCOOSubjac(COOSubjac):
             return self.coo @ vec
         else:
             # don't update self.coo with random values
-            return coo_matrix((self.get_val(randgen), (self.info['rows'], self.info['cols'])),
-                              shape=self.shape) @ vec
+            if self._saved_val is None:
+                self._saved_val = self.coo.data.copy()
+            else:
+                self._saved_val[:] = self.coo.data
+            self.coo.data[:] = self.get_val(randgen)
+            result = self.coo @ vec
+            self.coo.data[:] = self._saved_val
+            return result
 
     def _matvec_rev(self, vec, randgen=None):
         if randgen is None:

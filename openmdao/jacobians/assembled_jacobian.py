@@ -22,9 +22,9 @@ class AssembledJacobian(SplitJacobian):
     Attributes
     ----------
     _int_mtx : <Matrix>
-        Global internal Jacobian.
-    _ext_mtx : {str: <Matrix>, ...}
-        External Jacobian for each viewing subsystem.
+        Global internal Jacobian. Used by a direct solver to perform a linear solve.
+    _ext_mtx : <Matrix>
+        External Jacobian.
     _mask_caches : dict
         Contains masking arrays for when a subset of the variables are present in a vector, keyed
         by the input._names set.
@@ -45,7 +45,7 @@ class AssembledJacobian(SplitJacobian):
 
         super().__init__(system)
         self._int_mtx = None
-        self._ext_mtx = {}
+        self._ext_mtx = None
         self._mask_caches = {}
         self._matrix_class = matrix_class
         self._subjac_iters = defaultdict(lambda: None)
@@ -77,7 +77,10 @@ class AssembledJacobian(SplitJacobian):
         else:
             ext_mtx = None
 
-        self._ext_mtx[system.pathname] = ext_mtx
+        if self._ext_mtx:
+            raise RuntimeError(f"Adding ext mtx for system {system.pathname} but already have "
+                               f"ext mtx")
+        self._ext_mtx = ext_mtx
 
     def _update(self, system):
         """
@@ -93,7 +96,7 @@ class AssembledJacobian(SplitJacobian):
             self._initialize(system)
 
         int_mtx = self._int_mtx
-        ext_mtx = self._ext_mtx[system.pathname]
+        ext_mtx = self._ext_mtx
         int_subjacs, ext_subjacs = self._get_split_subjacs(system)
 
         int_mtx._pre_update()
@@ -139,7 +142,7 @@ class AssembledJacobian(SplitJacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        ext_mtx = self._ext_mtx[system.pathname]
+        ext_mtx = self._ext_mtx
         if ext_mtx is None and not d_outputs._names:  # avoid unnecessary unscaling
             return
 
@@ -184,9 +187,8 @@ class AssembledJacobian(SplitJacobian):
 
         if self._int_mtx is not None:
             self._int_mtx.set_complex_step_mode(active)
-            for mtx in self._ext_mtx.values():
-                if mtx:
-                    mtx.set_complex_step_mode(active)
+            if self._ext_mtx:
+                self._ext_mtx.set_complex_step_mode(active)
 
 
 class DenseJacobian(AssembledJacobian):
