@@ -12,7 +12,7 @@ While we neglected to post an official roadmap for 2024, we made significant pro
 
 We made considerable strides into automatic differentiation by closely coupling the capability of the JAX framework with OpenMDAO's JAXExplicitComponent and JaxImplicitComponent. This is in addition to existing AD capability on the Julia side via `OpenMDAO.jl` and the work being developed on the Computational Systems Design Language (CSDL) at UCSD.
 
-AnalysisDriver is a generalization of capability regarding model analysis and visualization. DOEDriver's behavior was governed by the optimization problem as defined upon the system. Performing a simple parameter sweep across model inputs wasn't simple to do. The work on the AnalaysisDriver and related visualizations should improve the situation.
+AnalysisDriver is a generalization of DOEDriver capability regarding model analysis and visualization. DOEDriver's behavior was governed by the optimization problem as defined upon the system. Performing a simple parameter sweep across model inputs wasn't simple to do. The work on the AnalaysisDriver and related visualizations should improve the situation.
 
 While we made some good strides into developing instructional content on the web, changes in our team and our budget have put an end to those efforts in the short term.
 
