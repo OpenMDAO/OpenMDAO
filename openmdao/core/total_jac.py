@@ -1880,6 +1880,8 @@ class _TotalJacInfo(object):
         system : System
             System that is setting up the total jacobian.
         """
+        # This is called when this is a system ._jacobian.  Eventually, once we unify the
+        # interfaces between partial and total jacobians, this will actually do something.
         pass
 
     def set_col(self, system, icol, column):

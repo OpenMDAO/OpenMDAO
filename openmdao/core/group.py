@@ -3863,7 +3863,7 @@ class Group(System):
                     # TODO: for top level FD, call below is unnecessary, but we need this
                     # for some tests that just call run_linearize directly without calling
                     # compute_totals.
-                    self._setup_approx_derivs(),
+                    self._setup_approx_derivs()
             else:
                 self._setup_approx_coloring()
                 if self._jacobian is None:

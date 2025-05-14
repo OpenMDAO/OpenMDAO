@@ -53,6 +53,14 @@ class Jacobian(object):
         self._vec_slices = {'output': None, 'input': None}
 
     def _setup(self, system):
+        """
+        Initialize our subjacobians if they haven't been initialized yet.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        """
         self._get_subjacs(system)
 
     def create_subjac(self, system, abs_key, meta):
@@ -92,7 +100,7 @@ class Jacobian(object):
         return Subjac.get_subjac_class(meta)(key, meta, row_slice, col_slice, wrt_is_input,
                                              src_indices, factor, src)
 
-    def _get_subjacs(self, system):
+    def _get_subjacs(self, system=None):
         if self._subjacs is None:
             self._subjacs = {}
             out_slices = self._get_vec_slices(system, 'output')
@@ -476,7 +484,7 @@ class SplitJacobian(Jacobian):
 
     def _setup(self, system):
         """
-        Initialize the Subjacs in the SplitJacobian.
+        Initialize our subjacobians if they haven't been initialized yet.
 
         Parameters
         ----------

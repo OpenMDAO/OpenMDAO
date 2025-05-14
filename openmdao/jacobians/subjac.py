@@ -1259,6 +1259,8 @@ class DiagonalSubjac(SparseSubjac):
             column[icol] = 0.  # zero out the row that is covered by sparsity
             nzs = np.where(np.abs(column) > uncovered_threshold)[0]
             if nzs.size > 0:
+                if 'uncovered_nz' not in self.info:
+                    self.info['uncovered_nz'] = []
                 self.info['uncovered_nz'].extend(list(zip(nzs, icol * np.ones_like(nzs))))
             column[icol] = save
 
