@@ -1770,7 +1770,8 @@ class Problem(object, metaclass=ProblemMetaclass):
                          desvar_opts=[],
                          cons_opts=[],
                          objs_opts=[],
-                         out_stream=_DEFAULT_OUT_STREAM
+                         out_stream=_DEFAULT_OUT_STREAM,
+                         return_format='list'
                          ):
         """
         Print all design variables and responses (objectives and constraints).
@@ -1807,6 +1808,10 @@ class Problem(object, metaclass=ProblemMetaclass):
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
+        return_format : str
+            Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
+            If 'dict', the return value is a dictionary mapping {kind: {name: metadata}}.
+            If 'list', the return value is a dictionary mapping {kind: [(name, metadata), ...]}.
 
         Returns
         -------
@@ -1896,9 +1901,14 @@ class Problem(object, metaclass=ProblemMetaclass):
             o[1]['val'] = vals[o[0]]
         obj_vars = [tuple(o) for o in obj_vars]
 
-        prob_vars = {'design_vars': des_vars,
-                     'constraints': cons_vars,
-                     'objectives': obj_vars}
+        if return_format == 'dict':
+            prob_vars = {'design_vars': {k: v for k, v in des_vars},
+                         'constraints': {k: v for k, v in cons_vars},
+                         'objectives': {k: v for k, v in obj_vars}}
+        else:
+            prob_vars = {'design_vars': des_vars,
+                         'constraints': cons_vars,
+                         'objectives': obj_vars}
 
         return prob_vars
 
