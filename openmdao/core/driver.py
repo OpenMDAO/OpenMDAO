@@ -1737,16 +1737,16 @@ class Driver(object, metaclass=DriverMetaclass):
                     upper_idxs = np.empty()
                 else:
                     upper_mask = np.logical_or(constraint_value > constraint_upper,
-                                            np.isclose(constraint_value, constraint_upper,
-                                                        atol=feas_atol, rtol=feas_rtol))
+                                               np.isclose(constraint_value, constraint_upper,
+                                                          atol=feas_atol, rtol=feas_rtol))
                     upper_idxs = np.where(upper_mask)[0]
 
                 if np.all(np.isinf(constraint_lower)):
                     lower_idxs = np.empty()
                 else:
                     lower_mask = np.logical_or(constraint_value < constraint_lower,
-                                            np.isclose(constraint_value, constraint_lower,
-                                                        atol=feas_atol, rtol=feas_rtol))
+                                               np.isclose(constraint_value, constraint_lower,
+                                                          atol=feas_atol, rtol=feas_rtol))
                     lower_idxs = np.where(lower_mask)[0]
 
                 active_idxs = sorted(np.concatenate((upper_idxs, lower_idxs)))
