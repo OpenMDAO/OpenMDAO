@@ -1708,7 +1708,8 @@ class Driver(object, metaclass=DriverMetaclass):
         active_cons : dict[str: dict
             The names of the active constraints. For each active constraint,
             a dict of the active indices and the active bound (0='equals',
-            -1='lower', 1='upper') is provided.
+            -1='lower', 1='upper') is provided. These are the active indices
+            _of_ the constraint "indices".
         active_dvs : list[str]
             The names of the active design variables. For each active design
             variable, a dict of the active indices and the active bound
@@ -1716,22 +1717,32 @@ class Driver(object, metaclass=DriverMetaclass):
             design variable bound of 'equal' is only possible when
             assume_dvs_active is True, and the design variables are
             returned as if they are on an active equality constraint.
+            These are the active indices _of_ the design var indices.
         """
         active_cons = {}
         active_dvs = {}
-        prob = self._problem()
         des_vars = self._designvars
         constraints = self._cons
 
+        # We obtain the driver scaled values so that feasibility check is performed
+        # with driver scaling.
+        dv_vals = self.get_design_var_values(driver_scaling=True)
+        con_vals = self.get_constraint_values(driver_scaling=True)
+
         for constraint, con_options in constraints.items():
-            constraint_value = prob.get_val(constraint).ravel()
+            constraint_value = con_vals[constraint]
             con_size = con_options['size']
+            adder = 0.0 if con_options['total_adder'] is None else con_options['total_adder']
+            scaler = 1.0 if con_options['total_scaler'] is None else con_options['total_scaler']
+
             if con_options.get('equals', None) is not None:
+                # Equality constraint, all indices active
                 active_cons[constraint] = {'indices': np.arange(con_size, dtype=int),
                                            'active_bounds': np.zeros(con_size, dtype=int)}
             else:
-                constraint_upper = con_options.get("upper", np.inf)
-                constraint_lower = con_options.get("lower", -np.inf)
+                # Inequality constraint, determine active indices and bounds
+                constraint_upper = (con_options.get("upper", np.inf) + adder) * scaler
+                constraint_lower = (con_options.get("lower", -np.inf) + adder) * scaler
 
                 if np.all(np.isinf(constraint_upper)):
                     upper_idxs = np.empty()
@@ -1756,10 +1767,13 @@ class Driver(object, metaclass=DriverMetaclass):
                                                'active_bounds': active_bounds}
 
         for des_var, des_var_options in des_vars.items():
-            des_var_value = prob.get_val(des_var).ravel()
-            des_var_upper = np.ravel(des_var_options.get("upper", np.inf))
-            des_var_lower = np.ravel(des_var_options.get("lower", -np.inf))
+            des_var_value = dv_vals[des_var]
             des_var_size = des_var_options['size']
+            adder = 0.0 if con_options['total_adder'] is None else con_options['total_adder']
+            scaler = 1.0 if con_options['total_scaler'] is None else con_options['total_scaler']
+            des_var_upper = (np.ravel(des_var_options.get("upper", np.inf)) + adder) * scaler
+            des_var_lower = (np.ravel(des_var_options.get("lower", -np.inf)) + adder) * scaler
+
             if assume_dvs_active:
                 active_dvs[des_var] = {'indices': np.arange(des_var_size, dtype=int),
                                        'active_bounds': np.zeros(des_var_size, dtype=int)}
@@ -1814,24 +1828,18 @@ class Driver(object, metaclass=DriverMetaclass):
         if obj_ref0 is None:
             obj_ref0 = 0.0
 
+        obj_scaler = obj_meta['total_scaler'] or 1.0
+
         unscaled_multipliers = {}
 
         for name, val in multipliers.items():
             if name in self._designvars:
-                ref = self._designvars[name]['ref']
-                ref0 = self._designvars[name]['ref0']
+                scaler = self._designvars[name]['total_scaler']
             else:
-                for response in self._responses.values():
-                    if response['name'] == name:
-                        ref = response['ref']
-                        ref0 = response['ref0']
+                scaler = self._responses[name]['total_scaler']
+            scaler = scaler or 1.0
 
-            if ref is None:
-                ref = 1.0
-            if ref0 is None:
-                ref0 = 0.0
-
-            unscaled_multipliers[name] = val * (obj_ref - obj_ref0) / (ref - ref0)
+            unscaled_multipliers[name] = val * obj_scaler / scaler
 
         return unscaled_multipliers
 
@@ -1872,20 +1880,52 @@ class Driver(object, metaclass=DriverMetaclass):
 
         prob = self._problem()
 
-        objective = list(self._objs.keys())[0]
+        obj_name = list(self._objs.keys())[0]
         constraints = self._cons
         des_vars = self._designvars
 
-        of_totals = {objective, *constraints.keys()}
+        of_totals = {obj_name, *constraints.keys()}
 
         active_cons, active_dvs = self._get_active_cons_and_dvs(feas_atol=feas_tol,
                                                                 feas_rtol=feas_tol)
 
+        # Active cons and vs provide the active indices in the design vars and constraints.
+        # But these design vars and constraints may themselves be indices of a larger
+        # variable.
         totals = prob.compute_totals(list(of_totals),
                                      list(des_vars),
                                      driver_scaling=True)
 
-        grad_f = {inp: totals[objective, inp] for inp in des_vars.keys()}
+        # print(totals[obj_name, 'traj0.phase0.states:x'])
+        # print(obj_name)
+        # print(obj_idxs)
+
+        # grad_f = np.empty(shape=(0,))
+        # for dv, dv_meta in des_vars.items():
+        #     dv_idxs = dv_meta['indices']
+        #     if dv_idxs is not None:
+        #         if dv_meta['flat_indices']:
+        #             flat_dv_idxs = dv_idxs.flat()
+        #         else:
+        #             flat_dv_idxs = np.ravel_multi_index(dv_idxs)
+        #     else:
+        #         flat_dv_idxs = None
+
+        #     from openmdao.utils.indexer import Indexer
+        #     if isinstance(flat_obj_idxs, Indexer):
+        #         flat_obj_idxs = flat_obj_idxs.flat()
+        #     if isinstance(flat_dv_idxs, Indexer):
+        #         flat_dv_idxs = flat_dv_idxs.flat()
+        #     print(dv)
+        #     print(totals[obj_name, dv].shape)
+        #     print(self._problem().get_val(dv).shape)
+
+        #     grad_f = np.concatenate((grad_f, totals[obj_name, dv].ravel()))
+
+        # print(grad_f)
+        # exit(0)
+
+        grad_f = {inp: totals[obj_name, inp] for inp in des_vars.keys()}
 
         n = 0
         for inp in grad_f.keys():
@@ -1900,7 +1940,6 @@ class Driver(object, metaclass=DriverMetaclass):
 
         actives = active_cons | active_dvs
         n_active = np.sum(np.fromiter((len(c['indices']) for c in actives.values()), dtype=int))
-        active_cons_mat = np.zeros((n, n_active))
         active_jac_blocks = []
 
         if n_active > 0:
@@ -1913,8 +1952,8 @@ class Driver(object, metaclass=DriverMetaclass):
                 if con_name in des_vars.keys():
                     size = des_vars[con_name]['size']
                     con_grad = {(con_name, inp): np.eye(size)[active_idxs, ...] if inp == con_name
-                                else np.zeros((size, size))[active_idxs, ...]
-                                for inp in des_vars.keys()}
+                                else np.zeros((size, dv_meta['size']))[active_idxs, ...]
+                                for (inp, dv_meta) in des_vars.items()}
                 else:
                     con_grad = {(con_name, inp): totals[con_name, inp][active_idxs, ...]
                                 for inp in des_vars.keys()}
@@ -1922,7 +1961,7 @@ class Driver(object, metaclass=DriverMetaclass):
 
             active_cons_mat = np.block(active_jac_blocks)
         else:
-            return {}, actives
+            return {}, {}
 
         multipliers_vec, optimality_squared, rank, singular_vals = \
             np.linalg.lstsq(active_cons_mat.T, -grad_f_vec, rcond=None)
@@ -1942,20 +1981,7 @@ class Driver(object, metaclass=DriverMetaclass):
             act_idxs = act_info['indices']
             active_size = len(act_idxs)
             mult_vals = multipliers_vec[offset:offset + active_size]
-
-            shape = prob.get_val(constraint).shape
-            opt_idxs = driver_vars[constraint]['indices']
-            opt_flat_idxs = driver_vars[constraint]['indices']
-            if opt_idxs is not None:
-                if opt_flat_idxs:
-                    flat_opt_idxs = opt_idxs
-                else:
-                    flat_opt_idxs = np.ravel_multi_index(opt_idxs)
-                unraveled_idxs = np.unravel_index(flat_opt_idxs[act_idxs], shape)
-            else:
-                unraveled_idxs = np.unravel_index(act_idxs, shape)
-            multipliers[constraint] = np.zeros(shape)
-            multipliers[constraint][unraveled_idxs] = mult_vals
+            multipliers[constraint] = mult_vals
             offset += active_size
 
         if not driver_scaling:
