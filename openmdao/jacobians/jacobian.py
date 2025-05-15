@@ -458,7 +458,7 @@ class SplitJacobian(Jacobian):
         """
         super().__init__(system)
         self._int_subjacs = None
-        self._ext_subjacs = {}
+        self._ext_subjacs = None
 
     def _setup(self, system):
         """
@@ -474,7 +474,7 @@ class SplitJacobian(Jacobian):
     def _get_split_subjacs(self, system):
         is_top = system.pathname == ''
 
-        if self._int_subjacs is None or system.pathname not in self._ext_subjacs:
+        if self._int_subjacs is None:
             self._int_subjacs = {}
             ext_subjacs = {}
             abs2meta_out = system._var_abs2meta['output']
@@ -524,16 +524,14 @@ class SplitJacobian(Jacobian):
             if not ext_subjacs:
                 ext_subjacs = None
 
-            self._ext_subjacs[system.pathname] = ext_subjacs
+            self._ext_subjacs = ext_subjacs
 
             # also populate regular subjacs dict for use with Jacobian class methods
             self._subjacs = self._int_subjacs.copy()
             if ext_subjacs is not None:
                 self._subjacs.update(ext_subjacs)
-        else:
-            ext_subjacs = self._ext_subjacs[system.pathname]
 
-        return self._int_subjacs, ext_subjacs
+        return self._int_subjacs, self._ext_subjacs
 
     def _update_subjacs(self, system):
         """
@@ -541,7 +539,7 @@ class SplitJacobian(Jacobian):
         """
         self._subjacs = None
         self._int_subjacs = None
-        self._ext_subjacs = {}
+        self._ext_subjacs = None
         self._get_split_subjacs(system)
 
         self._col_mapper = None  # force recompute of internal index maps on next set_col
