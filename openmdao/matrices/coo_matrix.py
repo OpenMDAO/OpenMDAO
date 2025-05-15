@@ -189,30 +189,3 @@ class COOMatrix(Matrix):
             Dense array representation of the matrix.
         """
         return self._matrix.toarray()
-
-
-def _compute_index_map(jrows, jcols, src_indices):
-    """
-    Return row/column indices and coo indicesto map sub-jacobian to an 'internal' subjac.
-
-    For a given subjac which is the partial of the residual wrt the input, the 'internal' subjac
-    is the partial of the residual wrt the source of that input.
-
-    Parameters
-    ----------
-    jrows : index array
-        Array of row indices.
-    jcols : index array
-        Array of column indices.
-    src_indices : index array
-        Index array of which values to pull from a source into an input
-        variable.
-
-    Returns
-    -------
-    tuple of (ndarray, ndarray, ndarray)
-        Row indices, column indices, and indices of columns matching
-        src_indices.
-    """
-    icols = src_indices.shaped_array()[jcols]
-    return (jrows, icols, np.arange(icols.size))

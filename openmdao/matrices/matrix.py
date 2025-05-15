@@ -35,65 +35,6 @@ class Matrix(object):
         self._submats = submats
         self._metadata = {}
 
-    def _build(self, num_rows, num_cols, dtype=float):
-        """
-        Allocate the matrix.
-
-        Parameters
-        ----------
-        num_rows : int
-            number of rows in the matrix.
-        num_cols : int
-            number of cols in the matrix.
-        dtype : dtype
-            The dtype of the matrix.
-        """
-        pass
-
-    def _update_submat(self, key, jac):
-        """
-        Update the values of a sub-jacobian.
-
-        Parameters
-        ----------
-        key : (str, str)
-            the global output and input variable names.
-        jac : ndarray or scipy.sparse or tuple
-            the sub-jacobian, the same format with which it was declared.
-        """
-        raise NotImplementedError("Matrix._update_submat")
-
-    def _prod(self, vec, mode, mask=None):
-        """
-        Perform a matrix vector product.
-
-        Parameters
-        ----------
-        vec : ndarray[:]
-            incoming vector to multiply.
-        mode : str
-            'fwd' or 'rev'.
-        mask : ndarray of type bool, or None
-            Array used to mask out part of the input vector.
-
-        Returns
-        -------
-        ndarray[:]
-            vector resulting from the product.
-        """
-        raise NotImplementedError("Matrix._prod")
-
-    def transpose(self):
-        """
-        Transpose the matrix.
-
-        Returns
-        -------
-        sparse_matrix
-            Transposed matrix.
-        """
-        raise NotImplementedError("Matrix.transpose")
-
     def _pre_update(self):
         """
         Do anything that needs to be done at the beginning of AssembledJacobian._update.

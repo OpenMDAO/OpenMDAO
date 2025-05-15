@@ -31,6 +31,7 @@ def index_to_varname(system, loc):
     """
     start = end = 0
     varsizes = np.sum(system._owned_sizes, axis=0)
+    varname = None
     for i, name in enumerate(system._resolver.abs_iter('output')):
         end += varsizes[i]
         if loc < end:

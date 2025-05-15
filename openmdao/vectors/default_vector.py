@@ -84,7 +84,10 @@ class DefaultVector(Vector):
         for vinfo in views.values():
             vinfo.set_view(data)
 
-        self._names = frozenset(views) if self._name == 'linear' else views
+        if self._name == 'linear' and self._kind in ('input', 'output'):
+            self._names = frozenset(views)
+        else:
+            self._names = views
 
     def _set_scaling(self, system, do_adder, nlvec=None):
         """
@@ -375,8 +378,8 @@ class DefaultVector(Vector):
         copy : bool
             If True, return a copy of the array.
         mask : ndarray of type bool, or None
-            Array used to mask out part of the vector.  If mask is not None then a copy
-            of the vector is returned with the masked values set to 0.0.
+            Array used to mask out part of the vector.  If mask is not None then
+            the vector is returned with the masked values set to 0.0.
 
         Returns
         -------

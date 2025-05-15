@@ -15,22 +15,6 @@ class CSRMatrix(COOMatrix):
         Dictionary of sub-jacobian data keyed by (row_name, col_name).
     """
 
-    def _build(self, num_rows, num_cols, dtype=float):
-        """
-        Allocate the matrix.
-
-        Parameters
-        ----------
-        num_rows : int
-            number of rows in the matrix.
-        num_cols : int
-            number of cols in the matrix.
-        dtype : dtype
-            The dtype of the matrix.
-        """
-        super()._build(num_rows, num_cols, dtype)
-        self._coo = self._matrix
-
     def _pre_update(self):
         """
         Do anything that needs to be done at the end of AssembledJacobian._update.
