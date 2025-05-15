@@ -14,8 +14,8 @@ import sys
 import re
 import os.path
 from collections import OrderedDict
-
 from configparser import RawConfigParser as ConfigParser
+from difflib import get_close_matches
 
 # pylint: disable=E0611, F0401
 from math import floor, pi
@@ -915,7 +915,11 @@ def _find_unit(unit, error=False):
                         # no prefixes found, unknown unit
                         else:
                             if error:
-                                raise ValueError(f"The units '{name}' are invalid.")
+                                guesses = get_close_matches(name, list(unit_table.keys()),
+                                                            n=5, cutoff=0.5)
+                                raise ValueError(f"The units '{name}' are invalid. "
+                                                 "Perhaps you meant one of the "
+                                                 f"following units?: {guesses}")
                             return None
 
                 unit = eval(name, {'__builtins__': None}, unit_table)  # nosec: scope limited
