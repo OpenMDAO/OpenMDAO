@@ -8,6 +8,7 @@ import os
 import weakref
 
 import numpy as np
+import scipy.sparse as sp
 
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
@@ -1732,8 +1733,6 @@ class Driver(object, metaclass=DriverMetaclass):
         for constraint, con_options in constraints.items():
             constraint_value = con_vals[constraint]
             con_size = con_options['size']
-            adder = 0.0 if con_options['total_adder'] is None else con_options['total_adder']
-            scaler = 1.0 if con_options['total_scaler'] is None else con_options['total_scaler']
 
             if con_options.get('equals', None) is not None:
                 # Equality constraint, all indices active
@@ -1741,8 +1740,8 @@ class Driver(object, metaclass=DriverMetaclass):
                                            'active_bounds': np.zeros(con_size, dtype=int)}
             else:
                 # Inequality constraint, determine active indices and bounds
-                constraint_upper = (con_options.get("upper", np.inf) + adder) * scaler
-                constraint_lower = (con_options.get("lower", -np.inf) + adder) * scaler
+                constraint_upper = con_options.get("upper", np.inf)
+                constraint_lower = con_options.get("lower", -np.inf)
 
                 if np.all(np.isinf(constraint_upper)):
                     upper_idxs = np.empty()
@@ -1769,10 +1768,8 @@ class Driver(object, metaclass=DriverMetaclass):
         for des_var, des_var_options in des_vars.items():
             des_var_value = dv_vals[des_var]
             des_var_size = des_var_options['size']
-            adder = 0.0 if con_options['total_adder'] is None else con_options['total_adder']
-            scaler = 1.0 if con_options['total_scaler'] is None else con_options['total_scaler']
-            des_var_upper = (np.ravel(des_var_options.get("upper", np.inf)) + adder) * scaler
-            des_var_lower = (np.ravel(des_var_options.get("lower", -np.inf)) + adder) * scaler
+            des_var_upper = np.ravel(des_var_options.get("upper", np.inf))
+            des_var_lower = np.ravel(des_var_options.get("lower", -np.inf))
 
             if assume_dvs_active:
                 active_dvs[des_var] = {'indices': np.arange(des_var_size, dtype=int),
@@ -1839,11 +1836,12 @@ class Driver(object, metaclass=DriverMetaclass):
                 scaler = self._responses[name]['total_scaler']
             scaler = scaler or 1.0
 
-            unscaled_multipliers[name] = val * obj_scaler / scaler
+            unscaled_multipliers[name] = val * scaler / obj_scaler
 
         return unscaled_multipliers
 
-    def compute_lagrange_multipliers(self, driver_scaling=False, feas_tol=1.0E-6):
+    def compute_lagrange_multipliers(self, driver_scaling=False, feas_tol=1.0E-6,
+                                     use_sparse_solve=True):
         """
         Get the approximated Lagrange multipliers of one or more constraints.
 
@@ -1854,8 +1852,6 @@ class Driver(object, metaclass=DriverMetaclass):
         specified. This applies to the driver-scaled values of the constraints, and should be
         the same as that used by the optimizer, if available.
 
-        Optimizers which provide their Lagrange multipliers may override this method.
-
         Parameters
         ----------
         driver_scaling : bool
@@ -1864,6 +1860,9 @@ class Driver(object, metaclass=DriverMetaclass):
         feas_tol : float or None
             The feasibility tolerance under which the optimization was run. If None, attempt
             to determine this automatically based on the specified optimizer settings.
+        use_sparse_solve : bool
+            If True, use scipy.sparse.linalg.lstsq to solve for the multipliers. Otherwise, numpy
+            will be used with dense arrays.
 
         Returns
         -------
@@ -1896,35 +1895,6 @@ class Driver(object, metaclass=DriverMetaclass):
                                      list(des_vars),
                                      driver_scaling=True)
 
-        # print(totals[obj_name, 'traj0.phase0.states:x'])
-        # print(obj_name)
-        # print(obj_idxs)
-
-        # grad_f = np.empty(shape=(0,))
-        # for dv, dv_meta in des_vars.items():
-        #     dv_idxs = dv_meta['indices']
-        #     if dv_idxs is not None:
-        #         if dv_meta['flat_indices']:
-        #             flat_dv_idxs = dv_idxs.flat()
-        #         else:
-        #             flat_dv_idxs = np.ravel_multi_index(dv_idxs)
-        #     else:
-        #         flat_dv_idxs = None
-
-        #     from openmdao.utils.indexer import Indexer
-        #     if isinstance(flat_obj_idxs, Indexer):
-        #         flat_obj_idxs = flat_obj_idxs.flat()
-        #     if isinstance(flat_dv_idxs, Indexer):
-        #         flat_dv_idxs = flat_dv_idxs.flat()
-        #     print(dv)
-        #     print(totals[obj_name, dv].shape)
-        #     print(self._problem().get_val(dv).shape)
-
-        #     grad_f = np.concatenate((grad_f, totals[obj_name, dv].ravel()))
-
-        # print(grad_f)
-        # exit(0)
-
         grad_f = {inp: totals[obj_name, inp] for inp in des_vars.keys()}
 
         n = 0
@@ -1943,7 +1913,6 @@ class Driver(object, metaclass=DriverMetaclass):
         active_jac_blocks = []
 
         if n_active > 0:
-            # TODO: Convert this to a sparse nonlinear least squares.
             for i, (con_name, active_meta) in enumerate(actives.items()):
                 # If the constraint is a design variable, the constraint gradient
                 # wrt des vars is just an identity matrix sized by the number of
@@ -1957,14 +1926,23 @@ class Driver(object, metaclass=DriverMetaclass):
                 else:
                     con_grad = {(con_name, inp): totals[con_name, inp][active_idxs, ...]
                                 for inp in des_vars.keys()}
-                active_jac_blocks.append(list(con_grad.values()))
+                if use_sparse_solve:
+                    active_jac_blocks.append([sp.csr_matrix(cg) for cg in con_grad.values()])
+                else:
+                    active_jac_blocks.append(list(con_grad.values()))
 
-            active_cons_mat = np.block(active_jac_blocks)
+            if use_sparse_solve:
+                active_cons_mat = sp.block_array(active_jac_blocks)
+            else:
+                active_cons_mat = np.block(active_jac_blocks)
         else:
             return {}, {}
 
-        multipliers_vec, optimality_squared, rank, singular_vals = \
-            np.linalg.lstsq(active_cons_mat.T, -grad_f_vec, rcond=None)
+        if use_sparse_solve:
+            lstsq_sol = sp.linalg.lsqr(active_cons_mat.T, -grad_f_vec)
+        else:
+            lstsq_sol = np.linalg.lstsq(active_cons_mat.T, -grad_f_vec, rcond=None)
+        multipliers_vec = lstsq_sol[0]
 
         multipliers = dict()
         offset = 0
@@ -1981,11 +1959,15 @@ class Driver(object, metaclass=DriverMetaclass):
             act_idxs = act_info['indices']
             active_size = len(act_idxs)
             mult_vals = multipliers_vec[offset:offset + active_size]
-            multipliers[constraint] = mult_vals
+            if constraint in des_vars:
+                multipliers[constraint] = np.zeros_like(self.get_design_var_values()[constraint])
+            else:
+                multipliers[constraint] = np.zeros_like(self.get_constraint_values()[constraint])
+            multipliers[constraint].flat[act_idxs] = mult_vals
             offset += active_size
 
         if not driver_scaling:
-            self._unscale_lagrange_multipliers(multipliers)
+            multipliers = self._unscale_lagrange_multipliers(multipliers)
 
         return multipliers, actives
 

@@ -8,6 +8,10 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.drivers.pyoptsparse_driver import pyoptsparse_version
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.general_utils import set_pyoptsparse_opt
+
+
+_, snopt_opt = set_pyoptsparse_opt('SNOPT', fallback=True)
 
 
 @require_pyoptsparse('IPOPT')
@@ -17,7 +21,7 @@ from openmdao.utils.assert_utils import assert_near_equal
 @use_tempdirs
 class TestComputeLagrangeMultipliers(unittest.TestCase):
 
-    def _make_problem(self, driver, y_lower=-50):
+    def _make_problem(self, driver, y_lower=-50, f_xy_ref=1.0, x_ref=1.0, y_ref=1.0, c_ref=1.0):
         prob = om.Problem()
         model = prob.model
 
@@ -30,23 +34,23 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
 
         prob.driver = driver
 
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=y_lower, upper=50.0)
-        model.add_objective('f_xy')
-        model.add_constraint('c', upper=-15)
+        model.add_design_var('x', lower=-50.0, upper=50.0, ref=x_ref)
+        model.add_design_var('y', lower=y_lower, upper=50.0, ref=y_ref)
+        model.add_objective('f_xy', ref=f_xy_ref)
+        model.add_constraint('c', upper=-15, ref=c_ref)
 
         prob.setup()
 
         return prob
 
-    def test_simple_paraboloid_upper_inequality_constraint(self):
+    def test_simple_paraboloid_upper_inequality_constraint_unscaled(self):
         """
         Test the computed Lagrange multipliers against IPOPT. Note IPOPT and
         SNOPT use opposite sign conventions on Lagrange multipliers.
         """
         drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
                    'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
-                   'pos_SNOPT': om.pyOptSparseDriver(optimizer='SNOPT', print_results=False),
+                   'pos_SNOPT': om.pyOptSparseDriver(optimizer=snopt_opt, print_results=False),
                    'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
                    'scipy_COBYLA': om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)}
 
@@ -66,6 +70,39 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
                 assert_near_equal(multipliers['c'], reference_multipliers['c'], tolerance=1.0E-5)
                 self.assertEqual(active_info['c']['indices'], [0])
                 self.assertEqual(active_info['c']['active_bounds'], [1])
+
+    def test_simple_paraboloid_upper_inequality_constraint_scaled(self):
+        """
+        Test the computed Lagrange multipliers against IPOPT. Note IPOPT and
+        SNOPT use opposite sign conventions on Lagrange multipliers.
+        """
+        drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
+                   'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
+                   'pos_SNOPT': om.pyOptSparseDriver(optimizer=snopt_opt, print_results=False),
+                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
+                   'scipy_COBYLA': om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)}
+
+        prob = self._make_problem(driver=drivers['pos_IPOPT'], f_xy_ref=0.1, c_ref=15, x_ref=10, y_ref=10)
+        result = prob.run_driver()
+        self.assertEqual(result.exit_status, 'SUCCESS',
+                         msg='Failed to converge baseline IPOPT optimization.')
+        reference_multipliers = prob.driver.pyopt_solution.lambdaStar
+        multipliers, active_info = prob.driver.compute_lagrange_multipliers(driver_scaling=True)
+        assert_near_equal(multipliers['c'], reference_multipliers['c'], tolerance=1.0E-5)
+
+        for driver_name, driver in drivers.items():
+            with self.subTest(f'{driver_name=}'):
+                prob = self._make_problem(driver=driver, f_xy_ref=0.1, c_ref=15, x_ref=10, y_ref=10)
+                result =  prob.run_driver()
+                self.assertEqual(result.exit_status, 'SUCCESS',
+                                 msg=f'Failed to converge optimization with {driver_name}.')
+                multipliers, active_info = prob.driver.compute_lagrange_multipliers(driver_scaling=True)
+                assert_near_equal(multipliers['c'], reference_multipliers['c'], tolerance=1.0E-5)
+                self.assertEqual(active_info['c']['indices'], [0])
+                self.assertEqual(active_info['c']['active_bounds'], [1])
+                # Now test the unscaled multipliers
+                unscaled_mults, active_info = prob.driver.compute_lagrange_multipliers(driver_scaling=False)
+                assert_near_equal(unscaled_mults['c'], 0.5, tolerance=1.0E-5)
 
     def test_simple_paraboloid_upper_inequality_constraint_lower_y_bound(self):
         """
@@ -101,6 +138,53 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
 
                 # if we decrease y bound by 0.01 units, we should see the objective increase by lambda[y] * 0.01 units.
                 # we use a loose tolerance when testing this due to FD across the optimization
+                lambda_y = multipliers['y']
+                f_nom = prob.get_val('f_xy')
+
+                prob = self._make_problem(driver=driver, y_lower=-7.01)
+                result =  prob.run_driver()
+                self.assertEqual(result.exit_status, 'SUCCESS',
+                                 msg=f'Failed to converge optimization with {driver_name}.')
+                f_perturbed = prob.get_val('f_xy')
+                assert_near_equal((f_perturbed - f_nom) / 0.01, lambda_y, tolerance=1.0E-1)
+
+    def test_simple_paraboloid_upper_inequality_constraint_lower_y_bound_scaled(self):
+        """
+        Test the computed Lagrange multipliers against IPOPT. Note IPOPT and
+        SNOPT use opposite sign conventions on Lagrange multipliers.
+        """
+        drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
+                   'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
+                   'pos_SNOPT': om.pyOptSparseDriver(optimizer='SNOPT', print_results=False),
+                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
+                   'scipy_COBYLA': om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)}
+
+        prob = self._make_problem(driver=drivers['pos_IPOPT'], y_lower=-7.0, f_xy_ref=0.1,
+                                  c_ref=15, x_ref=10, y_ref=10)
+        result = prob.run_driver()
+        self.assertEqual(result.exit_status, 'SUCCESS',
+                         msg='Failed to converge baseline IPOPT optimization.')
+        reference_multipliers = prob.driver.pyopt_solution.lambdaStar
+
+        for driver_name, driver in drivers.items():
+            with self.subTest(f'{driver_name=}'):
+                prob = self._make_problem(driver=driver, y_lower=-7.0, f_xy_ref=0.1,
+                                          c_ref=15, x_ref=10, y_ref=10)
+                result =  prob.run_driver()
+                self.assertEqual(result.exit_status, 'SUCCESS',
+                                 msg=f'Failed to converge optimization with {driver_name}.')
+                multipliers, active_info = prob.driver.compute_lagrange_multipliers(driver_scaling=True)
+                assert_near_equal(multipliers['c'], reference_multipliers['c'], tolerance=1.0E-5)
+                self.assertEqual(active_info['c']['indices'], [0])
+                self.assertEqual(active_info['c']['active_bounds'], [1])
+
+                # In this case, we also have a multiplier on the y lower bound
+                self.assertEqual(active_info['y']['indices'], [0])
+                self.assertEqual(active_info['y']['active_bounds'], [-1])
+
+                # if we decrease y bound by 0.01 units, we should see the objective increase by lambda[y] * 0.01 units.
+                # we use a loose tolerance when testing this due to FD across the optimization
+                multipliers, active_info = prob.driver.compute_lagrange_multipliers(driver_scaling=False)
                 lambda_y = multipliers['y']
                 f_nom = prob.get_val('f_xy')
 
