@@ -3,7 +3,6 @@ import weakref
 
 import numpy as np
 
-from openmdao.matrices.matrix import sparse_types
 from openmdao.utils.iter_utils import meta2range_iter
 from openmdao.jacobians.subjac import Subjac
 from openmdao.utils.units import unit_conversion
@@ -38,6 +37,12 @@ class Jacobian(object):
         Maps iotype to slice of the vector.
     _col_mapper : RangeMapper
         Maps variable names to column indices and vice versa.
+    _problem_meta : dict
+        Problem metadata.
+    _msginfo : str
+        Message info.
+    _resolver : <Resolver>
+        Resolver for this system.
     """
 
     def __init__(self, system):
@@ -51,6 +56,9 @@ class Jacobian(object):
         self._abs_keys = {}
         self._col_mapper = None
         self._vec_slices = {'output': None, 'input': None}
+        self._problem_meta = system._problem_meta
+        self._msginfo = system.msginfo
+        self._resolver = system._resolver
 
     def _setup(self, system):
         """
@@ -124,7 +132,7 @@ class Jacobian(object):
         try:
             return self._abs_keys[key]
         except KeyError:
-            abskey = self._system()._resolver.any2abs_key(key)
+            abskey = self._resolver.any2abs_key(key)
             if abskey is not None:
                 self._abs_keys[key] = abskey
             return abskey
@@ -236,8 +244,8 @@ class Jacobian(object):
         ------
         str
         """
-        for key, meta in self._subjacs.items():
-            yield key, meta.get_val()
+        for key, subjac in self._subjacs.items():
+            yield key, subjac.get_val()
 
     @property
     def msginfo(self):
@@ -249,15 +257,14 @@ class Jacobian(object):
         str
             Info to prepend to messages.
         """
-        if self._system() is None:
+        if self._msginfo is None:
             return type(self).__name__
-        return '{} in {}'.format(type(self).__name__, self._system().msginfo)
+        return '{} in {}'.format(type(self).__name__, self._msginfo)
 
     @property
     def _randgen(self):
-        s = self._system()
-        if s is not None and s._problem_meta['randomize_subjacs']:
-            return s._problem_meta['coloring_randgen']
+        if self._problem_meta['randomize_subjacs']:
+            return self._problem_meta['coloring_randgen']
 
     def _update(self, system):
         """
@@ -289,47 +296,6 @@ class Jacobian(object):
         """
         raise NotImplementedError(f"Class {type(self).__name__} does not implement _apply.")
 
-    def _randomize_subjac(self, subjac, key):
-        """
-        Return a subjac that is the given subjac filled with random values.
-
-        Parameters
-        ----------
-        subjac : ndarray or csc_matrix
-            Sub-jacobian to be randomized.
-        key : tuple (of, wrt)
-            Key for subjac within the jacobian.
-
-        Returns
-        -------
-        ndarray or csc_matrix
-            Randomized version of the subjac.
-        """
-        if isinstance(subjac, sparse_types):  # sparse
-            sparse = subjac.copy()
-            sparse.data = self._randgen.random(sparse.data.size)
-            sparse.data += 1.0
-            return sparse
-
-        # if a subsystem has computed a dynamic partial or semi-total coloring,
-        # we use that sparsity information to set the sparsity of the randomized
-        # subjac.  Otherwise all subjacs that didn't have sparsity declared by the
-        # user will appear completely dense, which will lead to a total jacobian that
-        # is more dense than it should be, causing any total coloring that we compute
-        # to be overly conservative.
-        subjac_info = self._subjacs_info[key]
-        if 'sparsity' in subjac_info and subjac_info['sparsity']:
-            rows, cols, shape = subjac_info['sparsity']
-            r = np.zeros(shape)
-            val = self._randgen.random(len(rows))
-            val += 1.0
-            r[rows, cols] = val
-        else:
-            r = self._randgen.random(subjac.shape)
-            r += 1.0
-
-        return r
-
     def set_complex_step_mode(self, active):
         """
         Turn on or off complex stepping mode.
@@ -351,6 +317,18 @@ class Jacobian(object):
                     subjac.set_dtype(float)
 
             self._under_complex_step = active
+
+    def _reset_random(self, system):
+        """
+        Reset any cached random subjacs.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        """
+        for subjac in self._get_subjacs(system).values():
+            subjac.reset_random()
 
     def _setup_index_maps(self, system):
         namesize_iter = [(n, end - start) for n, start, end, _, _, _ in system._jac_wrt_iter()]

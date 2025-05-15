@@ -101,10 +101,7 @@ class DictionaryJacobian(Jacobian):
         iflat = d_inputs._abs_get_val
         subjacs_info = self._subjacs_info
         subjacs = self._get_subjacs(system)
-        if self._randgen is not None and system._problem_meta['randomize_subjacs']:
-            randgen = self._randgen
-        else:
-            randgen = None
+        randgen = self._randgen
 
         do_reset = False
         key_owners = system._get_subjac_owners()

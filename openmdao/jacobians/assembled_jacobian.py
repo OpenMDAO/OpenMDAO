@@ -103,10 +103,7 @@ class AssembledJacobian(SplitJacobian):
         if ext_mtx is not None:
             ext_mtx._pre_update()
 
-        if self._randgen is not None and system._problem_meta['randomize_subjacs']:
-            randgen = self._randgen
-        else:
-            randgen = None
+        randgen = self._randgen
 
         for key, subjac in int_subjacs.items():
             int_mtx._update_submat(key, subjac.get_as_coo_data(randgen))

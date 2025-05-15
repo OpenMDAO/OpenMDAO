@@ -78,10 +78,7 @@ class BlockJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        if self._randgen is not None and system._problem_meta['randomize_subjacs']:
-            randgen = self._randgen
-        else:
-            randgen = None
+        randgen = self._randgen
 
         d_out_names = d_outputs._names
         d_inp_names = d_inputs._names
