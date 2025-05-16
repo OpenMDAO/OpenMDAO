@@ -6588,6 +6588,22 @@ class System(object, metaclass=SystemMetaclass):
         """
         return False
 
+    def total_local_size(self, io):
+        """
+        Return the total local size of the given variable.
+
+        Parameters
+        ----------
+        io : str
+            Either 'input' or 'output'.
+
+        Returns
+        -------
+        int
+            The total local size of the given input or output vector.
+        """
+        return np.sum(self._var_sizes[io][self.comm.rank, :])
+
     def best_partial_deriv_direction(self):
         """
         Return the best direction for partial deriv calculations based on input and output sizes.
@@ -6597,8 +6613,8 @@ class System(object, metaclass=SystemMetaclass):
         str
             The best direction for derivative calculations, 'fwd' or 'rev'.
         """
-        nouts = np.sum(self._var_sizes['output'][self.comm.rank, :])
-        nins = np.sum(self._var_sizes['input'][self.comm.rank, :])
+        nouts = self.total_local_size('output')
+        nins = self.total_local_size('input')
         return 'fwd' if nouts >= nins else 'rev'
 
     def _get_sys_promotion_tree(self, tree=None):

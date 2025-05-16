@@ -1,5 +1,4 @@
 """Define the AssembledJacobian class."""
-from collections import defaultdict
 
 from openmdao.jacobians.jacobian import SplitJacobian
 from openmdao.matrices.dense_matrix import DenseMatrix
@@ -30,9 +29,6 @@ class AssembledJacobian(SplitJacobian):
         by the input._names set.
     _matrix_class : type
         Class used to create Matrix objects.
-    _subjac_iters : dict
-        Mapping of system pathname to tuple of lists of absolute key tuples used to index into
-        the jacobian.
     """
 
     def __init__(self, matrix_class, system):
@@ -44,13 +40,13 @@ class AssembledJacobian(SplitJacobian):
         from openmdao.core.component import Component
 
         super().__init__(system)
+        self._initialized = False
         self._int_mtx = None
         self._ext_mtx = None
         self._mask_caches = {}
         self._matrix_class = matrix_class
-        self._subjac_iters = defaultdict(lambda: None)
 
-    def _initialize(self, system):
+    def _initialize(self, system, int_subjacs, ext_subjacs):
         """
         Allocate the global matrices.
 
@@ -58,9 +54,11 @@ class AssembledJacobian(SplitJacobian):
         ----------
         system : System
             Parent system to this jacobian.
+        int_subjacs : dict
+            Internal sub-Jacobians.
+        ext_subjacs : dict
+            External sub-Jacobians.
         """
-        int_subjacs, ext_subjacs = self._get_split_subjacs(system)
-
         self._int_mtx = int_mtx = self._matrix_class(int_subjacs)
 
         out_size = len(system._outputs)
@@ -82,6 +80,27 @@ class AssembledJacobian(SplitJacobian):
                                f"ext mtx")
         self._ext_mtx = ext_mtx
 
+        self._initialized = True
+
+    def _get_split_subjacs(self, system):
+        """
+        Get the split sub-Jacobians.
+
+        Parameters
+        ----------
+        system : System
+            System to get the split sub-Jacobians for.
+
+        Returns
+        -------
+        tuple
+            A tuple containing the internal and external sub-Jacobians.
+        """
+        int_subjacs, ext_subjacs = super()._get_split_subjacs(system)
+        if self._initialized is False:
+            self._initialize(system, int_subjacs, ext_subjacs)
+        return int_subjacs, ext_subjacs
+
     def _update(self, system):
         """
         Read the user's sub-Jacobians and set into the global matrix.
@@ -94,8 +113,8 @@ class AssembledJacobian(SplitJacobian):
         int_subjacs, ext_subjacs = self._get_split_subjacs(system)
 
         # _initialize has been delayed until the first _update call
-        if self._int_mtx is None:
-            self._initialize(system)
+        # if self._int_mtx is None:
+        #     self._initialize(system)
 
         int_mtx = self._int_mtx
         int_mtx._pre_update()
