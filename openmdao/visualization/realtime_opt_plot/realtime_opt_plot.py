@@ -21,6 +21,7 @@ try:
         LinearColorMapper,
         ColorBar,
         DataRange1d,
+        Select,
     )
     from bokeh.layouts import gridplot, row, column, Spacer
     from bokeh.transform import transform
@@ -49,8 +50,10 @@ except ImportError:
 
 # Constants
 # the time between calls to the udpate method
-# _time_between_callbacks_in_ms = 1000
-_time_between_callbacks_in_ms = 100
+# if this is too small, the GUI interactions get delayed because
+# code is busy trying to keep up with the periodic callbacks
+_time_between_callbacks_in_ms = 1000
+# _time_between_callbacks_in_ms = 100
 # Number of milliseconds for unused session lifetime
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10
 
@@ -299,6 +302,12 @@ class _RealTimeOptPlot(object):
 
         self._num_samples_plotted = 0
 
+        self._responses = None
+
+        self._prom_responses = None
+
+        self._scatter_plots = {}
+
         self._source = None
         self._lines = []
         # flag to prevent updating label with units each time we get new data
@@ -307,19 +316,25 @@ class _RealTimeOptPlot(object):
 
         self._hist_source = {}
 
+        self._plotted_response_variable = None
+
         # used to keep track of the y min and max of the data so that
         # the axes ranges can be adjusted as data comes in
-        self._y_min = defaultdict(lambda: float("inf"))
-        self._y_max = defaultdict(lambda: float("-inf"))
+        # self._y_min = defaultdict(lambda: float("inf"))
+        # self._y_max = defaultdict(lambda: float("-inf"))
 
-        self._prom_response_min = float("inf")
-        self._prom_response_max = float("-inf")
+        # self._prom_response_min = float("inf")
+        # self._prom_response_max = float("-inf")
+
+        self._prom_response_min = defaultdict(lambda: float("inf"))
+        self._prom_response_max = defaultdict(lambda: float("-inf"))
 
         self._start_time = time.time()
 
         self._hist_figures = {}
 
         def _update():
+            print("_update")
             # this is the main method of the class. It gets called periodically by Bokeh
             # It looks for new data and if found, updates the plot with the new data
             new_case = self._case_tracker._get_new_case()
@@ -357,6 +372,13 @@ class _RealTimeOptPlot(object):
                 self._prom_response
             )[:1]
 
+
+            for response in self._prom_responses:
+                self._source_stream_dict[response] = new_case.get_val(
+                    response
+                )[:1]
+
+
             for sampled_variable in self._sampled_variables:
                 self._source_stream_dict[sampled_variable] = new_case.get_val(
                     sampled_variable
@@ -365,15 +387,16 @@ class _RealTimeOptPlot(object):
             self._source.stream(self._source_stream_dict)
             self._num_samples_plotted += 1
 
-            self._prom_response_min = min(
-                self._prom_response_min, new_case.get_val(self._prom_response)[:1][0]
-            )
-            self._prom_response_max = max(
-                self._prom_response_max, new_case.get_val(self._prom_response)[:1][0]
-            )
+            for response in self._prom_responses:
+                self._prom_response_min[response] = min(
+                    self._prom_response_min[response], new_case.get_val(response)[:1][0]
+                )
+                self._prom_response_max[response] = max(
+                    self._prom_response_max[response], new_case.get_val(response)[:1][0]
+                )
 
-            self._color_mapper.low = self._prom_response_min
-            self._color_mapper.high = self._prom_response_max
+            self._color_mapper.low = self._prom_response_min[self._prom_response]
+            self._color_mapper.high = self._prom_response_max[self._prom_response]
 
             # Get current date and time
             now = datetime.now()
@@ -432,27 +455,32 @@ class _RealTimeOptPlot(object):
         ]
 
         # returns abs
-        responses = list(
+        self._responses = list(
             self._case_tracker.get_case_reader().problem_metadata["responses"].keys()
         )
 
         # convert to prom
-        prom_responses = []
-        for response in responses:
+        self._prom_responses = []
+        for response in self._responses:
             if response in self._case_tracker.get_case_reader()._abs2prom["output"]:
-                prom_responses.append(
+                self._prom_responses.append(
                     self._case_tracker.get_case_reader()._abs2prom["output"][response]
                 )
             else:
                 raise RuntimeError(f"No prom for abs variable {response}")
 
-        driver_case = self._case_tracker._get_case_by_counter(1)
-        objs = driver_case.get_objectives()
+
+        # driver_case = self._case_tracker._get_case_by_counter(1)
+        # objs = driver_case.get_objectives()
         # for now assume one response
-        self._prom_response = prom_responses[0]
+        self._prom_response = self._prom_responses[0]
         self._source_dict[self._prom_response] = []
+
+        for response in self._prom_responses:
+            self._source_dict[response] = []
+
         self._sampled_variables = [
-            varname for varname in outputs if varname not in prom_responses
+            varname for varname in outputs if varname not in self._prom_responses
         ]
         for sampled_variable in self._sampled_variables:
             self._source_dict[sampled_variable] = []
@@ -467,28 +495,10 @@ class _RealTimeOptPlot(object):
         ydrs = [DataRange1d(bounds=None) for _ in range(N)]
 
         # Create a color mapper using Viridis (colorblind-friendly)
-
-        # color_mapper = LinearColorMapper(palette=Viridis256, low=min(self._source.data['obj']), high=max(self._source.data['obj']))
-
         self._color_mapper = LinearColorMapper(palette=Viridis256, low=0, high=200)
-
-        # For alpha values, we need to handle it differently
-        # Instead of creating a LinearColorMapper for alpha, use a different approach:
-        min_alpha = 0.2
-        max_alpha = 0.9
-
-        # # Calculate alpha values directly based on f
-        # f_min = min(source.data[prom_response])
-        # f_max = max(source.data[prom_response])
-        # normalized_f = [(val - f_min) / (f_max - f_min) for val in source.data[prom_response]]
-        # alpha_values = [min_alpha + norm_val * (max_alpha - min_alpha) for norm_val in normalized_f]
-
-        # # Add alpha to the source
-        # source.data['alpha'] = alpha_values
 
         plots = []
 
-        # for i, (y, x) in enumerate(product(sampled_variables, reversed(sampled_variables))):
         for i, (y, x) in enumerate(
             product(self._sampled_variables, self._sampled_variables)
         ):
@@ -508,13 +518,14 @@ class _RealTimeOptPlot(object):
                     border_fill_color="white",
                     width=240,
                     height=240,
+                    output_backend="webgl",
                 )
 
                 p.xaxis.axis_label = f"{x} ({x_units})"
                 p.yaxis.axis_label = f"{y} ({y_units})"
                 p.axis.visible = True
 
-                p.scatter(
+                self._scatter_plots[(x,y)] = p.scatter(
                     x=x,
                     source=self._source,
                     y=y,
@@ -563,7 +574,8 @@ class _RealTimeOptPlot(object):
                     # tools="pan,wheel_zoom,box_zoom,reset,save",
                     x_axis_label=f"{x} ({units})",
                     y_axis_label="Frequency",
-                )
+                    output_backend="webgl",
+               )
 
                 # Add the histogram bars using quad glyphs
                 p.quad(
@@ -646,6 +658,7 @@ class _RealTimeOptPlot(object):
 
         spacer2 = Spacer(width=150, height=300)  # Between plot 2 (with colorbar) and text box
         spacer3 = Spacer(width=100, height=20)
+        spacer4 = Spacer(width=100, height=20)
 
         script_name = self._case_recorder_filename
 
@@ -663,13 +676,51 @@ class _RealTimeOptPlot(object):
         # Attach the callback to the button
         quit_button.on_click(quit_app)
 
+
+        # Create a Select widget with some options
+        menu = Select(
+            title="Choose a response variable:",
+            options=self._prom_responses,
+            value=self._prom_responses[0]  # Default value
+        )
+
+        # Python callback function that will run when selection changes
+        def cb_select_response_variable(attr, old, new):
+            # Print the selected value to the console
+            print(f"Selected value: {new}")
+
+            self._plotted_response_variable = new
+
+            self._prom_response = new 
+
+
+            color_bar.title = f"Response variable: '{new}'"
+
+            self._color_mapper.low = self._prom_response_min[self._prom_response]
+            self._color_mapper.high = self._prom_response_max[self._prom_response]
+
+
+            for (x,y), scatter_plot in self._scatter_plots.items():
+                t = transform(
+                        self._prom_response, self._color_mapper
+                    )
+                # t is <class 'bokeh.core.property.vectorization.Field'>
+                scatter_plot.glyph.fill_color = transform(
+                        self._prom_response, self._color_mapper
+                    )
+                
+                    # line.glyph.y = {'field': selected_column}
+                # scatter_plot.glyph.fill_color is a Field
+
+        # Attach the callback to the Select widget
+        menu.on_change("value", cb_select_response_variable)
+
         # Add the text box after the grid in a row
-        # final_layout = row(gp, p, spacer2, self._text_box, sizing_mode='fixed')
         final_layout = row(
             column(title_div, gp),
             p,
             spacer2,
-            column(self._text_box, spacer3, quit_button),
+            column(self._text_box, spacer3, menu, spacer4, quit_button),
             sizing_mode="fixed",
         )
 
