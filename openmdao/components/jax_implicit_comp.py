@@ -153,7 +153,8 @@ class JaxImplicitComponent(ImplicitComponent):
                 self.compute_sparsity()
             if self._jacobian is None:
                 self._init_jacobian()
-            self._jacobian._setup(self)
+            if self._jacobian is not None:
+                self._jacobian._setup(self)
 
     def _setup_partials(self):
         """

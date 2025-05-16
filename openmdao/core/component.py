@@ -17,7 +17,9 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.subjac import Subjac
 from openmdao.jacobians.block_jacobian import BlockJacobian
+# from openmdao.jacobians.simple_jacobian import ComponentJacobian
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
+# from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_key2abs_key
 from openmdao.utils.mpi import MPI
@@ -1609,8 +1611,9 @@ class Component(System):
         Jacobian
             The initialized jacobian.
         """
-        self._jacobian = BlockJacobian(system=self)
-        return self._jacobian
+        if not self.matrix_free:
+            self._jacobian = BlockJacobian(system=self)
+            return self._jacobian
 
     def _column_iotypes(self):
         """

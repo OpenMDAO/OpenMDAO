@@ -1175,11 +1175,9 @@ class Group(System):
 
         self._problem_meta['relevance'] = get_relevance(self, responses, desvars)
 
-        # Transfers do not require recursion, but they have to be set up after the vector setup.
+        # Transfers have to be set up after the vector setup.
         self._setup_transfers()
 
-        # Same situation with solvers, partials, and Jacobians.
-        # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers()
         self._setup_solver_print()
         if self._use_derivatives:

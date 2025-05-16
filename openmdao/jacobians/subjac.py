@@ -313,6 +313,9 @@ class DenseSubjac(Subjac):
         """
         Get the value of the subjacobian.
 
+        If randgen is not None then we're computing sparsity and we return a matrix of random
+        values based on our 'sparsity' metadata.
+
         Parameters
         ----------
         randgen : RandomNumberGenerator or None
