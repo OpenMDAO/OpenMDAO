@@ -22,6 +22,8 @@ try:
         ColorBar,
         DataRange1d,
         Select,
+        Toggle,
+        Column,
     )
     from bokeh.layouts import gridplot, row, column, Spacer
     from bokeh.transform import transform
@@ -56,6 +58,13 @@ _time_between_callbacks_in_ms = 1000
 # _time_between_callbacks_in_ms = 100
 # Number of milliseconds for unused session lifetime
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10
+_toggle_styles = """
+    font-size: 22px;
+    box-shadow:
+        0 4px 6px rgba(0, 0, 0, 0.1),    /* Distant shadow */
+        0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
+        inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
+"""
 
 
 def _is_process_running(pid):
@@ -331,6 +340,8 @@ class _RealTimeOptPlot(object):
 
         self._start_time = time.time()
 
+        self._sampled_variables_toggles = []
+
         self._hist_figures = {}
 
         def _update():
@@ -487,6 +498,28 @@ class _RealTimeOptPlot(object):
 
         self._source = ColumnDataSource(self._source_dict)
 
+    def _make_variable_button(self, varname, active, callback):
+        toggle = Toggle(
+            label=varname,
+            active=active,
+            margin=(0, 0, 8, 0),
+        )
+        # toggle.js_on_change("active", callback) TODO
+        self._sampled_variables_toggles.append(toggle)
+        # Add custom CSS styles for both active and inactive states
+        toggle.stylesheets = [
+            f"""
+                .bk-btn {{
+                    {_toggle_styles}
+                }}
+                .bk-btn.bk-active {{
+                    background-color: rgb(from #000000 R G B / 0.3);
+                    {_toggle_styles}
+                }}
+            """
+        ]
+        return toggle
+
     def _setup_figure(self):
 
         N = len(self._sampled_variables)
@@ -602,6 +635,29 @@ class _RealTimeOptPlot(object):
             toolbar_location=None,
         )
 
+
+        
+        def _sampled_variable_callback(attr, old, new):
+            pass
+
+        for sampled_var in self._sampled_variables:
+            self._make_variable_button(sampled_var,True,_sampled_variable_callback
+            )
+
+        print(f"{self._sampled_variables_toggles=}")
+        toggle_column = Column(
+            children=self._sampled_variables_toggles,
+            sizing_mode="stretch_both",
+            height_policy="fit",
+            styles={
+                "overflow-y": "auto",
+                "border": "1px solid #ddd",
+                "padding": "8px",
+                "background-color": "#dddddd",
+                'max-height': '100vh'  # Ensures it doesn't exceed viewport
+            },
+        )
+
         p = figure(height=2 * plots[0].height, width=0, toolbar_location=None)
 
         # Define two points (x0, y0) and (x1, y1)
@@ -659,6 +715,7 @@ class _RealTimeOptPlot(object):
         spacer2 = Spacer(width=150, height=300)  # Between plot 2 (with colorbar) and text box
         spacer3 = Spacer(width=100, height=20)
         spacer4 = Spacer(width=100, height=20)
+        spacer5 = Spacer(width=100, height=20)
 
         script_name = self._case_recorder_filename
 
@@ -720,7 +777,7 @@ class _RealTimeOptPlot(object):
             column(title_div, gp),
             p,
             spacer2,
-            column(self._text_box, spacer3, menu, spacer4, quit_button),
+            column(self._text_box, spacer3, quit_button, spacer4, menu, spacer5, toggle_column),
             sizing_mode="fixed",
         )
 
