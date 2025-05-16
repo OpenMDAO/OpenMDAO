@@ -91,30 +91,26 @@ class AssembledJacobian(SplitJacobian):
         system : System
             System that is updating this jacobian.
         """
+        int_subjacs, ext_subjacs = self._get_split_subjacs(system)
+
         # _initialize has been delayed until the first _update call
         if self._int_mtx is None:
             self._initialize(system)
 
         int_mtx = self._int_mtx
-        ext_mtx = self._ext_mtx
-        int_subjacs, ext_subjacs = self._get_split_subjacs(system)
-
         int_mtx._pre_update()
-        if ext_mtx is not None:
-            ext_mtx._pre_update()
 
         randgen = self._randgen
 
         for key, subjac in int_subjacs.items():
-            int_mtx._update_submat(key, subjac.get_as_coo_data(randgen))
-
-        if ext_subjacs:
-            for key, subjac in ext_subjacs.items():
-                ext_mtx._update_submat(key, subjac.get_as_coo_data(randgen))
-
+            int_mtx._update_submat(key, subjac, randgen)
         int_mtx._post_update()
 
-        if ext_mtx is not None:
+        if ext_subjacs:
+            ext_mtx = self._ext_mtx
+            ext_mtx._pre_update()
+            for key, subjac in ext_subjacs.items():
+                ext_mtx._update_submat(key, subjac, randgen)
             ext_mtx._post_update()
 
         if self._under_complex_step:
