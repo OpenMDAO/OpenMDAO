@@ -469,8 +469,9 @@ class ColoringMeta(object):
         bool
             True if coloring should be used.
         """
-        return not self._failed and (self.coloring is not None or self.dynamic or
-                                     self.has_static_coloring())
+        return not self._failed and _use_total_sparsity and (self.coloring is not None or
+                                                             self.dynamic or
+                                                             self.has_static_coloring())
 
     def has_static_coloring(self):
         """
@@ -606,6 +607,21 @@ class Partial_ColoringMeta(ColoringMeta):
                     raise RuntimeError("Patterns in wrt_patterns must be strings, but found "
                                        f"{pattern} instead.")
             self._wrt_patterns = tuple(newpats)
+
+    def use_coloring(self):
+        """
+        Return True if coloring should be used.
+
+        It may not have been computed yet.
+
+        Returns
+        -------
+        bool
+            True if coloring should be used.
+        """
+        return not self._failed and _use_partial_sparsity and (self.coloring is not None or
+                                                               self.dynamic or
+                                                               self.has_static_coloring())
 
     def _update_wrt_matches(self, system):
         """

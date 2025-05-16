@@ -15,7 +15,6 @@ from openmdao.utils.jax_utils import jax, jit, \
     _ensure_returns_tuple, _compute_output_shapes, _update_add_input_kwargs, \
     _update_add_output_kwargs, _get_differentiable_compute_primal, _re_init
 from openmdao.utils.code_utils import get_return_names, get_function_deps
-import openmdao.utils.coloring as coloring_mod
 
 
 class JaxExplicitComponent(ExplicitComponent):
@@ -159,8 +158,7 @@ class JaxExplicitComponent(ExplicitComponent):
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
-            if not self.matrix_free and self._coloring_info.use_coloring() and \
-                    coloring_mod._use_partial_sparsity:
+            if not self.matrix_free and self._coloring_info.use_coloring():
                 self._get_coloring()
             elif self._do_sparsity and self.options['derivs_method'] == 'jax':
                 self.compute_sparsity()
