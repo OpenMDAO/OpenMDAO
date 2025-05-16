@@ -155,7 +155,7 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
         """
         drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
                    'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
-                   'pos_SNOPT': om.pyOptSparseDriver(optimizer='snopt_opt', print_results=False),
+                   'pos_SNOPT': om.pyOptSparseDriver(optimizer=snopt_opt, print_results=False),
                    'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
                    'scipy_COBYLA': om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)}
 
