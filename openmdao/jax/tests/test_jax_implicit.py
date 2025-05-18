@@ -199,6 +199,8 @@ class TestJaxImplicitComp(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob['lingrp.lin.x'], np.array([-4, 9, -4]), tolerance=1e-14)
+        J = prob.compute_totals(of=['lingrp.lin.x'], wrt=['ivc.b', 'ivc.A'])
+        print(J)
 
         assert_check_totals(prob.check_totals(of=['lingrp.lin.x'], wrt=['ivc.b', 'ivc.A'],
                                               abs_err_tol=2e-4, rel_err_tol=3e-6, show_only_incorrect=True),
