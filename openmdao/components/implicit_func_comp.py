@@ -222,8 +222,8 @@ class ImplicitFuncComp(ImplicitComponent):
                 self._tangents = None
             self._check_first_linearize()
             self._jax_linearize()
-            if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
-                self._assembled_jac._update(self)
+            # if (jac is None or jac is self._jacobian) and self._jacobian is not None:
+            #     self._jacobian._update(self)
         else:
             super()._linearize(jac, sub_do_ln)
 
@@ -283,7 +283,7 @@ class ImplicitFuncComp(ImplicitComponent):
                     j.append(a)
                 j = self._reorder_cols(np.vstack(j).reshape((osize, isize)))
 
-        self._jacobian.set_dense_jac(self, j)
+        self._get_jacobian().set_dense_jac(self, j)
 
     def _user_linearize(self, inputs, outputs, jacobian):
         """

@@ -224,7 +224,7 @@ class ExplicitFuncComp(ExplicitComponent):
                      for a in jac_forward(func, argnums, tangents)(*invals)]
                 j = coloring._expand_jac(np.vstack(j), 'fwd').toarray()
 
-        self._jacobian.set_dense_jac(self, j)
+        self._get_jacobian().set_dense_jac(self, j)
 
     def _get_tangents(self, vals, direction, coloring=None, argnums=None):
         """

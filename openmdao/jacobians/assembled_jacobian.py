@@ -27,39 +27,17 @@ class AssembledJacobian(SplitJacobian):
     _mask_caches : dict
         Contains masking arrays for when a subset of the variables are present in a vector, keyed
         by the input._names set.
-    _matrix_class : type
-        Class used to create Matrix objects.
     """
 
     def __init__(self, matrix_class, system):
         """
         Initialize all attributes.
         """
-        global Component
-        # avoid circular imports
-        from openmdao.core.component import Component
-
         super().__init__(system)
-        self._initialized = False
-        self._int_mtx = None
-        self._ext_mtx = None
         self._mask_caches = {}
-        self._matrix_class = matrix_class
+        int_subjacs, ext_subjacs = self._get_split_subjacs(system)
 
-    def _initialize(self, system, int_subjacs, ext_subjacs):
-        """
-        Allocate the global matrices.
-
-        Parameters
-        ----------
-        system : System
-            Parent system to this jacobian.
-        int_subjacs : dict
-            Internal sub-Jacobians.
-        ext_subjacs : dict
-            External sub-Jacobians.
-        """
-        self._int_mtx = int_mtx = self._matrix_class(int_subjacs)
+        self._int_mtx = int_mtx = matrix_class(int_subjacs)
 
         out_size = len(system._outputs)
         if system.under_complex_step:
@@ -70,36 +48,28 @@ class AssembledJacobian(SplitJacobian):
         int_mtx._build(out_size, out_size, dtype)
 
         if ext_subjacs:
-            ext_mtx = self._matrix_class(ext_subjacs)
-            ext_mtx._build(out_size, len(system._dinputs), dtype)
+            self._ext_mtx = matrix_class(ext_subjacs)
+            self._ext_mtx._build(out_size, len(system._dinputs), dtype)
         else:
-            ext_mtx = None
+            self._ext_mtx = None
 
-        if self._ext_mtx:
-            raise RuntimeError(f"Adding ext mtx for system {system.pathname} but already have "
-                               f"ext mtx")
-        self._ext_mtx = ext_mtx
-
-        self._initialized = True
-
-    def _get_split_subjacs(self, system):
+    def _update_matrix(self, matrixobj, subjacs, randgen):
         """
-        Get the split sub-Jacobians.
+        Update a matrix object with the new sub-Jacobians.
 
         Parameters
         ----------
-        system : System
-            System to get the split sub-Jacobians for.
-
-        Returns
-        -------
-        tuple
-            A tuple containing the internal and external sub-Jacobians.
+        matrixobj : <Matrix>
+            Matrix object to update.
+        subjacs : dict
+            Dictionary of sub-Jacobians.
+        randgen : <RandGen>
+            Random number generator.
         """
-        int_subjacs, ext_subjacs = super()._get_split_subjacs(system)
-        if self._initialized is False:
-            self._initialize(system, int_subjacs, ext_subjacs)
-        return int_subjacs, ext_subjacs
+        matrixobj._pre_update()
+        for key, subjac in subjacs.items():
+            matrixobj._update_submat(key, subjac, randgen)
+        matrixobj._post_update()
 
     def _update(self, system):
         """
@@ -110,27 +80,14 @@ class AssembledJacobian(SplitJacobian):
         system : System
             System that is updating this jacobian.
         """
+        self._update_needed = False
+        randgen = self._randgen
         int_subjacs, ext_subjacs = self._get_split_subjacs(system)
 
-        # _initialize has been delayed until the first _update call
-        # if self._int_mtx is None:
-        #     self._initialize(system)
-
-        int_mtx = self._int_mtx
-        int_mtx._pre_update()
-
-        randgen = self._randgen
-
-        for key, subjac in int_subjacs.items():
-            int_mtx._update_submat(key, subjac, randgen)
-        int_mtx._post_update()
+        self._update_matrix(self._int_mtx, int_subjacs, randgen)
 
         if ext_subjacs:
-            ext_mtx = self._ext_mtx
-            ext_mtx._pre_update()
-            for key, subjac in ext_subjacs.items():
-                ext_mtx._update_submat(key, subjac, randgen)
-            ext_mtx._post_update()
+            self._update_matrix(self._ext_mtx, ext_subjacs, randgen)
 
         if self._under_complex_step:
             # If we create a new _int_mtx while under complex step, we need to convert it to a
@@ -154,6 +111,9 @@ class AssembledJacobian(SplitJacobian):
         mode : str
             'fwd' or 'rev'.
         """
+        if self._update_needed:
+            self._update(system)
+
         ext_mtx = self._ext_mtx
         if ext_mtx is None and not d_outputs._names:  # avoid unnecessary unscaling
             return

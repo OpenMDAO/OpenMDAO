@@ -321,7 +321,9 @@ class DirectSolver(LinearSolver):
         system = self._system()
         nproc = system.comm.size
 
-        if self._assembled_jac is not None:
+        if system._get_assembled_jac() is not None:
+            if self._assembled_jac._update_needed:
+                self._assembled_jac._update(system)
             matrix = self._assembled_jac._int_mtx._matrix
 
             if matrix is None:
@@ -396,9 +398,10 @@ class DirectSolver(LinearSolver):
         system = self._system()
         nproc = system.comm.size
 
-        if self._assembled_jac is not None:
-
-            matrix = self._assembled_jac._int_mtx._matrix
+        if system._get_assembled_jac() is not None:
+            if system._assembled_jac._update_needed:
+                system._assembled_jac._update(system)
+            matrix = system._assembled_jac._int_mtx._matrix
 
             if matrix is None:
                 # This happens if we're not rank 0 and owned_sizes are being used

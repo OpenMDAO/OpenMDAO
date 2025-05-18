@@ -46,3 +46,24 @@ class CSRMatrix(COOMatrix):
         if self._matrix_T is None:
             self._matrix_T = self._matrix.T
         return self._matrix_T
+
+    def set_complex_step_mode(self, active):
+        """
+        Turn on or off complex stepping mode.
+
+        When turned on, the value in each subjac is cast as complex, and when turned
+        off, they are returned to real values.
+
+        Parameters
+        ----------
+        active : bool
+            Complex mode flag; set to True prior to commencing complex step.
+        """
+        is_complex = 'complex' in self._matrix.dtype.__str__()
+        if active:
+            if not is_complex:
+                self._matrix.data = self._matrix.data.astype(complex)
+                self._coo.data = self._coo.data.astype(complex)
+        elif is_complex:
+            self._matrix.data = self._matrix.data.astype(float)
+            self._coo.data = self._coo.data.astype(float)

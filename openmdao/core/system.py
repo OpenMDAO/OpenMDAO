@@ -745,20 +745,6 @@ class System(object, metaclass=SystemMetaclass):
                 yield wrt, start, end, vec, _full_slice, dist_sizes
                 start = end
 
-    def _init_jacobian(self):
-        """
-        Initialize the jacobian.
-
-        Override this in a subclass to use a different jacobian type than DictionaryJacobian.
-
-        Returns
-        -------
-        Jacobian
-            The initialized jacobian.
-        """
-        self._jacobian = DictionaryJacobian(system=self)
-        return self._jacobian
-
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -1735,6 +1721,8 @@ class System(object, metaclass=SystemMetaclass):
             if method is None:
                 method = 'fd'
 
+        self._get_jacobian()
+
         uses_approx = self.uses_approx()
         if uses_approx:
             approx_scheme = self._get_approx_scheme(method)
@@ -2052,9 +2040,10 @@ class System(object, metaclass=SystemMetaclass):
                                    (self.msginfo, coloring._meta['wrt_patterns'],
                                     info.wrt_patterns))
             info.update(info.coloring._meta)
-            approx = self._get_approx_scheme(info['method'])
-            # force regen of approx groups during next compute_approximations
-            approx._reset()
+            if self.uses_approx():
+                approx = self._get_approx_scheme(info['method'])
+                # force regen of approx groups during next compute_approximations
+                approx._reset()
         elif isinstance(static, Coloring):
             info.coloring = coloring = static
 
@@ -2209,6 +2198,8 @@ class System(object, metaclass=SystemMetaclass):
         self._responses = {}
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
+
+        self._jacobian = None
 
     def _setup_procs(self, pathname, comm, prob_meta):
         """
@@ -2506,50 +2497,100 @@ class System(object, metaclass=SystemMetaclass):
         for subsys in self._subsystems_myproc:
             subsys._setup_solvers()
 
-    def _setup_jacobians(self, recurse=True):
+    def _get_asm_jac_solvers(self):
         """
-        Set and populate jacobians down through the system tree.
-
-        Parameters
-        ----------
-        recurse : bool
-            If True, setup jacobians in all descendants.
+        Get the solvers that need an assembled jacobian.
         """
         asm_jac_solvers = set()
         if self._linear_solver is not None:
             asm_jac_solvers.update(self._linear_solver._assembled_jac_solver_iter())
 
-        nl_asm_jac_solvers = set()
         if self.nonlinear_solver is not None:
-            nl_asm_jac_solvers.update(self.nonlinear_solver._assembled_jac_solver_iter())
+            asm_jac_solvers.update(self.nonlinear_solver._assembled_jac_solver_iter())
 
-        asm_jac = None
-        if asm_jac_solvers:
-            asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
-            self._assembled_jac = asm_jac
-            for s in asm_jac_solvers:
-                s._assembled_jac = asm_jac
+        return asm_jac_solvers
 
-        if nl_asm_jac_solvers:
-            if asm_jac is None:
+    def _get_assembled_jac(self):
+        """
+        Get the assembled jacobian if there is one.
+        """
+        if self._assembled_jac is None:
+            asm_jac_solvers = self._get_asm_jac_solvers()
+
+            # At present, we don't support a AssembledJacobian in a group
+            # if any subcomponents are matrix-free.
+            if asm_jac_solvers:
+                if self.matrix_free:
+                    raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
+                                    "subcomponent." % self.msginfo)
+
                 asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
-            for s in nl_asm_jac_solvers:
-                s._assembled_jac = asm_jac
+                self._assembled_jac = self._jacobian = asm_jac
+                for solver in asm_jac_solvers:
+                    solver._assembled_jac = asm_jac
 
-        if self._has_approx:
-            self._get_static_wrt_matches()
-            self._add_approximations()  # this does nothing for a Group
+        return self._assembled_jac
 
-        # At present, we don't support a AssembledJacobian in a group
-        # if any subcomponents are matrix-free.
-        if asm_jac is not None:
-            if self.matrix_free:
-                raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
-                                   "subcomponent." % self.msginfo)
+    def _get_jacobian(self, force_if_mat_free=False):
+        """
+        Initialize the jacobian if it is not already initialized.
 
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians()
+        Override this in a subclass to use a different jacobian type.
+
+        Parameters
+        ----------
+        force_if_mat_free : bool
+            Ignored.
+
+        Returns
+        -------
+        Jacobian
+            The initialized jacobian.
+        """
+        if self._jacobian is None:
+            self._jacobian = self._get_assembled_jac()
+
+            if self._jacobian is None:
+                self._jacobian = DictionaryJacobian(system=self)
+
+            if self._has_approx:
+                self._get_static_wrt_matches()
+                self._add_approximations()  # this does nothing for a Group
+
+        return self._jacobian
+
+    # def _setup_jacobians(self, recurse=True):
+    #     """
+    #     Set and populate jacobians down through the system tree.
+
+    #     Parameters
+    #     ----------
+    #     recurse : bool
+    #         If True, setup jacobians in all descendants.
+    #     """
+    #     asm_jac_solvers = self._get_asm_jac_solvers()
+
+    #     asm_jac = None
+    #     if asm_jac_solvers:
+    #         asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
+    #         self._assembled_jac = self._jacobian = asm_jac
+    #         for solver in asm_jac_solvers:
+    #             solver._assembled_jac = asm_jac
+
+    #     if self._has_approx:
+    #         self._get_static_wrt_matches()
+    #         self._add_approximations()  # this does nothing for a Group
+
+    #     # At present, we don't support a AssembledJacobian in a group
+    #     # if any subcomponents are matrix-free.
+    #     if asm_jac is not None:
+    #         if self.matrix_free:
+    #             raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
+    #                                "subcomponent." % self.msginfo)
+
+    #     if recurse:
+    #         for subsys in self._subsystems_myproc:
+    #             subsys._setup_jacobians()
 
     def _get_promotion_maps(self):
         """

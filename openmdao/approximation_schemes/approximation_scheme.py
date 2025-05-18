@@ -579,7 +579,7 @@ class ApproximationScheme(object):
                     else:
                         yield jinds, res
 
-    def compute_approximations(self, system, jac=None):
+    def compute_approximations(self, system, jac):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -587,17 +587,16 @@ class ApproximationScheme(object):
         ----------
         system : System
             System on which the execution is run.
-        jac : None or dict-like
-            If None, update system with the approximated sub-Jacobians. Otherwise, store the
-            approximations in the given dict-like object.
+        jac : dict-like
+            Store the approximations in the given dict-like object.
         """
+        # if system._tot_jac is not None:
+        #     jac = system._tot_jac
+        # elif jac is None:
+        #     jac = system._get_jacobian(force_if_mat_free=True)
+
         if not self._wrt_meta:
             return
-
-        if system._tot_jac is not None:
-            jac = system._tot_jac
-        elif jac is None:
-            jac = system._jacobian
 
         for ic, col in self.compute_approx_col_iter(system,
                                                     under_cs=system._outputs._under_complex_step):

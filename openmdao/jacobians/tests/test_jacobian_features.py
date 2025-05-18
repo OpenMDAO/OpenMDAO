@@ -174,9 +174,9 @@ class TestJacobianFeatures(unittest.TestCase):
         model = problem.model
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
-        problem.setup()
+        problem.setup(mode='fwd')
         problem.run_model()
-
+        
         # Note: since this test is looking for something not user-facing, it is inherently fragile
         # w.r.t. internal implementations.
         model._linearize(model._assembled_jac)

@@ -1180,8 +1180,8 @@ class Group(System):
 
         self._setup_solvers()
         self._setup_solver_print()
-        if self._use_derivatives:
-            self._setup_jacobians()
+        # if self._use_derivatives:
+        #     self._setup_jacobians()
 
         self._setup_recording()
 
@@ -3689,7 +3689,7 @@ class Group(System):
         """
         if self._owns_approx_jac:
             jac = self._jacobian
-        elif jac is None and self._assembled_jac is not None:
+        elif jac is None and self._get_assembled_jac() is not None:
             jac = self._assembled_jac
 
         if jac is not None:
@@ -3698,43 +3698,8 @@ class Group(System):
 
                 jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
-                # _fd_rev_xfer_correction_dist is used to correct for the fact that we don't
-                # do reverse transfers internal to an FD group.  Reverse transfers
-                # are constructed such that derivative values are correct when transferred into
-                # system doutput variables, taking into account distributed inputs.
-                # Since the transfers are not correcting for those issues, we need to do it here.
-
-                # If we have a distributed constraint/obj within the FD group and that con/obj is,
-                # active, we perform essentially an allreduce on the d_inputs vars that connect to
-                # outside systems so they'll include the contribution from all procs.
                 if self._fd_rev_xfer_correction_dist and mode == 'rev':
-                    seed_vars = self._problem_meta['seed_vars']
-                    if seed_vars is not None:
-                        seed_vars = [n for n in seed_vars if n in self._fd_rev_xfer_correction_dist]
-                        dinvec = self._dinputs
-                        inarr = dinvec.asarray()
-                        data = {}
-                        for seed_var in seed_vars:
-                            for inp in self._fd_rev_xfer_correction_dist[seed_var]:
-                                if inp not in data:
-                                    if dinvec._contains_abs(inp):  # inp is a local input
-                                        start, stop = dinvec.get_range(inp)
-                                        arr = inarr[start:stop]
-                                        if np.any(arr):
-                                            data[inp] = arr
-                                        else:
-                                            data[inp] = None  # don't send an array of zeros
-                                    else:
-                                        data[inp] = None  # prevent possible MPI hangs
-
-                        if data:
-                            myrank = self.comm.rank
-                            for rank, d in enumerate(self.comm.allgather(data)):
-                                if rank != myrank:
-                                    for n, val in d.items():
-                                        if val is not None and dinvec._contains_abs(n):
-                                            start, stop = dinvec.get_range(n)
-                                            inarr[start:stop] += val
+                    self._apply_fd_rev_xfer_correction()
 
         # Apply recursion
         else:
@@ -3752,6 +3717,48 @@ class Group(System):
                 for s in self._relevance.filter(self._subsystems_myproc, relevant=False):
                     # zero out dvecs of irrelevant subsystems
                     s._doutputs.set_val(0.0)
+
+    def _apply_fd_rev_xfer_correction(self):
+        """
+        Apply the fd reverse transfer correction.
+
+        FD reverse transfer correction is used to correct for the fact that we don't
+        do reverse transfers internal to an FD group.  Reverse transfers
+        are constructed such that derivative values are correct when transferred into
+        system doutput variables, taking into account distributed inputs.
+        Since the transfers are not correcting for those issues, we need to do it here.
+
+        If we have a distributed constraint/obj within the FD group and that con/obj is,
+        active, we perform essentially an allreduce on the d_inputs vars that connect to
+        outside systems so they'll include the contribution from all procs.
+        """
+        seed_vars = self._problem_meta['seed_vars']
+        if seed_vars is not None:
+            seed_vars = [n for n in seed_vars if n in self._fd_rev_xfer_correction_dist]
+            dinvec = self._dinputs
+            inarr = dinvec.asarray()
+            data = {}
+            for seed_var in seed_vars:
+                for inp in self._fd_rev_xfer_correction_dist[seed_var]:
+                    if inp not in data:
+                        if dinvec._contains_abs(inp):  # inp is a local input
+                            start, stop = dinvec.get_range(inp)
+                            arr = inarr[start:stop]
+                            if np.any(arr):
+                                data[inp] = arr
+                            else:
+                                data[inp] = None  # don't send an array of zeros
+                        else:
+                            data[inp] = None  # prevent possible MPI hangs
+
+            if data:
+                myrank = self.comm.rank
+                for rank, d in enumerate(self.comm.allgather(data)):
+                    if rank != myrank:
+                        for n, val in d.items():
+                            if val is not None and dinvec._contains_abs(n):
+                                start, stop = dinvec.get_range(n)
+                                inarr[start:stop] += val
 
     def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
@@ -3807,14 +3814,15 @@ class Group(System):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if (self._tot_jac is not None and self._owns_approx_jac and
-                not isinstance(self._jacobian, coloring_mod._ColSparsityJac)):
-            self._jacobian = self._tot_jac
-
         self._check_first_linearize()
 
         # Group finite difference
         if self._owns_approx_jac:
+            if (self._tot_jac is not None and
+                    not isinstance(self._jacobian, coloring_mod._ColSparsityJac)):
+                self._jacobian = self._tot_jac
+            else:
+                self._jacobian = self._get_jacobian()
 
             if self.pathname == "":
                 for approximation in self._approx_schemes.values():
@@ -3827,8 +3835,11 @@ class Group(System):
                         approximation.compute_approximations(self, jac=self._jacobian)
 
         else:
-            if self._assembled_jac is not None:
-                jac = self._assembled_jac
+
+            jac = self._get_assembled_jac()
+            if jac is not None:
+                # we're updating subsystem jacs, so we need to update this one as well
+                jac._update_needed = True
 
             relevance = self._relevance
             with relevance.active(self._linear_solver.use_relevance()):
@@ -3839,10 +3850,6 @@ class Group(System):
                     do_ln = sub_do_ln and (subsys._linear_solver is not None and
                                            subsys._linear_solver._linearize_children())
                     subsys._linearize(jac, sub_do_ln=do_ln)
-
-                # Update jacobian
-                if self._assembled_jac is not None:
-                    self._assembled_jac._update(self)
 
                 if sub_do_ln:
                     for subsys in subs:
@@ -3856,19 +3863,12 @@ class Group(System):
 
             if coloring is None:
                 if self._approx_schemes:
-                    if self._jacobian is None:
-                        self._init_jacobian()
                     # TODO: for top level FD, call below is unnecessary, but we need this
                     # for some tests that just call run_linearize directly without calling
                     # compute_totals.
                     self._setup_approx_derivs()
             else:
                 self._setup_approx_coloring()
-                if self._jacobian is None:
-                    self._init_jacobian()
-
-            if self._jacobian is not None:
-                self._jacobian._setup(self)
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
@@ -3966,7 +3966,11 @@ class Group(System):
             subsys._get_missing_partials(missing)
 
     def _approx_subjac_keys_iter(self):
-        yield from self._subjac_keys_iter()
+        relevant = self._relevance
+        for key in self._subjac_keys_iter():
+            of, wrt = key
+            if relevant.is_relevant(of) and relevant.is_relevant(wrt):
+                yield key
 
     def _subjac_keys_iter(self):
         # yields absolute keys (no aliases)
@@ -4175,9 +4179,6 @@ class Group(System):
         """
         Add approximations for all approx derivs.
         """
-        if self._jacobian is None:
-            self._init_jacobian()
-
         abs2meta = self._var_allprocs_abs2meta
         total = self.pathname == ''
         nprocs = self.comm.size
@@ -4201,16 +4202,16 @@ class Group(System):
 
         approx_keys = self._get_approx_subjac_keys()
         for key in approx_keys:
-            left, right = key
+            of, wrt = key
             if not total and nprocs > 1 and self._has_fd_group:
-                sout = sizes_out[:, abs2idx[left]]
-                sin = sizes_in[:, abs2idx[right]]
+                sout = sizes_out[:, abs2idx[of]]
+                sin = sizes_in[:, abs2idx[wrt]]
                 if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
                     # we have of and wrt that exist on different procs. Now see if they're relevant
                     # to each other
                     for _, _, rel in self._relevance.iter_seed_pair_relevance(inputs=True,
                                                                               outputs=True):
-                        if left in rel and right in rel:
+                        if of in rel and wrt in rel:
                             self._cross_keys.add(key)
                             break
 
@@ -4219,8 +4220,8 @@ class Group(System):
             else:
                 meta = SUBJAC_META_DEFAULTS.copy()
 
-                if left == right:
-                    size = abs2meta['output'][left]['size']
+                if of == wrt:
+                    size = abs2meta['output'][of]['size']
                     meta['diagonal'] = True
                     # All group approximations are treated as explicit components, so we
                     # have a -1 on the diagonal.
@@ -4231,15 +4232,15 @@ class Group(System):
 
             meta.update(self._owns_approx_jac_meta)
 
-            if wrt_matches is None or right in wrt_matches:
+            if wrt_matches is None or wrt in wrt_matches:
                 self._update_approx_coloring_meta(meta)
 
             if meta['val'] is None:
-                if not total and right in abs2meta['input']:
-                    sz = abs2meta['input'][right]['size']
+                if not total and wrt in abs2meta['input']:
+                    sz = abs2meta['input'][wrt]['size']
                 else:
-                    sz = abs2meta['output'][right]['size']
-                shape = (abs2meta['output'][left]['size'], sz)
+                    sz = abs2meta['output'][wrt]['size']
+                shape = (abs2meta['output'][of]['size'], sz)
                 meta['shape'] = shape
                 if meta['rows'] is not None:  # subjac is sparse
                     meta['val'] = np.zeros(len(meta['rows']))
@@ -4267,11 +4268,7 @@ class Group(System):
             self._owns_approx_wrt = {}
             for n, m in self._var_allprocs_abs2meta['input'].items():
                 if n in wrtset:
-                    # self._owns_approx_wrt[n] = dct = m.copy()
                     self._owns_approx_wrt[n] = {'distributed': m['distributed']}
-                    # dct['name'] = resolver.abs2prom(n, 'input')
-                    # dct['source'] = n
-                    # dct['indices'] = None
 
             self._owns_approx_jac = True
 

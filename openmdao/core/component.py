@@ -406,7 +406,8 @@ class Component(System):
                                    "allowed for a matrix free component.")
             self._has_approx = True
             method = self.options['derivs_method']
-            self._get_approx_scheme(method)
+            if method in ('cs', 'fd'):
+                self._get_approx_scheme(method)
             if not self._declared_partials_patterns:
                 if self.compute_primal is None:
                     raise RuntimeError(f"{self.msginfo}: compute_primal must be defined if using "
@@ -435,9 +436,6 @@ class Component(System):
         for key, pattern_meta in self._declared_partials_patterns.items():
             of, wrt = key
             self._resolve_partials_patterns(of, wrt, pattern_meta)
-
-        if not self.matrix_free:
-            self._init_jacobian()
 
     def setup_partials(self):
         """
@@ -1494,6 +1492,9 @@ class Component(System):
             options.update(checkopts)
             options.update(approx._wrt_meta)
 
+        if not approx._wrt_meta:
+            del self._approx_schemes[method]
+
         abs_key = rel_key2abs_key(self, key)
         if abs_key in self._subjacs_info:
             meta = self._subjacs_info[abs_key]
@@ -1600,19 +1601,27 @@ class Component(System):
             self._subjacs_info[abs_key] = Subjac.get_instance_metadata(pattern_meta, prev_meta,
                                                                        shape, self, abs_key)
 
-    def _init_jacobian(self):
+    def _get_jacobian(self, force_if_mat_free=False):
         """
-        Initialize the jacobian.
+        Initialize the jacobian if it is not already initialized.
 
-        Override this in a subclass to use a different jacobian type than DictionaryJacobian.
+        Parameters
+        ----------
+        force_if_mat_free : bool
+            If True, force the jacobian to be initialized even for a matrix free component.
 
         Returns
         -------
         Jacobian
             The initialized jacobian.
         """
-        if not self.matrix_free:
-            self._jacobian = BlockJacobian(system=self)
+        if force_if_mat_free or not self.matrix_free:
+            if self._jacobian is None:
+                self._jacobian = BlockJacobian(system=self)
+                if self._has_approx:
+                    self._get_static_wrt_matches()
+                    self._add_approximations()
+
             return self._jacobian
 
     def _column_iotypes(self):
@@ -1762,9 +1771,6 @@ class Component(System):
             self._first_call_to_linearize = False  # only do this once
             if coloring_mod._use_partial_sparsity:
                 self._get_coloring()
-            if self._jacobian is None:
-                self._init_jacobian()
-            self._jacobian._setup(self)
 
     def _resolve_src_inds(self):
         abs2prom = self._resolver.abs2prom
@@ -1915,14 +1921,10 @@ class Component(System):
         except KeyError:
             raise ValueError(f"Method '{method}' is not a recognized finite difference method.")
 
-        # these are relative names
-        ofs = self._get_partials_ofs()
-        wrts = self._get_partials_wrts()
-
         local_opts = self._get_check_partial_options()
         added_wrts = set()
 
-        for rel_key in product(ofs, wrts):
+        for rel_key in product(self._get_partials_ofs(), self._get_partials_wrts()):
             fd_options = self._get_approx_partial_options(rel_key, method=method,
                                                           checkopts=local_opts)
             abs_key = rel_key2abs_key(self, rel_key)
@@ -2091,7 +2093,7 @@ class Component(System):
                        compact_print=False, abs_err_tol=0.0, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
                        minimum_step=1e-12, force_dense=True, show_only_incorrect=False,
-                       show_worst=True):
+                       show_worst=True, rich_print=True):
         """
         Check partial derivatives comprehensively for this component.
 
@@ -2132,6 +2134,8 @@ class Component(System):
             Set to True if output should print only the subjacs found to be incorrect.
         show_worst : bool, optional
             Set to False to suppress the display of the worst subjac.
+        rich_print : bool, optional
+            If True, print using rich if available.
 
         Returns
         -------
@@ -2308,7 +2312,7 @@ class Component(System):
                 # This component already has a Jacobian with calculated derivatives.
                 else:
 
-                    subjacs = self._jacobian._get_subjacs(self)
+                    subjacs = self._get_jacobian()._get_subjacs()
 
                     for rel_key in product(of_list, wrt_list):
                         abs_key = rel_key2abs_key(self, rel_key)
@@ -2509,10 +2513,10 @@ class Component(System):
                 worst = _deriv_display_compact(self, err_iter, partials_data, out_stream,
                                                totals=False,
                                                show_only_incorrect=show_only_incorrect,
-                                               show_worst=show_worst)
+                                               show_worst=show_worst, rich_print=rich_print)
             else:
                 _deriv_display(self, err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
-                               all_fd_options, False, show_only_incorrect)
+                               all_fd_options, False, show_only_incorrect, rich_print=rich_print)
 
         # check for zero subjacs that are declared as dependent
         zero_keys = set()

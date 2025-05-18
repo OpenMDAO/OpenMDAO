@@ -355,25 +355,26 @@ class ImplicitComponent(Component):
         """
         Call linearize based on the value of the "run_root_only" option.
         """
+        jac = self._get_jac_wrapper()
         with self._call_user_function('linearize', protect_outputs=True):
             if self._run_root_only():
                 if self.comm.rank == 0:
                     if self._discrete_inputs or self._discrete_outputs:
-                        self.linearize(self._inputs, self._outputs, self._jac_wrapper,
+                        self.linearize(self._inputs, self._outputs, jac,
                                        self._discrete_inputs, self._discrete_outputs)
                     else:
-                        self.linearize(self._inputs, self._outputs, self._jac_wrapper)
+                        self.linearize(self._inputs, self._outputs, jac)
                     if self._jacobian is not None:
                         self.comm.bcast(list(self._jacobian.items()), root=0)
                 elif self._jacobian is not None:
                     for key, val in self.comm.bcast(None, root=0):
-                        self._jac_wrapper[key] = val
+                        jac[key] = val
             else:
                 if self._discrete_inputs or self._discrete_outputs:
-                    self.linearize(self._inputs, self._outputs, self._jac_wrapper,
+                    self.linearize(self._inputs, self._outputs, jac,
                                    self._discrete_inputs, self._discrete_outputs)
                 else:
-                    self.linearize(self._inputs, self._outputs, self._jac_wrapper)
+                    self.linearize(self._inputs, self._outputs, jac)
 
     def _linearize(self, jac=None, sub_do_ln=True):
         """
@@ -392,12 +393,12 @@ class ImplicitComponent(Component):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.
             for approximation in self._approx_schemes.values():
-                approximation.compute_approximations(self, jac=self._jacobian)
+                approximation.compute_approximations(self, jac=self._get_jacobian())
 
             self._linearize_wrapper()
 
-        if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
-            self._assembled_jac._update(self)
+        # if (jac is None or jac is self._jacobian) and self._jacobian is not None:
+        #     self._jacobian._update(self)
 
     def add_output(self, name, val=1.0, **kwargs):
         """
@@ -527,6 +528,7 @@ class ImplicitComponent(Component):
         """
         super()._setup_vectors(parent_vectors)
 
+        self._jac_wrapper = None
         if self._declared_residuals:
             name2slcshape = _get_slice_shape_dict(self._resid_name_shape_iter())
 
@@ -534,11 +536,18 @@ class ImplicitComponent(Component):
                 self._dresiduals_wrapper = _ResidsWrapper(self._dresiduals, name2slcshape)
 
             self._residuals_wrapper = _ResidsWrapper(self._residuals, name2slcshape)
-            self._jac_wrapper = _JacobianWrapper(self._jacobian, self._resid2out_subjac_map)
         else:
             self._residuals_wrapper = self._residuals
             self._dresiduals_wrapper = self._dresiduals
-            self._jac_wrapper = self._jacobian
+
+    def _get_jac_wrapper(self):
+        if self._jac_wrapper is None:
+            if self._declared_residuals:
+                self._jac_wrapper = _JacobianWrapper(self._get_jacobian(),
+                                                     self._resid2out_subjac_map)
+            else:
+                self._jac_wrapper = self._get_jacobian()
+        return self._jac_wrapper
 
     def _resolve_partials_patterns(self, of, wrt, pattern_meta):
         """

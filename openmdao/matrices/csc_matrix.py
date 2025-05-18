@@ -46,24 +46,6 @@ class CSCMatrix(COOMatrix):
             self._matrix_T = self._matrix.T
         return self._matrix_T
 
-    def _convert_mask(self, mask):
-        """
-        Convert the mask to the format of this sparse matrix (CSC, etc.) from COO.
-
-        Parameters
-        ----------
-        mask : ndarray
-            The mask of indices to zero out.
-
-        Returns
-        -------
-        ndarray
-            The converted mask array.
-        """
-        coo = self._coo
-        csc = csc_matrix((mask, (coo.row, coo.col)), shape=coo.shape)
-        return csc.data
-
     def set_complex_step_mode(self, active):
         """
         Turn on or off complex stepping mode.
@@ -76,14 +58,11 @@ class CSCMatrix(COOMatrix):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
+        is_complex = 'complex' in self._matrix.dtype.__str__()
         if active:
-            if 'complex' not in self._matrix.dtype.__str__():
+            if not is_complex:
                 self._matrix.data = self._matrix.data.astype(complex)
-                self._matrix.dtype = complex
                 self._coo.data = self._coo.data.astype(complex)
-                self._coo.dtype = complex
-        else:
-            self._matrix.data = self._matrix.data.real
-            self._matrix.dtype = float
-            self._coo.data = self._coo.data.real
-            self._coo.dtype = float
+        elif is_complex:
+            self._matrix.data = self._matrix.data.astype(float)
+            self._coo.data = self._coo.data.astype(float)

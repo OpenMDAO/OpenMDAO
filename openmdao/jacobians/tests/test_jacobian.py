@@ -650,11 +650,11 @@ class TestJacobian(unittest.TestCase):
         model.connect('p2.y', 'comp.y')
 
         prob.setup()
+        prob.run_model()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.run_model()
-
+            prob.model._linearize(prob.model._get_jacobian())
         # Nested
 
         prob = Problem()
@@ -671,10 +671,11 @@ class TestJacobian(unittest.TestCase):
         model.connect('p2.y', 'sub.comp.y')
 
         prob.setup()
+        prob.run_model()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.run_model()
+            prob.model._linearize(prob.model._get_jacobian())
 
         # Try a component that is derived from a matrix-free one
 
@@ -694,10 +695,11 @@ class TestJacobian(unittest.TestCase):
         model.connect('p2.y', 'comp.y')
 
         prob.setup()
+        prob.run_model()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.run_model()
+            prob.model._linearize(prob.model._get_jacobian())
 
         # Make sure regular comps don't give an error.
 
@@ -740,10 +742,11 @@ class TestJacobian(unittest.TestCase):
         model.connect('p2.y', 'comp.y')
 
         prob.setup()
+        prob.run_model()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.run_model()
+            prob.model._linearize(prob.model._get_jacobian())
 
     def test_access_undeclared_subjac(self):
 
@@ -943,7 +946,7 @@ class TestJacobian(unittest.TestCase):
         p.run_model()
 
         p.compute_totals()
-        keys = p.model.ode._jacobian._subjacs_info
+        keys = p.model.ode._get_jacobian()._subjacs_info
         self.assertTrue(('ode.x', 'ode.y') not in keys)
         self.assertTrue(('ode.y', 'ode.x') not in keys)
 
@@ -1135,7 +1138,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
+        np.testing.assert_almost_equal(p.model._jacobian._int_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  0.,  0.],
                                                  [ 0., -1.,  0.,  0.],
                                                  [ 9.,  8., -1.,  0.],

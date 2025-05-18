@@ -1,6 +1,5 @@
 """Define the DictionaryJacobian class."""
 import numpy as np
-import scipy.sparse as sp
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.jacobians.subjac import SUBJAC_META_DEFAULTS
@@ -14,8 +13,6 @@ class DictionaryJacobian(Jacobian):
     ----------
     system : System
         Parent system to this jacobian.
-    **kwargs : dict
-        Options dictionary.
 
     Attributes
     ----------
@@ -23,12 +20,16 @@ class DictionaryJacobian(Jacobian):
         List of tuples of variable names that match subjacs in the this Jacobian.
     """
 
-    def __init__(self, system, **kwargs):
+    def __init__(self, system):
         """
         Initialize all attributes.
         """
-        super().__init__(system, **kwargs)
+        super().__init__(system)
         self._iter_keys = None
+        self._setup(system)
+
+    def _setup(self, system):
+        self._subjacs = self._get_subjacs()
 
     def _get_ordered_subjac_keys(self, system):
         """
@@ -88,6 +89,9 @@ class DictionaryJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
+        if self._update_needed:
+            self._update(system)
+
         fwd = mode == 'fwd'
         d_out_names = d_outputs._names
         d_res_names = d_residuals._names
@@ -100,7 +104,7 @@ class DictionaryJacobian(Jacobian):
         oflat = d_outputs._abs_get_val
         iflat = d_inputs._abs_get_val
         subjacs_info = self._subjacs_info
-        subjacs = self._get_subjacs(system)
+        subjacs = self._get_subjacs()
         randgen = self._randgen
 
         do_reset = False
@@ -179,17 +183,22 @@ class _CheckingJacobian(DictionaryJacobian):
     """
 
     def __init__(self, system, uncovered_threshold=1.0E-16):
-        super().__init__(system)
-        self._subjacs_info = self._subjacs_info.copy()
         self._uncovered_threshold = uncovered_threshold
+        super().__init__(system)
 
-        # Convert any scipy.sparse subjacs to OpenMDAO's interal COO specification.
-        for key, subjac in self._subjacs_info.items():
-            if sp.issparse(subjac['val']):
-                coo_val = subjac['val'].tocoo()
-                self._subjacs_info[key]['rows'] = coo_val.row
-                self._subjacs_info[key]['cols'] = coo_val.col
-                self._subjacs_info[key]['val'] = coo_val.data
+    def _setup(self, system):
+        self._subjacs_info = self._subjacs_info.copy()
+
+        # # Convert any scipy.sparse subjacs to OpenMDAO's interal COO specification.
+        # for key, subjac in self._subjacs_info.items():
+        #     if sp.issparse(subjac['val']):
+        #         coo_val = subjac['val'].tocoo()
+        #         self._subjacs_info[key]['rows'] = coo_val.row
+        #         self._subjacs_info[key]['cols'] = coo_val.col
+        #         self._subjacs_info[key]['val'] = coo_val.data
+
+        self._setup_index_maps(system)
+        self._subjacs = self._get_subjacs()
 
     def __iter__(self):
         for key, _ in self.items():
@@ -199,7 +208,7 @@ class _CheckingJacobian(DictionaryJacobian):
         from openmdao.core.explicitcomponent import ExplicitComponent
         explicit = isinstance(self._system(), ExplicitComponent)
 
-        self._get_subjacs(self._system())
+        self._get_subjacs()
 
         for key, subjac in self._subjacs.items():
             meta = subjac.info
@@ -265,9 +274,7 @@ class _CheckingJacobian(DictionaryJacobian):
         column : ndarray
             Column value.
         """
-        if self._col_mapper is None:
-            self._setup_index_maps(system)
-
+        self._update_needed = True
         wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
 
         # If we are doing a directional derivative, then the sparsity will be violated.
@@ -278,7 +285,7 @@ class _CheckingJacobian(DictionaryJacobian):
                        options[loc_wrt]['directional'])
 
         system = self._system()
-        subjacs = self._get_subjacs(system)
+        subjacs = self._get_subjacs()
 
         for of, start, end, _, _ in system._jac_of_iter():
             key = (of, wrt)
