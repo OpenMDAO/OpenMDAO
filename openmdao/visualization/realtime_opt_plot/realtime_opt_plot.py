@@ -24,6 +24,7 @@ try:
         Select,
         Toggle,
         Column,
+        ScrollBox,
     )
     from bokeh.layouts import gridplot, row, column, Spacer
     from bokeh.transform import transform
@@ -307,6 +308,7 @@ class _RealTimeOptPlot(object):
         self._pid_of_calling_script = pid_of_calling_script
 
         self._sampled_variables = None
+        self._sampled_variables_visibility = {}
         self._prom_response = None
 
         self._num_samples_plotted = 0
@@ -316,6 +318,8 @@ class _RealTimeOptPlot(object):
         self._prom_responses = None
 
         self._scatter_plots = {}
+
+        self._scatter_plots_figure = {}
 
         self._source = None
         self._lines = []
@@ -346,6 +350,7 @@ class _RealTimeOptPlot(object):
 
         def _update():
             print("_update")
+            # print (f"{self._sampled_variables_visibility=}")
             # this is the main method of the class. It gets called periodically by Bokeh
             # It looks for new data and if found, updates the plot with the new data
             new_case = self._case_tracker._get_new_case()
@@ -493,6 +498,10 @@ class _RealTimeOptPlot(object):
         self._sampled_variables = [
             varname for varname in outputs if varname not in self._prom_responses
         ]
+
+        for sampled_variable in self._sampled_variables:
+            self._sampled_variables_visibility[sampled_variable] = True
+
         for sampled_variable in self._sampled_variables:
             self._source_dict[sampled_variable] = []
 
@@ -504,7 +513,7 @@ class _RealTimeOptPlot(object):
             active=active,
             margin=(0, 0, 8, 0),
         )
-        # toggle.js_on_change("active", callback) TODO
+        toggle.on_change("active", callback) #TODO
         self._sampled_variables_toggles.append(toggle)
         # Add custom CSS styles for both active and inactive states
         toggle.stylesheets = [
@@ -532,7 +541,7 @@ class _RealTimeOptPlot(object):
 
         plots = []
 
-        for i, (y, x) in enumerate(
+        for i, (y, x) in enumerate(  #  Why y,x here ??
             product(self._sampled_variables, self._sampled_variables)
         ):
 
@@ -553,6 +562,8 @@ class _RealTimeOptPlot(object):
                     height=240,
                     output_backend="webgl",
                 )
+
+                self._scatter_plots_figure[(x,y)] = p
 
                 p.xaxis.axis_label = f"{x} ({x_units})"
                 p.yaxis.axis_label = f"{y} ({y_units})"
@@ -636,15 +647,34 @@ class _RealTimeOptPlot(object):
         )
 
 
-        
-        def _sampled_variable_callback(attr, old, new):
-            pass
+
+        def _sampled_variable_callback(var_name):
+            def toggle_callback(attr, old, new):
+                # The callback "closes over" the var_name variable
+                # lines[var_name].visible = toggles[var_name].active
+                self._sampled_variables_visibility[var_name] = new
+                self._hist_figures[var_name].visible = new
+
+
+                for i, (y, x) in enumerate(
+                    product(self._sampled_variables, self._sampled_variables)
+                ):
+
+                    icolumn = i % N
+                    irow = i // N
+
+                    # only do the lower half
+                    if x != y:
+                        self._scatter_plots_figure[(x,y)].visible = icolumn < irow \
+                            and self._sampled_variables_visibility[x] and self._sampled_variables_visibility[y] 
+
+            return toggle_callback
 
         for sampled_var in self._sampled_variables:
-            self._make_variable_button(sampled_var,True,_sampled_variable_callback
+            # self._make_variable_button(sampled_var,True,_sampled_variable_callback
+            self._make_variable_button(sampled_var,True,_sampled_variable_callback(sampled_var)
             )
 
-        print(f"{self._sampled_variables_toggles=}")
         toggle_column = Column(
             children=self._sampled_variables_toggles,
             sizing_mode="stretch_both",
@@ -657,6 +687,33 @@ class _RealTimeOptPlot(object):
                 'max-height': '100vh'  # Ensures it doesn't exceed viewport
             },
         )
+
+
+        # header for the variable list
+        label = Div(
+            text="Sampled Variables",
+            width=200,
+            styles={"font-size": "20px", "font-weight": "bold"},
+        )
+        label_and_toggle_column = Column(
+            label,
+            toggle_column,
+            sizing_mode="stretch_height",
+            height_policy="fit",
+                styles={
+                    'max-height': '100vh'  # Ensures it doesn't exceed viewport
+                },
+        )
+
+        scroll_box = ScrollBox(
+            child=label_and_toggle_column,
+            sizing_mode="stretch_height",
+            height_policy="max",
+        )
+
+
+
+
 
         p = figure(height=2 * plots[0].height, width=0, toolbar_location=None)
 
@@ -736,10 +793,18 @@ class _RealTimeOptPlot(object):
 
         # Create a Select widget with some options
         menu = Select(
-            title="Choose a response variable:",
+            # title="Choose a response variable:",
             options=self._prom_responses,
             value=self._prom_responses[0]  # Default value
         )
+
+        # header for the variable list
+        response_variable_label = Div(
+            text="Response variable:",
+            width=200,
+            styles={"font-size": "20px", "font-weight": "bold"},
+        )
+
 
         # Python callback function that will run when selection changes
         def cb_select_response_variable(attr, old, new):
@@ -750,12 +815,10 @@ class _RealTimeOptPlot(object):
 
             self._prom_response = new 
 
-
             color_bar.title = f"Response variable: '{new}'"
 
             self._color_mapper.low = self._prom_response_min[self._prom_response]
             self._color_mapper.high = self._prom_response_max[self._prom_response]
-
 
             for (x,y), scatter_plot in self._scatter_plots.items():
                 t = transform(
@@ -772,16 +835,47 @@ class _RealTimeOptPlot(object):
         # Attach the callback to the Select widget
         menu.on_change("value", cb_select_response_variable)
 
-        # Add the text box after the grid in a row
-        final_layout = row(
-            column(title_div, gp),
+        final_layout = Row(
+            Column(title_div, gp),
             p,
             spacer2,
-            column(self._text_box, spacer3, quit_button, spacer4, menu, spacer5, toggle_column),
-            sizing_mode="fixed",
+            Column(self._text_box, spacer3, quit_button, spacer4, response_variable_label, menu, spacer5, scroll_box, sizing_mode="stretch_both"),
+            # sizing_mode="fixed",
+            sizing_mode="stretch_both",
         )
 
         self.plot_figure = final_layout
+
+def print_bokeh_objects(doc):
+    # Get all objects in the document
+    all_objects = doc.roots[0].references()
+    
+    # Print information about each object
+    print("\n=== BOKEH OBJECTS IN DOCUMENT ===")
+    for obj in all_objects:
+        obj_id = obj.id
+        obj_type = type(obj).__name__
+        
+        # Get additional information based on object type
+        additional_info = {}
+        if hasattr(obj, 'name') and obj.name:
+            additional_info['name'] = obj.name
+        if hasattr(obj, 'tags') and obj.tags:
+            additional_info['tags'] = obj.tags
+        if hasattr(obj, 'label') and obj.label:
+            additional_info['label'] = obj.label
+        if hasattr(obj, 'title') and obj.title:
+            if hasattr(obj.title, 'text'):
+                additional_info['title'] = obj.title.text
+            else:
+                additional_info['title'] = str(obj.title)
+        
+        # Print the information
+        print(f"ID: {obj_id} | Type: {obj_type}", end="")
+        if additional_info:
+            print(f" | Info: {additional_info}")
+        else:
+            print()
 
 
 def realtime_opt_plot(
@@ -803,12 +897,24 @@ def realtime_opt_plot(
     """
 
     def _make_realtime_opt_plot_doc(doc):
+
+
+        # Print to console when the document is loaded
+        def on_document_ready(event):
+            print_bokeh_objects(doc)
+
+        doc.on_event('document_ready', on_document_ready)
+
+
+
         _RealTimeOptPlot(
             case_recorder_filename,
             callback_period,
             doc=doc,
             pid_of_calling_script=pid_of_calling_script,
         )
+
+
 
     _port_number = _get_free_port()
 
