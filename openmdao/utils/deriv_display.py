@@ -198,7 +198,7 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                     derivative_info['directional_fwd_rev']):
                 err = _format_error(tol_violations[0].fwd_rev, 0.0, format_func=pwrap)
                 parts.append(pwrap('    Max Tolerance Violation '
-                                       f'([rev, fwd] Dot Product Test) : {err}'))
+                                   f'([rev, fwd] Dot Product Test) : {err}'))
                 parts.append(f'      abs error: {abs_errs[0].fwd_rev:.6e}')
                 parts.append(f'      rel error: {rel_errs[0].fwd_rev:.6e}')
                 fwd, rev = derivative_info['directional_fwd_rev']
@@ -555,7 +555,9 @@ def _format_error(error, tol, format_func=rich_wrap):
     error : float
         The error.
     tol : float
-        Tolerance above which errors are flagged
+        Tolerance above which errors are flagged.
+    format_func : callable
+        A function used to format the output.
 
     Returns
     -------

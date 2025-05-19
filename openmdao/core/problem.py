@@ -1233,6 +1233,8 @@ class Problem(object, metaclass=ProblemMetaclass):
             If True, analytic derivatives will be coerced into arrays. Default is True.
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
+        rich_print : bool, optional
+            If True, print using rich if available.
 
         Returns
         -------

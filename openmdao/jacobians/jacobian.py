@@ -72,6 +72,8 @@ class Jacobian(object):
         self._update_needed = True
         self._output_slices = _get_vec_slices(system, 'output')
         self._input_slices = _get_vec_slices(system, 'input')
+        if system._has_approx:
+            system._get_approx_subjac_keys()  # possibly regenerate keys
 
     def create_subjac(self, abs_key, meta):
         """
@@ -144,8 +146,7 @@ class Jacobian(object):
         try:
             return self._subjacs[self._get_abs_key(key)].info
         except KeyError:
-            msg = '{}: Variable name pair ("{}", "{}") not found.'
-            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
+            raise KeyError(f'{self.msginfo}: Variable name pair {key} not found.')
 
     def __contains__(self, key):
         """
@@ -180,8 +181,7 @@ class Jacobian(object):
         try:
             return self._subjacs[self._get_abs_key(key)].get_val()
         except KeyError:
-            msg = '{}: Variable name pair ("{}", "{}") not found.'
-            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
+            raise KeyError(f'{self.msginfo}: Variable name pair {key} not found.')
 
     def __setitem__(self, key, subjac):
         """
@@ -415,14 +415,6 @@ class Jacobian(object):
                         subj = jac[start:end, wstart:wend]
                         subjac['val'][:] = subj[subjac['rows'], subjac['cols']]
 
-    def asdense(self):
-        """
-        Return the jacobian as a dense array.
-        """
-        for key, subjac in self._subjacs.items():
-            pass
-
-
     def _update_subjacs(self, system):
         """
         Revert all subjacs back to the way they were as declared by the user.
@@ -430,6 +422,50 @@ class Jacobian(object):
         self._subjacs = None
         self._get_subjacs()
         self._col_mapper = None  # force recompute of internal index maps on next set_col
+
+    def _get_ordered_subjac_keys(self, system):
+        """
+        Iterate over subjacs keyed by absolute names.
+
+        This includes only subjacs that have been set and are part of the current system.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+
+        Returns
+        -------
+        list
+            List of keys matching this jacobian for the current system.
+        """
+        #TODO: implement this for all Jacobians, possibly generating all Group related subjac_infos
+        #TODO: on the fly and storing them in the Jacobian object, i.e. the only 'permanent'
+        #TODO: subjac_infos would be those from the Components...
+        if self._iter_keys is None:
+            subjacs = self._subjacs_info
+            keys = []
+            # determine the set of remote keys (keys where either of or wrt is remote somewhere)
+            # only if we're under MPI with comm size > 1 and the given system is a Group that
+            # computes its derivatives using finite difference or complex step.
+            if system.pathname and system.comm.size > 1 and system._owns_approx_jac and \
+                    system._subsystems_allprocs:
+                ofnames = system._var_allprocs_abs2meta['output']
+                wrtnames = system._var_allprocs_abs2meta
+            else:
+                ofnames = system._var_abs2meta['output']
+                wrtnames = system._var_abs2meta
+
+            for res_name in ofnames:
+                for type_ in ('output', 'input'):
+                    for name in wrtnames[type_]:
+                        key = (res_name, name)
+                        if key in subjacs:
+                            keys.append(key)
+
+            self._iter_keys = keys
+
+        return self._iter_keys
 
 
 class SplitJacobian(Jacobian):

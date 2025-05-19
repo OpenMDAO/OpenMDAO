@@ -16,6 +16,7 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.coloring import _ColSparsityJac
+from openmdao.jacobians.block_jacobian import BlockJacobian
 
 _tuplist = (tuple, list)
 
@@ -253,7 +254,7 @@ class ImplicitComponent(Component):
             If None, all are in the scope.
         """
         if jac is None:
-            jac = self._assembled_jac if self._assembled_jac is not None else self._jacobian
+            jac = self._get_jacobian()
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
@@ -539,6 +540,34 @@ class ImplicitComponent(Component):
         else:
             self._residuals_wrapper = self._residuals
             self._dresiduals_wrapper = self._dresiduals
+
+    def _get_jacobian(self, force_if_mat_free=False):
+        """
+        Initialize the jacobian if it is not already initialized.
+
+        Override this in a subclass to use a different jacobian type.
+
+        Parameters
+        ----------
+        force_if_mat_free : bool
+            Ignored.
+
+        Returns
+        -------
+        Jacobian
+            The initialized jacobian.
+        """
+        if self._jacobian is None:
+            self._jacobian = self._get_assembled_jac()
+
+            if self._jacobian is None:
+                self._jacobian = BlockJacobian(system=self)
+
+            if self._has_approx:
+                self._get_static_wrt_matches()
+                self._add_approximations()  # this does nothing for a Group
+
+        return self._jacobian
 
     def _get_jac_wrapper(self):
         if self._jac_wrapper is None:

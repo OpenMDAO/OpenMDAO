@@ -151,40 +151,28 @@ class ExplicitComponent(Component):
                     'dependent': True,
                 }
 
-    # def _setup_jacobians(self, recurse=True):
-    #     """
-    #     Set and populate jacobian.
+    def _get_jacobian(self, force_if_mat_free=False):
+        """
+        Initialize the jacobian if it is not already initialized.
 
-    #     Parameters
-    #     ----------
-    #     recurse : bool
-    #         If True, setup jacobians in all descendants. (ignored)
-    #     """
-    #     if self._has_approx:
-    #         self._get_static_wrt_matches()
-    #         self._add_approximations()
+        Parameters
+        ----------
+        force_if_mat_free : bool
+            If True, force the jacobian to be initialized even for a matrix free component.
 
-    # def _get_jacobian(self, force_if_mat_free=False):
-    #     """
-    #     Initialize the jacobian if it is not already initialized.
+        Returns
+        -------
+        Jacobian
+            The initialized jacobian.
+        """
+        if force_if_mat_free or not self.matrix_free:
+            if self._jacobian is None:
+                self._jacobian = BlockJacobian(system=self)
+                if self._has_approx:
+                    self._get_static_wrt_matches()
+                    self._add_approximations()
 
-    #     Parameters
-    #     ----------
-    #     force_if_mat_free : bool
-    #         If True, force the jacobian to be initialized even for a matrix free component.
-
-    #     Returns
-    #     -------
-    #     Jacobian
-    #         The initialized jacobian.
-    #     """
-    #     if force_if_mat_free or not self.matrix_free:
-    #         if self._jacobian is None:
-    #             self._jacobian = BlockJacobian(system=self)
-    #             if self._has_approx:
-    #                 self._get_static_wrt_matches()
-    #                 self._add_approximations()
-    #         return self._jacobian
+            return self._jacobian
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,

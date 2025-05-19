@@ -41,6 +41,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 
 # regex to check for valid names.
 import re
@@ -1160,7 +1161,8 @@ class Group(System):
         self._fd_rev_xfer_correction_dist = {}
 
         desvars = self.get_design_vars(get_sizes=False)
-        responses = self._check_alias_overlaps(self.get_responses(get_sizes=False))
+        responses = self._check_alias_overlaps(self.get_responses(get_sizes=False,
+                                                                  use_prom_ivc=True))
 
         self._dataflow_graph = self._get_dataflow_graph()
 
@@ -3688,8 +3690,8 @@ class Group(System):
             If None, all are in the scope.
         """
         if self._owns_approx_jac:
-            jac = self._jacobian
-        elif jac is None and self._get_assembled_jac() is not None:
+            jac = self._get_jacobian()
+        if jac is None and self._get_assembled_jac() is not None:
             jac = self._assembled_jac
 
         if jac is not None:
@@ -3823,6 +3825,8 @@ class Group(System):
                 self._jacobian = self._tot_jac
             else:
                 self._jacobian = self._get_jacobian()
+                if self._jacobian is not None:
+                    self._jacobian._update_needed = True
 
             if self.pathname == "":
                 for approximation in self._approx_schemes.values():
@@ -3965,12 +3969,48 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._get_missing_partials(missing)
 
+    def _get_jacobian(self, force_if_mat_free=False):
+        """
+        Initialize the jacobian if it is not already initialized.
+
+        Override this in a subclass to use a different jacobian type.
+
+        Parameters
+        ----------
+        force_if_mat_free : bool
+            Ignored.
+
+        Returns
+        -------
+        Jacobian
+            The initialized jacobian.
+        """
+        if self._old_relevance is not self._relevance:
+            self._jacobian = None
+            self._old_relevance = self._relevance
+
+        if self._jacobian is None:
+            self._jacobian = self._get_assembled_jac()
+
+            if self._jacobian is None and self._has_approx:
+                self._jacobian = DictionaryJacobian(system=self)
+
+            if self._has_approx:
+                self._get_static_wrt_matches()
+                self._add_approximations()  # this does nothing for a Group
+
+        return self._jacobian
+
     def _approx_subjac_keys_iter(self):
+        print(self.msginfo, "_approx_subjac_keys")
         relevant = self._relevance
-        for key in self._subjac_keys_iter():
-            of, wrt = key
-            if relevant.is_relevant(of) and relevant.is_relevant(wrt):
-                yield key
+        with relevant.all_seeds_active():
+            for key in self._subjac_keys_iter():
+                of, wrt = key
+                if relevant.is_relevant(of) and relevant.is_relevant(wrt):
+                    yield key
+                else:
+                    print(f"skipping {key}")
 
     def _subjac_keys_iter(self):
         # yields absolute keys (no aliases)

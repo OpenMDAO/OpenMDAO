@@ -19,6 +19,9 @@ class BlockJacobian(Jacobian):
     """
 
     def __init__(self, system):
+        """
+        Initialize the BlockJacobian.
+        """
         super().__init__(system)
         self._subjacs = self._get_subjacs()
 

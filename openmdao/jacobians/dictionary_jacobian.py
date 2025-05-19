@@ -31,47 +31,6 @@ class DictionaryJacobian(Jacobian):
     def _setup(self, system):
         self._subjacs = self._get_subjacs()
 
-    def _get_ordered_subjac_keys(self, system):
-        """
-        Iterate over subjacs keyed by absolute names.
-
-        This includes only subjacs that have been set and are part of the current system.
-
-        Parameters
-        ----------
-        system : System
-            System that is updating this jacobian.
-
-        Returns
-        -------
-        list
-            List of keys matching this jacobian for the current system.
-        """
-        if self._iter_keys is None:
-            subjacs = self._subjacs_info
-            keys = []
-            # determine the set of remote keys (keys where either of or wrt is remote somewhere)
-            # only if we're under MPI with comm size > 1 and the given system is a Group that
-            # computes its derivatives using finite difference or complex step.
-            if system.pathname and system.comm.size > 1 and system._owns_approx_jac and \
-                    system._subsystems_allprocs:
-                ofnames = system._var_allprocs_abs2meta['output']
-                wrtnames = system._var_allprocs_abs2meta
-            else:
-                ofnames = system._var_abs2meta['output']
-                wrtnames = system._var_abs2meta
-
-            for res_name in ofnames:
-                for type_ in ('output', 'input'):
-                    for name in wrtnames[type_]:
-                        key = (res_name, name)
-                        if key in subjacs:
-                            keys.append(key)
-
-            self._iter_keys = keys
-
-        return self._iter_keys
-
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.

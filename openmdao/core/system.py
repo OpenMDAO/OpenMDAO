@@ -18,7 +18,7 @@ import numpy as np
 
 from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
     _UNDEFINED, INT_DTYPE, INF_BOUND, _SetupStatus
-from openmdao.jacobians.dictionary_jacobian import Jacobian, DictionaryJacobian
+from openmdao.jacobians.dictionary_jacobian import Jacobian
 from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
@@ -210,6 +210,8 @@ class System(object, metaclass=SystemMetaclass):
         Recording options dictionary
     _problem_meta : dict
         Problem level metadata.
+    _old_relevance : Relevance or None
+        The relevance object from the previous call to _get_approx_subjac_keys.
     under_complex_step : bool
         When True, this system is undergoing complex step.
     under_finite_difference : bool
@@ -436,6 +438,8 @@ class System(object, metaclass=SystemMetaclass):
                                        desc='User-defined metadata to exclude in recording')
 
         self._problem_meta = None
+
+        self._old_relevance = None
 
         # Counting iterations.
         self.iter_count = 0
@@ -1440,8 +1444,16 @@ class System(object, metaclass=SystemMetaclass):
         list
             List of approx derivative subjacobian keys.
         """
+        relevance = self._relevance
+        if self._old_relevance is not relevance:
+            print(f"{self.msginfo}: relevance changed from {self._old_relevance} to {relevance}")
+            self._approx_subjac_keys = None
+
         if self._approx_subjac_keys is None:
+            self._old_relevance = relevance
             self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
+        else:
+            print(f"{self.msginfo}: reusing subjac keys:", self._approx_subjac_keys)
 
         return self._approx_subjac_keys
 
@@ -2522,7 +2534,7 @@ class System(object, metaclass=SystemMetaclass):
             if asm_jac_solvers:
                 if self.matrix_free:
                     raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
-                                    "subcomponent." % self.msginfo)
+                                       "subcomponent." % self.msginfo)
 
                 asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
                 self._assembled_jac = self._jacobian = asm_jac
@@ -2530,34 +2542,6 @@ class System(object, metaclass=SystemMetaclass):
                     solver._assembled_jac = asm_jac
 
         return self._assembled_jac
-
-    def _get_jacobian(self, force_if_mat_free=False):
-        """
-        Initialize the jacobian if it is not already initialized.
-
-        Override this in a subclass to use a different jacobian type.
-
-        Parameters
-        ----------
-        force_if_mat_free : bool
-            Ignored.
-
-        Returns
-        -------
-        Jacobian
-            The initialized jacobian.
-        """
-        if self._jacobian is None:
-            self._jacobian = self._get_assembled_jac()
-
-            if self._jacobian is None:
-                self._jacobian = DictionaryJacobian(system=self)
-
-            if self._has_approx:
-                self._get_static_wrt_matches()
-                self._add_approximations()  # this does nothing for a Group
-
-        return self._jacobian
 
     # def _setup_jacobians(self, recurse=True):
     #     """

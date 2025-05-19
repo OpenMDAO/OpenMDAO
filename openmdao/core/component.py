@@ -16,7 +16,6 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
     global_meta_names, collect_errors, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.subjac import Subjac
-from openmdao.jacobians.block_jacobian import BlockJacobian
 # from openmdao.jacobians.simple_jacobian import ComponentJacobian
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 # from openmdao.matrices.coo_matrix import COOMatrix
@@ -1601,29 +1600,6 @@ class Component(System):
             self._subjacs_info[abs_key] = Subjac.get_instance_metadata(pattern_meta, prev_meta,
                                                                        shape, self, abs_key)
 
-    def _get_jacobian(self, force_if_mat_free=False):
-        """
-        Initialize the jacobian if it is not already initialized.
-
-        Parameters
-        ----------
-        force_if_mat_free : bool
-            If True, force the jacobian to be initialized even for a matrix free component.
-
-        Returns
-        -------
-        Jacobian
-            The initialized jacobian.
-        """
-        if force_if_mat_free or not self.matrix_free:
-            if self._jacobian is None:
-                self._jacobian = BlockJacobian(system=self)
-                if self._has_approx:
-                    self._get_static_wrt_matches()
-                    self._add_approximations()
-
-            return self._jacobian
-
     def _column_iotypes(self):
         """
         Return a tuple of the iotypes that make up columns of the jacobian.
@@ -2036,6 +2012,9 @@ class Component(System):
         requested_method = method
         alloc_complex = self._outputs._alloc_complex
 
+        if not alloc_complex and method == 'cs':
+            self._nocs_warning()
+
         local_opts = self._get_check_partial_options()
 
         for keypats, meta in self._declared_partials_patterns.items():
@@ -2059,9 +2038,9 @@ class Component(System):
                 for var in wrtvars:
                     # we now have individual vars like 'x'
                     # get the options for checking partials
-                    fd_options, _ = _get_fd_options(var, requested_method, local_opts, step,
-                                                    form, step_calc, alloc_complex,
-                                                    minimum_step)
+                    fd_options = _get_fd_options(var, requested_method, local_opts, step,
+                                                 form, step_calc, alloc_complex, minimum_step)
+
                     # compare the compute options to the check options
                     if fd_options['method'] != meta_with_defaults['method']:
                         all_same = False
@@ -2411,8 +2390,6 @@ class Component(System):
         else:
             steps = step
 
-        could_not_cs = False
-
         actual_steps = defaultdict(list)
         alloc_complex = self._outputs._alloc_complex
 
@@ -2428,11 +2405,9 @@ class Component(System):
                 abs_key = rel_key2abs_key(self, rel_key)
                 local_wrt = rel_key[1]
 
-                fd_options, no_cs = _get_fd_options(local_wrt, requested_method,
-                                                    local_opts, step, form, step_calc,
-                                                    alloc_complex, minimum_step)
-                if no_cs:
-                    could_not_cs = True
+                fd_options = _get_fd_options(local_wrt, requested_method,
+                                             local_opts, step, form, step_calc,
+                                             alloc_complex, minimum_step)
 
                 actual_steps[rel_key].append(fd_options['step'])
 
@@ -2491,14 +2466,6 @@ class Component(System):
         # convert to regular dict from defaultdict
         partials_data = {key: dict(d) for key, d in partials_data.items()}
 
-        if could_not_cs:
-            issue_warning(f"Component '{self.pathname}' requested complex step, but "
-                          "force_alloc_complex has not been set to True, so finite difference was "
-                          "used.\nTo enable complex step, specify 'force_alloc_complex=True' when "
-                          "calling setup on the problem, e.g. "
-                          "'problem.setup(force_alloc_complex=True)'.",
-                          category=DerivativesWarning)
-
         incon_keys = self._get_inconsistent_keys()
 
         # if compact_print is True, we'll show all derivatives, even non-dependent ones
@@ -2538,6 +2505,13 @@ class Component(System):
         # add pathname to the partials dict to make it compatible with the return value
         # from Problem.check_partials and passable to assert_check_partials.
         return {self.pathname: partials_data}, worst
+
+    def _nocs_warning(self):
+        issue_warning(f"Component '{self.pathname}' requested complex step, but "
+                      "force_alloc_complex has not been set to True, so finite difference was "
+                      "used.\nTo enable complex step, specify 'force_alloc_complex=True' when "
+                      "calling setup on the problem, e.g. "
+                      "'problem.setup(force_alloc_complex=True)'.", category=DerivativesWarning)
 
     def _check_compute_primal_args(self):
         """
@@ -2657,9 +2631,6 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
     # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
     if method == 'cs' and not alloc_complex:
         method = 'fd'
-        could_not_cs = True
-    else:
-        could_not_cs = False
 
     fd_options = {'order': None,
                   'method': method}
@@ -2692,4 +2663,4 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
             if value is not None:
                 fd_options[name] = value
 
-    return fd_options, could_not_cs
+    return fd_options
