@@ -2,6 +2,7 @@
 
 import ctypes
 import errno
+import gc
 import os
 import sys
 from collections import defaultdict
@@ -20,13 +21,12 @@ try:
         BasicTicker,
         LinearColorMapper,
         ColorBar,
-        DataRange1d,
         Select,
         Toggle,
         Column,
         ScrollBox,
     )
-    from bokeh.layouts import gridplot, row, column, Spacer
+    from bokeh.layouts import gridplot, Spacer
     from bokeh.transform import transform
     from bokeh.plotting import figure
     from bokeh.server.server import Server
@@ -321,6 +321,8 @@ class _RealTimeOptPlot(object):
 
         self._scatter_plots_figure = {}
 
+        self._doc = doc
+
         self._source = None
         self._lines = []
         # flag to prevent updating label with units each time we get new data
@@ -348,8 +350,14 @@ class _RealTimeOptPlot(object):
 
         self._hist_figures = {}
 
+
+
+
         def _update():
             print("_update")
+
+            # print(f"{self.access_by_id('p1014')=}")
+
             # print (f"{self._sampled_variables_visibility=}")
             # this is the main method of the class. It gets called periodically by Bokeh
             # It looks for new data and if found, updates the plot with the new data
@@ -424,8 +432,9 @@ class _RealTimeOptPlot(object):
             elapsed_total = current_time - self._start_time
             elapsed_formatted = str(timedelta(seconds=int(elapsed_total)))
 
-            stats_text = f"""<div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
-                            <h3>Analysis Progress</h3>
+            # styles={"font-size": "20px", "font-weight": "bold"},
+
+            stats_text = f"""<div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px; border: 5px solid black">
                             <p>Number of samples: {self._num_samples_plotted}</p>
                             <p>Last updated: {formatted_time}</p>
                             <p>Elapsed time: {elapsed_formatted}</p>
@@ -439,6 +448,17 @@ class _RealTimeOptPlot(object):
 
         doc.add_periodic_callback(_update, callback_period)
         doc.title = "OpenMDAO Analysis Progress Plot"
+
+    # Alternative: Access objects by ID
+    def access_by_id(self, object_id):
+        """Retrieve a Bokeh object by its ID"""
+        try:
+            for obj in self._doc.roots[0].references():
+                if obj.id == object_id:
+                    return obj
+        except IndexError as e:
+            return None
+        return None
 
     def _update_histograms(self):
         for sampled_variable in self._sampled_variables:
@@ -463,6 +483,7 @@ class _RealTimeOptPlot(object):
             )
 
     def _setup_data_source(self):
+
         self._source_dict = {}
 
         # return prom
@@ -533,8 +554,11 @@ class _RealTimeOptPlot(object):
 
         N = len(self._sampled_variables)
 
-        xdrs = [DataRange1d(bounds=None) for _ in range(N)]
-        ydrs = [DataRange1d(bounds=None) for _ in range(N)]
+        # xdrs = [DataRange1d(bounds=None) for _ in range(N)]
+        # ydrs = [DataRange1d(bounds=None) for _ in range(N)]
+
+        # print(f"{xdrs=}")
+        # print(f"{ydrs=}")
 
         # Create a color mapper using Viridis (colorblind-friendly)
         self._color_mapper = LinearColorMapper(palette=Viridis256, low=0, high=200)
@@ -554,8 +578,8 @@ class _RealTimeOptPlot(object):
                 y_units = self._case_tracker._get_units(y)
 
                 p = figure(
-                    x_range=xdrs[i % N],
-                    y_range=ydrs[i // N],
+                    # x_range=xdrs[i % N],
+                    # y_range=ydrs[i // N],
                     background_fill_color="#fafafa",
                     border_fill_color="white",
                     width=240,
@@ -683,7 +707,7 @@ class _RealTimeOptPlot(object):
                 "overflow-y": "auto",
                 "border": "1px solid #ddd",
                 "padding": "8px",
-                "background-color": "#dddddd",
+                "background-color": "#f0f0f0",
                 'max-height': '100vh'  # Ensures it doesn't exceed viewport
             },
         )
@@ -701,7 +725,9 @@ class _RealTimeOptPlot(object):
             sizing_mode="stretch_height",
             height_policy="fit",
                 styles={
-                    'max-height': '100vh'  # Ensures it doesn't exceed viewport
+                    'max-height': '100vh',  # Ensures it doesn't exceed viewport
+                    'border-radius': '5px',
+                    'border': '5px solid black',
                 },
         )
 
@@ -760,7 +786,6 @@ class _RealTimeOptPlot(object):
         # show number of samples plotted
         self._text_box = Div(
             text="""<div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
-                    <h3>Analysys Progress</h3>
                     <p>Waiting for data...</p>
                     </div>""",
             width=600,
@@ -769,7 +794,7 @@ class _RealTimeOptPlot(object):
 
         p.min_border_right = 100
 
-        spacer2 = Spacer(width=150, height=300)  # Between plot 2 (with colorbar) and text box
+        spacer2 = Spacer(width=150, height=50)  # Between plot 2 (with colorbar) and text box
         spacer3 = Spacer(width=100, height=20)
         spacer4 = Spacer(width=100, height=20)
         spacer5 = Spacer(width=100, height=20)
@@ -795,12 +820,17 @@ class _RealTimeOptPlot(object):
         menu = Select(
             # title="Choose a response variable:",
             options=self._prom_responses,
-            value=self._prom_responses[0]  # Default value
-        )
+            value=self._prom_responses[0],  # Default value
+            styles={
+                "border": "5px solid black",
+                "padding": "8px",
+                "background-color": "#f0f0f0",
+        },
+    )
 
         # header for the variable list
         response_variable_label = Div(
-            text="Response variable:",
+            text="Response variable",
             width=200,
             styles={"font-size": "20px", "font-weight": "bold"},
         )
@@ -835,16 +865,25 @@ class _RealTimeOptPlot(object):
         # Attach the callback to the Select widget
         menu.on_change("value", cb_select_response_variable)
 
+        analysis_progress_label = Div(
+            text="Analysis Progress",
+            width=200,
+            styles={"font-size": "20px", "font-weight": "bold"},
+        )
+
         final_layout = Row(
             Column(title_div, gp),
             p,
             spacer2,
-            Column(self._text_box, spacer3, quit_button, spacer4, response_variable_label, menu, spacer5, scroll_box, sizing_mode="stretch_both"),
+            Column(spacer2, quit_button, spacer3, analysis_progress_label, self._text_box, response_variable_label, 
+                   menu, spacer5, scroll_box, sizing_mode="stretch_both"),
             # sizing_mode="fixed",
             sizing_mode="stretch_both",
         )
 
         self.plot_figure = final_layout
+
+
 
 def print_bokeh_objects(doc):
     # Get all objects in the document
@@ -903,7 +942,7 @@ def realtime_opt_plot(
         def on_document_ready(event):
             print_bokeh_objects(doc)
 
-        doc.on_event('document_ready', on_document_ready)
+        # doc.on_event('document_ready', on_document_ready)
 
 
 
