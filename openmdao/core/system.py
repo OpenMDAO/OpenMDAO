@@ -1446,7 +1446,7 @@ class System(object, metaclass=SystemMetaclass):
             return True
         return False
 
-    def _get_approx_subjac_keys(self, use_relevance=True):
+    def _get_approx_subjac_keys(self, use_relevance=True, initialize=False):
         """
         Return a list of (of, wrt) keys needed for approx derivs for this system.
 
@@ -1457,21 +1457,28 @@ class System(object, metaclass=SystemMetaclass):
         ----------
         use_relevance : bool
             If True, use relevance to determine which partials to approximate.
+        initialize : bool
+            If True, initialize the list of approx subjac keys.
 
         Returns
         -------
         list
             List of approx derivative subjacobian keys.
         """
-        if use_relevance:
-            relevance = self._relevance
-            # regerate the keys if relevance has changed
-            if self._old_relevance is not relevance:
-                self._approx_subjac_keys = None
-                self._old_relevance = relevance
+        if initialize:
+            self._approx_subjac_keys = None
 
         if self._approx_subjac_keys is None:
-            self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
+            if use_relevance:
+                lst = []
+                is_relevant = self._relevance.is_relevant
+                for key in self._approx_subjac_keys_iter():
+                    _, wrt = key
+                    if is_relevant(wrt):
+                        lst.append(key)
+                self._approx_subjac_keys = lst
+            else:
+                self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
 
         return self._approx_subjac_keys
 

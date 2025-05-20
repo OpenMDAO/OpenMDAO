@@ -504,7 +504,8 @@ class ExplicitComponent(Component):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        # need this here to ensure that jacobian and approx_schemes are initialized
+        # need this here to ensure that jacobian and approx_schemes are initialized properly
+        # based on relevance
         jac = self._get_jacobian()
 
         if self.matrix_free or not (self._has_compute_partials or self._approx_schemes):

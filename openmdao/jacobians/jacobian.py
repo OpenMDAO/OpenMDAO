@@ -78,8 +78,6 @@ class Jacobian(object):
         self._input_slices = _get_vec_slices(system, 'input')
         self._has_approx = system._has_approx
         self._explicit = system.is_explicit()
-        if system._has_approx:
-            system._get_approx_subjac_keys()  # possibly regenerate keys
 
     def create_subjac(self, abs_key, meta):
         """
@@ -119,9 +117,9 @@ class Jacobian(object):
             out_slices = self._output_slices
             in_slices = self._input_slices
             # try:
-            #     relevance = self._problem_meta['relevance']
+            #     is_relevant = self._problem_meta['relevance'].is_relevant
             # except Exception:
-            #     relevance = None
+            #     is_relevant = None
             for key, meta in self._subjacs_info.items():
                 of, wrt = key
                 if of in out_slices:

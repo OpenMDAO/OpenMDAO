@@ -4243,7 +4243,7 @@ class Group(System):
         sizes_in = self._var_sizes['input']
         abs2idx = self._var_allprocs_abs2idx
 
-        approx_keys = self._get_approx_subjac_keys()
+        approx_keys = self._get_approx_subjac_keys(initialize=True)
         wrt_seen = set()
 
         for key in approx_keys:

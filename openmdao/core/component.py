@@ -1722,7 +1722,7 @@ class Component(System):
         """
         subjacs = self._subjacs_info
         wrtset = set()
-        subjac_keys = self._get_approx_subjac_keys(use_relevance=use_relevance)
+        subjac_keys = self._get_approx_subjac_keys(use_relevance=use_relevance, initialize=True)
         methods = list(self._approx_schemes)
         self._approx_schemes = {}
         for method in methods:
