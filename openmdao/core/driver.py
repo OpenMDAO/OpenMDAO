@@ -1706,7 +1706,7 @@ class Driver(object, metaclass=DriverMetaclass):
 
         Returns
         -------
-        active_cons : dict[str: dict
+        active_cons : dict[str: dict]
             The names of the active constraints. For each active constraint,
             a dict of the active indices and the active bound (0='equals',
             -1='lower', 1='upper') is provided. These are the active indices
@@ -1792,7 +1792,7 @@ class Driver(object, metaclass=DriverMetaclass):
 
         return active_cons, active_dvs
 
-    def _unscale_lagrange_multipliers(self, multipliers):
+    def _unscale_lagrange_multipliers(self, multipliers, assume_dv=False):
         """
         Unscale the Lagrange multipliers from optimizer scaling to physical/model scaling.
 
@@ -1806,6 +1806,11 @@ class Driver(object, metaclass=DriverMetaclass):
             get_active_cons_and_dvs method.
         multipliers : dict[str: ArrayLike]
             The Lagrange multipliers, in Driver-scaled units.
+        assume_dv : bool
+            This function can unscale the multipliers of either design variables or constraints.
+            Since variables can be both a design variable and a constraint, this flag
+            disambiguates the type of multiplier we're handling so the appropriate scaling
+            factors can be used.
 
         Returns
         -------
@@ -1830,7 +1835,7 @@ class Driver(object, metaclass=DriverMetaclass):
         unscaled_multipliers = {}
 
         for name, val in multipliers.items():
-            if name in self._designvars:
+            if name in self._designvars and assume_dv:
                 scaler = self._designvars[name]['total_scaler']
             else:
                 scaler = self._responses[name]['total_scaler']
@@ -1866,12 +1871,14 @@ class Driver(object, metaclass=DriverMetaclass):
 
         Returns
         -------
-        multipliers : dict[str: ArrayLike]
-            A dictionary with an entry for each active constraint and the
-            associated Lagrange multiplier value.
-        active_info : dict[str: dict
-            A dictionary with an entry for each active constraint and its
-            active indices and bounds.
+        active_desvars : dict[str: dict]
+            A dictionary with an entry for each active design variable.
+            For each active design variable, the corresponding dictionary
+            provides the 'multipliers', active 'indices', and 'active_bounds'.
+        active_cons : dict[str: dict]
+            A dictionary with an entry for each active constraint.
+            For each active constraint, the corresponding dictionary
+            provides the 'multipliers', active 'indices', and 'active_bounds'.
         """
         if not self.supports['optimization']:
             raise NotImplementedError('Lagrange multipliers are only available for '
@@ -1888,7 +1895,7 @@ class Driver(object, metaclass=DriverMetaclass):
         active_cons, active_dvs = self._get_active_cons_and_dvs(feas_atol=feas_tol,
                                                                 feas_rtol=feas_tol)
 
-        # Active cons and vs provide the active indices in the design vars and constraints.
+        # Active cons and dvs provide the active indices in the design vars and constraints.
         # But these design vars and constraints may themselves be indices of a larger
         # variable.
         totals = prob.compute_totals(list(of_totals),
@@ -1897,46 +1904,58 @@ class Driver(object, metaclass=DriverMetaclass):
 
         grad_f = {inp: totals[obj_name, inp] for inp in des_vars.keys()}
 
-        n = 0
-        for inp in grad_f.keys():
-            n += grad_f[inp].size
+        n = sum([grad_f_val.size for grad_f_val in grad_f.values()])
 
         grad_f_vec = np.zeros((n))
         offset = 0
-        for inp in grad_f.keys():
-            inp_size = grad_f[inp].size
-            grad_f_vec[offset:offset + inp_size] = grad_f[inp]
+        for grad_f_val in grad_f.values():
+            inp_size = grad_f_val.size
+            grad_f_vec[offset:offset + inp_size] = grad_f_val
             offset += inp_size
 
-        actives = active_cons | active_dvs
-        n_active = np.sum(np.fromiter((len(c['indices']) for c in actives.values()), dtype=int))
         active_jac_blocks = []
 
-        if n_active > 0:
-            for i, (con_name, active_meta) in enumerate(actives.items()):
-                # If the constraint is a design variable, the constraint gradient
-                # wrt des vars is just an identity matrix sized by the number of
-                # active elements in the design variable.
-                active_idxs = active_meta['indices']
-                if con_name in des_vars.keys():
-                    size = des_vars[con_name]['size']
-                    con_grad = {(con_name, inp): np.eye(size)[active_idxs, ...] if inp == con_name
-                                else np.zeros((size, dv_meta['size']))[active_idxs, ...]
-                                for (inp, dv_meta) in des_vars.items()}
-                else:
-                    con_grad = {(con_name, inp): totals[con_name, inp][active_idxs, ...]
-                                for inp in des_vars.keys()}
-                if use_sparse_solve:
-                    active_jac_blocks.append([sp.csr_matrix(cg) for cg in con_grad.values()])
-                else:
-                    active_jac_blocks.append(list(con_grad.values()))
+        if not active_cons and not active_dvs:
+            return {}, {}
+
+        for (dv_name, active_meta) in active_dvs.items():
+            # For active design variable bounds, the constraint gradient
+            # wrt des vars is just an identity matrix sized by the number of
+            # active elements in the design variable.
+            active_idxs = active_meta['indices']
+
+            size = des_vars[dv_name]['size']
+            con_grad = {(dv_name, inp): np.eye(size)[active_idxs, ...] if inp == dv_name
+                        else np.zeros((size, dv_meta['size']))[active_idxs, ...]
+                        for (inp, dv_meta) in des_vars.items()}
 
             if use_sparse_solve:
-                active_cons_mat = sp.block_array(active_jac_blocks)
+                active_jac_blocks.append([sp.csr_matrix(cg) for cg in con_grad.values()])
             else:
-                active_cons_mat = np.block(active_jac_blocks)
+                active_jac_blocks.append(list(con_grad.values()))
+
+        for (con_name, active_meta) in active_cons.items():
+            # If the constraint is a design variable, the constraint gradient
+            # wrt des vars is just an identity matrix sized by the number of
+            # active elements in the design variable.
+            active_idxs = active_meta['indices']
+            if con_name in des_vars.keys():
+                size = des_vars[con_name]['size']
+                con_grad = {(con_name, inp): np.eye(size)[active_idxs, ...] if inp == con_name
+                            else np.zeros((size, dv_meta['size']))[active_idxs, ...]
+                            for (inp, dv_meta) in des_vars.items()}
+            else:
+                con_grad = {(con_name, inp): totals[con_name, inp][active_idxs, ...]
+                            for inp in des_vars.keys()}
+            if use_sparse_solve:
+                active_jac_blocks.append([sp.csr_matrix(cg) for cg in con_grad.values()])
+            else:
+                active_jac_blocks.append(list(con_grad.values()))
+
+        if use_sparse_solve:
+            active_cons_mat = sp.block_array(active_jac_blocks)
         else:
-            return {}, {}
+            active_cons_mat = np.block(active_jac_blocks)
 
         if use_sparse_solve:
             lstsq_sol = sp.linalg.lsqr(active_cons_mat.T, -grad_f_vec)
@@ -1944,32 +1963,43 @@ class Driver(object, metaclass=DriverMetaclass):
             lstsq_sol = np.linalg.lstsq(active_cons_mat.T, -grad_f_vec, rcond=None)
         multipliers_vec = lstsq_sol[0]
 
-        multipliers = dict()
+        dv_multipliers = dict()
+        con_multipliers = dict()
         offset = 0
 
-        opts = ['indices', 'ref0', 'ref', 'units']
-        driver_vars = prob.list_driver_vars(out_stream=None,
-                                            desvar_opts=opts + ['flat_indices'],
-                                            cons_opts=opts + ['flat_indices'],
-                                            objs_opts=opts,
-                                            return_format='dict')
-        driver_vars = driver_vars['design_vars'] | driver_vars['constraints']
+        dv_vals = self.get_design_var_values()
+        con_vals = self.get_constraint_values()
 
-        for constraint, act_info in actives.items():
+        for desvar, act_info in active_dvs.items():
+            act_idxs = act_info['indices']
+            active_size = len(act_idxs)
+            mult_vals = multipliers_vec[offset:offset + active_size]
+            dv_multipliers[desvar] = np.zeros_like(dv_vals[desvar])
+            dv_multipliers[desvar].flat[act_idxs] = mult_vals
+            offset += active_size
+
+        for constraint, act_info in active_cons.items():
             act_idxs = act_info['indices']
             active_size = len(act_idxs)
             mult_vals = multipliers_vec[offset:offset + active_size]
             if constraint in des_vars:
-                multipliers[constraint] = np.zeros_like(self.get_design_var_values()[constraint])
+                con_multipliers[constraint] = np.zeros_like(dv_vals[constraint])
             else:
-                multipliers[constraint] = np.zeros_like(self.get_constraint_values()[constraint])
-            multipliers[constraint].flat[act_idxs] = mult_vals
+                con_multipliers[constraint] = np.zeros_like(con_vals[constraint])
+            con_multipliers[constraint].flat[act_idxs] = mult_vals
             offset += active_size
 
         if not driver_scaling:
-            multipliers = self._unscale_lagrange_multipliers(multipliers)
+            dv_multipliers = self._unscale_lagrange_multipliers(dv_multipliers, assume_dv=True)
+            con_multipliers = self._unscale_lagrange_multipliers(con_multipliers, assume_dv=False)
 
-        return multipliers, actives
+        for key, val in dv_multipliers.items():
+            active_dvs[key]['multipliers'] = val
+
+        for key, val in con_multipliers.items():
+            active_cons[key]['multipliers'] = val
+
+        return active_dvs, active_cons
 
 
 class SaveOptResult(object):

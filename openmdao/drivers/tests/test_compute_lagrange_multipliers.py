@@ -66,10 +66,10 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
                 result =  prob.run_driver()
                 self.assertEqual(result.exit_status, 'SUCCESS',
                                  msg=f'Failed to converge optimization with {driver_name}.')
-                multipliers, active_info = prob.driver.compute_lagrange_multipliers()
-                assert_near_equal(multipliers['c'], reference_multipliers['c'], tolerance=1.0E-5)
-                self.assertEqual(active_info['c']['indices'], [0])
-                self.assertEqual(active_info['c']['active_bounds'], [1])
+                _, active_cons = prob.driver.compute_lagrange_multipliers()
+                assert_near_equal(active_cons['c']['multipliers'], reference_multipliers['c'], tolerance=1.0E-5)
+                self.assertEqual(active_cons['c']['indices'], [0])
+                self.assertEqual(active_cons['c']['active_bounds'], [1])
 
     def test_simple_paraboloid_upper_inequality_constraint_scaled(self):
         """
@@ -87,8 +87,8 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
         self.assertEqual(result.exit_status, 'SUCCESS',
                          msg='Failed to converge baseline IPOPT optimization.')
         reference_multipliers = prob.driver.pyopt_solution.lambdaStar
-        multipliers, active_info = prob.driver.compute_lagrange_multipliers(driver_scaling=True)
-        assert_near_equal(multipliers['c'], reference_multipliers['c'], tolerance=1.0E-5)
+        active_dvs, active_cons = prob.driver.compute_lagrange_multipliers(driver_scaling=True)
+        assert_near_equal(active_cons['c']['multipliers'], reference_multipliers['c'], tolerance=1.0E-5)
 
         for driver_name, driver in drivers.items():
             with self.subTest(f'{driver_name=}'):
@@ -96,13 +96,13 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
                 result =  prob.run_driver()
                 self.assertEqual(result.exit_status, 'SUCCESS',
                                  msg=f'Failed to converge optimization with {driver_name}.')
-                multipliers, active_info = prob.driver.compute_lagrange_multipliers(driver_scaling=True)
-                assert_near_equal(multipliers['c'], reference_multipliers['c'], tolerance=1.0E-5)
-                self.assertEqual(active_info['c']['indices'], [0])
-                self.assertEqual(active_info['c']['active_bounds'], [1])
+                _, active_cons = prob.driver.compute_lagrange_multipliers(driver_scaling=True)
+                assert_near_equal(active_cons['c']['multipliers'], reference_multipliers['c'], tolerance=1.0E-5)
+                self.assertEqual(active_cons['c']['indices'], [0])
+                self.assertEqual(active_cons['c']['active_bounds'], [1])
                 # Now test the unscaled multipliers
-                unscaled_mults, active_info = prob.driver.compute_lagrange_multipliers(driver_scaling=False)
-                assert_near_equal(unscaled_mults['c'], 0.5, tolerance=1.0E-5)
+                _, unscaled_active_cons = prob.driver.compute_lagrange_multipliers(driver_scaling=False)
+                assert_near_equal(unscaled_active_cons['c']['multipliers'], 0.5, tolerance=1.0E-5)
 
     def test_simple_paraboloid_upper_inequality_constraint_lower_y_bound(self):
         """
@@ -127,18 +127,18 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
                 result =  prob.run_driver()
                 self.assertEqual(result.exit_status, 'SUCCESS',
                                  msg=f'Failed to converge optimization with {driver_name}.')
-                multipliers, active_info = prob.driver.compute_lagrange_multipliers()
-                assert_near_equal(multipliers['c'], reference_multipliers['c'], tolerance=1.0E-5)
-                self.assertEqual(active_info['c']['indices'], [0])
-                self.assertEqual(active_info['c']['active_bounds'], [1])
+                active_dvs, active_cons = prob.driver.compute_lagrange_multipliers()
+                assert_near_equal(active_cons['c']['multipliers'], reference_multipliers['c'], tolerance=1.0E-5)
+                self.assertEqual(active_cons['c']['indices'], [0])
+                self.assertEqual(active_cons['c']['active_bounds'], [1])
 
                 # In this case, we also have a multiplier on the y lower bound
-                self.assertEqual(active_info['y']['indices'], [0])
-                self.assertEqual(active_info['y']['active_bounds'], [-1])
+                self.assertEqual(active_dvs['y']['indices'], [0])
+                self.assertEqual(active_dvs['y']['active_bounds'], [-1])
 
                 # if we decrease y bound by 0.01 units, we should see the objective increase by lambda[y] * 0.01 units.
                 # we use a loose tolerance when testing this due to FD across the optimization
-                lambda_y = multipliers['y']
+                lambda_y = active_dvs['y']['multipliers']
                 f_nom = prob.get_val('f_xy')
 
                 prob = self._make_problem(driver=driver, y_lower=-7.01)
@@ -167,34 +167,35 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
         reference_multipliers = prob.driver.pyopt_solution.lambdaStar
 
         for driver_name, driver in drivers.items():
-            with self.subTest(f'{driver_name=}'):
-                prob = self._make_problem(driver=driver, y_lower=-7.0, f_xy_ref=0.1,
-                                          c_ref=15, x_ref=10, y_ref=10)
-                result =  prob.run_driver()
-                self.assertEqual(result.exit_status, 'SUCCESS',
-                                 msg=f'Failed to converge optimization with {driver_name}.')
-                multipliers, active_info = prob.driver.compute_lagrange_multipliers(driver_scaling=True)
-                assert_near_equal(multipliers['c'], reference_multipliers['c'], tolerance=1.0E-5)
-                self.assertEqual(active_info['c']['indices'], [0])
-                self.assertEqual(active_info['c']['active_bounds'], [1])
+            for use_sparse in [True, False]:
+                with self.subTest(f'{driver_name=} {use_sparse=}'):
+                    prob = self._make_problem(driver=driver, y_lower=-7.0, f_xy_ref=0.1,
+                                            c_ref=15, x_ref=10, y_ref=10)
+                    result =  prob.run_driver()
+                    self.assertEqual(result.exit_status, 'SUCCESS',
+                                    msg=f'Failed to converge optimization with {driver_name}.')
+                    active_dvs, active_cons = prob.driver.compute_lagrange_multipliers(driver_scaling=True)
+                    assert_near_equal(active_cons['c']['multipliers'], reference_multipliers['c'], tolerance=1.0E-5)
+                    self.assertEqual(active_cons['c']['indices'], [0])
+                    self.assertEqual(active_cons['c']['active_bounds'], [1])
 
-                # In this case, we also have a multiplier on the y lower bound
-                self.assertEqual(active_info['y']['indices'], [0])
-                self.assertEqual(active_info['y']['active_bounds'], [-1])
+                    # In this case, we also have a multiplier on the y lower bound
+                    self.assertEqual(active_dvs['y']['indices'], [0])
+                    self.assertEqual(active_dvs['y']['active_bounds'], [-1])
 
-                # if we decrease y bound by 0.01 units, we should see the objective increase by lambda[y] * 0.01 units.
-                # we use a loose tolerance when testing this due to FD across the optimization
-                multipliers, active_info = prob.driver.compute_lagrange_multipliers(driver_scaling=False)
-                lambda_y = multipliers['y']
-                f_nom = prob.get_val('f_xy')
+                    # if we decrease y bound by 0.01 units, we should see the objective increase by lambda[y] * 0.01 units.
+                    # we use a loose tolerance when testing this due to FD across the optimization
+                    active_dvs, active_cons = prob.driver.compute_lagrange_multipliers(driver_scaling=False,
+                                                                                       use_sparse_solve=use_sparse)
+                    lambda_y = active_dvs['y']['multipliers']
+                    f_nom = prob.get_val('f_xy')
 
-                prob = self._make_problem(driver=driver, y_lower=-7.01)
-                result =  prob.run_driver()
-                self.assertEqual(result.exit_status, 'SUCCESS',
-                                 msg=f'Failed to converge optimization with {driver_name}.')
-                f_perturbed = prob.get_val('f_xy')
-                assert_near_equal((f_perturbed - f_nom) / 0.01, lambda_y, tolerance=1.0E-1)
-
+                    prob = self._make_problem(driver=driver, y_lower=-7.01)
+                    result =  prob.run_driver()
+                    self.assertEqual(result.exit_status, 'SUCCESS',
+                                    msg=f'Failed to converge optimization with {driver_name}.')
+                    f_perturbed = prob.get_val('f_xy')
+                    assert_near_equal((f_perturbed - f_nom) / 0.01, lambda_y, tolerance=1.0E-1)
 
 
 if __name__ == "__main__":
