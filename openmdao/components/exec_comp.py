@@ -839,6 +839,7 @@ class ExecComp(ExplicitComponent):
             Flag indicating if the children should call linearize on their linear solvers.
         """
         if self._requires_fd:
+            self._get_jacobian()
             if 'fd' in self._approx_schemes:
                 fdins = {wrt.rsplit('.', 1)[1] for wrt in self._approx_schemes['fd']._wrt_meta}
             else:

@@ -16,7 +16,6 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
     global_meta_names, collect_errors, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.subjac import Subjac
-from openmdao.jacobians.block_jacobian import BlockJacobian
 # from openmdao.jacobians.simple_jacobian import ComponentJacobian
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 # from openmdao.matrices.coo_matrix import COOMatrix
@@ -406,7 +405,8 @@ class Component(System):
                                    "allowed for a matrix free component.")
             self._has_approx = True
             method = self.options['derivs_method']
-            self._get_approx_scheme(method)
+            if method in ('cs', 'fd'):
+                self._get_approx_scheme(method)
             if not self._declared_partials_patterns:
                 if self.compute_primal is None:
                     raise RuntimeError(f"{self.msginfo}: compute_primal must be defined if using "
@@ -436,9 +436,6 @@ class Component(System):
             of, wrt = key
             self._resolve_partials_patterns(of, wrt, pattern_meta)
 
-        if not self.matrix_free:
-            self._init_jacobian()
-
     def setup_partials(self):
         """
         Declare partials.
@@ -462,9 +459,11 @@ class Component(System):
         Yields
         ------
         key : tuple (of, wrt)
-            Subjacobian key.
+            Subjacobian key.  Names are absolute.
         """
         yield from self._subjacs_info.keys()
+
+    _subjac_keys_iter = _declared_partials_iter
 
     def _get_missing_partials(self, missing):
         """
@@ -1494,6 +1493,9 @@ class Component(System):
             options.update(checkopts)
             options.update(approx._wrt_meta)
 
+        if not approx._wrt_meta:
+            del self._approx_schemes[method]
+
         abs_key = rel_key2abs_key(self, key)
         if abs_key in self._subjacs_info:
             meta = self._subjacs_info[abs_key]
@@ -1599,21 +1601,6 @@ class Component(System):
 
             self._subjacs_info[abs_key] = Subjac.get_instance_metadata(pattern_meta, prev_meta,
                                                                        shape, self, abs_key)
-
-    def _init_jacobian(self):
-        """
-        Initialize the jacobian.
-
-        Override this in a subclass to use a different jacobian type than DictionaryJacobian.
-
-        Returns
-        -------
-        Jacobian
-            The initialized jacobian.
-        """
-        if not self.matrix_free:
-            self._jacobian = BlockJacobian(system=self)
-            return self._jacobian
 
     def _column_iotypes(self):
         """
@@ -1724,13 +1711,23 @@ class Component(System):
         patterns = [pattern] if isinstance(pattern, str) else pattern
         return [(pattern, find_matches(pattern, self._get_partials_wrts())) for pattern in patterns]
 
-    def _add_approximations(self):
+    def _add_approximations(self, use_relevance=True):
         """
         Add approximations for those partials registered with method=fd or method=cs.
+
+        Parameters
+        ----------
+        use_relevance : bool
+            If True, use relevance to determine which partials to approximate.
         """
         subjacs = self._subjacs_info
         wrtset = set()
-        subjac_keys = self._get_approx_subjac_keys()
+        subjac_keys = self._get_approx_subjac_keys(use_relevance=use_relevance)
+        methods = list(self._approx_schemes)
+        self._approx_schemes = {}
+        for method in methods:
+            self._get_approx_scheme(method)
+
         # go through subjac keys in reverse and only add approx for the last of each wrt
         # (this prevents warnings that could confuse users)
         for i in range(len(subjac_keys) - 1, -1, -1):
@@ -1740,6 +1737,11 @@ class Component(System):
                 wrtset.add(wrt)
                 meta = subjacs[key]
                 self._approx_schemes[meta['method']].add_approximation(key, self, meta)
+
+        # get rid of any empty approx schemes
+        to_remove = [name for name, scheme in self._approx_schemes.items() if not scheme._wrt_meta]
+        for name in to_remove:
+            del self._approx_schemes[name]
 
     def _guess_nonlinear(self):
         """
@@ -1762,9 +1764,6 @@ class Component(System):
             self._first_call_to_linearize = False  # only do this once
             if coloring_mod._use_partial_sparsity:
                 self._get_coloring()
-            if self._jacobian is None:
-                self._init_jacobian()
-            self._jacobian._setup(self)
 
     def _resolve_src_inds(self):
         abs2prom = self._resolver.abs2prom
@@ -1915,14 +1914,10 @@ class Component(System):
         except KeyError:
             raise ValueError(f"Method '{method}' is not a recognized finite difference method.")
 
-        # these are relative names
-        ofs = self._get_partials_ofs()
-        wrts = self._get_partials_wrts()
-
         local_opts = self._get_check_partial_options()
         added_wrts = set()
 
-        for rel_key in product(ofs, wrts):
+        for rel_key in product(self._get_partials_ofs(), self._get_partials_wrts()):
             fd_options = self._get_approx_partial_options(rel_key, method=method,
                                                           checkopts=local_opts)
             abs_key = rel_key2abs_key(self, rel_key)
@@ -2036,6 +2031,16 @@ class Component(System):
 
         local_opts = self._get_check_partial_options()
 
+        nocs = False
+        if not alloc_complex:
+            if method == 'cs':
+                nocs = True
+
+            for meta in local_opts.values():
+                if 'method' in meta and meta['method'] == 'cs':
+                    nocs = True
+                    break
+
         for keypats, meta in self._declared_partials_patterns.items():
 
             # Get the complete set of options, including defaults
@@ -2057,9 +2062,13 @@ class Component(System):
                 for var in wrtvars:
                     # we now have individual vars like 'x'
                     # get the options for checking partials
-                    fd_options, _ = _get_fd_options(var, requested_method, local_opts, step,
-                                                    form, step_calc, alloc_complex,
-                                                    minimum_step)
+                    fd_options = _get_fd_options(var, requested_method, local_opts, step,
+                                                 form, step_calc, alloc_complex, minimum_step)
+
+                    if not alloc_complex:
+                        if meta_with_defaults['method'] == 'cs' or fd_options['method'] == 'cs':
+                            nocs = True
+
                     # compare the compute options to the check options
                     if fd_options['method'] != meta_with_defaults['method']:
                         all_same = False
@@ -2086,12 +2095,15 @@ class Component(System):
 
                         issue_warning(msg, prefix=self.msginfo,
                                       category=OMInvalidCheckDerivativesOptionsWarning)
+                        
+        if nocs:
+            self._nocs_warning()
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM,
                        compact_print=False, abs_err_tol=0.0, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
                        minimum_step=1e-12, force_dense=True, show_only_incorrect=False,
-                       show_worst=True):
+                       show_worst=True, rich_print=True):
         """
         Check partial derivatives comprehensively for this component.
 
@@ -2132,6 +2144,8 @@ class Component(System):
             Set to True if output should print only the subjacs found to be incorrect.
         show_worst : bool, optional
             Set to False to suppress the display of the worst subjac.
+        rich_print : bool, optional
+            If True, print using rich if available.
 
         Returns
         -------
@@ -2308,7 +2322,7 @@ class Component(System):
                 # This component already has a Jacobian with calculated derivatives.
                 else:
 
-                    subjacs = self._jacobian._get_subjacs(self)
+                    subjacs = self._get_jacobian()._get_subjacs()
 
                     for rel_key in product(of_list, wrt_list):
                         abs_key = rel_key2abs_key(self, rel_key)
@@ -2407,8 +2421,6 @@ class Component(System):
         else:
             steps = step
 
-        could_not_cs = False
-
         actual_steps = defaultdict(list)
         alloc_complex = self._outputs._alloc_complex
 
@@ -2424,11 +2436,9 @@ class Component(System):
                 abs_key = rel_key2abs_key(self, rel_key)
                 local_wrt = rel_key[1]
 
-                fd_options, no_cs = _get_fd_options(local_wrt, requested_method,
-                                                    local_opts, step, form, step_calc,
-                                                    alloc_complex, minimum_step)
-                if no_cs:
-                    could_not_cs = True
+                fd_options = _get_fd_options(local_wrt, requested_method,
+                                             local_opts, step, form, step_calc,
+                                             alloc_complex, minimum_step)
 
                 actual_steps[rel_key].append(fd_options['step'])
 
@@ -2487,14 +2497,6 @@ class Component(System):
         # convert to regular dict from defaultdict
         partials_data = {key: dict(d) for key, d in partials_data.items()}
 
-        if could_not_cs:
-            issue_warning(f"Component '{self.pathname}' requested complex step, but "
-                          "force_alloc_complex has not been set to True, so finite difference was "
-                          "used.\nTo enable complex step, specify 'force_alloc_complex=True' when "
-                          "calling setup on the problem, e.g. "
-                          "'problem.setup(force_alloc_complex=True)'.",
-                          category=DerivativesWarning)
-
         incon_keys = self._get_inconsistent_keys()
 
         # if compact_print is True, we'll show all derivatives, even non-dependent ones
@@ -2509,10 +2511,10 @@ class Component(System):
                 worst = _deriv_display_compact(self, err_iter, partials_data, out_stream,
                                                totals=False,
                                                show_only_incorrect=show_only_incorrect,
-                                               show_worst=show_worst)
+                                               show_worst=show_worst, rich_print=rich_print)
             else:
                 _deriv_display(self, err_iter, partials_data, rel_err_tol, abs_err_tol, out_stream,
-                               all_fd_options, False, show_only_incorrect)
+                               all_fd_options, False, show_only_incorrect, rich_print=rich_print)
 
         # check for zero subjacs that are declared as dependent
         zero_keys = set()
@@ -2534,6 +2536,13 @@ class Component(System):
         # add pathname to the partials dict to make it compatible with the return value
         # from Problem.check_partials and passable to assert_check_partials.
         return {self.pathname: partials_data}, worst
+
+    def _nocs_warning(self):
+        issue_warning(f"Component '{self.pathname}' requested complex step, but "
+                      "force_alloc_complex has not been set to True, so finite difference was "
+                      "used.\nTo enable complex step, specify 'force_alloc_complex=True' when "
+                      "calling setup on the problem, e.g. "
+                      "'problem.setup(force_alloc_complex=True)'.", category=DerivativesWarning)
 
     def _check_compute_primal_args(self):
         """
@@ -2653,9 +2662,6 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
     # We can't use CS if we haven't allocated a complex vector, so we fall back on fd.
     if method == 'cs' and not alloc_complex:
         method = 'fd'
-        could_not_cs = True
-    else:
-        could_not_cs = False
 
     fd_options = {'order': None,
                   'method': method}
@@ -2688,4 +2694,4 @@ def _get_fd_options(var, global_method, local_opts, global_step, global_form, gl
             if value is not None:
                 fd_options[name] = value
 
-    return fd_options, could_not_cs
+    return fd_options

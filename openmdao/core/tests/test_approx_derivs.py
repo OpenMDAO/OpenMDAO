@@ -1762,6 +1762,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
         prob.setup()
         prob.run_model()
+        
         model.run_linearize()
 
         Jfd = comp._jacobian
@@ -2350,9 +2351,10 @@ class TestFDRelative(unittest.TestCase):
         model.add_subsystem('comp', FDComp(vec_size=3))
 
         prob.setup()
+        prob.run_model()
 
         with self.assertRaises(ValueError) as cm:
-            prob.run_model()
+            prob.model.run_linearize()
 
         msg = "'comp' <class FDComp>: 'junk' is not a valid setting for step_calc; must be one of ['abs', 'rel', 'rel_legacy', 'rel_avg', 'rel_element']."
         self.assertEqual(cm.exception.args[0], msg)

@@ -321,8 +321,10 @@ class DirectSolver(LinearSolver):
         system = self._system()
         nproc = system.comm.size
 
-        if self._assembled_jac is not None:
-            matrix = self._assembled_jac._int_mtx._matrix
+        if system._get_assembled_jac() is not None:
+            if system._assembled_jac._update_needed:
+                system._assembled_jac._update(system)
+            matrix = system._assembled_jac._int_mtx._matrix
 
             if matrix is None:
                 # this happens if we're not rank 0 when using owned_sizes
@@ -353,7 +355,7 @@ class DirectSolver(LinearSolver):
             # the matrix during conversion to csc prior to LU decomp, so we can't use COO.
             else:
                 raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in %s." % (type(self._assembled_jac._int_mtx),
+                                   " in %s." % (type(system._assembled_jac._int_mtx),
                                                 system.msginfo))
         else:
             if nproc > 1:
@@ -396,9 +398,10 @@ class DirectSolver(LinearSolver):
         system = self._system()
         nproc = system.comm.size
 
-        if self._assembled_jac is not None:
-
-            matrix = self._assembled_jac._int_mtx._matrix
+        if system._get_assembled_jac() is not None:
+            if system._assembled_jac._update_needed:
+                system._assembled_jac._update(system)
+            matrix = system._assembled_jac._int_mtx._matrix
 
             if matrix is None:
                 # This happens if we're not rank 0 and owned_sizes are being used
@@ -496,11 +499,11 @@ class DirectSolver(LinearSolver):
                     return
 
         # AssembledJacobians are unscaled.
-        if self._assembled_jac is not None:
+        if system._get_assembled_jac() is not None:
             full_b = b_vec
 
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
+                if isinstance(system._assembled_jac._int_mtx, DenseMatrix):
                     sol_array = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
                 else:
                     sol_array = self._lu.solve(full_b, trans_splu)

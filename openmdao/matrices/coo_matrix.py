@@ -158,29 +158,12 @@ class COOMatrix(Matrix):
         active : bool
             Complex mode flag; set to True prior to commencing complex step.
         """
+        is_complex = 'complex' in self._coo.dtype.__str__()
         if active:
-            if 'complex' not in self._coo.dtype.__str__():
+            if not is_complex:
                 self._coo.data = self._coo.data.astype(complex)
-                self._coo.dtype = complex
-        else:
-            self._coo.data = self._coo.data.real
-            self._coo.dtype = float
-
-    def _convert_mask(self, mask):
-        """
-        Convert the mask to the format of this sparse matrix (CSC, etc.) from COO.
-
-        Parameters
-        ----------
-        mask : ndarray
-            The mask of indices to zero out.
-
-        Returns
-        -------
-        ndarray
-            The converted mask array.
-        """
-        return mask
+        elif is_complex:
+            self._coo.data = self._coo.data.astype(float)
 
     def toarray(self):
         """

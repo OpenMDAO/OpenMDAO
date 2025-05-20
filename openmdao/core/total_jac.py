@@ -1408,9 +1408,9 @@ class _TotalJacInfo(object):
                             with model._scaled_context_all():
                                 model._linearize(model._assembled_jac,
                                                  sub_do_ln=ln_solver._linearize_children())
-                            if ln_solver._assembled_jac is not None and \
-                                    ln_solver._assembled_jac._under_complex_step:
-                                model.linear_solver._assembled_jac._update(model)
+                            # if ln_solver._assembled_jac is not None and \
+                            #         ln_solver._assembled_jac._under_complex_step:
+                            #     model.linear_solver._assembled_jac._update(model)
                             ln_solver._linearize()
                         finally:
                             model._tot_jac = None
@@ -1553,7 +1553,6 @@ class _TotalJacInfo(object):
                         if progress_out_stream is not None:
                             model._approx_schemes['fd']._progress_out = progress_out_stream
 
-                    model._setup_jacobians(recurse=False)
                     model._setup_approx_derivs()
                     if model._coloring_info.coloring is not None:
                         model._coloring_info._update_wrt_matches(model)
@@ -1882,6 +1881,12 @@ class _TotalJacInfo(object):
         """
         # This is called when this is a system ._jacobian.  Eventually, once we unify the
         # interfaces between partial and total jacobians, this will actually do something.
+        pass
+
+    def _update(self, system):
+        """
+        Update the total jacobian.
+        """
         pass
 
     def set_col(self, system, icol, column):

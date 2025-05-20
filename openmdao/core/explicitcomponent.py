@@ -151,18 +151,30 @@ class ExplicitComponent(Component):
                     'dependent': True,
                 }
 
-    def _setup_jacobians(self, recurse=True):
+    def _get_jacobian(self, force_if_mat_free=False, use_relevance=True):
         """
-        Set and populate jacobian.
+        Initialize the jacobian if it is not already initialized.
 
         Parameters
         ----------
-        recurse : bool
-            If True, setup jacobians in all descendants. (ignored)
+        force_if_mat_free : bool
+            If True, force the jacobian to be initialized even for a matrix free component.
+        use_relevance : bool
+            If True, use relevance to determine which partials to approximate.
+
+        Returns
+        -------
+        Jacobian
+            The initialized jacobian.
         """
-        if self._has_approx:
-            self._get_static_wrt_matches()
-            self._add_approximations()
+        if force_if_mat_free or not self.matrix_free:
+            if self._jacobian is None:
+                self._jacobian = BlockJacobian(system=self)
+                if self._has_approx:
+                    self._get_static_wrt_matches()
+                    self._add_approximations(use_relevance=use_relevance)
+
+            return self._jacobian
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
@@ -370,7 +382,7 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        J = self._jacobian if jac is None else jac
+        J = self._get_jacobian() if jac is None else jac
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
@@ -460,22 +472,23 @@ class ExplicitComponent(Component):
         """
         Call compute_partials based on the value of the "run_root_only" option.
         """
+        jac = self._get_jacobian()
         with self._call_user_function('compute_partials'):
             if self._run_root_only():
                 if self.comm.rank == 0:
                     if self._discrete_inputs:
-                        self.compute_partials(self._inputs, self._jacobian, self._discrete_inputs)
+                        self.compute_partials(self._inputs, jac, self._discrete_inputs)
                     else:
-                        self.compute_partials(self._inputs, self._jacobian)
-                    self.comm.bcast(list(self._jacobian.items()), root=0)
+                        self.compute_partials(self._inputs, jac)
+                    self.comm.bcast(list(jac.items()), root=0)
                 else:
                     for key, val in self.comm.bcast(None, root=0):
-                        self._jacobian[key] = val
+                        jac[key] = val
             else:
                 if self._discrete_inputs:
-                    self.compute_partials(self._inputs, self._jacobian, self._discrete_inputs)
+                    self.compute_partials(self._inputs, jac, self._discrete_inputs)
                 else:
-                    self.compute_partials(self._inputs, self._jacobian)
+                    self.compute_partials(self._inputs, jac)
 
     def _linearize(self, jac=None, sub_do_ln=False):
         """
@@ -488,6 +501,9 @@ class ExplicitComponent(Component):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
+        # need this here to ensure that jacobian and approx_schemes are initialized
+        jac = self._get_jacobian()
+
         if self.matrix_free or not (self._has_compute_partials or self._approx_schemes):
             return
 
@@ -497,7 +513,7 @@ class ExplicitComponent(Component):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.
             for approximation in self._approx_schemes.values():
-                approximation.compute_approximations(self, jac=self._jacobian)
+                approximation.compute_approximations(self, jac=jac)
 
             if self._has_compute_partials:
                 # We used to negate the jacobian here, and then re-negate after the hook.

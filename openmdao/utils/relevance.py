@@ -40,7 +40,7 @@ def get_relevance(model, of, wrt):
         of = {}
         wrt = {}
 
-    key = (id(model), tuple(sorted(wrt)), tuple(sorted(of)))
+    key = (id(model), tuple(sorted(wrt)), tuple(of))
     cache = model._problem_meta['relevance_cache']
     if key in cache:
         return cache[key]
@@ -850,7 +850,7 @@ class Relevance(object):
         bool
             True if the given variable is relevant.
         """
-        if not self._active:
+        if not self._active or self._current_rel_varray is None:
             return True
 
         return self._current_rel_varray[self._var2idx[name]]

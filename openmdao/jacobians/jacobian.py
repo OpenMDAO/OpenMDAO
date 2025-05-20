@@ -9,6 +9,13 @@ from openmdao.utils.units import unit_conversion
 from openmdao.utils.rangemapper import RangeMapper
 
 
+def _get_vec_slices(system, iotype, subset=None):
+    return {
+        name: slice(start, end) for name, start, end in
+        meta2range_iter(system._var_abs2meta[iotype].items(), subset=subset)
+    }
+
+
 class Jacobian(object):
     """
     Base Jacobian class.
@@ -33,8 +40,6 @@ class Jacobian(object):
         When True, this Jacobian is under complex step, using a complex jacobian.
     _abs_keys : dict
         A cache dict for key to absolute key.
-    _vec_slices : dict
-        Maps iotype to slice of the vector.
     _col_mapper : RangeMapper
         Maps variable names to column indices and vice versa.
     _problem_meta : dict
@@ -43,6 +48,16 @@ class Jacobian(object):
         Message info.
     _resolver : <Resolver>
         Resolver for this system.
+    _update_needed : bool
+        Whether the jacobian needs to be updated.
+    _output_slices : dict
+        Maps output names to slices of the output vector.
+    _input_slices : dict
+        Maps input names to slices of the input vector.
+    _has_approx : bool
+        Whether the system has an approximate jacobian.
+    _explicit : bool
+        Whether the system is explicit.
     """
 
     def __init__(self, system):
@@ -55,30 +70,23 @@ class Jacobian(object):
         self._under_complex_step = False
         self._abs_keys = {}
         self._col_mapper = None
-        self._vec_slices = {'output': None, 'input': None}
         self._problem_meta = system._problem_meta
         self._msginfo = system.msginfo
         self._resolver = system._resolver
+        self._update_needed = True
+        self._output_slices = _get_vec_slices(system, 'output')
+        self._input_slices = _get_vec_slices(system, 'input')
+        self._has_approx = system._has_approx
+        self._explicit = system.is_explicit()
+        if system._has_approx:
+            system._get_approx_subjac_keys()  # possibly regenerate keys
 
-    def _setup(self, system):
-        """
-        Initialize our subjacobians if they haven't been initialized yet.
-
-        Parameters
-        ----------
-        system : System
-            The system that owns this jacobian.
-        """
-        self._get_subjacs(system)
-
-    def create_subjac(self, system, abs_key, meta):
+    def create_subjac(self, abs_key, meta):
         """
         Create a subjacobian.
 
         Parameters
         ----------
-        system : System
-            The system that owns this jacobian.
         abs_key : tuple
             The absolute key for the subjacobian.
         meta : dict
@@ -89,17 +97,14 @@ class Jacobian(object):
         Subjac
             The created subjacobian, or None if meta['dependent'] is False.
         """
-        output_slices = self._get_vec_slices(system, 'output')
-        input_slices = self._get_vec_slices(system, 'input')
         of, wrt = abs_key
+        row_slice = self._output_slices[of]
 
-        row_slice = output_slices[of]
-
-        wrt_is_input = wrt in input_slices
+        wrt_is_input = wrt in self._input_slices
         if wrt_is_input:
-            col_slice = input_slices[wrt]
+            col_slice = self._input_slices[wrt]
         else:
-            col_slice = output_slices[wrt]
+            col_slice = self._output_slices[wrt]
 
         return self._subjac_from_meta(abs_key, meta, row_slice, col_slice, wrt_is_input)
 
@@ -108,25 +113,22 @@ class Jacobian(object):
         return Subjac.get_subjac_class(meta)(key, meta, row_slice, col_slice, wrt_is_input,
                                              src_indices, factor, src)
 
-    def _get_subjacs(self, system=None):
+    def _get_subjacs(self):
         if self._subjacs is None:
             self._subjacs = {}
-            out_slices = self._get_vec_slices(system, 'output')
-            in_slices = self._get_vec_slices(system, 'input')
+            out_slices = self._output_slices
+            in_slices = self._input_slices
+            # try:
+            #     relevance = self._problem_meta['relevance']
+            # except Exception:
+            #     relevance = None
             for key, meta in self._subjacs_info.items():
                 of, wrt = key
                 if of in out_slices:
                     if wrt in in_slices or wrt in out_slices:
-                        self._subjacs[key] = self.create_subjac(system, key, meta)
+                        self._subjacs[key] = self.create_subjac(key, meta)
 
         return self._subjacs
-
-    def _get_vec_slices(self, system, iotype, subset=None):
-        slices = self._vec_slices[iotype]
-        if slices is None:
-            it = meta2range_iter(system._var_abs2meta[iotype].items(), subset=subset)
-            self._vec_slices[iotype] = slices = {n: slice(start, end) for n, start, end in it}
-        return slices
 
     def _get_abs_key(self, key):
         try:
@@ -154,8 +156,7 @@ class Jacobian(object):
         try:
             return self._subjacs[self._get_abs_key(key)].info
         except KeyError:
-            msg = '{}: Variable name pair ("{}", "{}") not found.'
-            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
+            raise KeyError(f'{self.msginfo}: Variable name pair {key} not found.')
 
     def __contains__(self, key):
         """
@@ -190,8 +191,7 @@ class Jacobian(object):
         try:
             return self._subjacs[self._get_abs_key(key)].get_val()
         except KeyError:
-            msg = '{}: Variable name pair ("{}", "{}") not found.'
-            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
+            raise KeyError(f'{self.msginfo}: Variable name pair {key} not found.')
 
     def __setitem__(self, key, subjac):
         """
@@ -204,17 +204,18 @@ class Jacobian(object):
         subjac : int or float or ndarray or sparse matrix
             sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
         """
+        self._update_needed = True
         abs_key = self._get_abs_key(key)
         if abs_key is None:
-            msg = '{}: Variable name pair ("{}", "{}") not found.'
-            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
+            raise KeyError(f'{self.msginfo}: Variable name pair {key} not found.')
 
         # You can only set declared subjacobians.
-        if abs_key not in self._subjacs_info:
-            msg = '{}: Variable name pair ("{}", "{}") must first be declared.'
-            raise KeyError(msg.format(self.msginfo, key[0], key[1]))
-
-        self._subjacs[abs_key].set_val(subjac)
+        try:
+            self._subjacs[abs_key].set_val(subjac)
+        except KeyError:
+            raise KeyError(f'{self.msginfo}: Variable name pair {key} must first be declared.')
+        except ValueError as err:
+            raise ValueError(f"{self.msginfo}: for subjacobian {key}: {err}")
 
     def __iter__(self):
         """
@@ -275,7 +276,8 @@ class Jacobian(object):
         system : System
             System that is updating this jacobian.
         """
-        self._get_subjacs(system)
+        self._get_subjacs()
+        self._update_needed = False
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -318,7 +320,7 @@ class Jacobian(object):
 
             self._under_complex_step = active
 
-    def _reset_random(self, system):
+    def _reset_random(self):
         """
         Reset any cached random subjacs.
 
@@ -327,7 +329,7 @@ class Jacobian(object):
         system : System
             The system that owns this jacobian.
         """
-        for subjac in self._get_subjacs(system).values():
+        for subjac in self._get_subjacs().values():
             subjac.reset_random()
 
     def _setup_index_maps(self, system):
@@ -352,6 +354,8 @@ class Jacobian(object):
         column : ndarray
             Column value.
         """
+        self._update_needed = True
+
         if self._col_mapper is None:
             self._setup_index_maps(system)
 
@@ -426,8 +430,52 @@ class Jacobian(object):
         Revert all subjacs back to the way they were as declared by the user.
         """
         self._subjacs = None
-        self._get_subjacs(system)
+        self._get_subjacs()
         self._col_mapper = None  # force recompute of internal index maps on next set_col
+
+    def _get_ordered_subjac_keys(self, system):
+        """
+        Iterate over subjacs keyed by absolute names.
+
+        This includes only subjacs that have been set and are part of the current system.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+
+        Returns
+        -------
+        list
+            List of keys matching this jacobian for the current system.
+        """
+        # TODO: implement this for all Jacobians, possibly generating all Group related subjac_infos
+        # TODO: on the fly and storing them in the Jacobian object, i.e. the only 'permanent'
+        # TODO: subjac_infos would be those from the Components...
+        if self._iter_keys is None:
+            subjacs = self._subjacs_info
+            keys = []
+            # determine the set of remote keys (keys where either of or wrt is remote somewhere)
+            # only if we're under MPI with comm size > 1 and the given system is a Group that
+            # computes its derivatives using finite difference or complex step.
+            if system.pathname and system.comm.size > 1 and system._owns_approx_jac and \
+                    system._subsystems_allprocs:
+                ofnames = system._var_allprocs_abs2meta['output']
+                wrtnames = system._var_allprocs_abs2meta
+            else:
+                ofnames = system._var_abs2meta['output']
+                wrtnames = system._var_abs2meta
+
+            for res_name in ofnames:
+                for type_ in ('output', 'input'):
+                    for name in wrtnames[type_]:
+                        key = (res_name, name)
+                        if key in subjacs:
+                            keys.append(key)
+
+            self._iter_keys = keys
+
+        return self._iter_keys
 
 
 class SplitJacobian(Jacobian):
@@ -460,18 +508,7 @@ class SplitJacobian(Jacobian):
         self._int_subjacs = None
         self._ext_subjacs = None
 
-    def _setup(self, system):
-        """
-        Initialize our subjacobians if they haven't been initialized yet.
-
-        Parameters
-        ----------
-        system : System
-            The system that owns this jacobian.
-        """
-        self._get_split_subjacs(system)
-
-    def _get_split_subjacs(self, system):
+    def _get_split_subjacs(self, system, explicit=False):
         is_top = system.pathname == ''
 
         if self._int_subjacs is None:
@@ -483,8 +520,9 @@ class SplitJacobian(Jacobian):
                 conns = system._conn_global_abs_in2out
             except AttributeError:
                 conns = {}
-            output_slices = self._get_vec_slices(system, 'output')
-            input_slices = self._get_vec_slices(system, 'input')
+
+            output_slices = self._output_slices
+            input_slices = self._input_slices
 
             for abs_key, meta in self._subjacs_info.items():
                 wrt = abs_key[1]
@@ -492,10 +530,11 @@ class SplitJacobian(Jacobian):
                 if not meta['dependent']:
                     continue
                 if wrt in output_slices:
-                    self._int_subjacs[abs_key] = self.create_internal_subjac(system, abs_key, wrt,
-                                                                             meta)
+                    self._int_subjacs[abs_key] = \
+                        self.create_internal_subjac(system._conn_global_abs_in2out, abs_key, wrt,
+                                                    meta)
                 elif wrt in input_slices:
-                    if wrt in conns:  # connected input
+                    if wrt in conns and not explicit:  # connected input
                         # For the int_subjacs that make up the 'internal' jacobian, both the row
                         # and column entries correspond to outputs/residuals, so we need to map
                         # derivatives wrt inputs into the corresponding derivative wrt the source,
@@ -516,10 +555,10 @@ class SplitJacobian(Jacobian):
                         src_indices = abs2meta_in[wrt]['src_indices']
 
                         self._int_subjacs[abs_key] = \
-                            self.create_internal_subjac(system, abs_key, src, meta, src_indices,
-                                                        factor)
+                            self.create_internal_subjac(system._conn_global_abs_in2out, abs_key,
+                                                        src, meta, src_indices, factor)
                     elif not is_top:  # input is connected to something outside current system
-                        ext_subjacs[abs_key] = self.create_subjac(system, abs_key, meta)
+                        ext_subjacs[abs_key] = self.create_subjac(abs_key, meta)
 
             if not ext_subjacs:
                 ext_subjacs = None
@@ -543,15 +582,16 @@ class SplitJacobian(Jacobian):
         self._get_split_subjacs(system)
 
         self._col_mapper = None  # force recompute of internal index maps on next set_col
+        self._update_needed = True
 
-    def create_internal_subjac(self, system, abs_key, src, meta, src_indices=None, factor=None):
+    def create_internal_subjac(self, conns, abs_key, src, meta, src_indices=None, factor=None):
         """
         Create a subjacobian for a square internal jacobian (d(residual)/d(source)).
 
         Parameters
         ----------
-        system : System
-            The system that owns this jacobian.
+        conns : dict
+            Global connection dictionary.
         abs_key : tuple
             The absolute key for the subjacobian.
         src : str or None
@@ -569,14 +609,14 @@ class SplitJacobian(Jacobian):
             The created subjacobian, or None if meta['dependent'] is False.
         """
         if meta['dependent']:
-            output_slices = self._get_vec_slices(system, 'output')
             of, wrt = abs_key
+            out_slices = self._output_slices
 
-            if wrt in output_slices:
-                col_slice = output_slices[wrt]
+            if wrt in out_slices:
+                col_slice = out_slices[wrt]
             else:
-                src = system._conn_global_abs_in2out[wrt]
-                col_slice = output_slices[src]
+                src = conns[wrt]
+                col_slice = out_slices[src]
 
-            return self._subjac_from_meta(abs_key, meta, output_slices[of], col_slice, False,
+            return self._subjac_from_meta(abs_key, meta, out_slices[of], col_slice, False,
                                           src_indices, factor, src)
