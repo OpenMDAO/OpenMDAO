@@ -67,6 +67,7 @@ _toggle_styles = """
         inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
 
+_number_initial_visible_sampled_variables = 2
 
 def _is_process_running(pid):
     if sys.platform == "win32":
@@ -278,6 +279,10 @@ class _CaseRecorderTracker:
             units = "Unitless"
         return units
 
+    def _get_shape(self, name):
+        item = self._initial_case[name]
+        return item.shape
+
 
 class _RealTimeOptPlot(object):
     """
@@ -350,9 +355,6 @@ class _RealTimeOptPlot(object):
 
         self._hist_figures = {}
 
-
-
-
         def _update():
             print("_update")
 
@@ -396,12 +398,10 @@ class _RealTimeOptPlot(object):
                 self._prom_response
             )[:1]
 
-
             for response in self._prom_responses:
                 self._source_stream_dict[response] = new_case.get_val(
                     response
                 )[:1]
-
 
             for sampled_variable in self._sampled_variables:
                 self._source_stream_dict[sampled_variable] = new_case.get_val(
@@ -434,7 +434,7 @@ class _RealTimeOptPlot(object):
 
             # styles={"font-size": "20px", "font-weight": "bold"},
 
-            stats_text = f"""<div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px; border: 5px solid black">
+            stats_text = f"""<div style="padding: 10px; ">
                             <p>Number of samples: {self._num_samples_plotted}</p>
                             <p>Last updated: {formatted_time}</p>
                             <p>Elapsed time: {elapsed_formatted}</p>
@@ -506,7 +506,6 @@ class _RealTimeOptPlot(object):
             else:
                 raise RuntimeError(f"No prom for abs variable {response}")
 
-
         # driver_case = self._case_tracker._get_case_by_counter(1)
         # objs = driver_case.get_objectives()
         # for now assume one response
@@ -516,12 +515,31 @@ class _RealTimeOptPlot(object):
         for response in self._prom_responses:
             self._source_dict[response] = []
 
+
+        # need to make unavailble for this any variables that are not scalars
+        # self._case_tracker._get_shape
         self._sampled_variables = [
             varname for varname in outputs if varname not in self._prom_responses
         ]
 
-        for sampled_variable in self._sampled_variables:
-            self._sampled_variables_visibility[sampled_variable] = True
+        self._sampled_variables = []
+
+        self._sampled_variables_non_scalar = []
+
+        for varname in outputs:
+            if varname not in self._prom_responses:
+                shape = self._case_tracker._get_shape(varname)
+                if shape == () or shape == (1,): # is scalar ??
+                    self._sampled_variables.append(varname)
+                else:
+                    self._sampled_variables_non_scalar.append(varname)
+
+
+        self._sampled_variables.sort()
+        self._sampled_variables_non_scalar.sort()
+
+        # for sampled_variable in self._sampled_variables:
+        #     self._sampled_variables_visibility[sampled_variable] = True
 
         for sampled_variable in self._sampled_variables:
             self._source_dict[sampled_variable] = []
@@ -553,6 +571,45 @@ class _RealTimeOptPlot(object):
     def _setup_figure(self):
 
         N = len(self._sampled_variables)
+
+
+
+        def _sampled_variable_callback(var_name):
+            def toggle_callback(attr, old, new):
+                # The callback "closes over" the var_name variable
+                # lines[var_name].visible = toggles[var_name].active
+                self._sampled_variables_visibility[var_name] = new
+                self._hist_figures[var_name].visible = new
+
+                for i, (y, x) in enumerate(
+                    product(self._sampled_variables, self._sampled_variables)
+                ):
+
+                    icolumn = i % N
+                    irow = i // N
+
+                    # only do the lower half
+                    if x != y:
+                        self._scatter_plots_figure[(x,y)].visible = (icolumn < irow \
+                            and self._sampled_variables_visibility[x] and self._sampled_variables_visibility[y] )
+
+            return toggle_callback
+
+        for i, sampled_var in enumerate(self._sampled_variables):
+            # self._make_variable_button(sampled_var,True,_sampled_variable_callback
+            if i < _number_initial_visible_sampled_variables:
+                self._sampled_variables_visibility[sampled_var] = True
+                self._make_variable_button(sampled_var,True,_sampled_variable_callback(sampled_var))
+            else:
+                self._sampled_variables_visibility[sampled_var] = False
+                self._make_variable_button(sampled_var,False,_sampled_variable_callback(sampled_var))            
+            
+
+
+
+
+
+
 
         # xdrs = [DataRange1d(bounds=None) for _ in range(N)]
         # ydrs = [DataRange1d(bounds=None) for _ in range(N)]
@@ -659,8 +716,13 @@ class _RealTimeOptPlot(object):
 
                 self._hist_figures[x] = p
 
-            if icolumn > irow:
+            if icolumn > irow: # only lower half and diagonal
                 p.visible = False
+            else:
+                if self._sampled_variables_visibility[x] and self._sampled_variables_visibility[y]:
+                    p.visible = True
+                else:
+                    p.visible = False
 
             plots.append(p)
 
@@ -671,34 +733,6 @@ class _RealTimeOptPlot(object):
         )
 
 
-
-        def _sampled_variable_callback(var_name):
-            def toggle_callback(attr, old, new):
-                # The callback "closes over" the var_name variable
-                # lines[var_name].visible = toggles[var_name].active
-                self._sampled_variables_visibility[var_name] = new
-                self._hist_figures[var_name].visible = new
-
-
-                for i, (y, x) in enumerate(
-                    product(self._sampled_variables, self._sampled_variables)
-                ):
-
-                    icolumn = i % N
-                    irow = i // N
-
-                    # only do the lower half
-                    if x != y:
-                        self._scatter_plots_figure[(x,y)].visible = icolumn < irow \
-                            and self._sampled_variables_visibility[x] and self._sampled_variables_visibility[y] 
-
-            return toggle_callback
-
-        for sampled_var in self._sampled_variables:
-            # self._make_variable_button(sampled_var,True,_sampled_variable_callback
-            self._make_variable_button(sampled_var,True,_sampled_variable_callback(sampled_var)
-            )
-
         toggle_column = Column(
             children=self._sampled_variables_toggles,
             sizing_mode="stretch_both",
@@ -707,28 +741,27 @@ class _RealTimeOptPlot(object):
                 "overflow-y": "auto",
                 "border": "1px solid #ddd",
                 "padding": "8px",
-                "background-color": "#f0f0f0",
+                # "background-color": "#f0f0f0",
                 'max-height': '100vh'  # Ensures it doesn't exceed viewport
             },
         )
 
-
         # header for the variable list
-        label = Div(
+        sampled_variables_label = Div(
             text="Sampled Variables",
             width=200,
             styles={"font-size": "20px", "font-weight": "bold"},
         )
         label_and_toggle_column = Column(
-            label,
+            sampled_variables_label,
             toggle_column,
             sizing_mode="stretch_height",
             height_policy="fit",
-                styles={
-                    'max-height': '100vh',  # Ensures it doesn't exceed viewport
-                    'border-radius': '5px',
-                    'border': '5px solid black',
-                },
+            styles={
+                'max-height': '100vh',  # Ensures it doesn't exceed viewport
+                'border-radius': '5px',
+                'border': '5px solid black',
+            },
         )
 
         scroll_box = ScrollBox(
@@ -736,10 +769,6 @@ class _RealTimeOptPlot(object):
             sizing_mode="stretch_height",
             height_policy="max",
         )
-
-
-
-
 
         p = figure(height=2 * plots[0].height, width=0, toolbar_location=None)
 
@@ -783,13 +812,29 @@ class _RealTimeOptPlot(object):
 
         p.outline_line_alpha = 0
 
+        analysis_progress_label = Div(
+            text="Analysis Progress",
+            width=200,
+            styles={"font-size": "20px", "font-weight": "bold"},
+        )
+
         # show number of samples plotted
         self._text_box = Div(
-            text="""<div style="background-color: #f0f0f0; padding: 10px; border-radius: 5px;">
+            text="""<div style="padding: 10px; border-radius: 5px;">
                     <p>Waiting for data...</p>
                     </div>""",
             width=600,
             height=100,
+        )
+
+        analysis_progress_box = Column(
+            analysis_progress_label,
+            self._text_box,
+            styles={
+                # "max-height": "100vh",  # Ensures it doesn't exceed viewport
+                "border-radius": "5px",
+                "border": "5px solid black",
+            },
         )
 
         p.min_border_right = 100
@@ -803,7 +848,13 @@ class _RealTimeOptPlot(object):
 
         title_div = Div(
             text=f"Analysis Progress for {script_name}",
-            styles={"font-size": "20px", "font-weight": "bold"},
+            styles={
+                "font-size": "20px", 
+                "font-weight": "bold",
+                "border-radius": "5px",
+                "border": "5px solid black",
+                "padding": "8px",
+                },
         )
 
         quit_button = Button(label="Quit Application", button_type="danger")
@@ -815,17 +866,16 @@ class _RealTimeOptPlot(object):
         # Attach the callback to the button
         quit_button.on_click(quit_app)
 
-
         # Create a Select widget with some options
         menu = Select(
             # title="Choose a response variable:",
             options=self._prom_responses,
             value=self._prom_responses[0],  # Default value
-            styles={
-                "border": "5px solid black",
-                "padding": "8px",
-                "background-color": "#f0f0f0",
-        },
+        #     styles={
+        #         "border": "5px solid black",
+        #         "padding": "8px",
+        #         "background-color": "#f0f0f0",
+        # },
     )
 
         # header for the variable list
@@ -835,6 +885,13 @@ class _RealTimeOptPlot(object):
             styles={"font-size": "20px", "font-weight": "bold"},
         )
 
+        response_varible_box = Column(response_variable_label, menu,
+                                                  styles={
+                "border": "5px solid black",
+                "padding": "8px",
+                # "background-color": "#f0f0f0",
+        },
+        )
 
         # Python callback function that will run when selection changes
         def cb_select_response_variable(attr, old, new):
@@ -858,31 +915,36 @@ class _RealTimeOptPlot(object):
                 scatter_plot.glyph.fill_color = transform(
                         self._prom_response, self._color_mapper
                     )
-                
-                    # line.glyph.y = {'field': selected_column}
+
+                # line.glyph.y = {'field': selected_column}
                 # scatter_plot.glyph.fill_color is a Field
 
         # Attach the callback to the Select widget
         menu.on_change("value", cb_select_response_variable)
 
-        analysis_progress_label = Div(
-            text="Analysis Progress",
-            width=200,
-            styles={"font-size": "20px", "font-weight": "bold"},
+        sampled_variables_non_scalar_div = Div(
+            text=f"The following non-scalar variables cannot be plotted {self._sampled_variables_non_scalar}",
+            styles={
+                "font-size": "12px", 
+                "border-radius": "5px",
+                "border": "5px solid black",
+                "padding": "8px",
+                },
         )
+
 
         final_layout = Row(
             Column(title_div, gp),
             p,
             spacer2,
-            Column(spacer2, quit_button, spacer3, analysis_progress_label, self._text_box, response_variable_label, 
-                   menu, spacer5, scroll_box, sizing_mode="stretch_both"),
+            Column(spacer2, quit_button, spacer3, analysis_progress_box, spacer4, response_varible_box, spacer5, 
+                   sampled_variables_non_scalar_div, spacer3,
+                   scroll_box, sizing_mode="stretch_both"),
             # sizing_mode="fixed",
             sizing_mode="stretch_both",
         )
 
         self.plot_figure = final_layout
-
 
 
 def print_bokeh_objects(doc):
