@@ -1432,28 +1432,32 @@ class System(object, metaclass=SystemMetaclass):
         """
         pass
 
-    def _get_approx_subjac_keys(self):
+    def _get_approx_subjac_keys(self, use_relevance=True):
         """
         Return a list of (of, wrt) keys needed for approx derivs for this system.
 
         All keys are absolute names. If this system is the top level Group, the keys will be source
         names.  If not, they will be absolute input and output names.
 
+        Parameters
+        ----------
+        use_relevance : bool
+            If True, use relevance to determine which partials to approximate.
+
         Returns
         -------
         list
             List of approx derivative subjacobian keys.
         """
-        relevance = self._relevance
-        if self._old_relevance is not relevance:
-            print(f"{self.msginfo}: relevance changed from {self._old_relevance} to {relevance}")
-            self._approx_subjac_keys = None
+        if False:  # use_relevance:
+            relevance = self._relevance
+            # regerate the keys if relevance has changed
+            if self._old_relevance is not relevance:
+                self._approx_subjac_keys = None
+                self._old_relevance = relevance
 
         if self._approx_subjac_keys is None:
-            self._old_relevance = relevance
             self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
-        else:
-            print(f"{self.msginfo}: reusing subjac keys:", self._approx_subjac_keys)
 
         return self._approx_subjac_keys
 
@@ -2542,39 +2546,6 @@ class System(object, metaclass=SystemMetaclass):
                     solver._assembled_jac = asm_jac
 
         return self._assembled_jac
-
-    # def _setup_jacobians(self, recurse=True):
-    #     """
-    #     Set and populate jacobians down through the system tree.
-
-    #     Parameters
-    #     ----------
-    #     recurse : bool
-    #         If True, setup jacobians in all descendants.
-    #     """
-    #     asm_jac_solvers = self._get_asm_jac_solvers()
-
-    #     asm_jac = None
-    #     if asm_jac_solvers:
-    #         asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
-    #         self._assembled_jac = self._jacobian = asm_jac
-    #         for solver in asm_jac_solvers:
-    #             solver._assembled_jac = asm_jac
-
-    #     if self._has_approx:
-    #         self._get_static_wrt_matches()
-    #         self._add_approximations()  # this does nothing for a Group
-
-    #     # At present, we don't support a AssembledJacobian in a group
-    #     # if any subcomponents are matrix-free.
-    #     if asm_jac is not None:
-    #         if self.matrix_free:
-    #             raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
-    #                                "subcomponent." % self.msginfo)
-
-    #     if recurse:
-    #         for subsys in self._subsystems_myproc:
-    #             subsys._setup_jacobians()
 
     def _get_promotion_maps(self):
         """

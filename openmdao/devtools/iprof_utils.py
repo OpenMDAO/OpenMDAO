@@ -233,7 +233,7 @@ def _setup_func_group():
         from petsc4py import PETSc  # noqa: F401
         from openmdao.vectors.petsc_vector import PETScVector, PETScTransfer
 
-        #TODO: this needs work.  Still lots of MPI calls not covered here...
+        # TODO: this needs work.  Still lots of MPI calls not covered here...
         func_group['mpi'] = [
             ('*', (PETScTransfer,)),
             ('get_norm', (PETScVector,)),

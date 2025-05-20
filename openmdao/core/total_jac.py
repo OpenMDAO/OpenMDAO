@@ -1553,7 +1553,6 @@ class _TotalJacInfo(object):
                         if progress_out_stream is not None:
                             model._approx_schemes['fd']._progress_out = progress_out_stream
 
-                    # model._setup_jacobians(recurse=False)
                     model._setup_approx_derivs()
                     if model._coloring_info.coloring is not None:
                         model._coloring_info._update_wrt_matches(model)

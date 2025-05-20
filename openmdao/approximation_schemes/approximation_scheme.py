@@ -590,11 +590,6 @@ class ApproximationScheme(object):
         jac : dict-like
             Store the approximations in the given dict-like object.
         """
-        # if system._tot_jac is not None:
-        #     jac = system._tot_jac
-        # elif jac is None:
-        #     jac = system._get_jacobian(force_if_mat_free=True)
-
         if not self._wrt_meta:
             return
 

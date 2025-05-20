@@ -54,6 +54,10 @@ class Jacobian(object):
         Maps output names to slices of the output vector.
     _input_slices : dict
         Maps input names to slices of the input vector.
+    _has_approx : bool
+        Whether the system has an approximate jacobian.
+    _explicit : bool
+        Whether the system is explicit.
     """
 
     def __init__(self, system):
@@ -72,6 +76,8 @@ class Jacobian(object):
         self._update_needed = True
         self._output_slices = _get_vec_slices(system, 'output')
         self._input_slices = _get_vec_slices(system, 'input')
+        self._has_approx = system._has_approx
+        self._explicit = system.is_explicit()
         if system._has_approx:
             system._get_approx_subjac_keys()  # possibly regenerate keys
 
@@ -112,6 +118,10 @@ class Jacobian(object):
             self._subjacs = {}
             out_slices = self._output_slices
             in_slices = self._input_slices
+            # try:
+            #     relevance = self._problem_meta['relevance']
+            # except Exception:
+            #     relevance = None
             for key, meta in self._subjacs_info.items():
                 of, wrt = key
                 if of in out_slices:
@@ -439,9 +449,9 @@ class Jacobian(object):
         list
             List of keys matching this jacobian for the current system.
         """
-        #TODO: implement this for all Jacobians, possibly generating all Group related subjac_infos
-        #TODO: on the fly and storing them in the Jacobian object, i.e. the only 'permanent'
-        #TODO: subjac_infos would be those from the Components...
+        # TODO: implement this for all Jacobians, possibly generating all Group related subjac_infos
+        # TODO: on the fly and storing them in the Jacobian object, i.e. the only 'permanent'
+        # TODO: subjac_infos would be those from the Components...
         if self._iter_keys is None:
             subjacs = self._subjacs_info
             keys = []

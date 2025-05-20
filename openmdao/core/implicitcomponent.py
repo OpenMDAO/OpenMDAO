@@ -390,11 +390,14 @@ class ImplicitComponent(Component):
         """
         self._check_first_linearize()
 
+        # need this here to ensure that jacobian and approx_schemes are initialized
+        jac = self._get_jacobian()
+
         with self._unscaled_context(outputs=[self._outputs]):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.
             for approximation in self._approx_schemes.values():
-                approximation.compute_approximations(self, jac=self._get_jacobian())
+                approximation.compute_approximations(self, jac=jac)
 
             self._linearize_wrapper()
 
@@ -541,7 +544,7 @@ class ImplicitComponent(Component):
             self._residuals_wrapper = self._residuals
             self._dresiduals_wrapper = self._dresiduals
 
-    def _get_jacobian(self, force_if_mat_free=False):
+    def _get_jacobian(self, force_if_mat_free=False, use_relevance=True):
         """
         Initialize the jacobian if it is not already initialized.
 
@@ -550,7 +553,9 @@ class ImplicitComponent(Component):
         Parameters
         ----------
         force_if_mat_free : bool
-            Ignored.
+            If True, force the jacobian to be initialized even for a matrix free component.
+        use_relevance : bool
+            If True, use relevance to determine which partials to approximate.
 
         Returns
         -------
@@ -565,7 +570,7 @@ class ImplicitComponent(Component):
 
             if self._has_approx:
                 self._get_static_wrt_matches()
-                self._add_approximations()  # this does nothing for a Group
+                self._add_approximations(use_relevance=use_relevance)
 
         return self._jacobian
 

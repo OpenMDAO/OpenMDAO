@@ -1204,9 +1204,6 @@ class Group(System):
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(self._vectors)
 
-    def _add_approximations(self):
-        pass
-
     def _update_dataflow_graph(self, responses):
         """
         Update the dataflow graph based on missing partials.
@@ -3993,27 +3990,38 @@ class Group(System):
             self._jacobian = self._get_assembled_jac()
 
             if self._jacobian is None and self._has_approx:
+                # Group only needs a jacobian if it's approximating derivatives.
                 self._jacobian = DictionaryJacobian(system=self)
 
             if self._has_approx:
                 self._get_static_wrt_matches()
-                self._add_approximations()  # this does nothing for a Group
 
         return self._jacobian
 
     def _approx_subjac_keys_iter(self):
-        print(self.msginfo, "_approx_subjac_keys")
         relevant = self._relevance
         with relevant.all_seeds_active():
             for key in self._subjac_keys_iter():
-                of, wrt = key
-                if relevant.is_relevant(of) and relevant.is_relevant(wrt):
+                _, wrt = key
+                # if wrt is not relevant, no need to compute finite difference for those columns
+                if True:  #relevant.is_relevant(wrt):
                     yield key
-                else:
-                    print(f"skipping {key}")
 
     def _subjac_keys_iter(self):
-        # yields absolute keys (no aliases)
+        """
+        Iterate over all subjacobian keys needed for this Group.
+
+        These keys include all declared at the Component level below this group, plus any added
+        at this group level for approximations, etc.
+
+        Relevance is not considered for these, but will be used later when using these to
+        construct a Jacobian.
+
+        Yields
+        ------
+        tuple
+            A tuple of the form (of_name, wrt_name).  Names are absolute (no aliases).
+        """
         totals = self.pathname == ''
 
         wrt = set()

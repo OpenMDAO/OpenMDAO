@@ -151,7 +151,7 @@ class ExplicitComponent(Component):
                     'dependent': True,
                 }
 
-    def _get_jacobian(self, force_if_mat_free=False):
+    def _get_jacobian(self, force_if_mat_free=False, use_relevance=True):
         """
         Initialize the jacobian if it is not already initialized.
 
@@ -159,6 +159,8 @@ class ExplicitComponent(Component):
         ----------
         force_if_mat_free : bool
             If True, force the jacobian to be initialized even for a matrix free component.
+        use_relevance : bool
+            If True, use relevance to determine which partials to approximate.
 
         Returns
         -------
@@ -170,7 +172,7 @@ class ExplicitComponent(Component):
                 self._jacobian = BlockJacobian(system=self)
                 if self._has_approx:
                     self._get_static_wrt_matches()
-                    self._add_approximations()
+                    self._add_approximations(use_relevance=use_relevance)
 
             return self._jacobian
 
@@ -499,6 +501,9 @@ class ExplicitComponent(Component):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
+        # need this here to ensure that jacobian and approx_schemes are initialized
+        jac = self._get_jacobian()
+
         if self.matrix_free or not (self._has_compute_partials or self._approx_schemes):
             return
 
@@ -508,7 +513,7 @@ class ExplicitComponent(Component):
             # Computing the approximation before the call to compute_partials allows users to
             # override FD'd values.
             for approximation in self._approx_schemes.values():
-                approximation.compute_approximations(self, jac=self._get_jacobian())
+                approximation.compute_approximations(self, jac=jac)
 
             if self._has_compute_partials:
                 # We used to negate the jacobian here, and then re-negate after the hook.

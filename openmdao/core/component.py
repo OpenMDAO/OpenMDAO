@@ -459,9 +459,11 @@ class Component(System):
         Yields
         ------
         key : tuple (of, wrt)
-            Subjacobian key.
+            Subjacobian key.  Names are absolute.
         """
         yield from self._subjacs_info.keys()
+
+    _subjac_keys_iter = _declared_partials_iter
 
     def _get_missing_partials(self, missing):
         """
@@ -1709,13 +1711,23 @@ class Component(System):
         patterns = [pattern] if isinstance(pattern, str) else pattern
         return [(pattern, find_matches(pattern, self._get_partials_wrts())) for pattern in patterns]
 
-    def _add_approximations(self):
+    def _add_approximations(self, use_relevance=True):
         """
         Add approximations for those partials registered with method=fd or method=cs.
+
+        Parameters
+        ----------
+        use_relevance : bool
+            If True, use relevance to determine which partials to approximate.
         """
         subjacs = self._subjacs_info
         wrtset = set()
-        subjac_keys = self._get_approx_subjac_keys()
+        subjac_keys = self._get_approx_subjac_keys(use_relevance=use_relevance)
+        methods = list(self._approx_schemes)
+        self._approx_schemes = {}
+        for method in methods:
+            self._get_approx_scheme(method)
+
         # go through subjac keys in reverse and only add approx for the last of each wrt
         # (this prevents warnings that could confuse users)
         for i in range(len(subjac_keys) - 1, -1, -1):
@@ -1725,6 +1737,11 @@ class Component(System):
                 wrtset.add(wrt)
                 meta = subjacs[key]
                 self._approx_schemes[meta['method']].add_approximation(key, self, meta)
+
+        # get rid of any empty approx schemes
+        to_remove = [name for name, scheme in self._approx_schemes.items() if not scheme._wrt_meta]
+        for name in to_remove:
+            del self._approx_schemes[name]
 
     def _guess_nonlinear(self):
         """
@@ -2012,10 +2029,17 @@ class Component(System):
         requested_method = method
         alloc_complex = self._outputs._alloc_complex
 
-        if not alloc_complex and method == 'cs':
-            self._nocs_warning()
-
         local_opts = self._get_check_partial_options()
+
+        nocs = False
+        if not alloc_complex:
+            if method == 'cs':
+                nocs = True
+
+            for meta in local_opts.values():
+                if 'method' in meta and meta['method'] == 'cs':
+                    nocs = True
+                    break
 
         for keypats, meta in self._declared_partials_patterns.items():
 
@@ -2040,6 +2064,10 @@ class Component(System):
                     # get the options for checking partials
                     fd_options = _get_fd_options(var, requested_method, local_opts, step,
                                                  form, step_calc, alloc_complex, minimum_step)
+
+                    if not alloc_complex:
+                        if meta_with_defaults['method'] == 'cs' or fd_options['method'] == 'cs':
+                            nocs = True
 
                     # compare the compute options to the check options
                     if fd_options['method'] != meta_with_defaults['method']:
@@ -2067,6 +2095,9 @@ class Component(System):
 
                         issue_warning(msg, prefix=self.msginfo,
                                       category=OMInvalidCheckDerivativesOptionsWarning)
+                        
+        if nocs:
+            self._nocs_warning()
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM,
                        compact_print=False, abs_err_tol=0.0, rel_err_tol=1e-6,

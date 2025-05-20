@@ -167,9 +167,7 @@ class _CheckingJacobian(DictionaryJacobian):
         from openmdao.core.explicitcomponent import ExplicitComponent
         explicit = isinstance(self._system(), ExplicitComponent)
 
-        self._get_subjacs()
-
-        for key, subjac in self._subjacs.items():
+        for key, subjac in self._get_subjacs().items():
             meta = subjac.info
             if explicit and key[0] == key[1]:
                 continue
