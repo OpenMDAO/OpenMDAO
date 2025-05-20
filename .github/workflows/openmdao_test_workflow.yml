@@ -8,7 +8,7 @@ on:
     branches: [ master ]
 
   # Allow running the workflow manually from the Actions tab
-  # All jobs are excluded by default, desired jobs must be selected
+  # All jobs are included by default and may be deselected if desired
   workflow_dispatch:
 
     inputs:
@@ -23,43 +23,56 @@ on:
         type: boolean
         description: 'Include Ubuntu Baseline in test matrix'
         required: false
-        default: false
+        default: true
 
       MacOS_Baseline:
         type: boolean
         description: 'Include MacOS Baseline in test matrix'
         required: false
-        default: false
+        default: true
 
       MacOS_ARM:
         type: boolean
         description: 'Include MacOS ARM in test matrix'
         required: false
-        default: false
+        default: true
 
       Windows_Baseline:
         type: boolean
         description: 'Include Windows Baseline in test matrix'
         required: false
-        default: false
+        default: true
 
       Ubuntu_Minimal:
         type: boolean
         description: 'Include Ubuntu Minimal in test matrix'
         required: false
-        default: false
+        default: true
 
       Ubuntu_Oldest:
         type: boolean
         description: 'Include Ubuntu Oldest in test matrix'
         required: false
-        default: false
+        default: true
+
+      Ubuntu_Newer:
+        type: boolean
+        description: 'Include Ubuntu Newer in test matrix'
+        required: false
+        default: true
 
       debug_enabled:
         type: boolean
         description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
         required: false
         default: false
+
+      use_pypi:
+        type: boolean
+        description: 'Run tests against the published PyPi version of OpenMDAO'
+        required: false
+        default: false
+
 
 run-name:  ${{ inputs.run_name }}
 
@@ -124,6 +137,20 @@ jobs:
             SCIPY: '1.14'
             OPTIONAL: '[test]'
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
+
+          # test newer versions on Ubuntu
+          - NAME: Ubuntu Newer
+            OS: ubuntu-24.04
+            PY: '3.13'
+            NUMPY: '2.2'
+            SCIPY: '1.15'
+            PETSc: '3.23'
+            PYOPTSPARSE: conda-forge
+            # PAROPT: true
+            SNOPT: '7.7'
+            OPTIONAL: '[docs,doe,jax,notebooks,numba,test,visualization]'
+            PEP517: true
+            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Newer }}
 
           # test oldest supported versions
           - NAME: Ubuntu Oldest
@@ -194,7 +221,12 @@ jobs:
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
-          if [[ "${{ matrix.PEP517 }}" == "true" ]]; then
+          if [[  "${{ inputs.use_pypi }}" == "true" ]]; then
+            echo "-----------------------------------------------------------"
+            echo "Installing from PyPi"
+            echo "-----------------------------------------------------------"
+            python -m pip install openmdao${{ matrix.OPTIONAL }}
+          elif [[ "${{ matrix.PEP517 }}" == "true" ]]; then
             pip wheel --no-deps --use-pep517 .
             WHEEL=`find openmdao-*.whl`
             echo "-----------------------------------------------------------"
@@ -205,7 +237,12 @@ jobs:
             python -m pip install .${{ matrix.OPTIONAL }}
           fi
 
-      - name: Install MacOS-specific dependencies
+      - name: Install Ubuntu 24.04 specific dependencies
+        if: matrix.OS == 'ubuntu-24.04'
+        run: |
+          sudo apt install libblas-dev liblapack-dev
+
+      - name: Install MacOS 13 specific dependencies
         if: matrix.OS == 'macos-13'
         run: |
           conda install swig
@@ -254,7 +291,7 @@ jobs:
                                  print(x.getArray())"
           echo "-----------------------"
 
-          echo "export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> $GITHUB_ENV
+          echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> $GITHUB_ENV
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
           echo "OMPI_MCA_btl=^openib" >> $GITHUB_ENV
 
@@ -481,6 +518,7 @@ jobs:
                   core.setFailed('Tests failed.');
               }
 
+
   windows_tests:
     runs-on: windows-latest
 
@@ -532,7 +570,7 @@ jobs:
           channels: conda-forge
           conda-remove-defaults: true
 
-      - name: Install OpenDMAO
+      - name: Install OpenMDAO
         run: |
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
@@ -546,7 +584,14 @@ jobs:
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
-          python -m pip install .[all]
+          if ( "${{ inputs.use_pypi }}" -eq "true" ) {
+            echo "-----------------------------------------------------------"
+            echo "Installing from PyPi"
+            echo "-----------------------------------------------------------"
+            python -m pip install openmdao[all]
+          } else {
+            python -m pip install .[all]
+          }
 
       - name: Install pyOptSparse
         if: matrix.PYOPTSPARSE
@@ -581,6 +626,7 @@ jobs:
                     f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
 
       - name: Run tests
+        id: run_tests
         env:
           OPENMDAO_CHECK_ALL_PARTIALS: true
         run: |
