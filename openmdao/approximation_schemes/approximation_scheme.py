@@ -127,14 +127,14 @@ class ApproximationScheme(object):
 
         return self._approx_groups, self._colored_approx_groups
 
-    def add_approximation(self, abs_key, system, kwargs):
+    def add_approximation(self, wrt, system, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
         Parameters
         ----------
-        abs_key : tuple(str,str)
-            Absolute name pairing of (of, wrt) for the derivative.
+        wrt : str
+            Name of wrt variable.
         system : System
             Containing System.
         kwargs : dict

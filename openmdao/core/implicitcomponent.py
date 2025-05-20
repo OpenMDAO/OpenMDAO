@@ -349,7 +349,7 @@ class ImplicitComponent(Component):
         for abs_key, meta in self._subjacs_info.items():
             if 'method' in meta:
                 method = meta['method']
-                if method is not None and method in self._approx_schemes:
+                if method in self._approx_schemes:
                     yield abs_key
 
     def _linearize_wrapper(self):
@@ -562,6 +562,9 @@ class ImplicitComponent(Component):
         Jacobian
             The initialized jacobian.
         """
+        if self._relevance_changed():
+            self._jacobian = None
+
         if self._jacobian is None:
             self._jacobian = self._get_assembled_jac()
 

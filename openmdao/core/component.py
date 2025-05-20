@@ -1736,7 +1736,7 @@ class Component(System):
             if wrt not in wrtset:
                 wrtset.add(wrt)
                 meta = subjacs[key]
-                self._approx_schemes[meta['method']].add_approximation(key, self, meta)
+                self._approx_schemes[meta['method']].add_approximation(wrt, self, meta)
 
         # get rid of any empty approx schemes
         to_remove = [name for name, scheme in self._approx_schemes.items() if not scheme._wrt_meta]
@@ -1920,12 +1920,13 @@ class Component(System):
         for rel_key in product(self._get_partials_ofs(), self._get_partials_wrts()):
             fd_options = self._get_approx_partial_options(rel_key, method=method,
                                                           checkopts=local_opts)
-            abs_key = rel_key2abs_key(self, rel_key)
+            _, rel_wrt = rel_key
+            wrt = self._resolver.rel2abs(rel_wrt)
 
             # prevent adding multiple approxs with same wrt (and confusing users with warnings)
-            if abs_key[1] not in added_wrts:
-                approximation.add_approximation(abs_key, self, fd_options)
-                added_wrts.add(abs_key[1])
+            if wrt not in added_wrts:
+                approximation.add_approximation(wrt, self, fd_options)
+                added_wrts.add(wrt)
 
         # Perform the FD here.
         with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
@@ -2095,7 +2096,7 @@ class Component(System):
 
                         issue_warning(msg, prefix=self.msginfo,
                                       category=OMInvalidCheckDerivativesOptionsWarning)
-                        
+
         if nocs:
             self._nocs_warning()
 
@@ -2423,6 +2424,7 @@ class Component(System):
 
         actual_steps = defaultdict(list)
         alloc_complex = self._outputs._alloc_complex
+        rel2abs = self._resolver.rel2abs
 
         for step in steps:
             self.run_apply_nonlinear()
@@ -2433,10 +2435,9 @@ class Component(System):
             # Load up approximation objects with the requested settings.
 
             for rel_key in product(of, wrt):
-                abs_key = rel_key2abs_key(self, rel_key)
-                local_wrt = rel_key[1]
+                _, rel_wrt = rel_key
 
-                fd_options = _get_fd_options(local_wrt, requested_method,
+                fd_options = _get_fd_options(rel_wrt, requested_method,
                                              local_opts, step, form, step_calc,
                                              alloc_complex, minimum_step)
 
@@ -2445,19 +2446,20 @@ class Component(System):
                 # Determine if fd or cs.
                 method = requested_method
 
-                all_fd_options[local_wrt] = fd_options
-                if local_wrt in mfree_directions:
-                    vector = mfree_directions.get(local_wrt)
+                all_fd_options[rel_wrt] = fd_options
+                if rel_wrt in mfree_directions:
+                    vector = mfree_directions.get(rel_wrt)
                 else:
                     vector = None
 
                 # prevent adding multiple approxs with same wrt (and confusing users with
                 # warnings)
-                if abs_key[1] not in added_wrts:
-                    approximations[fd_options['method']].add_approximation(abs_key, self,
+                abs_wrt = rel2abs(rel_wrt)
+                if abs_wrt not in added_wrts:
+                    approximations[fd_options['method']].add_approximation(abs_wrt, self,
                                                                            fd_options,
                                                                            vector=vector)
-                    added_wrts.add(abs_key[1])
+                    added_wrts.add(abs_wrt)
 
             approx_jac = _CheckingJacobian(self)
             for approximation in approximations.values():

@@ -1432,6 +1432,20 @@ class System(object, metaclass=SystemMetaclass):
         """
         pass
 
+    def _relevance_changed(self):
+        """
+        Return True if the relevance has changed since the last call to this method.
+
+        Returns
+        -------
+        bool
+            True if the relevance has changed.
+        """
+        if self._old_relevance is not self._relevance:
+            self._old_relevance = self._relevance
+            return True
+        return False
+
     def _get_approx_subjac_keys(self, use_relevance=True):
         """
         Return a list of (of, wrt) keys needed for approx derivs for this system.
@@ -1449,7 +1463,7 @@ class System(object, metaclass=SystemMetaclass):
         list
             List of approx derivative subjacobian keys.
         """
-        if False:  # use_relevance:
+        if use_relevance:
             relevance = self._relevance
             # regerate the keys if relevance has changed
             if self._old_relevance is not relevance:

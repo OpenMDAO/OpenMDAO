@@ -42,7 +42,7 @@ from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-
+from openmdao.jacobians.subjac import Subjac
 # regex to check for valid names.
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
@@ -3982,9 +3982,8 @@ class Group(System):
         Jacobian
             The initialized jacobian.
         """
-        if self._old_relevance is not self._relevance:
+        if self._relevance_changed():
             self._jacobian = None
-            self._old_relevance = self._relevance
 
         if self._jacobian is None:
             self._jacobian = self._get_assembled_jac()
@@ -3999,13 +3998,7 @@ class Group(System):
         return self._jacobian
 
     def _approx_subjac_keys_iter(self):
-        relevant = self._relevance
-        with relevant.all_seeds_active():
-            for key in self._subjac_keys_iter():
-                _, wrt = key
-                # if wrt is not relevant, no need to compute finite difference for those columns
-                if True:  #relevant.is_relevant(wrt):
-                    yield key
+        yield from self._subjac_keys_iter()
 
     def _subjac_keys_iter(self):
         """
@@ -4230,6 +4223,8 @@ class Group(System):
         abs2meta = self._var_allprocs_abs2meta
         total = self.pathname == ''
         nprocs = self.comm.size
+        abs2meta_out = self._var_allprocs_abs2meta['output']
+        abs2meta_in = self._var_allprocs_abs2meta['input']
 
         if self._coloring_info.coloring is not None and (self._owns_approx_of is None or
                                                          self._owns_approx_wrt is None):
@@ -4249,6 +4244,8 @@ class Group(System):
         abs2idx = self._var_allprocs_abs2idx
 
         approx_keys = self._get_approx_subjac_keys()
+        wrt_seen = set()
+
         for key in approx_keys:
             of, wrt = key
             if not total and nprocs > 1 and self._has_fd_group:
@@ -4267,6 +4264,11 @@ class Group(System):
                 meta = self._subjacs_info[key]
             else:
                 meta = SUBJAC_META_DEFAULTS.copy()
+                osize = abs2meta_out[of]['size']
+                if wrt in abs2meta_in:
+                    isize = abs2meta_in[wrt]['size']
+                else:
+                    isize = abs2meta_out[wrt]['size']
 
                 if of == wrt:
                     size = abs2meta['output'][of]['size']
@@ -4274,7 +4276,10 @@ class Group(System):
                     # All group approximations are treated as explicit components, so we
                     # have a -1 on the diagonal.
                     meta['val'] = np.full(size, -1.0)
-                self._subjacs_info[key] = meta
+
+                self._subjacs_info[key] = meta = Subjac.get_instance_metadata(meta, None,
+                                                                              (osize, isize),
+                                                                              self, key)
 
             meta['method'] = method
 
@@ -4283,19 +4288,9 @@ class Group(System):
             if wrt_matches is None or wrt in wrt_matches:
                 self._update_approx_coloring_meta(meta)
 
-            if meta['val'] is None:
-                if not total and wrt in abs2meta['input']:
-                    sz = abs2meta['input'][wrt]['size']
-                else:
-                    sz = abs2meta['output'][wrt]['size']
-                shape = (abs2meta['output'][of]['size'], sz)
-                meta['shape'] = shape
-                if meta['rows'] is not None:  # subjac is sparse
-                    meta['val'] = np.zeros(len(meta['rows']))
-                else:
-                    meta['val'] = np.zeros(shape)
-
-            approx.add_approximation(key, self, meta)
+            if wrt not in wrt_seen:
+                wrt_seen.add(wrt)
+                approx.add_approximation(wrt, self, meta)
 
         if not total:
             # we're taking semi-total derivs for this group. Update _owns_approx_of

@@ -167,6 +167,9 @@ class ExplicitComponent(Component):
         Jacobian
             The initialized jacobian.
         """
+        if self._relevance_changed():
+            self._jacobian = None
+
         if force_if_mat_free or not self.matrix_free:
             if self._jacobian is None:
                 self._jacobian = BlockJacobian(system=self)
@@ -260,7 +263,7 @@ class ExplicitComponent(Component):
         for abs_key, meta in self._subjacs_info.items():
             if 'method' in meta and not is_output(abs_key[1]):
                 method = meta['method']
-                if (method is not None and method in self._approx_schemes):
+                if method in self._approx_schemes:
                     yield abs_key
 
     def _compute_wrapper(self):
