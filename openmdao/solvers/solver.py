@@ -1026,6 +1026,7 @@ class LinearSolver(Solver):
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
+        self._assembled_jac = None
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
             raise RuntimeError("Linear solver %s doesn't support assembled "
                                "jacobians." % self.msginfo)

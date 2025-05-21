@@ -413,18 +413,17 @@ class ExplicitComponent(Component):
                         if d_outputs._names:
                             rflat = d_residuals._abs_get_val
                             oflat = d_outputs._abs_get_val
-                            subjacs_empty = len(self._subjacs_info) == 0
 
                             # 'val' in the code below is a reference to the part of the
                             # output or residual array corresponding to the variable 'v'
                             if mode == 'fwd':
                                 for v in d_outputs._names:
-                                    if subjacs_empty or (v, v) not in self._subjacs_info:
+                                    if (v, v) not in self._subjacs_info:
                                         val = rflat(v)
                                         val -= oflat(v)
                             else:  # rev
                                 for v in d_outputs._names:
-                                    if subjacs_empty or (v, v) not in self._subjacs_info:
+                                    if (v, v) not in self._subjacs_info:
                                         val = oflat(v)
                                         val -= rflat(v)
 

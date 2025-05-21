@@ -84,10 +84,6 @@ class DictionaryJacobian(Jacobian):
 
                 if other_name in d_out_names:
                     wrtvec = oflat(other_name)
-                    # if fwd and is_explicit and res_name is other_name:
-                    #     # skip the matvec mult completely for identity subjacs
-                    #     ofvec -= wrtvec
-                    #     continue
                 elif other_name in d_inp_names:
                     wrtvec = iflat(other_name)
                 else:
@@ -147,14 +143,6 @@ class _CheckingJacobian(DictionaryJacobian):
 
     def _setup(self, system):
         self._subjacs_info = self._subjacs_info.copy()
-
-        # # Convert any scipy.sparse subjacs to OpenMDAO's interal COO specification.
-        # for key, subjac in self._subjacs_info.items():
-        #     if sp.issparse(subjac['val']):
-        #         coo_val = subjac['val'].tocoo()
-        #         self._subjacs_info[key]['rows'] = coo_val.row
-        #         self._subjacs_info[key]['cols'] = coo_val.col
-        #         self._subjacs_info[key]['val'] = coo_val.data
 
         self._setup_index_maps(system)
         self._subjacs = self._get_subjacs()

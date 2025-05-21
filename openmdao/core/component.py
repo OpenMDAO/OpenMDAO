@@ -395,6 +395,8 @@ class Component(System):
         """
         Process all partials and approximations that the user declared.
         """
+        # from openmdao.devtools.debug import DebugDict
+        # self._subjacs_info = DebugDict()
         self._subjacs_info = {}
 
         self.setup_partials()  # hook for component writers to specify sparsity patterns

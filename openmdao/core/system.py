@@ -487,6 +487,8 @@ class System(object, metaclass=SystemMetaclass):
 
         self._jacobian = None
         self._approx_schemes = {}
+        # from openmdao.devtools.debug import DebugDict
+        # self._subjacs_info = DebugDict()
         self._subjacs_info = {}
         self._approx_subjac_keys = None
         self.matrix_free = _UNDEFINED
@@ -2236,7 +2238,7 @@ class System(object, metaclass=SystemMetaclass):
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
 
-        self._jacobian = None
+        self._jacobian = self._assembled_jac = None
 
     def _setup_procs(self, pathname, comm, prob_meta):
         """

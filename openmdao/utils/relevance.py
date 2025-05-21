@@ -314,12 +314,12 @@ class Relevance(object):
             local = nprocs > 1 and meta['parallel_deriv_color'] is not None
             if local:
                 if src in group._var_abs2meta['output']:  # src is local
-                    depnodes = self._dependent_nodes(src, direction, local=local)
+                    depnodes = self._dependent_nodes(src, direction, local=True)
                     group.comm.bcast(depnodes, root=group._owning_rank[src])
                 else:
                     depnodes = group.comm.bcast(None, root=group._owning_rank[src])
             else:
-                depnodes = self._dependent_nodes(src, direction, local=local)
+                depnodes = self._dependent_nodes(src, direction, local=False)
 
             rel_systems = _vars2systems(depnodes)
             rel_vars = depnodes - all_systems
@@ -1058,6 +1058,42 @@ class Relevance(object):
         outputs = set(self._filter_nodes_iter(relevant_vars, _is_output))
 
         return inputs, outputs, relevant_systems
+
+    def are_connected(self, src, tgt, scope=''):
+        """
+        Return True if the given source and target are connected.
+
+        Parameters
+        ----------
+        src : str
+            Name of the source node.
+        tgt : str
+            Name of the target node.
+        scope : str
+            Pathname of the scoping system.  Search will be limited to nodes within this scope.
+
+        Returns
+        -------
+        bool
+            True if the given source and target are connected.
+        """
+        if src in self._graph and tgt in self._graph:
+            successors = self._graph.successors
+
+            stack = [src]
+            visited = {src}
+
+            while stack:
+                src = stack.pop()
+                for node in successors(src):
+                    if node not in visited:
+                        if node == tgt:
+                            return True
+                        if node.startswith(scope):
+                            visited.add(node)
+                            stack.append(node)
+
+        return False
 
     def _dependent_nodes(self, start, direction, local=False):
         """

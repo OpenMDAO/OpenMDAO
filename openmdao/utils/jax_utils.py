@@ -868,10 +868,11 @@ def _update_subjac_sparsity(sparsity_iter, pathname, subjacs_info):
                 'rows': rows,
                 'cols': cols,
                 'diagonal': False,
+                'val': np.zeros(shape) if rows is None else np.zeros(len(rows))
             }
-            diag = False
         else:
-            diag = subjacs_info[abs_key]['diagonal']
+            subj = subjacs_info[abs_key]
+            diag = subj['diagonal']
             if diag:
                 assert shape[0] == shape[1]
                 if rows is None:
@@ -882,25 +883,16 @@ def _update_subjac_sparsity(sparsity_iter, pathname, subjacs_info):
                                        "number of row/cols > diag size "
                                        f"({len(rows)} > {shape[0]}).")
                 elif len(rows) < shape[0]:
-                    subjacs_info[abs_key]['diagonal'] = diag = False
+                    subj['diagonal'] = diag = False
                     issue_warning(f"Subjacobian ({of}, {wrt}) is labeled as diagonal but is "
                                   "actually more sparse than that, row/cols < diag size "
                                   f"({len(rows)} < {shape[0]}).")
 
-        if rows is None:
-            if diag:
-                assert shape[0] == shape[1]
-            else:
-                subjacs_info[abs_key]['val'] = np.zeros(shape)
-        else:
-            if len(rows) == 0:
-                del subjacs_info[abs_key]
-            else:
-                subjacs_info[abs_key].update({
-                    'rows': rows,
-                    'cols': cols,
-                    'val': np.zeros(len(rows))
-                })
+            if rows is not None:
+                if len(rows) == 0:
+                    del subjacs_info[abs_key]
+                else:
+                    subj['sparsity'] = (rows, cols, shape)
 
 
 def _re_init(self):

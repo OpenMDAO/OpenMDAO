@@ -7,6 +7,7 @@ from openmdao.utils.iter_utils import meta2range_iter
 from openmdao.jacobians.subjac import Subjac
 from openmdao.utils.units import unit_conversion
 from openmdao.utils.rangemapper import RangeMapper
+from openmdao.utils.general_utils import do_nothing_context
 
 
 def _get_vec_slices(system, iotype, subset=None):
@@ -116,15 +117,24 @@ class Jacobian(object):
             self._subjacs = {}
             out_slices = self._output_slices
             in_slices = self._input_slices
-            # try:
-            #     is_relevant = self._problem_meta['relevance'].is_relevant
-            # except Exception:
-            #     is_relevant = None
-            for key, meta in self._subjacs_info.items():
-                of, wrt = key
-                if of in out_slices:
-                    if wrt in in_slices or wrt in out_slices:
-                        self._subjacs[key] = self.create_subjac(key, meta)
+            if self._has_approx:
+                try:
+                    relevance = self._problem_meta['relevance'].is_relevant
+                    is_relevant = relevance.is_relevant
+                except Exception:
+                    relevance = None
+            else:
+                relevance = None
+
+            with relevance.all_seeds_active() if relevance else do_nothing_context():
+                for key, meta in self._subjacs_info.items():
+                    of, wrt = key
+                    if of in out_slices:
+                        if wrt in in_slices or wrt in out_slices:
+                            if relevance is None or is_relevant(wrt):
+                                self._subjacs[key] = self.create_subjac(key, meta)
+                            else:
+                                pass
 
         return self._subjacs
 
@@ -389,7 +399,7 @@ class Jacobian(object):
                 if key in self._subjacs_info:
                     subjac = self.get_metadata(key)
                     if subjac['cols'] is None:  # dense
-                        subjac['val'][:, :] = wjac[start:end, :]
+                        subjac['val'][:, :] = wjac[start:end, :].toarray()
                     else:  # our COO format
                         subj = wjac[start:end, :]
                         subjac['val'][:] = subj[subjac['rows'], subjac['cols']]
@@ -431,7 +441,7 @@ class Jacobian(object):
         self._get_subjacs()
         self._col_mapper = None  # force recompute of internal index maps on next set_col
 
-    def _get_ordered_subjac_keys(self, system):
+    def _get_ordered_subjac_keys(self, system, use_relevance=True):
         """
         Iterate over subjacs keyed by absolute names.
 
@@ -441,39 +451,47 @@ class Jacobian(object):
         ----------
         system : System
             System that is updating this jacobian.
+        use_relevance : bool
+            If True, only include subjacs where the wrt variable is relevant.
 
         Returns
         -------
         list
             List of keys matching this jacobian for the current system.
         """
-        # TODO: implement this for all Jacobians, possibly generating all Group related subjac_infos
-        # TODO: on the fly and storing them in the Jacobian object, i.e. the only 'permanent'
-        # TODO: subjac_infos would be those from the Components...
-        if self._iter_keys is None:
-            subjacs = self._subjacs_info
+        if use_relevance and self._has_approx:
+            relevance = self._problem_meta['relevance']
+            is_relevant = relevance.is_relevant
+        else:
+            relevance = None
+
+        if self._ordered_subjac_keys is None:
+            subjacs_info = self._subjacs_info
             keys = []
             # determine the set of remote keys (keys where either of or wrt is remote somewhere)
             # only if we're under MPI with comm size > 1 and the given system is a Group that
             # computes its derivatives using finite difference or complex step.
-            if system.pathname and system.comm.size > 1 and system._owns_approx_jac and \
-                    system._subsystems_allprocs:
+            if system.pathname and system.comm.size > 1 and system._owns_approx_jac:
                 ofnames = system._var_allprocs_abs2meta['output']
                 wrtnames = system._var_allprocs_abs2meta
             else:
                 ofnames = system._var_abs2meta['output']
                 wrtnames = system._var_abs2meta
 
-            for res_name in ofnames:
-                for type_ in ('output', 'input'):
-                    for name in wrtnames[type_]:
-                        key = (res_name, name)
-                        if key in subjacs:
-                            keys.append(key)
+            with relevance.all_seeds_active() if relevance else do_nothing_context():
+                for of in ofnames:
+                    for type_ in ('output', 'input'):
+                        for wrt in wrtnames[type_]:
+                            key = (of, wrt)
+                            if key in subjacs_info:
+                                if relevance is None or is_relevant(wrt):
+                                    keys.append(key)
+                                else:
+                                    pass
 
-            self._iter_keys = keys
+            self._ordered_subjac_keys = keys
 
-        return self._iter_keys
+        return self._ordered_subjac_keys
 
 
 class SplitJacobian(Jacobian):

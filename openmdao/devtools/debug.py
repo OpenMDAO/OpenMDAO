@@ -367,6 +367,18 @@ def _summary_report_register():
     register_report('summary', _summary_report, 'Model summary', 'Problem', 'final_setup', 'post')
 
 
+class DebugDict(dict):
+    """
+    A drop-in replacement for a dict that allows breakpoints to be set in __setitem__.
+
+    This is useful when debugging and a dict's value is being changed and you want to know
+    where that is happening.
+    """
+
+    def __setitem__(self, key, value):
+        return super().__setitem__(key, value)
+
+
 @contextmanager
 def profiling(outname='prof.out'):
     """

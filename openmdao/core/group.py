@@ -3916,6 +3916,8 @@ class Group(System):
         """
         Call setup_partials in components.
         """
+        # from openmdao.devtools.debug import DebugDict
+        # self._subjacs_info = info = DebugDict()
         self._subjacs_info = info = {}
 
         for subsys in self._sorted_sys_iter():
@@ -4220,9 +4222,7 @@ class Group(System):
         """
         Add approximations for all approx derivs.
         """
-        abs2meta = self._var_allprocs_abs2meta
         total = self.pathname == ''
-        nprocs = self.comm.size
         abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_allprocs_abs2meta['input']
 
@@ -4245,24 +4245,18 @@ class Group(System):
 
         approx_keys = self._get_approx_subjac_keys(initialize=True)
         wrt_seen = set()
+        compute_cross_keys = not total and self.comm.size > 1 and self._has_fd_group
 
         for key in approx_keys:
             of, wrt = key
-            if not total and nprocs > 1 and self._has_fd_group:
-                sout = sizes_out[:, abs2idx[of]]
-                sin = sizes_in[:, abs2idx[wrt]]
-                if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
-                    # we have of and wrt that exist on different procs. Now see if they're relevant
-                    # to each other
-                    for _, _, rel in self._relevance.iter_seed_pair_relevance(inputs=True,
-                                                                              outputs=True):
-                        if of in rel and wrt in rel:
-                            self._cross_keys.add(key)
-                            break
 
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
             else:
+                # check connection between of and wrt before creating a subjac
+                if not self._relevance.are_connected(wrt, of, self.pathname):
+                    continue
+
                 meta = SUBJAC_META_DEFAULTS.copy()
                 osize = abs2meta_out[of]['size']
                 if wrt in abs2meta_in:
@@ -4271,15 +4265,20 @@ class Group(System):
                     isize = abs2meta_out[wrt]['size']
 
                 if of == wrt:
-                    size = abs2meta['output'][of]['size']
                     meta['diagonal'] = True
                     # All group approximations are treated as explicit components, so we
                     # have a -1 on the diagonal.
-                    meta['val'] = np.full(size, -1.0)
+                    meta['val'] = np.full(osize, -1.0)
 
                 self._subjacs_info[key] = meta = Subjac.get_instance_metadata(meta, None,
                                                                               (osize, isize),
                                                                               self, key)
+
+            if compute_cross_keys:
+                sout = sizes_out[:, abs2idx[of]]
+                sin = sizes_in[:, abs2idx[wrt]]
+                if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
+                    self._cross_keys.add(key)
 
             meta['method'] = method
 
@@ -5390,9 +5389,8 @@ class Group(System):
                 allouts = self._var_allprocs_abs2meta['output']
                 local_out = self._var_abs2meta['output']
                 local_in = self._var_abs2meta['input']
-                subjac_keys = self._jacobian._get_ordered_subjac_keys(self)
                 remote_keys = []
-                for key in subjac_keys:
+                for key in self._jacobian._get_ordered_subjac_keys(self):
                     of, wrt = key
                     if of not in local_out or (wrt not in local_in and wrt not in local_out):
                         remote_keys.append(key)

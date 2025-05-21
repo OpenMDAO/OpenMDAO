@@ -12,6 +12,8 @@ from pprint import pformat
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, csc_matrix, issparse
 
+# from openmdao.devtools.debug import DebugDict
+
 
 class Subjac(object):
     """
@@ -1470,6 +1472,7 @@ def _init_meta(pattern_meta, prev_inst_meta):
                 meta[key] = val
     else:
         meta = SUBJAC_META_DEFAULTS.copy()
+        # meta = DebugDict(SUBJAC_META_DEFAULTS)
         meta['dependent'] = False
         meta.update(pattern_meta)
 
