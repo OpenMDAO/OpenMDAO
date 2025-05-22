@@ -336,17 +336,12 @@ class DenseSubjac(Subjac):
             rows, cols, _ = self.info['sparsity']
             # since the subjac is dense, we need to create a dense random array
             r = np.zeros(self.info['shape'])
-            if self._randval is None:
-                self._randval = randgen.random(rows.size)
-                self._randval += 1.0
-
-            r[rows, cols] = self._randval
+            randval = randgen.random(rows.size)
+            randval += 1.0
+            r[rows, cols] = randval
         else:
-            if self._randval is None:
-                self._randval = randgen.random(self.info['shape'])
-                self._randval += 1.0
-
-            r = self._randval
+            r = randgen.random(self.info['shape'])
+            r += 1.0
 
         return r
 
@@ -1201,9 +1196,9 @@ class DiagonalSubjac(SparseSubjac):
             COO column indices of the subjacobian.
         """
         if self.src_indices is None:
-            return np.arange(self.shape[1])
+            return np.arange(self.shape[0])
         else:
-            return self.src_indices.shaped_array(flat=True)
+            return self.src_indices.shaped_array(flat=True)[np.arange(self.shape[0])]
 
     def get_val(self, randgen=None):
         """
@@ -1222,11 +1217,9 @@ class DiagonalSubjac(SparseSubjac):
         if randgen is None:
             return self.info['val']
 
-        if self._randval is None:
-            self._randval = randgen.random(self.info['val'].size)
-            self._randval += 1.0
-
-        return self._randval
+        val = randgen.random(self.info['val'].size)
+        val += 1.0
+        return val
 
     get_as_coo_data = get_val
 
@@ -1472,7 +1465,6 @@ def _init_meta(pattern_meta, prev_inst_meta):
                 meta[key] = val
     else:
         meta = SUBJAC_META_DEFAULTS.copy()
-        # meta = DebugDict(SUBJAC_META_DEFAULTS)
         meta['dependent'] = False
         meta.update(pattern_meta)
 

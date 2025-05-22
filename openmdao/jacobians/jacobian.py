@@ -79,6 +79,7 @@ class Jacobian(object):
         self._input_slices = _get_vec_slices(system, 'input')
         self._has_approx = system._has_approx
         self._explicit = system.is_explicit()
+        self._ordered_subjac_keys = None
 
     def create_subjac(self, abs_key, meta):
         """
