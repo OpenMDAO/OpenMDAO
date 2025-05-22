@@ -124,8 +124,19 @@ def _subjac_meta2value(meta):
     val = meta['val'] if 'val' in meta else None
     rows = meta['rows'] if 'rows' in meta else None
     cols = meta['cols'] if 'cols' in meta else None
+    diagonal = meta['diagonal'] if 'diagonal' in meta else False
+    shape = meta['shape'] if 'shape' in meta else None
 
-    if rows is not None:
+    if diagonal:
+        if shape is None:
+            raise ValueError("Shape is required for diagonal subjacobian.")
+        rows = np.arange(shape_to_len(shape))
+        cols = rows
+        if val is not None:
+            val = np.full(shape_to_len(shape), val)
+        else:
+            val = None
+    elif rows is not None:
         if val is not None and np.isscalar(val):
             val = np.full(len(rows), val)
     elif np.isscalar(val):

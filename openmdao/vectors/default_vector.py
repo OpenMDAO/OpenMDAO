@@ -393,7 +393,6 @@ class DefaultVector(Vector):
 
         if mask is not None:
             arr[mask] = 0.0
-            return arr
 
         if copy:
             return arr.copy()

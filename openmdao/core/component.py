@@ -395,8 +395,6 @@ class Component(System):
         """
         Process all partials and approximations that the user declared.
         """
-        # from openmdao.devtools.debug import DebugDict
-        # self._subjacs_info = DebugDict()
         self._subjacs_info = {}
 
         self.setup_partials()  # hook for component writers to specify sparsity patterns
@@ -1561,11 +1559,11 @@ class Component(System):
                     del self._subjacs_info[abs_key]
                 continue
 
-            of, wrt = abs_key
-            wrtmeta = abs2meta_in[wrt] if wrt in abs2meta_in else abs2meta_out[wrt]
-            shape = (abs2meta_out[of]['size'], wrtmeta['size'])
+            _of, _wrt = abs_key
+            wrtmeta = abs2meta_in[_wrt] if _wrt in abs2meta_in else abs2meta_out[_wrt]
+            shape = (abs2meta_out[_of]['size'], wrtmeta['size'])
 
-            dist_out = abs2meta_out[of]['distributed']
+            dist_out = abs2meta_out[_of]['distributed']
             dist_in = wrtmeta['distributed']
 
             if dist_in and not dist_out and not matfree:
@@ -1581,18 +1579,18 @@ class Component(System):
                         rows_max = -1
                     else:
                         # non-distributed vars are not allowed to have zero size inputs
-                        raise ValueError(f"{self.msginfo}: '{of}' is an array of size 0.")
+                        raise ValueError(f"{self.msginfo}: '{_of}' is an array of size 0.")
                 if shape[1] == 0:
                     if not dist_in:
                         # non-distributed vars are not allowed to have zero size outputs
-                        raise ValueError(f"{self.msginfo}: '{wrt}' is an array of size 0.")
+                        raise ValueError(f"{self.msginfo}: '{_wrt}' is an array of size 0.")
                     else:
                         # distributed vars are allowed to have zero size outputs on some procs
                         cols_max = -1
 
             if rows_max >= shape[0] or cols_max >= shape[1]:
-                of, wrt = abs_key2rel_key(self, abs_key)
-                raise ValueError(f"{self.msginfo}: d({of})/d({wrt}): Expected {shape[0]}x"
+                relof, relwrt = abs_key2rel_key(self, abs_key)
+                raise ValueError(f"{self.msginfo}: d({relof})/d({relwrt}): Expected {shape[0]}x"
                                  f"{shape[1]} but declared at least {rows_max + 1}x"
                                  f"{cols_max + 1}.")
 

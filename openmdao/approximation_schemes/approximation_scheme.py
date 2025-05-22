@@ -3,9 +3,8 @@ import time
 from collections import defaultdict
 import numpy as np
 
-from openmdao.core.constants import INT_DTYPE
 from openmdao.vectors.vector import _full_slice
-from openmdao.utils.array_utils import get_input_idx_split, ValueRepeater
+from openmdao.utils.array_utils import get_input_idx_split, ValueRepeater, get_index_dtype
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.general_utils import LocalRangeIterable
 from openmdao.utils.mpi import check_mpi_env
@@ -159,11 +158,15 @@ class ApproximationScheme(object):
 
         # this maps column indices into colored jac into indices into full jac
         if wrt_matches is not None:
-            ccol2jcol = np.empty(coloring._shape[1], dtype=INT_DTYPE)
+            if system.is_explicit:
+                nfull_cols = len(system._inputs)
+            else:
+                nfull_cols = len(system._outputs) + len(system._inputs)
+            ccol2jcol = np.empty(coloring._shape[1], dtype=get_index_dtype(nfull_cols))
 
         # colored col to out vec idx
         if is_total:
-            ccol2outvec = np.empty(coloring._shape[1], dtype=INT_DTYPE)
+            ccol2outvec = np.empty(coloring._shape[1], dtype=get_index_dtype(len(outvec)))
 
         if is_total or wrt_matches is not None:
             colored_start = colored_end = 0
@@ -183,7 +186,7 @@ class ApproximationScheme(object):
                     colored_start = colored_end
 
         row_var_sizes = {v: sz for v, sz in zip(coloring._row_vars, coloring._row_var_sizes)}
-        row_map = np.empty(coloring._shape[0], dtype=INT_DTYPE)
+        row_map = np.empty(coloring._shape[0], dtype=get_index_dtype(len(outvec)))
         abs2prom = system._resolver.abs2prom
 
         if is_total:

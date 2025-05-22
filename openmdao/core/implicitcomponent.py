@@ -728,7 +728,7 @@ class ImplicitComponent(Component):
                             meta['cols'] = cols
                             meta['val'] = val
 
-                else:  # resid partials are all dense
+                else:
                     outsize = shape_to_len(self._var_abs2meta['output'][self.pathname + '.' +
                                                                         oname]['shape'])
                     for meta in existing_metas:

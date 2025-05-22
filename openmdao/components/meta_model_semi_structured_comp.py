@@ -164,11 +164,9 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         Metamodel needs to declare its partials after inputs and outputs are known.
         """
         super()._setup_partials()
-        arange = np.arange(self.options['vec_size'])
         wrtnames = tuple(self.pnames)
         pattern_meta = {
-            'rows': arange,
-            'cols': arange,
+            'diagonal': True,
             'dependent': True,
         }
 

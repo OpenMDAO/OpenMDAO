@@ -119,6 +119,8 @@ class Jacobian(object):
         """
         Get the subjacs for the current system, creating them if necessary based on _subjacs_info.
 
+        If approx derivs are being computed, only create subjacs where the wrt variable is relevant.
+
         Returns
         -------
         dict
