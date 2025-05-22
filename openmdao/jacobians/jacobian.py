@@ -59,6 +59,8 @@ class Jacobian(object):
         Whether the system has an approximate jacobian.
     _explicit : bool
         Whether the system is explicit.
+    _ordered_subjac_keys : list
+        List of subjac keys in order of appearance.
     """
 
     def __init__(self, system):
