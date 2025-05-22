@@ -591,6 +591,17 @@ class Relevance(object):
         self._no_dv_responses = \
             [rsrc for rsrc in self._single_seed2relvars['rev'] if rsrc not in found]
 
+    def get_full_seeds(self):
+        """
+        Get the full forward and reverse seeds.
+
+        Returns
+        -------
+        tuple
+            Tuple of forward and reverse seeds.
+        """
+        return self._all_seed_vars['fwd'], self._all_seed_vars['rev']
+
     def get_redundant_adjoint_systems(self):
         """
         Find any systems that depend on responses that depend on other responses.
@@ -631,9 +642,8 @@ class Relevance(object):
         effect, i.e., calling this with active=True will not activate an inactive relevance object,
         but calling it with active=False will deactivate an active relevance object.
 
-        The only way to activate an otherwise inactive relevance object is to use the
-        all_seeds_active, seeds_active, or nonlinear_active context managers and this will only
-        work if _active is None or True.
+        If _active is None, then all_seeds_active, seeds_active, or nonlinear_active context
+        managers can be used to activate the relevance object.
 
         Parameters
         ----------
@@ -1059,39 +1069,49 @@ class Relevance(object):
 
         return inputs, outputs, relevant_systems
 
-    def are_connected(self, src, tgt, scope=''):
+    def are_connected(self, start, end):
         """
         Return True if the given source and target are connected.
 
         Parameters
         ----------
-        src : str
-            Name of the source node.
-        tgt : str
-            Name of the target node.
-        scope : str
-            Pathname of the scoping system.  Search will be limited to nodes within this scope.
+        start : str
+            Name of the starting node.
+        end : str
+            Name of the ending node.
 
         Returns
         -------
         bool
             True if the given source and target are connected.
         """
-        if src in self._graph and tgt in self._graph:
+        if start in self._graph and end in self._graph:
+            if self._active:
+                # if we've already computed the relevance arrays, we can use them as a quick way
+                # to prove that the two nodes are connected.  Unfortunately we can only prove
+                # connection, not disconnection, because the two nodes could be connected but
+                # one or both could be irrelevant to all seeds.
+                start_idx = self._var2idx[start]
+                end_idx = self._var2idx[end]
+                single_seed_rel_arrays = self._single_seed2relvars['fwd']
+                for fwd_seed in self._all_seed_vars['fwd']:
+                    arr = single_seed_rel_arrays[fwd_seed]
+                    if arr[start_idx] and arr[end_idx]:
+                        return True
+
             successors = self._graph.successors
 
-            stack = [src]
-            visited = {src}
+            stack = [start]
+            visited = set(stack)
 
             while stack:
-                src = stack.pop()
-                for node in successors(src):
+                start = stack.pop()
+                for node in successors(start):
+                    if node == end:
+                        return True
                     if node not in visited:
-                        if node == tgt:
-                            return True
-                        if node.startswith(scope):
-                            visited.add(node)
-                            stack.append(node)
+                        visited.add(node)
+                        stack.append(node)
 
         return False
 

@@ -116,6 +116,14 @@ class Jacobian(object):
                                              src_indices, factor, src)
 
     def _get_subjacs(self):
+        """
+        Get the subjacs for the current system, creating them if necessary based on _subjacs_info.
+
+        Returns
+        -------
+        dict
+            Dictionary of subjacs keyed by absolute names.
+        """
         if self._subjacs is None:
             self._subjacs = {}
             out_slices = self._output_slices
@@ -132,12 +140,9 @@ class Jacobian(object):
             with relevance.all_seeds_active() if relevance else do_nothing_context():
                 for key, meta in self._subjacs_info.items():
                     of, wrt = key
-                    if of in out_slices:
-                        if wrt in in_slices or wrt in out_slices:
-                            if relevance is None or is_relevant(wrt):
-                                self._subjacs[key] = self.create_subjac(key, meta)
-                            else:
-                                pass
+                    if of in out_slices and (wrt in in_slices or wrt in out_slices):
+                        if relevance is None or is_relevant(wrt):
+                            self._subjacs[key] = self.create_subjac(key, meta)
 
         return self._subjacs
 
@@ -489,8 +494,6 @@ class Jacobian(object):
                             if key in subjacs_info:
                                 if relevance is None or is_relevant(wrt):
                                     keys.append(key)
-                                else:
-                                    pass
 
             self._ordered_subjac_keys = keys
 

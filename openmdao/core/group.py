@@ -4254,7 +4254,7 @@ class Group(System):
                 meta = self._subjacs_info[key]
             else:
                 # check connection between of and wrt before creating a subjac
-                if not self._relevance.are_connected(wrt, of, self.pathname):
+                if not self._relevance.are_connected(wrt, of):
                     continue
 
                 meta = SUBJAC_META_DEFAULTS.copy()
