@@ -67,7 +67,24 @@ _toggle_styles = """
         inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
 
-_number_initial_visible_sampled_variables = 2
+_number_initial_visible_sampled_variables = 4
+_grid_plot_height_and_width = 240 
+
+_max_label_length = 25
+def _elide_variable_name_with_units(variable_name, units):
+    elide_string = "..."
+    if units:
+        un_elided_string_length = len(f"{variable_name} ({units})")
+    else:
+        un_elided_string_length = len(variable_name)
+    chop_length = max(un_elided_string_length - _max_label_length + len(elide_string),0)
+    if chop_length:
+        variable_name = elide_string + variable_name[chop_length:]
+
+    if units:
+        return f"{variable_name} ({units})"
+    else:
+        return variable_name
 
 def _is_process_running(pid):
     if sys.platform == "win32":
@@ -515,7 +532,6 @@ class _RealTimeOptPlot(object):
         for response in self._prom_responses:
             self._source_dict[response] = []
 
-
         # need to make unavailble for this any variables that are not scalars
         # self._case_tracker._get_shape
         self._sampled_variables = [
@@ -533,7 +549,6 @@ class _RealTimeOptPlot(object):
                     self._sampled_variables.append(varname)
                 else:
                     self._sampled_variables_non_scalar.append(varname)
-
 
         self._sampled_variables.sort()
         self._sampled_variables_non_scalar.sort()
@@ -572,8 +587,6 @@ class _RealTimeOptPlot(object):
 
         N = len(self._sampled_variables)
 
-
-
         def _sampled_variable_callback(var_name):
             def toggle_callback(attr, old, new):
                 # The callback "closes over" the var_name variable
@@ -603,13 +616,6 @@ class _RealTimeOptPlot(object):
             else:
                 self._sampled_variables_visibility[sampled_var] = False
                 self._make_variable_button(sampled_var,False,_sampled_variable_callback(sampled_var))            
-            
-
-
-
-
-
-
 
         # xdrs = [DataRange1d(bounds=None) for _ in range(N)]
         # ydrs = [DataRange1d(bounds=None) for _ in range(N)]
@@ -639,15 +645,15 @@ class _RealTimeOptPlot(object):
                     # y_range=ydrs[i // N],
                     background_fill_color="#fafafa",
                     border_fill_color="white",
-                    width=240,
-                    height=240,
+                    width=_grid_plot_height_and_width,
+                    height=_grid_plot_height_and_width,
                     output_backend="webgl",
                 )
 
                 self._scatter_plots_figure[(x,y)] = p
 
-                p.xaxis.axis_label = f"{x} ({x_units})"
-                p.yaxis.axis_label = f"{y} ({y_units})"
+                # p.xaxis.axis_label = f"{x} ({x_units} {i})"
+                # p.yaxis.axis_label = f"{y} ({y_units})"
                 p.axis.visible = True
 
                 self._scatter_plots[(x,y)] = p.scatter(
@@ -660,7 +666,6 @@ class _RealTimeOptPlot(object):
                         self._prom_response, self._color_mapper
                     ),  # This maps f to colors
                 )
-
             else:  # on the diagonal
                 # Extract the x column data for the histogram
                 x_data = self._source.data[x]
@@ -690,15 +695,15 @@ class _RealTimeOptPlot(object):
 
                 # Create the figure
                 p = figure(
-                    title=f"Histogram of {x} Values",
+                    # title=f"Histogram of {x} Values",
                     # For reasons TBD, the width and height in the Plot constructor
                     # and the width and height here mean different things.
                     # so need to add 40. TODO do this better
-                    width=240,
-                    height=240,
+                    width=_grid_plot_height_and_width,
+                    height=_grid_plot_height_and_width,
                     # tools="pan,wheel_zoom,box_zoom,reset,save",
-                    x_axis_label=f"{x} ({units})",
-                    y_axis_label="Frequency",
+                    # x_axis_label=f"{x} ({units})",
+                    # y_axis_label="Frequency",
                     output_backend="webgl",
                )
 
@@ -726,12 +731,59 @@ class _RealTimeOptPlot(object):
 
             plots.append(p)
 
+        # insert var name labels along edges
+
+#           writing-mode: vertical-lr;
+#   text-orientation: upright;
+
+            # writing-mode: vertical-rl;
+            # text-orientation: mixed;
+
+#               writing-mode: vertical-lr;
+#   transform: rotate(180deg);
+
+
+        # row labels
+        for i, sampled_variable in enumerate(reversed(self._sampled_variables)):
+            irow = N - i - 1
+            idx = irow * N
+            elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, None)
+            p = Div(
+                # text=f"{sampled_variable}",
+                text=f"<div style='text-align:center;font-size:12px;writing-mode:vertical-lr;transform:rotate(180deg); title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
+                # styles={"font-size": "12px",
+                #         "text-align":"center",
+                #         "writing-mode":"vertical-lr",
+                #         "text-orientation":"upright",
+                #         },
+                align="center",
+            )
+            plots.insert(idx,p)
+
+        # column labels
+        # need to push one blank one for the bottom left corner
+        p = Div(
+            text=f"",
+        )
+        plots.append(p)
+        for sampled_variable in self._sampled_variables:
+            units = self._case_tracker._get_units(x)
+            elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, units)
+            p = Div(
+                # text=f"{sampled_variable} ({units})",
+                text=f"<div style='text-align:center;font-size:14px' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
+                # text=f"<center>{sampled_variable} ({units})</center>",
+                styles={"font-size": "12px", "text-align":"center"},
+                align="center",
+            )
+            plots.append(p)
+
         gp = gridplot(
             plots,
-            ncols=N,
+            # ncols=N,
+            ncols=N+1,
             toolbar_location=None,
         )
-
 
         toggle_column = Column(
             children=self._sampled_variables_toggles,
@@ -770,7 +822,8 @@ class _RealTimeOptPlot(object):
             height_policy="max",
         )
 
-        p = figure(height=2 * plots[0].height, width=0, toolbar_location=None)
+        # TODO avoid the [1]
+        p = figure(height=2 * _grid_plot_height_and_width, width=0, toolbar_location=None)
 
         # Define two points (x0, y0) and (x1, y1)
         x = [0, 1]
@@ -931,7 +984,6 @@ class _RealTimeOptPlot(object):
                 "padding": "8px",
                 },
         )
-
 
         final_layout = Row(
             Column(title_div, gp),
