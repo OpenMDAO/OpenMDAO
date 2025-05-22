@@ -750,7 +750,7 @@ class _RealTimeOptPlot(object):
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, None)
             p = Div(
                 # text=f"{sampled_variable}",
-                text=f"<div style='text-align:center;font-size:12px;writing-mode:vertical-lr;transform:rotate(180deg); title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
+                text=f"<div style='text-align:center;font-size:12px;writing-mode:vertical-lr;transform:rotate(180deg); cursor:help;' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
                 # styles={"font-size": "12px",
                 #         "text-align":"center",
                 #         "writing-mode":"vertical-lr",
@@ -771,7 +771,7 @@ class _RealTimeOptPlot(object):
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, units)
             p = Div(
                 # text=f"{sampled_variable} ({units})",
-                text=f"<div style='text-align:center;font-size:14px' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
+                text=f"<div style='text-align:center;font-size:14px; cursor:help;' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
                 # text=f"<center>{sampled_variable} ({units})</center>",
                 styles={"font-size": "12px", "text-align":"center"},
                 align="center",
