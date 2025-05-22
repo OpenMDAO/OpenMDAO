@@ -27,7 +27,10 @@ class TestJaxUtils(unittest.TestCase):
         try:
             import jax.numpy as np
             from jax import jit
-            import jaxlib
+            try:
+                from jax import Array as JaxArray
+            except ImportError:
+                from jaxlib.xla_extension import ArrayImpl as JaxArray
         except ImportError:
             self.skipTest('jax is not available but required for this test.')
 
@@ -40,7 +43,7 @@ class TestJaxUtils(unittest.TestCase):
         x = np.linspace(0, 10, 11)
         result = TestClass().f(x)
         assert_near_equal(result**2, x)
-        self.assertIsInstance(result, jaxlib.xla_extension.ArrayImpl)
+        self.assertIsInstance(result, JaxArray)
 
     def test_jax_component_option(self):
         """Test that the registration of jax-compatible components works."""
