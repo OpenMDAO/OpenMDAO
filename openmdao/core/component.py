@@ -16,9 +16,13 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
     global_meta_names, collect_errors, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.subjac import Subjac
-# from openmdao.jacobians.simple_jacobian import ComponentJacobian
+from openmdao.jacobians.block_jacobian import BlockJacobian
+from openmdao.jacobians.compjacobian import ComponentJacobian
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
-# from openmdao.matrices.coo_matrix import COOMatrix
+from openmdao.matrices.coo_matrix import COOMatrix
+from openmdao.matrices.csc_matrix import CSCMatrix
+from openmdao.matrices.csr_matrix import CSRMatrix
+from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_key2abs_key
 from openmdao.utils.mpi import MPI
@@ -173,6 +177,38 @@ class Component(System):
                              desc='Default shape for variables that do not set val to a non-scalar '
                              'value or set shape, shape_by_conn, copy_shape, or compute_shape.'
                              ' Default is (1,).')
+        self.options.declare('jac_type', types=str, default='dense',
+                             desc='Type of Jacobian to use.  Options are "auto", "dense", "coo", '
+                             '"csc", "csr", or "dict". Ignored by matrix free components.  "auto" '
+                             'will assign a jacobian type based on the sparsity of the component. '
+                             'Default is "dense".')
+
+    def _choose_jac_type(self):
+        """
+        Choose the Jacobian type based on the jac_type option.
+
+        Returns
+        -------
+        Jacobian
+            The Jacobian object.
+        """
+        # DBG: remove after debugging
+        return BlockJacobian(self)
+
+        if self.options['jac_type'] == 'auto':
+            return self._get_auto_jac()
+        elif self.options['jac_type'] == 'dense':
+            return ComponentJacobian(DenseMatrix, self)
+        elif self.options['jac_type'] == 'coo':
+            return ComponentJacobian(COOMatrix, self)
+        elif self.options['jac_type'] == 'csc':
+            return ComponentJacobian(CSCMatrix, self)
+        elif self.options['jac_type'] == 'csr':
+            return ComponentJacobian(CSRMatrix, self)
+        elif self.options['jac_type'] == 'dict':
+            return BlockJacobian(self)
+        else:
+            raise ValueError(f"Invalid jac_type: {self.options['jac_type']}")
 
     def setup(self):
         """
@@ -1524,6 +1560,10 @@ class Component(System):
         dependent = pattern_meta['dependent']
         matfree = self.matrix_free
         if matfree:
+            if 'val' in pattern_meta:
+                issue_warning(f"{self.msginfo}: 'val' was passed to declare_partials for {of} "
+                              f"wrt {wrt} but matrix_free is True, so 'val' will be ignored.")
+                del pattern_meta['val']
             val = None
         elif isinstance(val, list):
             val = pattern_meta['val'] = np.asarray(val, dtype=float)

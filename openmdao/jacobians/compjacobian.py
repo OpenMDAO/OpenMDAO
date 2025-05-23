@@ -7,9 +7,24 @@ class ComponentJacobian(SplitJacobian):
     """
     A jacobian for a component.
 
-    This jacobian assembles subjacobians into one or two matrices.  Explicit components use
-    only one matrix since the other is the negative identity matrix and can be applied without
-    allocating a matrix.
+    This jacobian contains one or two matrices.
+
+    One matrix, dr/di, contains the derivatives of the residuals with respect to the inputs. In fwd
+    mode it is applied to the dinputs vector and the result updates the dresiduals vector. In rev
+    mode its transpose is applied to the dresiduals vector and the result updates the dinputs
+    vector.
+
+    The other matrix, dr/do, contains the derivatives of the residuals with respect to the outputs.
+    In fwd mode it is applied to the doutputs vector and the result updates the dresiduals vector.
+    In rev mode its transpose is applied to the dresiduals vector and the result updates the
+    doutputs vector.
+
+    Explicit components use only the dr/di matrix since the dr/do matrix in the explicit case is
+    constant and equal to negative identity so its effects can be applied without creating the
+    matrix at all.
+
+    Implicit components use both matrices, and the dr/do matrix, which is always square, can be
+    used by a direct solver to perform a linear solve.
 
     Parameters
     ----------
@@ -20,10 +35,10 @@ class ComponentJacobian(SplitJacobian):
 
     Attributes
     ----------
-    _int_mtx : <Matrix>
-        Square output only Jacobian.
-    _ext_mtx : <Matrix>
-        Jacobian of derivatives of outputs with respect to inputs.
+    _dr_do_mtx : <Matrix>
+        Square matrix of derivatives of residuals with respect to outputs.
+    _dr_di_mtx : <Matrix>
+        Matrix of derivatives of residuals with respect to inputs.
     _mask_caches : dict
         Contains masking arrays for when a subset of the variables are present in a vector, keyed
         by the input._names set.
@@ -36,8 +51,8 @@ class ComponentJacobian(SplitJacobian):
         Initialize all attributes.
         """
         super().__init__(system)
-        self._int_mtx = None
-        self._ext_mtx = None
+        self._dr_do_mtx = None
+        self._dr_di_mtx = None
         self._mask_caches = {}
         self._explicit = system.is_explicit()
 
@@ -47,13 +62,13 @@ class ComponentJacobian(SplitJacobian):
         dtype = complex if system.under_complex_step else float
 
         if not self._explicit:
-            self._int_mtx = matrix_class(int_subjacs)
-            self._int_mtx._build(out_size, out_size, dtype)
+            self._dr_do_mtx = matrix_class(int_subjacs)
+            self._dr_do_mtx._build(out_size, out_size, dtype)
 
         if ext_subjacs:
             in_size = system.total_local_size('input')
-            self._ext_mtx = matrix_class(ext_subjacs)
-            self._ext_mtx._build(out_size, in_size, dtype)
+            self._dr_di_mtx = matrix_class(ext_subjacs)
+            self._dr_di_mtx._build(out_size, in_size, dtype)
 
     def _update(self, system):
         """
@@ -65,31 +80,31 @@ class ComponentJacobian(SplitJacobian):
             System that is updating this jacobian.
         """
         self._update_needed = False
-        ext_mtx = self._ext_mtx
+        drdi_mtx = self._dr_di_mtx
         int_subjacs, ext_subjacs = self._get_split_subjacs(system)
 
         randgen = self._randgen
 
-        if not self._explicit and self._int_mtx is not None:
-            int_mtx = self._int_mtx
-            int_mtx._pre_update()
-            for key, subjac in int_subjacs.items():
-                int_mtx._update_submat(key, subjac, randgen)
-            int_mtx._post_update()
+        if not self._explicit and self._dr_do_mtx is not None:
+            drdo_mtx = self._dr_do_mtx
+            drdo_mtx._pre_update()
+            for subjac in int_subjacs.values():
+                drdo_mtx._update_submat(subjac, randgen)
+            drdo_mtx._post_update()
 
-        if ext_mtx is not None:
-            ext_mtx._pre_update()
+        if drdi_mtx is not None:
+            drdi_mtx._pre_update()
 
-            for key, subjac in ext_subjacs.items():
-                ext_mtx._update_submat(key, subjac, randgen)
+            for subjac in ext_subjacs.values():
+                drdi_mtx._update_submat(subjac, randgen)
 
-            ext_mtx._post_update()
+            drdi_mtx._post_update()
 
         if self._under_complex_step:
-            # If we create a new _int_mtx while under complex step, we need to convert it to a
+            # If we create a new _dr_do_mtx while under complex step, we need to convert it to a
             # complex data type.
-            if self._int_mtx is not None:
-                self._int_mtx.set_complex_step_mode(True)
+            if self._dr_do_mtx is not None:
+                self._dr_do_mtx.set_complex_step_mode(True)
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -111,7 +126,7 @@ class ComponentJacobian(SplitJacobian):
         if self._update_needed:
             self._update(system)
 
-        ext_mtx = self._ext_mtx
+        drdi_mtx = self._dr_di_mtx
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             if d_inputs._names:
@@ -127,18 +142,18 @@ class ComponentJacobian(SplitJacobian):
                 if self._explicit:
                     dresids -= d_outputs.asarray()
                 elif d_outputs._names:
-                    dresids += self._int_mtx._prod(d_outputs.asarray(), mode)
+                    dresids += self._dr_do_mtx._prod(d_outputs.asarray(), mode)
                 if d_inputs._names:
-                    dresids += ext_mtx._prod(d_inputs.asarray(mask=mask), mode)
+                    dresids += drdi_mtx._prod(d_inputs.asarray(mask=mask), mode)
 
             else:  # rev
                 doutarr = d_outputs.asarray()
                 if self._explicit:
                     doutarr -= dresids
                 elif d_outputs._names:
-                    doutarr += self._int_mtx._prod(dresids, mode)
+                    doutarr += self._dr_do_mtx._prod(dresids, mode)
                 if d_inputs._names:
-                    arr = ext_mtx._prod(dresids, mode)
+                    arr = drdi_mtx._prod(dresids, mode)
                     arr[mask] = 0.0
                     d_inputs += arr
 
@@ -156,5 +171,5 @@ class ComponentJacobian(SplitJacobian):
         """
         super().set_complex_step_mode(active)
 
-        if self._int_mtx is not None:
-            self._int_mtx.set_complex_step_mode(active)
+        if self._dr_do_mtx is not None:
+            self._dr_do_mtx.set_complex_step_mode(active)

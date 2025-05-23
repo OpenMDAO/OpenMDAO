@@ -1099,7 +1099,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
+        np.testing.assert_almost_equal(p.model._assembled_jac._dr_do_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  0.],
                                                  [ 0., -1.,  0.],
                                                  [ 0., 13., -1.]]))
@@ -1119,7 +1119,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix,
+        np.testing.assert_almost_equal(p.model._assembled_jac._dr_do_mtx._matrix,
                                        np.array([[-1.,  0.,  0.],
                                                  [ 0., -1.,  0.],
                                                  [ 0., 13., -1.]]))
@@ -1138,7 +1138,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._jacobian._int_mtx._matrix.toarray(),
+        np.testing.assert_almost_equal(p.model._jacobian._dr_do_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  0.,  0.],
                                                  [ 0., -1.,  0.,  0.],
                                                  [ 9.,  8., -1.,  0.],
@@ -1157,7 +1157,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
+        np.testing.assert_almost_equal(p.model._assembled_jac._dr_do_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  0.,  0.],
                                                  [ 0., -1.,  0.,  0.],
                                                  [ 9.,  8., -1.,  0.],
@@ -1176,7 +1176,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
+        np.testing.assert_almost_equal(p.model._assembled_jac._dr_do_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  9.,  8.],
                                                  [ 0., -1.,  5., 10.],
                                                  [ 0.,  0., -1.,  0.],

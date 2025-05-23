@@ -176,11 +176,11 @@ class TestJacobianFeatures(unittest.TestCase):
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
         problem.setup(mode='fwd')
         problem.run_model()
-        
+
         # Note: since this test is looking for something not user-facing, it is inherently fragile
         # w.r.t. internal implementations.
         model._linearize(model._assembled_jac)
-        jac = model._assembled_jac._int_mtx._matrix
+        jac = model._assembled_jac._dr_do_mtx._matrix
 
         # Testing dependence by examining the number of entries in the Jacobian. If non-zeros are
         # removed during array creation (e.g. `eliminate_zeros` function on scipy.sparse matrices),

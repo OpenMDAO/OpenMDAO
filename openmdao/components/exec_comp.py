@@ -838,8 +838,11 @@ class ExecComp(ExplicitComponent):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
+        super()._linearize(jac, sub_do_ln)
+
+        # perform complex safe check
         if self._requires_fd:
-            self._get_jacobian()
+            # self._get_jacobian()
             if 'fd' in self._approx_schemes:
                 fdins = {wrt.rsplit('.', 1)[1] for wrt in self._approx_schemes['fd']._wrt_meta}
             else:
@@ -853,8 +856,6 @@ class ExecComp(ExplicitComponent):
                                        f"call declare_partials('*', {sorted(diff)}, method='fd') "
                                        f"on this component prior to setup.")
             self._requires_fd = False  # only need to do this check the first time around
-
-        super()._linearize(jac, sub_do_ln)
 
     def declare_coloring(self,
                          wrt=_DEFAULT_COLORING_META['wrt_patterns'],

@@ -1,7 +1,7 @@
 """Define the AssembledJacobian class."""
 
 from openmdao.jacobians.jacobian import SplitJacobian
-from openmdao.matrices.dense_matrix import DenseMatrix
+from openmdao.matrices.dense_matrix import GroupDenseMatrix
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
@@ -14,16 +14,16 @@ class AssembledJacobian(SplitJacobian):
     Parameters
     ----------
     matrix_class : type
-        Class to use to create internal matrices.
+        Class to use to create dr/do and dr/di matrices.
     system : System
         Parent system to this jacobian.
 
     Attributes
     ----------
-    _int_mtx : <Matrix>
-        Global internal Jacobian. Used by a direct solver to perform a linear solve.
-    _ext_mtx : <Matrix>
-        External Jacobian.
+    _dr_do_mtx : <Matrix>
+        Global dr/do Jacobian. May be used by a direct solver to perform a linear solve.
+    _dr_di_mtx : <Matrix>
+        Global dr/di Jacobian.
     _mask_caches : dict
         Contains masking arrays for when a subset of the variables are present in a vector, keyed
         by the input._names set.
@@ -35,9 +35,9 @@ class AssembledJacobian(SplitJacobian):
         """
         super().__init__(system)
         self._mask_caches = {}
-        int_subjacs, ext_subjacs = self._get_split_subjacs(system)
+        drdo_subjacs, drdi_subjacs = self._get_split_subjacs(system)
 
-        self._int_mtx = int_mtx = matrix_class(int_subjacs)
+        self._dr_do_mtx = drdo_mtx = matrix_class(drdo_subjacs)
 
         out_size = len(system._outputs)
         if system.under_complex_step:
@@ -45,13 +45,13 @@ class AssembledJacobian(SplitJacobian):
         else:
             dtype = float
 
-        int_mtx._build(out_size, out_size, dtype)
+        drdo_mtx._build(out_size, out_size, dtype)
 
-        if ext_subjacs:
-            self._ext_mtx = matrix_class(ext_subjacs)
-            self._ext_mtx._build(out_size, len(system._dinputs), dtype)
+        if drdi_subjacs:
+            self._dr_di_mtx = matrix_class(drdi_subjacs)
+            self._dr_di_mtx._build(out_size, len(system._dinputs), dtype)
         else:
-            self._ext_mtx = None
+            self._dr_di_mtx = None
 
     def _update_matrix(self, matrixobj, subjacs, randgen):
         """
@@ -67,8 +67,8 @@ class AssembledJacobian(SplitJacobian):
             Random number generator.
         """
         matrixobj._pre_update()
-        for key, subjac in subjacs.items():
-            matrixobj._update_submat(key, subjac, randgen)
+        for subjac in subjacs.values():
+            matrixobj._update_submat(subjac, randgen)
         matrixobj._post_update()
 
     def _update(self, system):
@@ -82,17 +82,17 @@ class AssembledJacobian(SplitJacobian):
         """
         self._update_needed = False
         randgen = self._randgen
-        int_subjacs, ext_subjacs = self._get_split_subjacs(system)
+        drdo_subjacs, drdi_subjacs = self._get_split_subjacs(system)
 
-        self._update_matrix(self._int_mtx, int_subjacs, randgen)
+        self._update_matrix(self._dr_do_mtx, drdo_subjacs, randgen)
 
-        if ext_subjacs:
-            self._update_matrix(self._ext_mtx, ext_subjacs, randgen)
+        if drdi_subjacs:
+            self._update_matrix(self._dr_di_mtx, drdi_subjacs, randgen)
 
         if self._under_complex_step:
-            # If we create a new _int_mtx while under complex step, we need to convert it to a
+            # If we create a new _dr_do_mtx while under complex step, we need to convert it to a
             # complex data type.
-            self._int_mtx.set_complex_step_mode(True)
+            self._dr_do_mtx.set_complex_step_mode(True)
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -114,12 +114,12 @@ class AssembledJacobian(SplitJacobian):
         if self._update_needed:
             self._update(system)
 
-        ext_mtx = self._ext_mtx
-        if ext_mtx is None and not d_outputs._names:  # avoid unnecessary unscaling
+        drdi_mtx = self._dr_di_mtx
+        if drdi_mtx is None and not d_outputs._names:  # avoid unnecessary unscaling
             return
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-            do_mask = ext_mtx is not None and d_inputs._names
+            do_mask = drdi_mtx is not None and d_inputs._names
             if do_mask:
                 try:
                     mask = self._mask_caches[(d_inputs._names, mode)]
@@ -131,15 +131,15 @@ class AssembledJacobian(SplitJacobian):
 
             if mode == 'fwd':
                 if d_outputs._names:
-                    dresids += self._int_mtx._prod(d_outputs.asarray(), mode)
+                    dresids += self._dr_do_mtx._prod(d_outputs.asarray(), mode)
                 if do_mask:
-                    dresids += ext_mtx._prod(d_inputs.asarray(mask=mask), mode)
+                    dresids += drdi_mtx._prod(d_inputs.asarray(mask=mask), mode)
 
             else:  # rev
                 if d_outputs._names:
-                    d_outputs += self._int_mtx._prod(dresids, mode)
+                    d_outputs += self._dr_do_mtx._prod(dresids, mode)
                 if do_mask:
-                    arr = ext_mtx._prod(dresids, mode)
+                    arr = drdi_mtx._prod(dresids, mode)
                     arr[mask] = 0.0
                     d_inputs += arr
 
@@ -157,10 +157,10 @@ class AssembledJacobian(SplitJacobian):
         """
         super().set_complex_step_mode(active)
 
-        if self._int_mtx is not None:
-            self._int_mtx.set_complex_step_mode(active)
-            if self._ext_mtx:
-                self._ext_mtx.set_complex_step_mode(active)
+        if self._dr_do_mtx is not None:
+            self._dr_do_mtx.set_complex_step_mode(active)
+            if self._dr_di_mtx:
+                self._dr_di_mtx.set_complex_step_mode(active)
 
 
 class DenseJacobian(AssembledJacobian):
@@ -177,7 +177,7 @@ class DenseJacobian(AssembledJacobian):
         """
         Initialize all attributes.
         """
-        super().__init__(DenseMatrix, system=system)
+        super().__init__(GroupDenseMatrix, system=system)
 
 
 class COOJacobian(AssembledJacobian):

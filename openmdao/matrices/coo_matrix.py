@@ -88,21 +88,19 @@ class COOMatrix(Matrix):
         data, rows, cols = self._build_coo(dtype)
         self._matrix = self._coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
 
-    def _update_submat(self, key, subjac, randgen=None):
+    def _update_submat(self, subjac, randgen=None):
         """
         Update the values of a sub-jacobian.
 
         Parameters
         ----------
-        key : (str, str)
-            the of and wrt variable names.
         subjac : Subjac
             the sub-jacobian
         randgen : RandomState or None
             Random number generator.
         """
         jac = subjac.get_as_coo_data(randgen)
-        idxs, factor = self._metadata[key]
+        idxs, factor = self._metadata[subjac.key]
         if isinstance(jac, ndarray):
             if factor is None:
                 self._matrix.data[idxs] = jac.flat

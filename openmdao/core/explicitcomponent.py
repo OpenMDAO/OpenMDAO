@@ -172,7 +172,7 @@ class ExplicitComponent(Component):
 
         if force_if_mat_free or not self.matrix_free:
             if self._jacobian is None:
-                self._jacobian = BlockJacobian(system=self)
+                self._jacobian = self._choose_jac_type()
                 if self._has_approx:
                     self._get_static_wrt_matches()
                     self._add_approximations(use_relevance=use_relevance)

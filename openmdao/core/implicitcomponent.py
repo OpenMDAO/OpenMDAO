@@ -16,7 +16,6 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.coloring import _ColSparsityJac
-from openmdao.jacobians.block_jacobian import BlockJacobian
 
 _tuplist = (tuple, list)
 
@@ -565,15 +564,16 @@ class ImplicitComponent(Component):
         if self._relevance_changed():
             self._jacobian = None
 
-        if self._jacobian is None:
-            self._jacobian = self._get_assembled_jac()
-
+        if force_if_mat_free or not self.matrix_free:
             if self._jacobian is None:
-                self._jacobian = BlockJacobian(system=self)
+                self._jacobian = self._get_assembled_jac()
 
-            if self._has_approx:
-                self._get_static_wrt_matches()
-                self._add_approximations(use_relevance=use_relevance)
+                if self._jacobian is None:
+                    self._jacobian = self._choose_jac_type()
+
+                if self._has_approx:
+                    self._get_static_wrt_matches()
+                    self._add_approximations(use_relevance=use_relevance)
 
         return self._jacobian
 

@@ -573,7 +573,7 @@ class SparseSubjac(Subjac):
         if self.src_indices is None:
             return coo.data, coo.row, coo.col
         else:
-            # if src_indices is not None, we are part of the 'int_mtx' of an assembled jac, so
+            # if src_indices is not None, we are part of the dr/do matrix, so
             # columns correspond to source variables and we have to convert columns using
             # src_indices.
             return coo.data, coo.row, self.src_indices.shaped_array(flat=True)[coo.col]
@@ -694,7 +694,7 @@ class COOSubjac(SparseSubjac):
         if self.src_indices is None:
             return coo.data, coo.row, coo.col
         else:
-            # if src_indices is not None, we are part of the 'int_mtx' of an assembled jac, so
+            # if src_indices is not None, we are part of the dr/do matrix, so
             # columns correspond to source variables and we have to convert columns using
             # src_indices.
             return coo.data, coo.row, self.src_indices.shaped_array(flat=True)[coo.col]
@@ -1023,7 +1023,7 @@ class OMCOOSubjac(COOSubjac):
         if self.src_indices is None:
             return self.info['val'], self.info['rows'], self.info['cols']
         else:
-            # if src_indices is not None, we are part of the 'int_mtx' of an assembled jac, so
+            # if src_indices is not None, we are part of the dr/do matrix, so
             # columns correspond to source variables and we have to convert columns using
             # src_indices.
             return self.info['val'], self.info['rows'], \

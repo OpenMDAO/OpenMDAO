@@ -450,6 +450,7 @@ class Jacobian(object):
         self._subjacs = None
         self._get_subjacs()
         self._col_mapper = None  # force recompute of internal index maps on next set_col
+        self._update_needed = True  # subjacs have been updated, so full jac may need to be updated
 
     def _get_ordered_subjac_keys(self, system, use_relevance=True):
         """
@@ -504,7 +505,24 @@ class Jacobian(object):
 
 class SplitJacobian(Jacobian):
     """
-    A Jacobian that is split into internal and external parts.
+    A Jacobian that is split into dr/do and dr/di parts.
+
+    The dr/di matrix contains the derivatives of the residuals with respect to the inputs. In fwd
+    mode it is applied to the dinputs vector and the result updates the dresiduals vector. In rev
+    mode its transpose is applied to the dresiduals vector and the result updates the dinputs
+    vector.
+
+    The dr/do matrix contains the derivatives of the residuals with respect to the outputs.
+    In fwd mode it is applied to the doutputs vector and the result updates the dresiduals vector.
+    In rev mode its transpose is applied to the dresiduals vector and the result updates the
+    doutputs vector.  It is always square and can be used by a direct solver to perform a linear
+    solve.
+
+    Explicit components use only the dr/di matrix since the dr/do matrix in the explicit case is
+    constant and equal to negative identity so its effects can be applied without creating the
+    matrix at all.
+
+    Implicit components and Groups use both matrices.
 
     Parameters
     ----------
@@ -513,10 +531,12 @@ class SplitJacobian(Jacobian):
 
     Attributes
     ----------
-    _int_subjacs : dict
-        Dictionary of the internal sub-Jacobian objects keyed by absolute names.
-    _ext_subjacs : dict
-        Dictionary of the external sub-Jacobian objects keyed by system pathname.
+    _dr_do_subjacs : dict
+        Dictionary containing subjacobians of residuals with respect to outputs, keyed by (of, wrt)
+        tuples containing absolute names.
+    _dr_di_subjacs : dict
+        Dictionary containing subjacobians of residuals with respect to inputs, keyed by (of, wrt)
+        tuples containing absolute names.
     """
 
     def __init__(self, system):
@@ -529,15 +549,30 @@ class SplitJacobian(Jacobian):
             The system that owns this jacobian.
         """
         super().__init__(system)
-        self._int_subjacs = None
-        self._ext_subjacs = None
+        self._dr_do_subjacs = None
+        self._dr_di_subjacs = None
 
     def _get_split_subjacs(self, system, explicit=False):
+        """
+        Get the dr/do and dr/di subjacs for the current system.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        explicit : bool
+            Whether the system is an explicit component.
+
+        Returns
+        -------
+        tuple
+            Tuple of dr/do and dr/di dictionaries.
+        """
         is_top = system.pathname == ''
 
-        if self._int_subjacs is None:
-            self._int_subjacs = {}
-            ext_subjacs = {}
+        if self._dr_do_subjacs is None:
+            self._dr_do_subjacs = {}
+            dr_di_subjacs = {}
             abs2meta_out = system._var_abs2meta['output']
             abs2meta_in = system._var_abs2meta['input']
             try:
@@ -554,15 +589,18 @@ class SplitJacobian(Jacobian):
                 if not meta['dependent']:
                     continue
                 if wrt in output_slices:
-                    self._int_subjacs[abs_key] = \
-                        self.create_internal_subjac(system._conn_global_abs_in2out, abs_key, wrt,
-                                                    meta)
+                    self._dr_do_subjacs[abs_key] = \
+                        self.create_dr_do_subjac(system._conn_global_abs_in2out, abs_key, wrt,
+                                                 meta)
                 elif wrt in input_slices:
-                    if wrt in conns and not explicit:  # connected input
-                        # For the int_subjacs that make up the 'internal' jacobian, both the row
-                        # and column entries correspond to outputs/residuals, so we need to map
-                        # derivatives wrt inputs into the corresponding derivative wrt the source,
-                        # so d(residual)/d(source) instead of d(residual)/d(input).
+                    if wrt in conns and not explicit:  # internally connected input
+                        # For the subjacs that make up the dr/do jacobian, the column entries
+                        # correspond to outputs, so we need to map derivatives wrt inputs into the
+                        # corresponding derivative wrt their source, so d(residual)/d(source)
+                        # instead of d(residual)/d(input).  This also means that if src_indices
+                        # exist in the connection between input and source, they will determine
+                        # which columns within the dr/do subjac will be populated based on the
+                        # contents of the corresponding dresid/dinput subjac.
                         src = conns[wrt]
 
                         meta_in = abs2meta_in[wrt]
@@ -578,37 +616,37 @@ class SplitJacobian(Jacobian):
 
                         src_indices = abs2meta_in[wrt]['src_indices']
 
-                        self._int_subjacs[abs_key] = \
-                            self.create_internal_subjac(system._conn_global_abs_in2out, abs_key,
-                                                        src, meta, src_indices, factor)
+                        self._dr_do_subjacs[abs_key] = \
+                            self.create_dr_do_subjac(system._conn_global_abs_in2out, abs_key,
+                                                     src, meta, src_indices, factor)
                     elif not is_top:  # input is connected to something outside current system
-                        ext_subjacs[abs_key] = self.create_subjac(abs_key, meta)
+                        dr_di_subjacs[abs_key] = self.create_subjac(abs_key, meta)
 
-            if not ext_subjacs:
-                ext_subjacs = None
+            if not dr_di_subjacs:
+                dr_di_subjacs = None
 
-            self._ext_subjacs = ext_subjacs
+            self._dr_di_subjacs = dr_di_subjacs
 
             # also populate regular subjacs dict for use with Jacobian class methods
-            self._subjacs = self._int_subjacs.copy()
-            if ext_subjacs is not None:
-                self._subjacs.update(ext_subjacs)
+            self._subjacs = self._dr_do_subjacs.copy()
+            if dr_di_subjacs is not None:
+                self._subjacs.update(dr_di_subjacs)
 
-        return self._int_subjacs, self._ext_subjacs
+        return self._dr_do_subjacs, self._dr_di_subjacs
 
     def _update_subjacs(self, system):
         """
         Revert all subjacs back to the way they were as declared by the user.
         """
         self._subjacs = None
-        self._int_subjacs = None
-        self._ext_subjacs = None
+        self._dr_do_subjacs = None
+        self._dr_di_subjacs = None
         self._get_split_subjacs(system)
 
         self._col_mapper = None  # force recompute of internal index maps on next set_col
         self._update_needed = True
 
-    def create_internal_subjac(self, conns, abs_key, src, meta, src_indices=None, factor=None):
+    def create_dr_do_subjac(self, conns, abs_key, src, meta, src_indices=None, factor=None):
         """
         Create a subjacobian for a square internal jacobian (d(residual)/d(source)).
 

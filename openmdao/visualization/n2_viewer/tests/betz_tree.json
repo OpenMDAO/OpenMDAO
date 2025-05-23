@@ -131,6 +131,7 @@
                 "default_shape": [
                     1
                 ],
+                "jac_type": "dense",
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -383,7 +384,8 @@
                 "use_jit": true,
                 "default_shape": [
                     1
-                ]
+                ],
+                "jac_type": "dense"
             }
         }
     ],
