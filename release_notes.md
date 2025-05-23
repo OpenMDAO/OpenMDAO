@@ -12,6 +12,15 @@ This method assumes the optimization has successfully converged. It then determi
 
 ## Backwards Incompatible API Changes
 
+- Hybrid-promoted names are no longer supported for accessing variables at a higher level.
+
+  For example, consider a variable with the absolute name: `traj.phases.climb.states.altitude`
+
+  This variable is promoted in states and phases to give the promoted name: `traj.climb.altitude`
+
+  Previously, the hybrid-promoted name was also valid: `traj.phases.climb.altitude`
+
+  This name is formed from the relative promoted name in the climb group, and appending the remaining absolute path to the left. These names required some additional complexity to maintain a cross-reference, and didn't provide any benefit aside from allowing the user to be less precise with variables. In this release, all hybrid-promoted names have been removed. They should be replaced with valid promoted or absolute names in calls to openmdao API methods.
 - `pyOptSparseDriver` will now raise an `ImportError` instead of a `RuntimeError` if `pyoptsparse` is not installed. [#3516](https://github.com/OpenMDAO/OpenMDAO/pull/3516)
 - Renamed `openmdao.utils.concurrent` to `openmdao.utils.concurrent_utils` [#3518](https://github.com/OpenMDAO/OpenMDAO/pull/3518)
 
