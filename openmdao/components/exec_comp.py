@@ -242,7 +242,6 @@ class ExecComp(ExplicitComponent):
         self._outarray = None
         self._indict = None
         self._viewdict = None
-        self._has_approx = True
 
     def initialize(self):
         """

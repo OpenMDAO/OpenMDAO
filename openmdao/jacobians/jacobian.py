@@ -132,7 +132,7 @@ class Jacobian(object):
             in_slices = self._input_slices
             if self._has_approx:
                 try:
-                    relevance = self._problem_meta['relevance'].is_relevant
+                    relevance = self._problem_meta['relevance']
                     is_relevant = relevance.is_relevant
                 except Exception:
                     relevance = None

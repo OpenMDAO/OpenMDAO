@@ -632,6 +632,17 @@ class System(object, metaclass=SystemMetaclass):
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
 
+    def __repr__(self):
+        """
+        Return a string representation of the System object.
+
+        Returns
+        -------
+        str
+            A string representation of the System object.
+        """
+        return self.msginfo
+
     def _get_inst_id(self):
         return self.pathname if self.pathname is not None else ''
 

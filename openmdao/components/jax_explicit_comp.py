@@ -334,6 +334,8 @@ class JaxExplicitComponent(ExplicitComponent):
                              "but got '{kwargs['method']}'.")
         kwargs['method'] = self.options['derivs_method']
         super().declare_coloring(**kwargs)
+        if kwargs['method'] == 'jax':
+            self._has_approx = False
 
     # we define _compute_partials here and possibly later rename it to compute_partials instead of
     # making this the base class version as we did with compute, because the existence of a

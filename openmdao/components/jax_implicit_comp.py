@@ -326,6 +326,8 @@ class JaxImplicitComponent(ImplicitComponent):
                              "but got '{kwargs['method']}'.")
         kwargs['method'] = self.options['derivs_method']
         super().declare_coloring(**kwargs)
+        if kwargs['method'] == 'jax':
+            self._has_approx = False
 
     def _jax_linearize(self, inputs, outputs, partials, discrete_inputs=None,
                        discrete_outputs=None):
