@@ -61,8 +61,6 @@ class Subjac(object):
         Source name for the subjacobian.
     shape : tuple
         Shape of the subjacobian.
-    _randval : ndarray or None
-        Random value of the subjacobian that will be used for later apply calls.
     """
 
     def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None,
@@ -97,7 +95,6 @@ class Subjac(object):
         self.factor = factor
         self.src = src
         self.shape = (row_slice.stop - row_slice.start, col_slice.stop - col_slice.start)
-        self._randval = None
 
         self._map_functions(wrt_is_input)
         self._init_val()
@@ -180,12 +177,6 @@ class Subjac(object):
 
     def _init_val(self):
         pass
-
-    def reset_random(self):
-        """
-        Reset cached random subjac.
-        """
-        self._randval = None
 
     def set_dtype(self, dtype):
         """
@@ -606,13 +597,12 @@ class SparseSubjac(Subjac):
         if randgen is None:
             return self.as_coo_info()[0]
 
-        if self._randval is None:
-            # our data size will be the same as the COO data size, so we don't have to
-            # convert to COO first
-            self._randval = randgen.random(self.get_coo_data_size())
-            self._randval += 1.0
+        # our data size will be the same as the COO data size, so we don't have to
+        # convert to COO first
+        randval = randgen.random(self.get_coo_data_size())
+        randval += 1.0
 
-        return self._randval
+        return randval
 
     def set_val(self, val):
         """
@@ -675,11 +665,10 @@ class COOSubjac(SparseSubjac):
             return self.info['val']
 
         submat = self.info['val']
-        if self._randval is None:
-            self._randval = randgen.random(submat.data.size) + 1.
+        randval = randgen.random(submat.data.size)
+        randval += 1.0
 
-        return coo_matrix((self._randval, (submat.row, submat.col)),
-                          shape=self.info['shape'])
+        return coo_matrix((randval, (submat.row, submat.col)), shape=self.info['shape'])
 
     def as_coo_info(self):
         """
@@ -792,11 +781,10 @@ class CSRSubjac(SparseSubjac):
             return self.info['val']
 
         submat = self.info['val']
-        if self._randval is None:
-            self._randval = randgen.random(submat.data.size) + 1.
+        randval = randgen.random(submat.data.size)
+        randval += 1.0
 
-        return csr_matrix((self._randval, submat.indices, submat.indptr),
-                          shape=self.info['shape'])
+        return csr_matrix((randval, submat.indices, submat.indptr), shape=self.info['shape'])
 
     def set_col(self, icol, column, uncovered_threshold=None):
         """
@@ -870,11 +858,10 @@ class CSCSubjac(SparseSubjac):
             return self.info['val']
 
         submat = self.info['val']
-        if self._randval is None:
-            self._randval = randgen.random(submat.data.size) + 1.
+        randval = randgen.random(submat.data.size)
+        randval += 1.0
 
-        return csc_matrix((self._randval, submat.indices, submat.indptr),
-                          shape=self.info['shape'])
+        return csc_matrix((randval, submat.indices, submat.indptr), shape=self.info['shape'])
 
     def set_col(self, icol, column, uncovered_threshold=None):
         """
@@ -1046,11 +1033,10 @@ class OMCOOSubjac(COOSubjac):
         if randgen is None:
             return self.info['val']
 
-        if self._randval is None:
-            self._randval = randgen.random(self.info['val'].size)
-            self._randval += 1.0
+        randval = randgen.random(self.info['val'].size)
+        randval += 1.0
 
-        return self._randval
+        return randval
 
     def set_val(self, val):
         """

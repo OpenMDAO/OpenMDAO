@@ -161,7 +161,7 @@ class COOMatrix(Matrix):
             if not is_complex:
                 self._coo.data = self._coo.data.astype(complex)
         elif is_complex:
-            self._coo.data = self._coo.data.astype(float)
+            self._coo.data = self._coo.data.real.astype(float)
 
     def toarray(self):
         """

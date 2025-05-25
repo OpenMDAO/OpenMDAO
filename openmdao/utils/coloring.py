@@ -2991,13 +2991,9 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
             else:
                 fullJ += np.abs(J)
 
-            # this clears out cached random subjacs
-            for system in prob.model.system_iter(recurse=True):
-                if system._jacobian is not None:
-                    system._jacobian._reset_random()
-
         if driver:
             driver._total_jac = None
+
         J = None
 
     if driver:
@@ -3671,6 +3667,24 @@ class _ColSparsityJac(object):
 
     def __setitem__(self, key, value):
         # ignore any setting of subjacs based on analytic derivs
+        pass
+
+    def _update(self, system):
+        """
+        Update the sparsity matrix.
+        """
+        pass
+
+    def _pre_update(self):
+        """
+        Pre-update the sparsity matrix.
+        """
+        pass
+
+    def _post_update(self):
+        """
+        Post-update the sparsity matrix.
+        """
         pass
 
     def get_sparsity(self):

@@ -338,18 +338,6 @@ class Jacobian(object):
 
             self._under_complex_step = active
 
-    def _reset_random(self):
-        """
-        Reset any cached random subjacs.
-
-        Parameters
-        ----------
-        system : System
-            The system that owns this jacobian.
-        """
-        for subjac in self._get_subjacs().values():
-            subjac.reset_random()
-
     def _setup_index_maps(self, system):
         namesize_iter = [(n, end - start) for n, start, end, _, _, _ in system._jac_wrt_iter()]
         self._col_mapper = RangeMapper.create(namesize_iter)
@@ -443,7 +431,7 @@ class Jacobian(object):
                         subj = jac[start:end, wstart:wend]
                         subjac['val'][:] = subj[subjac['rows'], subjac['cols']]
 
-    def _update_subjacs(self, system):
+    def _reset_subjacs(self, system):
         """
         Revert all subjacs back to the way they were as declared by the user.
         """
@@ -634,7 +622,7 @@ class SplitJacobian(Jacobian):
 
         return self._dr_do_subjacs, self._dr_di_subjacs
 
-    def _update_subjacs(self, system):
+    def _reset_subjacs(self, system):
         """
         Revert all subjacs back to the way they were as declared by the user.
         """

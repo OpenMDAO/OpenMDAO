@@ -430,7 +430,7 @@ class JaxImplicitComponent(ImplicitComponent):
         if self.options['derivs_method'] == 'jax':
             _update_subjac_sparsity(sparsity_iter, self.pathname, self._subjacs_info)
             if self._jacobian is not None:
-                self._jacobian._update_subjacs(self)
+                self._jacobian._reset_subjacs(self)
         else:
             super()._update_subjac_sparsity(sparsity_iter)
 

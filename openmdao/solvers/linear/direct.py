@@ -355,8 +355,7 @@ class DirectSolver(LinearSolver):
             # the matrix during conversion to csc prior to LU decomp, so we can't use COO.
             else:
                 raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in %s." % (type(system._assembled_jac._dr_do_mtx),
-                                                system.msginfo))
+                                   " in %s." % (type(matrix), system.msginfo))
         else:
             if nproc > 1:
                 raise RuntimeError("DirectSolvers without an assembled jacobian are not supported "

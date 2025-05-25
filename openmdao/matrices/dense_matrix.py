@@ -16,7 +16,7 @@ class GroupDenseMatrix(COOMatrix):
         Dictionary of sub-jacobian data keyed by (row_name, col_name).
     """
 
-    # NOTE: GropuDenseMatrix is inherited from COOMatrix so that we can easily handle use cases
+    # NOTE: GroupDenseMatrix is inherited from COOMatrix so that we can easily handle use cases
     #       where partials overlap the same matrix entries, as in the case of repeated
     #       src_indices entries.  This does require additional memory above storing just
     #       the dense matrix, but it's worth it because the code is simpler and more robust.
@@ -48,6 +48,8 @@ class GroupDenseMatrix(COOMatrix):
 class DenseMatrix(Matrix):
     """
     Dense jacobian matrix for use in Components.
+
+    This cannot be used in Groups because src_indices are not supported in this case.
 
     Parameters
     ----------
@@ -130,9 +132,9 @@ class DenseMatrix(Matrix):
         is_complex = 'complex' in self._matrix.dtype.__str__()
         if active:
             if not is_complex:
-                self._matrix.data = self._matrix.data.astype(complex)
+                self._matrix = self._matrix.astype(complex)
         elif is_complex:
-            self._matrix.data = self._matrix.data.astype(float)
+            self._matrix = self._matrix.real.astype(float)
 
     def toarray(self):
         """

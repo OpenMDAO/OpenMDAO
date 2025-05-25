@@ -242,6 +242,7 @@ class ExecComp(ExplicitComponent):
         self._outarray = None
         self._indict = None
         self._viewdict = None
+        self._has_approx = True
 
     def initialize(self):
         """
@@ -842,7 +843,6 @@ class ExecComp(ExplicitComponent):
 
         # perform complex safe check
         if self._requires_fd:
-            # self._get_jacobian()
             if 'fd' in self._approx_schemes:
                 fdins = {wrt.rsplit('.', 1)[1] for wrt in self._approx_schemes['fd']._wrt_meta}
             else:

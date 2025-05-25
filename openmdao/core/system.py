@@ -1837,7 +1837,7 @@ class System(object, metaclass=SystemMetaclass):
                 self._subjacs_info[abs_key]['sparsity'] = (rows, cols, shape)
 
         if isinstance(self._jacobian, Jacobian):
-            self._jacobian._update_subjacs(self)
+            self._jacobian._reset_subjacs(self)
 
     def subjac_sparsity_iter(self, sparsity, wrt_matches=None):
         """
