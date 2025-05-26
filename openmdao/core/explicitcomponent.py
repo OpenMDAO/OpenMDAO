@@ -595,9 +595,15 @@ class ExplicitComponent(Component):
         """
         pass
 
-    def is_explicit(self):
+    def is_explicit(self, is_comp=True):
         """
         Return True if this is an explicit component.
+
+        Parameters
+        ----------
+        is_comp : bool
+            If True, return True if this is an explicit component.
+            If False, return True if this is an explicit component or group.
 
         Returns
         -------

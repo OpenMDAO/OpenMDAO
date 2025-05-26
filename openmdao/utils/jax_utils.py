@@ -983,7 +983,7 @@ def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_
 
     ncontouts = self._outputs.nvars()
 
-    implicit = not self.is_explicit()
+    implicit = not self.is_explicit(is_comp=True)
 
     if implicit:
         ncontins = self._inputs.nvars() + ncontouts

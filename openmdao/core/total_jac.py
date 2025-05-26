@@ -1408,9 +1408,6 @@ class _TotalJacInfo(object):
                             with model._scaled_context_all():
                                 model._linearize(model._assembled_jac,
                                                  sub_do_ln=ln_solver._linearize_children())
-                            # if ln_solver._assembled_jac is not None and \
-                            #         ln_solver._assembled_jac._under_complex_step:
-                            #     model.linear_solver._assembled_jac._update(model)
                             ln_solver._linearize()
                         finally:
                             model._tot_jac = None
@@ -1883,9 +1880,32 @@ class _TotalJacInfo(object):
         # interfaces between partial and total jacobians, this will actually do something.
         pass
 
+    def todense(self):
+        """
+        Return the total jacobian as a dense array.
+
+        Returns
+        -------
+        ndarray
+            Dense array representation of the total jacobian.
+        """
+        return self.J
+
     def _update(self, system):
         """
         Update the total jacobian.
+        """
+        pass
+
+    def _pre_update(self):
+        """
+        Pre-update the total jacobian.
+        """
+        pass
+
+    def _post_update(self):
+        """
+        Post-update the total jacobian.
         """
         pass
 

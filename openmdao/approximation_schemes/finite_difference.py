@@ -246,6 +246,11 @@ class FiniteDifference(ApproximationScheme):
 
         try:
             yield from self._compute_approx_col_iter(system, under_cs=under_cs)
+            # for tup in self._compute_approx_col_iter(system, under_cs=under_cs):
+            #     yield tup
+            #     # this was needed after adding relevance to the NL solve in order to clean
+            #     # out old results left over in the output array from a previous solve.
+            #     system._outputs.set_val(self._starting_outs)
         finally:
             # Turn off finite difference.
             system._set_finite_difference_mode(False)

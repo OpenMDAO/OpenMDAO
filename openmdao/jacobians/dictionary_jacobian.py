@@ -29,7 +29,7 @@ class DictionaryJacobian(Jacobian):
         self._setup(system)
 
     def _setup(self, system):
-        self._subjacs = self._get_subjacs()
+        self._subjacs = self._get_subjacs(system)
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -63,11 +63,13 @@ class DictionaryJacobian(Jacobian):
         oflat = d_outputs._abs_get_val
         iflat = d_inputs._abs_get_val
         subjacs_info = self._subjacs_info
-        subjacs = self._get_subjacs()
+        subjacs = self._get_subjacs(system)
         randgen = self._randgen
 
         do_reset = False
         key_owners = system._get_subjac_owners()
+
+        # self._pre_apply(system, d_inputs, d_outputs, d_residuals, mode)
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._get_ordered_subjac_keys(system):
@@ -128,6 +130,8 @@ class DictionaryJacobian(Jacobian):
             if do_reset:
                 self._iter_keys = None  # subjacs_info has been reduced, so update iter keys
 
+        # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)
+
 
 class _CheckingJacobian(DictionaryJacobian):
     """
@@ -145,19 +149,16 @@ class _CheckingJacobian(DictionaryJacobian):
         self._subjacs_info = self._subjacs_info.copy()
 
         self._setup_index_maps(system)
-        self._subjacs = self._get_subjacs()
+        self._subjacs = self._get_subjacs(system)
 
     def __iter__(self):
         for key, _ in self.items():
             yield key
 
     def items(self):
-        from openmdao.core.explicitcomponent import ExplicitComponent
-        explicit = isinstance(self._system(), ExplicitComponent)
-
-        for key, subjac in self._get_subjacs().items():
+        for key, subjac in self._get_subjacs(self._system()).items():
             meta = subjac.info
-            if explicit and key[0] == key[1]:
+            if self._is_explicitcomp and key[0] == key[1]:
                 continue
             if 'directional' in meta:
                 yield key, np.atleast_2d(meta['val']).T
@@ -190,6 +191,7 @@ class _CheckingJacobian(DictionaryJacobian):
                     # destroyed, any extra allocated subjacs will be garbage collected.
                     self._subjacs_info[key] = subjac = SUBJAC_META_DEFAULTS.copy()
                     subjac['val'] = np.zeros((nrows, 1 if directional else ncols))
+                    subjac['shape'] = subjac['val'].shape
 
                 elif directional:
                     shape = self._subjacs_info[key]['val'].shape
@@ -230,7 +232,7 @@ class _CheckingJacobian(DictionaryJacobian):
                        options[loc_wrt]['directional'])
 
         system = self._system()
-        subjacs = self._get_subjacs()
+        subjacs = self._get_subjacs(system)
 
         for of, start, end, _, _ in system._jac_of_iter():
             key = (of, wrt)

@@ -8,6 +8,7 @@ from openmdao.jacobians.subjac import Subjac
 from openmdao.utils.units import unit_conversion
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.general_utils import do_nothing_context
+from openmdao.utils.coloring import _ColSparsityJac
 
 
 def _get_vec_slices(system, iotype, subset=None):
@@ -57,8 +58,8 @@ class Jacobian(object):
         Maps input names to slices of the input vector.
     _has_approx : bool
         Whether the system has an approximate jacobian.
-    _explicit : bool
-        Whether the system is explicit.
+    _is_explicitcomp : bool
+        Whether the system is an explicit component.
     _ordered_subjac_keys : list
         List of subjac keys in order of appearance.
     """
@@ -80,7 +81,7 @@ class Jacobian(object):
         self._output_slices = _get_vec_slices(system, 'output')
         self._input_slices = _get_vec_slices(system, 'input')
         self._has_approx = system._has_approx
-        self._explicit = system.is_explicit()
+        self._is_explicitcomp = system.is_explicit(is_comp=True)
         self._ordered_subjac_keys = None
 
     def create_subjac(self, abs_key, meta):
@@ -115,11 +116,16 @@ class Jacobian(object):
         return Subjac.get_subjac_class(meta)(key, meta, row_slice, col_slice, wrt_is_input,
                                              src_indices, factor, src)
 
-    def _get_subjacs(self):
+    def _get_subjacs(self, system=None):
         """
         Get the subjacs for the current system, creating them if necessary based on _subjacs_info.
 
         If approx derivs are being computed, only create subjacs where the wrt variable is relevant.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
 
         Returns
         -------
@@ -203,8 +209,8 @@ class Jacobian(object):
 
         Returns
         -------
-        ndarray or spmatrix or list[3]
-            sub-Jacobian as an array, sparse mtx, or AIJ/IJ list or tuple.
+        ndarray or sparse matrix
+            sub-Jacobian as an array or sparse matrix.
         """
         try:
             return self._subjacs[self._get_abs_key(key)].get_val()
@@ -219,8 +225,8 @@ class Jacobian(object):
         ----------
         key : (str, str)
             Promoted or relative name pair of sub-Jacobian.
-        subjac : int or float or ndarray or sparse matrix
-            sub-Jacobian as a scalar, vector, array, or AIJ list or tuple.
+        subjac : float or ndarray or sparse matrix
+            sub-Jacobian as a scalar, array, or sparse matrix.
         """
         self._update_needed = True
         abs_key = self._get_abs_key(key)
@@ -315,6 +321,20 @@ class Jacobian(object):
             'fwd' or 'rev'.
         """
         raise NotImplementedError(f"Class {type(self).__name__} does not implement _apply.")
+
+    # def _pre_apply(self, system, d_inputs, d_outputs, d_residuals, mode):
+    #     print(f"{system.msginfo}: BEFORE APPLY\n")
+    #     if mode == 'fwd':
+    #         print(f"    d_inputs: {d_inputs.asarray()}, d_outputs: {d_outputs.asarray()}")
+    #     else:
+    #         print(f"    d_residuals: {d_residuals.asarray()}")
+
+    # def _post_apply(self, system, d_inputs, d_outputs, d_residuals, mode):
+    #     print(f"{system.msginfo}: AFTER APPLY\n")
+    #     if mode == 'fwd':
+    #         print(f"    d_residuals: {d_residuals.asarray()}")
+    #     else:
+    #         print(f"    d_inputs: {d_inputs.asarray()}, d_outputs: {d_outputs.asarray()}")
 
     def set_complex_step_mode(self, active):
         """
@@ -436,7 +456,7 @@ class Jacobian(object):
         Revert all subjacs back to the way they were as declared by the user.
         """
         self._subjacs = None
-        self._get_subjacs()
+        self._get_subjacs(system)
         self._col_mapper = None  # force recompute of internal index maps on next set_col
         self._update_needed = True  # subjacs have been updated, so full jac may need to be updated
 
@@ -490,6 +510,34 @@ class Jacobian(object):
 
         return self._ordered_subjac_keys
 
+    def todense(self):
+        """
+        Return a dense version of the full jacobian.
+
+        This includes the combined dr/do and dr/di matrices.
+
+        Returns
+        -------
+        ndarray
+            Dense version of the full jacobian.
+        """
+        # get shapes of dr/do and dr/di
+        drdo_shape = (self.shape[0], self.shape[0])
+        drdi_shape = (self.shape[0], self.shape[1] - self.shape[0])
+
+        J_dr_do = np.zeros(drdo_shape)
+        J_dr_di = np.zeros(drdi_shape)
+
+        lst = [J_dr_do, J_dr_di]
+
+        for key, subjac in self._subjacs.items():
+            if key[1] in self._output_slices:
+                J_dr_do[subjac.row_slice, subjac.col_slice] = subjac.todense()
+            else:
+                J_dr_di[subjac.row_slice, subjac.col_slice] = subjac.todense()
+
+        return np.hstack(lst)
+
 
 class SplitJacobian(Jacobian):
     """
@@ -540,7 +588,7 @@ class SplitJacobian(Jacobian):
         self._dr_do_subjacs = None
         self._dr_di_subjacs = None
 
-    def _get_split_subjacs(self, system, explicit=False):
+    def _get_split_subjacs(self, system, is_explicit_comp=False):
         """
         Get the dr/do and dr/di subjacs for the current system.
 
@@ -548,7 +596,7 @@ class SplitJacobian(Jacobian):
         ----------
         system : System
             The system that owns this jacobian.
-        explicit : bool
+        is_explicit_comp : bool
             Whether the system is an explicit component.
 
         Returns
@@ -581,7 +629,7 @@ class SplitJacobian(Jacobian):
                         self.create_dr_do_subjac(system._conn_global_abs_in2out, abs_key, wrt,
                                                  meta)
                 elif wrt in input_slices:
-                    if wrt in conns and not explicit:  # internally connected input
+                    if wrt in conns and not is_explicit_comp:  # internally connected input
                         # For the subjacs that make up the dr/do jacobian, the column entries
                         # correspond to outputs, so we need to map derivatives wrt inputs into the
                         # corresponding derivative wrt their source, so d(residual)/d(source)
@@ -629,7 +677,7 @@ class SplitJacobian(Jacobian):
         self._subjacs = None
         self._dr_do_subjacs = None
         self._dr_di_subjacs = None
-        self._get_split_subjacs(system)
+        self._get_split_subjacs(system, self._is_explicitcomp)
 
         self._col_mapper = None  # force recompute of internal index maps on next set_col
         self._update_needed = True
@@ -670,3 +718,153 @@ class SplitJacobian(Jacobian):
 
             return self._subjac_from_meta(abs_key, meta, out_slices[of], col_slice, False,
                                           src_indices, factor, src)
+
+
+class JacobianUpdateContext:
+    """
+    Within this context, the Jacobian may be updated.
+
+    Ways to update:
+        - __setitem__, during component compute_jacvec_product or linearize
+        - set_col, during computation of approximate derivatives
+        - set_dense_jac, during linearization of jax components
+
+    Parameters
+    ----------
+    system : System
+        The system that owns this jacobian.
+
+    Attributes
+    ----------
+    system : System
+        The system that owns this jacobian.
+    jac : Jacobian
+        The jacobian that is being updated.
+    """
+
+    def __init__(self, system):
+        """
+        Initialize the JacobianUpdateContext.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        """
+        self.system = system
+        self.jac = None
+
+    def __enter__(self):
+        """
+        Enter the JacobianUpdateContext.
+
+        Returns
+        -------
+        Jacobian
+            The jacobian that is being updated.
+        """
+        self.jac = self.system._get_jacobian()
+        if self.jac is not None:
+            self.jac._pre_update()
+        return self.jac  # may be None for a Group
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit the JacobianUpdateContext.
+
+        Parameters
+        ----------
+        exc_type : type
+            The type of the exception.
+        exc_val : Exception
+            The exception object.
+        exc_tb : traceback
+            The traceback object.
+        """
+        if self.jac is not None:
+            self.jac._update(self.system)
+            self.jac._post_update()
+
+        if exc_type:
+            self.jac = self.system._jacobian = None
+            return False  # Re-raise the exception after logging/handling
+
+
+class GroupJacobianUpdateContext:
+    """
+    Within this context, the Jacobian may be updated.
+
+    Ways to update:
+        - set_col, during computation of approximate derivatives
+        - full subjac update after recursive linearization of children
+
+    Parameters
+    ----------
+    group : Group
+        The group that owns this jacobian.
+
+    Attributes
+    ----------
+    group : Group
+        The group that owns this jacobian.
+    jac : Jacobian
+        The jacobian that is being updated.
+    """
+
+    def __init__(self, group):
+        """
+        Initialize the GroupJacobianUpdateContext.
+
+        Parameters
+        ----------
+        group : Group
+            The group that owns this jacobian.
+        """
+        self.group = group
+        self.jac = None
+
+    def __enter__(self):
+        """
+        Enter the GroupJacobianUpdateContext.
+
+        Returns
+        -------
+        Jacobian
+            The jacobian that is being updated.
+        """
+        if self.group._owns_approx_jac:
+            if self.group._tot_jac is not None and not isinstance(self.group._jacobian,
+                                                                  _ColSparsityJac):
+                self.jac = self.group._jacobian = self.group._tot_jac
+            else:
+                self.jac = self.group._jacobian = self.group._get_jacobian()
+
+        else:
+            self.jac = self.group._get_assembled_jac()
+
+        if self.jac is not None:
+            self.jac._pre_update()
+
+        return self.jac  # may be None
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exit the GroupJacobianUpdateContext.
+
+        Parameters
+        ----------
+        exc_type : type
+            The type of the exception.
+        exc_val : Exception
+            The exception object.
+        exc_tb : traceback
+            The traceback object.
+        """
+        if self.jac is not None:
+            if True:  # not self.group._owns_approx_jac:
+                self.jac._update(self.group)
+            self.jac._post_update()
+
+        if exc_type:
+            self.jac = self.group._jacobian = None
+            return False  # Re-raise the exception after logging/handling

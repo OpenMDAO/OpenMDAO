@@ -632,17 +632,6 @@ class System(object, metaclass=SystemMetaclass):
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
 
-    def __repr__(self):
-        """
-        Return a string representation of the System object.
-
-        Returns
-        -------
-        str
-            A string representation of the System object.
-        """
-        return self.msginfo
-
     def _get_inst_id(self):
         return self.pathname if self.pathname is not None else ''
 
@@ -1430,7 +1419,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         return {
             'classname': type(self).__name__,
-            'implicit': not self.is_explicit(),
+            'implicit': not self.is_explicit(is_comp=False),
         }
 
     def _setup_check(self):
@@ -1485,10 +1474,11 @@ class System(object, metaclass=SystemMetaclass):
             if use_relevance:
                 lst = []
                 is_relevant = self._relevance.is_relevant
-                for key in self._approx_subjac_keys_iter():
-                    _, wrt = key
-                    if is_relevant(wrt):
-                        lst.append(key)
+                with self._relevance.all_seeds_active():
+                    for key in self._approx_subjac_keys_iter():
+                        _, wrt = key
+                        if is_relevant(wrt):
+                            lst.append(key)
                 self._approx_subjac_keys = lst
             else:
                 self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
@@ -1790,7 +1780,7 @@ class System(object, metaclass=SystemMetaclass):
 
         self._coloring_info._update_wrt_matches(self)
 
-        if self.is_explicit():
+        if self.is_explicit(is_comp=True):
             pvecs = (self._inputs,)
             save_vecs = (self._outputs, self._residuals)
         else:
@@ -6607,9 +6597,15 @@ class System(object, metaclass=SystemMetaclass):
                     keys.update(proc_keys)
         return keys
 
-    def is_explicit(self):
+    def is_explicit(self, is_comp=True):
         """
         Return True if this is an explicit component.
+
+        Parameters
+        ----------
+        is_comp : bool
+            If True, return True if this is an explicit component.
+            If False, return True if this is an explicit component or group.
 
         Returns
         -------

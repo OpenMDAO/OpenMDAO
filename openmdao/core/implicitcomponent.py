@@ -400,8 +400,8 @@ class ImplicitComponent(Component):
 
             self._linearize_wrapper()
 
-        # if (jac is None or jac is self._jacobian) and self._jacobian is not None:
-        #     self._jacobian._update(self)
+        # if self._jacobian is not None:
+        #     print(f"{self.msginfo}: jac\n{self._jacobian.todense()}")
 
     def add_output(self, name, val=1.0, **kwargs):
         """

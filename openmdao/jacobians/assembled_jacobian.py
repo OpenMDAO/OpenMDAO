@@ -129,6 +129,8 @@ class AssembledJacobian(SplitJacobian):
 
             dresids = d_residuals.asarray()
 
+            # self._pre_apply(system, d_inputs, d_outputs, d_residuals, mode)
+
             if mode == 'fwd':
                 if d_outputs._names:
                     dresids += self._dr_do_mtx._prod(d_outputs.asarray(), mode)
@@ -142,6 +144,8 @@ class AssembledJacobian(SplitJacobian):
                     arr = drdi_mtx._prod(dresids, mode)
                     arr[mask] = 0.0
                     d_inputs += arr
+
+            # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)
 
     def set_complex_step_mode(self, active):
         """
@@ -159,8 +163,6 @@ class AssembledJacobian(SplitJacobian):
 
         if self._dr_do_mtx is not None:
             self._dr_do_mtx.set_complex_step_mode(active)
-            if self._dr_di_mtx:
-                self._dr_di_mtx.set_complex_step_mode(active)
 
 
 class DenseJacobian(AssembledJacobian):

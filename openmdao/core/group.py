@@ -717,19 +717,28 @@ class Group(System):
 
         self._setup_procs_finished = True
 
-    def is_explicit(self):
+    def is_explicit(self, is_comp=True):
         """
         Return True if this Group contains only explicit systems and has no cycles.
+
+        Parameters
+        ----------
+        is_comp : bool
+            If True, return True if this is an explicit component.
+            If False, return True if this is an explicit component or group.
 
         Returns
         -------
         bool
             True if this is an explicit component.
         """
+        if is_comp:
+            return False
+
         if self._is_explicit is None:
             self._is_explicit = True
             for subsys in self._subsystems_myproc:
-                if not subsys.is_explicit():
+                if not subsys.is_explicit(is_comp=False):
                     self._is_explicit = False
                     break
 
@@ -3856,6 +3865,9 @@ class Group(System):
                     for subsys in subs:
                         if subsys._linear_solver is not None:
                             subsys._linear_solver._linearize()
+
+        # if self._jacobian is not None:
+        #     print(f"{self.msginfo}: jac\n{self._jacobian.todense()}")
 
     def _check_first_linearize(self):
         if self._first_call_to_linearize:

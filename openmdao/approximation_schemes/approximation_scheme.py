@@ -158,7 +158,7 @@ class ApproximationScheme(object):
 
         # this maps column indices into colored jac into indices into full jac
         if wrt_matches is not None:
-            if system.is_explicit:
+            if system.is_explicit(is_comp=True):
                 nfull_cols = len(system._inputs)
             else:
                 nfull_cols = len(system._outputs) + len(system._inputs)

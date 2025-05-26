@@ -322,7 +322,10 @@ class DenseSubjac(Subjac):
         if randgen is None:
             return self.info['val']
 
-        # we're generating a random subjac
+        # we're generating a random subjac during total derivative sparsity computation, so we need
+        # to check on the value of the 'sparsity' metadata so that our actual sparsity will be
+        # reported up to the top level.  Otherwise we'll report a fully dense subjac and the
+        # total derivative sparsity will be too conservative.
         if self.info['sparsity'] is not None:
             rows, cols, _ = self.info['sparsity']
             # since the subjac is dense, we need to create a dense random array

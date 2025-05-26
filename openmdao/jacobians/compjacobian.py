@@ -42,8 +42,6 @@ class ComponentJacobian(SplitJacobian):
     _mask_caches : dict
         Contains masking arrays for when a subset of the variables are present in a vector, keyed
         by the input._names set.
-    _explicit : bool
-        Whether the system is explicit.
     """
 
     def __init__(self, matrix_class, system):
@@ -54,14 +52,13 @@ class ComponentJacobian(SplitJacobian):
         self._dr_do_mtx = None
         self._dr_di_mtx = None
         self._mask_caches = {}
-        self._explicit = system.is_explicit()
 
         int_subjacs, ext_subjacs = self._get_split_subjacs(system, explicit=True)
         out_size = system.total_local_size('output')
 
         dtype = complex if system.under_complex_step else float
 
-        if not self._explicit:
+        if not self._is_explicitcomp:
             self._dr_do_mtx = matrix_class(int_subjacs)
             self._dr_do_mtx._build(out_size, out_size, dtype)
 
@@ -138,8 +135,10 @@ class ComponentJacobian(SplitJacobian):
 
             dresids = d_residuals.asarray()
 
+            # self._pre_apply(system, d_inputs, d_outputs, d_residuals, mode)
+
             if mode == 'fwd':
-                if self._explicit:
+                if self._is_explicitcomp:
                     dresids -= d_outputs.asarray()
                 elif d_outputs._names:
                     dresids += self._dr_do_mtx._prod(d_outputs.asarray(), mode)
@@ -148,7 +147,7 @@ class ComponentJacobian(SplitJacobian):
 
             else:  # rev
                 doutarr = d_outputs.asarray()
-                if self._explicit:
+                if self._is_explicitcomp:
                     doutarr -= dresids
                 elif d_outputs._names:
                     doutarr += self._dr_do_mtx._prod(dresids, mode)
@@ -156,6 +155,8 @@ class ComponentJacobian(SplitJacobian):
                     arr = drdi_mtx._prod(dresids, mode)
                     arr[mask] = 0.0
                     d_inputs += arr
+
+            # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)
 
     def set_complex_step_mode(self, active):
         """
