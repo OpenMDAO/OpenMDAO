@@ -510,10 +510,11 @@ class ExplicitComponent(Component):
         if self.matrix_free:
             return
 
-        om_dump_indent(self, f"{self.msginfo}: _linearize, approx_schemes: {self._approx_schemes}")
         self._check_first_linearize()
 
         with JacobianUpdateContext(self) as jac:
+
+            om_dump_indent(self, f"{self.msginfo}: _linearize, approx_schemes: {self._approx_schemes}")
 
             if not (self._has_compute_partials or self._approx_schemes):
                 return
