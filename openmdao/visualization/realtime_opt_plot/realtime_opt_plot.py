@@ -67,7 +67,7 @@ _toggle_styles = """
         inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
 
-_number_initial_visible_sampled_variables = 4
+_max_number_initial_visible_sampled_variables = 4
 _grid_plot_height_and_width = 240 
 
 _max_label_length = 25
@@ -464,7 +464,7 @@ class _RealTimeOptPlot(object):
             # end of _update method
 
         doc.add_periodic_callback(_update, callback_period)
-        doc.title = "OpenMDAO Analysis Progress Plot"
+        doc.title = "OpenMDAO Analysis Driver Progress Plot"
 
     # Alternative: Access objects by ID
     def access_by_id(self, object_id):
@@ -548,6 +548,7 @@ class _RealTimeOptPlot(object):
                 if shape == () or shape == (1,): # is scalar ??
                     self._sampled_variables.append(varname)
                 else:
+                    self._sampled_variables.append(varname)
                     self._sampled_variables_non_scalar.append(varname)
 
         self._sampled_variables.sort()
@@ -561,26 +562,55 @@ class _RealTimeOptPlot(object):
 
         self._source = ColumnDataSource(self._source_dict)
 
-    def _make_variable_button(self, varname, active, callback):
+    def _make_variable_button(self, varname, active, is_scalar, callback):
         toggle = Toggle(
             label=varname,
             active=active,
             margin=(0, 0, 8, 0),
         )
-        toggle.on_change("active", callback) #TODO
-        self._sampled_variables_toggles.append(toggle)
         # Add custom CSS styles for both active and inactive states
-        toggle.stylesheets = [
-            f"""
-                .bk-btn {{
-                    {_toggle_styles}
-                }}
-                .bk-btn.bk-active {{
-                    background-color: rgb(from #000000 R G B / 0.3);
-                    {_toggle_styles}
-                }}
-            """
-        ]
+        if is_scalar:
+            toggle.stylesheets = [
+                f"""
+                    .bk-btn {{
+                        {_toggle_styles}
+                    }}
+                    .bk-btn.bk-active {{
+                        background-color: rgb(from #000000 R G B / 0.3);
+                        {_toggle_styles}
+                    }}
+                """
+            ]
+        else:
+            toggle.stylesheets = [
+                f"""
+                    .bk-btn {{
+                        cursor:help;
+                        pointer-events: none !important;
+                        opacity: 0.5 !important;
+                        {_toggle_styles}
+                    }}
+                    .bk-btn.bk-active {{
+                        pointer-events: none !important;
+                        background-color: rgb(from #000000 R G B / 0.3);
+                        {_toggle_styles}
+                    }}
+                """
+            ]
+
+
+        if is_scalar:
+            toggle.on_change("active", callback)
+        else:
+            # Create a div for instructions/tooltip
+            tooltip_div = Div(
+                # text="<i>Non-scalar var.</i>",
+                text=f"<div style='text-align:center;font-size:12px;cursor:help;' title='Plotting of non-scalars is not currently supported'>Non-scalar var</div>",
+                styles={'font-size': '12px', 'color': 'gray', 'margin-top': '5px', 'cursor':'help'},
+            )
+            toggle = Row(toggle, tooltip_div)
+
+        self._sampled_variables_toggles.append(toggle)
         return toggle
 
     def _setup_figure(self):
@@ -608,14 +638,19 @@ class _RealTimeOptPlot(object):
 
             return toggle_callback
 
-        for i, sampled_var in enumerate(self._sampled_variables):
-            # self._make_variable_button(sampled_var,True,_sampled_variable_callback
-            if i < _number_initial_visible_sampled_variables:
-                self._sampled_variables_visibility[sampled_var] = True
-                self._make_variable_button(sampled_var,True,_sampled_variable_callback(sampled_var))
-            else:
+        number_initial_visible_sampled_variables = 0
+        for sampled_var in self._sampled_variables:
+            if sampled_var in self._sampled_variables_non_scalar:
                 self._sampled_variables_visibility[sampled_var] = False
-                self._make_variable_button(sampled_var,False,_sampled_variable_callback(sampled_var))            
+                self._make_variable_button(sampled_var,False, False, _sampled_variable_callback(sampled_var))            
+            else:  # is scalar
+                if number_initial_visible_sampled_variables < _max_number_initial_visible_sampled_variables:
+                    self._sampled_variables_visibility[sampled_var] = True
+                    self._make_variable_button(sampled_var,True, True, _sampled_variable_callback(sampled_var))
+                    number_initial_visible_sampled_variables += 1
+                else:
+                    self._sampled_variables_visibility[sampled_var] = False
+                    self._make_variable_button(sampled_var,False, True, _sampled_variable_callback(sampled_var))
 
         # xdrs = [DataRange1d(bounds=None) for _ in range(N)]
         # ydrs = [DataRange1d(bounds=None) for _ in range(N)]
@@ -866,7 +901,7 @@ class _RealTimeOptPlot(object):
         p.outline_line_alpha = 0
 
         analysis_progress_label = Div(
-            text="Analysis Progress",
+            text="Analysis Driver Progress",
             width=200,
             styles={"font-size": "20px", "font-weight": "bold"},
         )
@@ -900,7 +935,7 @@ class _RealTimeOptPlot(object):
         script_name = self._case_recorder_filename
 
         title_div = Div(
-            text=f"Analysis Progress for {script_name}",
+            text=f"Analysis Driver Progress for {script_name}",
             styles={
                 "font-size": "20px", 
                 "font-weight": "bold",
@@ -975,22 +1010,22 @@ class _RealTimeOptPlot(object):
         # Attach the callback to the Select widget
         menu.on_change("value", cb_select_response_variable)
 
-        sampled_variables_non_scalar_div = Div(
-            text=f"The following non-scalar variables cannot be plotted {self._sampled_variables_non_scalar}",
-            styles={
-                "font-size": "12px", 
-                "border-radius": "5px",
-                "border": "5px solid black",
-                "padding": "8px",
-                },
-        )
+        # sampled_variables_non_scalar_div = Div(
+        #     text=f"The following non-scalar variables cannot be plotted {self._sampled_variables_non_scalar}",
+        #     styles={
+        #         "font-size": "12px", 
+        #         "border-radius": "5px",
+        #         "border": "5px solid black",
+        #         "padding": "8px",
+        #         },
+        # )
 
         final_layout = Row(
             Column(title_div, gp),
             p,
             spacer2,
             Column(spacer2, quit_button, spacer3, analysis_progress_box, spacer4, response_varible_box, spacer5, 
-                   sampled_variables_non_scalar_div, spacer3,
+                #    sampled_variables_non_scalar_div, spacer3,
                    scroll_box, sizing_mode="stretch_both"),
             # sizing_mode="fixed",
             sizing_mode="stretch_both",
