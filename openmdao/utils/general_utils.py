@@ -1715,6 +1715,13 @@ if _om_dump:
     elif 'stderr' in parts:
         _dump_stream = sys.stderr
     else:
+        for p in parts:
+            if p.startswith('file='):
+                fname = p.partition('=')[2]
+                break
+        else:
+            fname = 'om_dump'
+
         rankstr = pidstr = ''
         if 'rank' in parts:
             from openmdao.utils.mpi import MPI
@@ -1723,7 +1730,7 @@ if _om_dump:
         if 'pid' in parts:
             pidstr = f"_{os.getpid()}"
 
-        _dump_stream = open(f'om_dump{rankstr}{pidstr}.out', 'w')
+        _dump_stream = open(f'{fname}{rankstr}{pidstr}.out', 'w')
 
     _show_args = 'args' in parts
 

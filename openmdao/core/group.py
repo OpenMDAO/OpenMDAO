@@ -4001,7 +4001,7 @@ class Group(System):
                 # Group only needs a jacobian if it's approximating derivatives.
                 om_dump_indent(self, f"New Jacobian for {self.msginfo}")
                 self._jacobian = DictionaryJacobian(system=self)
-                om_dump_indent(self, f"New Jacobian for {self.msginfo} is: {self._jacobian}")
+                om_dump_indent(self, f"New Jacobian for {self.msginfo} is: {type(self._jacobian).__name__}")
 
             if self._has_approx:
                 self._get_static_wrt_matches()
