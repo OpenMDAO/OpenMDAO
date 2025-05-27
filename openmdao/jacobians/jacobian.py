@@ -898,6 +898,8 @@ class JacobianUpdateContext:
             self.jac._update(self.system)
             self.jac._post_update()
 
+            om_dump_indent(self.system, f"{self.system.msginfo}:\n{self.jac.todense()}")
+
         if exc_type:
             self.jac = self.system._jacobian = None
             return False  # Re-raise the exception after logging/handling
@@ -977,6 +979,7 @@ class GroupJacobianUpdateContext:
             if True:  # not self.group._owns_approx_jac:
                 self.jac._update(self.group)
             self.jac._post_update()
+            om_dump_indent(self.group, f"{self.group.msginfo}:\n{self.jac.todense()}")
 
         if exc_type:
             self.jac = self.group._jacobian = None

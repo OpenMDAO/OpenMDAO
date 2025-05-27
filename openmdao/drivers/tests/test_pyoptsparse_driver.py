@@ -2084,7 +2084,10 @@ class TestPyoptSparse(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='rev')
-        prob.run_driver()
+        prob.final_setup()
+        J = prob.compute_totals(return_format='array')
+        om_dump(J)
+        #prob.run_driver()
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
 
