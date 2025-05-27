@@ -317,7 +317,9 @@ class DefaultTransfer(Transfer):
         if mode == 'fwd':
             # this works whether the vecs have multi columns or not due to broadcasting
             in_vec.set_val(out_vec.asarray()[self._out_inds.flat], self._in_inds)
+            om_dump(f"after transfer, in_vec: {in_vec._data}")
 
         else:  # rev
             out_vec.iadd(np.bincount(self._out_inds, in_vec._get_data()[self._in_inds],
                                      minlength=out_vec._data.size))
+            om_dump(f"after transfer, out_vec: {out_vec._data}")

@@ -3031,6 +3031,7 @@ class Group(System):
             If None, perform a full transfer.
             If str, perform a partial transfer to named subsystem for linear Gauss--Seidel.
         """
+        om_dump(f"{self.msginfo}: _transfer, vec_name: {vec_name}, mode: {mode}, sub: {sub}")
         xfer = self._transfers[mode]
         if sub in xfer:
             xfer = xfer[sub]

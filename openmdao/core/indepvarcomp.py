@@ -226,20 +226,20 @@ class IndepVarComp(ExplicitComponent):
         kwargs = {'desc': desc, 'tags': tags}
         return super().add_discrete_output(name, val, **kwargs)
 
-    def _linearize(self, jac=None, sub_do_ln=False):
-        """
-        Compute jacobian / factorization. The model is assumed to be in a scaled state.
+    # def _linearize(self, jac=None, sub_do_ln=False):
+    #     """
+    #     Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
-        Parameters
-        ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : bool
-            Flag indicating if the children should call linearize on their linear solvers.
-        """
-        # define this for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
-        om_dump_indent(self, f"{self.msginfo}: _linearize, do nothing")
-        self._get_jacobian()
+    #     Parameters
+    #     ----------
+    #     jac : Jacobian or None
+    #         If None, use local jacobian, else use assembled jacobian jac.
+    #     sub_do_ln : bool
+    #         Flag indicating if the children should call linearize on their linear solvers.
+    #     """
+    #     # define this for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
+    #     om_dump_indent(self, f"{self.msginfo}: _linearize, do nothing")
+    #     self._get_jacobian()
 
     def _apply_nonlinear(self):
         """
