@@ -1498,6 +1498,9 @@ class _TotalJacInfo(object):
         if self.simul_coloring is not None and self.simul_coloring._subtractions:
             self.simul_coloring._apply_subtractions(self.J)
 
+        om_dump("Total Jacobian:")
+        om_dump(self.J)
+
         return self.J_final
 
     def _compute_totals_approx(self, progress_out_stream=None):
