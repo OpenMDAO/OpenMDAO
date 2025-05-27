@@ -47,7 +47,6 @@ class QuadraticComp(om.ImplicitComponent):
 
 
 class QuadraticLinearize(QuadraticComp):
-
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
         b = inputs['b']
@@ -68,6 +67,9 @@ class QuadraticLinearize(QuadraticComp):
 
 
 class QuadraticJacVec(QuadraticComp):
+
+    def initialize(self):
+        self.inv_jac = 0.0
 
     def setup_partials(self):
         pass  # prevent declaration of partials from base class

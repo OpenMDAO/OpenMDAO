@@ -54,7 +54,7 @@ class Jacobian(object):
         Maps input names to slices of the input vector.
     _has_approx : bool
         Whether the system has an approximate jacobian.
-    _explicit_comp : bool
+    _is_explicitcomp : bool
         Whether the system is explicit.
     _ordered_subjac_keys : list
         List of subjac keys in order of appearance.
@@ -89,7 +89,6 @@ class Jacobian(object):
         """
         Pre-update the jacobian.
         """
-        #self._get_subjacs()
         pass
 
     def _post_update(self):
@@ -177,8 +176,9 @@ class Jacobian(object):
                         if relevance is None or is_relevant(wrt):
                             self._subjacs[key] = self.create_subjac(key, meta)
 
-            om_dump_indent(self._system(), f"{type(self).__name__}: {self._system().msginfo}: new subjacs:")
-            om_dump_indent(self._system(), f"    {[(s.key, s.info['val']) for s in self._subjacs.values()]}")
+            # odi = om_dump_indent
+            # odi(self._system(), f"{type(self).__name__}: {self._system().msginfo}: new subjacs:")
+            # odi(self._system(), f"    {[(s.key, s.info['val']) for s in self._subjacs.values()]}")
             self._initialized = True
 
         return self._subjacs
@@ -764,8 +764,9 @@ class SplitJacobian(Jacobian):
             self._subjacs.update(self._dr_di_subjacs)
 
             self._initialized = True
-            om_dump_indent(self._system(), f"{type(self).__name__}: {self._system().msginfo}: new subjacs:")
-            om_dump_indent(self._system(), f"    {[(s.key, s.info['val']) for s in self._subjacs.values()]}")
+            # odi = om_dump_indent
+            # odi(self._system(), f"{type(self).__name__}: {self._system().msginfo}: new subjacs:")
+            # odi(self._system(), f"    {[(s.key, s.info['val']) for s in self._subjacs.values()]}")
 
         return self._dr_do_subjacs, self._dr_di_subjacs
 
@@ -898,7 +899,7 @@ class JacobianUpdateContext:
             self.jac._update(self.system)
             self.jac._post_update()
 
-            om_dump_indent(self.system, f"{self.system.msginfo}:\n{self.jac.todense()}")
+            # om_dump_indent(self.system, f"{self.system.msginfo}:\n{self.jac.todense()}")
 
         if exc_type:
             self.jac = self.system._jacobian = None
@@ -979,7 +980,7 @@ class GroupJacobianUpdateContext:
             if True:  # not self.group._owns_approx_jac:
                 self.jac._update(self.group)
             self.jac._post_update()
-            om_dump_indent(self.group, f"{self.group.msginfo}:\n{self.jac.todense()}")
+            # om_dump_indent(self.group, f"{self.group.msginfo}:\n{self.jac.todense()}")
 
         if exc_type:
             self.jac = self.group._jacobian = None

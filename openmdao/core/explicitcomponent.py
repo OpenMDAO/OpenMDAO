@@ -152,14 +152,12 @@ class ExplicitComponent(Component):
                     'dependent': True,
                 }
 
-    def _get_jacobian(self, force_if_mat_free=False, use_relevance=True):
+    def _get_jacobian(self, use_relevance=True):
         """
         Initialize the jacobian if it is not already initialized.
 
         Parameters
         ----------
-        force_if_mat_free : bool
-            If True, force the jacobian to be initialized even for a matrix free component.
         use_relevance : bool
             If True, use relevance to determine which partials to approximate.
 
@@ -171,11 +169,10 @@ class ExplicitComponent(Component):
         if self._relevance_changed():
             self._jacobian = None
 
-        if force_if_mat_free or not self.matrix_free:
+        if not self.matrix_free:
             if self._jacobian is None:
-                om_dump_indent(self, f"New Jacobian for {self.msginfo}")
+                # om_dump_indent(self, f"New Jacobian for {self.msginfo}")
                 self._jacobian = self._choose_jac_type()
-                om_dump_indent(self, f"New Jacobian for {self.msginfo} is: {type(self._jacobian).__name__}")
                 if self._has_approx:
                     self._get_static_wrt_matches()
                     self._add_approximations(use_relevance=use_relevance)
@@ -388,7 +385,7 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        om_dump_indent(self, f"{self.msginfo}: _apply_linear, jac: {jac}")
+        # om_dump_indent(self, f"{self.msginfo}: _apply_linear, jac: {jac}")
         J = self._get_jacobian() if jac is None else jac
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
@@ -507,16 +504,13 @@ class ExplicitComponent(Component):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self.matrix_free:
-            return
-
         self._check_first_linearize()
 
         with JacobianUpdateContext(self) as jac:
 
-            om_dump_indent(self, f"{self.msginfo}: _linearize, approx_schemes: {self._approx_schemes}")
+            # om_dump_indent(self, f"{self.msginfo}: _linearize")
 
-            if not (self._has_compute_partials or self._approx_schemes):
+            if self.matrix_free or not (self._has_compute_partials or self._approx_schemes):
                 return
 
             with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):

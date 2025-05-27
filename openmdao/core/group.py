@@ -3031,7 +3031,7 @@ class Group(System):
             If None, perform a full transfer.
             If str, perform a partial transfer to named subsystem for linear Gauss--Seidel.
         """
-        om_dump(f"{self.msginfo}: _transfer, vec_name: {vec_name}, mode: {mode}, sub: {sub}")
+        #  om_dump(f"{self.msginfo}: _transfer, vec_name: {vec_name}, mode: {mode}, sub: {sub}")
         xfer = self._transfers[mode]
         if sub in xfer:
             xfer = xfer[sub]
@@ -3698,11 +3698,11 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        om_dump_indent(self, f"{self.msginfo}: _apply_linear, owns approx: {self._owns_approx_jac}")
+        # om_dump_indent(self, f"{self.msginfo}: _apply_linear, approx: {self._owns_approx_jac}")
         if self._owns_approx_jac:
             jac = self._get_jacobian()
         if jac is None and self._get_assembled_jac() is not None:
-            om_dump_indent(self, f"assembled jac: {self._assembled_jac}")
+            # om_dump_indent(self, f"assembled jac: {self._assembled_jac}")
             jac = self._assembled_jac
 
         if jac is not None:
@@ -3827,7 +3827,7 @@ class Group(System):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        om_dump_indent(self, f"{self.msginfo}: _linearize, owns approx: {self._owns_approx_jac}")
+        # om_dump_indent(self, f"{self.msginfo}: _linearize, owns approx: {self._owns_approx_jac}")
         self._check_first_linearize()
 
         # Group finite difference
@@ -3976,16 +3976,11 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._get_missing_partials(missing)
 
-    def _get_jacobian(self, force_if_mat_free=False):
+    def _get_jacobian(self):
         """
         Initialize the jacobian if it is not already initialized.
 
         Override this in a subclass to use a different jacobian type.
-
-        Parameters
-        ----------
-        force_if_mat_free : bool
-            Ignored.
 
         Returns
         -------
@@ -4000,9 +3995,8 @@ class Group(System):
 
             if self._jacobian is None and self._has_approx:
                 # Group only needs a jacobian if it's approximating derivatives.
-                om_dump_indent(self, f"New Jacobian for {self.msginfo}")
+                # om_dump_indent(self, f"New Jacobian for {self.msginfo}")
                 self._jacobian = DictionaryJacobian(system=self)
-                om_dump_indent(self, f"New Jacobian for {self.msginfo} is: {type(self._jacobian).__name__}")
 
             if self._has_approx:
                 self._get_static_wrt_matches()

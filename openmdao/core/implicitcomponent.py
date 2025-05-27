@@ -253,7 +253,7 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        om_dump_indent(self, f"{self.msginfo}: _apply_linear, jac: {jac}")
+        # om_dump_indent(self, f"{self.msginfo}: _apply_linear, jac: {jac}")
         if jac is None:
             jac = self._get_jacobian()
 
@@ -389,14 +389,11 @@ class ImplicitComponent(Component):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if self.matrix_free:
-            return
-
         self._check_first_linearize()
 
         with JacobianUpdateContext(self) as jac:
 
-            om_dump_indent(self, f"{self.msginfo}: _linearize, approx_schemes: {self._approx_schemes}")
+            # om_dump_indent(self, f"{self.msginfo}: _linearize, approx: {self._approx_schemes}")
 
             if not (self._has_linearize or self._approx_schemes):
                 return
@@ -552,7 +549,7 @@ class ImplicitComponent(Component):
             self._residuals_wrapper = self._residuals
             self._dresiduals_wrapper = self._dresiduals
 
-    def _get_jacobian(self, force_if_mat_free=False, use_relevance=True):
+    def _get_jacobian(self, use_relevance=True):
         """
         Initialize the jacobian if it is not already initialized.
 
@@ -560,8 +557,6 @@ class ImplicitComponent(Component):
 
         Parameters
         ----------
-        force_if_mat_free : bool
-            If True, force the jacobian to be initialized even for a matrix free component.
         use_relevance : bool
             If True, use relevance to determine which partials to approximate.
 
@@ -573,14 +568,13 @@ class ImplicitComponent(Component):
         if self._relevance_changed():
             self._jacobian = None
 
-        if force_if_mat_free or not self.matrix_free:
+        if not self.matrix_free:
             if self._jacobian is None:
                 self._jacobian = self._get_assembled_jac()
 
                 if self._jacobian is None:
-                    om_dump_indent(self, f"New Jacobian for {self.msginfo}")
+                    # om_dump_indent(self, f"New Jacobian for {self.msginfo}")
                     self._jacobian = self._choose_jac_type()
-                    om_dump_indent(self, f"New Jacobian for {self.msginfo} is: {type(self._jacobian).__name__}")
 
                 if self._has_approx:
                     self._get_static_wrt_matches()

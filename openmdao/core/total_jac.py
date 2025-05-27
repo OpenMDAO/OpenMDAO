@@ -1380,12 +1380,13 @@ class _TotalJacInfo(object):
 
         if self.approx:
             try:
-                om_dump("total_jac: compute_totals_approx")
-                return self._compute_totals_approx(progress_out_stream=progress_out_stream)
+                #  om_dump("total_jac: compute_totals_approx")
+                with self.relevance.all_seeds_active():
+                    return self._compute_totals_approx(progress_out_stream=progress_out_stream)
             finally:
                 self.model._recording_iter.pop()
 
-        om_dump("total_jac: compute_totals")
+        #  om_dump("total_jac: compute_totals")
         try:
             debug_print = self.debug_print
             par_print = self.par_deriv_printnames
@@ -1497,9 +1498,6 @@ class _TotalJacInfo(object):
 
         if self.simul_coloring is not None and self.simul_coloring._subtractions:
             self.simul_coloring._apply_subtractions(self.J)
-
-        om_dump("Total Jacobian:")
-        om_dump(self.J)
 
         return self.J_final
 

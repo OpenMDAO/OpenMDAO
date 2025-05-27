@@ -238,7 +238,7 @@ class IndepVarComp(ExplicitComponent):
     #         Flag indicating if the children should call linearize on their linear solvers.
     #     """
     #     # define this for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
-    #     om_dump_indent(self, f"{self.msginfo}: _linearize, do nothing")
+    #     # om_dump_indent(self, f"{self.msginfo}: _linearize, do nothing")
     #     self._get_jacobian()
 
     def _apply_nonlinear(self):

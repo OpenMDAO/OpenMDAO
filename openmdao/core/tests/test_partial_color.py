@@ -372,7 +372,7 @@ class TestColoringExplicit(unittest.TestCase):
                 prob = Problem(name=f'test_partials_explicit_{method}_'
                                f'{isplit}_{osplit}_{sparse_partials}')
                 model = prob.model
-    
+
                 sparsity = setup_sparsity(_BIGMASK)
                 indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'comp')
                 model.add_subsystem('indeps', indeps)
@@ -380,14 +380,14 @@ class TestColoringExplicit(unittest.TestCase):
                                                                     isplit=isplit, osplit=osplit,
                                                                     sparse_partials=sparse_partials))
                 comp.declare_coloring('x*', method=method)
-    
+
                 for conn in conns:
                     model.connect(*conn)
-    
+
                 prob.setup(mode='fwd')
                 prob.set_solver_print(level=0)
                 prob.run_model()
-    
+
                 comp.run_linearize()
                 prob.run_model()
                 start_nruns = comp._nruns
@@ -1644,13 +1644,11 @@ class TestStaticColoringParallelCS(unittest.TestCase):
                 [0, 1, 1, 0, 1, 1, 1]]
         )
 
-        om_dump('---------- bcast sparsity')
         if prob.comm.rank == 0:
             sparsity = setup_sparsity(mask)
             prob.comm.bcast(sparsity, root=0)
         else:
             sparsity = prob.comm.bcast(None, root=0)
-        om_dump('---------- bcast sparsity DONE')
 
         isplit = 2
         indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
@@ -1662,25 +1660,16 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         model.connect('indeps.x0', 'comp.x0')
         model.connect('indeps.x1', 'comp.x1')
 
-        om_dump('---------------- problem setup')
-
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
 
-        om_dump('--------------- run model')
-
         prob.run_model()
-        om_dump('--------------- run model DONE')
-
         coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
-        om_dump('--------------- compute_coloring DONE')
 
         comp._save_coloring(coloring)
-        om_dump('--------------- save_coloring DONE')
 
         # make sure coloring file exists by the time we try to load the spec
         prob.comm.barrier()
-        om_dump('--------------- barrier DONE')
 
         _clear_problem_names()
         prob = Problem(name=f'test_simple_partials_implicit_{method}')
@@ -1698,28 +1687,20 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         comp.declare_coloring(wrt='x*', method=method)
         comp.use_fixed_coloring()
 
-        om_dump('--------------- 2nd problem setup')
         prob.setup(check=False, mode='fwd')
         prob.set_solver_print(level=0)
-        om_dump('---------------  2nd problem run_model')
         prob.run_model()
-        om_dump('---------------  2nd problem run_model DONE')
 
         start_nruns = comp._nruns
-        om_dump('---------------  comp linearize')
         comp._linearize()   # colored
-        om_dump('---------------  comp linearize DONE')
         # number of runs = ncolors + number of outputs (only input columns were colored here)
         nruns = comp._nruns - start_nruns
         if comp._full_comm is not None:
             nruns = comp._full_comm.allreduce(nruns)
-        om_dump('---------------  allreduce DONE')
         self.assertEqual(nruns, 5 + sparsity.shape[0])
-        om_dump('---------------  assert check DONE')
 
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity, method)
-        om_dump('---------------  check_partial_matrix DONE')
 
     @parameterized.expand(['fd', 'cs'], name_func=lambda func, n, p: f'{func.__name__}_{p.args[0]}')
     def test_simple_partials_explicit(self, method):
@@ -1740,7 +1721,6 @@ class TestStaticColoringParallelCS(unittest.TestCase):
             prob.comm.bcast(sparsity, root=0)
         else:
             sparsity = prob.comm.bcast(None, root=0)
-        om_dump('---------------  sparsity bcast DONE')
 
         isplit = 2
         indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
@@ -1753,18 +1733,13 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         model.connect('indeps.x1', 'comp.x1')
 
         prob.setup(check=False, mode='fwd')
-        om_dump('---------------  setup DONE')
         prob.set_solver_print(level=0)
         prob.run_model()
-        om_dump('---------------  run_model DONE')
         coloring = comp._compute_coloring(wrt_patterns='x*', method=method)[0]
-        om_dump('---------------  compute_coloring DONE')
         comp._save_coloring(coloring)
-        om_dump('---------------  save_coloring DONE')
 
         # make sure coloring file exists by the time we try to load the spec
         prob.comm.barrier()
-        om_dump('---------------  barrier DONE')
 
         # now create a new problem and use the previously generated coloring
         _clear_problem_names()
@@ -1784,24 +1759,18 @@ class TestStaticColoringParallelCS(unittest.TestCase):
         comp.declare_coloring(wrt='x*', method=method)
         comp.use_fixed_coloring()
         prob.setup(check=False, mode='fwd')
-        om_dump('---------------  2nd prob setup DONE')
         prob.set_solver_print(level=0)
         prob.run_model()
-        om_dump('---------------  2nd prob run_model DONE')
 
         start_nruns = comp._nruns
         comp._linearize()
-        om_dump('---------------  comp linearize DONE')
         nruns = comp._nruns - start_nruns
         if comp._full_comm is not None:
             nruns = comp._full_comm.allreduce(nruns)
-        om_dump('---------------  allreduce DONE')
         self.assertEqual(nruns, 5)
-        om_dump('---------------  assert check DONE')
 
         jac = comp._jacobian._subjacs_info
         _check_partial_matrix(comp, jac, sparsity, method)
-        om_dump('---------------  check_partial_matrix DONE')
 
 
 if __name__ == '__main__':

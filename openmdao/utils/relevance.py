@@ -40,7 +40,7 @@ def get_relevance(model, of, wrt):
         of = {}
         wrt = {}
 
-    key = (id(model), tuple(sorted(wrt)), tuple(of))
+    key = (id(model), tuple(sorted(wrt)), tuple(sorted(of)))
     cache = model._problem_meta['relevance_cache']
     if key in cache:
         return cache[key]
@@ -654,7 +654,7 @@ class Relevance(object):
         ------
         None
         """
-        if self._active is False:  # if already inactive from higher level, don't change it
+        if not self._active:  # if already inactive from higher level, don't change it
             yield
         else:
             save = self._active
@@ -693,6 +693,26 @@ class Relevance(object):
             return self._apply_node_filter(names, _is_output)
         else:
             return set()
+
+    def current_relevant_vars(self, inputs=True, outputs=True):
+        """
+        Return a set of variables relevant to the current seeds.
+
+        Parameters
+        ----------
+        inputs : bool
+            If True, include inputs.
+        outputs : bool
+            If True, include outputs.
+
+        Returns
+        -------
+        set
+            Set of names of the relevant variables.
+        """
+        return self._apply_node_filter(self._rel_names_iter(self._current_rel_varray,
+                                                            self._var2idx),
+                                       _get_io_filter(inputs, outputs))
 
     @contextmanager
     def all_seeds_active(self):
