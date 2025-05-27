@@ -150,6 +150,7 @@ class NewtonSolver(NonlinearSolver):
         """
         Perform any required linearization operations such as matrix factorization.
         """
+        om_dump_indent(self._system(),f"{self._system().msginfo}: NewtonSolver._linearize")
         if self.linear_solver is not None:
             self.linear_solver._linearize()
 

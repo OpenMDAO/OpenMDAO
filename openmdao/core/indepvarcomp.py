@@ -6,6 +6,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.general_utils import make_set, ensure_compatible
 from openmdao.recorders.recording_iteration_stack import Recording
+from openmdao.jacobians.block_jacobian import BlockJacobian
 
 
 class IndepVarComp(ExplicitComponent):
@@ -130,6 +131,18 @@ class IndepVarComp(ExplicitComponent):
                     desc="User defined tags that can be used to filter what gets listed when "
                          "calling list_outputs.")
 
+    def _choose_jac_type(self):
+        """
+        Choose the Jacobian type based on the jac_type option.
+
+        Returns
+        -------
+        Jacobian
+            The Jacobian object.
+        """
+        # FIXME: currently ComponentJacobian doens't work with IndepVarComp
+        return BlockJacobian(self)
+
     def _configure_check(self):
         """
         Do any error checking on i/o configuration.
@@ -225,7 +238,8 @@ class IndepVarComp(ExplicitComponent):
             Flag indicating if the children should call linearize on their linear solvers.
         """
         # define this for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
-        self._get_jacobian()
+        om_dump_indent(self, f"{self.msginfo}: _linearize, do nothing")
+        pass
 
     def _apply_nonlinear(self):
         """

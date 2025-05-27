@@ -42,9 +42,6 @@ class BlockJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        if self._update_needed:
-            self._update(system)
-
         randgen = self._randgen
 
         d_out_names = d_outputs._names

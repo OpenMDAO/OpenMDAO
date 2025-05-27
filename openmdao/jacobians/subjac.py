@@ -59,8 +59,15 @@ class Subjac(object):
         Unit conversion factor for the subjacobian.
     src : str or None
         Source name for the subjacobian.
-    shape : tuple
-        Shape of the subjacobian.
+    dense : bool
+        Whether the subjacobian is dense.
+    nrows : int
+        Number of rows in the subjacobian.
+    ncols : int
+        Number of columns in the subjacobian.
+    parent_ncols : int
+        Number of columns this subjacobian occupies in the parent jacobian.  If this subjac has
+        src_indices then parent_ncols may differ from ncols.
     """
 
     def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None,
@@ -91,10 +98,16 @@ class Subjac(object):
         self.info = info
         self.row_slice = row_slice
         self.col_slice = col_slice
+        self.nrows = row_slice.stop - row_slice.start
+        self.ncols = info['shape'][1]
+        self.parent_ncols = col_slice.stop - col_slice.start
+        if src_indices is not None:
+            src_indices = src_indices.shaped_array(flat=True)
+            om_dump(f"Subjac {key}: src_indices: {src_indices}")
         self.src_indices = src_indices
         self.factor = factor
         self.src = src
-        self.shape = (row_slice.stop - row_slice.start, col_slice.stop - col_slice.start)
+        self.dense = False
 
         self._map_functions(wrt_is_input)
         self._init_val()
@@ -108,10 +121,11 @@ class Subjac(object):
         str
             String representation of the subjacobian.
         """
-        return (f"{type(self).__name__}(key={self.key}, shape={self.shape}, "
-                f"row_slice={self.row_slice}, col_slice={self.col_slice}, "
+        return (f"{type(self).__name__}(key={self.key}, nrows={self.nrows}, ncols={self.ncols}, "
+                f"parent_ncols={self.parent_ncols}, row_slice={self.row_slice}, "
+                f"col_slice={self.col_slice}, "
                 f"src_indices={self.src_indices}, factor={self.factor}, src={self.src}, "
-                f"info:\n{pformat(self.info)})")
+                f"info:\n{pformat(self.info)})\n")
 
     @staticmethod
     def get_subjac_class(pattern_meta):
@@ -253,6 +267,7 @@ class DenseSubjac(Subjac):
     """
 
     def _init_val(self):
+        self.dense = True
         if self.info['val'] is None:
             self.info['val'] = np.zeros(self.info['shape'])
 
@@ -351,8 +366,8 @@ class DenseSubjac(Subjac):
         if np.isscalar(val):
             self.info['val'][:] = val
         else:
+            myval = self.info['val']
             try:
-                myval = self.info['val']
                 myval[:] = np.atleast_2d(val).reshape(myval.shape)
             except ValueError as err:
                 if val.size == 1:  # allow for backwards compatability
@@ -411,41 +426,44 @@ class DenseSubjac(Subjac):
         int
             Size of the subjacobian in COO format.
         """
-        if self.src_indices is None:
-            ncols = self.shape[1]
-        else:
-            ncols = self.src_indices.indexed_src_size
-        return self.shape[0] * ncols
+        return self.nrows * self.ncols
 
-    def cols(self):
+    def as_coo_info(self, full=False, randgen=None):
         """
-        Get the COO column indices of the subjacobian.
+        Get the subjac as COO data.
+
+        This is here for completeness, but it shouldn't normally be called.
+
+        Parameters
+        ----------
+        full : bool
+            Whether to offset the row and column indices by the row and column slice start so the
+            rows and columns will then represent the rows and columns of the full jacobian.
+        randgen : RandomNumberGenerator or None
+            Random number generator.
 
         Returns
         -------
-        ndarray
-            COO column indices of the subjacobian.
+        tuple
+            (data, rows, cols).
         """
+        nrows, ncols = self.info['shape']
+        roffset = self.row_slice.start if full else 0
+        size = self.row_slice.stop - self.row_slice.start
+        a = np.arange(roffset, roffset + size).reshape((nrows, 1))
+        rows = np.repeat(a, ncols, axis=1).ravel()
+
+        coffset = self.col_slice.start if full else 0
         if self.src_indices is None:
-            colrange = range(self.col_slice.stop - self.col_slice.start)
+            colrange = range(coffset, coffset + ncols)
         else:
-            colrange = self.src_indices.shaped_array(flat=True)
+            colrange = self.src_indices
+            if full:
+                colrange = colrange + coffset
 
-        return np.tile(colrange, self.shape[0])
+        cols = np.tile(colrange, nrows)
 
-    def rows(self):
-        """
-        Get the COO row indices of the subjacobian.
-
-        Returns
-        -------
-        ndarray
-            COO row indices of the subjacobian.
-        """
-        nrows = self.shape[0]
-        a = np.arange(self.row_slice.stop - self.row_slice.start).reshape((nrows, 1))
-        repeats = self.shape[1] if self.src_indices is None else self.src_indices.indexed_src_size
-        return np.repeat(a, repeats, axis=1).ravel()
+        return self.get_val(randgen).ravel(), rows, cols
 
 
 class SparseSubjac(Subjac):
@@ -530,33 +548,17 @@ class SparseSubjac(Subjac):
         """
         return self.info['val'].toarray()
 
-    def rows(self):
-        """
-        Get the COO row indices of the subjacobian.
-
-        Returns
-        -------
-        ndarray
-            COO row indices of the subjacobian.
-        """
-        _, rows, _ = self.as_coo_info()
-        return rows
-
-    def cols(self):
-        """
-        Get the COO column indices of the subjacobian.
-
-        Returns
-        -------
-        ndarray
-            COO column indices of the subjacobian.
-        """
-        _, _, cols = self.as_coo_info()
-        return cols
-
-    def as_coo_info(self):
+    def as_coo_info(self, full=False, randgen=None):
         """
         Get the subjac as COO data.
+
+        Parameters
+        ----------
+        full : bool
+            Whether to offset the row and column indices by the row and column slice start so the
+            rows and columns will then represent the rows and columns of the full jacobian.
+        randgen : RandomNumberGenerator or None
+            Random number generator.
 
         Returns
         -------
@@ -564,13 +566,23 @@ class SparseSubjac(Subjac):
             (data, rows, cols).
         """
         coo = self.info['val'].tocoo(copy=True)
-        if self.src_indices is None:
-            return coo.data, coo.row, coo.col
+        row = coo.row
+        col = coo.col
+
+        if randgen is None:
+            data = coo.data
         else:
-            # if src_indices is not None, we are part of the dr/do matrix, so
-            # columns correspond to source variables and we have to convert columns using
-            # src_indices.
-            return coo.data, coo.row, self.src_indices.shaped_array(flat=True)[coo.col]
+            data = randgen.random(coo.data.size)
+            data += 1.0
+
+        if self.src_indices is not None:
+            col = self.src_indices[col]
+
+        if full:
+            row = row + self.row_slice.start
+            col = col + self.col_slice.start
+
+        return data, row, col
 
     def get_coo_data_size(self):
         """
@@ -673,9 +685,17 @@ class COOSubjac(SparseSubjac):
 
         return coo_matrix((randval, (submat.row, submat.col)), shape=self.info['shape'])
 
-    def as_coo_info(self):
+    def as_coo_info(self, full=False, randgen=None):
         """
         Get the subjac as COO data.
+
+        Parameters
+        ----------
+        full : bool
+            Whether to offset the row and column indices by the row and column slice start so the
+            rows and columns will then represent the rows and columns of the full jacobian.
+        randgen : RandomNumberGenerator or None
+            Random number generator.
 
         Returns
         -------
@@ -683,13 +703,21 @@ class COOSubjac(SparseSubjac):
             (data, rows, cols).
         """
         coo = self.info['val']
-        if self.src_indices is None:
-            return coo.data, coo.row, coo.col
-        else:
-            # if src_indices is not None, we are part of the dr/do matrix, so
-            # columns correspond to source variables and we have to convert columns using
-            # src_indices.
-            return coo.data, coo.row, self.src_indices.shaped_array(flat=True)[coo.col]
+        data, rows, cols = coo.data, coo.row, coo.col
+        if randgen is not None:
+            data = randgen.random(data.size)
+            data += 1.0
+
+        if self.src_indices is not None:
+            # if src_indices is not None, we are part of the dr/do matrix, so columns correspond
+            # to source variables and we have to convert columns using src_indices.
+            cols = self.src_indices[cols]
+
+        if full:
+            rows = rows + self.row_slice.start
+            cols = cols + self.col_slice.start
+
+        return data, rows, cols
 
     def set_col(self, icol, column, uncovered_threshold=None):
         """
@@ -1001,23 +1029,35 @@ class OMCOOSubjac(COOSubjac):
         """
         return self.info['val'].size
 
-    def as_coo_info(self):
+    def as_coo_info(self, full=False, randgen=None):
         """
         Get the subjac as COO data.
+
+        Parameters
+        ----------
+        full : bool
+            Whether to offset the row and column indices by the row and column slice start so the
+            rows and columns will then represent the rows and columns of the full jacobian.
+        randgen : RandomNumberGenerator or None
+            Random number generator.
 
         Returns
         -------
         tuple
             (data, rows, cols).
         """
-        if self.src_indices is None:
-            return self.info['val'], self.info['rows'], self.info['cols']
-        else:
-            # if src_indices is not None, we are part of the dr/do matrix, so
-            # columns correspond to source variables and we have to convert columns using
-            # src_indices.
-            return self.info['val'], self.info['rows'], \
-                self.src_indices.shaped_array(flat=True)[self.info['cols']]
+        data, rows, cols = self.get_val(randgen), self.info['rows'], self.info['cols']
+
+        if self.src_indices is not None:
+            # if src_indices is not None, we are part of the dr/do matrix, so columns correspond
+            # to source variables and we have to convert columns using src_indices.
+            cols = self.src_indices[cols]
+
+        if full:
+            rows = rows + self.row_slice.start
+            cols = cols + self.col_slice.start
+
+        return data, rows, cols
 
     def get_val(self, randgen=None):
         """
@@ -1070,11 +1110,11 @@ class OMCOOSubjac(COOSubjac):
 
     def _matvec_fwd(self, vec, randgen=None):
         return np.bincount(self.info['rows'], vec[self.info['cols']] * self.get_val(randgen),
-                           minlength=self.shape[0])
+                           minlength=self.nrows)
 
     def _matvec_rev(self, vec, randgen=None):
         return np.bincount(self.info['cols'], vec[self.info['rows']] * self.get_val(randgen),
-                           minlength=self.shape[1])
+                           minlength=self.parent_ncols)
 
 
 class DiagonalSubjac(SparseSubjac):
@@ -1106,9 +1146,9 @@ class DiagonalSubjac(SparseSubjac):
         Initialize the val in the subjacobian's metadata, converting to correct shape if necessary.
         """
         if self.info['val'] is None:
-            self.info['val'] = np.zeros(self.shape[0])
+            self.info['val'] = np.zeros(self.nrows)
         elif np.isscalar(self.info['val']):
-            self.info['val'] = np.full(self.shape[0], self.info['val'])
+            self.info['val'] = np.full(self.nrows, self.info['val'])
 
     @classmethod
     def _update_instance_meta(cls, meta, system, key):
@@ -1164,30 +1204,35 @@ class DiagonalSubjac(SparseSubjac):
         """
         return self.info['val'].size
 
-    def rows(self):
+    def as_coo_info(self, full=False, randgen=None):
         """
-        Get the COO row indices of the subjacobian.
+        Get the subjac as COO data.
+
+        Parameters
+        ----------
+        full : bool
+            Whether to offset the row and column indices by the row and column slice start so the
+            rows and columns will then represent the rows and columns of the full jacobian.
+        randgen : RandomNumberGenerator or None
+            Random number generator.
 
         Returns
         -------
-        ndarray
-            COO row indices of the subjacobian.
+        tuple
+            (data, rows, cols).
         """
-        return np.arange(self.shape[0])
-
-    def cols(self):
-        """
-        Get the COO column indices of the subjacobian.
-
-        Returns
-        -------
-        ndarray
-            COO column indices of the subjacobian.
-        """
-        if self.src_indices is None:
-            return np.arange(self.shape[0])
+        if full:
+            rows = np.arange(self.row_slice.start, self.row_slice.stop)
+            if self.src_indices is None:
+                cols = np.arange(self.col_slice.start, self.col_slice.stop)
+            else:
+                cols = self.src_indices + self.col_slice.start
         else:
-            return self.src_indices.shaped_array(flat=True)[np.arange(self.shape[0])]
+            rows = cols = np.arange(self.nrows)
+            if self.src_indices is not None:
+                cols = self.src_indices
+
+        return self.get_val(randgen), rows, cols
 
     def get_val(self, randgen=None):
         """
@@ -1315,6 +1360,7 @@ class ZeroSubjac(Subjac):
         dict
             Updated instance metadata.
         """
+        raise RuntimeError("FOO")
         meta['val'] = coo_matrix((np.zeros(0), (np.zeros(0, dtype=int), np.zeros(0, dtype=int))),
                                  shape=meta['shape'])
         return meta
@@ -1344,6 +1390,7 @@ class ZeroSubjac(Subjac):
         ndarray
             Value of the subjacobian.
         """
+        raise RuntimeError("FOO")
         return np.zeros(0)
 
     get_as_coo_data = get_val
@@ -1357,29 +1404,7 @@ class ZeroSubjac(Subjac):
         ndarray
             Subjacobian as a dense array.
         """
-        return np.zeros(self.shape)
-
-    def rows(self):
-        """
-        Get the COO row indices of the subjacobian.
-
-        Returns
-        -------
-        ndarray
-            COO row indices of the subjacobian.
-        """
-        return np.zeros(0)
-
-    def cols(self):
-        """
-        Get the COO column indices of the subjacobian.
-
-        Returns
-        -------
-        ndarray
-            COO column indices of the subjacobian.
-        """
-        return np.zeros(0)
+        return np.zeros(self.info['shape'])
 
     def set_val(self, val):
         """

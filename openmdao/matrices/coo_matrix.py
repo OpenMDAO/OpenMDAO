@@ -1,6 +1,5 @@
 """Define the COOmatrix class."""
 import numpy as np
-from numpy import ndarray
 from scipy.sparse import coo_matrix
 
 
@@ -24,6 +23,8 @@ class COOMatrix(Matrix):
     _matrix_T : sparse matrix
         Transpose of the matrix.  Only computed if needed for reverse mode for CSC or CSR
         matrices.
+    _coo_slices : dict
+        Dictionary of slices into the COO matrix data/rows/cols for each sub-jacobian.
     """
 
     def __init__(self, submats):
@@ -33,44 +34,7 @@ class COOMatrix(Matrix):
         super().__init__(submats)
         self._coo = None
         self._matrix_T = None
-
-    def _build_coo(self, dtype=float):
-        """
-        Allocate the data, rows, and cols for the COO matrix.
-
-        Parameters
-        ----------
-        dtype : dtype
-            The dtype of the matrix.
-
-        Returns
-        -------
-        (ndarray, ndarray, ndarray)
-            data, rows, cols that can be used to construct a COO matrix.
-        """
-        submats = self._submats
-        key_ranges = {}
-
-        # compute the ranges of the subjacs within the COO data/rows/cols arrays
-        start = end = 0
-        for key, submat in submats.items():
-            end += submat.get_coo_data_size()
-            key_ranges[key] = (start, end, submat)
-            start = end
-
-        rows = np.empty(end, dtype=INT_DTYPE)
-        cols = np.empty(end, dtype=INT_DTYPE)
-        data = np.zeros(end, dtype=dtype)
-
-        metadata = self._metadata
-        for key, (start, end, submat) in key_ranges.items():
-            row_offset = submat.row_slice.start
-            col_offset = submat.col_slice.start
-            rows[start:end] = submat.rows() + row_offset
-            cols[start:end] = submat.cols() + col_offset
-            metadata[key] = (slice(start, end), submat.factor)
-
-        return data, rows, cols
+        self._coo_slices = {}
 
     def _build(self, num_rows, num_cols, dtype=float):
         """
@@ -85,32 +49,27 @@ class COOMatrix(Matrix):
         dtype : dtype
             The dtype of the matrix.
         """
-        data, rows, cols = self._build_coo(dtype)
+        submats = self._submats
+        self._coo_slices = {}
+
+        rows = []
+        cols = []
+
+        # compute the ranges of the subjacs within the COO data/rows/cols arrays
+        start = end = 0
+        for key, submat in submats.items():
+            _, r, c = submat.as_coo_info(full=True)
+            end += r.size
+            rows.append(r)
+            cols.append(c)
+            self._coo_slices[key] = slice(start, end)
+            start = end
+
+        rows = np.concatenate(rows, dtype=INT_DTYPE)
+        cols = np.concatenate(cols, dtype=INT_DTYPE)
+        data = np.zeros(end, dtype=dtype)
+
         self._matrix = self._coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
-
-    def _update_submat(self, subjac, randgen=None):
-        """
-        Update the values of a sub-jacobian.
-
-        Parameters
-        ----------
-        subjac : Subjac
-            the sub-jacobian
-        randgen : RandomState or None
-            Random number generator.
-        """
-        jac = subjac.get_as_coo_data(randgen)
-        idxs, factor = self._metadata[subjac.key]
-        if isinstance(jac, ndarray):
-            if factor is None:
-                self._matrix.data[idxs] = jac.flat
-            else:
-                self._matrix.data[idxs] = jac.ravel() * factor
-        else:  # sparse
-            if factor is None:
-                self._matrix.data[idxs] = jac.data
-            else:
-                self._matrix.data[idxs] = jac.data * factor
 
     def transpose(self):
         """
@@ -173,3 +132,22 @@ class COOMatrix(Matrix):
             Dense array representation of the matrix.
         """
         return self._matrix.toarray()
+
+    def _update_from_submat(self, subjac, randgen):
+        """
+        Update the matrix from a sub-jacobian.
+        """
+        self._coo.data[self._coo_slices[subjac.key]] = subjac.get_as_coo_data(randgen)
+        if subjac.factor is not None:
+            self._coo.data[self._coo_slices[subjac.key]] *= subjac.factor
+
+    def todense(self):
+        """
+        Return a dense version of the matrix.
+
+        Returns
+        -------
+        ndarray
+            Dense array representation of the matrix.
+        """
+        return self._coo.toarray()

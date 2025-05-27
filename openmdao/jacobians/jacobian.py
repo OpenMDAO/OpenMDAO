@@ -46,22 +46,22 @@ class Jacobian(object):
         Maps variable names to column indices and vice versa.
     _problem_meta : dict
         Problem metadata.
-    _msginfo : str
-        Message info.
     _resolver : <Resolver>
         Resolver for this system.
-    _update_needed : bool
-        Whether the jacobian needs to be updated.
     _output_slices : dict
         Maps output names to slices of the output vector.
     _input_slices : dict
         Maps input names to slices of the input vector.
     _has_approx : bool
         Whether the system has an approximate jacobian.
-    _is_explicitcomp : bool
-        Whether the system is an explicit component.
+    _explicit_comp : bool
+        Whether the system is explicit.
     _ordered_subjac_keys : list
         List of subjac keys in order of appearance.
+    _initialized : bool
+        Whether the jacobian has been initialized.
+    shape : tuple
+        Full shape of the jacobian, including dr/do and dr/di.
     """
 
     def __init__(self, system):
@@ -75,14 +75,39 @@ class Jacobian(object):
         self._abs_keys = {}
         self._col_mapper = None
         self._problem_meta = system._problem_meta
-        self._msginfo = system.msginfo
         self._resolver = system._resolver
-        self._update_needed = True
         self._output_slices = _get_vec_slices(system, 'output')
         self._input_slices = _get_vec_slices(system, 'input')
         self._has_approx = system._has_approx
         self._is_explicitcomp = system.is_explicit(is_comp=True)
         self._ordered_subjac_keys = None
+        self._initialized = False
+
+        self.shape = (len(system._outputs), len(system._outputs) + len(system._inputs))
+
+    def _pre_update(self):
+        """
+        Pre-update the jacobian.
+        """
+        #self._get_subjacs()
+        pass
+
+    def _post_update(self):
+        """
+        Post-update the jacobian.
+        """
+        pass
+
+    def _update(self, system):
+        """
+        Read the user's sub-Jacobians and set into the global matrix.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+        """
+        pass
 
     def create_subjac(self, abs_key, meta):
         """
@@ -132,10 +157,8 @@ class Jacobian(object):
         dict
             Dictionary of subjacs keyed by absolute names.
         """
-        if self._subjacs is None:
+        if not self._initialized:
             self._subjacs = {}
-            out_slices = self._output_slices
-            in_slices = self._input_slices
             if self._has_approx:
                 try:
                     relevance = self._problem_meta['relevance']
@@ -146,11 +169,17 @@ class Jacobian(object):
                 relevance = None
 
             with relevance.all_seeds_active() if relevance else do_nothing_context():
+                out_slices = self._output_slices
+                in_slices = self._input_slices
                 for key, meta in self._subjacs_info.items():
                     of, wrt = key
                     if of in out_slices and (wrt in in_slices or wrt in out_slices):
                         if relevance is None or is_relevant(wrt):
                             self._subjacs[key] = self.create_subjac(key, meta)
+
+            om_dump_indent(self._system(), f"{type(self).__name__}: {self._system().msginfo}: new subjacs:")
+            om_dump_indent(self._system(), f"    {[(s.key, s.info['val']) for s in self._subjacs.values()]}")
+            self._initialized = True
 
         return self._subjacs
 
@@ -180,7 +209,7 @@ class Jacobian(object):
         try:
             return self._subjacs[self._get_abs_key(key)].info
         except KeyError:
-            raise KeyError(f'{self.msginfo}: Variable name pair {key} not found.')
+            raise KeyError(f'Variable name pair {key} not found.')
 
     def __contains__(self, key):
         """
@@ -215,7 +244,7 @@ class Jacobian(object):
         try:
             return self._subjacs[self._get_abs_key(key)].get_val()
         except KeyError:
-            raise KeyError(f'{self.msginfo}: Variable name pair {key} not found.')
+            raise KeyError(f'Variable name pair {key} not found.')
 
     def __setitem__(self, key, subjac):
         """
@@ -228,18 +257,17 @@ class Jacobian(object):
         subjac : float or ndarray or sparse matrix
             sub-Jacobian as a scalar, array, or sparse matrix.
         """
-        self._update_needed = True
         abs_key = self._get_abs_key(key)
         if abs_key is None:
-            raise KeyError(f'{self.msginfo}: Variable name pair {key} not found.')
+            raise KeyError(f'Variable name pair {key} not found.')
 
         # You can only set declared subjacobians.
         try:
             self._subjacs[abs_key].set_val(subjac)
         except KeyError:
-            raise KeyError(f'{self.msginfo}: Variable name pair {key} must first be declared.')
+            raise KeyError(f'Variable name pair {key} must first be declared.')
         except ValueError as err:
-            raise ValueError(f"{self.msginfo}: for subjacobian {key}: {err}")
+            raise ValueError(f"For subjacobian {key}: {err}")
 
     def __iter__(self):
         """
@@ -273,35 +301,9 @@ class Jacobian(object):
             yield key, subjac.get_val()
 
     @property
-    def msginfo(self):
-        """
-        Return info to prepend to messages.
-
-        Returns
-        -------
-        str
-            Info to prepend to messages.
-        """
-        if self._msginfo is None:
-            return type(self).__name__
-        return '{} in {}'.format(type(self).__name__, self._msginfo)
-
-    @property
     def _randgen(self):
         if self._problem_meta['randomize_subjacs']:
             return self._problem_meta['coloring_randgen']
-
-    def _update(self, system):
-        """
-        Read the user's sub-Jacobians and set into the global matrix.
-
-        Parameters
-        ----------
-        system : System
-            System that is updating this jacobian.
-        """
-        self._get_subjacs()
-        self._update_needed = False
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -380,8 +382,6 @@ class Jacobian(object):
         column : ndarray
             Column value.
         """
-        self._update_needed = True
-
         if self._col_mapper is None:
             self._setup_index_maps(system)
 
@@ -455,10 +455,10 @@ class Jacobian(object):
         """
         Revert all subjacs back to the way they were as declared by the user.
         """
+        self._initialized = False
         self._subjacs = None
         self._get_subjacs(system)
         self._col_mapper = None  # force recompute of internal index maps on next set_col
-        self._update_needed = True  # subjacs have been updated, so full jac may need to be updated
 
     def _get_ordered_subjac_keys(self, system, use_relevance=True):
         """
@@ -573,6 +573,12 @@ class SplitJacobian(Jacobian):
     _dr_di_subjacs : dict
         Dictionary containing subjacobians of residuals with respect to inputs, keyed by (of, wrt)
         tuples containing absolute names.
+    _dr_do_mtx : Matrix
+        Matrix containing the dr/do subjacs.
+    _dr_di_mtx : Matrix
+        Matrix containing the dr/di subjacs.
+    _mask_caches : dict
+        Dictionary containing mask caches for the dr/di matrix.
     """
 
     def __init__(self, system):
@@ -585,8 +591,102 @@ class SplitJacobian(Jacobian):
             The system that owns this jacobian.
         """
         super().__init__(system)
-        self._dr_do_subjacs = None
-        self._dr_di_subjacs = None
+        self._dr_do_subjacs = {}
+        self._dr_di_subjacs = {}
+        self._dr_do_mtx = None
+        self._dr_di_mtx = None
+        self._mask_caches = {}
+
+    def get_dr_do_matrix(self):
+        """
+        Get the dr/do matrix.
+
+        Returns
+        -------
+        Matrix
+            The dr/do matrix.
+        """
+        return self._dr_do_mtx._matrix
+
+    def get_dr_di_matrix(self):
+        """
+        Get the dr/di matrix.
+
+        Returns
+        -------
+        Matrix
+            The dr/di matrix.
+        """
+        return self._dr_di_mtx._matrix
+
+    def _pre_update(self):
+        """
+        Pre-update the jacobian.
+        """
+        if self._dr_do_mtx is not None:
+            self._dr_do_mtx._pre_update()
+        if self._dr_di_mtx is not None:
+            self._dr_di_mtx._pre_update()
+
+    def _post_update(self):
+        """
+        Post-update the jacobian.
+        """
+        if self._dr_do_mtx is not None:
+            self._dr_do_mtx._post_update()
+        if self._dr_di_mtx is not None:
+            self._dr_di_mtx._post_update()
+
+    def _update(self, system):
+        """
+        Update our matrices with all of our sub-Jacobians.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+        """
+        # if randgen is not None, we're computing the sparsity pattern
+        randgen = self._randgen
+
+        if self._dr_do_mtx is not None:
+            self._update_matrix(self._dr_do_mtx, randgen)
+
+        if self._dr_di_mtx is not None:
+            self._update_matrix(self._dr_di_mtx, randgen)
+
+        # print(f"{system.msginfo}: UPDATED\n{self.todense()}")
+
+        if self._under_complex_step:
+            # If we create a new _dr_do_mtx while under complex step, we need to convert it to a
+            # complex data type.
+            if self._dr_do_mtx is not None:
+                self._dr_do_mtx.set_complex_step_mode(True)
+
+    def todense(self):
+        """
+        Return a dense version of the jacobian.
+
+        Returns
+        -------
+        ndarray
+            Dense version of the jacobian.
+        """
+        lst = []
+        if self._is_explicitcomp:
+            lst.append(-np.eye(self.shape[0]))
+        elif self._dr_do_mtx is not None:
+            lst.append(self._dr_do_mtx.todense())
+        if self._dr_di_mtx is not None:
+            lst.append(self._dr_di_mtx.todense())
+        if len(lst) == 1:
+            return lst[0]
+        return np.hstack(lst)
+
+    def _get_subjacs(self, system=None):
+        if not self._initialized:
+            self._get_split_subjacs(system, self._is_explicitcomp)
+        return self._subjacs
 
     def _get_split_subjacs(self, system, is_explicit_comp=False):
         """
@@ -606,7 +706,7 @@ class SplitJacobian(Jacobian):
         """
         is_top = system.pathname == ''
 
-        if self._dr_do_subjacs is None:
+        if not self._initialized:
             self._dr_do_subjacs = {}
             dr_di_subjacs = {}
             abs2meta_out = system._var_abs2meta['output']
@@ -626,8 +726,7 @@ class SplitJacobian(Jacobian):
                     continue
                 if wrt in output_slices:
                     self._dr_do_subjacs[abs_key] = \
-                        self.create_dr_do_subjac(system._conn_global_abs_in2out, abs_key, wrt,
-                                                 meta)
+                        self.create_dr_do_subjac(conns, abs_key, wrt, meta)
                 elif wrt in input_slices:
                     if wrt in conns and not is_explicit_comp:  # internally connected input
                         # For the subjacs that make up the dr/do jacobian, the column entries
@@ -653,20 +752,20 @@ class SplitJacobian(Jacobian):
                         src_indices = abs2meta_in[wrt]['src_indices']
 
                         self._dr_do_subjacs[abs_key] = \
-                            self.create_dr_do_subjac(system._conn_global_abs_in2out, abs_key,
-                                                     src, meta, src_indices, factor)
+                            self.create_dr_do_subjac(conns, abs_key, src, meta, src_indices, factor)
                     elif not is_top:  # input is connected to something outside current system
                         dr_di_subjacs[abs_key] = self.create_subjac(abs_key, meta)
-
-            if not dr_di_subjacs:
-                dr_di_subjacs = None
 
             self._dr_di_subjacs = dr_di_subjacs
 
             # also populate regular subjacs dict for use with Jacobian class methods
-            self._subjacs = self._dr_do_subjacs.copy()
-            if dr_di_subjacs is not None:
-                self._subjacs.update(dr_di_subjacs)
+            self._subjacs = {}
+            self._subjacs.update(self._dr_do_subjacs)
+            self._subjacs.update(self._dr_di_subjacs)
+
+            self._initialized = True
+            om_dump_indent(self._system(), f"{type(self).__name__}: {self._system().msginfo}: new subjacs:")
+            om_dump_indent(self._system(), f"    {[(s.key, s.info['val']) for s in self._subjacs.values()]}")
 
         return self._dr_do_subjacs, self._dr_di_subjacs
 
@@ -674,13 +773,27 @@ class SplitJacobian(Jacobian):
         """
         Revert all subjacs back to the way they were as declared by the user.
         """
+        self._initialized = False
         self._subjacs = None
-        self._dr_do_subjacs = None
-        self._dr_di_subjacs = None
+        self._dr_do_subjacs = {}
+        self._dr_di_subjacs = {}
         self._get_split_subjacs(system, self._is_explicitcomp)
 
         self._col_mapper = None  # force recompute of internal index maps on next set_col
-        self._update_needed = True
+
+    def _update_matrix(self, matrixobj, randgen):
+        """
+        Update a matrix object with the new sub-Jacobian data.
+
+        Parameters
+        ----------
+        matrixobj : <Matrix>
+            Matrix object to update.
+        randgen : <RandGen>
+            Random number generator.
+        """
+        for subjac in matrixobj._submats.values():
+            matrixobj._update_from_submat(subjac, randgen)
 
     def create_dr_do_subjac(self, conns, abs_key, src, meta, src_indices=None, factor=None):
         """

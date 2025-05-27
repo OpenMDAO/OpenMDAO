@@ -319,12 +319,11 @@ class DirectSolver(LinearSolver):
         Perform factorization.
         """
         system = self._system()
+        om_dump_indent(system, f"{system.msginfo}: DirectSolver._linearize")
         nproc = system.comm.size
 
         if system._get_assembled_jac() is not None:
-            if system._assembled_jac._update_needed:
-                system._assembled_jac._update(system)
-            matrix = system._assembled_jac._dr_do_mtx._matrix
+            matrix = system._assembled_jac.get_dr_do_matrix()
 
             if matrix is None:
                 # this happens if we're not rank 0 when using owned_sizes
@@ -398,9 +397,7 @@ class DirectSolver(LinearSolver):
         nproc = system.comm.size
 
         if system._get_assembled_jac() is not None:
-            if system._assembled_jac._update_needed:
-                system._assembled_jac._update(system)
-            matrix = system._assembled_jac._dr_do_mtx._matrix
+            matrix = system._assembled_jac.get_dr_do_matrix()
 
             if matrix is None:
                 # This happens if we're not rank 0 and owned_sizes are being used

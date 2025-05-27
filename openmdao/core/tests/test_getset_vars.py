@@ -188,18 +188,18 @@ class TestGetSetVariables(unittest.TestCase):
         # d(output)/d(input)
         with self.assertRaises(KeyError) as cm:
             jac['y', 'x'] = 5.0
-        self.assertEqual(cm.exception.args[0], "DenseJacobian in 'g' <class Group>: Variable name pair ('y', 'x') not found.")
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'x') not found.")
         with self.assertRaises(KeyError) as cm:
             jac['y', 'x']
-        self.assertEqual(cm.exception.args[0], "DenseJacobian in 'g' <class Group>: Variable name pair ('y', 'x') not found.")
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'x') not found.")
 
         # d(output)/d(output)
         with self.assertRaises(KeyError) as cm:
             jac['y', 'y'] = 5.0
-        self.assertEqual(cm.exception.args[0], "DenseJacobian in 'g' <class Group>: Variable name pair ('y', 'y') not found.")
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'y') not found.")
         with self.assertRaises(KeyError) as cm:
             jac['y', 'y']
-        self.assertEqual(cm.exception.args[0], "DenseJacobian in 'g' <class Group>: Variable name pair ('y', 'y') not found.")
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'y') not found.")
 
 
     def test_with_promotion_errors(self):
@@ -222,7 +222,7 @@ class TestGetSetVariables(unittest.TestCase):
         p.final_setup()
 
         g._get_jacobian()
-        
+
         # -------------------------------------------------------------------
 
         msg1 = "'g' <class Group>: Variable name '{}' not found."

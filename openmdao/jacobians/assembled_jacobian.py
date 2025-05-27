@@ -34,65 +34,18 @@ class AssembledJacobian(SplitJacobian):
         Initialize all attributes.
         """
         super().__init__(system)
-        self._mask_caches = {}
+
         drdo_subjacs, drdi_subjacs = self._get_split_subjacs(system)
-
-        self._dr_do_mtx = drdo_mtx = matrix_class(drdo_subjacs)
-
         out_size = len(system._outputs)
-        if system.under_complex_step:
-            dtype = complex
-        else:
-            dtype = float
 
-        drdo_mtx._build(out_size, out_size, dtype)
+        dtype = complex if system.under_complex_step else float
+
+        self._dr_do_mtx = matrix_class(drdo_subjacs)
+        self._dr_do_mtx._build(out_size, out_size, dtype)
 
         if drdi_subjacs:
             self._dr_di_mtx = matrix_class(drdi_subjacs)
             self._dr_di_mtx._build(out_size, len(system._dinputs), dtype)
-        else:
-            self._dr_di_mtx = None
-
-    def _update_matrix(self, matrixobj, subjacs, randgen):
-        """
-        Update a matrix object with the new sub-Jacobians.
-
-        Parameters
-        ----------
-        matrixobj : <Matrix>
-            Matrix object to update.
-        subjacs : dict
-            Dictionary of sub-Jacobians.
-        randgen : <RandGen>
-            Random number generator.
-        """
-        matrixobj._pre_update()
-        for subjac in subjacs.values():
-            matrixobj._update_submat(subjac, randgen)
-        matrixobj._post_update()
-
-    def _update(self, system):
-        """
-        Read the user's sub-Jacobians and set into the global matrix.
-
-        Parameters
-        ----------
-        system : System
-            System that is updating this jacobian.
-        """
-        self._update_needed = False
-        randgen = self._randgen
-        drdo_subjacs, drdi_subjacs = self._get_split_subjacs(system)
-
-        self._update_matrix(self._dr_do_mtx, drdo_subjacs, randgen)
-
-        if drdi_subjacs:
-            self._update_matrix(self._dr_di_mtx, drdi_subjacs, randgen)
-
-        if self._under_complex_step:
-            # If we create a new _dr_do_mtx while under complex step, we need to convert it to a
-            # complex data type.
-            self._dr_do_mtx.set_complex_step_mode(True)
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
@@ -111,9 +64,6 @@ class AssembledJacobian(SplitJacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        if self._update_needed:
-            self._update(system)
-
         drdi_mtx = self._dr_di_mtx
         if drdi_mtx is None and not d_outputs._names:  # avoid unnecessary unscaling
             return

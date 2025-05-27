@@ -72,19 +72,6 @@ class DenseMatrix(Matrix):
         """
         self._matrix = np.zeros((num_rows, num_cols), dtype=dtype)
 
-    def _update_submat(self, subjac, randgen=None):
-        """
-        Update the values of a sub-jacobian.
-
-        Parameters
-        ----------
-        subjac : Subjac
-            the sub-jacobian
-        randgen : RandomState or None
-            Random number generator.
-        """
-        subjac.update_dense(self._matrix, randgen)
-
     def transpose(self):
         """
         Transpose the matrix.
@@ -139,6 +126,33 @@ class DenseMatrix(Matrix):
     def toarray(self):
         """
         Return the matrix as a dense array.
+
+        Returns
+        -------
+        ndarray
+            Dense array representation of the matrix.
+        """
+        return self._matrix
+
+    def _update_from_submat(self, subjac, randgen):
+        """
+        Update the matrix from a sub-jacobian.
+        """
+        if subjac.dense:
+            self._matrix[subjac.row_slice, subjac.col_slice] = subjac.get_val(randgen)
+            if subjac.factor is not None:
+                self._matrix[subjac.row_slice, subjac.col_slice] *= subjac.factor
+        else:
+            data, rows, cols = subjac.as_coo_info(full=True, randgen=randgen)
+            # note that this only works properly if used in a Component where src_indices is
+            # always None, so no duplicated row/col entries.
+            self._matrix[rows, cols] = data
+            if subjac.factor is not None:
+                self._matrix[rows, cols] *= subjac.factor
+
+    def todense(self):
+        """
+        Return a dense version of the matrix.
 
         Returns
         -------

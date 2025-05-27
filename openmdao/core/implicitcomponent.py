@@ -16,6 +16,7 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.coloring import _ColSparsityJac
+from openmdao.jacobians.jacobian import JacobianUpdateContext
 
 _tuplist = (tuple, list)
 
@@ -252,6 +253,7 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
+        om_dump_indent(self, f"{self.msginfo}: _apply_linear, jac: {jac}")
         if jac is None:
             jac = self._get_jacobian()
 
@@ -387,18 +389,24 @@ class ImplicitComponent(Component):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
+        if self.matrix_free:
+            return
+
+        om_dump_indent(self, f"{self.msginfo}: _linearize")
         self._check_first_linearize()
 
-        # need this here to ensure that jacobian and approx_schemes are initialized
-        jac = self._get_jacobian()
+        with JacobianUpdateContext(self) as jac:
 
-        with self._unscaled_context(outputs=[self._outputs]):
-            # Computing the approximation before the call to compute_partials allows users to
-            # override FD'd values.
-            for approximation in self._approx_schemes.values():
-                approximation.compute_approximations(self, jac=jac)
+            if not (self._has_linearize or self._approx_schemes):
+                return
 
-            self._linearize_wrapper()
+            with self._unscaled_context(outputs=[self._outputs]):
+                # Computing the approximation before the call to compute_partials allows users to
+                # override FD'd values.
+                for approximation in self._approx_schemes.values():
+                    approximation.compute_approximations(self, jac=jac)
+
+                self._linearize_wrapper()
 
         # if self._jacobian is not None:
         #     print(f"{self.msginfo}: jac\n{self._jacobian.todense()}")
@@ -569,7 +577,9 @@ class ImplicitComponent(Component):
                 self._jacobian = self._get_assembled_jac()
 
                 if self._jacobian is None:
+                    om_dump_indent(self, f"New Jacobian for {self.msginfo}")
                     self._jacobian = self._choose_jac_type()
+                    om_dump_indent(self, f"New Jacobian for {self.msginfo} is: {self._jacobian}")
 
                 if self._has_approx:
                     self._get_static_wrt_matches()

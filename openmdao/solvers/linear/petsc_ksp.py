@@ -342,6 +342,7 @@ class PETScKrylov(LinearSolver):
         """
         Perform any required linearization operations such as matrix factorization.
         """
+        om_dump_indent(self._system(), f"{self._system().msginfo}: PETScKrylov._linearize")
         if self.precon is not None:
             self.precon._linearize()
 

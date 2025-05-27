@@ -10,6 +10,7 @@ import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, \
     jac_forward, jac_reverse, _get_tangents, _ensure_iter
 from openmdao.utils.array_utils import shape_to_len
+from openmdao.jacobians.jacobian import JacobianUpdateContext
 
 try:
     import jax
@@ -221,9 +222,8 @@ class ImplicitFuncComp(ImplicitComponent):
                 self._first_call_to_linearize = True
                 self._tangents = None
             self._check_first_linearize()
-            self._jax_linearize()
-            # if (jac is None or jac is self._jacobian) and self._jacobian is not None:
-            #     self._jacobian._update(self)
+            with JacobianUpdateContext(self):
+                self._jax_linearize()
         else:
             super()._linearize(jac, sub_do_ln)
 

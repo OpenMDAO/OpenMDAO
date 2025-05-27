@@ -2564,7 +2564,9 @@ class System(object, metaclass=SystemMetaclass):
                     raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
                                        "subcomponent." % self.msginfo)
 
+                om_dump_indent(self, f"New AssembledJacobian for {self.msginfo}")
                 asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
+                om_dump_indent(self, f"New AssembledJacobian for {self.msginfo} is: {asm_jac}")
                 self._assembled_jac = self._jacobian = asm_jac
                 for solver in asm_jac_solvers:
                     solver._assembled_jac = asm_jac

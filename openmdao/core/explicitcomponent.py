@@ -4,6 +4,7 @@ from itertools import chain
 
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.block_jacobian import BlockJacobian
+from openmdao.jacobians.jacobian import JacobianUpdateContext
 from openmdao.utils.coloring import _ColSparsityJac
 from openmdao.core.component import Component
 from openmdao.vectors.vector import _full_slice
@@ -172,12 +173,14 @@ class ExplicitComponent(Component):
 
         if force_if_mat_free or not self.matrix_free:
             if self._jacobian is None:
+                om_dump_indent(self, f"New Jacobian for {self.msginfo}")
                 self._jacobian = self._choose_jac_type()
+                om_dump_indent(self, f"New Jacobian for {self.msginfo} is: {self._jacobian}")
                 if self._has_approx:
                     self._get_static_wrt_matches()
                     self._add_approximations(use_relevance=use_relevance)
 
-            return self._jacobian
+        return self._jacobian
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
@@ -385,6 +388,7 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
+        om_dump_indent(self, f"{self.msginfo}: _apply_linear, jac: {jac}")
         J = self._get_jacobian() if jac is None else jac
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
@@ -503,24 +507,29 @@ class ExplicitComponent(Component):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        # need this here to ensure that jacobian and approx_schemes are initialized properly
-        # based on relevance
-        jac = self._get_jacobian()
-
-        if self.matrix_free or not (self._has_compute_partials or self._approx_schemes):
+        if self.matrix_free:
             return
 
+        om_dump_indent(self, f"{self.msginfo}: _linearize, approx_schemes: {self._approx_schemes}")
         self._check_first_linearize()
 
-        with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-            # Computing the approximation before the call to compute_partials allows users to
-            # override FD'd values.
-            for approximation in self._approx_schemes.values():
-                approximation.compute_approximations(self, jac=jac)
+        with JacobianUpdateContext(self) as jac:
 
-            if self._has_compute_partials:
-                # We used to negate the jacobian here, and then re-negate after the hook.
-                self._compute_partials_wrapper()
+            if not (self._has_compute_partials or self._approx_schemes):
+                return
+
+            with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+                # Computing the approximation before the call to compute_partials allows users to
+                # override FD'd values.
+                for approximation in self._approx_schemes.values():
+                    approximation.compute_approximations(self, jac=jac)
+
+                if self._has_compute_partials:
+                    # We used to negate the jacobian here, and then re-negate after the hook.
+                    self._compute_partials_wrapper()
+
+        # if self._jacobian is not None:
+        #     print(f"{self.msginfo}: jac\n{self._jacobian.todense()}")
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """

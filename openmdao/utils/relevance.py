@@ -654,7 +654,7 @@ class Relevance(object):
         ------
         None
         """
-        if not self._active:  # if already inactive from higher level, don't change it
+        if self._active is False:  # if already inactive from higher level, don't change it
             yield
         else:
             save = self._active
@@ -905,7 +905,7 @@ class Relevance(object):
         bool
             True if the given system is relevant.
         """
-        if not self._active:
+        if not self._active or self._current_rel_sarray is None:
             return True
 
         try:

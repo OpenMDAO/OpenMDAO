@@ -48,9 +48,6 @@ class DictionaryJacobian(Jacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        if self._update_needed:
-            self._update(system)
-
         fwd = mode == 'fwd'
         d_out_names = d_outputs._names
         d_res_names = d_residuals._names
@@ -221,7 +218,6 @@ class _CheckingJacobian(DictionaryJacobian):
         column : ndarray
             Column value.
         """
-        self._update_needed = True
         wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
 
         # If we are doing a directional derivative, then the sparsity will be violated.

@@ -43,6 +43,8 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.subjac import Subjac
+from openmdao.jacobians.jacobian import GroupJacobianUpdateContext
+
 # regex to check for valid names.
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
@@ -3695,9 +3697,11 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
+        om_dump_indent(self, f"{self.msginfo}: _apply_linear, owns approx: {self._owns_approx_jac}")
         if self._owns_approx_jac:
             jac = self._get_jacobian()
         if jac is None and self._get_assembled_jac() is not None:
+            om_dump_indent(self, f"assembled jac: {self._assembled_jac}")
             jac = self._assembled_jac
 
         if jac is not None:
@@ -3822,44 +3826,35 @@ class Group(System):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
+        om_dump_indent(self, f"{self.msginfo}: _linearize, owns approx: {self._owns_approx_jac}")
         self._check_first_linearize()
 
         # Group finite difference
         if self._owns_approx_jac:
-            if (self._tot_jac is not None and
-                    not isinstance(self._jacobian, coloring_mod._ColSparsityJac)):
-                self._jacobian = self._tot_jac
-            else:
-                self._jacobian = self._get_jacobian()
-                if self._jacobian is not None:
-                    self._jacobian._update_needed = True
 
-            if self.pathname == "":
-                for approximation in self._approx_schemes.values():
-                    approximation.compute_approximations(self, jac=self._jacobian)
-            else:
-                # When an approximation exists in a submodel (instead of in root), the model is
-                # in a scaled state.
-                with self._unscaled_context(outputs=[self._outputs]):
+            with GroupJacobianUpdateContext(self) as jac:
+                if self.pathname == "":
                     for approximation in self._approx_schemes.values():
-                        approximation.compute_approximations(self, jac=self._jacobian)
+                        approximation.compute_approximations(self, jac=jac)
+                else:
+                    # When an approximation exists in a submodel (instead of in root), the model is
+                    # in a scaled state.
+                    with self._unscaled_context(outputs=[self._outputs]):
+                        for approximation in self._approx_schemes.values():
+                            approximation.compute_approximations(self, jac=jac)
 
         else:
-
-            jac = self._get_assembled_jac()
-            if jac is not None:
-                # we're updating subsystem jacs, so we need to update this one as well
-                jac._update_needed = True
 
             relevance = self._relevance
             with relevance.active(self._linear_solver.use_relevance()):
                 subs = list(relevance.filter(self._subsystems_myproc))
 
-                # Only linearize subsystems if we aren't approximating the derivs at this level.
-                for subsys in subs:
-                    do_ln = sub_do_ln and (subsys._linear_solver is not None and
-                                           subsys._linear_solver._linearize_children())
-                    subsys._linearize(jac, sub_do_ln=do_ln)
+                with GroupJacobianUpdateContext(self) as jac:
+                    # Only linearize subsystems if we aren't approximating the derivs at this level.
+                    for subsys in subs:
+                        do_ln = sub_do_ln and (subsys._linear_solver is not None and
+                                               subsys._linear_solver._linearize_children())
+                        subsys._linearize(jac, sub_do_ln=do_ln)
 
                 if sub_do_ln:
                     for subsys in subs:
@@ -4004,7 +3999,9 @@ class Group(System):
 
             if self._jacobian is None and self._has_approx:
                 # Group only needs a jacobian if it's approximating derivatives.
+                om_dump_indent(self, f"New Jacobian for {self.msginfo}")
                 self._jacobian = DictionaryJacobian(system=self)
+                om_dump_indent(self, f"New Jacobian for {self.msginfo} is: {self._jacobian}")
 
             if self._has_approx:
                 self._get_static_wrt_matches()

@@ -1666,6 +1666,9 @@ def om_dump(*args, **kwargs):
     pass
 
 
+om_dump_indent = om_dump
+
+
 def dbg(funct):
     """
     Do nothing.
@@ -1737,6 +1740,39 @@ if _om_dump:
         kwargs : dict
             Named args.
         """
+        kwargs['file'] = _dump_stream
+        kwargs['flush'] = True
+        print(*args, **kwargs)
+
+    def om_dump_indent(pathobj, *args, **kwargs):
+        """
+        Dump to a stream with indent if OPENMDAO_DUMP is truthy in the environment.
+
+        Depending on the value of OPENMDAO_DUMP, output will go to file(s), stdout, or stderr.
+
+        Parameters
+        ----------
+        pathobj : object
+            The object to get the pathname from.
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        pathname = pathobj.pathname
+        if pathname:
+            indent = ' ' * (len(pathname.split('.')) * 3)
+            newargs = []
+            for arg in args:
+                if isinstance(arg, str):
+                    newargs.append(arg)
+                else:
+                    newargs.append(str(arg))
+
+            args = ''.join(newargs)
+            args = textwrap.indent(args, indent)
+            args = (args,)
+
         kwargs['file'] = _dump_stream
         kwargs['flush'] = True
         print(*args, **kwargs)
@@ -1863,6 +1899,13 @@ if _om_dump:
             if isinstance(comm, _DebugComm):
                 return comm._comm
             return comm
+
+# if OPENMDAO_DUMP is set to anything, even a falsey value, make om_dump and om_dump_indent
+# available as builtins so we don't have to import them anywhere
+if os.environ.get('OPENMDAO_DUMP') is not None:
+    import builtins
+    builtins.om_dump = om_dump
+    builtins.om_dump_indent = om_dump_indent
 
 
 def call_depth2indent(tabsize=2, offset=-1):

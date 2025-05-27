@@ -23,8 +23,6 @@ class Matrix(object):
         implementation-specific representation of the actual matrix.
     _submats : dict
         dictionary of sub-matrix data keyed by (out_name, in_name).
-    _metadata : dict
-        implementation-specific data for the sub-matrices.
     """
 
     def __init__(self, submats):
@@ -33,7 +31,6 @@ class Matrix(object):
         """
         self._matrix = None
         self._submats = submats
-        self._metadata = {}
 
     def _pre_update(self):
         """
@@ -46,6 +43,15 @@ class Matrix(object):
         Do anything that needs to be done at the end of AssembledJacobian._update.
         """
         pass
+
+    def _update(self, randgen=None):
+        """
+        Update the matrix with the new sub-Jacobians.
+        """
+        self._pre_update()
+        for subjac in self._submats.values():
+            subjac._update(randgen)
+        self._post_update()
 
     def set_complex_step_mode(self, active):
         """
