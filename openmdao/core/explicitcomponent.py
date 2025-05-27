@@ -175,7 +175,7 @@ class ExplicitComponent(Component):
             if self._jacobian is None:
                 om_dump_indent(self, f"New Jacobian for {self.msginfo}")
                 self._jacobian = self._choose_jac_type()
-                om_dump_indent(self, f"New Jacobian for {self.msginfo} is: {self._jacobian}")
+                om_dump_indent(self, f"New Jacobian for {self.msginfo} is: {type(self._jacobian).__name__}")
                 if self._has_approx:
                     self._get_static_wrt_matches()
                     self._add_approximations(use_relevance=use_relevance)
