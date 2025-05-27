@@ -68,6 +68,7 @@ _toggle_styles = """
 """
 
 _max_number_initial_visible_sampled_variables = 4
+_max_number_initial_visible_sampled_variables = 1
 _grid_plot_height_and_width = 240 
 
 _max_label_length = 25
