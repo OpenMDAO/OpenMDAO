@@ -34,7 +34,7 @@ try:
 except ImportError:
     from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
-from openmdao.utils.general_utils import set_pyoptsparse_opt, om_dump
+from openmdao.utils.general_utils import set_pyoptsparse_opt
 
 
 # check that pyoptsparse is installed. if it is, try to use SLSQP.

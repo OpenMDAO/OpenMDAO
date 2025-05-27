@@ -1809,9 +1809,9 @@ if _om_dump:
                     argstr = f"(args={args}, kwargs={kwargs})"
                 else:
                     argstr = ''
-                #  om_dump(f"{indent}--> {cname}:{path}{funct.__name__}{argstr}")
+                om_dump(f"{indent}--> {cname}:{path}{funct.__name__}{argstr}")
                 ret = funct(*args, **kwargs)
-                #  om_dump(f"{indent}<-- {cname}:{path}{funct.__name__}")
+                om_dump(f"{indent}<-- {cname}:{path}{funct.__name__}")
                 return ret
 
             return wrapper
@@ -1871,9 +1871,9 @@ if _om_dump:
                     argstr = f"(args={args}, kwargs={kwargs})"
                 else:
                     argstr = ''
-                #  om_dump(f"{indent}--> {sc}{fn.__name__}{argstr}")
+                om_dump(f"{indent}--> {sc}{fn.__name__}{argstr}")
                 ret = fn(*args, **kwargs)
-                #  om_dump(f"{indent}<-- {sc}{fn.__name__}")
+                om_dump(f"{indent}<-- {sc}{fn.__name__}")
                 return ret
             return _wrap
 
