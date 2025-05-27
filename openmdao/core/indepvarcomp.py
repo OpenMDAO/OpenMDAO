@@ -239,7 +239,7 @@ class IndepVarComp(ExplicitComponent):
         """
         # define this for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
         om_dump_indent(self, f"{self.msginfo}: _linearize, do nothing")
-        pass
+        self._get_jacobian()
 
     def _apply_nonlinear(self):
         """
