@@ -23,6 +23,8 @@ class Matrix(object):
         implementation-specific representation of the actual matrix.
     _submats : dict
         dictionary of sub-matrix data keyed by (out_name, in_name).
+    _masked_arr_caches : dict
+        Dictionary of cached masked arrays for each mode.
     """
 
     def __init__(self, submats):
@@ -31,6 +33,7 @@ class Matrix(object):
         """
         self._matrix = None
         self._submats = submats
+        self._masked_arr_caches = {'fwd': None, 'rev': None}
 
     def _pre_update(self):
         """
@@ -66,3 +69,35 @@ class Matrix(object):
             Complex mode flag; set to True prior to commencing complex step.
         """
         pass
+
+    def _get_masked_arr(self, in_vec, mode, mask):
+        """
+        Get a masked array for the given vector and mode.
+
+        Parameters
+        ----------
+        in_vec : ndarray[:]
+            incoming vector to multiply.
+        mode : str
+            'fwd' or 'rev'.
+        mask : ndarray or None
+            Array used to mask out part of the vector.  If mask is not None then
+            the masked values will be set to 0.0.
+
+        Returns
+        -------
+        ndarray[:]
+            masked array.
+        """
+        if mask is not None:
+            mask_arr = self._masked_arr_caches[mode]
+            if mask_arr is None or mask_arr.dtype != in_vec.dtype:
+                mask_arr = in_vec.copy()
+                self._masked_arr_caches[mode] = mask_arr
+            else:
+                mask_arr[:] = in_vec
+
+            mask_arr[mask] = 0.0
+            return mask_arr
+
+        return in_vec

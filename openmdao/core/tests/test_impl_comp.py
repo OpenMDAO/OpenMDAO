@@ -579,7 +579,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         assert_near_equal(prob['comp.x'], 3.)
 
-        totals = prob.check_totals(of=['fn.y'], wrt=['p.a'], method='cs', out_stream=None)
+        totals = prob.check_totals(of=['fn.y'], wrt=['p.a'], method='cs', show_only_incorrect=True, rich_print=False)
         assert_check_totals(totals)
 
     def test_guess_nonlinear_residuals(self):

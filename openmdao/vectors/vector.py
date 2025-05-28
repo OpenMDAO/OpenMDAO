@@ -4,7 +4,6 @@ import hashlib
 import numpy as np
 
 from openmdao.utils.indexer import Indexer, indexer, combine_ranges
-from openmdao.utils.array_utils import get_index_dtype
 
 
 _full_slice = slice(None)
@@ -593,18 +592,17 @@ class Vector(object):
         slice or index array
             Values at this index will be zeroed out.
         """
-        if self._in_matvec_context():
-            return slice(0)
+        if not self._in_matvec_context():
+            return None
 
         ranges = combine_ranges([vinfo.range for name, vinfo in self._views.items()
                                  if name not in self._names])
         if len(ranges) == 1:
             mask = slice(ranges[0][0], ranges[0][1])
         elif len(ranges) == 0:
-            mask = slice(0, 0)
+            mask = None
         else:
-            mask = np.concatenate([range(start, end) for start, end in ranges],
-                                  dtype=get_index_dtype(len(self)))
+            mask = np.concatenate([range(start, end) for start, end in ranges])
 
         return mask
 

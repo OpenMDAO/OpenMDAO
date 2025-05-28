@@ -317,18 +317,16 @@ class Jacobian(object):
         raise NotImplementedError(f"Class {type(self).__name__} does not implement _apply.")
 
     # def _pre_apply(self, system, d_inputs, d_outputs, d_residuals, mode):
-    #     print(f"{system.msginfo}: BEFORE APPLY\n")
-    #     if mode == 'fwd':
-    #         print(f"    d_inputs: {d_inputs.asarray()}, d_outputs: {d_outputs.asarray()}")
-    #     else:
-    #         print(f"    d_residuals: {d_residuals.asarray()}")
+    #     print(f"{system.msginfo}: BEFORE APPLY (mode={mode})")
+    #     print(f"    d_inputs._names: {sorted(d_inputs._names)}")
+    #     print(f"    d_outputs._names: {sorted(d_outputs._names)}")
+    #     print(f"    d_inputs: {d_inputs.asarray()}\n    d_outputs: {d_outputs.asarray()}\n"
+    #           f"    d_residuals: {d_residuals.asarray()}")
 
     # def _post_apply(self, system, d_inputs, d_outputs, d_residuals, mode):
-    #     print(f"{system.msginfo}: AFTER APPLY\n")
-    #     if mode == 'fwd':
-    #         print(f"    d_residuals: {d_residuals.asarray()}")
-    #     else:
-    #         print(f"    d_inputs: {d_inputs.asarray()}, d_outputs: {d_outputs.asarray()}")
+    #     print(f"{system.msginfo}: AFTER APPLY (mode={mode})")
+    #     print(f"    d_inputs: {d_inputs.asarray()}\n    d_outputs: {d_outputs.asarray()}\n"
+    #           f"    d_residuals: {d_residuals.asarray()}")
 
     def set_complex_step_mode(self, active):
         """
@@ -671,11 +669,17 @@ class SplitJacobian(Jacobian):
         # if randgen is not None, we're computing the sparsity pattern
         randgen = self._randgen
 
+        # print(f"{system.msginfo}: _update BEFORE")
+        # print(self.todense())
+
         if self._dr_do_mtx is not None:
             self._update_matrix(self._dr_do_mtx, randgen)
 
         if self._dr_di_mtx is not None:
             self._update_matrix(self._dr_di_mtx, randgen)
+
+        # print(f"{system.msginfo}: _update AFTER")
+        # print(self.todense())
 
         # print(f"{system.msginfo}: UPDATED\n{self.todense()}")
 
@@ -684,6 +688,9 @@ class SplitJacobian(Jacobian):
             # complex data type.
             if self._dr_do_mtx is not None:
                 self._dr_do_mtx.set_complex_step_mode(True)
+
+        # print(f"{system.msginfo}: _update END")
+        # print(self.todense())
 
     def todense(self):
         """

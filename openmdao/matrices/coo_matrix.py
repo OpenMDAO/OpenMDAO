@@ -82,7 +82,7 @@ class COOMatrix(Matrix):
         """
         return self._matrix.T
 
-    def _prod(self, in_vec, mode):
+    def _prod(self, in_vec, mode, mask=None):
         """
         Perform a matrix vector product.
 
@@ -92,12 +92,17 @@ class COOMatrix(Matrix):
             incoming vector to multiply.
         mode : str
             'fwd' or 'rev'.
+        mask : ndarray or None
+            Array used to mask out part of the vector.  If mask is not None then
+            the masked values will be set to 0.0.
 
         Returns
         -------
         ndarray[:]
             vector resulting from the product.
         """
+        in_vec = self._get_masked_arr(in_vec, mode, mask)
+
         if mode == 'fwd':
             return self._matrix.dot(in_vec)
         else:  # rev

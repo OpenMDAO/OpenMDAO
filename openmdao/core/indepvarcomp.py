@@ -6,7 +6,6 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.general_utils import make_set, ensure_compatible
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.jacobians.block_jacobian import BlockJacobian
 
 
 class IndepVarComp(ExplicitComponent):
@@ -131,17 +130,17 @@ class IndepVarComp(ExplicitComponent):
                     desc="User defined tags that can be used to filter what gets listed when "
                          "calling list_outputs.")
 
-    def _choose_jac_type(self):
-        """
-        Choose the Jacobian type based on the jac_type option.
+    # def _choose_jac_type(self):
+    #     """
+    #     Choose the Jacobian type based on the jac_type option.
 
-        Returns
-        -------
-        Jacobian
-            The Jacobian object.
-        """
-        # FIXME: currently ComponentJacobian doesn't work with IndepVarComp
-        return BlockJacobian(self)
+    #     Returns
+    #     -------
+    #     Jacobian
+    #         The Jacobian object.
+    #     """
+    #     # FIXME: currently ComponentJacobian doesn't work with IndepVarComp
+    #     return BlockJacobian(self)
 
     def _configure_check(self):
         """
@@ -225,21 +224,6 @@ class IndepVarComp(ExplicitComponent):
 
         kwargs = {'desc': desc, 'tags': tags}
         return super().add_discrete_output(name, val, **kwargs)
-
-    # def _linearize(self, jac=None, sub_do_ln=False):
-    #     """
-    #     Compute jacobian / factorization. The model is assumed to be in a scaled state.
-
-    #     Parameters
-    #     ----------
-    #     jac : Jacobian or None
-    #         If None, use local jacobian, else use assembled jacobian jac.
-    #     sub_do_ln : bool
-    #         Flag indicating if the children should call linearize on their linear solvers.
-    #     """
-    #     # define this for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
-    #     # om_dump_indent(self, f"{self.msginfo}: _linearize, do nothing")
-    #     self._get_jacobian()
 
     def _apply_nonlinear(self):
         """

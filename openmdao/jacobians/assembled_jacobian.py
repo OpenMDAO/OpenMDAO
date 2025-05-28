@@ -85,14 +85,15 @@ class AssembledJacobian(SplitJacobian):
                 if d_outputs._names:
                     dresids += self._dr_do_mtx._prod(d_outputs.asarray(), mode)
                 if do_mask:
-                    dresids += drdi_mtx._prod(d_inputs.asarray(mask=mask), mode)
+                    dresids += drdi_mtx._prod(d_inputs.asarray(), mode, mask)
 
             else:  # rev
                 if d_outputs._names:
                     d_outputs += self._dr_do_mtx._prod(dresids, mode)
                 if do_mask:
                     arr = drdi_mtx._prod(dresids, mode)
-                    arr[mask] = 0.0
+                    if mask is not None:
+                        arr[mask] = 0.0
                     d_inputs += arr
 
             # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)

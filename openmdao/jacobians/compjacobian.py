@@ -64,6 +64,8 @@ class ComponentJacobian(SplitJacobian):
             self._dr_di_mtx = matrix_class(drdi_subjacs)
             self._dr_di_mtx._build(out_size, len(system._inputs), dtype)
 
+        self._update(system)
+
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.
@@ -81,6 +83,8 @@ class ComponentJacobian(SplitJacobian):
         mode : str
             'fwd' or 'rev'.
         """
+        # print(system.pathname)
+        # print(self.todense())
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             if d_inputs._names:
                 try:
@@ -94,22 +98,27 @@ class ComponentJacobian(SplitJacobian):
             # self._pre_apply(system, d_inputs, d_outputs, d_residuals, mode)
 
             if mode == 'fwd':
-                if self._is_explicitcomp:
-                    dresids -= d_outputs.asarray()
-                elif d_outputs._names:
-                    dresids += self._dr_do_mtx._prod(d_outputs.asarray(), mode)
+                if d_outputs._names:
+                    if self._is_explicitcomp:
+                        dresids -= d_outputs.asarray()
+                    else:
+                        dresids += self._dr_do_mtx._prod(d_outputs.asarray(), mode)
+
                 if self._dr_di_mtx is not None and d_inputs._names:
-                    dresids += self._dr_di_mtx._prod(d_inputs.asarray(mask=mask), mode)
+                    dresids += self._dr_di_mtx._prod(d_inputs.asarray(), mode, mask)
 
             else:  # rev
-                doutarr = d_outputs.asarray()
-                if self._is_explicitcomp:
-                    doutarr -= dresids
-                elif d_outputs._names:
-                    doutarr += self._dr_do_mtx._prod(dresids, mode)
+                if d_outputs._names:
+                    doutarr = d_outputs.asarray()
+                    if self._is_explicitcomp:
+                        doutarr -= dresids
+                    else:
+                        doutarr += self._dr_do_mtx._prod(dresids, mode)
+
                 if self._dr_di_mtx is not None and d_inputs._names:
                     arr = self._dr_di_mtx._prod(dresids, mode)
-                    arr[mask] = 0.0
+                    if mask is not None:
+                        arr[mask] = 0.0
                     d_inputs += arr
 
             # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)

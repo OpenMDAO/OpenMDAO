@@ -402,7 +402,7 @@ class Group(System):
             # A value of None will be interpreted as 'all outputs'.
             scope_out = None
 
-            # All inputs connected to an output in this system
+            # All inputs that are not connected to outputs outside of this group
             scope_in = frozenset(self._conn_global_abs_in2out).intersection(
                 self._var_allprocs_abs2meta['input'])
 
@@ -410,7 +410,7 @@ class Group(System):
             # Empty for the excl_sub
             scope_out = frozenset()
 
-            # All inputs connected to an output in this system but not in excl_sub
+            # All inputs connected to an output in this system but not in excl_sub.
             # allins is used to filter out discrete variables that might be found in
             # self._conn_global_abs_in2out.
             allins = self._var_allprocs_abs2meta['input']
@@ -3861,9 +3861,6 @@ class Group(System):
                     for subsys in subs:
                         if subsys._linear_solver is not None:
                             subsys._linear_solver._linearize()
-
-        # if self._jacobian is not None:
-        #     print(f"{self.msginfo}: jac\n{self._jacobian.todense()}")
 
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
