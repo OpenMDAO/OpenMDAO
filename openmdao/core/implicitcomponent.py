@@ -17,6 +17,7 @@ from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.coloring import _ColSparsityJac
 from openmdao.jacobians.jacobian import JacobianUpdateContext
+from openmdao.jacobians.subjac import SUBJAC_META_DEFAULTS
 
 _tuplist = (tuple, list)
 
@@ -353,11 +354,10 @@ class ImplicitComponent(Component):
                 if method in self._approx_schemes:
                     yield abs_key
 
-    def _linearize_wrapper(self):
+    def _linearize_wrapper(self, jac):
         """
         Call linearize based on the value of the "run_root_only" option.
         """
-        jac = self._get_jac_wrapper()
         with self._call_user_function('linearize', protect_outputs=True):
             if self._run_root_only():
                 if self.comm.rank == 0:
@@ -404,7 +404,7 @@ class ImplicitComponent(Component):
                 for approximation in self._approx_schemes.values():
                     approximation.compute_approximations(self, jac=jac)
 
-                self._linearize_wrapper()
+                self._linearize_wrapper(jac)
 
         # if self._jacobian is not None:
         #     print(f"{self.msginfo}: jac\n{self._jacobian.todense()}")
@@ -677,7 +677,7 @@ class ImplicitComponent(Component):
                     if (oabs_name, wabs) in self._subjacs_info:
                         existing_metas.append(self._subjacs_info[oabs_name, wabs])
 
-                newmeta = {'dependent': True, 'rows': None, 'cols': None}
+                newmeta = SUBJAC_META_DEFAULTS.copy()
                 if not existing_metas:
                     existing_metas.append(newmeta)
                     if 'method' in pattern_meta:

@@ -140,7 +140,7 @@ class IndepVarComp(ExplicitComponent):
         Jacobian
             The Jacobian object.
         """
-        # FIXME: currently ComponentJacobian doens't work with IndepVarComp
+        # FIXME: currently ComponentJacobian doesn't work with IndepVarComp
         return BlockJacobian(self)
 
     def _configure_check(self):

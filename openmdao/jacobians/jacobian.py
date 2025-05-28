@@ -364,6 +364,40 @@ class Jacobian(object):
         namesize_iter = [(n, end - start) for n, start, end, _, _, _ in system._jac_wrt_iter()]
         self._col_mapper = RangeMapper.create(namesize_iter)
 
+    # def set_col(self, system, icol, column):
+    #     """
+    #     Set a column of the jacobian.
+
+    #     The column is assumed to be the same size as a column of the jacobian.
+
+    #     This also assumes that the column does not attempt to set any nonzero values that are
+    #     outside of specified sparsity patterns for any of the subjacs.
+
+    #     Parameters
+    #     ----------
+    #     system : System
+    #         The system that owns this jacobian.
+    #     icol : int
+    #         Column index.
+    #     column : ndarray
+    #         Column value.
+    #     """
+    #     if self._col_mapper is None:
+    #         self._setup_index_maps(system)
+
+    #     wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
+
+    #     for of, start, end, _, _ in system._jac_of_iter():
+    #         key = (of, wrt)
+    #         if key in self._subjacs_info:
+    #             subjac = self._subjacs_info[key]
+    #             if subjac['cols'] is None:  # dense
+    #                 subjac['val'][:, loc_idx] = column[start:end]
+    #             else:  # our COO format
+    #                 match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
+    #                 if match_inds.size > 0:
+    #                     subjac['val'][match_inds] = column[start:end][subjac['rows'][match_inds]]
+
     def set_col(self, system, icol, column):
         """
         Set a column of the jacobian.
@@ -387,16 +421,12 @@ class Jacobian(object):
 
         wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
 
-        for of, start, end, _, _ in system._jac_of_iter():
+        subjacs = self._subjacs
+
+        for of, start, end, _, _ in self._system()._jac_of_iter():
             key = (of, wrt)
-            if key in self._subjacs_info:
-                subjac = self._subjacs_info[key]
-                if subjac['cols'] is None:  # dense
-                    subjac['val'][:, loc_idx] = column[start:end]
-                else:  # our COO format
-                    match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
-                    if match_inds.size > 0:
-                        subjac['val'][match_inds] = column[start:end][subjac['rows'][match_inds]]
+            if key in subjacs:
+                subjacs[key].set_col(loc_idx, column[start:end])
 
     def set_csc_jac(self, system, jac):
         """
@@ -877,10 +907,15 @@ class JacobianUpdateContext:
         Jacobian
             The jacobian that is being updated.
         """
-        self.jac = self.system._get_jacobian()
+        if self.system.is_explicit():
+            self.jac = self.system._get_jacobian()
+        else:
+            self.jac = self.system._get_jac_wrapper()
+
         if self.jac is not None:
             self.jac._pre_update()
-        return self.jac  # may be None for a Group
+
+        return self.jac
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """

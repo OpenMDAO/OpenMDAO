@@ -654,15 +654,15 @@ class Relevance(object):
         ------
         None
         """
-        if not self._active:  # if already inactive from higher level, don't change it
-            yield
-        else:
+        if self._active or (not active and self._active is None):
             save = self._active
             self._active = active
             try:
                 yield
             finally:
                 self._active = save
+        else:  # self._active is None, so we can be activated but aren't currently active
+            yield
 
     def relevant_vars(self, name, direction, inputs=True, outputs=True):
         """
