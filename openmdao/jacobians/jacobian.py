@@ -1,6 +1,4 @@
 """Define the base Jacobian class."""
-import weakref
-
 import numpy as np
 
 from openmdao.utils.iter_utils import meta2range_iter
@@ -32,8 +30,6 @@ class Jacobian(object):
 
     Attributes
     ----------
-    _system : <System>
-        Pointer to the system that is currently operating on this Jacobian.
     _subjacs_info : dict
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
     _subjacs : dict
@@ -68,7 +64,6 @@ class Jacobian(object):
         """
         Initialize all attributes.
         """
-        self._system = weakref.ref(system)
         self._subjacs_info = system._subjacs_info
         self._subjacs = None
         self._under_complex_step = False
@@ -176,9 +171,6 @@ class Jacobian(object):
                         if relevance is None or is_relevant(wrt):
                             self._subjacs[key] = self.create_subjac(key, meta)
 
-            # odi = om_dump_indent
-            # odi(self._system(), f"{type(self).__name__}: {self._system().msginfo}: new subjacs:")
-            # odi(self._system(), f"    {[(s.key, s.info['val']) for s in self._subjacs.values()]}")
             self._initialized = True
 
         return self._subjacs
@@ -423,7 +415,7 @@ class Jacobian(object):
 
         subjacs = self._subjacs
 
-        for of, start, end, _, _ in self._system()._jac_of_iter():
+        for of, start, end, _, _ in system._jac_of_iter():
             key = (of, wrt)
             if key in subjacs:
                 subjacs[key].set_col(loc_idx, column[start:end])
@@ -715,10 +707,10 @@ class SplitJacobian(Jacobian):
 
     def _get_subjacs(self, system=None):
         if not self._initialized:
-            self._get_split_subjacs(system, self._is_explicitcomp)
+            self._get_split_subjacs(system)
         return self._subjacs
 
-    def _get_split_subjacs(self, system, is_explicit_comp=False):
+    def _get_split_subjacs(self, system):
         """
         Get the dr/do and dr/di subjacs for the current system.
 
@@ -726,8 +718,6 @@ class SplitJacobian(Jacobian):
         ----------
         system : System
             The system that owns this jacobian.
-        is_explicit_comp : bool
-            Whether the system is an explicit component.
 
         Returns
         -------
@@ -741,6 +731,8 @@ class SplitJacobian(Jacobian):
             dr_di_subjacs = {}
             abs2meta_out = system._var_abs2meta['output']
             abs2meta_in = system._var_abs2meta['input']
+            is_explicit_comp = system.is_explicit(is_comp=True)
+
             try:
                 conns = system._conn_global_abs_in2out
             except AttributeError:
@@ -794,9 +786,6 @@ class SplitJacobian(Jacobian):
             self._subjacs.update(self._dr_di_subjacs)
 
             self._initialized = True
-            # odi = om_dump_indent
-            # odi(self._system(), f"{type(self).__name__}: {self._system().msginfo}: new subjacs:")
-            # odi(self._system(), f"    {[(s.key, s.info['val']) for s in self._subjacs.values()]}")
 
         return self._dr_do_subjacs, self._dr_di_subjacs
 
@@ -808,7 +797,7 @@ class SplitJacobian(Jacobian):
         self._subjacs = None
         self._dr_do_subjacs = {}
         self._dr_di_subjacs = {}
-        self._get_split_subjacs(system, self._is_explicitcomp)
+        self._get_split_subjacs(system)
 
         self._col_mapper = None  # force recompute of internal index maps on next set_col
 

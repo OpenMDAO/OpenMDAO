@@ -153,7 +153,7 @@ class _CheckingJacobian(DictionaryJacobian):
             yield key
 
     def items(self):
-        for key, subjac in self._get_subjacs(self._system()).items():
+        for key, subjac in self._subjacs.items():
             meta = subjac.info
             if self._is_explicitcomp and key[0] == key[1]:
                 continue
@@ -227,7 +227,6 @@ class _CheckingJacobian(DictionaryJacobian):
         directional = (options is not None and loc_wrt in options and
                        options[loc_wrt]['directional'])
 
-        system = self._system()
         subjacs = self._get_subjacs(system)
 
         for of, start, end, _, _ in system._jac_of_iter():

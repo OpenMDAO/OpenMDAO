@@ -51,7 +51,7 @@ class ComponentJacobian(SplitJacobian):
         super().__init__(system)
         self._mask_caches = {}
 
-        drdo_subjacs, drdi_subjacs = self._get_split_subjacs(system, explicit=True)
+        drdo_subjacs, drdi_subjacs = self._get_split_subjacs(system)
         out_size = len(system._outputs)
 
         dtype = complex if system.under_complex_step else float
