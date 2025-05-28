@@ -114,10 +114,9 @@ jobs:
           - NAME: MacOS ARM Baseline
             OS: macos-15
             PY: '3.13'
-            BREW: true
             NUMPY: '2.2'
             SCIPY: '1.15'
-            PETSc: '3'
+            PETSc: '3.23'
             PYOPTSPARSE_FROM: 'build_pyoptsparse'
             PYOPTSPARSE: '2.13.1'
             SNOPT: '7.7'
@@ -223,16 +222,10 @@ jobs:
           echo "============================================================="
           echo "Install compilers"
           echo "============================================================="
-          if [[ "${{ matrix.BREW }}" ]]; then
-            brew install gcc gfortran meson swig
-            if [[ "${{ matrix.OS }}" == "macos-15" ]]; then
-              ln -s /opt/homebrew/bin/gfortran-13 /opt/homebrew/bin/gfortran
-            fi
-          else
+          if [[  "${{ matrix.OS }}" != "macos-15" ]]; then
             conda install cython swig compilers cmake meson openmp -q -y
-          fi
-          if [[ "${{ matrix.XCODE }}" ]]; then
-            sudo xcode-select -s "/Applications/Xcode_${{ matrix.XCODE }}.app"
+          else
+            conda install cython swig compilers cmake meson -q -y
           fi
 
       - name: Install PETSc
@@ -241,10 +234,7 @@ jobs:
           echo "============================================================="
           echo "Install PETSc"
           echo "============================================================="
-
-          if [[ "${{ matrix.BREW }}" ]]; then
-            brew install open-mpi
-          elif [[ "${{ matrix.MPICH }}" ]]; then
+          if [[ "${{ matrix.MPICH }}" ]]; then
             conda install mpich-mpicc=${{ matrix.MPICH }} -q -y
           elif [[ "${{ matrix.OPENMPI }}" ]]; then
             conda install openmpi-mpicc=${{ matrix.OPENMPI }} -q -y
@@ -408,7 +398,11 @@ jobs:
           echo "============================================================="
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
-          conda install graphviz -q -y
+          if [[  "${{ matrix.OS }}" == "macos-15" ]]; then
+            brew install graphviz -q
+          else
+            conda install graphviz -q -y
+          fi
           python -m pip install pyparsing psutil objgraph pyxdsm pydot
 
           echo "Pre-install playwright dependencies to avoid 'Playwright Host validation warning'"
