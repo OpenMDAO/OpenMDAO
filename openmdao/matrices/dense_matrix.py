@@ -168,7 +168,12 @@ class DenseMatrix(Matrix):
 
     def dump(self, msginfo):
         """
-        Dump the matrix.
+        Dump the matrix to stdout.
+
+        Parameters
+        ----------
+        msginfo : str
+            Message info.
         """
         print(f"{msginfo}: DenseMatrix:")
         with np.printoptions(linewidth=9999, threshold=9999):

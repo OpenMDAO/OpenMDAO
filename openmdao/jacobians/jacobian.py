@@ -916,8 +916,6 @@ class JacobianUpdateContext:
         if self.jac is not None:
             self.jac._pre_update()
 
-        # om_dump_indent(self.system, f"{self.system.msginfo}: entered JacobianUpdateContext, jac={self.jac}")
-
         return self.jac
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -936,12 +934,6 @@ class JacobianUpdateContext:
         if self.jac is not None:
             self.jac._update(self.system)
             self.jac._post_update()
-
-            # om_dump_indent(self.system, f"{self.system.msginfo}:\n{self.jac.todense()}")
-            # om_dump_indent(self.system, f"{self.system.msginfo}: exited JacobianUpdateContext, jac={self.jac}")
-            # if sorted(self.jac._subjacs_info.keys()) != sorted(self.jac._subjacs.keys()):
-            #     om_dump_indent(self.system, f"{self.system.msginfo}: subjacs_info keys: {sorted(self.jac._subjacs_info.keys())}")
-            #     om_dump_indent(self.system, f"{self.system.msginfo}: subjacs keys: {sorted(self._subjacs.keys())}")
 
         if exc_type:
             self.jac = self.system._jacobian = None

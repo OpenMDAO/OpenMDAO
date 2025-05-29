@@ -562,7 +562,7 @@ class Vector(object):
         raise NotImplementedError('add_scale_vec not defined for vector type '
                                   f'{type(self).__name__}')
 
-    def asarray(self, copy=False, mask=None):
+    def asarray(self, copy=False):
         """
         Return a flat array representation of this vector.
 
@@ -572,8 +572,6 @@ class Vector(object):
         ----------
         copy : bool
             If True, return a copy of the array.
-        mask : ndarray of type bool, or None
-            Array used to mask out part of the vector.
 
         Returns
         -------

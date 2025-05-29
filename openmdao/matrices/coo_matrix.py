@@ -159,7 +159,12 @@ class COOMatrix(Matrix):
 
     def dump(self, msginfo):
         """
-        Dump the matrix.
+        Dump the matrix to stdout.
+
+        Parameters
+        ----------
+        msginfo : str
+            Message info.
         """
         print(f"{msginfo}: COOMatrix:")
         for r, c, v in sorted(zip(self._coo.row, self._coo.col, self._coo.data)):
