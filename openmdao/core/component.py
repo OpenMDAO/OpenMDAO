@@ -193,7 +193,7 @@ class Component(System):
             The Jacobian object.
         """
         # DBG: remove after debugging
-        # return BlockJacobian(self)
+        return BlockJacobian(self)
 
         if self.options['jac_type'] == 'auto':
             return self._get_auto_jac()

@@ -102,8 +102,8 @@ class Subjac(object):
         self.ncols = info['shape'][1]
         self.parent_ncols = col_slice.stop - col_slice.start
         if src_indices is not None:
+            om_dump(f"Subjac {key}: src_indices: {src_indices}")
             src_indices = src_indices.shaped_array(flat=True)
-            #  om_dump(f"Subjac {key}: src_indices: {src_indices}")
         self.src_indices = src_indices
         self.factor = factor
         self.src = src
