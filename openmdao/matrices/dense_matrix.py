@@ -165,3 +165,11 @@ class DenseMatrix(Matrix):
             Dense array representation of the matrix.
         """
         return self._matrix
+
+    def dump(self, msginfo):
+        """
+        Dump the matrix.
+        """
+        print(f"{msginfo}: DenseMatrix:")
+        with np.printoptions(linewidth=9999, threshold=9999):
+            print(self._matrix)

@@ -157,19 +157,21 @@ class Jacobian(object):
                 try:
                     relevance = self._problem_meta['relevance']
                     is_relevant = relevance.is_relevant
+                    active = system.linear_solver is None or system.linear_solver.use_relevance()
                 except Exception:
                     relevance = None
             else:
                 relevance = None
 
-            with relevance.all_seeds_active() if relevance else do_nothing_context():
-                out_slices = self._output_slices
-                in_slices = self._input_slices
-                for key, meta in self._subjacs_info.items():
-                    of, wrt = key
-                    if of in out_slices and (wrt in in_slices or wrt in out_slices):
-                        if relevance is None or is_relevant(wrt):
-                            self._subjacs[key] = self.create_subjac(key, meta)
+            with relevance.active(active) if relevance else do_nothing_context():
+                with relevance.all_seeds_active() if relevance else do_nothing_context():
+                    out_slices = self._output_slices
+                    in_slices = self._input_slices
+                    for key, meta in self._subjacs_info.items():
+                        of, wrt = key
+                        if of in out_slices and (wrt in in_slices or wrt in out_slices):
+                            if relevance is None or is_relevant(wrt):
+                                self._subjacs[key] = self.create_subjac(key, meta)
 
             self._initialized = True
 
@@ -501,6 +503,7 @@ class Jacobian(object):
         if use_relevance and self._has_approx:
             relevance = self._problem_meta['relevance']
             is_relevant = relevance.is_relevant
+            active = system.linear_solver is None or system.linear_solver.use_relevance()
         else:
             relevance = None
 
@@ -517,14 +520,15 @@ class Jacobian(object):
                 ofnames = system._var_abs2meta['output']
                 wrtnames = system._var_abs2meta
 
-            with relevance.all_seeds_active() if relevance else do_nothing_context():
-                for of in ofnames:
-                    for type_ in ('output', 'input'):
-                        for wrt in wrtnames[type_]:
-                            key = (of, wrt)
-                            if key in subjacs_info:
-                                if relevance is None or is_relevant(wrt):
-                                    keys.append(key)
+            with relevance.active(active) if relevance else do_nothing_context():
+                with relevance.all_seeds_active() if relevance else do_nothing_context():
+                    for of in ofnames:
+                        for type_ in ('output', 'input'):
+                            for wrt in wrtnames[type_]:
+                                key = (of, wrt)
+                                if key in subjacs_info:
+                                    if relevance is None or is_relevant(wrt):
+                                        keys.append(key)
 
             self._ordered_subjac_keys = keys
 

@@ -156,3 +156,11 @@ class COOMatrix(Matrix):
             Dense array representation of the matrix.
         """
         return self._coo.toarray()
+
+    def dump(self, msginfo):
+        """
+        Dump the matrix.
+        """
+        print(f"{msginfo}: COOMatrix:")
+        for r, c, v in sorted(zip(self._coo.row, self._coo.col, self._coo.data)):
+            print(f"{r}, {c}, {v}")

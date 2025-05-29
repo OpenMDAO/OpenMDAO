@@ -1443,7 +1443,8 @@ class System(object, metaclass=SystemMetaclass):
         bool
             True if the relevance has changed.
         """
-        if self._old_relevance is not self._relevance:
+        if (self._old_relevance is not self._relevance) or (self._old_relevance._active !=
+                                                            self._relevance._active):
             self._old_relevance = self._relevance
             return True
         return False

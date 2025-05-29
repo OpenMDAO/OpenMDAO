@@ -161,6 +161,10 @@ class _TotalJacInfo(object):
                                "was called.")
 
         of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of, wrt)
+        import pprint
+        pprint.pprint(of_metadata)
+        print('----------')
+        pprint.pprint(wrt_metadata)
 
         ofsize = sum(meta['global_size'] for meta in of_metadata.values())
         wrtsize = sum(meta['global_size'] for meta in wrt_metadata.values())
@@ -1567,64 +1571,6 @@ class _TotalJacInfo(object):
                         scheme._totals_directions = {}
                         scheme._totals_directional_mode = None
 
-                # Linearize Model
-                model._linearize(model._assembled_jac,
-                                 sub_do_ln=model._linear_solver._linearize_children())
-
-            finally:
-                model._tot_jac = None
-
-            totals = self.J_dict
-            if debug_print:
-                print(f'Elapsed time to approx totals: {time.perf_counter() - t0} secs\n',
-                      flush=True)
-
-            # Driver scaling.
-            if self.has_scaling:
-                self._do_driver_scaling(totals)
-
-            if return_format == 'array':
-                totals = self.J  # change back to array version
-
-            if debug_print:
-                # Debug outputs scaled derivatives.
-                self._print_derivatives()
-
-        return totals
-
-    def _compute_totals_jax(self, progress_out_stream=None):
-        """
-        Compute derivatives of desired quantities with respect to desired inputs.
-
-        Uses jax to calculate the derivatives.
-
-        Parameters
-        ----------
-        progress_out_stream : None or file-like object
-            Where to send human readable output. None by default which suppresses the output.
-
-        Returns
-        -------
-        derivs : object
-            Derivatives in form requested by 'return_format'.
-        """
-        model = self.model
-        return_format = self.return_format
-        debug_print = self.debug_print
-
-        # Prepare model for calculation by cleaning out the derivatives vectors.
-        model._dinputs.set_val(0.0)
-        model._doutputs.set_val(0.0)
-        model._dresiduals.set_val(0.0)
-
-        # Solve for derivs using jax
-        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
-
-        t0 = time.perf_counter()
-
-        with self._totjac_context():
-            model._tot_jac = self
-            try:
                 # Linearize Model
                 model._linearize(model._assembled_jac,
                                  sub_do_ln=model._linear_solver._linearize_children())
