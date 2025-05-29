@@ -7,8 +7,9 @@ import numpy as np
 from numbers import Integral
 from itertools import zip_longest
 
+from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import shape2tuple
-from openmdao.utils.array_utils import shape_to_len, get_index_dtype
+from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.om_warnings import issue_warning
 
 
@@ -655,8 +656,7 @@ class ShapedSliceIndexer(Indexer):
                 return np.arange(*slc.indices(sys.maxsize), dtype=int)
         else:
             src_size = shape_to_len(self._src_shape)
-            dtype = get_index_dtype(src_size)
-            arr = np.arange(src_size, dtype=dtype).reshape(self._src_shape)[self._slice].ravel()
+            arr = np.arange(src_size, dtype=INT_DTYPE).reshape(self._src_shape)[self._slice].ravel()
             if flat:
                 # Case 2: Requested flattened indices of multidimensional array
                 # Return indices into a flattened src.
@@ -1136,7 +1136,7 @@ class ShapedMultiIndexer(Indexer):
             raise ValueError("Can't determine extent of array because source shape is not known.")
 
         size = shape_to_len(self._src_shape)
-        idxs = np.arange(size, dtype=get_index_dtype(size)).reshape(self._src_shape)
+        idxs = np.arange(size, dtype=INT_DTYPE).reshape(self._src_shape)
 
         if flat:
             return idxs[self()].ravel()

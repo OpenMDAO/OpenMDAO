@@ -161,10 +161,6 @@ class _TotalJacInfo(object):
                                "was called.")
 
         of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of, wrt)
-        import pprint
-        pprint.pprint(of_metadata)
-        print('----------')
-        pprint.pprint(wrt_metadata)
 
         ofsize = sum(meta['global_size'] for meta in of_metadata.values())
         wrtsize = sum(meta['global_size'] for meta in wrt_metadata.values())

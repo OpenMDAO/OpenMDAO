@@ -324,7 +324,6 @@ class DirectSolver(LinearSolver):
 
         if system._get_assembled_jac() is not None:
             matrix = system._assembled_jac.get_dr_do_matrix()
-            system._assembled_jac._dr_do_mtx.dump(system.msginfo)
 
             if matrix is None:
                 # this happens if we're not rank 0 when using owned_sizes
