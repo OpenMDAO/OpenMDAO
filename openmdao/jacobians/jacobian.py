@@ -201,7 +201,8 @@ class Jacobian(object):
             Metadata dict for the given key.
         """
         try:
-            return self._subjacs[self._get_abs_key(key)].info
+            return self._subjacs_info[self._get_abs_key(key)]
+            # return self._subjacs[self._get_abs_key(key)].info
         except KeyError:
             raise KeyError(f'Variable name pair {key} not found.')
 
