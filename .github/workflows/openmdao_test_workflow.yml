@@ -294,11 +294,6 @@ jobs:
 
           if [ -d "SNOPT" ] ; then
             echo "-------------------------------------------------------------"
-            echo "Installing additional build dependencies"
-            echo "-------------------------------------------------------------"
-            conda install cmake meson openmp -q -y
-
-            echo "-------------------------------------------------------------"
             echo "Building SNOPT"
             echo "-------------------------------------------------------------"
             cd SNOPT
