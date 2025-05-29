@@ -130,18 +130,6 @@ class IndepVarComp(ExplicitComponent):
                     desc="User defined tags that can be used to filter what gets listed when "
                          "calling list_outputs.")
 
-    # def _choose_jac_type(self):
-    #     """
-    #     Choose the Jacobian type based on the jac_type option.
-
-    #     Returns
-    #     -------
-    #     Jacobian
-    #         The Jacobian object.
-    #     """
-    #     # FIXME: currently ComponentJacobian doesn't work with IndepVarComp
-    #     return BlockJacobian(self)
-
     def _configure_check(self):
         """
         Do any error checking on i/o configuration.
