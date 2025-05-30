@@ -355,7 +355,7 @@ class Jacobian(object):
     #           f"    d_residuals: {d_residuals.asarray()}")
 
     def _setup_index_maps(self, system):
-        namesize_iter = [(n, end - start) for n, start, end, _, _, _ in system._jac_wrt_iter()]
+        namesize_iter = [(n, end - start) for n, start, end, _, _, _ in system._get_jac_wrts()]
         self._col_mapper = RangeMapper.create(namesize_iter)
 
     def set_col(self, system, icol, column):
@@ -383,7 +383,7 @@ class Jacobian(object):
 
         subjacs = self._subjacs
 
-        for of, start, end, _, _ in system._jac_of_iter():
+        for of, start, end, _, _ in system._get_jac_ofs():
             key = (of, wrt)
             if key in subjacs:
                 subjacs[key].set_col(loc_idx, column[start:end])
@@ -399,8 +399,8 @@ class Jacobian(object):
         jac : csc_matrix
             CSC jacobian.
         """
-        ofiter = list(system._jac_of_iter())
-        for wrt, wstart, wend, _, _, _ in system._jac_wrt_iter():
+        ofiter = list(system._get_jac_ofs())
+        for wrt, wstart, wend, _, _, _ in system._get_jac_wrts():
             wjac = jac[:, wstart:wend]
             for of, start, end, _, _ in ofiter:
                 key = (of, wrt)
@@ -429,8 +429,8 @@ class Jacobian(object):
         if self._col_mapper is None:
             self._setup_index_maps(system)
 
-        wrtiter = list(system._jac_wrt_iter())
-        for of, start, end, _, _ in system._jac_of_iter():
+        wrtiter = list(system._get_jac_wrts())
+        for of, start, end, _, _ in system._get_jac_ofs():
             for wrt, wstart, wend, _, _, _ in wrtiter:
                 key = (of, wrt)
                 if key in self._subjacs_info:
@@ -807,36 +807,35 @@ class SplitJacobian(Jacobian):
             return self._subjac_from_meta(abs_key, meta, out_slices[of], col_slice, False,
                                           dtype, src_indices, factor, src)
 
-    # def set_col(self, system, icol, column):
-    #     """
-    #     Set a column of the jacobian.
+    def set_col(self, system, icol, column):
+        """
+        Set a column of the jacobian.
 
-    #     The column is assumed to be the same size as a column of the jacobian.
+        The column is assumed to be the same size as a column of the jacobian.
 
-    #     This also assumes that the column does not attempt to set any nonzero values that are
-    #     outside of specified sparsity patterns for any of the subjacs.
+        This also assumes that the column does not attempt to set any nonzero values that are
+        outside of specified sparsity patterns for any of the subjacs.
 
-    #     Parameters
-    #     ----------
-    #     system : System
-    #         The system that owns this jacobian.
-    #     icol : int
-    #         Column index.
-    #     column : ndarray
-    #         Column value.
-    #     """
-    #     if self._col_mapper is None:
-    #         self._setup_index_maps(system)
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        icol : int
+            Column index.
+        column : ndarray
+            Column value.
+        """
+        if self._col_mapper is None:
+            self._setup_index_maps(system)
 
-    #     wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
+        wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
 
-    #     subjacs = self._subjacs
+        subjacs = self._subjacs
 
-    #     for of, start, end, _, _ in system._jac_of_iter():
-    #         key = (of, wrt)
-    #         if key in subjacs:
-    #             subjacs[key].set_col(loc_idx, column[start:end])
-
+        for of, start, end, _, _ in system._get_jac_ofs():
+            key = (of, wrt)
+            if key in subjacs:
+                subjacs[key].set_col(loc_idx, column[start:end])
 
 
 class JacobianUpdateContext:

@@ -671,6 +671,33 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 yield from self._var_allprocs_discrete[iotype].items()
 
+    def _get_jac_ofs(self):
+        if self._jac_ofs_cache is None:
+            self._jac_ofs_cache = list(self._jac_of_iter())
+        return self._jac_ofs_cache
+
+    def _get_jac_wrts(self, wrt_matches=None):
+        """
+        Iterate over (name, start, end, vec, slice, dist_sizes) for each column var in the jacobian.
+
+        Parameters
+        ----------
+        wrt_matches : frozenset or None
+            Only include column vars that are contained in this set.  This will determine what
+            the actual offsets are, i.e. the offsets will be into a reduced jacobian
+            containing only the matching columns.
+        """
+        if wrt_matches not in self._jac_wrts_cache:
+            self._jac_wrts_cache[wrt_matches] = list(self._jac_wrt_iter(wrt_matches))
+        return self._jac_wrts_cache[wrt_matches]
+
+    def _clear_jac_caches(self):
+        """
+        Clear the jacobian of and wrtcaches.
+        """
+        self._jac_ofs_cache = None
+        self._jac_wrts_cache = {}
+
     def _jac_of_iter(self):
         """
         Iterate over (name, offset, end, slice, dist_sizes) for each 'of' (row) var in the jacobian.
@@ -720,7 +747,9 @@ class System(object, metaclass=SystemMetaclass):
         Vector or None
             Either the _outputs or _inputs vector if var is local else None.
         slice
-            A full slice.
+            A full slice.  In the total derivative version of this function, which only is called
+            on the top level Group, this may not be a full slice, but rather indices specified
+            for the corresponding design variable.
         ndarray or None
             Distributed sizes if var is distributed else None
         """
@@ -736,7 +765,7 @@ class System(object, metaclass=SystemMetaclass):
         szname = 'global_size' if total else 'size'
 
         start = end = 0
-        for of, _start, _end, _, dist_sizes in self._jac_of_iter():
+        for of, _start, _end, _, dist_sizes in self._get_jac_ofs():
             if wrt_matches is None or of in wrt_matches:
                 end += (_end - _start)
                 vec = self._outputs if of in local_outs else None
@@ -1630,8 +1659,8 @@ class System(object, metaclass=SystemMetaclass):
         sp_info['class'] = type(self).__name__
         sp_info['type'] = 'semi-total' if self._subsystems_allprocs else 'partial'
 
-        ordered_wrt_info = list(self._jac_wrt_iter(info.wrt_matches))
-        ordered_of_info = list(self._jac_of_iter())
+        ordered_wrt_info = self._get_jac_wrts(info.wrt_matches)
+        ordered_of_info = self._get_jac_ofs()
 
         if self.pathname:
             ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
@@ -1869,9 +1898,9 @@ class System(object, metaclass=SystemMetaclass):
         rows = sparsity.row
         cols = sparsity.col
         plen = len(self.pathname) + 1 if self.pathname else 0
-        for of, ofstart, ofend, _, _ in self._jac_of_iter():
+        for of, ofstart, ofend, _, _ in self._get_jac_ofs():
             subrows = np.logical_and(sparsity.row >= ofstart, sparsity.row < ofend)
-            for wrt, wrtstart, wrtend, _, _, _ in self._jac_wrt_iter(wrt_matches):
+            for wrt, wrtstart, wrtend, _, _, _ in self._get_jac_wrts(wrt_matches):
                 matching = np.logical_and(sparsity.col >= wrtstart, sparsity.col < wrtend)
                 matching &= subrows
                 nzrows = rows[matching] - ofstart
@@ -2242,6 +2271,8 @@ class System(object, metaclass=SystemMetaclass):
         self._responses.update(self._static_responses)
 
         self._jacobian = self._assembled_jac = None
+        self._jac_ofs_cache = None
+        self._jac_wrts_cache = {}
 
     def _setup_procs(self, pathname, comm, prob_meta):
         """

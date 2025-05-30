@@ -642,8 +642,8 @@ class Partial_ColoringMeta(ColoringMeta):
             return
 
         prefix = system.pathname + '.' if system.pathname else ''
-        self.wrt_matches = set(prefix + n for n in
-                               pattern_filter(self.wrt_patterns, system._promoted_wrt_iter()))
+        self.wrt_matches = frozenset(prefix + n for n in
+                                     pattern_filter(self.wrt_patterns, system._promoted_wrt_iter()))
 
         # error if nothing matched
         if not self.wrt_matches:
@@ -1151,12 +1151,12 @@ class Coloring(object):
         info._update_wrt_matches(system)
         if system.pathname:
             # for partial and semi-total derivs, convert to promoted names
-            ordered_of_info = system._jac_var_info_abs2prom(system._jac_of_iter())
+            ordered_of_info = system._jac_var_info_abs2prom(system._get_jac_ofs())
             ordered_wrt_info = \
-                system._jac_var_info_abs2prom(system._jac_wrt_iter(info.wrt_matches))
+                system._jac_var_info_abs2prom(system._get_jac_wrts(info.wrt_matches))
         else:
-            ordered_of_info = list(system._jac_of_iter())
-            ordered_wrt_info = list(system._jac_wrt_iter(info.wrt_matches))
+            ordered_of_info = system._get_jac_ofs()
+            ordered_wrt_info = system._get_jac_wrts(info.wrt_matches)
 
         of_names = [t[0] for t in ordered_of_info]
         wrt_names = [t[0] for t in ordered_wrt_info]
@@ -3624,9 +3624,9 @@ class _ColSparsityJac(object):
     def __init__(self, system):
         self._coloring_info = system._coloring_info
 
-        nrows = sum([end - start for _, start, end, _, _ in system._jac_of_iter()])
+        nrows = sum([end - start for _, start, end, _, _ in system._get_jac_ofs()])
         end = 0
-        for _, _, end, _, _, _ in system._jac_wrt_iter(self._coloring_info.wrt_matches):
+        for _, _, end, _, _, _ in system._get_jac_wrts(self._coloring_info.wrt_matches):
             pass
 
         self._nrows = nrows

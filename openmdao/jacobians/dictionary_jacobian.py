@@ -171,9 +171,9 @@ class _CheckingJacobian(DictionaryJacobian):
         else:
             local_opts = None
 
-        for of, start, end, _, _ in system._jac_of_iter():
+        for of, start, end, _, _ in system._get_jac_ofs():
             nrows = end - start
-            for wrt, wstart, wend, vec, _, _ in system._jac_wrt_iter():
+            for wrt, wstart, wend, vec, _, _ in system._get_jac_wrts():
                 if local_opts:
                     loc_wrt = wrt.rsplit('.', 1)[-1]
                     directional = (loc_wrt in local_opts and
@@ -229,7 +229,7 @@ class _CheckingJacobian(DictionaryJacobian):
 
         subjacs = self._get_subjacs(system)
 
-        for of, start, end, _, _ in system._jac_of_iter():
+        for of, start, end, _, _ in system._get_jac_ofs():
             key = (of, wrt)
             if key in subjacs:
                 subjac = subjacs[key]

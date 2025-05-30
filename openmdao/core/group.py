@@ -1057,7 +1057,7 @@ class Group(System):
         abs2meta = self._var_abs2meta['output']
         sizes = self._var_sizes['output']
         global_offsets = self._get_var_offsets()['output']
-        oflist = list(self._jac_of_iter())
+        oflist = self._get_jac_ofs()
         tsize = oflist[-1][2]
         toffset = myrank * tsize
         has_dist_data = False
@@ -3611,14 +3611,6 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            #for sname, sinfo in self._subsystems_allprocs.items():
-                #sub = sinfo.system
-                ## TODO: could gather 'has_guess' information during setup and be able to
-                ## skip transfer for subs that don't have guesses...
-                #self._transfer('nonlinear', 'fwd', sname)
-                #if sub._is_local and sub._has_guess:
-                    #sub._guess_nonlinear()
-
             # call our own guess_nonlinear method, after the recursion is done to
             # all the lower level systems and the data transfers have happened
             complex_step = self._inputs._under_complex_step
@@ -4138,7 +4130,7 @@ class Group(System):
 
                 start = end
         else:
-            yield from super()._jac_of_iter()
+            yield from super()._get_jac_ofs()
 
     def _jac_wrt_iter(self, wrt_matches=None):
         """
@@ -4162,7 +4154,8 @@ class Group(System):
         Vector
             Either the _outputs or _inputs vector.
         slice or ndarray
-            A full slice or indices for the 'wrt' variable.
+            A full slice or indices for the corresponding design variable when computing total
+            derivatives.
         ndarray or None
             Distributed sizes if var is distributed else None
         """
@@ -4211,7 +4204,7 @@ class Group(System):
                     yield wrt, start, end, vec, sub_wrt_idx, dist_sizes
                     start = end
         else:
-            yield from super()._jac_wrt_iter(wrt_matches)
+            yield from super()._get_jac_wrts(wrt_matches)
 
     def _promoted_wrt_iter(self):
         if not (self._owns_approx_of or self.pathname):

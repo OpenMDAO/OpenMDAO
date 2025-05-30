@@ -194,21 +194,23 @@ class Component(System):
         """
         # DBG: remove after debugging
         # return BlockJacobian(self)
+        jac_type = self.options['jac_type']
 
-        if self.options['jac_type'] == 'auto':
-            return self._get_auto_jac()
-        elif self.options['jac_type'] == 'dense':
+        # if jac_type == 'auto':
+        #     jac_type = self._get_auto_jac()
+
+        if jac_type == 'dense':
             return ComponentJacobian(DenseMatrix, self)
-        elif self.options['jac_type'] == 'coo':
+        elif jac_type == 'coo':
             return ComponentJacobian(COOMatrix, self)
-        elif self.options['jac_type'] == 'csc':
+        elif jac_type == 'csc':
             return ComponentJacobian(CSCMatrix, self)
-        elif self.options['jac_type'] == 'csr':
+        elif jac_type == 'csr':
             return ComponentJacobian(CSRMatrix, self)
-        elif self.options['jac_type'] == 'dict':
+        elif jac_type == 'dict':
             return BlockJacobian(self)
         else:
-            raise ValueError(f"Invalid jac_type: {self.options['jac_type']}")
+            raise ValueError(f"Invalid jac_type: {jac_type}")
 
     def setup(self):
         """
@@ -1863,7 +1865,7 @@ class Component(System):
         if self._serial_idxs is None:
             ranges = defaultdict(list)
             output_len = 0 if self.is_explicit(is_comp=True) else len(self._outputs)
-            for _, offset, end, vec, slc, dist_sizes in self._jac_wrt_iter():
+            for _, offset, end, vec, slc, dist_sizes in self._get_jac_wrts():
                 if dist_sizes is None:  # not distributed
                     if offset != end:
                         if vec is self._outputs:
@@ -1904,7 +1906,7 @@ class Component(System):
         """
         nzresids = []
         dresids = self._dresiduals.asarray()
-        for of, start, end, _, dist_sizes in self._jac_of_iter():
+        for of, start, end, _, dist_sizes in self._get_jac_ofs():
             if dist_sizes is not None:
                 if np.any(dresids[start:end]):
                     nzresids.append(of)
@@ -2001,11 +2003,11 @@ class Component(System):
             out_stream = sys.stdout
 
         def rowsizeiter():
-            for of, start, end, _, _ in self._jac_of_iter():
+            for of, start, end, _, _ in self._get_jac_ofs():
                 yield of, end - start
 
         def colsizeiter():
-            for wrt, start, end, _, _, _ in self._jac_wrt_iter():
+            for wrt, start, end, _, _, _ in self._get_jac_wrts():
                 yield wrt, end - start
 
         sparsity, _ = self.compute_fd_sparsity(method=method)

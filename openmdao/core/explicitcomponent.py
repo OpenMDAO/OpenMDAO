@@ -104,7 +104,9 @@ class ExplicitComponent(Component):
         Vector
             The _inputs vector.
         slice
-            A full slice.
+            A full slice.  In the total derivative version of this function, which only is called
+            on the top level Group, this may not be a full slice, but rather indices specified
+            for the corresponding design variable.
         ndarray or None
             Distributed sizes if var is distributed else None
         """

@@ -132,6 +132,7 @@ class _TotalJacInfo(object):
         if driver is None:
             driver = problem.driver
         self.model = model = problem.model
+        model._clear_jac_caches()
 
         self.comm = model.comm
         self._orig_mode = problem._orig_mode
