@@ -64,8 +64,6 @@ class NameResolver(object):
         The pathname of the system.
     msginfo : str
         The message information for the system.
-    check_dups : bool
-        If True, check for duplicate names.
 
     Attributes
     ----------
@@ -97,7 +95,7 @@ class NameResolver(object):
         The message information for the system.
     """
 
-    def __init__(self, pathname, msginfo='', check_dups=False):
+    def __init__(self, pathname, msginfo=''):
         """
         Initialize the name resolver.
 
@@ -107,8 +105,6 @@ class NameResolver(object):
             The pathname of the system.
         msginfo : str
             The message information for the system.
-        check_dups : bool
-            If True, check for duplicate names.
         """
         self._pathname = pathname
         self._prefix = pathname + '.' if pathname else ''

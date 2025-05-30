@@ -1152,24 +1152,7 @@ def _src_or_alias_item_iter(proms):
             yield name, meta
 
 
-def _src_or_alias_dict(prom_dict):
-    """
-    Convert a dict with promoted input names into one with source or alias names.
-
-    Parameters
-    ----------
-    prom_dict : dict
-        Original dict with some promoted paths.
-
-    Returns
-    -------
-    dict
-        New dict with source pathnames or alias names.
-    """
-    return {name: meta for name, meta in _src_or_alias_item_iter(prom_dict)}
-
-
-def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shape):
+def convert_src_inds(parent_src_inds, my_src_inds, my_src_shape):
     """
     Compute lower level src_indices based on parent src_indices.
 
@@ -1177,8 +1160,6 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
     ----------
     parent_src_inds : ndarray
         Parent src_indices.
-    parent_src_shape : tuple
-        Shape of source expected by parent.
     my_src_inds : ndarray or fancy index
         Src_indices at the current system level, before conversion.
     my_src_shape : tuple
@@ -1463,34 +1444,6 @@ def make_traceback():
     """
     finfo = getouterframes(currentframe())[2]
     return TracebackType(None, finfo.frame, finfo.frame.f_lasti, finfo.frame.f_lineno)
-
-
-if env_truthy('OM_DBG'):
-    def dprint(*args, **kwargs):
-        """
-        Print only if OM_DBG is truthy in the environment.
-
-        Parameters
-        ----------
-        args : list
-            Positional args.
-        kwargs : dict
-            Named args.
-        """
-        print(*args, **kwargs)
-else:
-    def dprint(*args, **kwargs):
-        """
-        Print only if OM_DBG is truthy in the environment.
-
-        Parameters
-        ----------
-        args : list
-            Positional args.
-        kwargs : dict
-            Named args.
-        """
-        pass
 
 
 def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):

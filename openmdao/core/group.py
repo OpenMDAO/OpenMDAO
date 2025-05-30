@@ -1318,7 +1318,7 @@ class Group(System):
 
         # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
         # linear root vec
-        self._root_vecs = root_vectors = {'input': {}, 'output': {}, 'residual': {}}
+        root_vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         for kind in ['input', 'output', 'residual']:
             rvec = root_vectors[kind]
@@ -1606,7 +1606,7 @@ class Group(System):
                     try:
                         if pinfo.src_shape is None:
                             pinfo.set_src_shape(current_pinfo.src_indices.indexed_src_shape)
-                        sinds = convert_src_inds(current_pinfo.src_indices, current_pinfo.src_shape,
+                        sinds = convert_src_inds(current_pinfo.src_indices,
                                                  pinfo.src_indices, pinfo.src_shape)
                     except Exception:
                         type_exc, exc, tb = sys.exc_info()
@@ -4490,7 +4490,7 @@ class Group(System):
                             if src_indices is None:
                                 src_indices = inds
                             else:
-                                sinds = convert_src_inds(src_indices, newshape, inds, shape)
+                                sinds = convert_src_inds(src_indices, inds, shape)
                                 # final src_indices are wrt original full sized source and are flat,
                                 # so use val_shape and flat_src=True
                                 src_indices = indexer(sinds, src_shape=val_shape, flat_src=True)

@@ -202,8 +202,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         Problem level metadata.
     _run_counter : int
         The number of times run_driver or run_model has been called.
-    _warned : bool
-        Bool to check if `value` deprecation warning has occured yet
     _computing_coloring : bool
         When True, we are computing coloring.
     """
@@ -222,7 +220,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         self._reports = get_reports_to_activate(reports)
 
         self.cite = CITATION
-        self._warned = False
         self._computing_coloring = False
 
         if comm is None:
@@ -2372,47 +2369,6 @@ class Problem(object, metaclass=ProblemMetaclass):
                 print('None found', file=out_stream)
 
         return problem_indep_vars
-
-    def iter_count_iter(self, include_driver=True, include_solvers=True, include_systems=False):
-        """
-        Yield iteration counts for driver, solvers and/or systems.
-
-        Parameters
-        ----------
-        include_driver : bool
-            If True, include the driver in the iteration counts.
-        include_solvers : bool
-            If True, include solvers in the iteration counts.
-        include_systems : bool
-            If True, include systems in the iteration counts.
-
-        Yields
-        ------
-        str
-            Name of the object.
-        str
-            Name of the counter.
-        int
-            Value of the counter.
-        """
-        if include_driver:
-            yield ('Driver', 'iter_count', self.driver.iter_count)
-        if include_solvers or include_systems:
-            for s in self.model.system_iter(include_self=True, recurse=True):
-                if include_systems:
-                    for it in ('iter_count', 'iter_count_apply'):
-                        val = getattr(s, it)
-                        if val > 0:
-                            yield (s.pathname, it, val)
-
-                if include_solvers:
-                    prefix = s.pathname + '.' if s.pathname else ''
-                    if s.nonlinear_solver is not None and s.nonlinear_solver._iter_count > 0:
-                        yield (prefix + 'nonlinear_solver', '_iter_count',
-                               s.nonlinear_solver._iter_count)
-                    if s.linear_solver is not None and s.linear_solver._iter_count > 0:
-                        yield (prefix + 'linear_solver', '_iter_count',
-                               s.linear_solver._iter_count)
 
     def list_pre_post(self, outfile=None):
         """

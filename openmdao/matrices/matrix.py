@@ -1,10 +1,6 @@
 """Define the base Matrix class."""
 
-from scipy.sparse import coo_matrix, csr_matrix, csc_matrix
 import numpy as np
-
-# scipy sparse types allowed to be subjacs
-sparse_types = (csr_matrix, csc_matrix, coo_matrix)
 
 
 class Matrix(object):

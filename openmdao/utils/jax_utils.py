@@ -14,7 +14,6 @@ import importlib
 import numpy as np
 from scipy.sparse import coo_matrix
 
-from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.utils.code_utils import _get_long_name, remove_src_blocks, replace_src_block, \
     get_function_deps
 from openmdao.utils.file_utils import get_module_path, _load_and_exec
@@ -52,51 +51,6 @@ except ImportError:
     jax = None
     jnp = np
     jit = jit_stub
-
-
-def register_jax_component(comp_class):
-    """
-    Provide a class decorator that registers the given class as a pytree_node.
-
-    This allows jax to use jit compilation on the methods of this class if they
-    reference attributes of the class itself, such as `self.options`.
-
-    Note that this decorator is not necessary if the given class does not reference
-    `self` in any methods to which `jax.jit` is applied.
-
-    Parameters
-    ----------
-    comp_class : class
-        The decorated class.
-
-    Returns
-    -------
-    object
-        The same class given as an argument.
-
-    Raises
-    ------
-    NotImplementedError
-        If this class does not define the `_tree_flatten` and _tree_unflatten` methods.
-    RuntimeError
-        If jax is not available.
-    """
-    if jax is None:
-        raise RuntimeError("jax is not available. "
-                           "Try 'pip install openmdao[jax]' with Python>=3.8.")
-
-    if not hasattr(comp_class, '_tree_flatten'):
-        raise NotImplementedError(f'class {comp_class} does not implement method _tree_flatten.'
-                                  f'\nCannot register {comp_class} as a jax jit-compatible '
-                                  f'component.')
-
-    if not hasattr(comp_class, '_tree_unflatten'):
-        raise NotImplementedError(f'class {comp_class} does not implement method _tree_unflatten.'
-                                  f'\nCannot register class {comp_class} as a jax jit-compatible '
-                                  f'component.')
-
-    _jax_register_pytree_class(comp_class)
-    return comp_class
 
 
 def dump_jaxpr(closed_jaxpr):
@@ -670,95 +624,6 @@ def _fixname(name):
         for c in intr:
             name = name.replace(c, '_')
     return name
-
-
-def benchmark_component(comp_class, methods=(None, 'cs', 'jax'), initial_vals=None, repeats=2,
-                        mode='auto', table_format='simple_grid', **kwargs):
-    """
-    Benchmark the performance of a Component using different methods for computing derivatives.
-
-    Parameters
-    ----------
-    comp_class : class
-        The class of the Component to be benchmarked.
-    methods : tuple of str
-        The methods to be benchmarked. Options are 'cs', 'jax', and None.
-    initial_vals : dict or None
-        Initial values for the input variables.
-    repeats : int
-        The number of times to run compute/compute_partials.
-    mode : str
-        The preferred derivative direction for the Problem.
-    table_format : str or None
-        If not None, the format of the table to be displayed.
-    **kwargs : dict
-        Additional keyword arguments to be passed to the Component.
-
-    Returns
-    -------
-    dict
-        A dictionary containing the benchmark results.
-    """
-    import time
-
-    from openmdao.core.problem import Problem
-    from openmdao.devtools.memory import mem_usage
-
-    verbose = table_format is not None
-    results = []
-    for method in methods:
-        mem_start = mem_usage()
-        p = Problem()
-        comp = p.model.add_subsystem('comp', comp_class(**kwargs))
-        comp.options['derivs_method'] = method
-        if method in ('cs', 'fd'):
-            comp._has_approx = True
-            comp._get_approx_scheme(method)
-
-        if initial_vals:
-            for name, val in initial_vals.items():
-                p.model.set_val('comp.' + name, val)
-
-        p.setup(mode=mode, force_alloc_complex='cs' in methods)
-        p.run_model()
-
-        model_mem = mem_usage
-
-        if verbose:
-            print(f"\nModel memory usage: {model_mem} MB")
-            print(f"\nTiming {repeats} compute calls for {comp_class.__name__} using "
-                  f"{method} method.")
-        start = time.perf_counter()
-        for n in range(repeats):
-            comp.compute(comp._inputs, comp._outputs)
-            if verbose:
-                print('.', end='', flush=True)
-        results.append([method, 'compute', n, time.perf_counter() - start, None])
-
-        diff_mem = mem_usage() - mem_start
-        results[-1][-1] = diff_mem
-
-        if verbose:
-            print(f"\n\nTiming {repeats} compute_partials calls for {comp_class.__name__} using "
-                  f"{method} method.")
-        start = time.perf_counter()
-        for n in range(repeats):
-            p.model._linearize(None)
-            if verbose:
-                print('.', end='', flush=True)
-        results.append([method, 'compute_partials', n, time.perf_counter() - start, None])
-
-        diff_mem = mem_usage() - model_mem
-        results[-1][-1] = diff_mem
-
-        del p
-
-    if verbose:
-        print('\n')
-        headers = ['Method', 'Function', 'Iterations', 'Time (s)', 'Memory (MB)']
-        generate_table(results, tablefmt=table_format, headers=headers).display()
-
-    return results
 
 
 if jax is None:

@@ -127,25 +127,6 @@ class _MatchType(IntEnum):
     PATTERN = 2
 
 
-class _OptStatus(IntEnum):
-    """
-    Class used to define different states during the optimization process.
-
-    Attributes
-    ----------
-    PRE : int
-        Before the optimization.
-    OPTIMIZING : int
-        During the optimization.
-    POST : int
-        After the optimization.
-    """
-
-    PRE = 0
-    OPTIMIZING = 1
-    POST = 2
-
-
 def collect_errors(method):
     """
     Decorate a method so that it will collect any exceptions for later display.
@@ -6886,27 +6867,6 @@ class System(object, metaclass=SystemMetaclass):
                 sz = sizes[io][rank, ivar]
                 if sz > 0:
                     yield (vname, mytopranks[rank]), sz
-
-    def local_range_iter(self, io):
-        """
-        Yield names and local ranges of all local variables in this system.
-
-        Parameters
-        ----------
-        io : str
-            Either 'input' or 'output'.
-
-        Yields
-        ------
-        tuple
-            A tuple of the form (abs_name, start, end).
-        """
-        offset = 0
-        for vname, size in zip(self._var_allprocs_abs2meta[io],
-                               self._var_sizes[io][self.comm.rank]):
-            if size > 0:
-                yield vname, offset, offset + size
-            offset += size
 
     def get_var_dup_info(self, name, io):
         """

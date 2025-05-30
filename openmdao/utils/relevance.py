@@ -489,9 +489,6 @@ class Relevance(object):
         self._seed_var_map = seed_var_map = {}
         self._seed_sys_map = seed_sys_map = {}
 
-        self._current_var_array = np.zeros(0, dtype=bool)
-        self._current_sys_array = np.zeros(0, dtype=bool)
-
         self._all_seed_vars['fwd'] = fwd_seeds
         self._all_seed_vars['rev'] = rev_seeds
 
