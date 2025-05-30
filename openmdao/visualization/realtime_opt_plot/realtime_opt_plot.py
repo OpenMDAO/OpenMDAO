@@ -56,7 +56,6 @@ except ImportError:
 # if this is too small, the GUI interactions get delayed because
 # code is busy trying to keep up with the periodic callbacks
 _time_between_callbacks_in_ms = 1000
-# _time_between_callbacks_in_ms = 100
 # Number of milliseconds for unused session lifetime
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10
 _toggle_styles = """
@@ -66,21 +65,32 @@ _toggle_styles = """
         0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
         inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
-
+# some models have a large number of variables. Putting them all in a plot 
+#   is not practical. Initially show no more than this number
 _max_number_initial_visible_sampled_variables = 4
-_max_number_initial_visible_sampled_variables = 1
-_grid_plot_height_and_width = 240 
+# how big the individual plots should be in the grid
+_grid_plot_height_and_width = 240
+# number of histogram bins in the histogram plots for the sampled variables
+_num_histogram_bins = 30 
 
+# variable names can be very long and too large to show completely
+#  in the plot axes. This is the largest number of characters that
+#  can be shown in the axes. The rest are elided. Full variable 
+#  shown as a tooltip
 _max_label_length = 25
+_elide_string = "..."
+_color_palette = Viridis256
+_initial_response_range_for_plots = (0,200)
+
+# function to create the labels for the plots, need to elide long variable names
 def _elide_variable_name_with_units(variable_name, units):
-    elide_string = "..."
     if units:
         un_elided_string_length = len(f"{variable_name} ({units})")
     else:
         un_elided_string_length = len(variable_name)
-    chop_length = max(un_elided_string_length - _max_label_length + len(elide_string),0)
+    chop_length = max(un_elided_string_length - _max_label_length + len(_elide_string),0)
     if chop_length:
-        variable_name = elide_string + variable_name[chop_length:]
+        variable_name = _elide_string + variable_name[chop_length:]
 
     if units:
         return f"{variable_name} ({units})"
@@ -329,56 +339,27 @@ class _RealTimeOptPlot(object):
         self._case_recorder_filename = case_recorder_filename
         self._case_tracker = _CaseRecorderTracker(case_recorder_filename)
         self._pid_of_calling_script = pid_of_calling_script
-
         self._sampled_variables = None
         self._sampled_variables_visibility = {}
         self._prom_response = None
-
         self._num_samples_plotted = 0
-
         self._responses = None
-
         self._prom_responses = None
-
         self._scatter_plots = {}
-
         self._scatter_plots_figure = {}
-
         self._doc = doc
-
         self._source = None
-        self._lines = []
-        # flag to prevent updating label with units each time we get new data
-        self._labels_updated_with_units = False
         self._source_stream_dict = None
-
         self._hist_source = {}
-
-        self._plotted_response_variable = None
-
         # used to keep track of the y min and max of the data so that
         # the axes ranges can be adjusted as data comes in
-        # self._y_min = defaultdict(lambda: float("inf"))
-        # self._y_max = defaultdict(lambda: float("-inf"))
-
-        # self._prom_response_min = float("inf")
-        # self._prom_response_max = float("-inf")
-
         self._prom_response_min = defaultdict(lambda: float("inf"))
         self._prom_response_max = defaultdict(lambda: float("-inf"))
-
         self._start_time = time.time()
-
         self._sampled_variables_toggles = []
-
         self._hist_figures = {}
 
         def _update():
-            print("_update")
-
-            # print(f"{self.access_by_id('p1014')=}")
-
-            # print (f"{self._sampled_variables_visibility=}")
             # this is the main method of the class. It gets called periodically by Bokeh
             # It looks for new data and if found, updates the plot with the new data
             new_case = self._case_tracker._get_new_case()
@@ -450,8 +431,6 @@ class _RealTimeOptPlot(object):
             elapsed_total = current_time - self._start_time
             elapsed_formatted = str(timedelta(seconds=int(elapsed_total)))
 
-            # styles={"font-size": "20px", "font-weight": "bold"},
-
             stats_text = f"""<div style="padding: 10px; ">
                             <p>Number of samples: {self._num_samples_plotted}</p>
                             <p>Last updated: {formatted_time}</p>
@@ -482,10 +461,8 @@ class _RealTimeOptPlot(object):
         for sampled_variable in self._sampled_variables:
             x_data = self._source.data[sampled_variable]
 
-            # Compute histogram with 30 bins
-            # TODO make 30 a variable
             hist, edges = np.histogram(
-                x_data, bins=30, range=(np.min(x_data), np.max(x_data))
+                x_data, bins=_num_histogram_bins, range=(np.min(x_data), np.max(x_data))
             )
 
             self._hist_source[sampled_variable].data.update(
@@ -524,8 +501,6 @@ class _RealTimeOptPlot(object):
             else:
                 raise RuntimeError(f"No prom for abs variable {response}")
 
-        # driver_case = self._case_tracker._get_case_by_counter(1)
-        # objs = driver_case.get_objectives()
         # for now assume one response
         self._prom_response = self._prom_responses[0]
         self._source_dict[self._prom_response] = []
@@ -534,13 +509,10 @@ class _RealTimeOptPlot(object):
             self._source_dict[response] = []
 
         # need to make unavailble for this any variables that are not scalars
-        # self._case_tracker._get_shape
         self._sampled_variables = [
             varname for varname in outputs if varname not in self._prom_responses
         ]
-
         self._sampled_variables = []
-
         self._sampled_variables_non_scalar = []
 
         for varname in outputs:
@@ -554,9 +526,6 @@ class _RealTimeOptPlot(object):
 
         self._sampled_variables.sort()
         self._sampled_variables_non_scalar.sort()
-
-        # for sampled_variable in self._sampled_variables:
-        #     self._sampled_variables_visibility[sampled_variable] = True
 
         for sampled_variable in self._sampled_variables:
             self._source_dict[sampled_variable] = []
@@ -620,8 +589,6 @@ class _RealTimeOptPlot(object):
 
         def _sampled_variable_callback(var_name):
             def toggle_callback(attr, old, new):
-                # The callback "closes over" the var_name variable
-                # lines[var_name].visible = toggles[var_name].active
                 self._sampled_variables_visibility[var_name] = new
                 self._hist_figures[var_name].visible = new
 
@@ -653,14 +620,10 @@ class _RealTimeOptPlot(object):
                     self._sampled_variables_visibility[sampled_var] = False
                     self._make_variable_button(sampled_var,False, True, _sampled_variable_callback(sampled_var))
 
-        # xdrs = [DataRange1d(bounds=None) for _ in range(N)]
-        # ydrs = [DataRange1d(bounds=None) for _ in range(N)]
-
-        # print(f"{xdrs=}")
-        # print(f"{ydrs=}")
-
         # Create a color mapper using Viridis (colorblind-friendly)
-        self._color_mapper = LinearColorMapper(palette=Viridis256, low=0, high=200)
+        self._color_mapper = LinearColorMapper(palette=_color_palette, 
+                                               low=_initial_response_range_for_plots[0], 
+                                               high=_initial_response_range_for_plots[1])
 
         plots = []
 
@@ -677,21 +640,14 @@ class _RealTimeOptPlot(object):
                 y_units = self._case_tracker._get_units(y)
 
                 p = figure(
-                    # x_range=xdrs[i % N],
-                    # y_range=ydrs[i // N],
                     background_fill_color="#fafafa",
                     border_fill_color="white",
                     width=_grid_plot_height_and_width,
                     height=_grid_plot_height_and_width,
                     output_backend="webgl",
                 )
-
                 self._scatter_plots_figure[(x,y)] = p
-
-                # p.xaxis.axis_label = f"{x} ({x_units} {i})"
-                # p.yaxis.axis_label = f"{y} ({y_units})"
                 p.axis.visible = True
-
                 self._scatter_plots[(x,y)] = p.scatter(
                     x=x,
                     source=self._source,
@@ -706,15 +662,13 @@ class _RealTimeOptPlot(object):
                 # Extract the x column data for the histogram
                 x_data = self._source.data[x]
 
-                # Compute histogram with 30 bins
-
                 # DO I EVEN NEED THIS HERE? OR JUST in update?
                 if x_data:
                     hist, edges = np.histogram(
-                        x_data, bins=30, range=(np.min(x_data), np.max(x_data))
+                        x_data, bins=_num_histogram_bins, range=(np.min(x_data), np.max(x_data))
                     )
                 else:
-                    hist, edges = np.histogram(x_data, bins=30)
+                    hist, edges = np.histogram(x_data, bins=_num_histogram_bins)
 
                 # Create a new ColumnDataSource for the histogram data
                 # hist_source = ColumnDataSource(data={
@@ -731,15 +685,8 @@ class _RealTimeOptPlot(object):
 
                 # Create the figure
                 p = figure(
-                    # title=f"Histogram of {x} Values",
-                    # For reasons TBD, the width and height in the Plot constructor
-                    # and the width and height here mean different things.
-                    # so need to add 40. TODO do this better
                     width=_grid_plot_height_and_width,
                     height=_grid_plot_height_and_width,
-                    # tools="pan,wheel_zoom,box_zoom,reset,save",
-                    # x_axis_label=f"{x} ({units})",
-                    # y_axis_label="Frequency",
                     output_backend="webgl",
                )
 
@@ -767,18 +714,6 @@ class _RealTimeOptPlot(object):
 
             plots.append(p)
 
-        # insert var name labels along edges
-
-#           writing-mode: vertical-lr;
-#   text-orientation: upright;
-
-            # writing-mode: vertical-rl;
-            # text-orientation: mixed;
-
-#               writing-mode: vertical-lr;
-#   transform: rotate(180deg);
-
-
         # row labels
         for i, sampled_variable in enumerate(reversed(self._sampled_variables)):
             irow = N - i - 1
@@ -787,11 +722,6 @@ class _RealTimeOptPlot(object):
             p = Div(
                 # text=f"{sampled_variable}",
                 text=f"<div style='text-align:center;font-size:12px;writing-mode:vertical-lr;transform:rotate(180deg); cursor:help;' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
-                # styles={"font-size": "12px",
-                #         "text-align":"center",
-                #         "writing-mode":"vertical-lr",
-                #         "text-orientation":"upright",
-                #         },
                 align="center",
             )
             plots.insert(idx,p)
@@ -806,9 +736,7 @@ class _RealTimeOptPlot(object):
             units = self._case_tracker._get_units(x)
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, units)
             p = Div(
-                # text=f"{sampled_variable} ({units})",
                 text=f"<div style='text-align:center;font-size:14px; cursor:help;' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
-                # text=f"<center>{sampled_variable} ({units})</center>",
                 styles={"font-size": "12px", "text-align":"center"},
                 align="center",
             )
@@ -816,8 +744,7 @@ class _RealTimeOptPlot(object):
 
         gp = gridplot(
             plots,
-            # ncols=N,
-            ncols=N+1,
+            ncols=N+1,  # need one extra row and column in the grid for the axes labels
             toolbar_location=None,
         )
 
@@ -829,7 +756,6 @@ class _RealTimeOptPlot(object):
                 "overflow-y": "auto",
                 "border": "1px solid #ddd",
                 "padding": "8px",
-                # "background-color": "#f0f0f0",
                 'max-height': '100vh'  # Ensures it doesn't exceed viewport
             },
         )
@@ -960,11 +886,6 @@ class _RealTimeOptPlot(object):
             # title="Choose a response variable:",
             options=self._prom_responses,
             value=self._prom_responses[0],  # Default value
-        #     styles={
-        #         "border": "5px solid black",
-        #         "padding": "8px",
-        #         "background-color": "#f0f0f0",
-        # },
     )
 
         # header for the variable list
@@ -978,21 +899,14 @@ class _RealTimeOptPlot(object):
                                                   styles={
                 "border": "5px solid black",
                 "padding": "8px",
-                # "background-color": "#f0f0f0",
         },
         )
 
         # Python callback function that will run when selection changes
         def cb_select_response_variable(attr, old, new):
             # Print the selected value to the console
-            print(f"Selected value: {new}")
-
-            self._plotted_response_variable = new
-
             self._prom_response = new 
-
             color_bar.title = f"Response variable: '{new}'"
-
             self._color_mapper.low = self._prom_response_min[self._prom_response]
             self._color_mapper.high = self._prom_response_max[self._prom_response]
 
@@ -1005,37 +919,22 @@ class _RealTimeOptPlot(object):
                         self._prom_response, self._color_mapper
                     )
 
-                # line.glyph.y = {'field': selected_column}
-                # scatter_plot.glyph.fill_color is a Field
-
         # Attach the callback to the Select widget
         menu.on_change("value", cb_select_response_variable)
-
-        # sampled_variables_non_scalar_div = Div(
-        #     text=f"The following non-scalar variables cannot be plotted {self._sampled_variables_non_scalar}",
-        #     styles={
-        #         "font-size": "12px", 
-        #         "border-radius": "5px",
-        #         "border": "5px solid black",
-        #         "padding": "8px",
-        #         },
-        # )
 
         final_layout = Row(
             Column(title_div, gp),
             p,
             spacer2,
             Column(spacer2, quit_button, spacer3, analysis_progress_box, spacer4, response_varible_box, spacer5, 
-                #    sampled_variables_non_scalar_div, spacer3,
                    scroll_box, sizing_mode="stretch_both"),
-            # sizing_mode="fixed",
             sizing_mode="stretch_both",
         )
 
         self.plot_figure = final_layout
 
 
-def print_bokeh_objects(doc):
+def print_bokeh_objects(doc):  # TODO remove!
     # Get all objects in the document
     all_objects = doc.roots[0].references()
     
@@ -1088,10 +987,9 @@ def realtime_opt_plot(
     def _make_realtime_opt_plot_doc(doc):
 
 
-        # Print to console when the document is loaded
+        # Print to console when the document is loaded  TODO remove
         def on_document_ready(event):
             print_bokeh_objects(doc)
-
         # doc.on_event('document_ready', on_document_ready)
 
 
