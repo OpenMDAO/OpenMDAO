@@ -177,7 +177,7 @@ class Component(System):
                              desc='Default shape for variables that do not set val to a non-scalar '
                              'value or set shape, shape_by_conn, copy_shape, or compute_shape.'
                              ' Default is (1,).')
-        self.options.declare('jac_type', types=str, default='csc',
+        self.options.declare('jac_type', types=str, default='block',
                              desc='Type of Jacobian to use.  Options are "auto", "dense", "coo", '
                              '"csc", "csr", or "dict". Ignored by matrix free components.  "auto" '
                              'will assign a jacobian type based on the sparsity of the component. '
@@ -192,12 +192,7 @@ class Component(System):
         Jacobian
             The Jacobian object.
         """
-        # DBG: remove after debugging
-        # return BlockJacobian(self)
         jac_type = self.options['jac_type']
-
-        # if jac_type == 'auto':
-        #     jac_type = self._get_auto_jac()
 
         if jac_type == 'dense':
             return ComponentSplitJacobian(DenseMatrix, self)
@@ -207,7 +202,7 @@ class Component(System):
             return ComponentSplitJacobian(CSCMatrix, self)
         elif jac_type == 'csr':
             return ComponentSplitJacobian(CSRMatrix, self)
-        elif jac_type == 'dict':
+        elif jac_type == 'block':
             return BlockJacobian(self)
         else:
             raise ValueError(f"Invalid jac_type: {jac_type}")

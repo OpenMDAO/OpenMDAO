@@ -82,7 +82,7 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dense",
+                "jac_type": "block",
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -192,7 +192,7 @@
                                 "default_shape": [
                                     1
                                 ],
-                                "jac_type": "dense"
+                                "jac_type": "block"
                             }
                         }
                     ],
@@ -266,7 +266,7 @@
                         "default_shape": [
                             1
                         ],
-                        "jac_type": "dense"
+                        "jac_type": "block"
                     }
                 },
                 {
@@ -323,7 +323,7 @@
                         "default_shape": [
                             1
                         ],
-                        "jac_type": "dense"
+                        "jac_type": "block"
                     }
                 }
             ],
@@ -408,7 +408,7 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dense",
+                "jac_type": "block",
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -461,7 +461,7 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dense",
+                "jac_type": "block",
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -514,7 +514,7 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dense",
+                "jac_type": "block",
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
