@@ -256,8 +256,6 @@ class NewtonSolver(NonlinearSolver):
         """
         if self.linear_solver is not None:
             self.linear_solver._set_complex_step_mode(active)
-            if self.linear_solver._assembled_jac is not None:
-                self.linear_solver._assembled_jac.set_complex_step_mode(active)
 
     def cleanup(self):
         """

@@ -20,10 +20,16 @@ class GroupDenseMatrix(COOMatrix):
     #       where partials overlap the same matrix entries, as in the case of repeated
     #       src_indices entries.  This does require additional memory above storing just
     #       the dense matrix, but it's worth it because the code is simpler and more robust.
-    def _pre_update(self):
+    def _pre_update(self, dtype):
         """
         Do anything that needs to be done at the end of AssembledJacobian._update.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The dtype of the jacobian.
         """
+        super()._pre_update(dtype)
         self._matrix = self._coo
 
     def _post_update(self):
@@ -57,7 +63,7 @@ class DenseMatrix(Matrix):
         Dictionary of sub-jacobian data keyed by (row_name, col_name).
     """
 
-    def _build(self, num_rows, num_cols, dtype=float):
+    def _build(self, num_rows, num_cols, dtype):
         """
         Allocate the matrix.
 
@@ -109,24 +115,19 @@ class DenseMatrix(Matrix):
         else:  # rev
             return self._matrix.transpose() @ in_vec
 
-    def set_complex_step_mode(self, active):
+    def _update_dtype(self, dtype):
         """
-        Turn on or off complex stepping mode.
-
-        When turned on, the value in each subjac is cast as complex, and when turned
-        off, they are returned to real values.
+        Update the dtype of the matrix.
 
         Parameters
         ----------
-        active : bool
-            Complex mode flag; set to True prior to commencing complex step.
+        dtype : dtype
+            The new dtype of the matrix.
         """
-        is_complex = 'complex' in self._matrix.dtype.__str__()
-        if active:
-            if not is_complex:
-                self._matrix = self._matrix.astype(complex)
-        elif is_complex:
-            self._matrix = self._matrix.real.astype(float)
+        if dtype.kind != self.dtype.kind:
+            self.dtype = dtype
+            mat = self._matrix if dtype.kind == 'c' else self._matrix.real
+            self._matrix = np.ascontiguousarray(mat, dtype=dtype)
 
     def toarray(self):
         """

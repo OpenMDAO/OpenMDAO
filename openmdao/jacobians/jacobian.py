@@ -56,6 +56,8 @@ class Jacobian(object):
         List of subjac keys in order of appearance.
     _initialized : bool
         Whether the jacobian has been initialized.
+    dtype : dtype
+        The dtype of the jacobian.
     shape : tuple
         Full shape of the jacobian, including dr/do and dr/di.
     """
@@ -77,18 +79,35 @@ class Jacobian(object):
         self._is_explicitcomp = system.is_explicit(is_comp=True)
         self._ordered_subjac_keys = None
         self._initialized = False
+        self.dtype = system._outputs.dtype
 
         self.shape = (len(system._outputs), len(system._outputs) + len(system._inputs))
 
-    def _pre_update(self):
+    def _pre_update(self, dtype):
         """
         Pre-update the jacobian.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The dtype of the jacobian.
         """
-        pass
+        if dtype.kind != self.dtype.kind:
+            self.dtype = dtype
+
+            # if _subjacs is None, our system hasn't been linearized
+            if self._subjacs is not None:
+                for subjac in self._subjacs.values():
+                    subjac.set_dtype(dtype)
 
     def _post_update(self):
         """
         Post-update the jacobian.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
         """
         pass
 
@@ -103,7 +122,7 @@ class Jacobian(object):
         """
         pass
 
-    def create_subjac(self, abs_key, meta):
+    def create_subjac(self, abs_key, meta, dtype):
         """
         Create a subjacobian.
 
@@ -113,6 +132,8 @@ class Jacobian(object):
             The absolute key for the subjacobian.
         meta : dict
             Metadata for the subjacobian.
+        dtype : dtype
+            The dtype of the subjacobian.
 
         Returns
         -------
@@ -128,12 +149,12 @@ class Jacobian(object):
         else:
             col_slice = self._output_slices[wrt]
 
-        return self._subjac_from_meta(abs_key, meta, row_slice, col_slice, wrt_is_input)
+        return self._subjac_from_meta(abs_key, meta, row_slice, col_slice, wrt_is_input, dtype)
 
-    def _subjac_from_meta(self, key, meta, row_slice, col_slice, wrt_is_input, src_indices=None,
-                          factor=None, src=None):
+    def _subjac_from_meta(self, key, meta, row_slice, col_slice, wrt_is_input, dtype,
+                          src_indices=None, factor=None, src=None):
         return Subjac.get_subjac_class(meta)(key, meta, row_slice, col_slice, wrt_is_input,
-                                             src_indices, factor, src)
+                                             dtype, src_indices, factor, src)
 
     def _get_subjacs(self, system=None):
         """
@@ -163,6 +184,8 @@ class Jacobian(object):
             else:
                 relevance = None
 
+            dtype = system._outputs.dtype
+
             with relevance.active(active) if relevance else do_nothing_context():
                 with relevance.all_seeds_active() if relevance else do_nothing_context():
                     out_slices = self._output_slices
@@ -171,7 +194,7 @@ class Jacobian(object):
                         of, wrt = key
                         if of in out_slices and (wrt in in_slices or wrt in out_slices):
                             if relevance is None or is_relevant(wrt):
-                                self._subjacs[key] = self.create_subjac(key, meta)
+                                self._subjacs[key] = self.create_subjac(key, meta, dtype)
 
             self._initialized = True
 
@@ -331,65 +354,9 @@ class Jacobian(object):
     #     print(f"    d_inputs: {d_inputs.asarray()}\n    d_outputs: {d_outputs.asarray()}\n"
     #           f"    d_residuals: {d_residuals.asarray()}")
 
-    def set_complex_step_mode(self, active):
-        """
-        Turn on or off complex stepping mode.
-
-        When turned on, the value in each subjac is cast as complex, and when turned
-        off, they are returned to real values.
-
-        Parameters
-        ----------
-        active : bool
-            Complex mode flag; set to True prior to commencing complex step.
-        """
-        # if _subjacs is None, our system hasn't been linearized
-        if self._subjacs is not None:
-            for subjac in self._subjacs.values():
-                if active:
-                    subjac.set_dtype(complex)
-                else:
-                    subjac.set_dtype(float)
-
-            self._under_complex_step = active
-
     def _setup_index_maps(self, system):
         namesize_iter = [(n, end - start) for n, start, end, _, _, _ in system._jac_wrt_iter()]
         self._col_mapper = RangeMapper.create(namesize_iter)
-
-    # def set_col(self, system, icol, column):
-    #     """
-    #     Set a column of the jacobian.
-
-    #     The column is assumed to be the same size as a column of the jacobian.
-
-    #     This also assumes that the column does not attempt to set any nonzero values that are
-    #     outside of specified sparsity patterns for any of the subjacs.
-
-    #     Parameters
-    #     ----------
-    #     system : System
-    #         The system that owns this jacobian.
-    #     icol : int
-    #         Column index.
-    #     column : ndarray
-    #         Column value.
-    #     """
-    #     if self._col_mapper is None:
-    #         self._setup_index_maps(system)
-
-    #     wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
-
-    #     for of, start, end, _, _ in system._jac_of_iter():
-    #         key = (of, wrt)
-    #         if key in self._subjacs_info:
-    #             subjac = self._subjacs_info[key]
-    #             if subjac['cols'] is None:  # dense
-    #                 subjac['val'][:, loc_idx] = column[start:end]
-    #             else:  # our COO format
-    #                 match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
-    #                 if match_inds.size > 0:
-    #                     subjac['val'][match_inds] = column[start:end][subjac['rows'][match_inds]]
 
     def set_col(self, system, icol, column):
         """
@@ -585,6 +552,9 @@ class SplitJacobian(Jacobian):
 
     Implicit components and Groups use both matrices.
 
+    TODO: If a Group is entirely explicit (no implicit components and no cycles), we can treat
+    the dr/do matrix a negative identity as in the explicit component case.
+
     Parameters
     ----------
     system : System
@@ -622,6 +592,18 @@ class SplitJacobian(Jacobian):
         self._dr_di_mtx = None
         self._mask_caches = {}
 
+    def _reset_subjacs(self, system):
+        """
+        Revert all subjacs back to the way they were as declared by the user.
+        """
+        self._initialized = False
+        self._subjacs = None
+        self._dr_do_subjacs = {}
+        self._dr_di_subjacs = {}
+        self._get_split_subjacs(system)
+
+        self._col_mapper = None  # force recompute of internal index maps on next set_col
+
     def get_dr_do_matrix(self):
         """
         Get the dr/do matrix.
@@ -644,24 +626,6 @@ class SplitJacobian(Jacobian):
         """
         return self._dr_di_mtx._matrix
 
-    def _pre_update(self):
-        """
-        Pre-update the jacobian.
-        """
-        if self._dr_do_mtx is not None:
-            self._dr_do_mtx._pre_update()
-        if self._dr_di_mtx is not None:
-            self._dr_di_mtx._pre_update()
-
-    def _post_update(self):
-        """
-        Post-update the jacobian.
-        """
-        if self._dr_do_mtx is not None:
-            self._dr_do_mtx._post_update()
-        if self._dr_di_mtx is not None:
-            self._dr_di_mtx._post_update()
-
     def _update(self, system):
         """
         Update our matrices with all of our sub-Jacobians.
@@ -674,28 +638,11 @@ class SplitJacobian(Jacobian):
         # if randgen is not None, we're computing the sparsity pattern
         randgen = self._randgen
 
-        # print(f"{system.msginfo}: _update BEFORE")
-        # print(self.todense())
-
         if self._dr_do_mtx is not None:
-            self._update_matrix(self._dr_do_mtx, randgen)
+            self._update_matrix(self._dr_do_mtx, randgen, self.dtype)
 
         if self._dr_di_mtx is not None:
-            self._update_matrix(self._dr_di_mtx, randgen)
-
-        # print(f"{system.msginfo}: _update AFTER")
-        # print(self.todense())
-
-        # print(f"{system.msginfo}: UPDATED\n{self.todense()}")
-
-        if self._under_complex_step:
-            # If we create a new _dr_do_mtx while under complex step, we need to convert it to a
-            # complex data type.
-            if self._dr_do_mtx is not None:
-                self._dr_do_mtx.set_complex_step_mode(True)
-
-        # print(f"{system.msginfo}: _update END")
-        # print(self.todense())
+            self._update_matrix(self._dr_di_mtx, randgen, self.dtype)
 
     def todense(self):
         """
@@ -739,6 +686,7 @@ class SplitJacobian(Jacobian):
         is_top = system.pathname == ''
 
         if not self._initialized:
+            dtype = system._outputs.dtype
             self._dr_do_subjacs = {}
             dr_di_subjacs = {}
             abs2meta_out = system._var_abs2meta['output']
@@ -760,7 +708,7 @@ class SplitJacobian(Jacobian):
                     continue
                 if wrt in output_slices:
                     self._dr_do_subjacs[abs_key] = \
-                        self.create_dr_do_subjac(conns, abs_key, wrt, meta)
+                        self.create_dr_do_subjac(conns, abs_key, wrt, meta, dtype)
                 elif wrt in input_slices:
                     if wrt in conns and not is_explicit_comp:  # internally connected input
                         # For the subjacs that make up the dr/do jacobian, the column entries
@@ -786,9 +734,10 @@ class SplitJacobian(Jacobian):
                         src_indices = abs2meta_in[wrt]['src_indices']
 
                         self._dr_do_subjacs[abs_key] = \
-                            self.create_dr_do_subjac(conns, abs_key, src, meta, src_indices, factor)
+                            self.create_dr_do_subjac(conns, abs_key, src, meta, dtype,
+                                                     src_indices, factor)
                     elif not is_top:  # input is connected to something outside current system
-                        dr_di_subjacs[abs_key] = self.create_subjac(abs_key, meta)
+                        dr_di_subjacs[abs_key] = self.create_subjac(abs_key, meta, dtype)
 
             self._dr_di_subjacs = dr_di_subjacs
 
@@ -801,19 +750,7 @@ class SplitJacobian(Jacobian):
 
         return self._dr_do_subjacs, self._dr_di_subjacs
 
-    def _reset_subjacs(self, system):
-        """
-        Revert all subjacs back to the way they were as declared by the user.
-        """
-        self._initialized = False
-        self._subjacs = None
-        self._dr_do_subjacs = {}
-        self._dr_di_subjacs = {}
-        self._get_split_subjacs(system)
-
-        self._col_mapper = None  # force recompute of internal index maps on next set_col
-
-    def _update_matrix(self, matrixobj, randgen):
+    def _update_matrix(self, matrixobj, randgen, dtype):
         """
         Update a matrix object with the new sub-Jacobian data.
 
@@ -823,11 +760,15 @@ class SplitJacobian(Jacobian):
             Matrix object to update.
         randgen : <RandGen>
             Random number generator.
+        dtype : dtype
+            The dtype of the jacobian.
         """
+        matrixobj._pre_update(dtype)
         for subjac in matrixobj._submats.values():
             matrixobj._update_from_submat(subjac, randgen)
+        matrixobj._post_update()
 
-    def create_dr_do_subjac(self, conns, abs_key, src, meta, src_indices=None, factor=None):
+    def create_dr_do_subjac(self, conns, abs_key, src, meta, dtype, src_indices=None, factor=None):
         """
         Create a subjacobian for a square internal jacobian (d(residual)/d(source)).
 
@@ -841,6 +782,8 @@ class SplitJacobian(Jacobian):
             Source name for the subjacobian.
         meta : dict
             Metadata for the subjacobian.
+        dtype : dtype
+            The dtype of the subjacobian.
         src_indices : array or None
             Source indices for the subjacobian.
         factor : float or None
@@ -862,7 +805,38 @@ class SplitJacobian(Jacobian):
                 col_slice = out_slices[src]
 
             return self._subjac_from_meta(abs_key, meta, out_slices[of], col_slice, False,
-                                          src_indices, factor, src)
+                                          dtype, src_indices, factor, src)
+
+    # def set_col(self, system, icol, column):
+    #     """
+    #     Set a column of the jacobian.
+
+    #     The column is assumed to be the same size as a column of the jacobian.
+
+    #     This also assumes that the column does not attempt to set any nonzero values that are
+    #     outside of specified sparsity patterns for any of the subjacs.
+
+    #     Parameters
+    #     ----------
+    #     system : System
+    #         The system that owns this jacobian.
+    #     icol : int
+    #         Column index.
+    #     column : ndarray
+    #         Column value.
+    #     """
+    #     if self._col_mapper is None:
+    #         self._setup_index_maps(system)
+
+    #     wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
+
+    #     subjacs = self._subjacs
+
+    #     for of, start, end, _, _ in system._jac_of_iter():
+    #         key = (of, wrt)
+    #         if key in subjacs:
+    #             subjacs[key].set_col(loc_idx, column[start:end])
+
 
 
 class JacobianUpdateContext:
@@ -914,7 +888,7 @@ class JacobianUpdateContext:
             self.jac = self.system._get_jac_wrapper()
 
         if self.jac is not None:
-            self.jac._pre_update()
+            self.jac._pre_update(self.system._outputs.dtype)
 
         return self.jac
 
@@ -993,7 +967,7 @@ class GroupJacobianUpdateContext:
             self.jac = self.group._get_assembled_jac()
 
         if self.jac is not None:
-            self.jac._pre_update()
+            self.jac._pre_update(self.group._outputs.dtype)
 
         return self.jac  # may be None
 
@@ -1014,7 +988,6 @@ class GroupJacobianUpdateContext:
             if True:  # not self.group._owns_approx_jac:
                 self.jac._update(self.group)
             self.jac._post_update()
-            # om_dump_indent(self.group, f"{self.group.msginfo}:\n{self.jac.todense()}")
 
         if exc_type:
             self.jac = self.group._jacobian = None

@@ -3675,9 +3675,14 @@ class _ColSparsityJac(object):
         """
         pass
 
-    def _pre_update(self):
+    def _pre_update(self, dtype):
         """
         Pre-update the sparsity matrix.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The dtype of the jacobian.
         """
         pass
 

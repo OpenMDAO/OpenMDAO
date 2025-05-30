@@ -32,6 +32,8 @@ class Subjac(object):
         vector, not the absolute indices with respect to the full jacobian columns.
     wrt_is_input : bool
         Whether the wrt variable is an input.
+    dtype : dtype
+        The dtype of the subjacobian.
     src_indices : array or None
         Source indices for the subjacobian.  None unless the jacobian is split into a square
         and non-square part where the square part has outputs as rows and columns, requiring
@@ -53,6 +55,8 @@ class Subjac(object):
         Slice of the row indices.
     col_slice : slice
         Slice of the column indices.
+    dtype : dtype
+        The dtype of the subjacobian.
     src_indices : array or None
         Source indices for the subjacobian.
     factor : float or None
@@ -70,7 +74,7 @@ class Subjac(object):
         src_indices then parent_ncols may differ from ncols.
     """
 
-    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None,
+    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, dtype, src_indices=None,
                  factor=None, src=None):
         """
         Initialize the subjacobian.
@@ -87,6 +91,8 @@ class Subjac(object):
             Slice of the column indices.
         wrt_is_input : bool
             Whether the wrt variable is an input.
+        dtype : dtype
+            The dtype of the subjacobian.
         src_indices : array or None
             Source indices for the subjacobian.
         factor : float or None
@@ -98,11 +104,11 @@ class Subjac(object):
         self.info = info
         self.row_slice = row_slice
         self.col_slice = col_slice
+        self.dtype = dtype
         self.nrows = row_slice.stop - row_slice.start
         self.ncols = info['shape'][1]
         self.parent_ncols = col_slice.stop - col_slice.start
         if src_indices is not None:
-            # om_dump(f"Subjac {key}: src_indices: {src_indices}")
             src_indices = src_indices.shaped_array(flat=True)
         self.src_indices = src_indices
         self.factor = factor
@@ -123,7 +129,7 @@ class Subjac(object):
         """
         return (f"{type(self).__name__}(key={self.key}, nrows={self.nrows}, ncols={self.ncols}, "
                 f"parent_ncols={self.parent_ncols}, row_slice={self.row_slice}, "
-                f"col_slice={self.col_slice}, "
+                f"col_slice={self.col_slice}, dtype={self.dtype}, "
                 f"src_indices={self.src_indices}, factor={self.factor}, src={self.src}, "
                 f"info:\n{pformat(self.info)})\n")
 
@@ -201,12 +207,12 @@ class Subjac(object):
         dtype : dtype
             The type to set the subjacobian to.
         """
-        if dtype is self.info['val'].dtype:
+        if dtype.kind == self.info['val'].dtype.kind:
             return
 
-        if dtype is float:
-            self.info['val'] = self.info['val'].real
-        elif dtype is complex:
+        if dtype.kind == 'f':
+            self.info['val'] = np.ascontiguousarray(self.info['val'].real)
+        elif dtype.kind == 'c':
             self.info['val'] = np.asarray(self.info['val'], dtype=dtype)
         else:
             raise ValueError(f"Subjacobian {self.key}: Unsupported dtype: {dtype}")
@@ -258,6 +264,8 @@ class DenseSubjac(Subjac):
         Slice of the column indices.
     wrt_is_input : bool
         Whether the wrt variable is an input.
+    dtype : dtype
+        The dtype of the subjacobian.
     src_indices : array or None
         Source indices for the subjacobian.
     factor : float or None
@@ -483,6 +491,8 @@ class SparseSubjac(Subjac):
         vector, not the absolute indices with respect to the full jacobian columns.
     wrt_is_input : bool
         Whether the wrt variable is an input.
+    dtype : dtype
+        The dtype of the subjacobian.
     src_indices : array or None
         Source indices for the subjacobian.  None unless the jacobian is split into a square
         and non-square part where the square part has outputs as rows and columns, requiring
@@ -527,12 +537,12 @@ class SparseSubjac(Subjac):
         dtype : dtype
             The type to set the subjacobian to.
         """
-        if dtype is self.info['val'].dtype:
+        if dtype.kind == self.info['val'].dtype.kind:
             return
 
-        if dtype is float:
-            self.info['val'].data = self.info['val'].data.real
-        elif dtype is complex:
+        if dtype.kind == 'f':
+            self.info['val'].data = np.ascontiguousarray(self.info['val'].data.real, dtype=dtype)
+        elif dtype.kind == 'c':
             self.info['val'].data = np.asarray(self.info['val'].data, dtype=dtype)
         else:
             raise ValueError(f"Subjacobian {self.key}: Unsupported dtype: {dtype}")
@@ -654,6 +664,8 @@ class COOSubjac(SparseSubjac):
         Slice of the column indices.
     wrt_is_input : bool
         Whether the wrt variable is an input.
+    dtype : dtype
+        The dtype of the subjacobian.
     src_indices : array or None
         Source indices for the subjacobian.
     factor : float or None
@@ -759,12 +771,12 @@ class COOSubjac(SparseSubjac):
         dtype : dtype
             The type to set the subjacobian to.
         """
-        if dtype is self.info['val'].dtype:
+        if dtype.kind == self.info['val'].dtype.kind:
             return
 
-        if dtype is float:
-            self.info['val'] = self.info['val'].real
-        elif dtype is complex:
+        if dtype.kind == 'f':
+            self.info['val'] = np.ascontiguousarray(self.info['val'].real, dtype=dtype)
+        elif dtype.kind == 'c':
             self.info['val'] = np.asarray(self.info['val'], dtype=dtype)
         else:
             raise ValueError(f"Subjacobian {self.key}: Unsupported dtype: {dtype}")
@@ -786,6 +798,8 @@ class CSRSubjac(SparseSubjac):
         Slice of the column indices.
     wrt_is_input : bool
         Whether the wrt variable is an input.
+    dtype : dtype
+        The dtype of the subjacobian.
     src_indices : array or None
         Source indices for the subjacobian.
     factor : float or None
@@ -863,6 +877,8 @@ class CSCSubjac(SparseSubjac):
         Slice of the column indices.
     wrt_is_input : bool
         Whether the wrt variable is an input.
+    dtype : dtype
+        The dtype of the subjacobian.
     src_indices : array or None
         Source indices for the subjacobian.
     factor : float or None
@@ -938,6 +954,8 @@ class OMCOOSubjac(COOSubjac):
         Slice of the column indices.
     wrt_is_input : bool
         Whether the wrt variable is an input.
+    dtype : dtype
+        The dtype of the subjacobian.
     src_indices : array or None
         Source indices for the subjacobian.
     factor : float or None
@@ -946,7 +964,7 @@ class OMCOOSubjac(COOSubjac):
         Source name for the subjacobian.
     """
 
-    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, src_indices=None,
+    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, dtype, src_indices=None,
                  factor=None, src=None):
         """
         Initialize the subjacobian.
@@ -963,6 +981,8 @@ class OMCOOSubjac(COOSubjac):
             Slice of the column indices.
         wrt_is_input : bool
             Whether the wrt variable is an input.
+        dtype : dtype
+            The dtype of the subjacobian.
         src_indices : array or None
             Source indices for the subjacobian.
         factor : float or None
@@ -970,7 +990,8 @@ class OMCOOSubjac(COOSubjac):
         src : str or None
             Source name for the subjacobian.
         """
-        super().__init__(key, info, row_slice, col_slice, wrt_is_input, src_indices, factor, src)
+        super().__init__(key, info, row_slice, col_slice, wrt_is_input, dtype, src_indices,
+                         factor, src)
         self.set_val(info['val'])
 
     @classmethod
@@ -1133,6 +1154,8 @@ class DiagonalSubjac(SparseSubjac):
         Slice of the column indices.
     wrt_is_input : bool
         Whether the wrt variable is an input.
+    dtype : dtype
+        The dtype of the subjacobian.
     src_indices : array or None
         Source indices for the subjacobian.
     factor : float or None
@@ -1306,12 +1329,12 @@ class DiagonalSubjac(SparseSubjac):
         dtype : dtype
             The type to set the subjacobian to.
         """
-        if dtype is self.info['val'].dtype:
+        if dtype.kind == self.info['val'].dtype.kind:
             return
 
-        if dtype is float:
-            self.info['val'] = self.info['val'].real
-        elif dtype is complex:
+        if dtype.kind == 'f':
+            self.info['val'] = np.ascontiguousarray(self.info['val'].real, dtype=dtype)
+        elif dtype.kind == 'c':
             self.info['val'] = np.asarray(self.info['val'], dtype=dtype)
         else:
             raise ValueError(f"Subjacobian {self.key}: Unsupported dtype: {dtype}")
@@ -1333,6 +1356,8 @@ class ZeroSubjac(Subjac):
         Slice of the column indices.
     wrt_is_input : bool
         Whether the wrt variable is an input.
+    dtype : dtype
+        The dtype of the subjacobian.
     src_indices : array or None
         Source indices for the subjacobian.
     factor : float or None

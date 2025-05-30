@@ -15,10 +15,16 @@ class CSCMatrix(COOMatrix):
         Dictionary of sub-jacobian data keyed by (row_name, col_name).
     """
 
-    def _pre_update(self):
+    def _pre_update(self, dtype):
         """
         Do anything that needs to be done at the start of AssembledJacobian._update.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The dtype of the jacobian.
         """
+        super()._pre_update(dtype)
         self._matrix = self._coo
 
     def _post_update(self):
@@ -45,24 +51,3 @@ class CSCMatrix(COOMatrix):
         if self._matrix_T is None:
             self._matrix_T = self._matrix.T
         return self._matrix_T
-
-    def set_complex_step_mode(self, active):
-        """
-        Turn on or off complex stepping mode.
-
-        When turned on, the value in each subjac is cast as complex, and when turned
-        off, they are returned to real values.
-
-        Parameters
-        ----------
-        active : bool
-            Complex mode flag; set to True prior to commencing complex step.
-        """
-        is_complex = 'complex' in self._matrix.dtype.__str__()
-        if active:
-            if not is_complex:
-                self._matrix.data = self._matrix.data.astype(complex)
-                self._coo.data = self._coo.data.astype(complex)
-        elif is_complex:
-            self._matrix.data = self._matrix.data.real.astype(float)
-            self._coo.data = self._coo.data.real.astype(float)

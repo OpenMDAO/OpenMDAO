@@ -5352,25 +5352,19 @@ class System(object, metaclass=SystemMetaclass):
             Complex mode flag; set to True prior to commencing complex step.
         """
         self.under_complex_step = active
-        self._inputs.set_complex_step_mode(active)
-        self._outputs.set_complex_step_mode(active)
-        self._residuals.set_complex_step_mode(active)
+        self._inputs._set_complex_step_mode(active)
+        self._outputs._set_complex_step_mode(active)
+        self._residuals._set_complex_step_mode(active)
 
         if self._doutputs._alloc_complex:
-            self._doutputs.set_complex_step_mode(active)
-            self._dinputs.set_complex_step_mode(active)
-            self._dresiduals.set_complex_step_mode(active)
+            self._doutputs._set_complex_step_mode(active)
+            self._dinputs._set_complex_step_mode(active)
+            self._dresiduals._set_complex_step_mode(active)
             if self.nonlinear_solver:
                 self.nonlinear_solver._set_complex_step_mode(active)
 
             if self.linear_solver:
                 self.linear_solver._set_complex_step_mode(active)
-
-            if isinstance(self._jacobian, Jacobian):
-                self._jacobian.set_complex_step_mode(active)
-
-            if self._assembled_jac:
-                self._assembled_jac.set_complex_step_mode(active)
 
         for sub in self._subsystems_myproc:
             sub._set_complex_step_mode(active)

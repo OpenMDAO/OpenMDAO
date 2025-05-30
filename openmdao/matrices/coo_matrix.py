@@ -11,6 +11,9 @@ class COOMatrix(Matrix):
     """
     Sparse matrix in Coordinate list format.
 
+    Used with the SplitJacobian to represent the dr/do and dr/di matrices, to form a matvec
+    product with the d_outputs and d_inputs vectors respectively.
+
     Parameters
     ----------
     submats : dict
@@ -39,6 +42,9 @@ class COOMatrix(Matrix):
     def _build(self, num_rows, num_cols, dtype=float):
         """
         Allocate the matrix.
+
+        Also, keep track of the slice within the COO data/rows/cols arrays corresponding to each
+        sub-jacobian.
 
         Parameters
         ----------
@@ -108,24 +114,22 @@ class COOMatrix(Matrix):
         else:  # rev
             return self._matrix.transpose().dot(in_vec)
 
-    def set_complex_step_mode(self, active):
+    def _update_dtype(self, dtype):
         """
-        Turn on or off complex stepping mode.
+        Update the dtype of the matrix.
 
-        When turned on, the value in each subjac is cast as complex, and when turned
-        off, they are returned to real values.
+        This happens during pre_update.
 
         Parameters
         ----------
-        active : bool
-            Complex mode flag; set to True prior to commencing complex step.
+        dtype : dtype
+            The new dtype of the matrix.
         """
-        is_complex = 'complex' in self._coo.dtype.__str__()
-        if active:
-            if not is_complex:
-                self._coo.data = self._coo.data.astype(complex)
-        elif is_complex:
-            self._coo.data = self._coo.data.real.astype(float)
+        if dtype.kind != self.dtype.kind:
+            self.dtype = dtype
+            data = self._coo.data if dtype.kind == 'c' else self._coo.data.real
+            self._coo.data = np.ascontiguousarray(data, dtype=dtype)
+            self._matrix_T = None
 
     def toarray(self):
         """

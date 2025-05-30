@@ -301,7 +301,7 @@ class Interp1DSlinear(InterpAlgorithmFixed):
         idx = idx[0]
 
         # Complex Step
-        if self.values.dtype == complex:
+        if self.values.dtype.kind == 'c':
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -384,7 +384,7 @@ class Interp1DSlinear(InterpAlgorithmFixed):
         i_x = idx[0]
 
         # Complex Step
-        if self.values.dtype == complex:
+        if self.values.dtype.kind == 'c':
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -532,7 +532,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
         idx_key = tuple(idx)
 
         # Complex Step
-        if self.values.dtype == complex:
+        if self.values.dtype.kind == 'c':
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -636,7 +636,7 @@ class Interp2DSlinear(InterpAlgorithmFixed):
         i_x, i_y = idx
 
         # Complex Step
-        if self.values.dtype == complex:
+        if self.values.dtype.kind == 'c':
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -799,7 +799,7 @@ class Interp3DSlinear(InterpAlgorithmFixed):
         idx_key = tuple(idx)
 
         # Complex Step
-        if self.values.dtype == complex:
+        if self.values.dtype.kind == 'c':
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -974,7 +974,7 @@ class Interp3DSlinear(InterpAlgorithmFixed):
         i_x, i_y, i_z = idx
 
         # Complex Step
-        if self.values.dtype == complex:
+        if self.values.dtype.kind == 'c':
             dtype = self.values.dtype
         else:
             dtype = x.dtype

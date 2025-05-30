@@ -171,7 +171,6 @@ class ExplicitComponent(Component):
 
         if not self.matrix_free:
             if self._jacobian is None:
-                # om_dump_indent(self, f"New Jacobian for {self.msginfo}")
                 self._jacobian = self._choose_jac_type()
                 if self._has_approx:
                     self._get_static_wrt_matches()

@@ -67,7 +67,7 @@ class InterpCubic(InterpAlgorithm):
         n = len(grid)
 
         # Complex Step
-        if values.dtype == complex:
+        if values.dtype.kind == 'c':
             dtype = values.dtype
         else:
             dtype = x.dtype

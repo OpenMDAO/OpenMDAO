@@ -3611,24 +3611,32 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for sname, sinfo in self._subsystems_allprocs.items():
-                sub = sinfo.system
-                # TODO: could gather 'has_guess' information during setup and be able to
-                # skip transfer for subs that don't have guesses...
-                self._transfer('nonlinear', 'fwd', sname)
-                if sub._is_local and sub._has_guess:
-                    sub._guess_nonlinear()
+            #for sname, sinfo in self._subsystems_allprocs.items():
+                #sub = sinfo.system
+                ## TODO: could gather 'has_guess' information during setup and be able to
+                ## skip transfer for subs that don't have guesses...
+                #self._transfer('nonlinear', 'fwd', sname)
+                #if sub._is_local and sub._has_guess:
+                    #sub._guess_nonlinear()
 
             # call our own guess_nonlinear method, after the recursion is done to
             # all the lower level systems and the data transfers have happened
             complex_step = self._inputs._under_complex_step
 
             if complex_step:
-                self._inputs.set_complex_step_mode(False)
-                self._residuals.set_complex_step_mode(False)
-                self._outputs.set_complex_step_mode(False)
+                self._inputs._set_complex_step_mode(False)
+                self._residuals._set_complex_step_mode(False)
+                self._outputs._set_complex_step_mode(False)
 
             try:
+                for sname, sinfo in self._subsystems_allprocs.items():
+                    sub = sinfo.system
+                    # TODO: could gather 'has_guess' information during setup and be able to
+                    # skip transfer for subs that don't have guesses...
+                    self._transfer('nonlinear', 'fwd', sname)
+                    if sub._is_local and sub._has_guess:
+                        sub._guess_nonlinear()
+
                 if self._discrete_inputs or self._discrete_outputs:
                     self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
                                          self._discrete_inputs, self._discrete_outputs)
@@ -3637,9 +3645,9 @@ class Group(System):
             finally:
 
                 if complex_step:
-                    self._inputs.set_complex_step_mode(True)
-                    self._residuals.set_complex_step_mode(True)
-                    self._outputs.set_complex_step_mode(True)
+                    self._inputs._set_complex_step_mode(True)
+                    self._residuals._set_complex_step_mode(True)
+                    self._outputs._set_complex_step_mode(True)
 
     def guess_nonlinear(self, inputs, outputs, residuals,
                         discrete_inputs=None, discrete_outputs=None):

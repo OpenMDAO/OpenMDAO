@@ -581,6 +581,18 @@ class Vector(object):
         raise NotImplementedError(f'asarray not defined for vector type {type(self).__name__}')
         return None  # silence lint warning
 
+    @property
+    def dtype(self):
+        """
+        Return the dtype of this vector.
+
+        Returns
+        -------
+        dtype
+            The dtype of this vector.
+        """
+        return self.asarray().dtype
+
     def get_mask(self):
         """
         Return a mask for the vector based on the current matvec context.
@@ -747,7 +759,7 @@ class Vector(object):
         raise NotImplementedError('_in_matvec_context not defined for vector type '
                                   f'{type(self).__name__}')
 
-    def set_complex_step_mode(self, active):
+    def _set_complex_step_mode(self, active):
         """
         Turn on or off complex stepping mode.
 

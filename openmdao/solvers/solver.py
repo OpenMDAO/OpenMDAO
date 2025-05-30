@@ -1206,7 +1206,7 @@ class BlockLinearSolver(LinearSolver):
         if active:
             self._rhs_vec = self._rhs_vec.astype(complex)
         else:
-            self._rhs_vec = self._rhs_vec.real
+            self._rhs_vec = np.ascontiguousarray(self._rhs_vec.real, dtype=float)
 
     def _vars_union(self, slv_vars, sys_vars):
         """

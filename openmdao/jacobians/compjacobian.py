@@ -122,20 +122,3 @@ class ComponentJacobian(SplitJacobian):
                     d_inputs += arr
 
             # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)
-
-    def set_complex_step_mode(self, active):
-        """
-        Turn on or off complex stepping mode.
-
-        When turned on, the value in each subjac is cast as complex, and when turned
-        off, they are returned to real values.
-
-        Parameters
-        ----------
-        active : bool
-            Complex mode flag; set to True prior to commencing complex step.
-        """
-        super().set_complex_step_mode(active)
-
-        if self._dr_do_mtx is not None:
-            self._dr_do_mtx.set_complex_step_mode(active)

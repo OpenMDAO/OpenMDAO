@@ -1842,9 +1842,14 @@ class _TotalJacInfo(object):
         """
         pass
 
-    def _pre_update(self):
+    def _pre_update(self, dtype):
         """
         Pre-update the total jacobian.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The dtype of the jacobian.
         """
         pass
 
