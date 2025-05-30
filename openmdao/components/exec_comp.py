@@ -708,10 +708,9 @@ class ExecComp(ExplicitComponent):
                                         "is not square (shape=(%d, %d))." %
                                         (self.msginfo, out, inp, oval.size, ival.size))
                                 # partial will be declared as diagonal
-                                diag = True
+                                decl_partials(of=out, wrt=inp, diagonal=True)
                             else:
-                                diag = None
-                            decl_partials(of=out, wrt=inp, diagonal=diag)
+                                decl_partials(of=out, wrt=inp)
                         else:
                             decl_partials(of=out, wrt=inp)
 

@@ -3,9 +3,9 @@
 from openmdao.jacobians.jacobian import SplitJacobian
 
 
-class ComponentJacobian(SplitJacobian):
+class ComponentSplitJacobian(SplitJacobian):
     """
-    A jacobian for a component.
+    A split jacobian for a component.
 
     This jacobian contains one or two matrices.
 
@@ -56,7 +56,7 @@ class ComponentJacobian(SplitJacobian):
 
         dtype = complex if system.under_complex_step else float
 
-        if not self._is_explicitcomp:
+        if not self._is_explicitcomp and drdo_subjacs:
             self._dr_do_mtx = matrix_class(drdo_subjacs)
             self._dr_do_mtx._build(out_size, out_size, dtype)
 
@@ -83,16 +83,7 @@ class ComponentJacobian(SplitJacobian):
         mode : str
             'fwd' or 'rev'.
         """
-        # print(system.pathname)
-        # print(self.todense())
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-            if d_inputs._names:
-                try:
-                    mask = self._mask_caches[(d_inputs._names, mode)]
-                except KeyError:
-                    mask = d_inputs.get_mask()
-                    self._mask_caches[(d_inputs._names, mode)] = mask
-
             dresids = d_residuals.asarray()
 
             # self._pre_apply(system, d_inputs, d_outputs, d_residuals, mode)
@@ -101,11 +92,12 @@ class ComponentJacobian(SplitJacobian):
                 if d_outputs._names:
                     if self._is_explicitcomp:
                         dresids -= d_outputs.asarray()
-                    else:
+                    elif self._dr_do_mtx is not None:
                         dresids += self._dr_do_mtx._prod(d_outputs.asarray(), mode)
 
                 if self._dr_di_mtx is not None and d_inputs._names:
-                    dresids += self._dr_di_mtx._prod(d_inputs.asarray(), mode, mask)
+                    dresids += self._dr_di_mtx._prod(d_inputs.asarray(), mode,
+                                                     self._get_mask(d_inputs, mode))
 
             else:  # rev
                 if d_outputs._names:
@@ -117,8 +109,33 @@ class ComponentJacobian(SplitJacobian):
 
                 if self._dr_di_mtx is not None and d_inputs._names:
                     arr = self._dr_di_mtx._prod(dresids, mode)
+                    mask = self._get_mask(d_inputs, mode)
                     if mask is not None:
                         arr[mask] = 0.0
                     d_inputs += arr
 
             # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)
+
+    def _get_mask(self, d_inputs, mode):
+        """
+        Get the mask for the inputs.
+
+        Parameters
+        ----------
+        d_inputs : Vector
+            inputs linear vector.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        mask : ndarray
+            Mask for the inputs.
+        """
+        try:
+            mask = self._mask_caches[(d_inputs._names, mode)]
+        except KeyError:
+            mask = d_inputs.get_mask()
+            self._mask_caches[(d_inputs._names, mode)] = mask
+
+        return mask

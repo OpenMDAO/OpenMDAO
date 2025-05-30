@@ -17,7 +17,7 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.subjac import Subjac
 from openmdao.jacobians.block_jacobian import BlockJacobian
-from openmdao.jacobians.compjacobian import ComponentJacobian
+from openmdao.jacobians.compjacobian import ComponentSplitJacobian
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
@@ -177,7 +177,7 @@ class Component(System):
                              desc='Default shape for variables that do not set val to a non-scalar '
                              'value or set shape, shape_by_conn, copy_shape, or compute_shape.'
                              ' Default is (1,).')
-        self.options.declare('jac_type', types=str, default='dense',
+        self.options.declare('jac_type', types=str, default='csc',
                              desc='Type of Jacobian to use.  Options are "auto", "dense", "coo", '
                              '"csc", "csr", or "dict". Ignored by matrix free components.  "auto" '
                              'will assign a jacobian type based on the sparsity of the component. '
@@ -200,13 +200,13 @@ class Component(System):
         #     jac_type = self._get_auto_jac()
 
         if jac_type == 'dense':
-            return ComponentJacobian(DenseMatrix, self)
+            return ComponentSplitJacobian(DenseMatrix, self)
         elif jac_type == 'coo':
-            return ComponentJacobian(COOMatrix, self)
+            return ComponentSplitJacobian(COOMatrix, self)
         elif jac_type == 'csc':
-            return ComponentJacobian(CSCMatrix, self)
+            return ComponentSplitJacobian(CSCMatrix, self)
         elif jac_type == 'csr':
-            return ComponentJacobian(CSRMatrix, self)
+            return ComponentSplitJacobian(CSRMatrix, self)
         elif jac_type == 'dict':
             return BlockJacobian(self)
         else:
