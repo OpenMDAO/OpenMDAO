@@ -4001,11 +4001,8 @@ class Group(System):
         return self._jacobian
 
     def _approx_subjac_keys_iter(self):
-        yield from self._subjac_keys_iter()
-
-    def _subjac_keys_iter(self):
         """
-        Iterate over all subjacobian keys needed for this Group.
+        Iterate over all approx subjacobian keys needed for this Group.
 
         These keys include all declared at the Component level below this group, plus any added
         at this group level for approximations, etc.
@@ -4018,60 +4015,53 @@ class Group(System):
         tuple
             A tuple of the form (of_name, wrt_name).  Names are absolute (no aliases).
         """
-        totals = self.pathname == ''
+        if self.pathname == '':  # totals
+            yield from self._approx_total_subjac_keys_iter()
+        else:
+            yield from self._approx_partials_subjac_keys_iter()
 
+    def _approx_total_subjac_keys_iter(self):
+        """
+        Iterate over all approx total subjacobian keys needed for this Group.
+        """
+        if self._owns_approx_of is None:
+            return
+
+        ivc = set(self.get_indep_vars(local=False))
+
+        # When computing totals, weed out inputs connected to anything inside our system unless
+        # the source is an indepvarcomp.
+        wrt = {m['source'] for m in self._owns_approx_wrt.values()}
+        diff = wrt.difference(ivc)
+        if diff:
+            bad = [n for n, m in self._owns_approx_wrt.items() if m['source'] in diff]
+            raise RuntimeError("When computing total derivatives for the model, the "
+                               "following wrt variables are not independent variables or "
+                               f"do not have an independant variable as a source: {sorted(bad)}")
+
+        of = set(m['source'] for m in self._owns_approx_of.values())
+
+        yield from product(of, wrt)
+
+    def _approx_partials_subjac_keys_iter(self):
         wrt = set()
         ivc = set(self.get_indep_vars(local=False))
 
-        if totals:
-            # When computing totals, weed out inputs connected to anything inside our system unless
-            # the source is an indepvarcomp.
-            if self._owns_approx_wrt:
-                wrt = {m['source'] for m in self._owns_approx_wrt.values()}
-                diff = wrt.difference(ivc)
-                if diff:
-                    bad = [n for n, m in self._owns_approx_wrt.items() if m['source'] in diff]
-                    raise RuntimeError("When computing total derivatives for the model, the "
-                                       "following wrt variables are not independent variables or "
-                                       "do not have an independant variable as a source: "
-                                       f"{sorted(bad)}")
-                wrt = wrt.intersection(ivc)
-            else:
-                wrt = ivc
+        for _, abs_inps in self._resolver.prom2abs_iter('input'):
+            if abs_inps[0] not in self._conn_abs_in2out:
+                # If connection is inside of this Group, perturbation of all implicitly
+                # connected inputs will be handled properly via internal transfers.
+                # Otherwise, we need to add all implicitly connected inputs separately.
+                wrt.update(abs_inps)
 
-        else:
-            for _, abs_inps in self._resolver.prom2abs_iter('input'):
-                if abs_inps[0] not in self._conn_abs_in2out:
-                    # If connection is inside of this Group, perturbation of all implicitly
-                    # connected inputs will be handled properly via internal transfers.
-                    # Otherwise, we need to add all implicitly connected inputs separately.
-                    wrt.update(abs_inps)
+        # get rid of any old stuff in here
+        self._owns_approx_of = self._owns_approx_wrt = None
 
-            # get rid of any old stuff in here
-            self._owns_approx_of = self._owns_approx_wrt = None
+        of = set(self._var_allprocs_abs2meta['output'])
+        # Skip indepvarcomp res wrt other srcs
+        of -= ivc
 
-        if self._owns_approx_of:  # can only be total at this point
-            of = set(m['source'] for m in self._owns_approx_of.values())
-        else:
-            of = set(self._var_allprocs_abs2meta['output'])
-            # Skip indepvarcomp res wrt other srcs
-            of -= ivc
-
-        if totals:
-            yield from product(of, wrt.union(of))
-        else:
-            for key in product(of, wrt.union(of)):
-                # Create approximations for the ones we need.
-
-                _of, _wrt = key
-                # Skip res wrt outputs
-                if _wrt in of and _wrt not in ivc:
-
-                    # Support for specifying a desvar as an obj/con.
-                    if _wrt not in wrt or _of == _wrt:
-                        continue
-
-                yield key
+        yield from product(of, wrt)
 
     def _jac_of_iter(self):
         """

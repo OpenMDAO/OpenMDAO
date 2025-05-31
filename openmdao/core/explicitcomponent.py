@@ -260,9 +260,9 @@ class ExplicitComponent(Component):
                                   distributed=distributed, primal_name=primal_name)
 
     def _approx_subjac_keys_iter(self):
-        is_output = self._outputs._contains_abs
+        is_input = self._inputs._contains_abs
         for abs_key, meta in self._subjacs_info.items():
-            if 'method' in meta and not is_output(abs_key[1]):
+            if 'method' in meta and is_input(abs_key[1]):
                 method = meta['method']
                 if method in self._approx_schemes:
                     yield abs_key

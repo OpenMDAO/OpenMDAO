@@ -4,6 +4,7 @@ import os
 import unittest
 import openmdao.api as om
 from openmdao.utils.mpi import MPI
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from openmdao.parallel_api import PETScVector
@@ -45,6 +46,7 @@ class Top(om.Group):
         self.connect('indep_var.x1', 'myComp.x2')
 
 
+@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class N2ParallelTestCase(unittest.TestCase):
     N_PROCS = 2
@@ -67,6 +69,7 @@ class N2ParallelTestCase(unittest.TestCase):
         clean_outfile(OUTFILE)
 
 
+@use_tempdirs
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class MultiN2ParallelTestCase(unittest.TestCase):
     N_PROCS = 2

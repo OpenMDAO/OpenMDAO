@@ -1517,7 +1517,6 @@ class Component(System):
         return opts
 
     def _get_approx_partial_options(self, key, method='fd', checkopts=None):
-        # TODO: extend this to Groups
         approx = self._get_approx_scheme(method)
         options = approx.DEFAULT_OPTIONS.copy()
         if checkopts is None:
@@ -1757,7 +1756,7 @@ class Component(System):
         use_relevance : bool
             If True, use relevance to determine which partials to approximate.
         """
-        subjacs = self._subjacs_info
+        subjacs_info = self._subjacs_info
         wrtset = set()
         subjac_keys = self._get_approx_subjac_keys(use_relevance=use_relevance, initialize=True)
         methods = list(self._approx_schemes)
@@ -1772,7 +1771,7 @@ class Component(System):
             wrt = key[1]
             if wrt not in wrtset:
                 wrtset.add(wrt)
-                meta = subjacs[key]
+                meta = subjacs_info[key]
                 self._approx_schemes[meta['method']].add_approximation(wrt, self, meta)
 
         # get rid of any empty approx schemes
