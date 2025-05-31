@@ -240,7 +240,7 @@ class DirectSolver(LinearSolver):
         self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
                                                         self.options['rhs_checking'])
 
-    def _linearize_children(self):
+    def _needs_linearize_children(self):
         """
         Return a flag that is True when we need to call linearize on our subsystems' solvers.
 

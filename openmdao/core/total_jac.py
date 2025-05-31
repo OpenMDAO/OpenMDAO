@@ -1411,7 +1411,7 @@ class _TotalJacInfo(object):
                             ln_solver = model._linear_solver
                             with model._scaled_context_all():
                                 model._linearize(model._assembled_jac,
-                                                 sub_do_ln=ln_solver._linearize_children())
+                                                 sub_do_ln=ln_solver._needs_linearize_children())
                             ln_solver._linearize()
                         finally:
                             model._tot_jac = None
@@ -1570,7 +1570,7 @@ class _TotalJacInfo(object):
 
                 # Linearize Model
                 model._linearize(model._assembled_jac,
-                                 sub_do_ln=model._linear_solver._linearize_children())
+                                 sub_do_ln=model._linear_solver._needs_linearize_children())
 
             finally:
                 model._tot_jac = None

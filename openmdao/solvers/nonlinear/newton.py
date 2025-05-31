@@ -134,7 +134,7 @@ class NewtonSolver(NonlinearSolver):
             # Enable local fd
             system._owns_approx_jac = approx_status
 
-    def _linearize_children(self):
+    def _needs_linearize_children(self):
         """
         Return a flag that is True when we need to call linearize on our subsystems' solvers.
 
@@ -208,7 +208,7 @@ class NewtonSolver(NonlinearSolver):
         self._solver_info.append_subsolver()
         do_subsolve = self.options['solve_subsystems'] and not system.under_complex_step and \
             (self._iter_count < self.options['max_sub_solves'])
-        do_sub_ln = self.linear_solver._linearize_children()
+        do_sub_ln = self.linear_solver._needs_linearize_children()
 
         # Disable local fd
         approx_status = system._owns_approx_jac

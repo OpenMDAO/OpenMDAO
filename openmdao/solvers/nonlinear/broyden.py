@@ -571,7 +571,7 @@ class BroydenSolver(NonlinearSolver):
             # Linearize model.
             ln_solver = self.linear_solver
             my_asm_jac = ln_solver._assembled_jac
-            system._linearize(my_asm_jac, sub_do_ln=ln_solver._linearize_children())
+            system._linearize(my_asm_jac, sub_do_ln=ln_solver._needs_linearize_children())
             self._linearize()
 
             for wrt_name in states:
@@ -629,7 +629,7 @@ class BroydenSolver(NonlinearSolver):
         try:
             # Linearize model.
             ln_solver = self.linear_solver
-            do_sub_ln = ln_solver._linearize_children()
+            do_sub_ln = ln_solver._needs_linearize_children()
             my_asm_jac = ln_solver._assembled_jac
             system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
 

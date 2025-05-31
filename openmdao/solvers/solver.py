@@ -455,7 +455,7 @@ class Solver(object, metaclass=SolverMetaclass):
         """
         pass
 
-    def _linearize_children(self):
+    def _needs_linearize_children(self):
         """
         Return a flag that is True when we need to call linearize on our subsystems' solvers.
 

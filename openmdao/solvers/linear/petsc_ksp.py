@@ -327,7 +327,7 @@ class PETScKrylov(LinearSolver):
         # stuff resulting value of b vector into result for KSP
         result.array[:] = b_vec.asarray()
 
-    def _linearize_children(self):
+    def _needs_linearize_children(self):
         """
         Return a flag that is True when we need to call linearize on our subsystems' solvers.
 
@@ -336,7 +336,7 @@ class PETScKrylov(LinearSolver):
         bool
             Flag for indicating child linerization
         """
-        return (self.precon is not None) and (self.precon._linearize_children())
+        return (self.precon is not None) and (self.precon._needs_linearize_children())
 
     def _linearize(self):
         """
