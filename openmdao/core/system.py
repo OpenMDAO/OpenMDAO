@@ -19,7 +19,6 @@ import numpy as np
 from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
     _UNDEFINED, INT_DTYPE, INF_BOUND, _SetupStatus
 from openmdao.jacobians.dictionary_jacobian import Jacobian
-from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
@@ -44,13 +43,6 @@ from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 
-
-_empty_frozen_set = frozenset()
-
-_asm_jac_types = {
-    'csc': CSCJacobian,
-    'dense': DenseJacobian,
-}
 
 # Suppored methods for derivatives
 _supported_methods = {
@@ -2564,29 +2556,6 @@ class System(object, metaclass=SystemMetaclass):
 
         return asm_jac_solvers
 
-    def _get_assembled_jac(self):
-        """
-        Get the assembled jacobian if there is one.
-        """
-        if self._assembled_jac is None:
-            asm_jac_solvers = self._get_asm_jac_solvers()
-
-            # At present, we don't support a AssembledJacobian in a group
-            # if any subcomponents are matrix-free.
-            if asm_jac_solvers:
-                if self.matrix_free:
-                    raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
-                                       "subcomponent." % self.msginfo)
-
-                # om_dump_indent(self, f"New AssembledJacobian for {self.msginfo}")
-                asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
-                # om_dump_indent(self, f"New AssembledJacobian for {self.msginfo} is: {asm_jac}")
-                self._assembled_jac = self._jacobian = asm_jac
-                for solver in asm_jac_solvers:
-                    solver._assembled_jac = asm_jac
-
-        return self._assembled_jac
-
     def _get_promotion_maps(self):
         """
         Define variable maps based on promotes lists.
@@ -2763,21 +2732,6 @@ class System(object, metaclass=SystemMetaclass):
 
         return maps
 
-    def _get_matvec_scope(self):
-        """
-        Find the input and output variables that are needed for a particular matvec product.
-
-        Returns
-        -------
-        (set, set)
-            Sets of output and input variables.
-        """
-        try:
-            return self._scope_cache[None]
-        except KeyError:
-            self._scope_cache[None] = (None, _empty_frozen_set)
-            return self._scope_cache[None]
-
     @contextmanager
     def _unscaled_context(self, outputs=(), residuals=()):
         """
@@ -2840,7 +2794,7 @@ class System(object, metaclass=SystemMetaclass):
                     vec.scale_to_phys()
 
     @contextmanager
-    def _matvec_context(self, scope_out, scope_in, mode, clear=True):
+    def _matvec_context(self, scope_out, scope_in, mode):
         """
         Context manager for vectors.
 
@@ -2858,9 +2812,6 @@ class System(object, metaclass=SystemMetaclass):
         mode : str
             Key for specifying derivative direction. Values are 'fwd'
             or 'rev'.
-        clear : bool(True)
-            If True, zero out residuals (in fwd mode) or inputs and outputs
-            (in rev mode).
 
         Yields
         ------
@@ -2873,12 +2824,11 @@ class System(object, metaclass=SystemMetaclass):
         d_outputs = self._doutputs
         d_residuals = self._dresiduals
 
-        if clear:
-            if mode == 'fwd':
-                d_residuals.set_val(0.0)
-            else:  # rev
-                d_inputs.set_val(0.0)
-                d_outputs.set_val(0.0)
+        if mode == 'fwd':
+            d_residuals.set_val(0.0)
+        else:  # rev
+            d_inputs.set_val(0.0)
+            d_outputs.set_val(0.0)
 
         if scope_out is None and scope_in is None:
             yield d_inputs, d_outputs, d_residuals
@@ -5233,8 +5183,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         Record an iteration of the current System.
         """
-        global _recordable_funcs
-
         if self._rec_mgr._recorders:
             parallel = self._rec_mgr._check_parallel() if self.comm.size > 1 else False
             do_gather = self._rec_mgr._check_gather()

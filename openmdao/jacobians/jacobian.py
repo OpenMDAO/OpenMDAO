@@ -600,8 +600,8 @@ class SplitJacobian(Jacobian):
         self._subjacs = None
         self._dr_do_subjacs = {}
         self._dr_di_subjacs = {}
+        self._mask_caches = {}
         self._get_split_subjacs(system)
-
         self._col_mapper = None  # force recompute of internal index maps on next set_col
 
     def get_dr_do_matrix(self):
@@ -613,6 +613,8 @@ class SplitJacobian(Jacobian):
         Matrix
             The dr/do matrix.
         """
+        if self._dr_do_mtx is None:
+            return None
         return self._dr_do_mtx._matrix
 
     def get_dr_di_matrix(self):
@@ -624,6 +626,8 @@ class SplitJacobian(Jacobian):
         Matrix
             The dr/di matrix.
         """
+        if self._dr_di_mtx is None:
+            return None
         return self._dr_di_mtx._matrix
 
     def _update(self, system):
@@ -706,11 +710,11 @@ class SplitJacobian(Jacobian):
                 factor = None
                 if not meta['dependent']:
                     continue
-                if wrt in output_slices:
+                if wrt in output_slices and not is_explicit_comp:
                     self._dr_do_subjacs[abs_key] = \
                         self.create_dr_do_subjac(conns, abs_key, wrt, meta, dtype)
                 elif wrt in input_slices:
-                    if wrt in conns and not is_explicit_comp:  # internally connected input
+                    if wrt in conns:  # internally connected input (only can happen in Groups)
                         # For the subjacs that make up the dr/do jacobian, the column entries
                         # correspond to outputs, so we need to map derivatives wrt inputs into the
                         # corresponding derivative wrt their source, so d(residual)/d(source)

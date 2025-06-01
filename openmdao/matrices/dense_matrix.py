@@ -95,7 +95,7 @@ class DenseMatrix(Matrix):
 
         Parameters
         ----------
-        in_vec : ndarray[:]
+        in_vec : ndarray
             incoming vector to multiply.
         mode : str
             'fwd' or 'rev'.
@@ -105,7 +105,7 @@ class DenseMatrix(Matrix):
 
         Returns
         -------
-        ndarray[:]
+        ndarray
             vector resulting from the product.
         """
         in_vec = self._get_masked_arr(in_vec, mode, mask)

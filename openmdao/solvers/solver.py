@@ -1208,7 +1208,7 @@ class BlockLinearSolver(LinearSolver):
         else:
             self._rhs_vec = np.ascontiguousarray(self._rhs_vec.real, dtype=float)
 
-    def _vars_union(self, slv_vars, sys_vars):
+    def _union_matvec_scope(self, slv_vars, sys_vars):
         """
         Return the union of the two 'set's of variables.
 
@@ -1223,7 +1223,7 @@ class BlockLinearSolver(LinearSolver):
         slv_vars : set, None, or _UNDEFINED
             First variable set, from the current solver.
         sys_vars : set, None, or _UNDEFINED
-            Second variable set, from above.
+            Second variable set, from the parent solver.
 
         Returns
         -------
@@ -1248,8 +1248,8 @@ class BlockLinearSolver(LinearSolver):
         try:
             scope_out, scope_in = system._get_matvec_scope()
             system._apply_linear(self._assembled_jac, self._mode,
-                                 self._vars_union(self._scope_out, scope_out),
-                                 self._vars_union(self._scope_in, scope_in))
+                                 self._union_matvec_scope(self._scope_out, scope_out),
+                                 self._union_matvec_scope(self._scope_in, scope_in))
         finally:
             self._recording_iter.pop()
 

@@ -28,7 +28,7 @@ class ComponentSplitJacobian(SplitJacobian):
 
     Parameters
     ----------
-    matrix_class : type
+    matrix_class : type or None
         Class to use to create internal matrices.
     system : System
         Parent system to this jacobian.
@@ -39,9 +39,8 @@ class ComponentSplitJacobian(SplitJacobian):
         Square matrix of derivatives of residuals with respect to outputs.
     _dr_di_mtx : <Matrix>
         Matrix of derivatives of residuals with respect to inputs.
-    _mask_caches : dict
-        Contains masking arrays for when a subset of the variables are present in a vector, keyed
-        by the input._names set.
+    _matrix_class : type or None
+        Class to use to create internal matrices.
     """
 
     def __init__(self, matrix_class, system):
@@ -49,18 +48,19 @@ class ComponentSplitJacobian(SplitJacobian):
         Initialize all attributes.
         """
         super().__init__(system)
-        self._mask_caches = {}
+
+        self._matrix_class = matrix_class
 
         drdo_subjacs, drdi_subjacs = self._get_split_subjacs(system)
         out_size = len(system._outputs)
 
         dtype = complex if system.under_complex_step else float
 
-        if not self._is_explicitcomp and drdo_subjacs:
+        if not self._is_explicitcomp and drdo_subjacs and matrix_class is not None:
             self._dr_do_mtx = matrix_class(drdo_subjacs)
             self._dr_do_mtx._build(out_size, out_size, dtype)
 
-        if drdi_subjacs:
+        if drdi_subjacs and matrix_class is not None:
             self._dr_di_mtx = matrix_class(drdi_subjacs)
             self._dr_di_mtx._build(out_size, len(system._inputs), dtype)
 
@@ -95,9 +95,15 @@ class ComponentSplitJacobian(SplitJacobian):
                     elif self._dr_do_mtx is not None:
                         dresids += self._dr_do_mtx._prod(d_outputs.asarray(), mode)
 
-                if self._dr_di_mtx is not None and d_inputs._names:
-                    dresids += self._dr_di_mtx._prod(d_inputs.asarray(), mode,
-                                                     self._get_mask(d_inputs, mode))
+                if d_inputs._names:
+                    if self._dr_di_mtx is not None:
+                        dresids += self._dr_di_mtx._prod(d_inputs.asarray(), mode,
+                                                         self._get_mask(d_inputs, mode))
+                    elif self._matrix_class is None:  # only true for explicit components
+                        dinp_names = d_inputs._names
+                        for key, subjac in self._dr_di_subjacs.items():
+                            if key[1] in dinp_names:
+                                subjac.apply_fwd(d_inputs, d_outputs, d_residuals, self._randgen)
 
             else:  # rev
                 if d_outputs._names:
@@ -107,12 +113,18 @@ class ComponentSplitJacobian(SplitJacobian):
                     else:
                         doutarr += self._dr_do_mtx._prod(dresids, mode)
 
-                if self._dr_di_mtx is not None and d_inputs._names:
-                    arr = self._dr_di_mtx._prod(dresids, mode)
-                    mask = self._get_mask(d_inputs, mode)
-                    if mask is not None:
-                        arr[mask] = 0.0
-                    d_inputs += arr
+                if d_inputs._names:
+                    if self._dr_di_mtx is not None:
+                        arr = self._dr_di_mtx._prod(dresids, mode)
+                        mask = self._get_mask(d_inputs, mode)
+                        if mask is not None:
+                            arr[mask] = 0.0
+                        d_inputs += arr
+                    elif self._matrix_class is None:  # only true for explicit components
+                        dinp_names = d_inputs._names
+                        for key, subjac in self._dr_di_subjacs.items():
+                            if key[1] in dinp_names:
+                                subjac.apply_rev(d_inputs, d_outputs, d_residuals, self._randgen)
 
             # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)
 

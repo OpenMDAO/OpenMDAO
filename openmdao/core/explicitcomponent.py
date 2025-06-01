@@ -2,8 +2,7 @@
 
 from itertools import chain
 
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
-from openmdao.jacobians.block_jacobian import BlockJacobian
+from openmdao.jacobians.compjacobian import ComponentSplitJacobian
 from openmdao.jacobians.jacobian import JacobianUpdateContext
 from openmdao.utils.coloring import _ColSparsityJac
 from openmdao.core.component import Component
@@ -81,6 +80,28 @@ class ExplicitComponent(Component):
         """
         if is_undefined(self.matrix_free):
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
+
+    def _choose_jac_type(self, jac_type):
+        """
+        Choose the Jacobian type based on the given string.
+
+        Parameters
+        ----------
+        jac_type : str
+            The type of Jacobian to create.
+
+        Returns
+        -------
+        Jacobian
+            The Jacobian object.
+        """
+        if jac_type == 'block':
+            # special case for explicit components requesting a block jacobian.  We still split
+            # it into dr/do and dr/di subjacs, but the apply for the dr/do just does a simple
+            # vector subtraction. because dr/do is -I.
+            return ComponentSplitJacobian(None, self)
+        else:
+            return super()._choose_jac_type(jac_type)
 
     def _jac_wrt_iter(self, wrt_matches=None):
         """
@@ -173,7 +194,7 @@ class ExplicitComponent(Component):
 
         if not self.matrix_free:
             if self._jacobian is None:
-                self._jacobian = self._choose_jac_type()
+                self._jacobian = self._choose_jac_type(self.options['jac_type'])
                 if self._has_approx:
                     self._get_static_wrt_matches()
                     self._add_approximations(use_relevance=use_relevance)
@@ -393,9 +414,6 @@ class ExplicitComponent(Component):
             d_inputs, d_outputs, d_residuals = vecs
 
             if not self.matrix_free:
-                # if we're not matrix free, we can skip the rest because
-                # compute_jacvec_product does nothing.
-
                 # Jacobian and vectors are all scaled, unitless
                 J._apply(self, d_inputs, d_outputs, d_residuals, mode)
                 return
@@ -411,23 +429,22 @@ class ExplicitComponent(Component):
 
                 try:
                     # handle identity subjacs (output_or_resid wrt itself)
-                    if J is None or isinstance(J, (DictionaryJacobian, BlockJacobian)):
-                        if d_outputs._names:
-                            rflat = d_residuals._abs_get_val
-                            oflat = d_outputs._abs_get_val
+                    if d_outputs._names:
+                        rflat = d_residuals._abs_get_val
+                        oflat = d_outputs._abs_get_val
 
-                            # 'val' in the code below is a reference to the part of the
-                            # output or residual array corresponding to the variable 'v'
-                            if mode == 'fwd':
-                                for v in d_outputs._names:
-                                    if (v, v) not in self._subjacs_info:
-                                        val = rflat(v)
-                                        val -= oflat(v)
-                            else:  # rev
-                                for v in d_outputs._names:
-                                    if (v, v) not in self._subjacs_info:
-                                        val = oflat(v)
-                                        val -= rflat(v)
+                        # 'val' in the code below is a reference to the part of the
+                        # output or residual array corresponding to the variable 'v'
+                        if mode == 'fwd':
+                            for v in d_outputs._names:
+                                if (v, v) not in self._subjacs_info:
+                                    val = rflat(v)
+                                    val -= oflat(v)
+                        else:  # rev
+                            for v in d_outputs._names:
+                                if (v, v) not in self._subjacs_info:
+                                    val = oflat(v)
+                                    val -= rflat(v)
 
                     # We used to negate the residual here, and then re-negate after the hook
                     with self._call_user_function('compute_jacvec_product'):
@@ -545,8 +562,6 @@ class ExplicitComponent(Component):
         discrete_outputs : dict-like or None
             If not None, dict-like object containing discrete output values.
         """
-        global _tuplist
-
         if self.compute_primal is None:
             return
 

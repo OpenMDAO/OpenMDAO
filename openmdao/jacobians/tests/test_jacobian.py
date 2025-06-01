@@ -847,7 +847,6 @@ class TestJacobian(unittest.TestCase):
         prob.run_driver()
 
         expected = [
-            (('paraboloid.f_xy', 'paraboloid.f_xy'),[-1.]),
             (('paraboloid.f_xy', 'paraboloid.x'),[[0.]]),
             (('paraboloid.f_xy', 'paraboloid.y'),[[0.]]),
         ]

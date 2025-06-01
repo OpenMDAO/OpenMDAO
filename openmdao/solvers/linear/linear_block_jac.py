@@ -29,8 +29,8 @@ class LinearBlockJac(BlockLinearSolver):
 
             for i, subsys in enumerate(subs):
                 scope_out, scope_in = system._get_matvec_scope(subsys)
-                scope_out = self._vars_union(self._scope_out, scope_out)
-                scope_in = self._vars_union(self._scope_in, scope_in)
+                scope_out = self._union_matvec_scope(self._scope_out, scope_out)
+                scope_in = self._union_matvec_scope(self._scope_in, scope_in)
                 scopelist[i] = (scope_out, scope_in)
                 if subsys._iter_call_apply_linear():
                     subsys._apply_linear(None, mode, scope_out, scope_in)
@@ -47,8 +47,8 @@ class LinearBlockJac(BlockLinearSolver):
         else:  # rev
             for i, subsys in enumerate(subs):
                 scope_out, scope_in = system._get_matvec_scope(subsys)
-                scope_out = self._vars_union(self._scope_out, scope_out)
-                scope_in = self._vars_union(self._scope_in, scope_in)
+                scope_out = self._union_matvec_scope(self._scope_out, scope_out)
+                scope_in = self._union_matvec_scope(self._scope_in, scope_in)
                 scopelist[i] = (scope_out, scope_in)
                 if subsys._iter_call_apply_linear():
                     subsys._apply_linear(None, mode, scope_out, scope_in)

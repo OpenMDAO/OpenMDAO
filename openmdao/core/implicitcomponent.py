@@ -573,7 +573,7 @@ class ImplicitComponent(Component):
                 self._jacobian = self._get_assembled_jac()
 
                 if self._jacobian is None:
-                    self._jacobian = self._choose_jac_type()
+                    self._jacobian = self._choose_jac_type(self.options['jac_type'])
 
                 if self._has_approx:
                     self._get_static_wrt_matches()
@@ -581,7 +581,36 @@ class ImplicitComponent(Component):
 
         return self._jacobian
 
+    def _get_assembled_jac(self):
+        """
+        Get the assembled jacobian if there is one.
+        """
+        if self._assembled_jac is None:
+            asm_jac_solvers = self._get_asm_jac_solvers()
+
+            if asm_jac_solvers:
+                if self.matrix_free:
+                    # At present, we don't support a AssembledJacobian if the component is
+                    # matrix-free.
+                    raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
+                                       "subcomponent." % self.msginfo)
+
+                asm_jac = self._choose_jac_type(self.options['assembled_jac_type'], assembled=True)
+                self._assembled_jac = self._jacobian = asm_jac
+                for solver in asm_jac_solvers:
+                    solver._assembled_jac = asm_jac
+
+        return self._assembled_jac
+
     def _get_jac_wrapper(self):
+        """
+        Wrap our jacobian in a _JacobianWrapper if we have renamed residuals.
+
+        Returns
+        -------
+        _JacobianWrapper or Jacobian
+            The wrapped jacobian.
+        """
         if self._jac_wrapper is None:
             if self._declared_residuals:
                 self._jac_wrapper = _JacobianWrapper(self._get_jacobian(),
@@ -833,7 +862,6 @@ class ImplicitComponent(Component):
         discrete_outputs : dict or None
             If not None, dict containing discrete output values.
         """
-        global _tuplist
         if self.compute_primal is None:
             return
 

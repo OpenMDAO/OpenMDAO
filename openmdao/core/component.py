@@ -44,6 +44,8 @@ _forbidden_chars = {'.', '*', '?', '!', '[', ']'}
 _whitespace = {' ', '\t', '\r', '\n'}
 _allowed_types = (list, tuple, ndarray, Iterable)
 
+_no_matvec_scope = (None, frozenset())
+
 
 def _valid_var_name(name):
     """
@@ -62,7 +64,6 @@ def _valid_var_name(name):
     bool
         True if the proposed name is a valid variable name, else False.
     """
-    global _forbidden_chars, _whitespace
     if not name:
         return False
     if _forbidden_chars.intersection(name):
@@ -183,17 +184,22 @@ class Component(System):
                              'will assign a jacobian type based on the sparsity of the component. '
                              'Default is "dense".')
 
-    def _choose_jac_type(self):
+    def _choose_jac_type(self, jac_type, assembled=False):
         """
         Choose the Jacobian type based on the jac_type option.
+
+        Parameters
+        ----------
+        jac_type : str
+            The type of Jacobian to create.
+        assembled : bool, optional
+            If True, return an assembled Jacobian.  Default is False.
 
         Returns
         -------
         Jacobian
             The Jacobian object.
         """
-        jac_type = self.options['jac_type']
-
         if jac_type == 'dense':
             return ComponentSplitJacobian(DenseMatrix, self)
         elif jac_type == 'coo':
@@ -203,6 +209,9 @@ class Component(System):
         elif jac_type == 'csr':
             return ComponentSplitJacobian(CSRMatrix, self)
         elif jac_type == 'block':
+            if assembled:
+                raise RuntimeError(f"{self.msginfo}: BlockJacobian is not supported for assembled "
+                                   "Jacobians.")
             return BlockJacobian(self)
         else:
             raise ValueError(f"Invalid jac_type: {jac_type}")
@@ -314,7 +323,6 @@ class Component(System):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
-        global global_meta_names
         super()._setup_var_data()
 
         # Compute the prefix for turning rel/prom names into abs names
@@ -832,8 +840,6 @@ class Component(System):
         dict
             Metadata for added variable.
         """
-        global _allowed_types
-
         # First, type check all arguments
         if (shape_by_conn or copy_shape or compute_shape) and (shape is not None or ndim(val) > 0):
             raise ValueError("%s: If shape is to be set dynamically using 'shape_by_conn', "
@@ -2649,6 +2655,17 @@ class Component(System):
             lines.append(f"    self.declare_partials(of='{of}', wrt='{wrt}', "
                          f"rows={list(nzrows)}, cols={list(nzcols)})")
         return '\n'.join(lines)
+
+    def _get_matvec_scope(self):
+        """
+        Find the input and output variables that are needed for a particular matvec product.
+
+        Returns
+        -------
+        (set, set)
+            Sets of output and input variables.
+        """
+        return _no_matvec_scope
 
 
 class _DictValues(object):

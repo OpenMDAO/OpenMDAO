@@ -44,10 +44,18 @@ from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.subjac import Subjac
 from openmdao.jacobians.jacobian import GroupJacobianUpdateContext
+from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
+
 
 # regex to check for valid names.
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
+
+
+_asm_jac_types = {
+    'csc': CSCJacobian,
+    'dense': DenseJacobian,
+}
 
 
 # use a class with slots instead of a namedtuple so that we can
@@ -402,18 +410,19 @@ class Group(System):
             # A value of None will be interpreted as 'all outputs'.
             scope_out = None
 
-            # All inputs that are not connected to outputs outside of this group
+            # All inputs that are connected to outputs within this group.  Use only local inputs
+            # because only local inputs exist in our input vector.
             scope_in = frozenset(self._conn_global_abs_in2out).intersection(
-                self._var_allprocs_abs2meta['input'])
+                self._var_abs2meta['input'])
 
         else:
             # Empty for the excl_sub
             scope_out = frozenset()
 
-            # All inputs connected to an output in this system but not in excl_sub.
+            # All inputs connected to an output in this Group but not in excl_sub.
             # allins is used to filter out discrete variables that might be found in
             # self._conn_global_abs_in2out.
-            allins = self._var_allprocs_abs2meta['input']
+            allins = self._var_abs2meta['input']
             exvars = excl_sub._var_allprocs_abs2idx
             scope_in = frozenset(abs_in for abs_in, abs_out in self._conn_global_abs_in2out.items()
                                  if abs_out not in exvars and abs_in in allins)
@@ -3999,6 +4008,29 @@ class Group(System):
                 self._get_static_wrt_matches()
 
         return self._jacobian
+
+    def _get_assembled_jac(self):
+        """
+        Get the assembled jacobian if there is one.
+        """
+        if self._assembled_jac is None:
+            asm_jac_solvers = self._get_asm_jac_solvers()
+
+            if asm_jac_solvers:
+                if self.matrix_free:
+                    # At present, we don't support a AssembledJacobian in a group
+                    # if any subcomponents are matrix-free.
+                    raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
+                                       "subcomponent." % self.msginfo)
+
+                # om_dump_indent(self, f"New AssembledJacobian for {self.msginfo}")
+                asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
+                # om_dump_indent(self, f"New AssembledJacobian for {self.msginfo} is: {asm_jac}")
+                self._assembled_jac = self._jacobian = asm_jac
+                for solver in asm_jac_solvers:
+                    solver._assembled_jac = asm_jac
+
+        return self._assembled_jac
 
     def _approx_subjac_keys_iter(self):
         """
