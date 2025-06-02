@@ -51,7 +51,7 @@ class MPISetvalBug(unittest.TestCase):
         #     g3.set_val('x3', 2.5)
 
         g1.set_val('x1', 2.5)
-        g2.set_val('x2', 2.5)
+        g2.set_val('x2', 2.6)
         #g3.set_val('x3', 2.5)
 
         p.final_setup()

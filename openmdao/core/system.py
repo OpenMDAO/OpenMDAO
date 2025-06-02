@@ -5684,6 +5684,9 @@ class System(object, metaclass=SystemMetaclass):
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set.
         """
+        if not self._is_local:
+            return
+
         try:
             ginputs = self._group_inputs
         except AttributeError:
@@ -5705,6 +5708,7 @@ class System(object, metaclass=SystemMetaclass):
 
         all_meta = model._var_allprocs_abs2meta
         all_meta_in = model._var_allprocs_abs2meta['input']
+        all_meta_out = model._var_allprocs_abs2meta['output']
         loc_meta_in = model._var_abs2meta['input']
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
