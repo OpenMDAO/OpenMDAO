@@ -384,11 +384,11 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         J = self._jac_func_(self._tangents['fwd'], tuple(inputs.values()))
         J = _jax2np(J)
-        if self._coloring_info.coloring is not None:
+        if self._coloring_info.coloring is None:
+            partials.set_dense_jac(self, J)
+        else:
             J = self._coloring_info.coloring._expand_jac(J, 'fwd')
             partials.set_csc_jac(self, J)
-        else:
-            partials.set_dense_jac(self, J)
 
     def _jacrev_colored(self, inputs, partials):
         """
@@ -403,11 +403,11 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         J = self._jac_func_(self._tangents['rev'], tuple(inputs.values()))
         J = _jax2np(J).T
-        if self._coloring_info.coloring is not None:
+        if self._coloring_info.coloring is None:
+            partials.set_dense_jac(self, J)
+        else:
             J = self._coloring_info.coloring._expand_jac(J, 'rev')
             partials.set_csc_jac(self, J)
-        else:
-            partials.set_dense_jac(self, J)
 
     def compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9):
         """
