@@ -299,7 +299,7 @@ jobs:
             cd SNOPT
             ./configure
             make
-            echo make check
+            make check
 
             echo "-------------------------------------------------------------"
             echo "Building Python bindings"
