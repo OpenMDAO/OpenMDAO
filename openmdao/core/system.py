@@ -5704,7 +5704,8 @@ class System(object, metaclass=SystemMetaclass):
         conns = model._conn_global_abs_in2out
 
         all_meta = model._var_allprocs_abs2meta
-        loc_meta = model._var_abs2meta
+        all_meta_in = model._var_allprocs_abs2meta['input']
+        loc_meta_in = model._var_abs2meta['input']
         n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
         n_proms = len(abs_names)  # for output this will never be > 1
@@ -5713,34 +5714,24 @@ class System(object, metaclass=SystemMetaclass):
         else:
             abs_name = abs_names[0]
 
-        if not has_vectors:
-            has_dyn_shape = []
-            for n in abs_names:
-                if n in all_meta['input']:
-                    m = all_meta['input'][n]
-                    if 'shape_by_conn' in m and m['shape_by_conn']:
-                        has_dyn_shape.append(True)
-                else:
-                    has_dyn_shape.append(False)
-
         set_units = None
 
         if abs_name in conns:  # we're setting an input
             src = conns[abs_name]
-            if abs_name not in model._var_allprocs_discrete['input']:  # input is continuous
+            if abs_name in all_meta_in:  # input is continuous
                 value = np.asarray(value)
-                tmeta = all_meta['input'][abs_name]
+                tmeta = all_meta_in[abs_name]
                 tunits = tmeta['units']
                 sunits = all_meta['output'][src]['units']
-                if abs_name in loc_meta['input']:
-                    tlocmeta = loc_meta['input'][abs_name]
+                if abs_name in loc_meta_in:
+                    tlocmeta = loc_meta_in[abs_name]
                 else:
                     tlocmeta = None
 
                 gunits = ginputs[name][0].get('units') if name in ginputs else None
                 if n_proms > 1:  # promoted input name was used
                     if gunits is None:
-                        tunit_list = [all_meta['input'][n]['units'] for n in abs_names]
+                        tunit_list = [all_meta_in[n]['units'] for n in abs_names]
                         tu0 = tunit_list[0]
                         for tu in tunit_list:
                             if tu != tu0:
@@ -5766,14 +5757,14 @@ class System(object, metaclass=SystemMetaclass):
                         ivalue = model.convert_units(name, value, units, gunits)
                     value = model.convert_from_units(src, value, units)
                 set_units = sunits
-        else:  # setting an output or an unconnected input
+        else:  # setting an output
             src = abs_name
             if units is not None:
                 value = model.convert_from_units(abs_name, np.asarray(value), units)
                 try:
                     set_units = all_meta['output'][abs_name]['units']
                 except KeyError:  # this can happen if a component is the top level System
-                    set_units = all_meta['input'][abs_name]['units']
+                    set_units = all_meta_in[abs_name]['units']
 
         # Caching only needed if vectors aren't allocated yet.
         if not has_vectors:
@@ -5796,13 +5787,15 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 ic_cache[abs_name] = (value, set_units, self.pathname, name)
 
-            for n, dyn in zip(abs_names, has_dyn_shape):
-                if dyn:
-                    val = ic_cache[abs_name][0]
-                    shape = () if np.isscalar(val) else val.shape
-                    all_meta['input'][n]['shape'] = shape
-                    if n in loc_meta['input']:
-                        loc_meta['input'][n]['shape'] = shape
+            for n in abs_names:
+                if n in all_meta_in:
+                    m = all_meta_in[n]
+                    if 'shape_by_conn' in m and m['shape_by_conn']:
+                        val = ic_cache[abs_name][0]
+                        shape = () if np.isscalar(val) else val.shape
+                        all_meta_in[n]['shape'] = shape
+                        if n in loc_meta_in:
+                            loc_meta_in[n]['shape'] = shape
         else:
             myrank = model.comm.rank
 

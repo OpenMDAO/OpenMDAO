@@ -791,7 +791,6 @@ class Group(System):
             Problem level metadata dictionary.
         """
         # save a ref to the problem level options.
-        self._problem_meta = prob_meta
         self._initial_condition_cache = {}
         self._auto_ivc_recorders = []
         self._sys_graph_cache = None
@@ -807,7 +806,7 @@ class Group(System):
         self._post_components = None
 
         # Besides setting up the processors, this method also builds the model hierarchy.
-        self._setup_procs(self.pathname, comm, self._problem_meta)
+        self._setup_procs(self.pathname, comm, prob_meta)
 
         prob_meta['config_info'] = _ConfigInfo()
 
@@ -1881,7 +1880,7 @@ class Group(System):
         show_warnings : bool
             Bool to show or hide the auto_ivc warnings.
         """
-        skip = set(('path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'))
+        skip = {'path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'}
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         abs2meta_in = self._var_allprocs_abs2meta['input']
         resolver = self._resolver
