@@ -2526,9 +2526,11 @@ class TestConnect(unittest.TestCase):
         msg = "Output and input are in the same System for connection " + \
               "from 'tgt.y' to 'tgt.x'."
 
+        p.model.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
+
         with set_env_vars_context(OPENMDAO_FAIL_FAST='1'):
             with self.assertRaisesRegex(Exception, msg):
-                p.model.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
+                p.setup()
 
     def test_connect_within_system_with_promotes(self):
         prob = om.Problem(name='connect_within_system_with_promotes')
@@ -2546,6 +2548,53 @@ class TestConnect(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(ctx.exception), msg)
+
+    def test_subgroup_promoted_connection(self):
+        """
+        This example demonstrates a problem which fails with an error when trying
+        to connect the variables promoted up to the same sub-group.
+        """
+        class Comp1(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3 * inputs['x']
+
+        class Comp2(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('w', val=1.0)
+                self.add_output('z', val=1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['z'] = 4 * inputs['w']
+
+        class Group2(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', Comp1(), promotes=['*'])
+                self.add_subsystem('comp2', Comp2(), promotes=['*'])
+
+        class Group1(om.Group):
+            def setup(self):
+                self.add_subsystem('group2', Group2())
+                self.connect('group2.y', 'group2.w')
+
+        prob = om.Problem()
+        prob.model = Group1()
+        prob.model.add_subsystem('group1', Group1())
+        prob.setup()
+
+        prob.set_val('group2.x', 2)
+
+        prob.run_model()
+
+        z = prob.get_val('group2.z')
+
+        assert_near_equal(z, 2 * 3 * 4)
 
     def test_connect_units_with_unitless(self):
         prob = om.Problem()
