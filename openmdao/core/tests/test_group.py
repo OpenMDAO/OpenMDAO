@@ -444,6 +444,12 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['group2.comp1.b'], 20.0)
         self.assertEqual(p['group2.comp2.b'], 40.0)
 
+        src = p.model.group1.get_source('comp1.x')
+        self.assertEqual(src, 'group1.comp1.x')
+
+        src = p.model.get_source('group2.comp1.a')
+        self.assertEqual(src, 'group1.comp2.b')
+
     def test_reused_output_promoted_names(self):
         prob = om.Problem()
         prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0))
