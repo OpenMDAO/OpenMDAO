@@ -407,7 +407,6 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        # om_dump_indent(self, f"{self.msginfo}: _apply_linear, jac: {jac}")
         J = self._get_jacobian() if jac is None else jac
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
@@ -526,8 +525,6 @@ class ExplicitComponent(Component):
 
         with JacobianUpdateContext(self) as jac:
 
-            # om_dump_indent(self, f"{self.msginfo}: _linearize")
-
             if self.matrix_free or not (self._has_compute_partials or self._approx_schemes):
                 return
 
@@ -540,9 +537,6 @@ class ExplicitComponent(Component):
                 if self._has_compute_partials:
                     # We used to negate the jacobian here, and then re-negate after the hook.
                     self._compute_partials_wrapper()
-
-        # if self._jacobian is not None:
-        #     print(f"{self.msginfo}: jac\n{self._jacobian.todense()}")
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """

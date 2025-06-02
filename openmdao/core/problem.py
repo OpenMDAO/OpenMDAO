@@ -1674,7 +1674,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         object
             Derivatives in form requested by 'return_format'.
         """
-        #  om_dump("problem: compute_totals")
         if use_abs_names:
             warn_deprecation("The use_abs_names argument to compute_totals is deprecated and has "
                              "no effect.")

@@ -254,7 +254,6 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        # om_dump_indent(self, f"{self.msginfo}: _apply_linear, jac: {jac}")
         if jac is None:
             jac = self._get_jacobian()
 
@@ -393,8 +392,6 @@ class ImplicitComponent(Component):
 
         with JacobianUpdateContext(self) as jac:
 
-            # om_dump_indent(self, f"{self.msginfo}: _linearize, approx: {self._approx_schemes}")
-
             if not (self._has_linearize or self._approx_schemes):
                 return
 
@@ -405,9 +402,6 @@ class ImplicitComponent(Component):
                     approximation.compute_approximations(self, jac=jac)
 
                 self._linearize_wrapper(jac)
-
-        # if self._jacobian is not None:
-        #     print(f"{self.msginfo}: jac\n{self._jacobian.todense()}")
 
     def add_output(self, name, val=1.0, **kwargs):
         """

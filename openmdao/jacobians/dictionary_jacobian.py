@@ -66,8 +66,6 @@ class DictionaryJacobian(Jacobian):
         do_reset = False
         key_owners = system._get_subjac_owners()
 
-        # self._pre_apply(system, d_inputs, d_outputs, d_residuals, mode)
-
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._get_ordered_subjac_keys(system):
                 if abs_key not in subjacs_info:
@@ -126,8 +124,6 @@ class DictionaryJacobian(Jacobian):
 
             if do_reset:
                 self._iter_keys = None  # subjacs_info has been reduced, so update iter keys
-
-        # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)
 
 
 class _CheckingJacobian(DictionaryJacobian):

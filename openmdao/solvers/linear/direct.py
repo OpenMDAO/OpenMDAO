@@ -319,7 +319,6 @@ class DirectSolver(LinearSolver):
         Perform factorization.
         """
         system = self._system()
-        # om_dump_indent(system, f"{system.msginfo}: DirectSolver._linearize")
         nproc = system.comm.size
 
         if system._get_assembled_jac() is not None:

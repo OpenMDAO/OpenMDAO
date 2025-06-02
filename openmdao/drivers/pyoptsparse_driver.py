@@ -785,7 +785,6 @@ class pyOptSparseDriver(Driver):
             0 for successful function evaluation
             1 for unsuccessful function evaluation
         """
-        #  om_dump("pyoptsparse_driver: _gradfunc")
         prob = self._problem()
         model = prob.model
         fail = 0

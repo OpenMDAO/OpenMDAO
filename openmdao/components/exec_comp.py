@@ -1024,8 +1024,6 @@ class ExecComp(ExplicitComponent):
         partials : `Jacobian`
             Contains sub-jacobians.
         """
-        #  om_dump(f"{self.msginfo}: _compute_colored_partials")
-
         step = self.complex_stepsize * 1j
         inv_stepsize = 1.0 / self.complex_stepsize
         inarr = self._inarray
@@ -1074,7 +1072,6 @@ class ExecComp(ExplicitComponent):
             Contains sub-jacobians.
         """
         if self._manual_decl_partials:
-            #  om_dump(f"{self.msginfo}: _compute_partials, manual_decl_partials")
             return
 
         if self.under_complex_step:
@@ -1086,8 +1083,6 @@ class ExecComp(ExplicitComponent):
             self._compute_colored_partials(partials)
             return
 
-        #  om_dump(f"{self.msginfo}: _compute_partials")
-
         step = self.complex_stepsize * 1j
         out_names = self._var_rel_names['output']
         inv_stepsize = 1.0 / self.complex_stepsize
@@ -1096,8 +1091,6 @@ class ExecComp(ExplicitComponent):
         vdict = self._viewdict.dct
 
         inarr[:] = self._inputs.asarray(copy=False)
-
-        #  om_dump(f"{self.msginfo}: _compute_partials, inarr: {inarr}")
 
         for inp, (ival, _) in self._indict.items():
             psize = ival.size

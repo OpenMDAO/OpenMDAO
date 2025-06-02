@@ -3040,7 +3040,6 @@ class Group(System):
             If None, perform a full transfer.
             If str, perform a partial transfer to named subsystem for linear Gauss--Seidel.
         """
-        #  om_dump(f"{self.msginfo}: _transfer, vec_name: {vec_name}, mode: {mode}, sub: {sub}")
         xfer = self._transfers[mode]
         if sub in xfer:
             xfer = xfer[sub]
@@ -3707,11 +3706,9 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        # om_dump_indent(self, f"{self.msginfo}: _apply_linear, approx: {self._owns_approx_jac}")
         if self._owns_approx_jac:
             jac = self._get_jacobian()
         if jac is None and self._get_assembled_jac() is not None:
-            # om_dump_indent(self, f"assembled jac: {self._assembled_jac}")
             jac = self._assembled_jac
 
         if jac is not None:
@@ -3836,7 +3833,6 @@ class Group(System):
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        # om_dump_indent(self, f"{self.msginfo}: _linearize, owns approx: {self._owns_approx_jac}")
         self._check_first_linearize()
 
         # Group finite difference
@@ -4001,7 +3997,6 @@ class Group(System):
 
             if self._jacobian is None and self._has_approx:
                 # Group only needs a jacobian if it's approximating derivatives.
-                # om_dump_indent(self, f"New Jacobian for {self.msginfo}")
                 self._jacobian = DictionaryJacobian(system=self)
 
             if self._has_approx:
@@ -4023,9 +4018,7 @@ class Group(System):
                     raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
                                        "subcomponent." % self.msginfo)
 
-                # om_dump_indent(self, f"New AssembledJacobian for {self.msginfo}")
                 asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
-                # om_dump_indent(self, f"New AssembledJacobian for {self.msginfo} is: {asm_jac}")
                 self._assembled_jac = self._jacobian = asm_jac
                 for solver in asm_jac_solvers:
                     solver._assembled_jac = asm_jac
