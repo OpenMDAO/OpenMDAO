@@ -1144,7 +1144,7 @@ class NameResolver(object):
         if include_abs:
             names.append(self.abs_iter())
 
-        guesses = sorted(get_close_matches(name, chain(*names), n=n, cutoff=cutoff))
+        guesses = sorted(set(get_close_matches(name, chain(*names), n=n, cutoff=cutoff)))
         if guesses:
             msg = f"{msg} Perhaps you meant one of the following variables: {guesses}."
         return msg

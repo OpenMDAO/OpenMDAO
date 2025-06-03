@@ -586,38 +586,39 @@ class TestColoringImplicitFuncComp(unittest.TestCase):
         for (method, direction), isplit, osplit in itertools.product([('fd', 'fwd'), ('cs', 'fwd'), ('jax', 'fwd'), ('jax', 'rev')] if jax else [('fd', 'fwd'), ('cs', 'fwd')],
         [1,2,7,19],
         [1,2,5,11]):
-            with self.subTest(msg=f'{method=}_{direction=}_{isplit=}_{osplit=}'):
-                prob = Problem(name=f'test_partials_implicit_funccomp_{method}_{direction}_{isplit}_{osplit}')
-                model = prob.model
+            prob = Problem(name=f'test_partials_implicit_funccomp_{method}_{direction}_{isplit}_{osplit}')
+            model = prob.model
 
-                if direction == 'rev':
-                    mat = np.vstack((_BIGMASK, _BIGMASK)).T
-                    ninputs = mat.shape[1]
-                    sparsity = setup_sparsity(mat)
-                else:
-                    ninputs = _BIGMASK.shape[1]
-                    sparsity = setup_sparsity(_BIGMASK)
+            if direction == 'rev':
+                mat = np.vstack((_BIGMASK, _BIGMASK)).T
+                ninputs = mat.shape[1]
+                sparsity = setup_sparsity(mat)
+            else:
+                ninputs = _BIGMASK.shape[1]
+                sparsity = setup_sparsity(_BIGMASK)
 
-                indeps, conns = setup_indeps(isplit, ninputs, 'indeps', 'comp')
-                model.add_subsystem('indeps', indeps)
-                if method == 'jax':
-                    sparsity = jnp.array(sparsity)
-                comp = model.add_subsystem('comp', SparseFuncCompImplicit(sparsity, method,
-                                                                        isplit=isplit, osplit=osplit))
-                comp.declare_coloring('*', method=method)
+            indeps, conns = setup_indeps(isplit, ninputs, 'indeps', 'comp')
+            model.add_subsystem('indeps', indeps)
+            if method == 'jax':
+                sparsity = jnp.array(sparsity)
+            comp = model.add_subsystem('comp', SparseFuncCompImplicit(sparsity, method,
+                                                                    isplit=isplit, osplit=osplit))
+            comp.declare_coloring('*', method=method)
 
-                for conn in conns:
-                    model.connect(*conn)
+            for conn in conns:
+                model.connect(*conn)
 
-                prob.setup(check=False, mode=direction)
-                prob.set_solver_print(level=0)
-                prob.run_model()
+            prob.setup(check=False, mode=direction)
+            prob.set_solver_print(level=0)
+            prob.run_model()
 
-                comp.run_linearize()
-                prob.run_model()
-                comp.run_linearize()
-                jac = comp._jacobian._subjacs_info
-                _check_partial_matrix(comp, jac, sparsity, method)
+            comp.run_linearize()
+            prob.run_model()
+            comp.run_linearize()
+            jac = comp._jacobian._subjacs_info
+            if method == 'jax':
+                sparsity = np.asarray(sparsity)
+            _check_partial_matrix(comp, jac, sparsity, method)
 
 
 @use_tempdirs
