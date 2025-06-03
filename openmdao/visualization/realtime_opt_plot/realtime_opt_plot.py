@@ -2,7 +2,6 @@
 
 import ctypes
 import errno
-import gc
 import os
 import sys
 from collections import defaultdict
@@ -521,7 +520,7 @@ class _RealTimeOptPlot(object):
                 if shape == () or shape == (1,): # is scalar ??
                     self._sampled_variables.append(varname)
                 else:
-                    self._sampled_variables.append(varname)
+                    # self._sampled_variables.append(varname)
                     self._sampled_variables_non_scalar.append(varname)
 
         self._sampled_variables.sort()
@@ -587,6 +586,11 @@ class _RealTimeOptPlot(object):
 
         N = len(self._sampled_variables)
 
+
+        # visible_variables = [var for var in self._sampled_variables if self._sampled_variables_visibility[var]]
+        # N = len(visible_variables)
+
+
         def _sampled_variable_callback(var_name):
             def toggle_callback(attr, old, new):
                 self._sampled_variables_visibility[var_name] = new
@@ -606,26 +610,28 @@ class _RealTimeOptPlot(object):
 
             return toggle_callback
 
+        # Make all the buttons for the Sample Variables area to the right of the plot
+        #   that lets the user select what to plot
         number_initial_visible_sampled_variables = 0
         for sampled_var in self._sampled_variables:
-            if sampled_var in self._sampled_variables_non_scalar:
+            if number_initial_visible_sampled_variables < _max_number_initial_visible_sampled_variables:
+                self._sampled_variables_visibility[sampled_var] = True
+                self._make_variable_button(sampled_var,True, True, _sampled_variable_callback(sampled_var))
+                number_initial_visible_sampled_variables += 1
+            else:
                 self._sampled_variables_visibility[sampled_var] = False
-                self._make_variable_button(sampled_var,False, False, _sampled_variable_callback(sampled_var))            
-            else:  # is scalar
-                if number_initial_visible_sampled_variables < _max_number_initial_visible_sampled_variables:
-                    self._sampled_variables_visibility[sampled_var] = True
-                    self._make_variable_button(sampled_var,True, True, _sampled_variable_callback(sampled_var))
-                    number_initial_visible_sampled_variables += 1
-                else:
-                    self._sampled_variables_visibility[sampled_var] = False
-                    self._make_variable_button(sampled_var,False, True, _sampled_variable_callback(sampled_var))
+                self._make_variable_button(sampled_var,False, True, _sampled_variable_callback(sampled_var))
+
+        for sampled_var in self._sampled_variables_non_scalar:
+            self._make_variable_button(sampled_var,False, False, _sampled_variable_callback(sampled_var))  # TODO need a callback ? Does it do anything?           
+
 
         # Create a color mapper using Viridis (colorblind-friendly)
         self._color_mapper = LinearColorMapper(palette=_color_palette, 
                                                low=_initial_response_range_for_plots[0], 
                                                high=_initial_response_range_for_plots[1])
 
-        plots = []
+        plots = []  # Add plots by row
 
         for i, (y, x) in enumerate(  #  Why y,x here ??
             product(self._sampled_variables, self._sampled_variables)
@@ -635,9 +641,6 @@ class _RealTimeOptPlot(object):
             irow = i // N
 
             if x != y:
-
-                x_units = self._case_tracker._get_units(x)
-                y_units = self._case_tracker._get_units(y)
 
                 p = figure(
                     background_fill_color="#fafafa",
@@ -704,8 +707,11 @@ class _RealTimeOptPlot(object):
 
                 self._hist_figures[x] = p
 
+
+            # TODO - can also just pass None for a plot to go into the gridplot
             if icolumn > irow: # only lower half and diagonal
-                p.visible = False
+                # p.visible = False
+                p = None
             else:
                 if self._sampled_variables_visibility[x] and self._sampled_variables_visibility[y]:
                     p.visible = True
@@ -715,12 +721,15 @@ class _RealTimeOptPlot(object):
             plots.append(p)
 
         # row labels
-        for i, sampled_variable in enumerate(reversed(self._sampled_variables)):
+        visible_variables = [var for var in self._sampled_variables if self._sampled_variables_visibility[var]]
+
+        N = len(visible_variables)
+        # for i, sampled_variable in enumerate(reversed(self._sampled_variables)):
+        for i, sampled_variable in enumerate(reversed(visible_variables)):
             irow = N - i - 1
             idx = irow * N
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, None)
             p = Div(
-                # text=f"{sampled_variable}",
                 text=f"<div style='text-align:center;font-size:12px;writing-mode:vertical-lr;transform:rotate(180deg); cursor:help;' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
                 align="center",
             )
@@ -732,7 +741,8 @@ class _RealTimeOptPlot(object):
             text=f"",
         )
         plots.append(p)
-        for sampled_variable in self._sampled_variables:
+        # for sampled_variable in self._sampled_variables:
+        for sampled_variable in visible_variables:
             units = self._case_tracker._get_units(x)
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, units)
             p = Div(
