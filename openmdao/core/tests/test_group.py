@@ -2550,10 +2550,7 @@ class TestConnect(unittest.TestCase):
         self.assertEqual(str(ctx.exception), msg)
 
     def test_subgroup_promoted_connection(self):
-        """
-        This example demonstrates a problem which fails with an error when trying
-        to connect the variables promoted up to the same sub-group.
-        """
+
         class Comp1(om.ExplicitComponent):
 
             def setup(self):
