@@ -3484,6 +3484,7 @@ class TestLinearOnlyDVs(unittest.TestCase):
 
         return prob
 
+    @require_pyoptsparse('IPOPT')
     def test_lin_only_dvs(self):
         shape = (2, 5)
         # do first opt without coloring
