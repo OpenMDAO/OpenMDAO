@@ -357,6 +357,8 @@ class _RealTimeOptPlot(object):
         self._start_time = time.time()
         self._sampled_variables_toggles = []
         self._hist_figures = {}
+        self._row_labels = {}
+        self._column_labels = {}
 
         def _update():
             # this is the main method of the class. It gets called periodically by Bokeh
@@ -595,6 +597,8 @@ class _RealTimeOptPlot(object):
             def toggle_callback(attr, old, new):
                 self._sampled_variables_visibility[var_name] = new
                 self._hist_figures[var_name].visible = new
+                self._row_labels[var_name].visible = new
+                self._column_labels[var_name].visible = new
 
                 for i, (y, x) in enumerate(
                     product(self._sampled_variables, self._sampled_variables)
@@ -733,6 +737,7 @@ class _RealTimeOptPlot(object):
                 text=f"<div style='text-align:center;font-size:12px;writing-mode:vertical-lr;transform:rotate(180deg); cursor:help;' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
                 align="center",
             )
+            self._row_labels[sampled_variable] = p
             plots.insert(idx,p)
 
         # column labels
@@ -750,6 +755,7 @@ class _RealTimeOptPlot(object):
                 styles={"font-size": "12px", "text-align":"center"},
                 align="center",
             )
+            self._column_labels[sampled_variable] = p
             plots.append(p)
 
         gp = gridplot(
