@@ -600,20 +600,16 @@ class _RealTimeOptPlot(object):
             for i, (y, x) in enumerate(
                 product(self._sampled_variables, self._sampled_variables)
             ):
-
                 icolumn = i % self._num_sampled_variables
                 irow = i // self._num_sampled_variables
-
                 # only do the lower half
                 if x != y:
                     self._scatter_plots_figure[(x,y)].visible = (icolumn < irow \
                         and self._sampled_variables_visibility[x] and self._sampled_variables_visibility[y] )
 
         return toggle_callback
-    def _setup_figure(self):
-        # Initially the response variable plotted is the first one
-        self._prom_response = self._prom_responses[0]
 
+    def _make_sampled_variables_selection_buttons(self):
         # Make all the buttons for the Sample Variables area to the right of the plot
         #   that lets the user select what to plot
         number_initial_visible_sampled_variables = 0
@@ -631,13 +627,26 @@ class _RealTimeOptPlot(object):
             toggle = _make_variable_button(sampled_var,False, False, self._sampled_variable_callback(sampled_var))  # TODO need a callback ? Does it do anything?           
             self._sampled_variables_toggles.append(toggle)
 
+
+    def _make_color_bar(self):
         # Create a color mapper using Viridis (colorblind-friendly)
         self._color_mapper = LinearColorMapper(palette=_color_palette, 
                                                low=_initial_response_range_for_plots[0], 
                                                high=_initial_response_range_for_plots[1])
+        # Add the color bar to this figure
+        color_bar = ColorBar(
+            color_mapper=self._color_mapper,
+            title=f"Response variable: '{self._prom_response}'",
+            border_line_color=None,
+            width=20,
+            label_standoff=14,
+            title_text_font_size="20px",
+            ticker=BasicTicker(),  # This is the key part you're missing
+            location=(0, 0),
+        )
+        return color_bar
 
-        plots = []  # Add plots by row
-
+    def _make_plots(self, plots):
         for i, (y, x) in enumerate(  #  Why y,x here ??
             product(self._sampled_variables, self._sampled_variables)
         ):
@@ -725,8 +734,8 @@ class _RealTimeOptPlot(object):
 
             plots.append(p)
 
+    def _make_plot_labels(self, visible_variables, plots):
         # row labels
-        visible_variables = [var for var in self._sampled_variables if self._sampled_variables_visibility[var]]
 
         num_visible_variables = len(visible_variables)
         # for i, sampled_variable in enumerate(reversed(self._sampled_variables)):
@@ -749,7 +758,7 @@ class _RealTimeOptPlot(object):
         plots.append(p)
         # for sampled_variable in self._sampled_variables:
         for sampled_variable in visible_variables:
-            units = self._case_tracker._get_units(x)
+            units = self._case_tracker._get_units(sampled_variable)
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, units)
             p = Div(
                 text=f"<div style='text-align:center;font-size:14px; cursor:help;' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
@@ -759,9 +768,22 @@ class _RealTimeOptPlot(object):
             self._column_labels[sampled_variable] = p
             plots.append(p)
 
+    def _setup_figure(self):
+        # Initially the response variable plotted is the first one
+        self._prom_response = self._prom_responses[0]
+
+        self._make_sampled_variables_selection_buttons()
+        color_bar = self._make_color_bar()
+
+        plots = []  # Add plots by row
+        self._make_plots(plots)
+        visible_variables = [var for var in self._sampled_variables if self._sampled_variables_visibility[var]]
+        self._make_plot_labels(visible_variables, plots)
+
+
         gp = gridplot(
             plots,
-            ncols=num_visible_variables+1,  # need one extra row and column in the grid for the axes labels
+            ncols=len(visible_variables)+1,  # need one extra row and column in the grid for the axes labels
             toolbar_location=None,
         )
 
@@ -815,18 +837,6 @@ class _RealTimeOptPlot(object):
         )
 
         p.grid.grid_line_color = None
-
-        # Add the color bar to this figure
-        color_bar = ColorBar(
-            color_mapper=self._color_mapper,
-            title=f"Response variable: '{self._prom_response}'",
-            border_line_color=None,
-            width=20,
-            label_standoff=14,
-            title_text_font_size="20px",
-            ticker=BasicTicker(),  # This is the key part you're missing
-            location=(0, 0),
-        )
 
         p.add_layout(color_bar, "right")
 
