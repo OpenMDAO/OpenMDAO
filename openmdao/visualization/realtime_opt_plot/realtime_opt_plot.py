@@ -43,10 +43,10 @@ from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.case import Case
 
 try:
-    from openmdao.utils.gui_testing_utils import _get_free_port
+    from openmdao.utils.gui_testing_utils import get_free_port
 except ImportError:
-    # If _get_free_port is unavailable, the default port will be used
-    def _get_free_port():
+    # If get_free_port is unavailable, the default port will be used
+    def get_free_port():
         return 5000
 
 
@@ -66,7 +66,7 @@ _toggle_styles = """
 """
 # some models have a large number of variables. Putting them all in a plot 
 #   is not practical. Initially show no more than this number
-_max_number_initial_visible_sampled_variables = 4
+_max_number_initial_visible_sampled_variables = 1
 # how big the individual plots should be in the grid
 _grid_plot_height_and_width = 240
 # number of histogram bins in the histogram plots for the sampled variables
@@ -609,17 +609,27 @@ class _RealTimeOptPlot(object):
 
         return toggle_callback
 
+    def _set_initial_number_initial_visible_sampled_variables(self):
+        number_initial_visible_sampled_variables = 0
+        for sampled_var in self._sampled_variables:
+            if number_initial_visible_sampled_variables < _max_number_initial_visible_sampled_variables:
+                self._sampled_variables_visibility[sampled_var] = True
+                number_initial_visible_sampled_variables += 1
+            else:
+                self._sampled_variables_visibility[sampled_var] = False
+
     def _make_sampled_variables_selection_buttons(self):
         # Make all the buttons for the Sample Variables area to the right of the plot
         #   that lets the user select what to plot
         number_initial_visible_sampled_variables = 0
         for sampled_var in self._sampled_variables:
-            if number_initial_visible_sampled_variables < _max_number_initial_visible_sampled_variables:
-                self._sampled_variables_visibility[sampled_var] = True
+            # if number_initial_visible_sampled_variables < _max_number_initial_visible_sampled_variables:
+            if self._sampled_variables_visibility[sampled_var]:
+                # self._sampled_variables_visibility[sampled_var] = True
                 toggle = _make_variable_button(sampled_var,True, True, self._sampled_variable_callback(sampled_var))
-                number_initial_visible_sampled_variables += 1
+                # number_initial_visible_sampled_variables += 1
             else:
-                self._sampled_variables_visibility[sampled_var] = False
+                # self._sampled_variables_visibility[sampled_var] = False
                 toggle = _make_variable_button(sampled_var,False, True, self._sampled_variable_callback(sampled_var))
             self._sampled_variables_toggles.append(toggle)
 
@@ -682,38 +692,22 @@ class _RealTimeOptPlot(object):
             location=(0, 0),
         )
 
-        # TODO avoid the [1]
+        # Need the color bar to be associated with a plot figure.
+        # So make a basic one and hide it
         p = figure(height=2 * _grid_plot_height_and_width, width=0, toolbar_location=None)
-
-        # Define two points (x0, y0) and (x1, y1)
-        x = [0, 1]
-        y = [0, 1]
-
         # Plot a line between the two points
-        line = p.line(
-            x,
-            y,
-        )
-
+        line = p.line([0, 1],[0, 1])
         p.grid.grid_line_color = None
-
-        p.add_layout(color_bar, "right")
-
         line.visible = False
-        # Hide axes
         p.xaxis.visible = False
         p.yaxis.visible = False
-
-        # Hide grid lines
         p.xgrid.visible = False
         p.ygrid.visible = False
-
-        # Hide the title
         p.title.visible = False
-
         p.outline_line_alpha = 0
-
         p.min_border_right = 100
+
+        p.add_layout(color_bar, "right")
 
         return p
 
@@ -809,8 +803,9 @@ class _RealTimeOptPlot(object):
         # row labels
 
         num_visible_variables = len(visible_variables)
-        # for i, sampled_variable in enumerate(reversed(self._sampled_variables)):
-        for i, sampled_variable in enumerate(reversed(visible_variables)):
+
+        for i, sampled_variable in enumerate(reversed(self._sampled_variables)):
+        # for i, sampled_variable in enumerate(reversed(visible_variables)):
             irow = num_visible_variables - i - 1
             idx = irow * num_visible_variables
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, None)
@@ -819,6 +814,7 @@ class _RealTimeOptPlot(object):
                 align="center",
             )
             self._row_labels[sampled_variable] = p
+            p.visible = sampled_variable in visible_variables
             plots_and_labels_in_grid.insert(idx,p)
 
         # column labels
@@ -827,8 +823,8 @@ class _RealTimeOptPlot(object):
             text=f"",
         )
         plots_and_labels_in_grid.append(p)
-        # for sampled_variable in self._sampled_variables:
-        for sampled_variable in visible_variables:
+        for sampled_variable in self._sampled_variables:
+        # for sampled_variable in visible_variables:
             units = self._case_tracker._get_units(sampled_variable)
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, units)
             p = Div(
@@ -837,6 +833,7 @@ class _RealTimeOptPlot(object):
                 align="center",
             )
             self._column_labels[sampled_variable] = p
+            p.visible = sampled_variable in visible_variables
             plots_and_labels_in_grid.append(p)
 
     def _make_analysis_driver_box(self):
@@ -956,20 +953,26 @@ class _RealTimeOptPlot(object):
     def _setup_figure(self):
         # Initially the response variable plotted is the first one
         self._prom_response = self._prom_responses[0]
+
+        self._set_initial_number_initial_visible_sampled_variables()
+
         visible_variables = [var for var in self._sampled_variables if self._sampled_variables_visibility[var]]
 
+
         title_box = self._make_title_div()
+
+        # need this before the plots since it makes the color mapper
+        color_bar = self._make_color_bar()
 
         plots_and_labels_in_grid = []  # Add plots by row
         self._make_plots(plots_and_labels_in_grid)
         self._make_plot_labels(visible_variables, plots_and_labels_in_grid)
         grid_of_plots = gridplot(
             plots_and_labels_in_grid,
-            ncols=len(visible_variables)+1,  # need one extra row and column in the grid for the axes labels
+            ncols=self._num_sampled_variables+1,  # need one extra row and column in the grid for the axes labels
             toolbar_location=None,
         )
 
-        color_bar = self._make_color_bar()
 
         sampled_variable_selector_box = self._make_sampled_variables_selection_buttons()
 
@@ -1045,7 +1048,7 @@ def realtime_opt_plot(
             pid_of_calling_script=pid_of_calling_script,
         )
 
-    _port_number = _get_free_port()
+    _port_number = get_free_port()
 
     try:
         server = Server(
