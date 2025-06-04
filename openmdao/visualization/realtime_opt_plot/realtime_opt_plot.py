@@ -627,6 +627,43 @@ class _RealTimeOptPlot(object):
             toggle = _make_variable_button(sampled_var,False, False, self._sampled_variable_callback(sampled_var))  # TODO need a callback ? Does it do anything?           
             self._sampled_variables_toggles.append(toggle)
 
+        toggle_column = Column(
+            children=self._sampled_variables_toggles,
+            sizing_mode="stretch_both",
+            height_policy="fit",
+            styles={
+                "overflow-y": "auto",
+                "border": "1px solid #ddd",
+                "padding": "8px",
+                'max-height': '100vh'  # Ensures it doesn't exceed viewport
+            },
+        )
+
+        # header for the variable list
+        sampled_variables_label = Div(
+            text="Sampled Variables",
+            width=200,
+            styles={"font-size": "20px", "font-weight": "bold"},
+        )
+        label_and_toggle_column = Column(
+            sampled_variables_label,
+            toggle_column,
+            sizing_mode="stretch_height",
+            height_policy="fit",
+            styles={
+                'max-height': '100vh',  # Ensures it doesn't exceed viewport
+                'border-radius': '5px',
+                'border': '5px solid black',
+            },
+        )
+
+        sampled_variable_selector_box = ScrollBox(
+            child=label_and_toggle_column,
+            sizing_mode="stretch_height",
+            height_policy="max",
+        )
+
+        return sampled_variable_selector_box
 
     def _make_color_bar(self):
         # Create a color mapper using Viridis (colorblind-friendly)
@@ -644,9 +681,43 @@ class _RealTimeOptPlot(object):
             ticker=BasicTicker(),  # This is the key part you're missing
             location=(0, 0),
         )
-        return color_bar
 
-    def _make_plots(self, plots):
+        # TODO avoid the [1]
+        p = figure(height=2 * _grid_plot_height_and_width, width=0, toolbar_location=None)
+
+        # Define two points (x0, y0) and (x1, y1)
+        x = [0, 1]
+        y = [0, 1]
+
+        # Plot a line between the two points
+        line = p.line(
+            x,
+            y,
+        )
+
+        p.grid.grid_line_color = None
+
+        p.add_layout(color_bar, "right")
+
+        line.visible = False
+        # Hide axes
+        p.xaxis.visible = False
+        p.yaxis.visible = False
+
+        # Hide grid lines
+        p.xgrid.visible = False
+        p.ygrid.visible = False
+
+        # Hide the title
+        p.title.visible = False
+
+        p.outline_line_alpha = 0
+
+        p.min_border_right = 100
+
+        return p
+
+    def _make_plots(self, plots_and_labels_in_grid):
         for i, (y, x) in enumerate(  #  Why y,x here ??
             product(self._sampled_variables, self._sampled_variables)
         ):
@@ -732,9 +803,9 @@ class _RealTimeOptPlot(object):
                 else:
                     p.visible = False
 
-            plots.append(p)
+            plots_and_labels_in_grid.append(p)
 
-    def _make_plot_labels(self, visible_variables, plots):
+    def _make_plot_labels(self, visible_variables, plots_and_labels_in_grid):
         # row labels
 
         num_visible_variables = len(visible_variables)
@@ -748,14 +819,14 @@ class _RealTimeOptPlot(object):
                 align="center",
             )
             self._row_labels[sampled_variable] = p
-            plots.insert(idx,p)
+            plots_and_labels_in_grid.insert(idx,p)
 
         # column labels
         # need to push one blank one for the bottom left corner
         p = Div(
             text=f"",
         )
-        plots.append(p)
+        plots_and_labels_in_grid.append(p)
         # for sampled_variable in self._sampled_variables:
         for sampled_variable in visible_variables:
             units = self._case_tracker._get_units(sampled_variable)
@@ -766,94 +837,9 @@ class _RealTimeOptPlot(object):
                 align="center",
             )
             self._column_labels[sampled_variable] = p
-            plots.append(p)
+            plots_and_labels_in_grid.append(p)
 
-    def _setup_figure(self):
-        # Initially the response variable plotted is the first one
-        self._prom_response = self._prom_responses[0]
-
-        self._make_sampled_variables_selection_buttons()
-        color_bar = self._make_color_bar()
-
-        plots = []  # Add plots by row
-        self._make_plots(plots)
-        visible_variables = [var for var in self._sampled_variables if self._sampled_variables_visibility[var]]
-        self._make_plot_labels(visible_variables, plots)
-
-
-        gp = gridplot(
-            plots,
-            ncols=len(visible_variables)+1,  # need one extra row and column in the grid for the axes labels
-            toolbar_location=None,
-        )
-
-        toggle_column = Column(
-            children=self._sampled_variables_toggles,
-            sizing_mode="stretch_both",
-            height_policy="fit",
-            styles={
-                "overflow-y": "auto",
-                "border": "1px solid #ddd",
-                "padding": "8px",
-                'max-height': '100vh'  # Ensures it doesn't exceed viewport
-            },
-        )
-
-        # header for the variable list
-        sampled_variables_label = Div(
-            text="Sampled Variables",
-            width=200,
-            styles={"font-size": "20px", "font-weight": "bold"},
-        )
-        label_and_toggle_column = Column(
-            sampled_variables_label,
-            toggle_column,
-            sizing_mode="stretch_height",
-            height_policy="fit",
-            styles={
-                'max-height': '100vh',  # Ensures it doesn't exceed viewport
-                'border-radius': '5px',
-                'border': '5px solid black',
-            },
-        )
-
-        scroll_box = ScrollBox(
-            child=label_and_toggle_column,
-            sizing_mode="stretch_height",
-            height_policy="max",
-        )
-
-        # TODO avoid the [1]
-        p = figure(height=2 * _grid_plot_height_and_width, width=0, toolbar_location=None)
-
-        # Define two points (x0, y0) and (x1, y1)
-        x = [0, 1]
-        y = [0, 1]
-
-        # Plot a line between the two points
-        line = p.line(
-            x,
-            y,
-        )
-
-        p.grid.grid_line_color = None
-
-        p.add_layout(color_bar, "right")
-
-        line.visible = False
-        # Hide axes
-        p.xaxis.visible = False
-        p.yaxis.visible = False
-
-        # Hide grid lines
-        p.xgrid.visible = False
-        p.ygrid.visible = False
-
-        # Hide the title
-        p.title.visible = False
-
-        p.outline_line_alpha = 0
-
+    def _make_analysis_driver_box(self):
         analysis_progress_label = Div(
             text="Analysis Driver Progress",
             styles={"font-size": "20px", "font-weight": "bold"},
@@ -877,17 +863,23 @@ class _RealTimeOptPlot(object):
                 "border": "5px solid black",
             },
         )
+        return analysis_progress_box
 
-        p.min_border_right = 100
+    def _make_quit_button(self):
+        quit_button = Button(label="Quit Application", button_type="danger")
 
-        spacer2 = Spacer(width=150, height=50)  # Between plot 2 (with colorbar) and text box
-        spacer3 = Spacer(width=100, height=20)
-        spacer4 = Spacer(width=100, height=20)
-        spacer5 = Spacer(width=100, height=20)
+        # Define callback function for the quit button
+        def quit_app():
+            raise KeyboardInterrupt("Quit button pressed")
 
+        # Attach the callback to the button
+        quit_button.on_click(quit_app)
+        return quit_button
+
+    def _make_title_div(self):
         script_name = self._case_recorder_filename
 
-        title_div = Div(
+        title_box = Div(
             text=f"Analysis Driver Progress for {script_name}",
             styles={
                 "font-size": "20px", 
@@ -898,21 +890,15 @@ class _RealTimeOptPlot(object):
                 },
         )
 
-        quit_button = Button(label="Quit Application", button_type="danger")
+        return title_box
 
-        # Define callback function for the quit button
-        def quit_app():
-            raise KeyboardInterrupt("Quit button pressed")
-
-        # Attach the callback to the button
-        quit_button.on_click(quit_app)
-
+    def _make_response_variable_selector(self, color_bar):
         # Create a Select widget with some options
         menu = Select(
             # title="Choose a response variable:",
             options=self._prom_responses,
             value=self._prom_responses[0],  # Default value
-    )
+        )
 
         # header for the variable list
         response_variable_label = Div(
@@ -921,43 +907,78 @@ class _RealTimeOptPlot(object):
             styles={"font-size": "20px", "font-weight": "bold"},
         )
 
-        response_varible_box = Column(response_variable_label, menu,
+        response_variable_box = Column(response_variable_label, menu,
                                                   styles={
                 "border": "5px solid black",
                 "padding": "8px",
         },
         )
 
-        # Python callback function that will run when selection changes
-        def cb_select_response_variable(attr, old, new):
-            # Print the selected value to the console
-            self._prom_response = new 
-            color_bar.title = f"Response variable: '{new}'"
-            self._color_mapper.low = self._prom_response_min[self._prom_response]
-            self._color_mapper.high = self._prom_response_max[self._prom_response]
+        def cb_select_response_variable(color_bar):
+            def toggle_callback(attr, old, new):
+                self._prom_response = new 
+                color_bar.title = f"Response variable: '{new}'"
+                self._color_mapper.low = self._prom_response_min[self._prom_response]
+                self._color_mapper.high = self._prom_response_max[self._prom_response]
 
-            for scatter_plot in self._scatter_plots:
-                t = transform(
-                        self._prom_response, self._color_mapper
-                    )
-                # t is <class 'bokeh.core.property.vectorization.Field'>
-                scatter_plot.glyph.fill_color = transform(
-                        self._prom_response, self._color_mapper
-                    )
+                for scatter_plot in self._scatter_plots:
+                    t = transform(
+                            self._prom_response, self._color_mapper
+                        )
+                    # t is <class 'bokeh.core.property.vectorization.Field'>
+                    scatter_plot.glyph.fill_color = transform(
+                            self._prom_response, self._color_mapper
+                        )
+            return toggle_callback
 
         # Attach the callback to the Select widget
-        menu.on_change("value", cb_select_response_variable)
+        menu.on_change("value", cb_select_response_variable(color_bar))
+
+        return response_variable_box
+
+    def _make_overall_layout(self, title_box, grid_of_plots, color_bar, analysis_progress_box, response_variable_box, sampled_variable_selector_box ):
+        spacer2 = Spacer(width=150, height=50)  # Between plot 2 (with colorbar) and text box
+        spacer3 = Spacer(width=100, height=20)
+        spacer4 = Spacer(width=100, height=20)
+        spacer5 = Spacer(width=100, height=20)
+
+        quit_button = self._make_quit_button()
 
         self._overall_layout = Row(
-            Column(title_div, gp),
-            p,
+            Column(title_box, grid_of_plots),
+            color_bar,
             spacer2,
-            Column(spacer2, quit_button, spacer3, analysis_progress_box, spacer4, response_varible_box, spacer5, 
-                   scroll_box, sizing_mode="stretch_both"),
+            Column(spacer2, quit_button, spacer3, analysis_progress_box, spacer4, response_variable_box, spacer5, 
+                   sampled_variable_selector_box, sizing_mode="stretch_both"),
             sizing_mode="stretch_both",
         )
 
+    def _setup_figure(self):
+        # Initially the response variable plotted is the first one
+        self._prom_response = self._prom_responses[0]
+        visible_variables = [var for var in self._sampled_variables if self._sampled_variables_visibility[var]]
 
+        title_box = self._make_title_div()
+
+        plots_and_labels_in_grid = []  # Add plots by row
+        self._make_plots(plots_and_labels_in_grid)
+        self._make_plot_labels(visible_variables, plots_and_labels_in_grid)
+        grid_of_plots = gridplot(
+            plots_and_labels_in_grid,
+            ncols=len(visible_variables)+1,  # need one extra row and column in the grid for the axes labels
+            toolbar_location=None,
+        )
+
+        color_bar = self._make_color_bar()
+
+        sampled_variable_selector_box = self._make_sampled_variables_selection_buttons()
+
+        analysis_progress_box = self._make_analysis_driver_box()
+
+        response_variable_box = self._make_response_variable_selector(color_bar)
+
+        self._make_overall_layout(title_box, grid_of_plots, color_bar, analysis_progress_box, 
+        response_variable_box, sampled_variable_selector_box)
 
 def print_bokeh_objects(doc):  # TODO remove!
     # Get all objects in the document
@@ -1017,16 +1038,12 @@ def realtime_opt_plot(
             print_bokeh_objects(doc)
         # doc.on_event('document_ready', on_document_ready)
 
-
-
         _RealTimeOptPlot(
             case_recorder_filename,
             callback_period,
             doc=doc,
             pid_of_calling_script=pid_of_calling_script,
         )
-
-
 
     _port_number = _get_free_port()
 
