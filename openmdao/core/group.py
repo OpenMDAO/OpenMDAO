@@ -41,6 +41,7 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
+from openmdao.utils.assert_utils import mimic
 
 # regex to check for valid names.
 import re
@@ -1322,60 +1323,6 @@ class Group(System):
 
         return root_vectors
 
-    def _get_all_promotes(self):
-        """
-        Create the top level mapping of all promoted names to absolute names for all local systems.
-
-        This includes all buried promoted names.
-
-        Returns
-        -------
-        dict
-            Mapping of all promoted names to absolute names.
-        """
-        iotypes = ('input', 'output')
-        if self.comm.size > 1:
-            prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
-            rem_prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
-            myrank = self.comm.rank
-            vars_to_gather = self._vars_to_gather
-
-            for s in self.system_iter(recurse=True, include_self=True):
-                prefix = s.pathname + '.' if s.pathname else ''
-                for typ in iotypes:
-                    t_remprom2abs = rem_prom2abs[typ]
-                    t_prom2abs = prom2abs[typ]
-                    for prom, abs_names in s._resolver.prom2abs_iter(typ, local=True):
-                        t_prom2abs[prefix + prom].update(abs_names)
-                        t_remprom2abs[prefix + prom].update(n for n in abs_names
-                                                            if n in vars_to_gather
-                                                            and vars_to_gather[n] == myrank)
-
-            all_proms = self.comm.gather(rem_prom2abs, root=0)
-            if myrank == 0:
-                for typ in iotypes:
-                    t_prom2abs = prom2abs[typ]
-                    for rankproms in all_proms:
-                        for prom, absnames in rankproms[typ].items():
-                            t_prom2abs[prom].update(absnames)
-
-                    for prom, absnames in t_prom2abs.items():
-                        t_prom2abs[prom] = sorted(absnames)  # sort to keep order same on all procs
-
-                self.comm.bcast(prom2abs, root=0)
-            else:
-                prom2abs = self.comm.bcast(None, root=0)
-        else:  # serial
-            prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
-            for s in self.system_iter(recurse=True, include_self=True):
-                prefix = s.pathname + '.' if s.pathname else ''
-                for typ in iotypes:
-                    t_prom2abs = prom2abs[typ]
-                    for prom, abs_names in s._resolver.prom2abs_iter(typ):
-                        t_prom2abs[prefix + prom] = abs_names
-
-        return prom2abs
-
     def _check_order(self, reorder=True, recurse=True, out_of_order=None):
         """
         Check if auto ordering is needed, optionally reordering subsystems if appropriate.
@@ -2016,12 +1963,12 @@ class Group(System):
         Return a mapping of var pathname to owning rank.
 
         The mapping will contain ONLY systems that are remote on at least one proc.
-        Distributed systems are not included.
+        Distributed variables are not included. Discrete variables ARE included.
 
         Returns
         -------
         dict
-            The mapping of variable pathname to owning rank.
+            The mapping of variable pathname to the lowest rank where it's local.
         """
         remote_vars = {}
 
@@ -2102,7 +2049,7 @@ class Group(System):
 
         if self.comm.size > 1:
             owns = self._owning_rank
-            self._owned_sizes = self._var_sizes['output'].copy()
+            self._owned_output_sizes = self._var_sizes['output'].copy()
             abs2idx = self._var_allprocs_abs2idx
             for io in ('input', 'output'):
                 sizes = self._var_sizes[io]
@@ -2113,7 +2060,7 @@ class Group(System):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
                             if not dist and io == 'output':
-                                self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
+                                self._owned_output_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
 
                 if abs2discrete[io]:
@@ -2126,7 +2073,7 @@ class Group(System):
                         for n in toadd:
                             owns[n] = rank
         else:
-            self._owned_sizes = self._var_sizes['output']
+            self._owned_output_sizes = self._var_sizes['output']
 
     def _owned_size(self, abs_name):
         """
@@ -2142,7 +2089,7 @@ class Group(System):
         int
             The size of the variable on this rank, 0 if this is not the owning rank.
         """
-        return self._owned_sizes[self.comm.rank, self._var_allprocs_abs2idx[abs_name]]
+        return self._owned_output_sizes[self.comm.rank, self._var_allprocs_abs2idx[abs_name]]
 
     def _setup_global_connections(self, parent_conns=None):
         """

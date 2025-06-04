@@ -261,8 +261,8 @@ class System(object, metaclass=SystemMetaclass):
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
-    _owned_sizes : ndarray
-        Array of local sizes for 'owned' or distributed vars only.
+    _owned_output_sizes : ndarray
+        Array of local sizes for 'owned' or distributed outputs only.
     _var_offsets : {<vecname>: {'input': dict of ndarray, 'output': dict of ndarray}, ...} or None
         Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
         of size nproc x num_var where nproc is the number of processors
@@ -462,7 +462,7 @@ class System(object, metaclass=SystemMetaclass):
         self._var_allprocs_abs2idx = {}
 
         self._var_sizes = None
-        self._owned_sizes = None
+        self._owned_output_sizes = None
         self._var_offsets = None
 
         self._full_comm = None
@@ -2256,7 +2256,7 @@ class System(object, metaclass=SystemMetaclass):
         self._var_allprocs_abs2idx = {}
         self._owning_rank = defaultdict(int)
         self._var_sizes = {}
-        self._owned_sizes = None
+        self._owned_output_sizes = None
         self._resolver = NameResolver(self.pathname, self.msginfo)
 
         cfginfo = self._problem_meta['config_info']

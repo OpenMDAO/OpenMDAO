@@ -386,7 +386,7 @@ class Component(System):
                 my_sizes = sizes[iproc, :].copy()
                 self.comm.Allgather(my_sizes, sizes)
 
-        self._owned_sizes = self._var_sizes['output']
+        self._owned_output_sizes = self._var_sizes['output']
 
     def _setup_partials(self):
         """

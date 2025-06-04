@@ -190,7 +190,7 @@ class BroydenSolver(NonlinearSolver):
         else:
             # Full system size.
             self._full_inverse = True
-            n = np.sum(system._owned_sizes)
+            n = np.sum(system._owned_output_sizes)
 
         self.size = n
         self.Gm = np.empty((n, n))
