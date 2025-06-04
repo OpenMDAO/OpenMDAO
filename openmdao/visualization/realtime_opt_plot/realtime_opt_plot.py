@@ -806,8 +806,8 @@ class _RealTimeOptPlot(object):
 
         for i, sampled_variable in enumerate(reversed(self._sampled_variables)):
         # for i, sampled_variable in enumerate(reversed(visible_variables)):
-            irow = num_visible_variables - i - 1
-            idx = irow * num_visible_variables
+            irow = self._num_sampled_variables - i - 1
+            idx = irow * self._num_sampled_variables
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, None)
             p = Div(
                 text=f"<div style='text-align:center;font-size:12px;writing-mode:vertical-lr;transform:rotate(180deg); cursor:help;' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
