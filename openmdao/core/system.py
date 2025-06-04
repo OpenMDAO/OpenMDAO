@@ -1453,6 +1453,27 @@ class System(object, metaclass=SystemMetaclass):
 
         return self._approx_subjac_keys
 
+    def get_source(self, name):
+        """
+        Return the source variable connected to the given named variable.
+
+        The name can be a promoted name or an absolute name.
+        If the given variable is an input, the absolute name of the connected source will
+        be returned.  If the given variable itself is a source, its own absolute name will
+        be returned.
+
+        Parameters
+        ----------
+        name : str
+            Absolute or promoted name of the variable.
+
+        Returns
+        -------
+        str
+            The absolute name of the source variable.
+        """
+        return self._resolver.source(name)
+
     def use_fixed_coloring(self, coloring=STD_COLORING_FNAME(), recurse=True):
         """
         Use a precomputed coloring for this System.

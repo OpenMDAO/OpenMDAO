@@ -3496,12 +3496,6 @@ class Group(System):
                                     f"'{srcname}'.")
                 return
 
-        # source and target should not be in the same system
-        if src_name.rsplit('.', 1)[0] == tgt_name.rsplit('.', 1)[0]:
-            self._collect_error(f"{self.msginfo}: Output and input are in the same System for "
-                                f"connection from '{src_name}' to '{tgt_name}'.")
-            return
-
         if self._static_mode:
             manual_connections = self._static_manual_connections
         else:
