@@ -404,6 +404,7 @@ class _RealTimeOptPlot(object):
 
         # lists of the sampled variables in the analysis and the responses
         self._sampled_variables = None
+        self._num_sampled_variables = None
         self._prom_responses = None
 
         # A dict indicating which sampled variables are visible in the grid
@@ -576,6 +577,7 @@ class _RealTimeOptPlot(object):
                     self._sampled_variables.append(varname)
                 else:
                     self._sampled_variables_non_scalar.append(varname)
+        self._num_sampled_variables = len(self._sampled_variables)
 
         # want them sorted in the Sampled Variables selection box
         self._sampled_variables.sort()
@@ -588,40 +590,29 @@ class _RealTimeOptPlot(object):
             self._source_dict[sampled_variable] = []
         self._source = ColumnDataSource(self._source_dict)
 
+    def _sampled_variable_callback(self,var_name):
+        def toggle_callback(attr, old, new):
+            self._sampled_variables_visibility[var_name] = new
+            self._hist_figures[var_name].visible = new
+            self._row_labels[var_name].visible = new
+            self._column_labels[var_name].visible = new
 
+            for i, (y, x) in enumerate(
+                product(self._sampled_variables, self._sampled_variables)
+            ):
+
+                icolumn = i % self._num_sampled_variables
+                irow = i // self._num_sampled_variables
+
+                # only do the lower half
+                if x != y:
+                    self._scatter_plots_figure[(x,y)].visible = (icolumn < irow \
+                        and self._sampled_variables_visibility[x] and self._sampled_variables_visibility[y] )
+
+        return toggle_callback
     def _setup_figure(self):
         # Initially the response variable plotted is the first one
         self._prom_response = self._prom_responses[0]
-
-
-
-        N = len(self._sampled_variables)
-
-
-        # visible_variables = [var for var in self._sampled_variables if self._sampled_variables_visibility[var]]
-        # N = len(visible_variables)
-
-
-        def _sampled_variable_callback(var_name):
-            def toggle_callback(attr, old, new):
-                self._sampled_variables_visibility[var_name] = new
-                self._hist_figures[var_name].visible = new
-                self._row_labels[var_name].visible = new
-                self._column_labels[var_name].visible = new
-
-                for i, (y, x) in enumerate(
-                    product(self._sampled_variables, self._sampled_variables)
-                ):
-
-                    icolumn = i % N
-                    irow = i // N
-
-                    # only do the lower half
-                    if x != y:
-                        self._scatter_plots_figure[(x,y)].visible = (icolumn < irow \
-                            and self._sampled_variables_visibility[x] and self._sampled_variables_visibility[y] )
-
-            return toggle_callback
 
         # Make all the buttons for the Sample Variables area to the right of the plot
         #   that lets the user select what to plot
@@ -629,17 +620,16 @@ class _RealTimeOptPlot(object):
         for sampled_var in self._sampled_variables:
             if number_initial_visible_sampled_variables < _max_number_initial_visible_sampled_variables:
                 self._sampled_variables_visibility[sampled_var] = True
-                toggle = _make_variable_button(sampled_var,True, True, _sampled_variable_callback(sampled_var))
+                toggle = _make_variable_button(sampled_var,True, True, self._sampled_variable_callback(sampled_var))
                 number_initial_visible_sampled_variables += 1
             else:
                 self._sampled_variables_visibility[sampled_var] = False
-                toggle = _make_variable_button(sampled_var,False, True, _sampled_variable_callback(sampled_var))
+                toggle = _make_variable_button(sampled_var,False, True, self._sampled_variable_callback(sampled_var))
             self._sampled_variables_toggles.append(toggle)
 
         for sampled_var in self._sampled_variables_non_scalar:
-            toggle = _make_variable_button(sampled_var,False, False, _sampled_variable_callback(sampled_var))  # TODO need a callback ? Does it do anything?           
+            toggle = _make_variable_button(sampled_var,False, False, self._sampled_variable_callback(sampled_var))  # TODO need a callback ? Does it do anything?           
             self._sampled_variables_toggles.append(toggle)
-
 
         # Create a color mapper using Viridis (colorblind-friendly)
         self._color_mapper = LinearColorMapper(palette=_color_palette, 
@@ -652,8 +642,8 @@ class _RealTimeOptPlot(object):
             product(self._sampled_variables, self._sampled_variables)
         ):
 
-            icolumn = i % N
-            irow = i // N
+            icolumn = i % self._num_sampled_variables
+            irow = i // self._num_sampled_variables
 
             if x != y:
 
@@ -738,11 +728,11 @@ class _RealTimeOptPlot(object):
         # row labels
         visible_variables = [var for var in self._sampled_variables if self._sampled_variables_visibility[var]]
 
-        N = len(visible_variables)
+        num_visible_variables = len(visible_variables)
         # for i, sampled_variable in enumerate(reversed(self._sampled_variables)):
         for i, sampled_variable in enumerate(reversed(visible_variables)):
-            irow = N - i - 1
-            idx = irow * N
+            irow = num_visible_variables - i - 1
+            idx = irow * num_visible_variables
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, None)
             p = Div(
                 text=f"<div style='text-align:center;font-size:12px;writing-mode:vertical-lr;transform:rotate(180deg); cursor:help;' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
@@ -771,7 +761,7 @@ class _RealTimeOptPlot(object):
 
         gp = gridplot(
             plots,
-            ncols=N+1,  # need one extra row and column in the grid for the axes labels
+            ncols=num_visible_variables+1,  # need one extra row and column in the grid for the axes labels
             toolbar_location=None,
         )
 
