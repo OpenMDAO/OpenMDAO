@@ -791,6 +791,7 @@ class Group(System):
             Problem level metadata dictionary.
         """
         # save a ref to the problem level options.
+        self._problem_meta = prob_meta
         self._initial_condition_cache = {}
         self._auto_ivc_recorders = []
         self._sys_graph_cache = None

@@ -5705,9 +5705,6 @@ class System(object, metaclass=SystemMetaclass):
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set.
         """
-        if not self._is_local:
-            return
-
         try:
             ginputs = self._group_inputs
         except AttributeError:
@@ -5720,6 +5717,9 @@ class System(object, metaclass=SystemMetaclass):
         else:
             raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
                                "completes.")
+
+        if not self._is_local:
+            return
 
         has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
         value = val
