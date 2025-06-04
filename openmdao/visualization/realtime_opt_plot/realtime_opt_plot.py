@@ -82,6 +82,7 @@ _color_palette = Viridis256
 _initial_response_range_for_plots = (0,200)
 
 # function to create the labels for the plots, need to elide long variable names
+# include the units, if given
 def _elide_variable_name_with_units(variable_name, units):
     if units:
         un_elided_string_length = len(f"{variable_name} ({units})")
@@ -95,6 +96,68 @@ def _elide_variable_name_with_units(variable_name, units):
         return f"{variable_name} ({units})"
     else:
         return variable_name
+
+# Alternative: Access objects by ID
+def access_by_id(doc, object_id):
+    """Retrieve a Bokeh object by its ID"""
+    try:
+        for obj in doc.roots[0].references():
+            if obj.id == object_id:
+                return obj
+    except IndexError as e:
+        return None
+    return None
+
+def _make_variable_button(varname, active, is_scalar, callback):
+    toggle = Toggle(
+        label=varname,
+        active=active,
+        margin=(0, 0, 8, 0),
+    )
+    # Add custom CSS styles for both active and inactive states
+    if is_scalar:
+        toggle.stylesheets = [
+            f"""
+                .bk-btn {{
+                    {_toggle_styles}
+                }}
+                .bk-btn.bk-active {{
+                    background-color: rgb(from #000000 R G B / 0.3);
+                    {_toggle_styles}
+                }}
+            """
+        ]
+    else:
+        toggle.stylesheets = [
+            f"""
+                .bk-btn {{
+                    cursor:help;
+                    pointer-events: none !important;
+                    opacity: 0.5 !important;
+                    {_toggle_styles}
+                }}
+                .bk-btn.bk-active {{
+                    pointer-events: none !important;
+                    background-color: rgb(from #000000 R G B / 0.3);
+                    {_toggle_styles}
+                }}
+            """
+        ]
+
+
+    if is_scalar:
+        toggle.on_change("active", callback)
+    else:
+        # Create a div for instructions/tooltip
+        tooltip_div = Div(
+            # text="<i>Non-scalar var.</i>",
+            text=f"<div style='text-align:center;font-size:12px;cursor:help;' title='Plotting of non-scalars is not currently supported'>Non-scalar var</div>",
+            styles={'font-size': '12px', 'color': 'gray', 'margin-top': '5px', 'cursor':'help'},
+        )
+        toggle = Row(toggle, tooltip_div)
+
+    return toggle
+
 
 def _is_process_running(pid):
     if sys.platform == "win32":
@@ -338,31 +401,53 @@ class _RealTimeOptPlot(object):
         self._case_recorder_filename = case_recorder_filename
         self._case_tracker = _CaseRecorderTracker(case_recorder_filename)
         self._pid_of_calling_script = pid_of_calling_script
+
+        # lists of the sampled variables in the analysis and the responses
         self._sampled_variables = None
-        self._sampled_variables_visibility = {}
-        self._prom_response = None
-        self._num_samples_plotted = 0
-        self._responses = None
         self._prom_responses = None
-        self._scatter_plots = {}
-        self._scatter_plots_figure = {}
-        self._doc = doc
+
+        # A dict indicating which sampled variables are visible in the grid
+        #   based on what the user selected
+        self._sampled_variables_visibility = {}
+
+        # The current response being plotted
+        self._prom_response = None
+
+        # just used for the access_by_id function TODO remove when debugging done
+        # self._doc = doc   
+
+        # data source items for doing streaming in bokeh
         self._source = None
-        self._source_stream_dict = None
+        self._source_stream_dict = {}
         self._hist_source = {}
+
         # used to keep track of the y min and max of the data so that
         # the axes ranges can be adjusted as data comes in
         self._prom_response_min = defaultdict(lambda: float("inf"))
         self._prom_response_max = defaultdict(lambda: float("-inf"))
-        self._start_time = time.time()
+
+        # This list of widgets used to let user turn on and off variable plots
         self._sampled_variables_toggles = []
+
+        # the actually scatter plots. Need access to them to change the 
+        #  fill color for the dots when the response variable range changes
+        #  due to new data. 
+        self._scatter_plots = []
+
+        # dictionaries for the items in the grid. 
+        #  used to turn their visibility on and off
+        self._scatter_plots_figure = {}
         self._hist_figures = {}
         self._row_labels = {}
         self._column_labels = {}
 
+        # data used to populate the Analysis Driver Progress block in the plot
+        self._start_time = time.time()
+        self._num_samples_plotted = 0
+
+        # this is the main method of the class. It gets called periodically by Bokeh
+        # It looks for new data and if found, updates the plot with the new data
         def _update():
-            # this is the main method of the class. It gets called periodically by Bokeh
-            # It looks for new data and if found, updates the plot with the new data
             new_case = self._case_tracker._get_new_case()
 
             if new_case is None:
@@ -370,93 +455,71 @@ class _RealTimeOptPlot(object):
                     self._pid_of_calling_script
                 ):
                     # no more new data in the case recorder file and the
-                    #   optimization script stopped running, so no possible way to
+                    #   analysis script stopped running, so no possible way to
                     #   get new data.
                     # But just keep sending the last data point.
                     # This is a hack to force the plot to re-draw.
                     # Otherwise if the user clicks on the variable buttons, the
                     #   lines will not change color because of the set_value hack done to get
-                    #   get around the bug in setting the line color from JavaScript
+                    #   get around the bug in setting the line color from JavaScript.
                     self._source.stream(self._source_stream_dict)
                 return
 
             # See if Bokeh source object is defined yet. If not, set it up
             # since now we have data from the case recorder with info about the
             # variables to be plotted.
+            # Also setup the overall page
             if self._source is None:
                 self._setup_data_source()
                 self._setup_figure()
-                graph = Row(self.plot_figure, sizing_mode="stretch_both")
-                doc.add_root(graph)
+                doc.add_root(self._overall_layout)
                 # end of self._source is None - plotting is setup
 
-            # Do the actual update of the plot including updating the plot range and adding the new
-            # data to the Bokeh plot stream
-            self._source_stream_dict = {}
-
-            self._source_stream_dict[self._prom_response] = new_case.get_val(
-                self._prom_response
-            )[:1]
-
-            for response in self._prom_responses:
-                self._source_stream_dict[response] = new_case.get_val(
-                    response
-                )[:1]
-
-            for sampled_variable in self._sampled_variables:
-                self._source_stream_dict[sampled_variable] = new_case.get_val(
-                    sampled_variable
-                )[:1]
-
-            self._source.stream(self._source_stream_dict)
-            self._num_samples_plotted += 1
-
-            for response in self._prom_responses:
-                self._prom_response_min[response] = min(
-                    self._prom_response_min[response], new_case.get_val(response)[:1][0]
-                )
-                self._prom_response_max[response] = max(
-                    self._prom_response_max[response], new_case.get_val(response)[:1][0]
-                )
-
-            self._color_mapper.low = self._prom_response_min[self._prom_response]
-            self._color_mapper.high = self._prom_response_max[self._prom_response]
-
-            # Get current date and time
-            now = datetime.now()
-            formatted_time = now.strftime("%H:%M:%S on %B %d, %Y")
-
-            # Format it as requested
-
-            current_time = time.time()
-            elapsed_total = current_time - self._start_time
-            elapsed_formatted = str(timedelta(seconds=int(elapsed_total)))
-
-            stats_text = f"""<div style="padding: 10px; ">
-                            <p>Number of samples: {self._num_samples_plotted}</p>
-                            <p>Last updated: {formatted_time}</p>
-                            <p>Elapsed time: {elapsed_formatted}</p>
-                            </div>"""
-
-            self._text_box.text = stats_text
-
+            # TODO - is the case of new_case None handled correctly?
+            self._update_source_stream(new_case)
+            self._update_scatter_plots(new_case)
             self._update_histograms()
-
+            self._update_analysis_driver_progress_text_box()
             # end of _update method
 
         doc.add_periodic_callback(_update, callback_period)
         doc.title = "OpenMDAO Analysis Driver Progress Plot"
 
-    # Alternative: Access objects by ID
-    def access_by_id(self, object_id):
-        """Retrieve a Bokeh object by its ID"""
-        try:
-            for obj in self._doc.roots[0].references():
-                if obj.id == object_id:
-                    return obj
-        except IndexError as e:
-            return None
-        return None
+    def _update_analysis_driver_progress_text_box(self):
+        self._num_samples_plotted += 1
+        last_updated_time_formatted = datetime.now().strftime("%H:%M:%S on %B %d, %Y")
+        elapsed_total_time = time.time() - self._start_time
+        elapsed_total_time_formatted = str(timedelta(seconds=int(elapsed_total_time)))
+        self._analysis_driver_progress_text_box.text = f"""<div style="padding: 10px; ">
+                        <p>Number of samples: {self._num_samples_plotted}</p>
+                        <p>Last updated: {last_updated_time_formatted}</p>
+                        <p>Elapsed time: {elapsed_total_time_formatted}</p>
+                        </div>"""
+
+    def _update_source_stream(self, new_case):
+        # fill up the stream dict with the values.
+        # These are fed to the bokeh source stream
+        for response in self._prom_responses:
+            self._source_stream_dict[response] = \
+                new_case.get_val(response)[:1]
+        for sampled_variable in self._sampled_variables:
+            self._source_stream_dict[sampled_variable] = \
+                new_case.get_val(sampled_variable)[:1]
+        self._source.stream(self._source_stream_dict)
+
+    def _update_scatter_plots(self, new_case):
+        # update the min and max for the response variable
+        for response in self._prom_responses:
+            self._prom_response_min[response] = min(
+                self._prom_response_min[response], new_case.get_val(response)[:1][0]
+            )
+            self._prom_response_max[response] = max(
+                self._prom_response_max[response], new_case.get_val(response)[:1][0]
+            )
+
+        # update the color mapper that is used to color the dots in the scatter plots
+        self._color_mapper.low = self._prom_response_min[self._prom_response]
+        self._color_mapper.high = self._prom_response_max[self._prom_response]
 
     def _update_histograms(self):
         for sampled_variable in self._sampled_variables:
@@ -479,22 +542,18 @@ class _RealTimeOptPlot(object):
             )
 
     def _setup_data_source(self):
-
         self._source_dict = {}
 
-        # return prom
         outputs = self._case_tracker.get_case_reader().list_source_vars("driver")[
             "outputs"
         ]
-
-        # returns abs
-        self._responses = list(
+        responses = list(
             self._case_tracker.get_case_reader().problem_metadata["responses"].keys()
         )
 
         # convert to prom
         self._prom_responses = []
-        for response in self._responses:
+        for response in responses:
             if response in self._case_tracker.get_case_reader()._abs2prom["output"]:
                 self._prom_responses.append(
                     self._case_tracker.get_case_reader()._abs2prom["output"][response]
@@ -502,89 +561,39 @@ class _RealTimeOptPlot(object):
             else:
                 raise RuntimeError(f"No prom for abs variable {response}")
 
-        # for now assume one response
-        self._prom_response = self._prom_responses[0]
-        self._source_dict[self._prom_response] = []
+        if not self._prom_responses:
+            raise RuntimeError(f"Need at least one response variable.")
 
-        for response in self._prom_responses:
-            self._source_dict[response] = []
-
-        # need to make unavailble for this any variables that are not scalars
-        self._sampled_variables = [
-            varname for varname in outputs if varname not in self._prom_responses
-        ]
+        # Don't include response variables in sampled variabales. 
+        # Also, split up the remaining sampled variables into scalars and 
+        # non-scalars
         self._sampled_variables = []
         self._sampled_variables_non_scalar = []
-
         for varname in outputs:
             if varname not in self._prom_responses:
                 shape = self._case_tracker._get_shape(varname)
                 if shape == () or shape == (1,): # is scalar ??
                     self._sampled_variables.append(varname)
                 else:
-                    # self._sampled_variables.append(varname)
                     self._sampled_variables_non_scalar.append(varname)
 
+        # want them sorted in the Sampled Variables selection box
         self._sampled_variables.sort()
         self._sampled_variables_non_scalar.sort()
 
+        # setup the source
+        for response in self._prom_responses:
+            self._source_dict[response] = []
         for sampled_variable in self._sampled_variables:
             self._source_dict[sampled_variable] = []
-
         self._source = ColumnDataSource(self._source_dict)
 
-    def _make_variable_button(self, varname, active, is_scalar, callback):
-        toggle = Toggle(
-            label=varname,
-            active=active,
-            margin=(0, 0, 8, 0),
-        )
-        # Add custom CSS styles for both active and inactive states
-        if is_scalar:
-            toggle.stylesheets = [
-                f"""
-                    .bk-btn {{
-                        {_toggle_styles}
-                    }}
-                    .bk-btn.bk-active {{
-                        background-color: rgb(from #000000 R G B / 0.3);
-                        {_toggle_styles}
-                    }}
-                """
-            ]
-        else:
-            toggle.stylesheets = [
-                f"""
-                    .bk-btn {{
-                        cursor:help;
-                        pointer-events: none !important;
-                        opacity: 0.5 !important;
-                        {_toggle_styles}
-                    }}
-                    .bk-btn.bk-active {{
-                        pointer-events: none !important;
-                        background-color: rgb(from #000000 R G B / 0.3);
-                        {_toggle_styles}
-                    }}
-                """
-            ]
-
-
-        if is_scalar:
-            toggle.on_change("active", callback)
-        else:
-            # Create a div for instructions/tooltip
-            tooltip_div = Div(
-                # text="<i>Non-scalar var.</i>",
-                text=f"<div style='text-align:center;font-size:12px;cursor:help;' title='Plotting of non-scalars is not currently supported'>Non-scalar var</div>",
-                styles={'font-size': '12px', 'color': 'gray', 'margin-top': '5px', 'cursor':'help'},
-            )
-            toggle = Row(toggle, tooltip_div)
-
-        self._sampled_variables_toggles.append(toggle)
-        return toggle
 
     def _setup_figure(self):
+        # Initially the response variable plotted is the first one
+        self._prom_response = self._prom_responses[0]
+
+
 
         N = len(self._sampled_variables)
 
@@ -620,14 +629,16 @@ class _RealTimeOptPlot(object):
         for sampled_var in self._sampled_variables:
             if number_initial_visible_sampled_variables < _max_number_initial_visible_sampled_variables:
                 self._sampled_variables_visibility[sampled_var] = True
-                self._make_variable_button(sampled_var,True, True, _sampled_variable_callback(sampled_var))
+                toggle = _make_variable_button(sampled_var,True, True, _sampled_variable_callback(sampled_var))
                 number_initial_visible_sampled_variables += 1
             else:
                 self._sampled_variables_visibility[sampled_var] = False
-                self._make_variable_button(sampled_var,False, True, _sampled_variable_callback(sampled_var))
+                toggle = _make_variable_button(sampled_var,False, True, _sampled_variable_callback(sampled_var))
+            self._sampled_variables_toggles.append(toggle)
 
         for sampled_var in self._sampled_variables_non_scalar:
-            self._make_variable_button(sampled_var,False, False, _sampled_variable_callback(sampled_var))  # TODO need a callback ? Does it do anything?           
+            toggle = _make_variable_button(sampled_var,False, False, _sampled_variable_callback(sampled_var))  # TODO need a callback ? Does it do anything?           
+            self._sampled_variables_toggles.append(toggle)
 
 
         # Create a color mapper using Viridis (colorblind-friendly)
@@ -655,7 +666,7 @@ class _RealTimeOptPlot(object):
                 )
                 self._scatter_plots_figure[(x,y)] = p
                 p.axis.visible = True
-                self._scatter_plots[(x,y)] = p.scatter(
+                self._scatter_plots.append(p.scatter(
                     x=x,
                     source=self._source,
                     y=y,
@@ -664,7 +675,7 @@ class _RealTimeOptPlot(object):
                     fill_color=transform(
                         self._prom_response, self._color_mapper
                     ),  # This maps f to colors
-                )
+                ))
             else:  # on the diagonal
                 # Extract the x column data for the histogram
                 x_data = self._source.data[x]
@@ -845,12 +856,11 @@ class _RealTimeOptPlot(object):
 
         analysis_progress_label = Div(
             text="Analysis Driver Progress",
-            width=200,
             styles={"font-size": "20px", "font-weight": "bold"},
         )
 
         # show number of samples plotted
-        self._text_box = Div(
+        self._analysis_driver_progress_text_box = Div(
             text="""<div style="padding: 10px; border-radius: 5px;">
                     <p>Waiting for data...</p>
                     </div>""",
@@ -860,7 +870,7 @@ class _RealTimeOptPlot(object):
 
         analysis_progress_box = Column(
             analysis_progress_label,
-            self._text_box,
+            self._analysis_driver_progress_text_box,
             styles={
                 # "max-height": "100vh",  # Ensures it doesn't exceed viewport
                 "border-radius": "5px",
@@ -926,7 +936,7 @@ class _RealTimeOptPlot(object):
             self._color_mapper.low = self._prom_response_min[self._prom_response]
             self._color_mapper.high = self._prom_response_max[self._prom_response]
 
-            for (x,y), scatter_plot in self._scatter_plots.items():
+            for scatter_plot in self._scatter_plots:
                 t = transform(
                         self._prom_response, self._color_mapper
                     )
@@ -938,7 +948,7 @@ class _RealTimeOptPlot(object):
         # Attach the callback to the Select widget
         menu.on_change("value", cb_select_response_variable)
 
-        final_layout = Row(
+        self._overall_layout = Row(
             Column(title_div, gp),
             p,
             spacer2,
@@ -947,7 +957,6 @@ class _RealTimeOptPlot(object):
             sizing_mode="stretch_both",
         )
 
-        self.plot_figure = final_layout
 
 
 def print_bokeh_objects(doc):  # TODO remove!
