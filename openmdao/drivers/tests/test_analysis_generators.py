@@ -87,6 +87,18 @@ class TestErrors(unittest.TestCase):
                          "Unable to determine levels for factor 'x'. Factors dictionary must "
                          "contain both 'lower' and 'upper' keys.")
 
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
+    def test_mismatched_bounds(self):
+        with self.assertRaises(ValueError) as err:
+            factors = {
+                'x': {'lower': 0.0, 'upper': np.array([1.0, 2.0, 3.0])},
+            }
+            FullFactorialGenerator(factors, levels=3)
+
+        self.assertEqual(str(err.exception),
+                         "Size mismatch for factor 'x': "
+                         "'lower' bound size (1) does not match 'upper' bound size (3).")
+
 
 @use_tempdirs
 class TestAnalysisGenerators(unittest.TestCase):

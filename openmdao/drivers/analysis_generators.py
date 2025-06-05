@@ -549,32 +549,28 @@ def _get_size(name, dct):
     name : str
         The name of the variable for which to determine the size.
     dct : dict
-        Dictionary containing metadata for the variable, which may include
-        'size', 'global_size', 'val', 'upper', and 'lower' keys.
+        Dictionary containing metadata for the variable, which must include 'upper', and 'lower' keys.
 
     Returns
     -------
     int
-        The size of the variable. If 'distributed' is True, returns 'global_size',
-        otherwise returns the value of 'size' or the size of 'val', 'lower', or 'upper'.
+        The size of the variable as determined from the lower and upper bounds of the range.
+        Note that both 'lower' and 'upper' must be present in the dictionary and have the same size.
 
     Raises
     ------
+    ValueError
+        The size of the specified lower bound does not match the size of the upper bound.
     RuntimeError
         The required metadata was not found in the dictionary to determine the size.
     """
     try:
-        if dct.get('distributed'):
-            return dct['global_size']
-        elif 'size' in dct:
-            return dct['size']
-        elif 'val' in dct:
-            return np.size(dct['val'])
-        elif 'lower' in dct:
-            return np.size(dct['lower'])
-        else:
-            return np.size(dct['upper'])
+        lower_size = np.size(dct['lower'])
+        upper_size = np.size(dct['upper'])
+        if lower_size != upper_size:
+            raise ValueError(f"Size mismatch for factor '{name}': "
+                             f"'lower' bound size ({lower_size}) does not match 'upper' bound size ({upper_size}).")
+        return lower_size
     except KeyError:
-        raise RuntimeError(f"Unable to determine size for factor '{name}'. "
-                           "Metadata dictionary must contain of of the following: "
-                           "'size', 'global_size', 'val', 'lower', 'upper'")
+        raise RuntimeError(f"Unable to determine levels for factor '{name}'. "
+                           "Factors dictionary must contain both 'lower' and 'upper' keys.")
