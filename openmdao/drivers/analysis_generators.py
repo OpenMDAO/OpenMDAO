@@ -1,5 +1,5 @@
 """
-DOE generators for Analysis Driver.
+Uniform and DOE generators for Analysis Driver.
 """
 import numpy as np
 
@@ -569,7 +569,7 @@ def _get_size(name, dct):
         upper_size = np.size(dct['upper'])
         if lower_size != upper_size:
             raise ValueError(f"Size mismatch for factor '{name}': 'lower' bound size "
-                             "({lower_size}) does not match 'upper' bound size ({upper_size}).")
+                             f"({lower_size}) does not match 'upper' bound size ({upper_size}).")
         return lower_size
     except KeyError:
         raise RuntimeError(f"Unable to determine levels for factor '{name}'. "

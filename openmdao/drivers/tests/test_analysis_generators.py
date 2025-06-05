@@ -132,20 +132,6 @@ class TestAnalysisGenerators(unittest.TestCase):
             {'x': np.array([1.]), 'y': np.array([1.]), 'f_xy': np.array([27.00])},
         ]
 
-        self.NOexpected_fullfact3_derivs = [
-            {('f_xy', 'x'): np.array(-6.), ('f_xy', 'y'): np.array(8.)},
-            {('f_xy', 'x'): np.array(-5.), ('f_xy', 'y'): np.array(8.5)},
-            {('f_xy', 'x'): np.array(-4.), ('f_xy', 'y'): np.array(9.)},
-
-            {('f_xy', 'x'): np.array(-5.5), ('f_xy', 'y'): np.array(9.)},
-            {('f_xy', 'x'): np.array(-4.5), ('f_xy', 'y'): np.array(9.5)},
-            {('f_xy', 'x'): np.array(-3.5), ('f_xy', 'y'): np.array(10.)},
-
-            {('f_xy', 'x'): np.array(-5.), ('f_xy', 'y'): np.array(10.)},
-            {('f_xy', 'x'): np.array(-4.), ('f_xy', 'y'): np.array(10.5)},
-            {('f_xy', 'x'): np.array(-3.), ('f_xy', 'y'): np.array(11.)},
-        ]
-
     def test_uniform(self):
         prob = om.Problem()
         model = prob.model
