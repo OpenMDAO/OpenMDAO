@@ -1027,9 +1027,10 @@ class Component(System):
         all_abs2meta : dict
             Mapping of absolute names to metadata for all variables in the model.
         all_abs2idx : dict
-            Dictionary mapping an absolute name to its allprocs variable index.
+            Dictionary mapping an absolute name to its allprocs variable index for the
+            whole model.
         all_sizes : dict
-            Mapping of types to sizes of each variable in all procs.
+            Mapping of types to sizes of each variable in all procs for the whole model.
 
         Returns
         -------
@@ -1043,11 +1044,14 @@ class Component(System):
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         sizes_in = self._var_sizes['input']
+        # src is outside of this component, so we need to use the all_sizes dict to get the sizes
+        # of the output variables
         sizes_out = all_sizes['output']
         added_src_inds = []
         # loop over continuous inputs
-        for i, (iname, meta_in) in enumerate(abs2meta_in.items()):
+        for iname, meta_in in abs2meta_in.items():
             if meta_in['src_indices'] is None and iname not in abs_in2prom_info:
+                i = self._var_allprocs_abs2idx[iname]
                 src = abs_in2out[iname]
                 dist_in = meta_in['distributed']
                 dist_out = all_abs2meta_out[src]['distributed']
@@ -1057,8 +1061,7 @@ class Component(System):
                     vout_sizes = sizes_out[:, all_abs2idx[src]]
 
                     offset = None
-                    if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes)
-                                                 == gsize_in):
+                    if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes) == gsize_in):
                         # This assumes one of:
                         # 1) a distributed output with total size matching the total size of a
                         #    distributed input
@@ -2196,7 +2199,7 @@ class Component(System):
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
-        if self._problem_meta is None:
+        if self._problem_meta is not None:
             if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
                 raise RuntimeError(f"{self.msginfo}: Can't check_partials before final_setup. Also,"
                                    " make sure to set valid input values before calling "

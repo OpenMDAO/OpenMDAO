@@ -2260,8 +2260,8 @@ class System(object, metaclass=SystemMetaclass):
         self._resolver = NameResolver(self.pathname, self.msginfo)
 
         cfginfo = self._problem_meta['config_info']
-        if cfginfo and self.pathname in cfginfo._modified_systems:
-            cfginfo._modified_systems.remove(self.pathname)
+        if cfginfo:
+            cfginfo._modified_systems.discard(self.pathname)
 
     def _setup_global_shapes(self):
         """
@@ -5648,7 +5648,7 @@ class System(object, metaclass=SystemMetaclass):
         model = self._problem_meta['model_ref']()
 
         try:
-            conns = model._conn_abs_in2out
+            conns = model._conn_global_abs_in2out
         except AttributeError:
             conns = {}
 
@@ -5705,6 +5705,24 @@ class System(object, metaclass=SystemMetaclass):
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set.
         """
+        post_setup = self._problem_meta is not None and \
+            self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP
+
+        if post_setup:
+            if self._is_local:
+                abs_names = self._resolver.absnames(name)
+        else:
+            raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
+                               "completes.")
+
+        if not self._is_local:
+            # we'll do any necessary transfers later
+            return
+
+        has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
+        model = self._problem_meta['model_ref']()
+        nprocs = model.comm.size
+
         try:
             ginputs = self._group_inputs
         except AttributeError:
@@ -5712,26 +5730,22 @@ class System(object, metaclass=SystemMetaclass):
 
         post_setup = self._problem_meta is not None and \
             self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP
+
         if post_setup:
             abs_names = self._resolver.absnames(name)
         else:
             raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
                                "completes.")
 
-        if not self._is_local:
-            return
-
-        has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
         value = val
 
-        model = self._problem_meta['model_ref']()
         conns = model._conn_global_abs_in2out
 
         all_meta = model._var_allprocs_abs2meta
+        all_idx = model._var_allprocs_abs2idx
+        all_sizes = model._var_sizes
         all_meta_in = model._var_allprocs_abs2meta['input']
-        all_meta_out = model._var_allprocs_abs2meta['output']
         loc_meta_in = model._var_abs2meta['input']
-        n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
 
         n_proms = len(abs_names)  # for output this will never be > 1
         if n_proms > 1 and name in ginputs:
@@ -5743,6 +5757,7 @@ class System(object, metaclass=SystemMetaclass):
 
         if abs_name in conns:  # we're setting an input
             src = conns[abs_name]
+
             if abs_name in all_meta_in:  # input is continuous
                 value = np.asarray(value)
                 tmeta = all_meta_in[abs_name]
@@ -5782,6 +5797,15 @@ class System(object, metaclass=SystemMetaclass):
                         ivalue = model.convert_units(name, value, units, gunits)
                     value = model.convert_from_units(src, value, units)
                 set_units = sunits
+
+                if nprocs > 1:
+                    # check if src exists on a proc where tgt doesn't
+                    insizes = all_sizes['input'][:, all_idx[abs_name]]
+                    outsizes = all_sizes['output'][:, all_idx[src]]
+                    if np.any(insizes != outsizes):
+                        # must keep track of this for later setting across all procs
+                        model._remote_sets.append((abs_name, src, value))
+
         else:  # setting an output
             src = abs_name
             if units is not None:

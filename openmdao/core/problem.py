@@ -588,8 +588,8 @@ class Problem(object, metaclass=ProblemMetaclass):
         for value, set_units, pathname, name in self.model._initial_condition_cache.values():
             if pathname:
                 system = self.model._get_subsystem(pathname)
-                if system is None:
-                    self.model.set_val(pathname + '.' + name, value, units=set_units)
+                if system is None or not system._is_local:
+                    pass
                 else:
                     system.set_val(name, value, units=set_units)
             else:
@@ -1140,6 +1140,10 @@ class Problem(object, metaclass=ProblemMetaclass):
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP
             self._set_initial_conditions()
+
+        if self.model.comm.size > 1:
+            # this updates any source values that are attached to remote inputs
+            self.model._resolve_remote_sets()
 
         if self._check and 'checks' not in self._reports:
             if self._check is True:

@@ -3,12 +3,12 @@ import unittest
 
 import openmdao.api as om
 
-
+from openmdao.utils.assert_utils import assert_near_equal
 
 class MPISetvalBug(unittest.TestCase):
     N_PROCS = 2
 
-    def test_set_val_mpi_bug(self):
+    def _build_model(self):
         p = om.Problem()
         par_group = om.ParallelGroup()
 
@@ -20,40 +20,75 @@ class MPISetvalBug(unittest.TestCase):
         g2 = om.Group()
         g2.add_subsystem('c2', c2, promotes=['*'])
 
-        #c3 = om.ExecComp('g3 = x3', x3={'shape': (1,)}, g3={'copy_shape': 'x3'})
-        #g3 = om.Group()
-        #g3.add_subsystem('c3', c3, promotes=['*'])
-
         par_group.add_subsystem('g1', g1, promotes=['*'])
         par_group.add_subsystem('g2', g2, promotes=['*'])
-        #par_group.add_subsystem('g3', g3, promotes=['*'])
 
         p.model.add_objective('y1')
         p.model.add_design_var('x1', lower=2, upper=5)
         p.model.add_design_var('x2', lower=2, upper=5)
-        #p.model.add_design_var('x3', lower=2, upper=5)
         p.model.add_constraint('g2', lower=3.)
-        #p.model.add_constraint('g3', lower=3.)
 
         p.model.add_subsystem('par_group', par_group, promotes=['*'])
 
         p.driver = om.pyOptSparseDriver(optimizer='SLSQP')
 
+        return p
+
+    def test_set_val_mpi_bug_post_setup(self):
+        p = self._build_model()
         p.setup()
 
-        # if g1 in p.model.par_group._subsystems_myproc:
-        #     g1.set_val('x1', 2.5)
-
-        # if g2 in p.model.par_group._subsystems_myproc:
-        #     g2.set_val('x2', 2.5)
-
-        # if g3 in p.model.par_group._subsystems_myproc:
-        #     g3.set_val('x3', 2.5)
-
-        g1.set_val('x1', 2.5)
-        g2.set_val('x2', 2.6)
-        #g3.set_val('x3', 2.5)
+        p.model.par_group.g1.set_val('x1', 2.5)
+        p.model.par_group.g2.set_val('x2', 2.6)
 
         p.final_setup()
-        p.list_driver_vars()
+
+        assert_near_equal(p.model.get_val(p.model.get_source('x1')), 2.5)
+        assert_near_equal(p.model.get_val(p.model.get_source('x2')), 2.6)
+
+    def test_set_val_mpi_bug_post_setup_set_single_proc(self):
+        p = self._build_model()
+        p.setup()
+
+        if p.model.par_group.g1._is_local:
+            p.model.par_group.g1.set_val('x1', 2.5)
+        if p.model.par_group.g2._is_local:
+            p.model.par_group.g2.set_val('x2', 2.6)
+
+        p.final_setup()
+
+        assert_near_equal(p.model.get_val(p.model.get_source('x1')), 2.5)
+        assert_near_equal(p.model.get_val(p.model.get_source('x2')), 2.6)
+
+    def test_set_val_mpi_bug_post_final_setup(self):
+        p = self._build_model()
+        p.setup()
+
+        p.final_setup()
+
+        p.model.par_group.g1.set_val('x1', 2.5)
+        p.model.par_group.g2.set_val('x2', 2.6)
+
+        p.run_model()
+
+        assert_near_equal(p.model.get_val(p.model.get_source('x1')), 2.5)
+        assert_near_equal(p.model.get_val(p.model.get_source('x2')), 2.6)
+
+    def test_set_val_mpi_bug_post_final_setup_set_single_proc(self):
+        p = self._build_model()
+        p.setup()
+
+        p.final_setup()
+
+        if p.model.par_group.g1._is_local:
+            p.model.par_group.g1.set_val('x1', 2.5)
+        if p.model.par_group.g2._is_local:
+            p.model.par_group.g2.set_val('x2', 2.6)
+
+        p.run_model()  # source values attached to remote inputs won't update until the final_setup
+                       # called within run_model
+
+        assert_near_equal(p.model.get_val(p.model.get_source('x1')), 2.5)
+        assert_near_equal(p.model.get_val(p.model.get_source('x2')), 2.6)
+
 
