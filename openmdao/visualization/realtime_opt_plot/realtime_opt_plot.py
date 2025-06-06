@@ -119,7 +119,6 @@ def _make_sampled_variable_button(varname, active, is_scalar, callback):
     sampled_variable_button = Toggle(
         label=varname,
         active=active,
-        # margin=(0, 0, 8, 0),
     )
     # Add custom CSS styles for both active and inactive states
     if is_scalar:
@@ -944,6 +943,7 @@ class _RealTimeOptPlot(object):
                 response_variable_box,
                 Spacer(height=20),
                 sampled_variable_selector_box,
+                Spacer(height=20),
                 sizing_mode="stretch_both",
             ),
             sizing_mode="stretch_both",
