@@ -513,10 +513,12 @@ class _RealTimeOptPlot(object):
 
     def _update_analysis_driver_progress_text_box(self):
         self._num_samples_plotted += 1
+        script_name = self._case_recorder_filename
         last_updated_time_formatted = datetime.now().strftime("%H:%M:%S on %B %d, %Y")
         elapsed_total_time = time.time() - self._start_time
         elapsed_total_time_formatted = str(timedelta(seconds=int(elapsed_total_time)))
         self._analysis_driver_progress_text_box.text = f"""<div style="padding: 10px; ">
+                        <p>Script: {script_name}</p>
                         <p>Number of samples: {self._num_samples_plotted}</p>
                         <p>Last updated: {last_updated_time_formatted}</p>
                         <p>Elapsed time: {elapsed_total_time_formatted}</p>
@@ -679,11 +681,11 @@ class _RealTimeOptPlot(object):
             sampled_variables_button_column,
             sizing_mode="stretch_height",
             height_policy="fit",
-            styles={
-                'max-height': '100vh',  # Ensures it doesn't exceed viewport
-                'border-radius': '5px',
-                'border': '5px solid black',
-            },
+            # styles={
+            #     'max-height': '100vh',  # Ensures it doesn't exceed viewport
+            #     'border-radius': '5px',
+            #     'border': '5px solid black',
+            # },
         )
 
         sampled_variable_selector_box = ScrollBox(
@@ -691,8 +693,35 @@ class _RealTimeOptPlot(object):
             sizing_mode="stretch_height",
             height_policy="max",
         )
+        
+        menu = Select(
+            options=self._prom_responses,
+            value=self._prom_responses[0],  # Default value
+        )
 
-        return sampled_variable_selector_box
+        response_variable_header = Div(
+            text="Response variable",
+            width=200,
+            styles={"font-size": "20px", "font-weight": "bold"},
+        )
+
+        col = Column(
+            response_variable_header,
+            menu,
+            sampled_variable_selector_box,
+            sizing_mode="stretch_height",
+            height_policy="fit",
+            styles={
+                'max-height': '100vh',  # Ensures it doesn't exceed viewport
+                'border-radius': '5px',
+                'border': '5px solid black',
+            },
+        )
+        
+        
+        return col
+
+        # return sampled_variable_selector_box
 
     def _make_color_bar(self):
         # Add the color bar to this figure
@@ -838,6 +867,31 @@ class _RealTimeOptPlot(object):
             p.visible = sampled_variable in visible_variables
             plots_and_labels_in_grid.append(p)
 
+    # def _make_analysis_driver_box(self):
+    #     analysis_progress_label = Div(
+    #         text="Analysis Driver Progress",
+    #         styles={"font-size": "20px", "font-weight": "bold"},
+    #     )
+
+    #     # placeholder until we have data
+    #     self._analysis_driver_progress_text_box = Div(
+    #         text="""<div style="padding: 10px; border-radius: 5px;">
+    #                 <p>Waiting for data...</p>
+    #                 </div>""",
+    #         width=600,
+    #         height=100,
+    #     )
+
+    #     analysis_progress_box = Column(
+    #         analysis_progress_label,
+    #         self._analysis_driver_progress_text_box,
+    #         styles={
+    #             "border-radius": "5px",
+    #             "border": "5px solid black",
+    #         },
+    #     )
+    #     return analysis_progress_box
+
     def _make_analysis_driver_box(self):
         analysis_progress_label = Div(
             text="Analysis Driver Progress",
@@ -849,12 +903,14 @@ class _RealTimeOptPlot(object):
             text="""<div style="padding: 10px; border-radius: 5px;">
                     <p>Waiting for data...</p>
                     </div>""",
-            width=600,
+            width=400,
             height=100,
         )
 
+        quit_button = self._make_quit_button()
+
         analysis_progress_box = Column(
-            analysis_progress_label,
+            Row(analysis_progress_label, quit_button),
             self._analysis_driver_progress_text_box,
             styles={
                 "border-radius": "5px",
@@ -864,7 +920,7 @@ class _RealTimeOptPlot(object):
         return analysis_progress_box
 
     def _make_quit_button(self):
-        quit_button = Button(label="Quit Application", button_type="danger")
+        quit_button = Button(label="Quit", button_type="danger")
 
         # Define callback function for the quit button
         def quit_app():
@@ -929,23 +985,38 @@ class _RealTimeOptPlot(object):
 
     def _make_overall_layout(self, title_box, grid_of_plots, color_bar, quit_button,
                              analysis_progress_box, response_variable_box, sampled_variable_selector_box ):
+        
+
+
+        # variable_box = Column(
+        #     response_variable_box,
+        #     sampled_variable_selector_box,
+        #         styles={
+        #             "border": "5px solid black",
+        #             "padding": "8px",
+        #         },
+        #     )
+
+
 
         self._overall_layout = Row(
-            Column(title_box, grid_of_plots),
-            color_bar,
-            Spacer(width=150, height=0), # move the column away from the color bar
             Column(
-                Spacer(height=20), # move quit button away from the top
-                quit_button,
+                # Spacer(height=20), # move quit button away from the top
+                # quit_button,
                 Spacer(height=20),
                 analysis_progress_box,
-                Spacer(height=20),
-                response_variable_box,
+                # Spacer(height=20),
+                # response_variable_box,
                 Spacer(height=20),
                 sampled_variable_selector_box,
                 Spacer(height=20),
                 sizing_mode="stretch_both",
             ),
+            # Column(title_box, grid_of_plots),
+            color_bar,
+            Spacer(width=100, height=0), # move the column away from the color bar
+            grid_of_plots,
+            Spacer(width=150, height=0), # move the column away from the color bar
             sizing_mode="stretch_both",
         )
 
