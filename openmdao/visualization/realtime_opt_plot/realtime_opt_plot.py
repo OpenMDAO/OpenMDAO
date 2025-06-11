@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 try:
     from bokeh.models import (
         ColumnDataSource,
-        Range1d,
+        CheckboxGroup,
         Button,
         Row,
         Div,
@@ -68,6 +68,11 @@ _sampled_variable_button_styles = """
         0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
         inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
+# layout params
+_left_side_column_width = 500
+
+_analysis_driver_progress_box_font_size = 16
+
 # some models have a large number of variables. Putting them all in a plot
 #   is not practical. Initially show no more than this number
 _max_number_initial_visible_sampled_variables = 3
@@ -517,7 +522,7 @@ class _RealTimeOptPlot(object):
         last_updated_time_formatted = datetime.now().strftime("%H:%M:%S on %B %d, %Y")
         elapsed_total_time = time.time() - self._start_time
         elapsed_total_time_formatted = str(timedelta(seconds=int(elapsed_total_time)))
-        self._analysis_driver_progress_text_box.text = f"""<div style="padding: 10px; ">
+        self._analysis_driver_progress_text_box.text = f"""<div style="padding: 10px; font-size: {_analysis_driver_progress_box_font_size}px ">
                         <p>Script: {script_name}</p>
                         <p>Number of samples: {self._num_samples_plotted}</p>
                         <p>Last updated: {last_updated_time_formatted}</p>
@@ -643,7 +648,7 @@ class _RealTimeOptPlot(object):
             else:
                 self._sampled_variables_visibility[sampled_var] = False
 
-    def _make_sampled_variables_selection_buttons(self):
+    def _make_sampled_variables_selection_buttons(self, color_bar):
         # Make all the buttons for the Sample Variables area to the right of the plot
         #   that lets the user select what to plot
         number_initial_visible_sampled_variables = 0
@@ -669,6 +674,55 @@ class _RealTimeOptPlot(object):
                 'max-height': '100vh'  # Ensures it doesn't exceed viewport
             },
         )
+        
+        
+        sampled_variables_button_column = CheckboxGroup(
+            labels=self._sampled_variables,
+            active=[0, 2],  # Initially check the first and third options
+            width=_left_side_column_width
+        )
+        # Add custom CSS that targets the Bokeh checkbox styling more specifically
+        custom_css = """
+        .bk-input-group .bk-checkbox input[type="checkbox"]:checked {
+            background-color: #4CAF50 !important;
+            border-color: #4CAF50 !important;
+        }
+
+        .bk-checkbox input[type="checkbox"]:checked {
+            background-color: #4CAF50 !important;
+            border-color: #4CAF50 !important;
+            accent-color: #2E7D32 !important;
+        }
+
+        input[type="checkbox"]:checked {
+            background-color: #4CAF50 !important;
+            border-color: #4CAF50 !important;
+            accent-color: #2E7D32 !important;
+        }
+
+
+        input[type="checkbox"]:checked::after {
+            color: white !important;
+        }
+
+        .bk-checkbox input[type="checkbox"]:checked::after {
+            color: white !important;
+        }
+
+
+        .bk-input-group label {
+            font-size: 20px !important;
+        }
+
+        .bk-checkbox label {
+            font-size: 20px !important;
+        }
+        """
+
+        
+        sampled_variables_button_column.stylesheets = [custom_css]
+
+        
 
         # header for the variable list
         sampled_variables_label = Div(
@@ -705,12 +759,29 @@ class _RealTimeOptPlot(object):
             styles={"font-size": "20px", "font-weight": "bold"},
         )
 
+        def cb_select_response_variable(color_bar):
+            def toggle_callback(attr, old, new):
+                self._prom_response = new 
+                color_bar.title = f"Response variable: '{new}'"
+                self._color_mapper.low = self._prom_response_min[self._prom_response]
+                self._color_mapper.high = self._prom_response_max[self._prom_response]
+
+                for scatter_plot in self._scatter_plots:
+                    scatter_plot.glyph.fill_color = transform(
+                            self._prom_response, self._color_mapper
+                        )
+            return toggle_callback
+
+        menu.on_change("value", cb_select_response_variable(color_bar))
+
         col = Column(
             response_variable_header,
             menu,
+            Spacer(height=20),
             sampled_variable_selector_box,
             sizing_mode="stretch_height",
             height_policy="fit",
+            width=_left_side_column_width,
             styles={
                 'max-height': '100vh',  # Ensures it doesn't exceed viewport
                 'border-radius': '5px',
@@ -903,15 +974,20 @@ class _RealTimeOptPlot(object):
             text="""<div style="padding: 10px; border-radius: 5px;">
                     <p>Waiting for data...</p>
                     </div>""",
-            width=400,
+            width=_left_side_column_width,
             height=100,
         )
 
         quit_button = self._make_quit_button()
 
         analysis_progress_box = Column(
-            Row(analysis_progress_label, quit_button),
+            Row(analysis_progress_label, 
+                Spacer(), 
+                quit_button,
+                sizing_mode="stretch_width",
+            ),
             self._analysis_driver_progress_text_box,
+            width=_left_side_column_width,
             styles={
                 "border-radius": "5px",
                 "border": "5px solid black",
@@ -945,43 +1021,43 @@ class _RealTimeOptPlot(object):
 
         return title_box
 
-    def _make_response_variable_selector(self, color_bar):
-        menu = Select(
-            options=self._prom_responses,
-            value=self._prom_responses[0],  # Default value
-        )
+    # def _make_response_variable_selector(self, color_bar):
+    #     menu = Select(
+    #         options=self._prom_responses,
+    #         value=self._prom_responses[0],  # Default value
+    #     )
 
-        response_variable_header = Div(
-            text="Response variable",
-            width=200,
-            styles={"font-size": "20px", "font-weight": "bold"},
-        )
+    #     response_variable_header = Div(
+    #         text="Response variable",
+    #         width=200,
+    #         styles={"font-size": "20px", "font-weight": "bold"},
+    #     )
 
-        response_variable_box = Column(
-            response_variable_header,
-            menu,
-            styles={
-                "border": "5px solid black",
-                "padding": "8px",
-            },
-        )
+    #     response_variable_box = Column(
+    #         response_variable_header,
+    #         menu,
+    #         styles={
+    #             "border": "5px solid black",
+    #             "padding": "8px",
+    #         },
+    #     )
 
-        def cb_select_response_variable(color_bar):
-            def toggle_callback(attr, old, new):
-                self._prom_response = new 
-                color_bar.title = f"Response variable: '{new}'"
-                self._color_mapper.low = self._prom_response_min[self._prom_response]
-                self._color_mapper.high = self._prom_response_max[self._prom_response]
+    #     def cb_select_response_variable(color_bar):
+    #         def toggle_callback(attr, old, new):
+    #             self._prom_response = new 
+    #             color_bar.title = f"Response variable: '{new}'"
+    #             self._color_mapper.low = self._prom_response_min[self._prom_response]
+    #             self._color_mapper.high = self._prom_response_max[self._prom_response]
 
-                for scatter_plot in self._scatter_plots:
-                    scatter_plot.glyph.fill_color = transform(
-                            self._prom_response, self._color_mapper
-                        )
-            return toggle_callback
+    #             for scatter_plot in self._scatter_plots:
+    #                 scatter_plot.glyph.fill_color = transform(
+    #                         self._prom_response, self._color_mapper
+    #                     )
+    #         return toggle_callback
 
-        menu.on_change("value", cb_select_response_variable(color_bar))
+    #     menu.on_change("value", cb_select_response_variable(color_bar))
 
-        return response_variable_box
+    #     return response_variable_box
 
     def _make_overall_layout(self, title_box, grid_of_plots, color_bar, quit_button,
                              analysis_progress_box, response_variable_box, sampled_variable_selector_box ):
@@ -1007,7 +1083,6 @@ class _RealTimeOptPlot(object):
                 analysis_progress_box,
                 # Spacer(height=20),
                 # response_variable_box,
-                Spacer(height=20),
                 sampled_variable_selector_box,
                 Spacer(height=20),
                 sizing_mode="stretch_both",
@@ -1017,7 +1092,7 @@ class _RealTimeOptPlot(object):
             Spacer(width=100, height=0), # move the column away from the color bar
             grid_of_plots,
             Spacer(width=150, height=0), # move the column away from the color bar
-            sizing_mode="stretch_both",
+            sizing_mode="stretch_height",
         )
 
     def _setup_figure(self):
@@ -1050,11 +1125,12 @@ class _RealTimeOptPlot(object):
 
         quit_button = self._make_quit_button()
 
-        sampled_variable_selector_box = self._make_sampled_variables_selection_buttons()
+        sampled_variable_selector_box = self._make_sampled_variables_selection_buttons(color_bar)
 
         analysis_progress_box = self._make_analysis_driver_box()
 
-        response_variable_box = self._make_response_variable_selector(color_bar)
+        # response_variable_box = self._make_response_variable_selector(color_bar)
+        response_variable_box = None
 
         self._make_overall_layout(title_box, grid_of_plots, color_bar, quit_button, analysis_progress_box, 
             response_variable_box, sampled_variable_selector_box)
