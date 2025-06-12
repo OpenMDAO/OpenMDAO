@@ -620,6 +620,10 @@ class _RealTimeOptPlot(object):
             self._source_dict[sampled_variable] = []
         self._source = ColumnDataSource(self._source_dict)
 
+    # TODO make this work with checkboxes
+
+        
+
     def _sampled_variable_callback(self,var_name):
         def toggle_callback(attr, old, new):
             self._sampled_variables_visibility[var_name] = new
@@ -652,35 +656,88 @@ class _RealTimeOptPlot(object):
         # Make all the buttons for the Sample Variables area to the right of the plot
         #   that lets the user select what to plot
         number_initial_visible_sampled_variables = 0
-        for sampled_var in self._sampled_variables:
-            if self._sampled_variables_visibility[sampled_var]:
-                sampled_variable_button = _make_sampled_variable_button(sampled_var,True, True, self._sampled_variable_callback(sampled_var))
-            else:
-                sampled_variable_button = _make_sampled_variable_button(sampled_var,False, True, self._sampled_variable_callback(sampled_var))
-            self._sampled_variables_buttons.append(sampled_variable_button)
-
-        for sampled_var in self._sampled_variables_non_scalar:
-            sampled_variable_button = _make_sampled_variable_button(sampled_var,False, False, self._sampled_variable_callback(sampled_var))  # TODO need a callback ? Does it do anything?           
-            self._sampled_variables_buttons.append(sampled_variable_button)
-
-        sampled_variables_button_column = Column(
-            children=self._sampled_variables_buttons,
-            sizing_mode="stretch_both",
-            height_policy="fit",
-            styles={
-                "overflow-y": "auto",
-                "border": "1px solid #ddd",
-                "padding": "8px",
-                'max-height': '100vh'  # Ensures it doesn't exceed viewport
-            },
-        )
         
+        # TODO make _make_sampled_variable_checkbox(var,active,callback)
+        # for sampled_var in self._sampled_variables:
+        #     if self._sampled_variables_visibility[sampled_var]:
+        #         sampled_variable_button = _make_sampled_variable_button(sampled_var,True, True, self._sampled_variable_callback(sampled_var))
+        #     else:
+        #         sampled_variable_button = _make_sampled_variable_button(sampled_var,False, True, self._sampled_variable_callback(sampled_var))
+        #     self._sampled_variables_buttons.append(sampled_variable_button)
+
+
+        # TODO do not make them buttons. Just text
+        # for sampled_var in self._sampled_variables_non_scalar:
+        #     sampled_variable_button = _make_sampled_variable_button(sampled_var,False, False, self._sampled_variable_callback(sampled_var))  # TODO need a callback ? Does it do anything?           
+        #     self._sampled_variables_buttons.append(sampled_variable_button)
+
+        sampled_variables_non_scalar_text_list = []
+        for sampled_var in self._sampled_variables_non_scalar:
+            sampled_variables_non_scalar_text = Div(text=sampled_var,
+                                                                styles={"font-size": "20px"},
+        )           
+            sampled_variables_non_scalar_text_list.append(sampled_variables_non_scalar_text)
+
+        sampled_variables_non_scalar_column = Column(
+            children=sampled_variables_non_scalar_text_list,
+        )
+
+        # sampled_variables_button_column = Column(
+        #     children=self._sampled_variables_buttons,
+        #     sizing_mode="stretch_both",
+        #     height_policy="fit",
+        #     styles={
+        #         "overflow-y": "auto",
+        #         "border": "1px solid #ddd",
+        #         "padding": "8px",
+        #         'max-height': '100vh'  # Ensures it doesn't exceed viewport
+        #     },
+        # )
+        
+        sampled_variable_active_index_list = []
+        for i, sampled_var in enumerate(self._sampled_variables):
+            if self._sampled_variables_visibility[sampled_var]:
+                sampled_variable_active_index_list.append(i)
+
         
         sampled_variables_button_column = CheckboxGroup(
             labels=self._sampled_variables,
-            active=[0, 2],  # Initially check the first and third options
+            active=sampled_variable_active_index_list,  # Initially check the first and third options
             width=_left_side_column_width
         )
+        
+        def _sampled_variable_checkbox_callback(attr, old, new):
+            
+            # old and new are lists in terms of index into the checkboxes
+            # starts at 0
+            # Find which checkbox was toggled by comparing old and new states
+            added = set(new) - set(old)
+            removed = set(old) - set(new)
+            
+            if added:
+                active = True
+                var_name = self._sampled_variables[added.pop()]
+                
+            if removed:
+                active = False
+                var_name = self._sampled_variables[removed.pop()]
+                
+            self._sampled_variables_visibility[var_name] = active
+            self._hist_figures[var_name].visible = active
+            self._row_labels[var_name].visible = active
+            self._column_labels[var_name].visible = active
+
+            for i, (y, x) in enumerate(
+                product(self._sampled_variables, self._sampled_variables)
+            ):
+                icolumn = i % self._num_sampled_variables
+                irow = i // self._num_sampled_variables
+                # only do the lower half
+                if x != y:
+                    self._scatter_plots_figure[(x,y)].visible = (icolumn < irow \
+                        and self._sampled_variables_visibility[x] and self._sampled_variables_visibility[y] )
+        
+        sampled_variables_button_column.on_change('active', _sampled_variable_checkbox_callback )
         # Add custom CSS that targets the Bokeh checkbox styling more specifically
         custom_css = """
         .bk-input-group .bk-checkbox input[type="checkbox"]:checked {
@@ -730,9 +787,15 @@ class _RealTimeOptPlot(object):
             width=200,
             styles={"font-size": "20px", "font-weight": "bold"},
         )
+        sampled_variables_non_scalar_label = Div(
+            text="Sampled Variables Non Scalar",
+            styles={"font-size": "20px", "font-weight": "bold"},
+        )
         label_and_buttons_column = Column(
             sampled_variables_label,
             sampled_variables_button_column,
+            sampled_variables_non_scalar_label,
+            sampled_variables_non_scalar_column,
             sizing_mode="stretch_height",
             height_policy="fit",
             # styles={
