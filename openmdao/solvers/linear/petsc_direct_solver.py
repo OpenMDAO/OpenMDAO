@@ -44,12 +44,15 @@ class PETScLU:
 
         Parameters
         ----------
-        A : spmatrix
+        A : ndarray or <scipy.sparse.csc_matrix>
+            Matrix to use in solving x @ A == b
         backend : str
             Name of the direct solver from PETSc to use.
 
         Attributes
         ----------
+        orig_A : ndarray or <scipy.sparse.csc_matrix>
+            Originally provided matrx.
         A : <petsc4py.PETSc.Mat>
             Assembled PETSc AIJ (compressed sparse row format) matrix
         ksp : <petsc4py.PETSc.KSP>
@@ -57,6 +60,7 @@ class PETScLU:
         _x : <petsc4py.PETSc.Vec>
             Sequential (non-distributed) PETSc vector to store the solve solution.
         """
+        self.orig_A = A
         # Create PETSc matrix
         # Dense
         if isinstance(A, np.ndarray):
@@ -324,13 +328,6 @@ class PETScDirectSolver(LinearSolver):
         super()._declare_options()
 
         self.options.declare(
-            'err_on_singular',
-            types=bool,
-            default=True,
-            desc="Raise an error if LU decomposition is singular."
-        )
-
-        self.options.declare(
             'rhs_checking',
             types=(bool, dict),
             default=False,
@@ -464,27 +461,21 @@ class PETScDirectSolver(LinearSolver):
                 self._lu = self._lup = None
 
             # Perform dense or sparse lu factorization.
-            # PETSc does not have an equivalent to scipy.linalg.lu_factor to use
-            # for dense matrices, so just use the same solver for either case
             elif isinstance(matrix, scipy.sparse.csc_matrix):
                 try:
                     self._lu = PETScLU(matrix, self.options['backend'])
                 except RuntimeError:
+                    # Zero pivot in LU factorization doesn't necessarily guarantee
+                    # that the matrix is singular, but not sure what else to raise
                     raise RuntimeError(format_singular_error(system, matrix))
 
             elif isinstance(matrix, np.ndarray):  # dense
-                # During LU decomposition, detect singularities and warn user.
-                with warnings.catch_warnings():
-                    if self.options['err_on_singular']:
-                        warnings.simplefilter('error', RuntimeWarning)
-                    try:
-                        self._lup = PETScLU(matrix)
-                    except RuntimeWarning:
-                        raise RuntimeError(format_singular_error(system, matrix))
-
-                    # NaN in matrix.
-                    except ValueError:
-                        raise RuntimeError(format_nan_error(system, matrix))
+                try:
+                    self._lup = PETScLU(matrix)
+                except PETSc.Error:
+                    # Zero pivot in LU factorization doesn't necessarily guarantee
+                    # that the matrix is singular, but not sure what else to raise
+                    raise RuntimeError(format_singular_error(system, matrix))
 
             # Note: calling scipy.sparse.linalg.splu on a COO actually transposes
             # the matrix during conversion to csc prior to LU decomp, so we can't use COO.
@@ -497,23 +488,14 @@ class PETScDirectSolver(LinearSolver):
                 raise RuntimeError("DirectSolvers without an assembled jacobian are not supported "
                                    "when running under MPI if comm.size > 1.")
 
-            mtx = self._build_mtx()
+            matrix = self._build_mtx()
+            try:
+                self._lup = PETScLU(matrix)
 
-            # During LU decomposition, detect singularities and warn user.
-            with warnings.catch_warnings():
-
-                if self.options['err_on_singular']:
-                    warnings.simplefilter('error', RuntimeWarning)
-
-                try:
-                    self._lup = PETScLU(mtx)
-
-                except RuntimeWarning:
-                    raise RuntimeError(format_singular_error(system, mtx))
-
-                # NaN in matrix.
-                except ValueError:
-                    raise RuntimeError(format_nan_error(system, mtx))
+            except PETSc.Error:
+                # Zero pivot in LU factorization doesn't necessarily guarantee
+                # that the matrix is singular, but not sure what else to raise
+                raise RuntimeError(format_singular_error(system, matrix))
 
         if self._lin_rhs_checker is not None:
             self._lin_rhs_checker.clear()
@@ -546,8 +528,6 @@ class PETScDirectSolver(LinearSolver):
             elif isinstance(matrix, np.ndarray):
                 # Detect singularities and warn user.
                 with warnings.catch_warnings():
-                    if self.options['err_on_singular']:
-                        warnings.simplefilter('error', RuntimeWarning)
                     try:
                         inv_jac = scipy.linalg.inv(matrix)
                     except RuntimeWarning:
@@ -581,10 +561,6 @@ class PETScDirectSolver(LinearSolver):
 
             # During inversion detect singularities and warn user.
             with warnings.catch_warnings():
-
-                if self.options['err_on_singular']:
-                    warnings.simplefilter('error', RuntimeWarning)
-
                 try:
                     inv_jac = scipy.linalg.inv(mtx)
 
@@ -642,14 +618,24 @@ class PETScDirectSolver(LinearSolver):
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
                 if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
                     sol_array = self._lup.solve(full_b, transpose=transpose)
+                    matrix = self._lup.orig_A
                 else:
                     sol_array = self._lu.solve(full_b, transpose=transpose)
+                    matrix = self._lu.orig_A.toarray()
 
                 x_vec[:] = sol_array
 
         # matrix-vector-product generated jacobians are scaled.
         else:
-            x_vec[:] = sol_array = self._lup.solve(full_b, transpose=transpose)
+            x_vec[:] = sol_array = self._lup.solve(b_vec, transpose=transpose)
+            matrix = self._lup.orig_A
+
+        # Detect singularities (PETSc linear solvers don't error out with NaN
+        # and inf so need to check for them).
+        if np.isnan(x_vec).any():
+            raise RuntimeError(format_nan_error(system, matrix))
+        if np.isinf(x_vec).any():
+            raise RuntimeError(format_singular_error(system, matrix))
 
         if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
             self._lin_rhs_checker.add_solution(b_vec, sol_array, copy=True)
