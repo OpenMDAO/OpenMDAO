@@ -652,54 +652,24 @@ class _RealTimeOptPlot(object):
             else:
                 self._sampled_variables_visibility[sampled_var] = False
 
-    def _make_sampled_variables_selection_buttons(self, color_bar):
-        # Make all the buttons for the Sample Variables area to the right of the plot
+    def _make_sampled_variables_box(self, color_bar):
+        # Make all the checkboxes for the Sample Variables area to the left of the plot
         #   that lets the user select what to plot
-        number_initial_visible_sampled_variables = 0
         
-        # TODO make _make_sampled_variable_checkbox(var,active,callback)
-        # for sampled_var in self._sampled_variables:
-        #     if self._sampled_variables_visibility[sampled_var]:
-        #         sampled_variable_button = _make_sampled_variable_button(sampled_var,True, True, self._sampled_variable_callback(sampled_var))
-        #     else:
-        #         sampled_variable_button = _make_sampled_variable_button(sampled_var,False, True, self._sampled_variable_callback(sampled_var))
-        #     self._sampled_variables_buttons.append(sampled_variable_button)
-
-
-        # TODO do not make them buttons. Just text
-        # for sampled_var in self._sampled_variables_non_scalar:
-        #     sampled_variable_button = _make_sampled_variable_button(sampled_var,False, False, self._sampled_variable_callback(sampled_var))  # TODO need a callback ? Does it do anything?           
-        #     self._sampled_variables_buttons.append(sampled_variable_button)
-
-        sampled_variables_non_scalar_text_list = []
-        for sampled_var in self._sampled_variables_non_scalar:
-            sampled_variables_non_scalar_text = Div(text=sampled_var,
-                                                                styles={"font-size": "20px"},
-        )           
-            sampled_variables_non_scalar_text_list.append(sampled_variables_non_scalar_text)
-
-        sampled_variables_non_scalar_column = Column(
-            children=sampled_variables_non_scalar_text_list,
+        # header for the scalar Sampled Variables list
+        sampled_variables_label = Div(
+            text="Sampled Variables",
+            # width=200,
+            styles={"font-size": "20px", "font-weight": "bold"},
         )
 
-        # sampled_variables_button_column = Column(
-        #     children=self._sampled_variables_buttons,
-        #     sizing_mode="stretch_both",
-        #     height_policy="fit",
-        #     styles={
-        #         "overflow-y": "auto",
-        #         "border": "1px solid #ddd",
-        #         "padding": "8px",
-        #         'max-height': '100vh'  # Ensures it doesn't exceed viewport
-        #     },
-        # )
-        
+        # make the checkbox group that contains the scalar sampled variables that can be
+        #   turned off and on
         sampled_variable_active_index_list = []
         for i, sampled_var in enumerate(self._sampled_variables):
             if self._sampled_variables_visibility[sampled_var]:
                 sampled_variable_active_index_list.append(i)
 
-        
         sampled_variables_button_column = CheckboxGroup(
             labels=self._sampled_variables,
             active=sampled_variable_active_index_list,  # Initially check the first and third options
@@ -775,22 +745,24 @@ class _RealTimeOptPlot(object):
             font-size: 20px !important;
         }
         """
-
-        
         sampled_variables_button_column.stylesheets = [custom_css]
 
-        
-
-        # header for the variable list
-        sampled_variables_label = Div(
-            text="Sampled Variables",
-            width=200,
-            styles={"font-size": "20px", "font-weight": "bold"},
-        )
+        # Create the non scalar variables list for the GUI
         sampled_variables_non_scalar_label = Div(
             text="Sampled Variables Non Scalar",
             styles={"font-size": "20px", "font-weight": "bold"},
         )
+        sampled_variables_non_scalar_text_list = []
+        for sampled_var in self._sampled_variables_non_scalar:
+            sampled_variables_non_scalar_text = Div(text=sampled_var,
+                                                                styles={"font-size": "20px"},
+        )           
+            sampled_variables_non_scalar_text_list.append(sampled_variables_non_scalar_text)
+
+        sampled_variables_non_scalar_column = Column(
+            children=sampled_variables_non_scalar_text_list,
+        )
+      
         label_and_buttons_column = Column(
             sampled_variables_label,
             sampled_variables_button_column,
@@ -798,11 +770,6 @@ class _RealTimeOptPlot(object):
             sampled_variables_non_scalar_column,
             sizing_mode="stretch_height",
             height_policy="fit",
-            # styles={
-            #     'max-height': '100vh',  # Ensures it doesn't exceed viewport
-            #     'border-radius': '5px',
-            #     'border': '5px solid black',
-            # },
         )
 
         sampled_variable_selector_box = ScrollBox(
@@ -811,7 +778,7 @@ class _RealTimeOptPlot(object):
             height_policy="max",
         )
         
-        menu = Select(
+        response_variable_menu = Select(
             options=self._prom_responses,
             value=self._prom_responses[0],  # Default value
         )
@@ -835,11 +802,11 @@ class _RealTimeOptPlot(object):
                         )
             return toggle_callback
 
-        menu.on_change("value", cb_select_response_variable(color_bar))
+        response_variable_menu.on_change("value", cb_select_response_variable(color_bar))
 
-        col = Column(
+        variable_box = Column(
             response_variable_header,
-            menu,
+            response_variable_menu,
             Spacer(height=20),
             sampled_variable_selector_box,
             sizing_mode="stretch_height",
@@ -853,9 +820,7 @@ class _RealTimeOptPlot(object):
         )
         
         
-        return col
-
-        # return sampled_variable_selector_box
+        return variable_box
 
     def _make_color_bar(self):
         # Add the color bar to this figure
@@ -1001,31 +966,6 @@ class _RealTimeOptPlot(object):
             p.visible = sampled_variable in visible_variables
             plots_and_labels_in_grid.append(p)
 
-    # def _make_analysis_driver_box(self):
-    #     analysis_progress_label = Div(
-    #         text="Analysis Driver Progress",
-    #         styles={"font-size": "20px", "font-weight": "bold"},
-    #     )
-
-    #     # placeholder until we have data
-    #     self._analysis_driver_progress_text_box = Div(
-    #         text="""<div style="padding: 10px; border-radius: 5px;">
-    #                 <p>Waiting for data...</p>
-    #                 </div>""",
-    #         width=600,
-    #         height=100,
-    #     )
-
-    #     analysis_progress_box = Column(
-    #         analysis_progress_label,
-    #         self._analysis_driver_progress_text_box,
-    #         styles={
-    #             "border-radius": "5px",
-    #             "border": "5px solid black",
-    #         },
-    #     )
-    #     return analysis_progress_box
-
     def _make_analysis_driver_box(self):
         analysis_progress_label = Div(
             text="Analysis Driver Progress",
@@ -1068,89 +1008,17 @@ class _RealTimeOptPlot(object):
         quit_button.on_click(quit_app)
         return quit_button
 
-    def _make_title_div(self):
-        script_name = self._case_recorder_filename
-
-        title_box = Div(
-            text=f"Analysis Driver Progress for {script_name}",
-            styles={
-                "font-size": "20px", 
-                "font-weight": "bold",
-                "border-radius": "5px",
-                "border": "5px solid black",
-                "padding": "8px",
-                },
-        )
-
-        return title_box
-
-    # def _make_response_variable_selector(self, color_bar):
-    #     menu = Select(
-    #         options=self._prom_responses,
-    #         value=self._prom_responses[0],  # Default value
-    #     )
-
-    #     response_variable_header = Div(
-    #         text="Response variable",
-    #         width=200,
-    #         styles={"font-size": "20px", "font-weight": "bold"},
-    #     )
-
-    #     response_variable_box = Column(
-    #         response_variable_header,
-    #         menu,
-    #         styles={
-    #             "border": "5px solid black",
-    #             "padding": "8px",
-    #         },
-    #     )
-
-    #     def cb_select_response_variable(color_bar):
-    #         def toggle_callback(attr, old, new):
-    #             self._prom_response = new 
-    #             color_bar.title = f"Response variable: '{new}'"
-    #             self._color_mapper.low = self._prom_response_min[self._prom_response]
-    #             self._color_mapper.high = self._prom_response_max[self._prom_response]
-
-    #             for scatter_plot in self._scatter_plots:
-    #                 scatter_plot.glyph.fill_color = transform(
-    #                         self._prom_response, self._color_mapper
-    #                     )
-    #         return toggle_callback
-
-    #     menu.on_change("value", cb_select_response_variable(color_bar))
-
-    #     return response_variable_box
-
-    def _make_overall_layout(self, title_box, grid_of_plots, color_bar, quit_button,
-                             analysis_progress_box, response_variable_box, sampled_variable_selector_box ):
+    def _make_overall_layout(self, analysis_progress_box, sampled_variables_box, color_bar, grid_of_plots):
         
-
-
-        # variable_box = Column(
-        #     response_variable_box,
-        #     sampled_variable_selector_box,
-        #         styles={
-        #             "border": "5px solid black",
-        #             "padding": "8px",
-        #         },
-        #     )
-
-
-
         self._overall_layout = Row(
             Column(
-                # Spacer(height=20), # move quit button away from the top
-                # quit_button,
                 Spacer(height=20),
                 analysis_progress_box,
-                # Spacer(height=20),
-                # response_variable_box,
-                sampled_variable_selector_box,
+                Spacer(height=20),
+                sampled_variables_box,
                 Spacer(height=20),
                 sizing_mode="stretch_both",
             ),
-            # Column(title_box, grid_of_plots),
             color_bar,
             Spacer(width=100, height=0), # move the column away from the color bar
             grid_of_plots,
@@ -1165,8 +1033,6 @@ class _RealTimeOptPlot(object):
         self._set_initial_number_initial_visible_sampled_variables()
 
         visible_variables = [var for var in self._sampled_variables if self._sampled_variables_visibility[var]]
-
-        title_box = self._make_title_div()
 
         # Create a color mapper using Viridis (colorblind-friendly)
         self._color_mapper = LinearColorMapper(palette=_color_palette, 
@@ -1186,17 +1052,11 @@ class _RealTimeOptPlot(object):
             toolbar_location=None,
         )
 
-        quit_button = self._make_quit_button()
-
-        sampled_variable_selector_box = self._make_sampled_variables_selection_buttons(color_bar)
+        sampled_variables_box = self._make_sampled_variables_box(color_bar)
 
         analysis_progress_box = self._make_analysis_driver_box()
 
-        # response_variable_box = self._make_response_variable_selector(color_bar)
-        response_variable_box = None
-
-        self._make_overall_layout(title_box, grid_of_plots, color_bar, quit_button, analysis_progress_box, 
-            response_variable_box, sampled_variable_selector_box)
+        self._make_overall_layout(analysis_progress_box, sampled_variables_box, color_bar, grid_of_plots)
 
 def print_bokeh_objects(doc):  # TODO remove!
     # Get all objects in the document
