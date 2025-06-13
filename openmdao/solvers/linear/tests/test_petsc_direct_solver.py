@@ -16,9 +16,9 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.mpi import MPI
 try:
-    from openmdao.vectors.petsc_vector import PETScVector
+    from petsc4py import PETSc
 except ImportError:
-    PETScVector = None
+    PETSc = None
 
 # TODO: ADD TESTS FOR EACH SOLVER TYPE
 # TODO: ADD TESTS FOR THE PETSC OBJECT
@@ -113,6 +113,7 @@ class DistribComp(om.ExplicitComponent):
 # Run the same test suite as the DirectSolver since the functionality is very
 # close to the same (except skip "test_raise_no_error_on_singular" PETSc
 # direct solver doesn't do that)
+@unittest.skipUnless(PETSc, "only run with PETSc.")
 class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     linear_solver_class = om.PETScDirectSolver
@@ -904,7 +905,7 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
             prob.run_model()
 
 
-@unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETSc, "only run with MPI and PETSc.")
 class TestPETScDirectSolverRemoteErrors(unittest.TestCase):
 
     N_PROCS = 2
