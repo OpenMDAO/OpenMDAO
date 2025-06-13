@@ -6,6 +6,7 @@ import numpy as np
 from openmdao.api import Group, IndepVarComp, Problem
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.linear.direct import DirectSolver
+from openmdao.solvers.linear.petsc_direct_solver import PETScDirectSolver
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJacVec
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, \
@@ -53,7 +54,7 @@ class LinearSolverTests(object):
 
         def test_simple_matvec(self):
             # Tests derivatives on a simple comp that defines compute_jacvec.
-            # Note, For DirectSolver, assemble_jac must be False for mat-vec.
+            # Note, For direct solvers, assemble_jac must be False for mat-vec.
             prob = Problem()
             model = prob.model
             model.add_subsystem('x_param', IndepVarComp('length', 3.0),
@@ -66,8 +67,9 @@ class LinearSolverTests(object):
 
             prob.setup(check=False, mode='fwd')
 
-            # Note, For DirectSolver, assemble_jac must be False for mat-vec.
-            if isinstance(model.linear_solver, DirectSolver):
+            # Note, For direct solvers, assemble_jac must be False for mat-vec.
+            if (isinstance(model.linear_solver, DirectSolver) or
+                    isinstance(model.linear_solver, PETScDirectSolver)):
                 model.linear_solver.options['assemble_jac'] = False
 
             prob['width'] = 2.0
@@ -104,8 +106,9 @@ class LinearSolverTests(object):
             prob.setup(check=False, mode='fwd')
             prob['width'] = 2.0
 
-            # Note, For DirectSolver, assemble_jac must be False for mat-vec.
-            if isinstance(model.linear_solver, DirectSolver):
+            # Note, For direct solvers, assemble_jac must be False for mat-vec.
+            if (isinstance(model.linear_solver, DirectSolver) or
+                    isinstance(model.linear_solver, PETScDirectSolver)):
                 model.linear_solver.options['assemble_jac'] = False
 
             prob.run_model()
@@ -142,8 +145,9 @@ class LinearSolverTests(object):
             prob.setup(check=False, mode='fwd')
             prob['width'] = 2.0
 
-            # Note, For DirectSolver, assemble_jac must be False for mat-vec.
-            if isinstance(model.linear_solver, DirectSolver):
+            # Note, For direct solvers, assemble_jac must be False for mat-vec.
+            if (isinstance(model.linear_solver, DirectSolver) or
+                    isinstance(model.linear_solver, PETScDirectSolver)):
                 model.linear_solver.options['assemble_jac'] = False
 
             prob.run_model()
