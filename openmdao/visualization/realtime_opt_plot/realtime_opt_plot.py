@@ -62,16 +62,82 @@ _unused_session_lifetime_milliseconds = 1000 * 60 * 10
 
 # layout and format params
 _left_side_column_width = 500
-_analysis_driver_progress_box_font_size = 16
 # how big the individual plots should be in the grid
 _grid_plot_height_and_width = 240
 
-style = InlineStyleSheet(css="""
+_page_styles = InlineStyleSheet(css="""
 :host(.div_header) {
     font-size: 20px;
     font-weight: bold;
 }
+
+:host(.row_labels) {
+    font-size: 20px;
+    text-align:center;
+    font-size:12px;
+    writing-mode:vertical-lr;
+    transform:rotate(180deg);
+    cursor:help;
+}
+
+:host(.column_labels) {
+    cursor:help;
+    text-align:center;
+    font-size:14px;
+}
+
+:host(.analysis_driver_progress_text_box) {
+    padding: 10px;
+    border-radius: 5px;
+    font-size:16px;
+}
+
+:host(.analysis_progress_box) {
+    border: 5px solid black;
+}
+
+:host(.sampled_variables_box) {
+    border: 5px solid black;
+}
+
+:host(.sampled_variables_text) {
+    font-size:20px;
+}
+
+.bk-input-group .bk-checkbox input[type="checkbox"]:checked {
+    background-color: #4CAF50 !important;
+    border-color: #4CAF50 !important;
+}
+
+.bk-checkbox input[type="checkbox"]:checked {
+    background-color: #4CAF50 !important;
+    border-color: #4CAF50 !important;
+    accent-color: #2E7D32 !important;
+}
+
+input[type="checkbox"]:checked {
+    background-color: #4CAF50 !important;
+    border-color: #4CAF50 !important;
+    accent-color: #2E7D32 !important;
+}
+
+input[type="checkbox"]:checked::after {
+    color: white !important;
+}
+
+.bk-checkbox input[type="checkbox"]:checked::after {
+    color: white !important;
+}
+
+.bk-input-group label {
+    font-size: 20px !important;
+}
+
+.bk-checkbox label {
+    font-size: 20px !important;
+}
 """)
+
 
 # some models have a large number of variables. Putting them all in a plot
 #   is not practical. Initially show no more than this number
@@ -552,7 +618,9 @@ class _RealTimeOptPlot(object):
         last_updated_time_formatted = datetime.now().strftime("%H:%M:%S on %B %d, %Y")
         elapsed_total_time = time.time() - self._start_time
         elapsed_total_time_formatted = str(timedelta(seconds=int(elapsed_total_time)))
-        self._analysis_driver_progress_text_box.text = f"""<div style="padding: 10px; font-size: {_analysis_driver_progress_box_font_size}px ">
+
+        self._analysis_driver_progress_text_box.text = \
+            f"""<div>
                         <p>Script: {self._case_recorder_filename}</p>
                         <p>Number of samples: {self._num_samples_plotted}</p>
                         <p>Last updated: {last_updated_time_formatted}</p>
@@ -576,7 +644,7 @@ class _RealTimeOptPlot(object):
         # header for the scalar Sampled Variables list
         sampled_variables_label = Div(
             text="Sampled Variables",
-            stylesheets = [style], css_classes = ['div_header']
+            stylesheets = [_page_styles], css_classes = ['div_header']
         )
 
         # make the checkbox group that contains the scalar sampled variables that can be
@@ -589,7 +657,8 @@ class _RealTimeOptPlot(object):
         sampled_variables_checkbox_group = CheckboxGroup(
             labels=self._sampled_variables,
             active=sampled_variable_active_index_list,
-            width=_left_side_column_width
+            width=_left_side_column_width,
+            stylesheets = [_page_styles],
         )
         
         def _sampled_variable_checkbox_callback(attr, old, new):
@@ -615,66 +684,28 @@ class _RealTimeOptPlot(object):
             self._row_labels[var_name].visible = active
             self._column_labels[var_name].visible = active
 
-            for i, (y, x) in enumerate(
+            for i, (var_along_columns,var_along_rows) in enumerate(
                 product(self._sampled_variables, self._sampled_variables)
             ):
                 icolumn = i % self._num_sampled_variables
                 irow = i // self._num_sampled_variables
                 # only do the lower half
-                if x != y:
-                    self._scatter_plots_figure[(x,y)].visible = (icolumn < irow \
-                        and self._sampled_variables_visibility[x] and self._sampled_variables_visibility[y] )
+                if var_along_columns != var_along_rows:
+                    self._scatter_plots_figure[(var_along_columns,var_along_rows)].visible = (icolumn < irow \
+                        and self._sampled_variables_visibility[var_along_columns] and self._sampled_variables_visibility[var_along_rows] )
         
         sampled_variables_checkbox_group.on_change('active', _sampled_variable_checkbox_callback )
-
-        # Add custom CSS that targets the Bokeh checkbox styling more specifically
-        custom_css = """
-        .bk-input-group .bk-checkbox input[type="checkbox"]:checked {
-            background-color: #4CAF50 !important;
-            border-color: #4CAF50 !important;
-        }
-
-        .bk-checkbox input[type="checkbox"]:checked {
-            background-color: #4CAF50 !important;
-            border-color: #4CAF50 !important;
-            accent-color: #2E7D32 !important;
-        }
-
-        input[type="checkbox"]:checked {
-            background-color: #4CAF50 !important;
-            border-color: #4CAF50 !important;
-            accent-color: #2E7D32 !important;
-        }
-
-        input[type="checkbox"]:checked::after {
-            color: white !important;
-        }
-
-        .bk-checkbox input[type="checkbox"]:checked::after {
-            color: white !important;
-        }
-
-
-        .bk-input-group label {
-            font-size: 20px !important;
-        }
-
-        .bk-checkbox label {
-            font-size: 20px !important;
-        }
-        """
-        sampled_variables_checkbox_group.stylesheets = [custom_css]
 
         # Create the non scalar variables list for the GUI
         sampled_variables_non_scalar_label = Div(
             text="Sampled Variables Non Scalar",
-            stylesheets = [style], css_classes = ['div_header']
+            stylesheets = [_page_styles], css_classes = ['div_header']
         )
         
         sampled_variables_non_scalar_text_list = []
         for sampled_var in self._sampled_variables_non_scalar:
             sampled_variables_non_scalar_text = Div(text=sampled_var,
-                                                                styles={"font-size": "20px"},
+            stylesheets = [_page_styles], css_classes = ['sampled_variables_text']
         )           
             sampled_variables_non_scalar_text_list.append(sampled_variables_non_scalar_text)
         sampled_variables_non_scalar_column = Column(
@@ -703,7 +734,7 @@ class _RealTimeOptPlot(object):
         )
         response_variable_header = Div(
             text="Response variable",
-            stylesheets = [style], css_classes = ['div_header']
+            stylesheets = [_page_styles], css_classes = ['div_header']
         )
 
         def cb_select_response_variable(color_bar):
@@ -729,11 +760,7 @@ class _RealTimeOptPlot(object):
             sizing_mode="stretch_height",
             height_policy="fit",
             width=_left_side_column_width,
-            styles={
-                'max-height': '100vh',  # Ensures it doesn't exceed viewport
-                'border-radius': '5px',
-                'border': '5px solid black',
-            },
+            stylesheets = [_page_styles], css_classes = ['sampled_variables_box']
         )
                
         return sampled_variables_box
@@ -849,8 +876,9 @@ class _RealTimeOptPlot(object):
             idx = irow * self._num_sampled_variables
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, None)
             p = Div(
-                text=f"<div style='text-align:center;font-size:12px;writing-mode:vertical-lr;transform:rotate(180deg); cursor:help;' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
-                align="center",
+                text=f"<div title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
+                stylesheets = [_page_styles], css_classes = ['row_labels']
+
             )
             self._row_labels[sampled_variable] = p
             p.visible = sampled_variable in visible_variables
@@ -865,8 +893,8 @@ class _RealTimeOptPlot(object):
             units = self._case_tracker._get_units(sampled_variable)
             elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, units)
             p = Div(
-                text=f"<div style='text-align:center;font-size:14px; cursor:help;' title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
-                styles={"font-size": "12px", "text-align":"center"},
+                text=f"<div title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
+                stylesheets = [_page_styles], css_classes = ['column_labels'],
                 align="center",
             )
             self._column_labels[sampled_variable] = p
@@ -876,16 +904,14 @@ class _RealTimeOptPlot(object):
     def _make_analysis_driver_box(self):
         analysis_progress_label = Div(
             text="Analysis Driver Progress",
-            stylesheets = [style], css_classes = ['div_header']
+            stylesheets = [_page_styles], css_classes = ['div_header']
         )
 
         # placeholder until we have data
         self._analysis_driver_progress_text_box = Div(
-            text="""<div style="padding: 10px; border-radius: 5px;">
-                    <p>Waiting for data...</p>
-                    </div>""",
+            text="""Waiting for data...""",
             width=_left_side_column_width,
-            # height=100,
+            stylesheets = [_page_styles], css_classes = ['analysis_driver_progress_text_box'],
         )
 
         quit_button = self._make_quit_button()
@@ -894,14 +920,10 @@ class _RealTimeOptPlot(object):
             Row(analysis_progress_label, 
                 Spacer(), 
                 quit_button,
-                # sizing_mode="stretch_width",
             ),
             self._analysis_driver_progress_text_box,
             width=_left_side_column_width,
-            styles={
-                "border-radius": "5px",
-                "border": "5px solid black",
-            },
+            stylesheets = [_page_styles], css_classes = ['analysis_progress_box'],
         )
         return analysis_progress_box
 
