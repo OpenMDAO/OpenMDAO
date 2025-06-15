@@ -21,9 +21,9 @@ try:
         LinearColorMapper,
         ColorBar,
         Select,
-        Toggle,
         Column,
         ScrollBox,
+        InlineStyleSheet,
     )
     from bokeh.layouts import gridplot, Spacer
     from bokeh.transform import transform
@@ -65,6 +65,13 @@ _left_side_column_width = 500
 _analysis_driver_progress_box_font_size = 16
 # how big the individual plots should be in the grid
 _grid_plot_height_and_width = 240
+
+style = InlineStyleSheet(css="""
+:host(.div_header) {
+    font-size: 20px;
+    font-weight: bold;
+}
+""")
 
 # some models have a large number of variables. Putting them all in a plot
 #   is not practical. Initially show no more than this number
@@ -569,7 +576,7 @@ class _RealTimeOptPlot(object):
         # header for the scalar Sampled Variables list
         sampled_variables_label = Div(
             text="Sampled Variables",
-            styles={"font-size": "20px", "font-weight": "bold"},
+            stylesheets = [style], css_classes = ['div_header']
         )
 
         # make the checkbox group that contains the scalar sampled variables that can be
@@ -661,8 +668,9 @@ class _RealTimeOptPlot(object):
         # Create the non scalar variables list for the GUI
         sampled_variables_non_scalar_label = Div(
             text="Sampled Variables Non Scalar",
-            styles={"font-size": "20px", "font-weight": "bold"},
+            stylesheets = [style], css_classes = ['div_header']
         )
+        
         sampled_variables_non_scalar_text_list = []
         for sampled_var in self._sampled_variables_non_scalar:
             sampled_variables_non_scalar_text = Div(text=sampled_var,
@@ -695,7 +703,7 @@ class _RealTimeOptPlot(object):
         )
         response_variable_header = Div(
             text="Response variable",
-            styles={"font-size": "20px", "font-weight": "bold"},
+            stylesheets = [style], css_classes = ['div_header']
         )
 
         def cb_select_response_variable(color_bar):
@@ -739,7 +747,7 @@ class _RealTimeOptPlot(object):
             width=20,
             label_standoff=14,
             title_text_font_size="20px",
-            ticker=BasicTicker(),  # This is the key part you're missing
+            ticker=BasicTicker(),
             location=(0, 0),
         )
 
@@ -765,13 +773,13 @@ class _RealTimeOptPlot(object):
     def _make_plots(self, plots_and_labels_in_grid):
         # x and y here refer to the x axis and y axis of the grid
         # Add plots by row starting from top
-        for i, (y, x) in enumerate(  #  TODO Why y,x here ??
+        for i, (var_along_columns,var_along_rows) in enumerate(
             product(self._sampled_variables, self._sampled_variables)
         ):
             icolumn = i % self._num_sampled_variables
             irow = i // self._num_sampled_variables
 
-            if x != y:
+            if var_along_columns != var_along_rows:
                 p = figure(
                     background_fill_color="#fafafa",
                     border_fill_color="white",
@@ -779,12 +787,12 @@ class _RealTimeOptPlot(object):
                     height=_grid_plot_height_and_width,
                     output_backend="webgl",
                 )
-                self._scatter_plots_figure[(x,y)] = p
+                self._scatter_plots_figure[(var_along_columns,var_along_rows)] = p
                 p.axis.visible = True
                 self._scatter_plots.append(p.scatter(
-                    x=x,
+                    x=var_along_columns,
                     source=self._source,
-                    y=y,
+                    y=var_along_rows,
                     size=5,
                     line_color=None,
                     fill_color=transform(
@@ -793,18 +801,11 @@ class _RealTimeOptPlot(object):
                 ))
             else:  # on the diagonal
                 # Extract the x column data for the histogram
-                x_data = self._source.data[x]
+                x_data = self._source.data[var_along_columns]
 
-                # TODO : DO I EVEN NEED THIS HERE? OR JUST in update?
-                if x_data:
-                    hist, edges = np.histogram(
-                        x_data, bins=_num_histogram_bins, range=(np.min(x_data), np.max(x_data))
-                    )
-                else:
-                    hist, edges = np.histogram(x_data, bins=_num_histogram_bins)
-
+                hist, edges = np.histogram(x_data, bins=_num_histogram_bins)
                 # Create a new ColumnDataSource for the histogram data
-                self._hist_source[x] = ColumnDataSource(
+                self._hist_source[var_along_columns] = ColumnDataSource(
                     data={
                         "top": hist,  # height of each bin
                         "bottom": np.zeros(len(hist)),  # bottom of each bin starts at 0
@@ -812,16 +813,14 @@ class _RealTimeOptPlot(object):
                         "right": edges[1:],  # right edge of each bin
                     }
                 )
-
                 p = figure(
                     width=_grid_plot_height_and_width,
                     height=_grid_plot_height_and_width,
                     output_backend="webgl",
                )
-
                 # Add the histogram bars using quad glyphs
                 p.quad(
-                    source=self._hist_source[x],
+                    source=self._hist_source[var_along_columns],
                     top="top",
                     bottom="bottom",
                     left="left",
@@ -830,13 +829,13 @@ class _RealTimeOptPlot(object):
                     line_color="white",
                     alpha=0.7,
                 )
-                self._hist_figures[x] = p
+                self._hist_figures[var_along_columns] = p
 
             if icolumn > irow: # only lower half and diagonal
                 p = None
             else:
                 # is it visible based on what the user has selected
-                if self._sampled_variables_visibility[x] and self._sampled_variables_visibility[y]:
+                if self._sampled_variables_visibility[var_along_columns] and self._sampled_variables_visibility[var_along_rows]:
                     p.visible = True
                 else:
                     p.visible = False
@@ -877,7 +876,7 @@ class _RealTimeOptPlot(object):
     def _make_analysis_driver_box(self):
         analysis_progress_label = Div(
             text="Analysis Driver Progress",
-            styles={"font-size": "20px", "font-weight": "bold"},
+            stylesheets = [style], css_classes = ['div_header']
         )
 
         # placeholder until we have data
@@ -917,7 +916,7 @@ class _RealTimeOptPlot(object):
         return quit_button
 
     def _make_overall_layout(self, analysis_progress_box, sampled_variables_box, color_bar, grid_of_plots):
-        
+
         self._overall_layout = Row(
             Column(
                 Spacer(height=20),
