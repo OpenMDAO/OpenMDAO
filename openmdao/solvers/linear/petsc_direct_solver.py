@@ -621,7 +621,7 @@ class PETScDirectSolver(LinearSolver):
                     matrix = self._lup.orig_A
                 else:
                     sol_array = self._lu.solve(full_b, transpose=transpose)
-                    matrix = self._lu.orig_A.toarray()
+                    matrix = self._lu.orig_A
 
                 x_vec[:] = sol_array
 
@@ -632,9 +632,7 @@ class PETScDirectSolver(LinearSolver):
 
         # Detect singularities (PETSc linear solvers don't error out with NaN
         # and inf so need to check for them).
-        if np.isnan(x_vec).any():
-            raise RuntimeError(format_nan_error(system, matrix))
-        if np.isinf(x_vec).any():
+        if np.isinf(x_vec).any() or np.isnan(x_vec).any():
             raise RuntimeError(format_singular_error(system, matrix))
 
         if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
