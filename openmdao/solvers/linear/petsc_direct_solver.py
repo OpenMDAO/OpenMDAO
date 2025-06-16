@@ -12,6 +12,7 @@ from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.array_utils import identity_column_iter
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 from openmdao.utils.mpi import check_mpi_env
+from openmdao.utils.om_warnings import issue_warning, SolverWarning
 
 try:
     from petsc4py import PETSc
@@ -92,8 +93,13 @@ class PETScLU:
         # default use LAPACK
         if backend and not isinstance(A, np.ndarray):
             if backend in PC_DISTRIBUTED_TYPES and check_mpi_env() is False:
-                raise ImportError(f"OPENMDAO_USE_MPI is False, but using the "
-                                  f"PETSc direct solver {backend} which requires MPI.")
+                issue_warning(
+                    msg=('OPENMDAO_USE_MPI is False, but a linear solver which '
+                         'is meant to use MPI was selected. The solver will '
+                         'run sequentially.'),
+                    prefix='PETScDirectSolver',
+                    category=SolverWarning,
+                )
             pc.setFactorSolverType(backend)
 
         # Read and apply the user specified options to configure the solver,
