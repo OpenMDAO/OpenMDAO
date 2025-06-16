@@ -1,9 +1,10 @@
 """Test the PETScDirectSolver linear solver class."""
 
 import unittest
-
+from unittest.mock import patch
 import numpy as np
-
+from scipy import sparse
+import os
 import openmdao.api as om
 
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
@@ -15,13 +16,13 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.mpi import MPI
+from openmdao.utils.om_warnings import SolverWarning
 try:
     from petsc4py import PETSc
+    from openmdao.solvers.linear.petsc_direct_solver import PETScLU
 except ImportError:
     PETSc = None
 
-# TODO: ADD TESTS FOR EACH SOLVER TYPE
-# TODO: ADD TESTS FOR THE PETSC OBJECT
 
 class NanComp(om.ExplicitComponent):
     def setup(self):
@@ -109,6 +110,110 @@ class DistribComp(om.ExplicitComponent):
             outputs['y'] = 2.0 * inputs['x']
         else:
             outputs['y'] = 3.0 * inputs['x']
+
+# Test the class used to setup and interact with the PETSc solver
+@unittest.skipUnless(PETSc, "only run with PETSc.")
+class TestPETScClass(unittest.TestCase):
+
+    def test_instantiate_dense(self):
+        """
+        Test that if the provided A is dense, a dense matrix is setup and
+        assembled with the default petsc solver, which uses LAPACK.
+        """
+        lup = PETScLU(
+            A=np.array([[1, 2], [3, 4]]),
+        )
+        self.assertEqual(lup.A.getType(), 'seqdense')
+        self.assertEqual(lup.A.getSize(), (2, 2))
+        self.assertEqual(lup.ksp.pc.getFactorSolverType(), 'petsc')
+
+    def test_instantiate_dense_with_backend(self):
+        """
+        Test that if the provided A is dense, even if a backend is explicitly
+        specified, use the default petsc solver which uses LAPACK
+        """
+        lup = PETScLU(
+            A=np.array([[1, 2], [3, 4]]),
+            backend='umfpack',
+        )
+        self.assertEqual(lup.A.getType(), 'seqdense')
+        self.assertEqual(lup.A.getSize(), (2, 2))
+        self.assertEqual(lup.ksp.pc.getFactorSolverType(), 'petsc')
+
+    def test_instantiate_csr_sparse(self):
+        """
+        Test that if a sparse CSR matrix is provided, a sparse AIJ matrix is
+        setup and assembled with the specified solver
+        """
+        lu = PETScLU(
+            A=sparse.csr_matrix(np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])),
+            backend='umfpack',
+        )
+        self.assertEqual(lu.A.getType(), 'seqaij')
+        self.assertEqual(lu.A.getSize(), (3, 3))
+        self.assertEqual(lu.ksp.pc.getFactorSolverType(), 'umfpack')
+
+    def test_instantiate_non_csr_sparse(self):
+        """
+        Test that if a sparse, non CSR matrix is provided, a sparse AIJ matrix is
+        still setup and assembled with the specified solver
+        """
+        lu = PETScLU(
+            A=sparse.csc_matrix(np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])),
+            backend='umfpack',
+        )
+        self.assertEqual(lu.A.getType(), 'seqaij')
+        self.assertEqual(lu.A.getSize(), (3, 3))
+        self.assertEqual(lu.ksp.pc.getFactorSolverType(), 'umfpack')
+
+    def test_allowable_solvers(self):
+        """
+        Test that each allowable solver type can be used without raising an
+        error by PETSc
+        """
+        for backend in ["superlu", "klu", "umfpack", "petsc", "pardiso"]:
+            with self.subTest(backend=backend):
+                PETScLU(
+                    A=sparse.csr_matrix(np.array([[1, 0], [0, 1]])),
+                    backend=backend,
+                )
+
+    @patch.dict(os.environ, {'OPENMDAO_USE_MPI': 'false'})
+    def test_distributed_warning(self):
+        """
+        Test that if specifying a backend which is meant to utilize MPI, but
+        the environment variable for using MPI is set to a negative, warn the
+        user.
+        """
+        with self.assertWarns(SolverWarning):
+            PETScLU(
+                A=sparse.csr_matrix(np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])),
+                backend='mumps',
+            )
+
+    def test_solve(self):
+        """
+        Test that calling the solve method correctly solves for x when A is not
+        transposed.
+        """
+        lu = PETScLU(
+            A=sparse.csc_matrix(np.array([[1, 0, 1], [0, 2, 0], [0, 0, 3]])),
+            backend='umfpack',
+        )
+        x = lu.solve(b=np.array([1, 2, 3]), transpose=False)
+        assert_near_equal(x, np.array([0.0, 1.0, 1.0]))
+
+    def test_transpose_solve(self):
+        """
+        Test that calling the solve method correctly solves for x when A is
+        transposed.
+        """
+        lu = PETScLU(
+            A=sparse.csc_matrix(np.array([[1, 0, 1], [0, 2, 0], [0, 0, 3]])),
+            backend='umfpack',
+        )
+        x = lu.solve(b=np.array([1, 2, 3]), transpose=True)
+        assert_near_equal(x, np.array([1.0, 1.0, 2.0 / 3.0]))
 
 # Run the same test suite as the DirectSolver since the functionality is very
 # close to the same (except skip "test_raise_no_error_on_singular" PETSc
