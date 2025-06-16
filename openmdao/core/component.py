@@ -179,10 +179,10 @@ class Component(System):
                              'value or set shape, shape_by_conn, copy_shape, or compute_shape.'
                              ' Default is (1,).')
         self.options.declare('jac_type', types=str, default='block',
-                             desc='Type of Jacobian to use.  Options are "auto", "dense", "coo", '
-                             '"csc", "csr", or "dict". Ignored by matrix free components.  "auto" '
+                             desc='Type of Jacobian to use.  Options are "dense", "coo", '
+                             '"csc", or "csr". Ignored by matrix free components.  "auto" '
                              'will assign a jacobian type based on the sparsity of the component. '
-                             'Default is "dense".')
+                             'Default is "block".')
 
     def _choose_jac_type(self, jac_type, assembled=False):
         """
@@ -200,7 +200,12 @@ class Component(System):
         Jacobian
             The Jacobian object.
         """
-        if jac_type == 'dense':
+        if jac_type == 'block':
+            if assembled:
+                raise RuntimeError(f"{self.msginfo}: BlockJacobian is not supported for assembled "
+                                   "Jacobians.")
+            return BlockJacobian(self)
+        elif jac_type == 'dense':
             return ComponentSplitJacobian(DenseMatrix, self)
         elif jac_type == 'coo':
             return ComponentSplitJacobian(COOMatrix, self)
@@ -208,11 +213,6 @@ class Component(System):
             return ComponentSplitJacobian(CSCMatrix, self)
         elif jac_type == 'csr':
             return ComponentSplitJacobian(CSRMatrix, self)
-        elif jac_type == 'block':
-            if assembled:
-                raise RuntimeError(f"{self.msginfo}: BlockJacobian is not supported for assembled "
-                                   "Jacobians.")
-            return BlockJacobian(self)
         else:
             raise ValueError(f"Invalid jac_type: {jac_type}")
 
