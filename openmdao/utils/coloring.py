@@ -1151,9 +1151,12 @@ class Coloring(object):
         info._update_wrt_matches(system)
         if system.pathname:
             # for partial and semi-total derivs, convert to promoted names
-            ordered_of_info = system._jac_var_info_abs2prom(system._get_jac_ofs())
-            ordered_wrt_info = \
-                system._jac_var_info_abs2prom(system._get_jac_wrts(info.wrt_matches))
+            abs2prom = system._resolver.abs2prom
+            ordered_of_info = [(abs2prom(name), offset, end, idxs, dsizes)
+                               for name, offset, end, idxs, dsizes in system._get_jac_ofs()]
+            ordered_wrt_info = [(abs2prom(name), offset, end, vec, idxs, dsizes)
+                                for name, offset, end, vec, idxs, dsizes in
+                                system._get_jac_wrts(info.wrt_matches)]
         else:
             ordered_of_info = system._get_jac_ofs()
             ordered_wrt_info = system._get_jac_wrts(info.wrt_matches)

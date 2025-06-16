@@ -13,9 +13,12 @@ from itertools import chain
 import numpy as np
 
 try:
-    from jaxlib.xla_extension import ArrayImpl
+    from jax import Array as JaxArray
 except ImportError:
-    ArrayImpl = None
+    try:
+        from jaxlib.xla_extension import ArrayImpl as JaxArray
+    except ImportError:
+        JaxArray = None
 
 from openmdao.core.component import Component
 from openmdao.core.group import Group
@@ -602,10 +605,10 @@ def assert_near_equal(actual, desired, tolerance=1e-15, tol_type='rel'):
         desired = np.atleast_1d(desired)
 
     # Handle jax arrays, if available
-    if ArrayImpl is not None:
-        if isinstance(actual, ArrayImpl):
+    if JaxArray is not None:
+        if isinstance(actual, JaxArray):
             actual = np.atleast_1d(actual)
-        if isinstance(desired, ArrayImpl):
+        if isinstance(desired, JaxArray):
             desired = np.atleast_1d(desired)
 
     # if desired is numeric list or tuple, make ndarray out of it

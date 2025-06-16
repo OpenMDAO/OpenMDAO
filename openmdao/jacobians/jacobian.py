@@ -552,9 +552,6 @@ class SplitJacobian(Jacobian):
 
     Implicit components and Groups use both matrices.
 
-    TODO: If a Group is entirely explicit (no implicit components and no cycles), we can treat
-    the dr/do matrix as a negative identity matrix like in the explicit component case.
-
     Parameters
     ----------
     system : System

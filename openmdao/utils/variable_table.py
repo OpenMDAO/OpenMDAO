@@ -93,13 +93,13 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     #  so that we do the column output in the correct order
     if var_type == 'input':
         out_types = ('val', 'units', 'shape', 'global_shape', 'prom_name', 'desc', 'min', 'max',
-                     'tags')
+                     'mean', 'tags')
     elif var_type == 'all':
         out_types = ('val', 'io', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
-                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max', 'tags')
+                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max', 'mean', 'tags')
     else:
         out_types = ('val', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
-                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max', 'tags')
+                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max', 'mean', 'tags')
 
     # Figure out which columns will be displayed.
     for var_meta in var_dict.values():
@@ -259,7 +259,7 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
         Set to None to suppress.
     row : str
         The string containing the contents of the beginning of this row output.
-        Contains the name of the System or varname, possibley indented to show hierarchy.
+        Contains the name of the System or varname, possibly indented to show hierarchy.
 
     column_names : list of str
         Indicates which columns will be written in this row.

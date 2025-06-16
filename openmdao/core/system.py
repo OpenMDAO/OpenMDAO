@@ -1489,6 +1489,27 @@ class System(object, metaclass=SystemMetaclass):
 
         return self._approx_subjac_keys
 
+    def get_source(self, name):
+        """
+        Return the source variable connected to the given named variable.
+
+        The name can be a promoted name or an absolute name.
+        If the given variable is an input, the absolute name of the connected source will
+        be returned.  If the given variable itself is a source, its own absolute name will
+        be returned.
+
+        Parameters
+        ----------
+        name : str
+            Absolute or promoted name of the variable.
+
+        Returns
+        -------
+        str
+            The absolute name of the source variable.
+        """
+        return self._resolver.source(name)
+
     def use_fixed_coloring(self, coloring=STD_COLORING_FNAME(), recurse=True):
         """
         Use a precomputed coloring for this System.
@@ -1636,8 +1657,11 @@ class System(object, metaclass=SystemMetaclass):
         ordered_of_info = self._get_jac_ofs()
 
         if self.pathname:
-            ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
-            ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
+            abs2prom = self._resolver.abs2prom
+            ordered_of_info = [(abs2prom(name), offset, end, idxs, dsizes)
+                               for name, offset, end, idxs, dsizes in ordered_of_info]
+            ordered_wrt_info = [(abs2prom(name), offset, end, vec, idxs, dsizes)
+                                for name, offset, end, vec, idxs, dsizes in ordered_wrt_info]
 
         coloring._row_vars = [t[0] for t in ordered_of_info]
         coloring._col_vars = [t[0] for t in ordered_wrt_info]
@@ -4217,6 +4241,7 @@ class System(object, metaclass=SystemMetaclass):
                   out_stream=_DEFAULT_OUT_STREAM,
                   print_min=False,
                   print_max=False,
+                  print_mean=False,
                   return_format='list'):
         """
         Write a list of inputs and outputs sorted by component in execution order.
@@ -4282,6 +4307,8 @@ class System(object, metaclass=SystemMetaclass):
             When true, if the output value is an array, print its smallest value.
         print_max : bool
             When true, if the output value is an array, print its largest value.
+        print_mean : bool
+            When true, if the output value is an array, print its mean value.
         return_format : str
             Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
             If 'list', the return value is a list of (name, metadata) tuples.
@@ -4358,6 +4385,9 @@ class System(object, metaclass=SystemMetaclass):
                         if print_max:
                             meta['max'] = np.round(np.max(meta['val']), np_precision)
 
+                        if print_mean:
+                            meta['mean'] = np.round(np.mean(meta['val']), np_precision)
+
                 if residuals or residuals_tol:
                     resids = self._abs_get_val(name, get_remote=True,
                                                rank=None if all_procs else 0,
@@ -4385,6 +4415,9 @@ class System(object, metaclass=SystemMetaclass):
 
                     if print_max:
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+                    if print_mean:
+                        meta['mean'] = np.round(np.mean(meta['val']), np_precision)
 
         # remove metadata we don't want to show/return
         to_remove = ['discrete']
@@ -4442,6 +4475,7 @@ class System(object, metaclass=SystemMetaclass):
                     out_stream=_DEFAULT_OUT_STREAM,
                     print_min=False,
                     print_max=False,
+                    print_mean=False,
                     return_format='list'):
         """
         Write a list of input names and other optional information to a specified stream.
@@ -4498,6 +4532,8 @@ class System(object, metaclass=SystemMetaclass):
             When true, if the input value is an array, print its smallest value.
         print_max : bool
             When true, if the input value is an array, print its largest value.
+        print_mean : bool
+            When true, if the input value is an array, print its mean value.
         return_format : str
             Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
             If 'list', the return value is a list of (name, metadata) tuples.
@@ -4544,6 +4580,9 @@ class System(object, metaclass=SystemMetaclass):
 
                     if print_max:
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+                    if print_mean:
+                        meta['mean'] = np.round(np.mean(meta['val']), np_precision)
 
         to_remove = ['discrete']
         if not print_tags:
@@ -4598,6 +4637,7 @@ class System(object, metaclass=SystemMetaclass):
                      out_stream=_DEFAULT_OUT_STREAM,
                      print_min=False,
                      print_max=False,
+                     print_mean=False,
                      return_format='list'):
         """
         Write a list of output names and other optional information to a specified stream.
@@ -4669,6 +4709,8 @@ class System(object, metaclass=SystemMetaclass):
             When true, if the output value is an array, print its smallest value.
         print_max : bool
             When true, if the output value is an array, print its largest value.
+        print_mean : bool
+            When true, if the output value is an array, print its mean value.
         return_format : str
             Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
             If 'list', the return value is a list of (name, metadata) tuples.
@@ -4722,6 +4764,9 @@ class System(object, metaclass=SystemMetaclass):
 
                         if print_max:
                             meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+                        if print_mean:
+                            meta['mean'] = np.round(np.mean(meta['val']), np_precision)
 
                 if residuals or residuals_tol:
                     resids = self._abs_get_val(name, get_remote=True,
@@ -5353,30 +5398,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         return set(s for s in self.system_iter(include_self=True, recurse=True)
                    if s.nonlinear_solver and s.nonlinear_solver.supports['gradients'])
-
-    def _jac_var_info_abs2prom(self, var_info):
-        """
-        Return a new list with tuples' [0] entry converted from absolute to promoted names.
-
-        Parameters
-        ----------
-        var_info : list of (name, offset, end, idxs)
-            The list that uses absolute names.
-
-        Returns
-        -------
-        list
-            The new list with promoted names.
-        """
-        new_list = []
-        abs2prom = self._resolver.abs2prom
-
-        for tup in var_info:
-            lst = list(tup)
-            lst[0] = abs2prom(tup[0])
-            new_list.append(lst)
-
-        return new_list
 
     def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,
                      flat=False, from_root=False):

@@ -1,4 +1,64 @@
 ***********************************
+# Release Notes for OpenMDAO 3.39.0
+
+May 23, 2025
+
+OpenMDAO 3.39.0 introduces an app for real-time monitoring of optimization process. Use `python -m openmdao realtime_opt_plot {recorder file}` to get a visualization of the change of the optimziation variables over the course of the optimization in real time.
+
+Continuing with the trend of adding tools to introspect models, System now provides a `list_options` method quickly see all options supported by a system and its children.
+
+Optimization drivers can now provide Lagrange multipliers using the `driver.compute_lagrange_multipliers` method.
+This method assumes the optimization has successfully converged. It then determines which design variable bounds and constraints are active, and provides the corresponding Lagrange multiplers by solving the first order KKT conditions. The multipliers provide the sensitivty of the objective value to changes in the active bounds.
+
+## Backwards Incompatible API Changes
+
+- Hybrid-promoted names are no longer supported for accessing variables at a higher level.
+
+  For example, consider a variable with the absolute name: `traj.phases.climb.states.altitude`
+
+  This variable is promoted in states and phases to give the promoted name: `traj.climb.altitude`
+
+  Previously, the hybrid-promoted name was also valid: `traj.phases.climb.altitude`
+
+  This name is formed from the relative promoted name in the climb group, and appending the remaining absolute path to the left. These names required some additional complexity to maintain a cross-reference, and didn't provide any benefit aside from allowing the user to be less precise with variables. In this release, all hybrid-promoted names have been removed. They should be replaced with valid promoted or absolute names in calls to openmdao API methods.
+- `pyOptSparseDriver` will now raise an `ImportError` instead of a `RuntimeError` if `pyoptsparse` is not installed. [#3516](https://github.com/OpenMDAO/OpenMDAO/pull/3516)
+- Renamed `openmdao.utils.concurrent` to `openmdao.utils.concurrent_utils` [#3518](https://github.com/OpenMDAO/OpenMDAO/pull/3518)
+
+## New Features
+
+- Modified name2abs_names so that set_val and get_val make suggestions … [#3488](https://github.com/OpenMDAO/OpenMDAO/pull/3488)
+- Updated the jax docs and updated JaxImplicitComponent to be consistent with JaxExplicitComponent [#3489](https://github.com/OpenMDAO/OpenMDAO/pull/3489)
+
+- Added colorized printout to check_totals(compact_print=False) [#3493](https://github.com/OpenMDAO/OpenMDAO/pull/3493)
+- Added real-time plotting of optimization progress [#3494](https://github.com/OpenMDAO/OpenMDAO/pull/3494)
+- Improved how the expansion of colored jacobians works for jax components. [#3503](https://github.com/OpenMDAO/OpenMDAO/pull/3503)
+- Some internal refactoring of Vector classes and name resolution functionality in Systems [#3512](https://github.com/OpenMDAO/OpenMDAO/pull/3512)
+- Added a simple method to output a list of options on a system. [#3519](https://github.com/OpenMDAO/OpenMDAO/pull/3519)
+- Added ability to return a copy with get_val [#3522](https://github.com/OpenMDAO/OpenMDAO/pull/3522)
+- Added MMBtu as a valid physical unit for our imperial-using HVAC users. [#3529](https://github.com/OpenMDAO/OpenMDAO/pull/3529)
+- Added compute_lagrange_multipliers method to Driver. [#3530](https://github.com/OpenMDAO/OpenMDAO/pull/3530)
+
+## Bug Fixes
+
+- Updated some tests to use consistent printoptions across numpy versions [#3492](https://github.com/OpenMDAO/OpenMDAO/pull/3492)
+- Fixed an issue with check_partials reports not being generated correctly without rich. [#3502](https://github.com/OpenMDAO/OpenMDAO/pull/3502)
+- Fixed a bug that caused openmdao to do output/residual scaling when not necessary. [#3506](https://github.com/OpenMDAO/OpenMDAO/pull/3506)
+- Fixed bugs with src_indices and promotion [#3514](https://github.com/OpenMDAO/OpenMDAO/pull/3514)
+
+
+## Miscellaneous
+
+- Publish docs to openmdao.org on release event [#3504](https://github.com/OpenMDAO/OpenMDAO/pull/3504)
+- Fixed typo in docs [#3500](https://github.com/OpenMDAO/OpenMDAO/pull/3500)
+- Updated min version for bokeh [#3508](https://github.com/OpenMDAO/OpenMDAO/pull/3508)
+- Added a workflow to publish to PyPi when a release is made on GitHub [#3509](https://github.com/OpenMDAO/OpenMDAO/pull/3509)
+- Fixed a PEP issue [#3523](https://github.com/OpenMDAO/OpenMDAO/pull/3523)
+- Updated some tests to use assert_warning [#3525](https://github.com/OpenMDAO/OpenMDAO/pull/3525)
+- Replaced view[0] with view.item() in Vector to get true scalars instead of numpy scalar arrays [#3524](https://github.com/OpenMDAO/OpenMDAO/pull/3524)
+- Added an option to the GitHub tests workflow to test the PyPI release [#3527](https://github.com/OpenMDAO/OpenMDAO/pull/3527)
+
+
+***********************************
 # Release Notes for OpenMDAO 3.38.0
 
 Mar 14, 2025
@@ -7,7 +67,7 @@ OpenMDAO introduces a few new features that users may find valuable, as well as 
 
 Derivatives checks now use a criteria like `numpy.allclose` to combine absolute and relative tolerances when checking derivative accuracy.
 This may change the behavior of some derivative checks that were previously passing but near the tolerance.
-See [#3465](https://github.com/OpenMDAO/OpenMDAO/pull/3465) for more information.i
+See [#3465](https://github.com/OpenMDAO/OpenMDAO/pull/3465) for more information.
 
 In an ongoing effort to reduce the amount of boilerplate code required, OpenMDAO now provides:
 
