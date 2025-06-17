@@ -108,6 +108,7 @@ class ListVarsTest(unittest.TestCase):
             list_autoivcs=True,
             print_min=True,
             print_max=True,
+            print_mean=True,
             out_stream=None
         )
         prob_case.list_inputs(
@@ -120,6 +121,7 @@ class ListVarsTest(unittest.TestCase):
             print_tags=True,
             print_min=True,
             print_max=True,
+            print_mean=True,
             out_stream=None
         )
         prob_case.list_outputs(
@@ -136,6 +138,7 @@ class ListVarsTest(unittest.TestCase):
             list_autoivcs=True,
             print_min=True,
             print_max=True,
+            print_mean=True,
             out_stream=None
         )
 
@@ -151,6 +154,7 @@ class ListVarsTest(unittest.TestCase):
             list_autoivcs=True,
             print_min=True,
             print_max=True,
+            print_mean=True,
             out_stream=None
         )
         drvr_case.list_inputs(
@@ -163,6 +167,7 @@ class ListVarsTest(unittest.TestCase):
             print_tags=True,
             print_min=True,
             print_max=True,
+            print_mean=True,
             out_stream=None
         )
         drvr_case.list_outputs(
@@ -179,6 +184,7 @@ class ListVarsTest(unittest.TestCase):
             list_autoivcs=True,
             print_min=True,
             print_max=True,
+            print_mean=True,
             out_stream=None
         )
 
@@ -194,6 +200,7 @@ class ListVarsTest(unittest.TestCase):
             list_autoivcs=True,
             print_min=True,
             print_max=True,
+            print_mean=True,
             out_stream=None
         )
         modl_case.list_inputs(
@@ -206,6 +213,7 @@ class ListVarsTest(unittest.TestCase):
             print_tags=True,
             print_min=True,
             print_max=True,
+            print_mean=True,
             out_stream=None
         )
         modl_case.list_outputs(
@@ -222,6 +230,7 @@ class ListVarsTest(unittest.TestCase):
             list_autoivcs=True,
             print_min=True,
             print_max=True,
+            print_mean=True,
             out_stream=None
         )
 

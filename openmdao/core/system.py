@@ -4243,6 +4243,7 @@ class System(object, metaclass=SystemMetaclass):
                   out_stream=_DEFAULT_OUT_STREAM,
                   print_min=False,
                   print_max=False,
+                  print_mean=False,
                   return_format='list'):
         """
         Write a list of inputs and outputs sorted by component in execution order.
@@ -4308,6 +4309,8 @@ class System(object, metaclass=SystemMetaclass):
             When true, if the output value is an array, print its smallest value.
         print_max : bool
             When true, if the output value is an array, print its largest value.
+        print_mean : bool
+            When true, if the output value is an array, print its mean value.
         return_format : str
             Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
             If 'list', the return value is a list of (name, metadata) tuples.
@@ -4384,6 +4387,9 @@ class System(object, metaclass=SystemMetaclass):
                         if print_max:
                             meta['max'] = np.round(np.max(meta['val']), np_precision)
 
+                        if print_mean:
+                            meta['mean'] = np.round(np.mean(meta['val']), np_precision)
+
                 if residuals or residuals_tol:
                     resids = self._abs_get_val(name, get_remote=True,
                                                rank=None if all_procs else 0,
@@ -4411,6 +4417,9 @@ class System(object, metaclass=SystemMetaclass):
 
                     if print_max:
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+                    if print_mean:
+                        meta['mean'] = np.round(np.mean(meta['val']), np_precision)
 
         # remove metadata we don't want to show/return
         to_remove = ['discrete']
@@ -4468,6 +4477,7 @@ class System(object, metaclass=SystemMetaclass):
                     out_stream=_DEFAULT_OUT_STREAM,
                     print_min=False,
                     print_max=False,
+                    print_mean=False,
                     return_format='list'):
         """
         Write a list of input names and other optional information to a specified stream.
@@ -4524,6 +4534,8 @@ class System(object, metaclass=SystemMetaclass):
             When true, if the input value is an array, print its smallest value.
         print_max : bool
             When true, if the input value is an array, print its largest value.
+        print_mean : bool
+            When true, if the input value is an array, print its mean value.
         return_format : str
             Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
             If 'list', the return value is a list of (name, metadata) tuples.
@@ -4570,6 +4582,9 @@ class System(object, metaclass=SystemMetaclass):
 
                     if print_max:
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+                    if print_mean:
+                        meta['mean'] = np.round(np.mean(meta['val']), np_precision)
 
         to_remove = ['discrete']
         if not print_tags:
@@ -4624,6 +4639,7 @@ class System(object, metaclass=SystemMetaclass):
                      out_stream=_DEFAULT_OUT_STREAM,
                      print_min=False,
                      print_max=False,
+                     print_mean=False,
                      return_format='list'):
         """
         Write a list of output names and other optional information to a specified stream.
@@ -4695,6 +4711,8 @@ class System(object, metaclass=SystemMetaclass):
             When true, if the output value is an array, print its smallest value.
         print_max : bool
             When true, if the output value is an array, print its largest value.
+        print_mean : bool
+            When true, if the output value is an array, print its mean value.
         return_format : str
             Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
             If 'list', the return value is a list of (name, metadata) tuples.
@@ -4748,6 +4766,9 @@ class System(object, metaclass=SystemMetaclass):
 
                         if print_max:
                             meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+                        if print_mean:
+                            meta['mean'] = np.round(np.mean(meta['val']), np_precision)
 
                 if residuals or residuals_tol:
                     resids = self._abs_get_val(name, get_remote=True,
