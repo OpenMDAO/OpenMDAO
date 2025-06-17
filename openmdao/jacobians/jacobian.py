@@ -182,31 +182,50 @@ class Jacobian(object):
         """
         if not self._initialized:
             self._subjacs = {}
-            if self._has_approx:
-                try:
-                    relevance = self._problem_meta['relevance']
-                    is_relevant = relevance.is_relevant
-                    active = system.linear_solver is None or system.linear_solver.use_relevance()
-                except Exception:
-                    relevance = None
-            else:
-                relevance = None
-
-            dtype = system._outputs.dtype
-
-            with relevance.active(active) if relevance else do_nothing_context():
-                with relevance.all_seeds_active() if relevance else do_nothing_context():
-                    out_slices = self._output_slices
-                    in_slices = self._input_slices
-                    for key, meta in self._subjacs_info.items():
-                        of, wrt = key
-                        if of in out_slices and (wrt in in_slices or wrt in out_slices):
-                            if relevance is None or is_relevant(wrt):
-                                self._subjacs[key] = self.create_subjac(key, meta, dtype)
+            for key, meta, dtype in self._subjacs_info_iter(system):
+                self._subjacs[key] = self.create_subjac(key, meta, dtype)
 
             self._initialized = True
 
         return self._subjacs
+
+    def _subjacs_info_iter(self, system=None):
+        """
+        Iterate over subjacs info for the current system.
+
+        Irrelevant subjacs are skipped.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+
+        Yields
+        ------
+        tuple
+            Tuple of (key, meta, dtype) for each subjac.
+        """
+        if self._has_approx:
+            try:
+                relevance = self._problem_meta['relevance']
+                is_relevant = relevance.is_relevant
+                active = system.linear_solver is None or system.linear_solver.use_relevance()
+            except Exception:
+                relevance = None
+        else:
+            relevance = None
+
+        dtype = system._outputs.dtype
+
+        with relevance.active(active) if relevance else do_nothing_context():
+            with relevance.all_seeds_active() if relevance else do_nothing_context():
+                out_slices = self._output_slices
+                in_slices = self._input_slices
+                for key, meta in self._subjacs_info.items():
+                    of, wrt = key
+                    if of in out_slices and (wrt in in_slices or wrt in out_slices):
+                        if relevance is None or is_relevant(wrt):
+                            yield key, meta, dtype
 
     def _get_abs_key(self, key):
         try:

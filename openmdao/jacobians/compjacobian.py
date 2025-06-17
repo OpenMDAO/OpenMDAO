@@ -39,8 +39,6 @@ class ComponentSplitJacobian(SplitJacobian):
         Square matrix of derivatives of residuals with respect to outputs.
     _dr_di_mtx : <Matrix>
         Matrix of derivatives of residuals with respect to inputs.
-    _matrix_class : type or None
-        Class to use to create internal matrices.
     """
 
     def __init__(self, matrix_class, system):
@@ -48,8 +46,6 @@ class ComponentSplitJacobian(SplitJacobian):
         Initialize all attributes.
         """
         super().__init__(system)
-
-        self._matrix_class = matrix_class
 
         drdo_subjacs, drdi_subjacs = self._get_split_subjacs(system)
         out_size = len(system._outputs)
@@ -97,11 +93,6 @@ class ComponentSplitJacobian(SplitJacobian):
                     if self._dr_di_mtx is not None:
                         dresids += self._dr_di_mtx._prod(d_inputs.asarray(), mode,
                                                          self._get_mask(d_inputs, mode))
-                    elif self._matrix_class is None:  # only true for explicit components
-                        dinp_names = d_inputs._names
-                        for key, subjac in self._dr_di_subjacs.items():
-                            if key[1] in dinp_names:
-                                subjac.apply_fwd(d_inputs, d_outputs, d_residuals, self._randgen)
 
             else:  # rev
                 if d_outputs._names:
@@ -118,8 +109,3 @@ class ComponentSplitJacobian(SplitJacobian):
                         if mask is not None:
                             arr[mask] = 0.0
                         d_inputs += arr
-                    elif self._matrix_class is None:  # only true for explicit components
-                        dinp_names = d_inputs._names
-                        for key, subjac in self._dr_di_subjacs.items():
-                            if key[1] in dinp_names:
-                                subjac.apply_rev(d_inputs, d_outputs, d_residuals, self._randgen)

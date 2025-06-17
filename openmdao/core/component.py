@@ -180,9 +180,8 @@ class Component(System):
                              ' Default is (1,).')
         self.options.declare('jac_type', types=str, default='block',
                              desc='Type of Jacobian to use.  Options are "dense", "coo", '
-                             '"csc", or "csr". Ignored by matrix free components.  "auto" '
-                             'will assign a jacobian type based on the sparsity of the component. '
-                             'Default is "block".')
+                             '"csc", or "csr". Ignored by matrix free components. Default is '
+                             '"block".')
 
     def _choose_jac_type(self, jac_type, assembled=False):
         """
@@ -214,7 +213,7 @@ class Component(System):
         elif jac_type == 'csr':
             return ComponentSplitJacobian(CSRMatrix, self)
         else:
-            raise ValueError(f"Invalid jac_type: {jac_type}")
+            raise ValueError(f"{self.msginfo}: Invalid jac_type: {jac_type}")
 
     def setup(self):
         """
