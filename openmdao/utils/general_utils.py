@@ -1662,28 +1662,51 @@ _om_dump = env_truthy('OPENMDAO_DUMP')
 if _om_dump:
     parts = [s.strip() for s in os.environ['OPENMDAO_DUMP'].split(',')]
     trace = 'trace' in parts
+    use_rank = 'rank' in parts
 
     if 'stdout' in parts:
         _dump_stream = sys.stdout
     elif 'stderr' in parts:
         _dump_stream = sys.stderr
     else:
+        dirname = None
+
+        for p in parts:
+            if p.startswith('dir='):
+                dirname = p.partition('=')[2]
+                break
+        else:
+            dirname = os.path.join(os.getcwd(), 'dump_dir')
+
+        if not os.path.exists(dirname):
+            try:
+                os.makedirs(dirname)
+            except Exception:
+                dirname = os.getcwd()
+
         for p in parts:
             if p.startswith('file='):
                 fname = p.partition('=')[2]
                 break
         else:
-            fname = 'om_dump'
+            testspec = os.environ.get('TESTFLO_SPEC')
+            if testspec:
+                tpath, ident = testspec.split(':')
+                tfile = os.path.basename(tpath)
+                fname = f'om_dump_{tfile}:{ident}'
+                use_rank = True  # always use rank for testflo tests
+            else:
+                fname = 'om_dump'
 
         rankstr = pidstr = ''
-        if 'rank' in parts:
+        if use_rank:
             from openmdao.utils.mpi import MPI
             rankstr = f"_{MPI.COMM_WORLD.rank if MPI else 0}"
 
         if 'pid' in parts:
             pidstr = f"_{os.getpid()}"
 
-        _dump_stream = open(f'{fname}{rankstr}{pidstr}.out', 'w')
+        _dump_stream = open(os.path.join(dirname, f'{fname}{rankstr}{pidstr}.out'), 'w')
 
     _show_args = 'args' in parts
 
