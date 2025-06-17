@@ -5861,11 +5861,12 @@ class System(object, metaclass=SystemMetaclass):
         else:
             if abs_name in conns and nprocs > 1:
                 # check if src exists on a proc where tgt doesn't
-                insizes = all_sizes['input'][:, all_idx[abs_name]]
-                outsizes = all_sizes['output'][:, all_idx[src]]
-                if np.any(insizes != outsizes):
-                    # keep track of this for later setting across all procs
-                    model._remote_sets.append((abs_name, src, value))
+                if abs_name in all_idx:
+                    insizes = all_sizes['input'][:, all_idx[abs_name]]
+                    outsizes = all_sizes['output'][:, all_idx[src]]
+                    if np.any(insizes != outsizes):
+                        # keep track of this for later setting across all procs
+                        model._remote_sets.append((abs_name, src, value))
 
             myrank = model.comm.rank
 
