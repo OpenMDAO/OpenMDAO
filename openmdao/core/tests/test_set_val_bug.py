@@ -2,9 +2,18 @@
 import unittest
 
 import openmdao.api as om
-
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.mpi import MPI
+from openmdao.utils.testing_utils import use_tempdirs
 
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class MPISetvalBug(unittest.TestCase):
     N_PROCS = 2
 
