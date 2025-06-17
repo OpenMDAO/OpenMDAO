@@ -1,14 +1,11 @@
 """A real-time plot monitoring the analysis driver process as an OpenMDAO script runs."""
 
-import ctypes
-import errno
-import os
-import sys
 from collections import defaultdict
-import sqlite3
 from itertools import product
 import time
 from datetime import datetime, timedelta
+
+from openmdao.visualization.realtime_opt_plot.realtime_plot import _CaseRecorderTracker, _RealTimePlot
 
 try:
     from bokeh.models import (
@@ -39,8 +36,6 @@ except ImportError:
 
 import numpy as np
 
-from openmdao.recorders.sqlite_reader import SqliteCaseReader
-from openmdao.recorders.case import Case
 
 try:
     from openmdao.utils.gui_testing_utils import get_free_port
@@ -64,6 +59,8 @@ _unused_session_lifetime_milliseconds = 1000 * 60 * 10
 _left_side_column_width = 500
 # how big the individual plots should be in the grid
 _grid_plot_height_and_width = 240
+
+_color_bar_title_font_size = "20px"
 
 _page_styles = InlineStyleSheet(css="""
 :host(.div_header) {
@@ -173,49 +170,6 @@ def _elide_variable_name_with_units(variable_name, units):
     else:
         return variable_name
 
-# Alternative: Access objects by ID
-def access_by_id(doc, object_id):
-    """Retrieve a Bokeh object by its ID"""
-    try:
-        for obj in doc.roots[0].references():
-            if obj.id == object_id:
-                return obj
-    except IndexError as e:
-        return None
-    return None
-
-def _is_process_running(pid):
-    if sys.platform == "win32":
-        # PROCESS_QUERY_LIMITED_INFORMATION is available on Windows Vista and later.
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-
-        # Attempt to open the process.
-        handle = ctypes.windll.kernel32.OpenProcess(
-            PROCESS_QUERY_LIMITED_INFORMATION, False, pid
-        )
-        if handle:
-            ctypes.windll.kernel32.CloseHandle(handle)
-            return True
-        else:
-            # If OpenProcess fails, check if it's due to access being denied.
-            ERROR_ACCESS_DENIED = 5
-            if ctypes.windll.kernel32.GetLastError() == ERROR_ACCESS_DENIED:
-                return True
-            return False
-    else:
-        try:
-            os.kill(pid, 0)
-        except OSError as err:
-            if err.errno == errno.ESRCH:  # No such process
-                return False
-            elif err.errno == errno.EPERM:  # Process exists, no permission to signal
-                return True
-            else:
-                raise
-        else:
-            return True
-
-
 def _realtime_opt_plot_setup_parser(parser):
     """
     Set up the realtime plot subparser for the 'openmdao opt_plot' command.
@@ -272,134 +226,9 @@ def _realtime_opt_plot_cmd(options, user_args):
         return
 
 
-class _CaseRecorderTracker:
-    """
-    A class that is used to get information from a case recorder.
-
-    These methods are not provided by the SqliteCaseReader class.
-    """
-
-    def __init__(self, case_recorder_filename):
-        self._case_recorder_filename = case_recorder_filename
-        self._cr = None
-        self._initial_case = (
-            None  # need the initial case to get info about the variables
-        )
-        self._next_id_to_read = 1
-
-    def get_case_reader(self):
-        return self._cr
-
-    def _open_case_recorder(self):
-        if self._cr is None:
-            self._cr = SqliteCaseReader(self._case_recorder_filename)
-
-    def _get_case_by_counter(self, counter):
-        # use SQL to see if a case with this counter exists
-        with sqlite3.connect(self._case_recorder_filename) as con:
-            con.row_factory = sqlite3.Row
-            cur = con.cursor()
-            cur.execute(
-                "SELECT * FROM driver_iterations WHERE " "counter=:counter",
-                {"counter": counter},
-            )
-            row = cur.fetchone()
-        con.close()
-
-        # use SqliteCaseReader code to get the data from this case
-        if row:
-            # TODO would be better to not have to open up the file each time
-            self._open_case_recorder()
-            var_info = self._cr.problem_metadata["variables"]
-            case = Case(
-                "driver",
-                row,
-                self._cr._prom2abs,
-                self._cr._abs2prom,
-                self._cr._abs2meta,
-                self._cr._conns,
-                var_info,
-                self._cr._format_version,
-            )
-
-            return case
-        else:
-            return None
-
-    def _get_data_from_case(self, driver_case):
-        objs = driver_case.get_objectives(scaled=False)
-        design_vars = driver_case.get_design_vars(scaled=False)
-        constraints = driver_case.get_constraints(scaled=False)
-
-        new_data = {
-            "counter": int(driver_case.counter),
-        }
-
-        # get objectives
-        objectives = {}
-        for name, value in objs.items():
-            objectives[name] = value
-        new_data["objs"] = objectives
-
-        # get des vars
-        desvars = {}
-        for name, value in design_vars.items():
-            desvars[name] = value
-        new_data["desvars"] = desvars
-
-        # get cons
-        cons = {}
-        for name, value in constraints.items():
-            cons[name] = value
-        new_data["cons"] = cons
-
-        return new_data
-
-    def _get_new_case(self):
-        # get the next unread case from the recorder
-        driver_case = self._get_case_by_counter(self._next_id_to_read)
-        if driver_case is None:
-            return None
-
-        if self._initial_case is None:
-            self._initial_case = driver_case
-
-        self._next_id_to_read += 1
-
-        return driver_case
-
-    def _get_obj_names(self):
-        obj_vars = self._initial_case.get_objectives()
-        return obj_vars.keys()
-
-    def _get_desvar_names(self):
-        design_vars = self._initial_case.get_design_vars()
-        return design_vars.keys()
-
-    def _get_cons_names(self):
-        cons = self._initial_case.get_constraints()
-        return cons.keys()
-
-    def _get_units(self, name):
-        try:
-            units = self._initial_case._get_units(name)
-        except RuntimeError as err:
-            if str(err).startswith("Can't get units for the promoted name"):
-                return "Ambiguous"
-            raise
-        except KeyError:
-            return "Unavailable"
-
-        if units is None:
-            units = "Unitless"
-        return units
-
-    def _get_shape(self, name):
-        item = self._initial_case[name]
-        return item.shape
 
 
-class _RealTimeOptPlot(object):
+class _RealTimeOptPlot(_RealTimePlot):
     """
     A class that handles all of the real-time plotting.
 
@@ -423,10 +252,7 @@ class _RealTimeOptPlot(object):
         """
         Construct and initialize _RealTimeOptPlot instance.
         """
-        self._case_recorder_filename = case_recorder_filename
-        self._case_tracker = _CaseRecorderTracker(case_recorder_filename)
-        self._pid_of_calling_script = pid_of_calling_script
-        self._doc = doc
+        super().__init__(case_recorder_filename, callback_period, doc, pid_of_calling_script)
 
         # lists of the sampled variables in the analysis and the responses
         self._sampled_variables = None
@@ -557,7 +383,7 @@ class _RealTimeOptPlot(object):
 
         color_bar = self._make_color_bar()
 
-        sampled_variables_box = self._make_sampled_variables_box(color_bar)
+        variables_box = self._make_variables_box(color_bar)
 
         plots_and_labels_in_grid = []
         self._make_plots(plots_and_labels_in_grid)
@@ -568,7 +394,7 @@ class _RealTimeOptPlot(object):
             toolbar_location=None,
         )
 
-        self._make_overall_layout(analysis_progress_box, sampled_variables_box, color_bar, grid_of_plots)
+        self._make_overall_layout(analysis_progress_box, variables_box, color_bar, grid_of_plots)
 
     def _update_source_stream(self, new_case):
         # fill up the stream dict with the values.
@@ -636,10 +462,11 @@ class _RealTimeOptPlot(object):
             else:
                 self._sampled_variables_visibility[sampled_var] = False
 
-    def _make_sampled_variables_box(self, color_bar):
+    def _make_variables_box(self, color_bar):
         # Make all the checkboxes for the Sample Variables area to the left of the plot
         #   that lets the user select what to plot. Also include the non scalar
         #   variables at the bottom of this box
+        # Also include the responses selection menu
         
         # header for the scalar Sampled Variables list
         sampled_variables_label = Div(
@@ -712,10 +539,21 @@ class _RealTimeOptPlot(object):
             children=sampled_variables_non_scalar_text_list,
         )
       
+        section_separator = Div(
+            sizing_mode="stretch_width",  # This makes it fill available horizontal space
+            height=1,
+            styles={
+                'border-top': '1px solid #5c5c5c',
+                'margin-top': '24px',
+                'margin-bottom': '24px'
+            }
+        )
+
         # put both the scalar and non scalar together in a Column inside a ScrollBox
         sampled_variables_column = Column(
             sampled_variables_label,
             sampled_variables_checkbox_group,
+            section_separator,
             sampled_variables_non_scalar_label,
             sampled_variables_non_scalar_column,
             sizing_mode="stretch_height",
@@ -752,10 +590,10 @@ class _RealTimeOptPlot(object):
 
         response_variable_menu.on_change("value", cb_select_response_variable(color_bar))
 
-        sampled_variables_box = Column(
+        variables_box = Column(
             response_variable_header,
             response_variable_menu,
-            Spacer(height=20),
+            section_separator,
             sampled_variables_box,
             sizing_mode="stretch_height",
             height_policy="fit",
@@ -763,17 +601,19 @@ class _RealTimeOptPlot(object):
             stylesheets = [_page_styles], css_classes = ['sampled_variables_box']
         )
                
-        return sampled_variables_box
+        return variables_box
 
     def _make_color_bar(self):
-        # Add the color bar to this figure
+        # can't make just a color bar. It needs to be associated with
+        #  a figure. So make a simple plot, hide it, and 
+        #  add the color bar to this figure
         color_bar = ColorBar(
             color_mapper=self._color_mapper,
             title=f"Response variable: '{self._prom_response}'",
             border_line_color=None,
             width=20,
             label_standoff=14,
-            title_text_font_size="20px",
+            title_text_font_size=_color_bar_title_font_size,
             ticker=BasicTicker(),
             location=(0, 0),
         )
@@ -781,7 +621,6 @@ class _RealTimeOptPlot(object):
         # Need the color bar to be associated with a plot figure.
         # So make a basic one and hide it
         p = figure(height=2 * _grid_plot_height_and_width, width=0, toolbar_location=None)
-        # Plot a line between the two points
         line = p.line([0, 1],[0, 1])
         p.grid.grid_line_color = None
         line.visible = False
@@ -807,24 +646,25 @@ class _RealTimeOptPlot(object):
             irow = i // self._num_sampled_variables
 
             if var_along_columns != var_along_rows:
-                p = figure(
+                plot_figure = figure(
                     background_fill_color="#fafafa",
                     border_fill_color="white",
                     width=_grid_plot_height_and_width,
                     height=_grid_plot_height_and_width,
                     output_backend="webgl",
                 )
-                self._scatter_plots_figure[(var_along_columns,var_along_rows)] = p
-                p.axis.visible = True
-                self._scatter_plots.append(p.scatter(
-                    x=var_along_columns,
-                    source=self._source,
-                    y=var_along_rows,
-                    size=5,
-                    line_color=None,
-                    fill_color=transform(
-                        self._prom_response, self._color_mapper
-                    ),  # This maps value ofself._prom_response variable to colors
+                self._scatter_plots_figure[(var_along_columns,var_along_rows)] = plot_figure
+                plot_figure.axis.visible = True
+                self._scatter_plots.append(
+                    plot_figure.scatter(
+                        x=var_along_columns,
+                        source=self._source,
+                        y=var_along_rows,
+                        size=5,
+                        line_color=None,
+                        fill_color=transform(
+                            self._prom_response, self._color_mapper
+                        ),  # This maps value ofself._prom_response variable to colors
                 ))
             else:  # on the diagonal
                 # Extract the x column data for the histogram
@@ -840,13 +680,13 @@ class _RealTimeOptPlot(object):
                         "right": edges[1:],  # right edge of each bin
                     }
                 )
-                p = figure(
+                plot_figure = figure(
                     width=_grid_plot_height_and_width,
                     height=_grid_plot_height_and_width,
                     output_backend="webgl",
                )
                 # Add the histogram bars using quad glyphs
-                p.quad(
+                plot_figure.quad(
                     source=self._hist_source[var_along_columns],
                     top="top",
                     bottom="bottom",
@@ -856,18 +696,18 @@ class _RealTimeOptPlot(object):
                     line_color="white",
                     alpha=0.7,
                 )
-                self._hist_figures[var_along_columns] = p
+                self._hist_figures[var_along_columns] = plot_figure
 
             if icolumn > irow: # only lower half and diagonal
-                p = None
+                plot_figure = None
             else:
                 # is it visible based on what the user has selected
                 if self._sampled_variables_visibility[var_along_columns] and self._sampled_variables_visibility[var_along_rows]:
-                    p.visible = True
+                    plot_figure.visible = True
                 else:
-                    p.visible = False
+                    plot_figure.visible = False
 
-            plots_and_labels_in_grid.append(p)
+            plots_and_labels_in_grid.append(plot_figure)
 
     def _make_plot_labels(self, visible_variables, plots_and_labels_in_grid):
         # row labels
