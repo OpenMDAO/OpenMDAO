@@ -16,6 +16,14 @@ def _get_vec_slices(system, iotype, subset=None):
     }
 
 
+# Design Notes:
+# - When Components declare partials, they are stored as metadata in the _subjacs_info dict.
+# - These _subjacs_info entries may be used by multiple Jacobians at higher levels of the System
+#   hierarchy.
+# - Jacobian objects contain Subjac objects, which wrap the _subjacs_info metadata and add context
+#   like row and column slices specific to a their owning Jacobian.
+
+
 class Jacobian(object):
     """
     Base Jacobian class.
@@ -341,18 +349,6 @@ class Jacobian(object):
             'fwd' or 'rev'.
         """
         raise NotImplementedError(f"Class {type(self).__name__} does not implement _apply.")
-
-    # def _pre_apply(self, system, d_inputs, d_outputs, d_residuals, mode):
-    #     print(f"{system.msginfo}: BEFORE APPLY (mode={mode})")
-    #     print(f"    d_inputs._names: {sorted(d_inputs._names)}")
-    #     print(f"    d_outputs._names: {sorted(d_outputs._names)}")
-    #     print(f"    d_inputs: {d_inputs.asarray()}\n    d_outputs: {d_outputs.asarray()}\n"
-    #           f"    d_residuals: {d_residuals.asarray()}")
-
-    # def _post_apply(self, system, d_inputs, d_outputs, d_residuals, mode):
-    #     print(f"{system.msginfo}: AFTER APPLY (mode={mode})")
-    #     print(f"    d_inputs: {d_inputs.asarray()}\n    d_outputs: {d_outputs.asarray()}\n"
-    #           f"    d_residuals: {d_residuals.asarray()}")
 
     def _setup_index_maps(self, system):
         namesize_iter = [(n, end - start) for n, start, end, _, _, _ in system._get_jac_wrts()]
@@ -838,6 +834,30 @@ class SplitJacobian(Jacobian):
             if key in subjacs:
                 subjacs[key].set_col(loc_idx, column[start:end])
 
+    def _get_mask(self, d_inputs, mode):
+        """
+        Get the mask for the inputs.
+
+        Parameters
+        ----------
+        d_inputs : Vector
+            inputs linear vector.
+        mode : str
+            'fwd' or 'rev'.
+
+        Returns
+        -------
+        mask : ndarray
+            Mask for the inputs.
+        """
+        try:
+            mask = self._mask_caches[(d_inputs._names, mode)]
+        except KeyError:
+            mask = d_inputs.get_mask()
+            self._mask_caches[(d_inputs._names, mode)] = mask
+
+        return mask
+
 
 class JacobianUpdateContext:
     """
@@ -882,10 +902,7 @@ class JacobianUpdateContext:
         Jacobian
             The jacobian that is being updated.
         """
-        if self.system.is_explicit():
-            self.jac = self.system._get_jacobian()
-        else:
-            self.jac = self.system._get_jac_wrapper()
+        self.jac = self.system._get_jacobian()
 
         if self.jac is not None:
             self.jac._pre_update(self.system._outputs.dtype)

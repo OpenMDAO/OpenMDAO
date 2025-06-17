@@ -560,20 +560,26 @@ class ImplicitComponent(Component):
             The initialized jacobian.
         """
         if self._relevance_changed():
-            self._jacobian = None
+            self._jac_wrapper = None
 
         if not self.matrix_free:
-            if self._jacobian is None:
+            if self._jac_wrapper is None:
                 self._jacobian = self._get_assembled_jac()
 
                 if self._jacobian is None:
                     self._jacobian = self._choose_jac_type(self.options['jac_type'])
 
+                if self._declared_residuals:
+                    self._jac_wrapper = _JacobianWrapper(self._jacobian,
+                                                         self._resid2out_subjac_map)
+                else:
+                    self._jac_wrapper = self._jacobian
+
                 if self._has_approx:
                     self._get_static_wrt_matches()
                     self._add_approximations(use_relevance=use_relevance)
 
-        return self._jacobian
+        return self._jac_wrapper
 
     def _get_assembled_jac(self):
         """
@@ -595,23 +601,6 @@ class ImplicitComponent(Component):
                     solver._assembled_jac = asm_jac
 
         return self._assembled_jac
-
-    def _get_jac_wrapper(self):
-        """
-        Wrap our jacobian in a _JacobianWrapper if we have renamed residuals.
-
-        Returns
-        -------
-        _JacobianWrapper or Jacobian
-            The wrapped jacobian.
-        """
-        if self._jac_wrapper is None:
-            if self._declared_residuals:
-                self._jac_wrapper = _JacobianWrapper(self._get_jacobian(),
-                                                     self._resid2out_subjac_map)
-            else:
-                self._jac_wrapper = self._get_jacobian()
-        return self._jac_wrapper
 
     def _resolve_partials_patterns(self, of, wrt, pattern_meta):
         """

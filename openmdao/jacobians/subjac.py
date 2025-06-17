@@ -94,7 +94,8 @@ class Subjac(object):
         dtype : dtype
             The dtype of the subjacobian.
         src_indices : array or None
-            Source indices for the subjacobian.
+            Source indices for the subjacobian.  If not None, this is a subjac in the dr/do matrix
+            of a SplitJacobian.
         factor : float or None
             Unit conversion factor for the subjacobian.
         src : str or None
@@ -1130,6 +1131,7 @@ class OMCOOSubjac(COOSubjac):
                           uncovered_threshold)
 
     def _matvec_fwd(self, vec, randgen=None):
+        # bincount allows rows and cols to contain repeated (row, col) pairs.
         return np.bincount(self.info['rows'], vec[self.info['cols']] * self.get_val(randgen),
                            minlength=self.nrows)
 

@@ -7,7 +7,17 @@ from openmdao.matrices.csc_matrix import CSCMatrix
 
 class AssembledJacobian(SplitJacobian):
     """
-    Assemble a global <Jacobian>.
+    A Jacobian that contains one or two matrices.
+
+    One matrix, dr/di, contains the derivatives of the residuals with respect to the inputs. In fwd
+    mode it is applied to the dinputs vector and the result updates the dresiduals vector. In rev
+    mode its transpose is applied to the dresiduals vector and the result updates the dinputs
+    vector.
+
+    The other matrix, dr/do, contains the derivatives of the residuals with respect to the outputs.
+    In fwd mode it is applied to the doutputs vector and the result updates the dresiduals vector.
+    In rev mode its transpose is applied to the dresiduals vector and the result updates the
+    doutputs vector.
 
     Parameters
     ----------
@@ -22,9 +32,6 @@ class AssembledJacobian(SplitJacobian):
         Global dr/do Jacobian. May be used by a direct solver to perform a linear solve.
     _dr_di_mtx : <Matrix>
         Global dr/di Jacobian.
-    _mask_caches : dict
-        Contains masking arrays for when a subset of the variables are present in a vector, keyed
-        by the input._names set.
     """
 
     def __init__(self, matrix_class, system):
@@ -67,34 +74,26 @@ class AssembledJacobian(SplitJacobian):
             return
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-            do_mask = drdi_mtx is not None and d_inputs._names
-            if do_mask:
-                try:
-                    mask = self._mask_caches[(d_inputs._names, mode)]
-                except KeyError:
-                    mask = d_inputs.get_mask()
-                    self._mask_caches[(d_inputs._names, mode)] = mask
-
             dresids = d_residuals.asarray()
-
-            # self._pre_apply(system, d_inputs, d_outputs, d_residuals, mode)
 
             if mode == 'fwd':
                 if d_outputs._names:
                     dresids += self._dr_do_mtx._prod(d_outputs.asarray(), mode)
-                if do_mask:
-                    dresids += drdi_mtx._prod(d_inputs.asarray(), mode, mask)
+
+                if d_inputs._names and drdi_mtx is not None:
+                    dresids += drdi_mtx._prod(d_inputs.asarray(), mode,
+                                              self._get_mask(d_inputs, mode))
 
             else:  # rev
                 if d_outputs._names:
                     d_outputs += self._dr_do_mtx._prod(dresids, mode)
-                if do_mask:
+
+                if d_inputs._names and drdi_mtx is not None:
                     arr = drdi_mtx._prod(dresids, mode)
+                    mask = self._get_mask(d_inputs, mode)
                     if mask is not None:
                         arr[mask] = 0.0
                     d_inputs += arr
-
-            # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)
 
 
 class DenseJacobian(AssembledJacobian):

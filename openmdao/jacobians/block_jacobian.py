@@ -47,8 +47,6 @@ class BlockJacobian(Jacobian):
         d_out_names = d_outputs._names
         d_inp_names = d_inputs._names
 
-        # self._pre_apply(system, d_inputs, d_outputs, d_residuals, mode)
-
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             if mode == 'fwd':
                 for key, subjac in self._get_subjacs(system).items():
@@ -60,5 +58,3 @@ class BlockJacobian(Jacobian):
                     _, wrt = key
                     if wrt in d_inp_names or wrt in d_out_names:
                         subjac.apply_rev(d_inputs, d_outputs, d_residuals, randgen)
-
-        # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)

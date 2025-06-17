@@ -7,17 +7,12 @@ from openmdao.jacobians.subjac import SUBJAC_META_DEFAULTS
 
 class DictionaryJacobian(Jacobian):
     """
-    No global <Jacobian>; use dictionary of user-supplied sub-Jacobians.
+    A Jacobian that stores nonzero subjacobians in a dictionary.
 
     Parameters
     ----------
     system : System
         Parent system to this jacobian.
-
-    Attributes
-    ----------
-    _iter_keys : list of (vname, vname) tuples
-        List of tuples of variable names that match subjacs in the this Jacobian.
     """
 
     def __init__(self, system):
@@ -25,7 +20,6 @@ class DictionaryJacobian(Jacobian):
         Initialize all attributes.
         """
         super().__init__(system)
-        self._iter_keys = None
         self._setup(system)
 
     def _setup(self, system):
@@ -63,16 +57,11 @@ class DictionaryJacobian(Jacobian):
         subjacs = self._get_subjacs(system)
         randgen = self._randgen
 
-        do_reset = False
         key_owners = system._get_subjac_owners()
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._get_ordered_subjac_keys(system):
                 if abs_key not in subjacs_info:
-                    # for components that compute sparsity at first linearization, some subjacs
-                    # will be determined to be zero and removed from subjacs_info., so we need to
-                    # update our iteration keys.
-                    do_reset = True
                     continue
 
                 res_name, other_name = abs_key
@@ -121,9 +110,6 @@ class DictionaryJacobian(Jacobian):
                                     d_outputs._abs_set_val(other_name, left_vec)
                                 elif other_name in d_inp_names:
                                     d_inputs._abs_set_val(other_name, left_vec)
-
-            if do_reset:
-                self._iter_keys = None  # subjacs_info has been reduced, so update iter keys
 
 
 class _CheckingJacobian(DictionaryJacobian):

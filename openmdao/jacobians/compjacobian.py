@@ -86,8 +86,6 @@ class ComponentSplitJacobian(SplitJacobian):
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             dresids = d_residuals.asarray()
 
-            # self._pre_apply(system, d_inputs, d_outputs, d_residuals, mode)
-
             if mode == 'fwd':
                 if d_outputs._names:
                     if self._is_explicitcomp:
@@ -125,29 +123,3 @@ class ComponentSplitJacobian(SplitJacobian):
                         for key, subjac in self._dr_di_subjacs.items():
                             if key[1] in dinp_names:
                                 subjac.apply_rev(d_inputs, d_outputs, d_residuals, self._randgen)
-
-            # self._post_apply(system, d_inputs, d_outputs, d_residuals, mode)
-
-    def _get_mask(self, d_inputs, mode):
-        """
-        Get the mask for the inputs.
-
-        Parameters
-        ----------
-        d_inputs : Vector
-            inputs linear vector.
-        mode : str
-            'fwd' or 'rev'.
-
-        Returns
-        -------
-        mask : ndarray
-            Mask for the inputs.
-        """
-        try:
-            mask = self._mask_caches[(d_inputs._names, mode)]
-        except KeyError:
-            mask = d_inputs.get_mask()
-            self._mask_caches[(d_inputs._names, mode)] = mask
-
-        return mask
