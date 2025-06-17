@@ -5798,14 +5798,6 @@ class System(object, metaclass=SystemMetaclass):
                     value = model.convert_from_units(src, value, units)
                 set_units = sunits
 
-                if nprocs > 1:
-                    # check if src exists on a proc where tgt doesn't
-                    insizes = all_sizes['input'][:, all_idx[abs_name]]
-                    outsizes = all_sizes['output'][:, all_idx[src]]
-                    if np.any(insizes != outsizes):
-                        # must keep track of this for later setting across all procs
-                        model._remote_sets.append((abs_name, src, value))
-
         else:  # setting an output
             src = abs_name
             if units is not None:
@@ -5846,6 +5838,14 @@ class System(object, metaclass=SystemMetaclass):
                         if n in loc_meta_in:
                             loc_meta_in[n]['shape'] = shape
         else:
+            if abs_name in conns and nprocs > 1:
+                # check if src exists on a proc where tgt doesn't
+                insizes = all_sizes['input'][:, all_idx[abs_name]]
+                outsizes = all_sizes['output'][:, all_idx[src]]
+                if np.any(insizes != outsizes):
+                    # keep track of this for later setting across all procs
+                    model._remote_sets.append((abs_name, src, value))
+
             myrank = model.comm.rank
 
             if indices is None:
