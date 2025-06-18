@@ -41,7 +41,6 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
-from openmdao.utils.assert_utils import mimic
 
 # regex to check for valid names.
 import re
