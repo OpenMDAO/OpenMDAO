@@ -43,7 +43,8 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.subjac import Subjac
-from openmdao.jacobians.jacobian import GroupJacobianUpdateContext, DenseJacobian, CSCJacobian
+from openmdao.jacobians.jacobian import GroupJacobianUpdateContext, DenseJacobian, CSCJacobian, \
+    CSRJacobian
 
 
 # regex to check for valid names.
@@ -53,6 +54,7 @@ namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
 _asm_jac_types = {
     'csc': CSCJacobian,
+    'csr': CSRJacobian,
     'dense': DenseJacobian,
 }
 
@@ -3997,26 +3999,23 @@ class Group(System):
 
         return self._jacobian
 
-    def _get_assembled_jac(self):
+    def _choose_jac_type(self, sparse_format, assembled=True):
         """
-        Get the assembled jacobian if there is one.
+        Choose the type of jacobian to use for this group.
+
+        Parameters
+        ----------
+        sparse_format : str
+            The sparse format to use for the jacobian.
+        assembled : bool
+            Whether to use an assembled jacobian.
+
+        Returns
+        -------
+        Jacobian
+            The chosen jacobian type.
         """
-        if self._assembled_jac is None:
-            asm_jac_solvers = self._get_asm_jac_solvers()
-
-            if asm_jac_solvers:
-                if self.matrix_free:
-                    # At present, we don't support a AssembledJacobian in a group
-                    # if any subcomponents are matrix-free.
-                    raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
-                                       "subcomponent." % self.msginfo)
-
-                asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
-                self._assembled_jac = self._jacobian = asm_jac
-                for solver in asm_jac_solvers:
-                    solver._assembled_jac = asm_jac
-
-        return self._assembled_jac
+        return _asm_jac_types[sparse_format](system=self)
 
     def _approx_subjac_keys_iter(self):
         """

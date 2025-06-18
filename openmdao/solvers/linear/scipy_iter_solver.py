@@ -50,10 +50,10 @@ class ScipyKrylov(LinearSolver):
         Return a generator of linear solvers using assembled jacs.
         """
         if self.options['assemble_jac']:
-            yield self
+            yield self, self.preferred_sparse_format()
         if self.precon is not None:
-            for s in self.precon._assembled_jac_solver_iter():
-                yield s
+            for tup in self.precon._assembled_jac_solver_iter():
+                yield tup
 
     def _declare_options(self):
         """
@@ -317,3 +317,14 @@ class ScipyKrylov(LinearSolver):
             True if relevance should be active.
         """
         return False
+
+    def preferred_sparse_format(self):
+        """
+        Return the preferred sparse format for the dr/do matrix of a split jacobian.
+
+        Returns
+        -------
+        str
+            The preferred sparse format for the dr/do matrix of a split jacobian.
+        """
+        return 'csr'

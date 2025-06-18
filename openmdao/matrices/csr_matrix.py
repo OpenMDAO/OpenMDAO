@@ -50,5 +50,6 @@ class CSRMatrix(COOMatrix):
             Transposed matrix.
         """
         if self._matrix_T is None:
-            self._matrix_T = self._matrix.T
+            coo_T = self._coo.T
+            self._matrix_T = csr_matrix((coo_T.data, (coo_T.row, coo_T.col)), shape=coo_T.shape)
         return self._matrix_T

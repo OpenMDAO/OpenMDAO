@@ -581,27 +581,6 @@ class ImplicitComponent(Component):
 
         return self._jac_wrapper
 
-    def _get_assembled_jac(self):
-        """
-        Get the assembled jacobian if there is one.
-        """
-        if self._assembled_jac is None:
-            asm_jac_solvers = self._get_asm_jac_solvers()
-
-            if asm_jac_solvers:
-                if self.matrix_free:
-                    # At present, we don't support a AssembledJacobian if the component is
-                    # matrix-free.
-                    raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
-                                       "subcomponent." % self.msginfo)
-
-                asm_jac = self._choose_jac_type(self.options['assembled_jac_type'], assembled=True)
-                self._assembled_jac = self._jacobian = asm_jac
-                for solver in asm_jac_solvers:
-                    solver._assembled_jac = asm_jac
-
-        return self._assembled_jac
-
     def _resolve_partials_patterns(self, of, wrt, pattern_meta):
         """
         Store subjacobian metadata for later use.

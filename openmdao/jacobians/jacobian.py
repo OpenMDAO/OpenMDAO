@@ -9,6 +9,7 @@ from openmdao.utils.general_utils import do_nothing_context
 from openmdao.utils.coloring import _ColSparsityJac
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
+from openmdao.matrices.csr_matrix import CSRMatrix
 
 
 def _get_vec_slices(system, iotype, subset=None):
@@ -620,6 +621,10 @@ class SplitJacobian(Jacobian):
             self._dr_do_mtx._build(out_size, out_size, dtype)
 
         if drdi_subjacs:
+            if not isinstance(matrix_class, DenseMatrix):
+                # dr/di is only used for matvec products and not for LU solves, so if caller
+                # hasn't specified dense, always use CSR.
+                matrix_class = CSRMatrix
             self._dr_di_mtx = matrix_class(drdi_subjacs)
             self._dr_di_mtx._build(out_size, len(system._inputs), dtype)
 
@@ -987,6 +992,23 @@ class CSCJacobian(SplitJacobian):
         Initialize all attributes.
         """
         super().__init__(CSCMatrix, system=system)
+
+
+class CSRJacobian(SplitJacobian):
+    """
+    Assemble sparse global <Jacobian> in Compressed Col Storage format.
+
+    Parameters
+    ----------
+    system : System
+        Parent system to this jacobian.
+    """
+
+    def __init__(self, system):
+        """
+        Initialize all attributes.
+        """
+        super().__init__(CSRMatrix, system=system)
 
 
 class JacobianUpdateContext:

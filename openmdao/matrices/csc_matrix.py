@@ -49,5 +49,7 @@ class CSCMatrix(COOMatrix):
             Transposed matrix.
         """
         if self._matrix_T is None:
+            # the transpose should only happen in reverse mode for apply_linear, and _matrix.T
+            # will be CSR, which is preferred for a matvec product.
             self._matrix_T = self._matrix.T
         return self._matrix_T

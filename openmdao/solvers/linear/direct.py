@@ -511,3 +511,14 @@ class DirectSolver(LinearSolver):
 
         if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
             self._lin_rhs_checker.add_solution(b_vec, sol_array, copy=True)
+
+    def preferred_sparse_format(self):
+        """
+        Return the preferred sparse format for the dr/do matrix of a split jacobian.
+
+        Returns
+        -------
+        str
+            The preferred sparse format for the dr/do matrix of a split jacobian.
+        """
+        return 'csc'

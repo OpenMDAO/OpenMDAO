@@ -110,7 +110,7 @@ class COOMatrix(Matrix):
         if mode == 'fwd':
             return self._matrix @ self._get_masked_arr(in_vec, mask)
         else:  # rev
-            return self._matrix.T @ self._get_masked_arr(in_vec, mask)
+            return self.transpose() @ self._get_masked_arr(in_vec, mask)
 
     def _update_dtype(self, dtype):
         """

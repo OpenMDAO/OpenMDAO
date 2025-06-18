@@ -387,7 +387,8 @@ class System(object, metaclass=SystemMetaclass):
         # System options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
 
-        self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
+        self.options.declare('assembled_jac_type', values=['csc', 'csr', 'dense', None],
+                             default=None,
                              desc='Linear solver(s) in this group or implicit component, '
                                   'if using an assembled jacobian, will use this type.')
         self.options.declare('derivs_method', default=None, values=['jax', 'cs', 'fd', None],
@@ -2579,6 +2580,46 @@ class System(object, metaclass=SystemMetaclass):
             asm_jac_solvers.update(self.nonlinear_solver._assembled_jac_solver_iter())
 
         return asm_jac_solvers
+
+    def _get_assembled_jac(self):
+        """
+        Get the assembled jacobian if there is one.
+        """
+        if self._jacobian is None:
+            asm_jac_solvers = self._get_asm_jac_solvers()
+
+            if asm_jac_solvers:
+                if self.matrix_free:
+                    # At present, we don't support a AssembledJacobian if the component is
+                    # matrix-free.
+                    raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
+                                       "subcomponent." % self.msginfo)
+
+                option_format = self.options['assembled_jac_type']
+                preferred = [fmt for _, fmt in asm_jac_solvers if fmt is not None]
+                if len(set(preferred)) == 1:
+                    sparse_format = preferred[0]
+                elif option_format is None:
+                    # use old default of 'csc'
+                    sparse_format = 'csc'
+                else:
+                    sparse_format = option_format
+
+                if option_format is not None:
+                    if option_format not in (sparse_format, 'dense'):
+                        issue_warning(
+                            f"{self.msginfo}: system is using a '{option_format}' "
+                            "sparse format, but a linear solver in the system prefers "
+                            f"'{sparse_format}'. This may result in performance degradation."
+                        )
+                    sparse_format = option_format
+
+                asm_jac = self._choose_jac_type(sparse_format, assembled=True)
+                self._assembled_jac = self._jacobian = asm_jac
+                for solver, _ in asm_jac_solvers:
+                    solver._assembled_jac = asm_jac
+
+        return self._assembled_jac
 
     def _get_promotion_maps(self):
         """

@@ -90,8 +90,8 @@ class NewtonSolver(NonlinearSolver):
         Return a generator of linear solvers using assembled jacs.
         """
         if self.linear_solver is not None:
-            for s in self.linear_solver._assembled_jac_solver_iter():
-                yield s
+            for tup in self.linear_solver._assembled_jac_solver_iter():
+                yield tup
 
     def _set_solver_print(self, level=2, type_='all'):
         """

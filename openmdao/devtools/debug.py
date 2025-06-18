@@ -155,7 +155,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
                 lnjac = s._assembled_jac
                 jacs.append(lnjac)
             if s.nonlinear_solver is not None:
-                jacsolvers = list(s.nonlinear_solver._assembled_jac_solver_iter())
+                jacsolvers = [tup[0] for tup in s.nonlinear_solver._assembled_jac_solver_iter()]
                 if jacsolvers:
                     nljac = jacsolvers[0]._assembled_jac
                     if nljac is not lnjac:

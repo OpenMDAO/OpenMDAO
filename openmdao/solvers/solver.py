@@ -992,7 +992,7 @@ class LinearSolver(Solver):
         Return a generator of linear solvers using assembled jacs.
         """
         if self.options['assemble_jac']:
-            yield self
+            yield self, self.preferred_sparse_format()
 
     def add_recorder(self, recorder):
         """
@@ -1114,6 +1114,17 @@ class LinearSolver(Solver):
             system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.pop()
+
+    def preferred_sparse_format(self):
+        """
+        Return the preferred sparse format for the dr/do matrix of a split jacobian.
+
+        Returns
+        -------
+        str or None
+            The preferred sparse format for the dr/do matrix of a split jacobian.
+        """
+        return None
 
 
 class BlockLinearSolver(LinearSolver):

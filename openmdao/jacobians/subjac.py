@@ -397,7 +397,7 @@ class DenseSubjac(Subjac):
         uncovered_threshold : float or None
             Threshold for uncovered elements. Only used in _CheckingJacobian for sparse subjacs.
         """
-        self.get_val()[:, icol] = column
+        self.info['val'][:, icol] = column
 
     def todense(self):
         """
