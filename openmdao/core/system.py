@@ -5859,14 +5859,13 @@ class System(object, metaclass=SystemMetaclass):
                         if n in loc_meta_in:
                             loc_meta_in[n]['shape'] = shape
         else:
-            if abs_name in conns and nprocs > 1:
+            if abs_name in conns and nprocs > 1 and if abs_name in all_idx:
                 # check if src exists on a proc where tgt doesn't
-                if abs_name in all_idx:
-                    insizes = all_sizes['input'][:, all_idx[abs_name]]
-                    outsizes = all_sizes['output'][:, all_idx[src]]
-                    if np.any(insizes != outsizes):
-                        # keep track of this for later setting across all procs
-                        model._remote_sets.append((abs_name, src, value))
+                insizes = all_sizes['input'][:, all_idx[abs_name]]
+                outsizes = all_sizes['output'][:, all_idx[src]]
+                if np.any(insizes != outsizes):
+                    # keep track of this for later setting across all procs
+                    model._remote_sets.append((abs_name, src, value))
 
             myrank = model.comm.rank
 

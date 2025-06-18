@@ -3518,9 +3518,6 @@ class Group(System):
         assert self.pathname == ''  # only call this on the top level model
 
         if self.comm.allreduce(len(self._remote_sets), op=MPI.SUM) > 0:
-            # translate pathname, promoted name to absolute name. Note that we have to locate
-            # a local system corresponding to the pathname so that we can translate the promoted
-            # name in that system's namespace to the absolute name.
             abs2meta_out = self._var_abs2meta['output']
             abs2meta_in = self._var_abs2meta['input']
             for setinfo in self.comm.allgather(self._remote_sets):
