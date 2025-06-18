@@ -17,7 +17,7 @@ class CSCMatrix(COOMatrix):
 
     def _pre_update(self, dtype):
         """
-        Do anything that needs to be done at the start of AssembledJacobian._update.
+        Do anything that needs to be done at the start of SplitJacobian._update.
 
         Parameters
         ----------
@@ -29,7 +29,7 @@ class CSCMatrix(COOMatrix):
 
     def _post_update(self):
         """
-        Do anything that needs to be done at the end of AssembledJacobian._update.
+        Do anything that needs to be done at the end of SplitJacobian._update.
         """
         coo = self._coo
         # this will add any repeated entries together

@@ -16,9 +16,8 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
     global_meta_names, collect_errors, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.subjac import Subjac
-from openmdao.jacobians.block_jacobian import BlockJacobian
-from openmdao.jacobians.compjacobian import ComponentSplitJacobian
-from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
+from openmdao.jacobians.jacobian import SplitJacobian
 from openmdao.matrices.coo_matrix import COOMatrix
 from openmdao.matrices.csc_matrix import CSCMatrix
 from openmdao.matrices.csr_matrix import CSRMatrix
@@ -178,10 +177,10 @@ class Component(System):
                              desc='Default shape for variables that do not set val to a non-scalar '
                              'value or set shape, shape_by_conn, copy_shape, or compute_shape.'
                              ' Default is (1,).')
-        self.options.declare('jac_type', types=str, default='block',
-                             desc='Type of Jacobian to use.  Options are "dense", "coo", '
+        self.options.declare('jac_type', types=str, default='dict',
+                             desc='Type of Jacobian to use.  Options are "dict", "dense", '
                              '"csc", or "csr". Ignored by matrix free components. Default is '
-                             '"block".')
+                             '"dict".')
 
     def _choose_jac_type(self, jac_type, assembled=False):
         """
@@ -199,19 +198,19 @@ class Component(System):
         Jacobian
             The Jacobian object.
         """
-        if jac_type == 'block':
+        if jac_type == 'dict':
             if assembled:
-                raise RuntimeError(f"{self.msginfo}: BlockJacobian is not supported for assembled "
-                                   "Jacobians.")
-            return BlockJacobian(self)
+                raise ValueError(f"{self.msginfo}: Invalid jac_type: {jac_type} for assembled "
+                                 "Jacobian.")
+            return DictionaryJacobian(self)
         elif jac_type == 'dense':
-            return ComponentSplitJacobian(DenseMatrix, self)
+            return SplitJacobian(DenseMatrix, self)
         elif jac_type == 'coo':
-            return ComponentSplitJacobian(COOMatrix, self)
+            return SplitJacobian(COOMatrix, self)
         elif jac_type == 'csc':
-            return ComponentSplitJacobian(CSCMatrix, self)
+            return SplitJacobian(CSCMatrix, self)
         elif jac_type == 'csr':
-            return ComponentSplitJacobian(CSRMatrix, self)
+            return SplitJacobian(CSRMatrix, self)
         else:
             raise ValueError(f"{self.msginfo}: Invalid jac_type: {jac_type}")
 
@@ -2256,7 +2255,7 @@ class Component(System):
             for mode in directions:
                 jac_key = 'J_' + mode
 
-                with self._unscaled_context():
+                with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
 
                     # Matrix-free components need to calculate Jacobian by matrix-vector product.
                     if self.matrix_free:

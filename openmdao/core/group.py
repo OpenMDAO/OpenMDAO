@@ -43,8 +43,7 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.subjac import Subjac
-from openmdao.jacobians.jacobian import GroupJacobianUpdateContext
-from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
+from openmdao.jacobians.jacobian import GroupJacobianUpdateContext, DenseJacobian, CSCJacobian
 
 
 # regex to check for valid names.

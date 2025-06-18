@@ -2,7 +2,7 @@
 
 from itertools import chain
 
-from openmdao.jacobians.block_jacobian import ExplicitBlockJacobian
+from openmdao.jacobians.dictionary_jacobian import ExplicitDictionaryJacobian
 from openmdao.jacobians.jacobian import JacobianUpdateContext
 from openmdao.utils.coloring import _ColSparsityJac
 from openmdao.core.component import Component
@@ -95,10 +95,10 @@ class ExplicitComponent(Component):
         Jacobian
             The Jacobian object.
         """
-        if jac_type == 'block':
-            # special case for explicit components requesting a block jacobian.  dr/do is -I,
+        if jac_type == 'dict':
+            # special case for explicit components requesting a dictionary jacobian.  dr/do is -I,
             # so we can just do a simple vector subtraction for all of those subjacs at once.
-            return ExplicitBlockJacobian(self)
+            return ExplicitDictionaryJacobian(self)
         else:
             return super()._choose_jac_type(jac_type)
 

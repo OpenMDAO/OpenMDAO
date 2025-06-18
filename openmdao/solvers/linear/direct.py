@@ -8,7 +8,7 @@ import scipy.sparse.linalg
 from scipy.sparse import csc_matrix
 
 from openmdao.solvers.solver import LinearSolver
-from openmdao.matrices.dense_matrix import DenseMatrix, GroupDenseMatrix
+from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.array_utils import identity_column_iter
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 
@@ -498,7 +498,7 @@ class DirectSolver(LinearSolver):
             full_b = b_vec
 
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                if isinstance(system._assembled_jac._dr_do_mtx, (DenseMatrix, GroupDenseMatrix)):
+                if isinstance(system._assembled_jac._dr_do_mtx, DenseMatrix):
                     sol_array = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
                 else:
                     sol_array = self._lu.solve(full_b, trans_splu)

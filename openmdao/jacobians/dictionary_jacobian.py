@@ -13,6 +13,11 @@ class DictionaryJacobian(Jacobian):
     ----------
     system : System
         Parent system to this jacobian.
+
+    Attributes
+    ----------
+    _has_children : bool
+        True if the system has children, False otherwise.
     """
 
     def __init__(self, system):
@@ -20,6 +25,7 @@ class DictionaryJacobian(Jacobian):
         Initialize all attributes.
         """
         super().__init__(system)
+        self._has_children = bool(system._subsystems_allprocs)
         self._setup(system)
 
     def _setup(self, system):
@@ -75,7 +81,7 @@ class DictionaryJacobian(Jacobian):
                 else:
                     wrtvec = None
 
-                if abs_key in system._cross_keys and abs_key in key_owners:
+                if self._has_children and abs_key in system._cross_keys and abs_key in key_owners:
                     wrtowner = key_owners[abs_key]
                     if system.comm.rank == wrtowner:
                         system.comm.bcast(wrtvec, root=wrtowner)
@@ -200,6 +206,9 @@ class _CheckingJacobian(DictionaryJacobian):
         column : ndarray
             Column value.
         """
+        if self._col_mapper is None:
+            self._setup_index_maps(system)
+
         wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
 
         # If we are doing a directional derivative, then the sparsity will be violated.
@@ -227,3 +236,97 @@ class _CheckingJacobian(DictionaryJacobian):
                         continue
                 else:
                     subjac.set_col(loc_idx, column[start:end], self._uncovered_threshold)
+
+
+class ExplicitDictionaryJacobian(Jacobian):
+    """
+    A DictionaryJacobian that is a collection of sub-Jacobians.
+
+    It is intended to be used with ExplicitComponents only because dr/do is assumed to be -I.
+
+    Parameters
+    ----------
+    system : System
+        System that is updating this jacobian.  Must be an ExplicitComponent.
+    """
+
+    def __init__(self, system):
+        """
+        Initialize all attributes.
+        """
+        super().__init__(system)
+        self._subjacs = self._get_subjacs(system)
+
+    def _get_subjacs(self, system=None):
+        """
+        Get the subjacs for the current system, creating them if necessary based on _subjacs_info.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+
+        Returns
+        -------
+        dict
+            Dictionary of subjacs keyed by absolute names.
+        """
+        if not self._initialized:
+            if not self._is_explicitcomp:
+                msginfo = system.msginfo if system else ''
+                raise RuntimeError(f"{msginfo}: ExplicitDictionaryJacobian is only intended to be "
+                                   "used with ExplicitComponents.")
+
+            self._subjacs = {}
+            for key, meta, dtype in self._subjacs_info_iter(system):
+                # only keep dr/di subjacs.  dr/do matrix is always -I
+                if key[1] in self._input_slices:
+                    self._subjacs[key] = self.create_subjac(key, meta, dtype)
+
+            self._initialized = True
+
+        return self._subjacs
+
+    def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
+        """
+        Compute matrix-vector product.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+        d_inputs : Vector
+            inputs linear vector.
+        d_outputs : Vector
+            outputs linear vector.
+        d_residuals : Vector
+            residuals linear vector.
+        mode : str
+            'fwd' or 'rev'.
+        """
+        randgen = self._randgen
+
+        d_inp_names = d_inputs._names
+
+        with system._unscaled_context(outputs=(d_outputs,), residuals=(d_residuals,)):
+            dresids = d_residuals.asarray()
+
+            if mode == 'fwd':
+                if d_outputs._names:
+                    # apply dr/do of -I
+                    dresids -= d_outputs.asarray()
+
+                if d_inp_names:
+                    for key, subjac in self._get_subjacs(system).items():
+                        if key[1] in d_inp_names:
+                            subjac.apply_fwd(d_inputs, d_outputs, d_residuals, randgen)
+            else:  # rev
+                if d_outputs._names:
+                    # apply dr/do of -I
+                    doutarr = d_outputs.asarray()
+                    doutarr -= dresids
+
+                if d_inp_names:
+                    for key, subjac in self._get_subjacs(system).items():
+                        if key[1] in d_inp_names:
+                            subjac.apply_rev(d_inputs, d_outputs, d_residuals, randgen)

@@ -7,6 +7,8 @@ from openmdao.utils.units import unit_conversion
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.general_utils import do_nothing_context
 from openmdao.utils.coloring import _ColSparsityJac
+from openmdao.matrices.dense_matrix import DenseMatrix
+from openmdao.matrices.csc_matrix import CSCMatrix
 
 
 def _get_vec_slices(system, iotype, subset=None):
@@ -483,14 +485,14 @@ class Jacobian(object):
         list
             List of keys matching this jacobian for the current system.
         """
-        if use_relevance and self._has_approx:
-            relevance = self._problem_meta['relevance']
-            is_relevant = relevance.is_relevant
-            active = system.linear_solver is None or system.linear_solver.use_relevance()
-        else:
-            relevance = None
-
         if self._ordered_subjac_keys is None:
+            if use_relevance and self._has_approx:
+                relevance = self._problem_meta['relevance']
+                is_relevant = relevance.is_relevant
+                active = system.linear_solver is None or system.linear_solver.use_relevance()
+            else:
+                relevance = None
+
             subjacs_info = self._subjacs_info
             keys = []
             # determine the set of remote keys (keys where either of or wrt is remote somewhere)
@@ -569,6 +571,8 @@ class SplitJacobian(Jacobian):
 
     Parameters
     ----------
+    matrix_class : Matrix
+        The matrix class to use for the dr/do and dr/di matrices.
     system : System
         System that is updating this jacobian.
 
@@ -588,12 +592,14 @@ class SplitJacobian(Jacobian):
         Dictionary containing mask caches for the dr/di matrix.
     """
 
-    def __init__(self, system):
+    def __init__(self, matrix_class, system):
         """
         Initialize the SplitJacobian.
 
         Parameters
         ----------
+        matrix_class : Matrix
+            The matrix class to use for the dr/do and dr/di matrices.
         system : System
             The system that owns this jacobian.
         """
@@ -603,6 +609,21 @@ class SplitJacobian(Jacobian):
         self._dr_do_mtx = None
         self._dr_di_mtx = None
         self._mask_caches = {}
+
+        drdo_subjacs, drdi_subjacs = self._get_split_subjacs(system)
+        out_size = len(system._outputs)
+
+        dtype = complex if system.under_complex_step else float
+
+        if not self._is_explicitcomp and drdo_subjacs:
+            self._dr_do_mtx = matrix_class(drdo_subjacs)
+            self._dr_do_mtx._build(out_size, out_size, dtype)
+
+        if drdi_subjacs:
+            self._dr_di_mtx = matrix_class(drdi_subjacs)
+            self._dr_di_mtx._build(out_size, len(system._inputs), dtype)
+
+        self._update(system)
 
     def _reset_subjacs(self, system):
         """
@@ -853,6 +874,58 @@ class SplitJacobian(Jacobian):
             if key in subjacs:
                 subjacs[key].set_col(loc_idx, column[start:end])
 
+    def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
+        """
+        Compute matrix-vector product.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+        d_inputs : Vector
+            inputs linear vector.
+        d_outputs : Vector
+            outputs linear vector.
+        d_residuals : Vector
+            residuals linear vector.
+        mode : str
+            'fwd' or 'rev'.
+        """
+        drdi_mtx = self._dr_di_mtx
+        if drdi_mtx is None and not d_outputs._names:  # avoid unnecessary unscaling
+            return
+
+        with system._unscaled_context(outputs=(d_outputs,), residuals=(d_residuals,)):
+            dresids = d_residuals.asarray()
+
+            if mode == 'fwd':
+                if d_outputs._names:
+                    if self._is_explicitcomp:
+                        # dr/do = -I
+                        dresids -= d_outputs.asarray()
+                    elif self._dr_do_mtx is not None:
+                        dresids += self._dr_do_mtx._prod(d_outputs.asarray(), mode)
+
+                if d_inputs._names and drdi_mtx is not None:
+                    dresids += drdi_mtx._prod(d_inputs.asarray(), mode,
+                                              self._get_mask(d_inputs, mode))
+
+            else:  # rev
+                if d_outputs._names:
+                    doutarr = d_outputs.asarray()
+                    if self._is_explicitcomp:
+                        # dr/do = -I
+                        doutarr -= dresids
+                    else:
+                        doutarr += self._dr_do_mtx._prod(dresids, mode)
+
+                if d_inputs._names and drdi_mtx is not None:
+                    arr = drdi_mtx._prod(dresids, mode)
+                    mask = self._get_mask(d_inputs, mode)
+                    if mask is not None:
+                        arr[mask] = 0.0
+                    d_inputs += arr
+
     def _get_mask(self, d_inputs, mode):
         """
         Get the mask for the inputs.
@@ -876,6 +949,44 @@ class SplitJacobian(Jacobian):
             self._mask_caches[(d_inputs._names, mode)] = mask
 
         return mask
+
+
+# keep this around for backwards compatibility
+AssembledJacobian = SplitJacobian
+
+
+class DenseJacobian(SplitJacobian):
+    """
+    Assemble dense global <Jacobian>.
+
+    Parameters
+    ----------
+    system : System
+        Parent system to this jacobian.
+    """
+
+    def __init__(self, system):
+        """
+        Initialize all attributes.
+        """
+        super().__init__(DenseMatrix, system=system)
+
+
+class CSCJacobian(SplitJacobian):
+    """
+    Assemble sparse global <Jacobian> in Compressed Col Storage format.
+
+    Parameters
+    ----------
+    system : System
+        Parent system to this jacobian.
+    """
+
+    def __init__(self, system):
+        """
+        Initialize all attributes.
+        """
+        super().__init__(CSCMatrix, system=system)
 
 
 class JacobianUpdateContext:

@@ -107,12 +107,10 @@ class COOMatrix(Matrix):
         ndarray
             vector resulting from the product.
         """
-        in_vec = self._get_masked_arr(in_vec, mode, mask)
-
         if mode == 'fwd':
-            return self._matrix.dot(in_vec)
+            return self._matrix @ self._get_masked_arr(in_vec, mask)
         else:  # rev
-            return self._matrix.transpose().dot(in_vec)
+            return self._matrix.T @ self._get_masked_arr(in_vec, mask)
 
     def _update_dtype(self, dtype):
         """
@@ -130,17 +128,6 @@ class COOMatrix(Matrix):
             data = self._coo.data if dtype.kind == 'c' else self._coo.data.real
             self._coo.data = np.ascontiguousarray(data, dtype=dtype)
             self._matrix_T = None
-
-    def toarray(self):
-        """
-        Return the matrix as a dense array.
-
-        Returns
-        -------
-        ndarray
-            Dense array representation of the matrix.
-        """
-        return self._matrix.toarray()
 
     def _update_from_submat(self, subjac, randgen):
         """
