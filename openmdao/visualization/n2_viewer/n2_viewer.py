@@ -536,7 +536,8 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
         'name': driver_name,
         'type': driver_type,
         'options': driver_options,
-        'opt_settings': driver_opt_settings
+        'opt_settings': driver_opt_settings,
+        'supports': driver.supports._dict,
     }
     data_dict['design_vars'] = root_group.get_design_vars(use_prom_ivc=False)
     data_dict['responses'] = root_group.get_responses(use_prom_ivc=False)

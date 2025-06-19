@@ -540,7 +540,7 @@ class _RealTimeOptPlot(_RealTimePlot):
         )
       
         section_separator = Div(
-            sizing_mode="stretch_width",  # This makes it fill available horizontal space
+            sizing_mode="stretch_width",
             height=1,
             styles={
                 'border-top': '1px solid #5c5c5c',
