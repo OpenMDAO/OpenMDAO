@@ -10,27 +10,9 @@ from openmdao.visualization.realtime_opt_plot.realtime_analysis_driver_plot impo
 from openmdao.visualization.realtime_opt_plot.realtime_optimizer_plot import _RealTimeOptimizerPlot
 
 try:
-    from bokeh.models import (
-        ColumnDataSource,
-        CheckboxGroup,
-        Button,
-        Row,
-        Div,
-        BasicTicker,
-        LinearColorMapper,
-        ColorBar,
-        Select,
-        Column,
-        ScrollBox,
-        InlineStyleSheet,
-    )
-    from bokeh.layouts import gridplot, Spacer
-    from bokeh.transform import transform
-    from bokeh.plotting import figure
     from bokeh.server.server import Server
     from bokeh.application.application import Application
     from bokeh.application.handlers import FunctionHandler
-    from bokeh.palettes import Viridis256
 
     bokeh_available = True
 except ImportError:

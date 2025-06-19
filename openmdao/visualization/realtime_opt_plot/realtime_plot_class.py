@@ -13,4 +13,6 @@ class _RealTimePlot(object):
         self._pid_of_calling_script = pid_of_calling_script
         self._doc = doc
         self._callback_period = callback_period
+        self._source = None
+        self._source_stream_dict = {}
 

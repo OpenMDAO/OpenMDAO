@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 
-from openmdao.visualization.realtime_opt_plot.realtime_plot import _is_process_running
+from openmdao.utils.shell_proc import _is_process_running
 from openmdao.visualization.realtime_opt_plot.realtime_plot_class import _RealTimePlot
 
 try:
@@ -273,14 +273,14 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         # self._case_recorder_filename = case_recorder_filename
         super().__init__(case_tracker, callback_period, doc, pid_of_calling_script)
         
-        self._source = None
+        # self._source = None
         self._lines = []
         self._toggles = []
         self._column_items = []
         self._axes = []
         # flag to prevent updating label with units each time we get new data
         self._labels_updated_with_units = False
-        self._source_stream_dict = None
+        # self._source_stream_dict = None
 
         self._setup_figure()
 

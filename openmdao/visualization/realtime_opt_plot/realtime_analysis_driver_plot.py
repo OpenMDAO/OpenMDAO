@@ -190,8 +190,6 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         self._prom_response = None
 
         # data source items for doing streaming in bokeh
-        self._source = None
-        self._source_stream_dict = {}
         self._hist_source = {}
 
         # used to keep track of the y min and max of the data so that
