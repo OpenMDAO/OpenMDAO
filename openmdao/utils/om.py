@@ -67,8 +67,8 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
 from openmdao.visualization.graph_viewer import _graph_setup_parser, _graph_cmd
-from openmdao.visualization.realtime_opt_plot.realtime_opt_plot import \
-    _realtime_opt_plot_setup_parser, _realtime_opt_plot_cmd
+from openmdao.visualization.realtime_opt_plot.realtime_plot import \
+    _realtime_plot_setup_parser, _realtime_plot_cmd
 from openmdao.recorders.view_cases import _view_cases_setup_parser, _view_cases_cmd
 
 
@@ -716,8 +716,8 @@ _command_map = {
         "Run the realtime optimization progress plot tool once the driver recorder file is started"
     ),
     'realtime_opt_plot': (
-        _realtime_opt_plot_setup_parser,
-        _realtime_opt_plot_cmd,
+        _realtime_plot_setup_parser,
+        _realtime_plot_cmd,
         "Run the realtime optimization progress plot tool"
     ),
     "scaffold": (

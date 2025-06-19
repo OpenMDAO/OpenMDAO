@@ -5,7 +5,8 @@ from itertools import product
 import time
 from datetime import datetime, timedelta
 
-from openmdao.visualization.realtime_opt_plot.realtime_plot import _CaseRecorderTracker, _RealTimePlot
+from openmdao.visualization.realtime_opt_plot.realtime_plot_class import _RealTimePlot
+
 
 try:
     from bokeh.models import (
@@ -47,13 +48,6 @@ except ImportError:
 
 # Define Constants
 
-# the time between calls to the udpate method
-# if this is too small, the GUI interactions get delayed because
-# code is busy trying to keep up with the periodic callbacks
-_time_between_callbacks_in_ms = 1000
-
-# Number of milliseconds for unused session lifetime
-_unused_session_lifetime_milliseconds = 1000 * 60 * 10
 
 # layout and format params
 _left_side_column_width = 500
@@ -170,65 +164,11 @@ def _elide_variable_name_with_units(variable_name, units):
     else:
         return variable_name
 
-def _realtime_opt_plot_setup_parser(parser):
-    """
-    Set up the realtime plot subparser for the 'openmdao opt_plot' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument(
-        "case_recorder_filename",
-        type=str,
-        help="Name of openmdao case recorder filename. It should contain driver cases",
-    )
-
-    parser.add_argument(
-        "--pid",
-        type=int,
-        default=None,
-        help="Process ID of calling optimization script, "
-        "defaults to None if called by the user directly",
-    )
-    parser.add_argument(
-        "--no-display",
-        action="store_false",
-        dest="show",
-        help="Do not launch browser showing plot. Used for CI testing",
-    )
-
-
-def _realtime_opt_plot_cmd(options, user_args):
-    """
-    Run the opt_plot command.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-    user_args : list of str
-        Args to be passed to the user script.
-    """
-    if bokeh_available:
-        realtime_opt_plot(
-            options.case_recorder_filename,
-            _time_between_callbacks_in_ms,
-            options.pid,
-            options.show,
-        )
-    else:
-        print(
-            "The bokeh library is not installed so the real-time optimizaton "
-            "lot is not available. "
-        )
-        return
 
 
 
 
-class _RealTimeOptPlot(_RealTimePlot):
+class _RealTimeAnalysisDriverPlot(_RealTimePlot):
     """
     A class that handles all of the real-time plotting.
 
@@ -247,12 +187,13 @@ class _RealTimeOptPlot(_RealTimePlot):
     """
 
     def __init__(
-        self, case_recorder_filename, callback_period, doc, pid_of_calling_script
+        self, case_tracker, callback_period, doc, pid_of_calling_script
     ):
         """
-        Construct and initialize _RealTimeOptPlot instance.
+        Construct and initialize _RealTimeAnalysisDriverPlot instance.
         """
-        super().__init__(case_recorder_filename, callback_period, doc, pid_of_calling_script)
+        super().__init__(case_tracker, callback_period, doc, pid_of_calling_script)
+
 
         # lists of the sampled variables in the analysis and the responses
         self._sampled_variables = None
@@ -447,7 +388,7 @@ class _RealTimeOptPlot(_RealTimePlot):
 
         self._analysis_driver_progress_text_box.text = \
             f"""<div>
-                        <p>Script: {self._case_recorder_filename}</p>
+                        <p>Script: {self._case_tracker.get_case_recorder_filename()}</p>
                         <p>Number of samples: {self._num_samples_plotted}</p>
                         <p>Last updated: {last_updated_time_formatted}</p>
                         <p>Elapsed time: {elapsed_total_time_formatted}</p>
@@ -794,56 +735,3 @@ class _RealTimeOptPlot(_RealTimePlot):
             sizing_mode="stretch_height",
         )
 
-
-def realtime_opt_plot(
-    case_recorder_filename, callback_period, pid_of_calling_script, show
-):
-    """
-    Visualize the objectives, desvars, and constraints during an optimization process.
-
-    Parameters
-    ----------
-    case_recorder_filename : MetaModelStructuredComp or MetaModelUnStructuredComp
-        The metamodel component.
-    callback_period : float
-        The time period between when the application calls the update method.
-    pid_of_calling_script : int
-        The process id of the calling optimization script, if called this way.
-    show : bool
-        If true, launch the browser display of the plot.
-    """
-
-    def _make_realtime_opt_plot_doc(doc):
-        _RealTimeOptPlot(
-            case_recorder_filename,
-            callback_period,
-            doc=doc,
-            pid_of_calling_script=pid_of_calling_script,
-        )
-
-    _port_number = get_free_port()
-
-    try:
-        server = Server(
-            {"/": Application(FunctionHandler(_make_realtime_opt_plot_doc))},
-            port=_port_number,
-            unused_session_lifetime_milliseconds=_unused_session_lifetime_milliseconds,
-        )
-        server.start()
-        if show:
-            server.io_loop.add_callback(server.show, "/")
-
-        print(
-            f"Real-time optimization plot server running on http://localhost:{_port_number}"
-        )
-        server.io_loop.start()
-    except KeyboardInterrupt as e:
-        print(
-            f"Real-time optimization plot server stopped due to keyboard interrupt: {e}"
-        )
-    except Exception as e:
-        print(f"Error starting real-time optimization plot server: {e}")
-    finally:
-        print("Stopping real-time optimization plot server")
-        if "server" in globals():
-            server.stop()
