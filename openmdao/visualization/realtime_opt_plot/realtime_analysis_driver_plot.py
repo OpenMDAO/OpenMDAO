@@ -26,9 +26,6 @@ try:
     from bokeh.layouts import gridplot, Spacer
     from bokeh.transform import transform
     from bokeh.plotting import figure
-    from bokeh.server.server import Server
-    from bokeh.application.application import Application
-    from bokeh.application.handlers import FunctionHandler
     from bokeh.palettes import Viridis256
 
     bokeh_available = True
@@ -37,18 +34,7 @@ except ImportError:
 
 import numpy as np
 
-
-try:
-    from openmdao.utils.gui_testing_utils import get_free_port
-except ImportError:
-    # If get_free_port is unavailable, the default port will be used
-    def get_free_port():
-        return 5000
-
-
 # Define Constants
-
-
 # layout and format params
 _left_side_column_width = 500
 # how big the individual plots should be in the grid
@@ -163,10 +149,6 @@ def _elide_variable_name_with_units(variable_name, units):
         return f"{variable_name} ({units})"
     else:
         return variable_name
-
-
-
-
 
 class _RealTimeAnalysisDriverPlot(_RealTimePlot):
     """
