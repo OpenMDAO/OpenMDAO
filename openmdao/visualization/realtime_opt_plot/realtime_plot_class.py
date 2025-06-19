@@ -16,3 +16,15 @@ class _RealTimePlot(object):
         self._source = None
         self._source_stream_dict = {}
 
+
+    def _setup_data_source(self):
+        raise NotImplementedError("_setup_data_source not implemented")
+
+    def _setup_figure(self):
+        raise NotImplementedError("_setup_figure not implemented")
+
+    def _update(self):
+        raise NotImplementedError("_update not implemented")
+
+
+

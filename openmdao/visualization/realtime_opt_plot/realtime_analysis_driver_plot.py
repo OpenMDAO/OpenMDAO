@@ -213,31 +213,31 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         self._start_time = time.time()
         self._num_samples_plotted = 0
 
+        doc.add_periodic_callback(self._update, callback_period)
+        doc.title = "OpenMDAO Analysis Driver Progress Plot"
+
+    def _update(self):
         # this is the main method of the class. It gets called periodically by Bokeh
         # It looks for new data and if found, updates the plot with the new data
-        def _update():
-            new_case = self._case_tracker._get_new_case()
-            if not new_case:
-                return
+        new_case = self._case_tracker._get_new_case()
+        if not new_case:
+            return
 
-            # See if Bokeh source object is defined yet. If not, set it up
-            # since now we have data from the case recorder with info about the
-            # variables to be plotted.
-            # Also setup the overall page
-            if self._source is None:
-                self._setup_data_source()
-                self._setup_figure()
-                doc.add_root(self._overall_layout)
+        # See if Bokeh source object is defined yet. If not, set it up
+        # since now we have data from the case recorder with info about the
+        # variables to be plotted.
+        # Also setup the overall page
+        if self._source is None:
+            self._setup_data_source()
+            self._setup_figure()
+            self._doc.add_root(self._overall_layout)
 
-            # TODO - is the case of new_case None handled correctly?
-            self._update_source_stream(new_case)
-            self._update_scatter_plots(new_case)
-            self._update_histograms()
-            self._update_analysis_driver_progress_text_box()
-            # end of _update method
-
-        doc.add_periodic_callback(_update, callback_period)
-        doc.title = "OpenMDAO Analysis Driver Progress Plot"
+        # TODO - is the case of new_case None handled correctly?
+        self._update_source_stream(new_case)
+        self._update_scatter_plots(new_case)
+        self._update_histograms()
+        self._update_analysis_driver_progress_text_box()
+        # end of _update method
 
     def _setup_data_source(self):
         self._source_dict = {}

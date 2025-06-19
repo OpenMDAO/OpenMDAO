@@ -1,4 +1,5 @@
 """Some basic shell utilities, used for ExternalCodeComp mostly."""
+import errno
 import os
 import signal
 import subprocess

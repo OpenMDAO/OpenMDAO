@@ -289,235 +289,241 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         self._y_min = defaultdict(lambda: float("inf"))
         self._y_max = defaultdict(lambda: float("-inf"))
 
-        def _update():
-            # this is the main method of the class. It gets called periodically by Bokeh
-            # It looks for new data and if found, updates the plot with the new data
-            new_case = self._case_tracker._get_new_case()
+        doc.add_periodic_callback(self._update, callback_period)
+        doc.title = "OpenMDAO Optimization Progress Plot"
 
-            if new_case is None:
-                if self._pid_of_calling_script is None or not _is_process_running(
-                    self._pid_of_calling_script
-                ):
-                    # no more new data in the case recorder file and the
-                    #   optimization script stopped running, so no possible way to
-                    #   get new data.
-                    # But just keep sending the last data point.
-                    # This is a hack to force the plot to re-draw.
-                    # Otherwise if the user clicks on the variable buttons, the
-                    #   lines will not change color because of the set_value hack done to get
-                    #   get around the bug in setting the line color from JavaScript
-                    self._source.stream(self._source_stream_dict)
-                return
 
-            new_data = self._case_tracker._get_data_from_case(new_case)
 
-            # See if Bokeh source object is defined yet. If not, set it up
-            # since now we have data from the case recorder with info about the
-            # variables to be plotted.
-            if self._source is None:
-                self._setup_data_source()
+    def _update(self):
+        # this is the main method of the class. It gets called periodically by Bokeh
+        # It looks for new data and if found, updates the plot with the new data
+        new_case = self._case_tracker._get_new_case()
 
-                # Check to make sure we have one and only one objective before going farther
-                obj_names = self._case_tracker._get_obj_names()
-                if len(obj_names) != 1:
-                    raise ValueError(
-                        f"Plot requires there to be one and only one objective \
-                            but {len(obj_names)} objectives found"
-                    )
+        if new_case is None:
+            if self._pid_of_calling_script is None or not _is_process_running(
+                self._pid_of_calling_script
+            ):
+                # no more new data in the case recorder file and the
+                #   optimization script stopped running, so no possible way to
+                #   get new data.
+                # But just keep sending the last data point.
+                # This is a hack to force the plot to re-draw.
+                # Otherwise if the user clicks on the variable buttons, the
+                #   lines will not change color because of the set_value hack done to get
+                #   get around the bug in setting the line color from JavaScript
+                self._source.stream(self._source_stream_dict)
+            return
 
-                # Create CustomJS callback for toggle buttons.
-                # Pass in the data from the Python side that the JavaScript side
-                #   needs
-                legend_item_callback = CustomJS(
-                    args=dict(
-                        lines=self._lines,
-                        axes=self._axes,
-                        toggles=self._toggles,
-                        colorPalette=_colorPalette,
-                        plot=self.plot_figure,
-                    ),
-                    code=callback_code,
+        new_data = self._case_tracker._get_data_from_case(new_case)
+
+        # See if Bokeh source object is defined yet. If not, set it up
+        # since now we have data from the case recorder with info about the
+        # variables to be plotted.
+        if self._source is None:
+            self._setup_data_source()
+
+            # Check to make sure we have one and only one objective before going farther
+            obj_names = self._case_tracker._get_obj_names()
+            if len(obj_names) != 1:
+                raise ValueError(
+                    f"Plot requires there to be one and only one objective \
+                        but {len(obj_names)} objectives found"
                 )
 
-                # For the variables, make lines, axes, and the buttons to turn on and
-                #   off the variable plot.
-                # All the lines and axes for the desvars and cons are created in
-                #   Python but initially are not visible. They are turned on and
-                #   off on the JavaScript side.
+            # Create CustomJS callback for toggle buttons.
+            # Pass in the data from the Python side that the JavaScript side
+            #   needs
+            legend_item_callback = CustomJS(
+                args=dict(
+                    lines=self._lines,
+                    axes=self._axes,
+                    toggles=self._toggles,
+                    colorPalette=_colorPalette,
+                    plot=self.plot_figure,
+                ),
+                code=callback_code,
+            )
 
-                # objs
-                obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
-                self._column_items.append(obj_label)
+            # For the variables, make lines, axes, and the buttons to turn on and
+            #   off the variable plot.
+            # All the lines and axes for the desvars and cons are created in
+            #   Python but initially are not visible. They are turned on and
+            #   off on the JavaScript side.
 
-                for i, obj_name in enumerate(obj_names):
-                    units = self._case_tracker._get_units(obj_name)
-                    self.plot_figure.yaxis.axis_label = f"{obj_name} ({units})"
-                    self._make_variable_button(f"{obj_name} ({units})", _obj_color,
-                                               True, legend_item_callback)
-                    self._make_line_and_hover_tool("objs", obj_name, False, _obj_color,
-                                                   "solid", True)
-                    value = new_data["objs"][obj_name]
-                    float_value = _get_value_for_plotting(value, "objs")
-                    # just give it some non-zero initial range since we only have one point
-                    self.plot_figure.y_range = Range1d(float_value - 1, float_value + 1)
+            # objs
+            obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
+            self._column_items.append(obj_label)
 
-                # desvars
-                desvars_label = _make_header_text_for_variable_chooser("DESIGN VARS")
-                self._column_items.append(desvars_label)
-                desvar_names = self._case_tracker._get_desvar_names()
-                for i, desvar_name in enumerate(desvar_names):
-                    units = self._case_tracker._get_units(desvar_name)
-                    self._make_variable_button(
-                        f"{desvar_name} ({units})",
-                        _non_active_plot_color,
-                        False,
-                        legend_item_callback,
-                    )
-                    value = new_data["desvars"][desvar_name]
-                    # for desvars, if value is a vector, use Bokeh Varea glyph
-                    use_varea = value.size > 1
-                    self._make_line_and_hover_tool(
-                        "desvars",
-                        desvar_name,
-                        use_varea,
-                        _non_active_plot_color,
-                        "solid",
-                        False,
-                    )
-                    float_value = _get_value_for_plotting(value, "desvars")
-                    self._make_axis("desvars", desvar_name, float_value, units)
+            for i, obj_name in enumerate(obj_names):
+                units = self._case_tracker._get_units(obj_name)
+                self.plot_figure.yaxis.axis_label = f"{obj_name} ({units})"
+                self._make_variable_button(f"{obj_name} ({units})", _obj_color,
+                                            True, legend_item_callback)
+                self._make_line_and_hover_tool("objs", obj_name, False, _obj_color,
+                                                "solid", True)
+                value = new_data["objs"][obj_name]
+                float_value = _get_value_for_plotting(value, "objs")
+                # just give it some non-zero initial range since we only have one point
+                self.plot_figure.y_range = Range1d(float_value - 1, float_value + 1)
 
-                # cons
-                cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
-                self._column_items.append(cons_label)
-                cons_names = self._case_tracker._get_cons_names()
-                for i, cons_name in enumerate(cons_names):
-                    units = self._case_tracker._get_units(cons_name)
-                    self._make_variable_button(
-                        f"{cons_name} ({units})",
-                        _non_active_plot_color,
-                        False,
-                        legend_item_callback,
-                    )
-                    self._make_line_and_hover_tool(
-                        "cons",
-                        cons_name,
-                        False,
-                        _non_active_plot_color,
-                        "dashed",
-                        False,
-                    )
-                    value = new_data["cons"][cons_name]
-                    float_value = _get_value_for_plotting(value, "cons")
-                    self._make_axis("cons", cons_name, float_value, units)
+            # desvars
+            desvars_label = _make_header_text_for_variable_chooser("DESIGN VARS")
+            self._column_items.append(desvars_label)
+            desvar_names = self._case_tracker._get_desvar_names()
+            for i, desvar_name in enumerate(desvar_names):
+                units = self._case_tracker._get_units(desvar_name)
+                self._make_variable_button(
+                    f"{desvar_name} ({units})",
+                    _non_active_plot_color,
+                    False,
+                    legend_item_callback,
+                )
+                value = new_data["desvars"][desvar_name]
+                # for desvars, if value is a vector, use Bokeh Varea glyph
+                use_varea = value.size > 1
+                self._make_line_and_hover_tool(
+                    "desvars",
+                    desvar_name,
+                    use_varea,
+                    _non_active_plot_color,
+                    "solid",
+                    False,
+                )
+                float_value = _get_value_for_plotting(value, "desvars")
+                self._make_axis("desvars", desvar_name, float_value, units)
 
-                # Create a Column of the variable buttons and headers inside a scrolling window
-                toggle_column = Column(
-                    children=self._column_items,
-                    sizing_mode="stretch_both",
-                    height_policy="fit",
+            # cons
+            cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
+            self._column_items.append(cons_label)
+            cons_names = self._case_tracker._get_cons_names()
+            for i, cons_name in enumerate(cons_names):
+                units = self._case_tracker._get_units(cons_name)
+                self._make_variable_button(
+                    f"{cons_name} ({units})",
+                    _non_active_plot_color,
+                    False,
+                    legend_item_callback,
+                )
+                self._make_line_and_hover_tool(
+                    "cons",
+                    cons_name,
+                    False,
+                    _non_active_plot_color,
+                    "dashed",
+                    False,
+                )
+                value = new_data["cons"][cons_name]
+                float_value = _get_value_for_plotting(value, "cons")
+                self._make_axis("cons", cons_name, float_value, units)
+
+            # Create a Column of the variable buttons and headers inside a scrolling window
+            toggle_column = Column(
+                children=self._column_items,
+                sizing_mode="stretch_both",
+                height_policy="fit",
+                styles={
+                    "overflow-y": "auto",
+                    "border": "1px solid #ddd",
+                    "padding": "8px",
+                    "background-color": "#dddddd",
+                    'max-height': '100vh'  # Ensures it doesn't exceed viewport
+                },
+            )
+
+            quit_button = Button(label="Quit Application", button_type="danger")
+
+            # Define callback function for the quit button
+            def quit_app():
+                raise KeyboardInterrupt("Quit button pressed")
+
+            # Attach the callback to the button
+            quit_button.on_click(quit_app)
+
+            # header for the variable list
+            label = Div(
+                text="Variables",
+                width=200,
+                styles={"font-size": "20px", "font-weight": "bold"},
+            )
+            label_and_toggle_column = Column(
+                quit_button,
+                label,
+                toggle_column,
+                sizing_mode="stretch_height",
+                height_policy="fit",
                     styles={
-                        "overflow-y": "auto",
-                        "border": "1px solid #ddd",
-                        "padding": "8px",
-                        "background-color": "#dddddd",
                         'max-height': '100vh'  # Ensures it doesn't exceed viewport
                     },
+            )
+
+            scroll_box = ScrollBox(
+                child=label_and_toggle_column,
+                sizing_mode="stretch_height",
+                height_policy="max",
+            )
+
+            graph = Row(self.plot_figure, scroll_box, sizing_mode="stretch_both")
+            self._doc.add_root(graph)
+            # end of self._source is None - plotting is setup
+
+        # Do the actual update of the plot including updating the plot range and adding the new
+        # data to the Bokeh plot stream
+        counter = new_data["counter"]
+
+        self._source_stream_dict = {"iteration": [counter]}
+
+        iline = 0
+        for obj_name, obj_value in new_data["objs"].items():
+            float_obj_value = _get_value_for_plotting(obj_value, "objs")
+            self._source_stream_dict[obj_name] = [float_obj_value]
+            min_max_changed = _update_y_min_max(obj_name, float_obj_value,
+                                                self._y_min, self._y_max)
+            if min_max_changed:
+                self.plot_figure.y_range.start = self._y_min[obj_name]
+                self.plot_figure.y_range.end = self._y_max[obj_name]
+            iline += 1
+
+        for desvar_name, desvar_value in new_data["desvars"].items():
+            if not self._labels_updated_with_units and desvar_value.size > 1:
+                units = self._case_tracker._get_units(desvar_name)
+                self._toggles[iline].label = f"{desvar_name} ({units}) {desvar_value.shape}"
+            min_max_changed = False
+            min_max_changed = min_max_changed or _update_y_min_max(
+                desvar_name, np.min(desvar_value), self._y_min, self._y_max
+            )
+            min_max_changed = min_max_changed or _update_y_min_max(
+                desvar_name, np.max(desvar_value), self._y_min, self._y_max
+            )
+            if min_max_changed:
+                range = Range1d(
+                    self._y_min[desvar_name], self._y_max[desvar_name]
                 )
+                self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
+            self._source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
+            self._source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
+            iline += 1
 
-                quit_button = Button(label="Quit Application", button_type="danger")
-
-                # Define callback function for the quit button
-                def quit_app():
-                    raise KeyboardInterrupt("Quit button pressed")
-
-                # Attach the callback to the button
-                quit_button.on_click(quit_app)
-
-                # header for the variable list
-                label = Div(
-                    text="Variables",
-                    width=200,
-                    styles={"font-size": "20px", "font-weight": "bold"},
+        for cons_name, cons_value in new_data["cons"].items():
+            float_cons_value = _get_value_for_plotting(cons_value, "cons")
+            if not self._labels_updated_with_units and cons_value.size > 1:
+                units = self._case_tracker._get_units(cons_name)
+                self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
+            self._source_stream_dict[cons_name] = [float_cons_value]
+            min_max_changed = _update_y_min_max(
+                cons_name, float_cons_value, self._y_min, self._y_max)
+            if min_max_changed:
+                range = Range1d(
+                    self._y_min[cons_name], self._y_max[cons_name]
                 )
-                label_and_toggle_column = Column(
-                    quit_button,
-                    label,
-                    toggle_column,
-                    sizing_mode="stretch_height",
-                    height_policy="fit",
-                        styles={
-                            'max-height': '100vh'  # Ensures it doesn't exceed viewport
-                        },
-                )
+                self.plot_figure.extra_y_ranges[f"extra_y_{cons_name}"] = range
+            iline += 1
+        self._source.stream(self._source_stream_dict)
+        self._labels_updated_with_units = True
+        # end of _update method
 
-                scroll_box = ScrollBox(
-                    child=label_and_toggle_column,
-                    sizing_mode="stretch_height",
-                    height_policy="max",
-                )
 
-                graph = Row(self.plot_figure, scroll_box, sizing_mode="stretch_both")
-                doc.add_root(graph)
-                # end of self._source is None - plotting is setup
 
-            # Do the actual update of the plot including updating the plot range and adding the new
-            # data to the Bokeh plot stream
-            counter = new_data["counter"]
 
-            self._source_stream_dict = {"iteration": [counter]}
-
-            iline = 0
-            for obj_name, obj_value in new_data["objs"].items():
-                float_obj_value = _get_value_for_plotting(obj_value, "objs")
-                self._source_stream_dict[obj_name] = [float_obj_value]
-                min_max_changed = _update_y_min_max(obj_name, float_obj_value,
-                                                    self._y_min, self._y_max)
-                if min_max_changed:
-                    self.plot_figure.y_range.start = self._y_min[obj_name]
-                    self.plot_figure.y_range.end = self._y_max[obj_name]
-                iline += 1
-
-            for desvar_name, desvar_value in new_data["desvars"].items():
-                if not self._labels_updated_with_units and desvar_value.size > 1:
-                    units = self._case_tracker._get_units(desvar_name)
-                    self._toggles[iline].label = f"{desvar_name} ({units}) {desvar_value.shape}"
-                min_max_changed = False
-                min_max_changed = min_max_changed or _update_y_min_max(
-                    desvar_name, np.min(desvar_value), self._y_min, self._y_max
-                )
-                min_max_changed = min_max_changed or _update_y_min_max(
-                    desvar_name, np.max(desvar_value), self._y_min, self._y_max
-                )
-                if min_max_changed:
-                    range = Range1d(
-                        self._y_min[desvar_name], self._y_max[desvar_name]
-                    )
-                    self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
-                self._source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
-                self._source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
-                iline += 1
-
-            for cons_name, cons_value in new_data["cons"].items():
-                float_cons_value = _get_value_for_plotting(cons_value, "cons")
-                if not self._labels_updated_with_units and cons_value.size > 1:
-                    units = self._case_tracker._get_units(cons_name)
-                    self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
-                self._source_stream_dict[cons_name] = [float_cons_value]
-                min_max_changed = _update_y_min_max(
-                    cons_name, float_cons_value, self._y_min, self._y_max)
-                if min_max_changed:
-                    range = Range1d(
-                        self._y_min[cons_name], self._y_max[cons_name]
-                    )
-                    self.plot_figure.extra_y_ranges[f"extra_y_{cons_name}"] = range
-                iline += 1
-            self._source.stream(self._source_stream_dict)
-            self._labels_updated_with_units = True
-            # end of _update method
-
-        doc.add_periodic_callback(_update, callback_period)
-        doc.title = "OpenMDAO Optimization Progress Plot"
 
     def _setup_data_source(self):
         self._source_dict = {"iteration": []}

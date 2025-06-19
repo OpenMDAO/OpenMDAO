@@ -1,8 +1,4 @@
 import sqlite3
-import ctypes
-import errno
-import os
-import sys
 
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.case import Case
@@ -285,36 +281,5 @@ def realtime_opt_plot(
         print("Stopping real-time optimization plot server")
         if "server" in globals():
             server.stop()
-
-def _is_process_running(pid):
-    if sys.platform == "win32":
-        # PROCESS_QUERY_LIMITED_INFORMATION is available on Windows Vista and later.
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-
-        # Attempt to open the process.
-        handle = ctypes.windll.kernel32.OpenProcess(
-            PROCESS_QUERY_LIMITED_INFORMATION, False, pid
-        )
-        if handle:
-            ctypes.windll.kernel32.CloseHandle(handle)
-            return True
-        else:
-            # If OpenProcess fails, check if it's due to access being denied.
-            ERROR_ACCESS_DENIED = 5
-            if ctypes.windll.kernel32.GetLastError() == ERROR_ACCESS_DENIED:
-                return True
-            return False
-    else:
-        try:
-            os.kill(pid, 0)
-        except OSError as err:
-            if err.errno == errno.ESRCH:  # No such process
-                return False
-            elif err.errno == errno.EPERM:  # Process exists, no permission to signal
-                return True
-            else:
-                raise
-        else:
-            return True
 
 
