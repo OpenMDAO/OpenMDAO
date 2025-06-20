@@ -100,8 +100,8 @@ jobs:
           # test baseline versions on MacOS
           - NAME: MacOS Baseline
             OS: macos-13
-            PY: '3.13'
-            NUMPY: '2.2'
+            PY: '3.12'
+            NUMPY: '1.26'
             SCIPY: '1.15'
             PETSc: '3'
             PYOPTSPARSE_FROM: 'conda-forge'
