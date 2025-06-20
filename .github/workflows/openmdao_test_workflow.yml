@@ -102,7 +102,7 @@ jobs:
             OS: macos-13
             PY: '3.12'
             NUMPY: '1.26'
-            SCIPY: '1.15'
+            SCIPY: '1.13'
             PETSc: '3.20'
             PYOPTSPARSE_FROM: 'conda-forge'
             PYOPTSPARSE: '2.13.1'
