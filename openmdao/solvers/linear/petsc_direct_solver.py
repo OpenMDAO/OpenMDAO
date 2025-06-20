@@ -11,8 +11,6 @@ from openmdao.solvers.solver import LinearSolver
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.array_utils import identity_column_iter
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
-from openmdao.utils.mpi import check_mpi_env
-from openmdao.utils.om_warnings import issue_warning, SolverWarning
 
 try:
     from petsc4py import PETSc
@@ -39,7 +37,8 @@ class PETScLU:
     """
     Wrapper for PETSc LU decomposition, using petsc4py.
     """
-    def __init__(self, A: scipy.sparse.spmatrix, backend: str = None):
+    def __init__(self, A: scipy.sparse.spmatrix, backend: str = None,
+                 comm = PETSc.COMM_WORLD):
         """
         Initialize and setup the PETSc LU Direct Solver object.
 
@@ -49,6 +48,8 @@ class PETScLU:
             Matrix to use in solving x @ A == b
         backend : str
             Name of the direct solver from PETSc to use.
+        comm : <mpi4py.MPI.Intracomm>
+            The system MPI communicator
 
         Attributes
         ----------
@@ -61,6 +62,8 @@ class PETScLU:
         _x : <petsc4py.PETSc.Vec>
             Sequential (non-distributed) PETSc vector to store the solve solution.
         """
+        self.comm = comm
+        self.running_mpi = not comm.size == 1
         self.orig_A = A
         # Create PETSc matrix
         # Dense
@@ -72,11 +75,37 @@ class PETScLU:
             # PETSc wants to use CSR matrices, not CSC
             if not scipy.sparse.isspmatrix_csr(A):
                 A = A.tocsr()
+
             # TODO: Look at how to maybe provide a nnz argument for a rough
             # estimate of number of nonzero rows so it hopefully doesn't have
             # to do frequent reallocations
-            self.A = PETSc.Mat().createAIJ(size=A.shape, csr=(A.indptr,
-                                                              A.indices, A.data))
+            if self.running_mpi:
+                # Parallel: build local CSR
+                self.A = PETSc.Mat().create(comm=comm)
+                self.A.setSizes(A.shape)
+                self.A.setType('aij')
+                self.A.setUp()
+
+                rstart, rend = self.A.getOwnershipRange()
+
+                indptr = A.indptr
+                indices = A.indices
+                data = A.data
+
+                for i in range(rstart, rend):
+                    row_start = indptr[i]
+                    row_end = indptr[i + 1]
+                    cols = indices[row_start : row_end]
+                    vals = data[row_start : row_end]
+                    self.A.setValues(i, cols, vals)
+
+            else:
+                # Serial: build full CSR
+                self.A = PETSc.Mat().createAIJ(
+                    size=A.shape,
+                    csr=(A.indptr, A.indices, A.data)
+                )
+
             self.A.assemble()
 
         # Create PETSc solver (KSP is the iterative linear solver [Krylov SPace
@@ -92,15 +121,20 @@ class PETScLU:
         # Backends are only for sparse matrices. For dense matrix should by
         # default use LAPACK
         if backend and not isinstance(A, np.ndarray):
-            if backend in PC_DISTRIBUTED_TYPES and check_mpi_env() is False:
-                issue_warning(
-                    msg=('OPENMDAO_USE_MPI is False, but a linear solver which '
-                         'is meant to use MPI was selected. The solver will '
-                         'run sequentially.'),
-                    prefix='PETScDirectSolver',
-                    category=SolverWarning,
+            if backend in PC_SERIAL_TYPES and self.running_mpi:
+                raise RuntimeError(
+                    f'The "{backend}" backend cannot be used when running the '
+                    'PETScDirectSolver with MPI. The "backend" must be one of '
+                    f'{PC_DISTRIBUTED_TYPES}'
                 )
             pc.setFactorSolverType(backend)
+
+        elif isinstance(A, np.ndarray) and self.running_mpi:
+            raise RuntimeError(
+                f'The "LAPACK" backend which is automatically chosen for dense '
+                'problems cannot be used when running the PETScDirectSolver '
+                f'with MPI. The "backend" must be one of {PC_DISTRIBUTED_TYPES}'
+            )
 
         # Read and apply the user specified options to configure the solver,
         # preconditioner, etc., then perform the internal setup and initialization
@@ -110,8 +144,9 @@ class PETScLU:
         self.ksp.setUp()
 
         # Create a single process vector which will store the solve solution
-        # vector
-        self._x = PETSc.Vec().createSeq(A.shape[1])
+        # vector (createVecLeft automatically creates a properly sized and
+        # distributed vector based on A)
+        self._x = self.A.createVecLeft()
 
     def solve(self, b: np.ndarray, transpose: bool = False) -> np.ndarray:
         """
@@ -129,12 +164,46 @@ class PETScLU:
         ndarray
             The solution array.
         """
-        b_petsc = PETSc.Vec().createWithArray(b)
+        b_petsc = self.A.createVecRight()
+        rstart, rend = b_petsc.getOwnershipRange()
+        b_petsc.setValues(range(rstart, rend), b[rstart : rend])
+        b_petsc.assemble()
+
         if transpose:
             self.ksp.solveTranspose(b_petsc, self._x)
         else:
             self.ksp.solve(b_petsc, self._x)
-        return self._x.getArray().copy()
+
+        # OpenMDAO needs x to be a numpy array, so we need to take the distributed
+        # x and "scatter" it (basically gather it to one rank). Once it's
+        # gathered into onen array, it can be converted to a numpy array and
+        # passed out.
+        if self.running_mpi:
+            # Create the sequential vector on COMM_SELF so it's not part of the
+            # distributed communication and is only on one process.
+            if self._x.comm.getRank() == 0:
+                x_seq = PETSc.Vec().createSeq(self._x.getSize(), comm=PETSc.COMM_SELF)
+            else:
+                x_seq = PETSc.Vec().createSeq(0, comm=PETSc.COMM_SELF)
+
+            # Have to call scatter on all ranks or MPI will error out (each
+            # rank is a processing being run in the MPI)
+            scatter, _ = PETSc.Scatter.toZero(self._x)
+            scatter.scatter(self._x, x_seq, addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+            scatter.destroy()
+
+            # Rank 0 owns x, broadcast (or send a copy) of it to the other ranks
+            # so that they don't break what OpenMDAO expects from the linear solver
+            if self._x.comm.getRank() == 0:
+                x_array = x_seq.getArray().copy()
+            else:
+                x_array = np.empty(self._x.getSize())
+            self.comm.Bcast(x_array, root=0)
+            return x_array
+
+        # If running in sequence, can just directly copy the whole thing to an array
+        else:
+            return self._x.getArray().copy()
 
 
 def index_to_varname(system, loc):
@@ -373,7 +442,8 @@ class PETScDirectSolver(LinearSolver):
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
-        self._disallow_distrib_solve()
+        if self.options['backend'] in PC_SERIAL_TYPES:
+            self._disallow_distrib_solve()
         self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
                                                         self.options['rhs_checking'])
 
@@ -469,7 +539,7 @@ class PETScDirectSolver(LinearSolver):
             # Perform dense or sparse lu factorization.
             elif isinstance(matrix, scipy.sparse.csc_matrix):
                 try:
-                    self._lu = PETScLU(matrix, self.options['backend'])
+                    self._lu = PETScLU(matrix, self.options['backend'], comm=system.comm)
                 except RuntimeError:
                     # Zero pivot in LU factorization doesn't necessarily guarantee
                     # that the matrix is singular, but not sure what else to raise
