@@ -428,21 +428,21 @@ class ExplicitComponent(Component):
                 try:
                     # handle identity subjacs (output_or_resid wrt itself)
                     if d_outputs._names:
-                        rflat = d_residuals._abs_get_val
-                        oflat = d_outputs._abs_get_val
+                        get_dresid = d_residuals._abs_get_val
+                        get_doutput = d_outputs._abs_get_val
 
                         # 'val' in the code below is a reference to the part of the
                         # output or residual array corresponding to the variable 'v'
                         if mode == 'fwd':
                             for v in d_outputs._names:
                                 if (v, v) not in self._subjacs_info:
-                                    val = rflat(v)
-                                    val -= oflat(v)
+                                    val = get_dresid(v)
+                                    val -= get_doutput(v)
                         else:  # rev
                             for v in d_outputs._names:
                                 if (v, v) not in self._subjacs_info:
-                                    val = oflat(v)
-                                    val -= rflat(v)
+                                    val = get_doutput(v)
+                                    val -= get_dresid(v)
 
                     # We used to negate the residual here, and then re-negate after the hook
                     with self._call_user_function('compute_jacvec_product'):
