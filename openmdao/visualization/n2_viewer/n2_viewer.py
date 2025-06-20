@@ -8,6 +8,7 @@ from operator import itemgetter
 import networkx as nx
 import numpy as np
 
+from openmdao.drivers.analysis_driver import AnalysisDriver
 import openmdao.utils.hooks as hooks
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
@@ -346,7 +347,12 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
 
         driver = data_source.driver
         driver_name = driver.__class__.__name__
-        driver_type = 'doe' if isinstance(driver, DOEDriver) else 'optimization'
+        if isinstance(driver, DOEDriver):
+            driver_type = 'doe'
+        elif isinstance(driver, AnalysisDriver):
+            driver_type = 'analysis'
+        else:
+            driver_type = 'optimization'
 
         driver_options = {key: _serialize_single_option(driver.options._dict[key])
                           for key in driver.options}
