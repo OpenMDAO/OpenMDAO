@@ -171,7 +171,7 @@ class TestPETScClass(unittest.TestCase):
         Test that each allowable solver type can be used without raising an
         error by PETSc
         """
-        for backend in ["superlu", "klu", "umfpack", "petsc", "pardiso"]:
+        for backend in ["superlu", "klu", "umfpack", "petsc", "mumps", "superlu_dist"]:
             with self.subTest(backend=backend):
                 PETScLU(
                     A=sparse.csr_matrix(np.array([[1, 0], [0, 1]])),
