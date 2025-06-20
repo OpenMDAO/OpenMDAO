@@ -2,8 +2,12 @@ import sqlite3
 
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.case import Case
-from openmdao.visualization.realtime_opt_plot.realtime_analysis_driver_plot import _RealTimeAnalysisDriverPlot
-from openmdao.visualization.realtime_opt_plot.realtime_optimizer_plot import _RealTimeOptimizerPlot
+from openmdao.visualization.realtime_opt_plot.realtime_analysis_driver_plot import (
+    _RealTimeAnalysisDriverPlot,
+)
+from openmdao.visualization.realtime_opt_plot.realtime_optimizer_plot import (
+    _RealTimeOptimizerPlot,
+)
 
 try:
     from bokeh.server.server import Server
@@ -28,6 +32,7 @@ except ImportError:
     # If get_free_port is unavailable, the default port will be used
     def get_free_port():
         return 5000
+
 
 def _realtime_plot_setup_parser(parser):
     """
@@ -106,13 +111,13 @@ class _CaseRecorderTracker:
     def _open_case_recorder(self):
         if self._cr is None:
             self._cr = SqliteCaseReader(self._case_recorder_filename)
-            
+
     def get_case_recorder_filename(self):
         return self._case_recorder_filename
 
     def is_driver_optimizer(self):
         self._open_case_recorder()
-        return self._cr.problem_metadata['driver']['supports']['optimization']['val']
+        return self._cr.problem_metadata["driver"]["supports"]["optimization"]["val"]
 
     def _get_case_by_counter(self, counter):
         # use SQL to see if a case with this counter exists
@@ -217,8 +222,7 @@ class _CaseRecorderTracker:
     def _get_shape(self, name):
         item = self._initial_case[name]
         return item.shape
-    
-    
+
 
 def realtime_opt_plot(
     case_recorder_filename, callback_period, pid_of_calling_script, show
@@ -281,5 +285,3 @@ def realtime_opt_plot(
         print("Stopping real-time optimization plot server")
         if "server" in globals():
             server.stop()
-
-

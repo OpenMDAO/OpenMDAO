@@ -42,7 +42,8 @@ _grid_plot_height_and_width = 240
 
 _color_bar_title_font_size = "20px"
 
-_page_styles = InlineStyleSheet(css="""
+_page_styles = InlineStyleSheet(
+    css="""
 :host(.div_header) {
     font-size: 20px;
     font-weight: bold;
@@ -113,14 +114,15 @@ input[type="checkbox"]:checked::after {
 .bk-checkbox label {
     font-size: 20px !important;
 }
-""")
+"""
+)
 
 
 # some models have a large number of variables. Putting them all in a plot
 #   is not practical. Initially show no more than this number
 _max_number_initial_visible_sampled_variables = 3
 # number of histogram bins in the histogram plots for the sampled variables
-_num_histogram_bins = 30 
+_num_histogram_bins = 30
 
 # variable names can be very long and too large to show completely
 #  in the plot axes. This is the largest number of characters that
@@ -133,7 +135,8 @@ _elide_string = "..."
 _color_palette = Viridis256
 
 # the color bar showing response needs an initial value before new data comes in
-_initial_response_range_for_plots = (0,100)
+_initial_response_range_for_plots = (0, 100)
+
 
 # function to create the labels for the plots, need to elide long variable names
 # include the units, if given
@@ -142,13 +145,16 @@ def _elide_variable_name_with_units(variable_name, units):
         un_elided_string_length = len(f"{variable_name} ({units})")
     else:
         un_elided_string_length = len(variable_name)
-    chop_length = max(un_elided_string_length - _max_label_length + len(_elide_string),0)
+    chop_length = max(
+        un_elided_string_length - _max_label_length + len(_elide_string), 0
+    )
     if chop_length:
         variable_name = _elide_string + variable_name[chop_length:]
     if units:
         return f"{variable_name} ({units})"
     else:
         return variable_name
+
 
 class _RealTimeAnalysisDriverPlot(_RealTimePlot):
     """
@@ -168,14 +174,11 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         None if the plot was called for directly by the user.
     """
 
-    def __init__(
-        self, case_tracker, callback_period, doc, pid_of_calling_script
-    ):
+    def __init__(self, case_tracker, callback_period, doc, pid_of_calling_script):
         """
         Construct and initialize _RealTimeAnalysisDriverPlot instance.
         """
         super().__init__(case_tracker, callback_period, doc, pid_of_calling_script)
-
 
         # lists of the sampled variables in the analysis and the responses
         self._sampled_variables = None
@@ -259,8 +262,9 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         if not self._prom_responses:
             raise RuntimeError(f"Need at least one response variable.")
 
-        outputs = self._case_tracker.get_case_reader().list_source_vars("driver", \
-            out_stream=None)["outputs"]
+        outputs = self._case_tracker.get_case_reader().list_source_vars(
+            "driver", out_stream=None
+        )["outputs"]
 
         # Don't include response variables in sampled variabales.
         # Also, split up the remaining sampled variables into scalars and
@@ -270,7 +274,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         for varname in outputs:
             if varname not in self._prom_responses:
                 shape = self._case_tracker._get_shape(varname)
-                if shape == () or shape == (1,): # is scalar ??
+                if shape == () or shape == (1,):  # is scalar ??
                     self._sampled_variables.append(varname)
                 else:
                     self._sampled_variables_non_scalar.append(varname)
@@ -288,19 +292,25 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         self._source = ColumnDataSource(self._source_dict)
 
     def _setup_figure(self):
-    
+
         analysis_progress_box = self._make_analysis_driver_box()
-    
+
         # Initially the response variable plotted is the first one
         self._prom_response = self._prom_responses[0]
 
         self._set_initial_number_initial_visible_sampled_variables()
-        visible_variables = [var for var in self._sampled_variables if self._sampled_variables_visibility[var]]
+        visible_variables = [
+            var
+            for var in self._sampled_variables
+            if self._sampled_variables_visibility[var]
+        ]
 
         # Create a color mapper using Viridis (colorblind-friendly)
-        self._color_mapper = LinearColorMapper(palette=_color_palette, 
-                                               low=_initial_response_range_for_plots[0], 
-                                               high=_initial_response_range_for_plots[1])
+        self._color_mapper = LinearColorMapper(
+            palette=_color_palette,
+            low=_initial_response_range_for_plots[0],
+            high=_initial_response_range_for_plots[1],
+        )
 
         color_bar = self._make_color_bar()
 
@@ -311,21 +321,24 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         self._make_plot_labels(visible_variables, plots_and_labels_in_grid)
         grid_of_plots = gridplot(
             plots_and_labels_in_grid,
-            ncols=self._num_sampled_variables+1,  # need one extra row and column in the grid for the axes labels
+            ncols=self._num_sampled_variables
+            + 1,  # need one extra row and column in the grid for the axes labels
             toolbar_location=None,
         )
 
-        self._make_overall_layout(analysis_progress_box, variables_box, color_bar, grid_of_plots)
+        self._make_overall_layout(
+            analysis_progress_box, variables_box, color_bar, grid_of_plots
+        )
 
     def _update_source_stream(self, new_case):
         # fill up the stream dict with the values.
         # These are fed to the bokeh source stream
         for response in self._prom_responses:
-            self._source_stream_dict[response] = \
-                new_case.get_val(response)[:1]
+            self._source_stream_dict[response] = new_case.get_val(response)[:1]
         for sampled_variable in self._sampled_variables:
-            self._source_stream_dict[sampled_variable] = \
-                new_case.get_val(sampled_variable)[:1]
+            self._source_stream_dict[sampled_variable] = new_case.get_val(
+                sampled_variable
+            )[:1]
         self._source.stream(self._source_stream_dict)
 
     def _update_scatter_plots(self, new_case):
@@ -366,8 +379,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         elapsed_total_time = time.time() - self._start_time
         elapsed_total_time_formatted = str(timedelta(seconds=int(elapsed_total_time)))
 
-        self._analysis_driver_progress_text_box.text = \
-            f"""<div>
+        self._analysis_driver_progress_text_box.text = f"""<div>
                         <p>Script: {self._case_tracker.get_case_recorder_filename()}</p>
                         <p>Number of samples: {self._num_samples_plotted}</p>
                         <p>Last updated: {last_updated_time_formatted}</p>
@@ -377,7 +389,10 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
     def _set_initial_number_initial_visible_sampled_variables(self):
         number_initial_visible_sampled_variables = 0
         for sampled_var in self._sampled_variables:
-            if number_initial_visible_sampled_variables < _max_number_initial_visible_sampled_variables:
+            if (
+                number_initial_visible_sampled_variables
+                < _max_number_initial_visible_sampled_variables
+            ):
                 self._sampled_variables_visibility[sampled_var] = True
                 number_initial_visible_sampled_variables += 1
             else:
@@ -388,11 +403,12 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         #   that lets the user select what to plot. Also include the non scalar
         #   variables at the bottom of this box
         # Also include the responses selection menu
-        
+
         # header for the scalar Sampled Variables list
         sampled_variables_label = Div(
             text="Sampled Variables",
-            stylesheets = [_page_styles], css_classes = ['div_header']
+            stylesheets=[_page_styles],
+            css_classes=["div_header"],
         )
 
         # make the checkbox group that contains the scalar sampled variables that can be
@@ -406,68 +422,80 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             labels=self._sampled_variables,
             active=sampled_variable_active_index_list,
             width=_left_side_column_width,
-            stylesheets = [_page_styles],
+            stylesheets=[_page_styles],
         )
-        
+
         def _sampled_variable_checkbox_callback(attr, old, new):
             # old and new are lists in terms of index into the checkboxes
             # starts at 0
             # Find which checkbox was toggled by comparing old and new states
             added = set(new) - set(old)
             removed = set(old) - set(new)
-            
+
             # added and removed should really only be lists of length 0 or 1
             #  since you can only check or uncheck one at a time
             if added:
                 active = True
                 var_name = self._sampled_variables[added.pop()]
-                
+
             if removed:
                 active = False
                 var_name = self._sampled_variables[removed.pop()]
-                
+
             # turn on or off visibility of histograms, scatter plots and labels
             self._sampled_variables_visibility[var_name] = active
             self._hist_figures[var_name].visible = active
             self._row_labels[var_name].visible = active
             self._column_labels[var_name].visible = active
 
-            for i, (var_along_columns,var_along_rows) in enumerate(
+            for i, (var_along_columns, var_along_rows) in enumerate(
                 product(self._sampled_variables, self._sampled_variables)
             ):
                 icolumn = i % self._num_sampled_variables
                 irow = i // self._num_sampled_variables
                 # only do the lower half
                 if var_along_columns != var_along_rows:
-                    self._scatter_plots_figure[(var_along_columns,var_along_rows)].visible = (icolumn < irow \
-                        and self._sampled_variables_visibility[var_along_columns] and self._sampled_variables_visibility[var_along_rows] )
-        
-        sampled_variables_checkbox_group.on_change('active', _sampled_variable_checkbox_callback )
+                    self._scatter_plots_figure[
+                        (var_along_columns, var_along_rows)
+                    ].visible = (
+                        icolumn < irow
+                        and self._sampled_variables_visibility[var_along_columns]
+                        and self._sampled_variables_visibility[var_along_rows]
+                    )
+
+        sampled_variables_checkbox_group.on_change(
+            "active", _sampled_variable_checkbox_callback
+        )
 
         # Create the non scalar variables list for the GUI
         sampled_variables_non_scalar_label = Div(
             text="Sampled Variables Non Scalar",
-            stylesheets = [_page_styles], css_classes = ['div_header']
+            stylesheets=[_page_styles],
+            css_classes=["div_header"],
         )
-        
+
         sampled_variables_non_scalar_text_list = []
         for sampled_var in self._sampled_variables_non_scalar:
-            sampled_variables_non_scalar_text = Div(text=sampled_var,
-            stylesheets = [_page_styles], css_classes = ['sampled_variables_text']
-        )           
-            sampled_variables_non_scalar_text_list.append(sampled_variables_non_scalar_text)
+            sampled_variables_non_scalar_text = Div(
+                text=sampled_var,
+                stylesheets=[_page_styles],
+                css_classes=["sampled_variables_text"],
+            )
+            sampled_variables_non_scalar_text_list.append(
+                sampled_variables_non_scalar_text
+            )
         sampled_variables_non_scalar_column = Column(
             children=sampled_variables_non_scalar_text_list,
         )
-      
+
         section_separator = Div(
             sizing_mode="stretch_width",
             height=1,
             styles={
-                'border-top': '1px solid #5c5c5c',
-                'margin-top': '24px',
-                'margin-bottom': '24px'
-            }
+                "border-top": "1px solid #5c5c5c",
+                "margin-top": "24px",
+                "margin-bottom": "24px",
+            },
         )
 
         # put both the scalar and non scalar together in a Column inside a ScrollBox
@@ -485,7 +513,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             sizing_mode="stretch_height",
             height_policy="max",
         )
-        
+
         # make response variable UI
         response_variable_menu = Select(
             options=self._prom_responses,
@@ -493,23 +521,27 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         )
         response_variable_header = Div(
             text="Response variable",
-            stylesheets = [_page_styles], css_classes = ['div_header']
+            stylesheets=[_page_styles],
+            css_classes=["div_header"],
         )
 
         def cb_select_response_variable(color_bar):
             def toggle_callback(attr, old, new):
-                self._prom_response = new 
+                self._prom_response = new
                 color_bar.title = f"Response variable: '{new}'"
                 self._color_mapper.low = self._prom_response_min[self._prom_response]
                 self._color_mapper.high = self._prom_response_max[self._prom_response]
 
                 for scatter_plot in self._scatter_plots:
                     scatter_plot.glyph.fill_color = transform(
-                            self._prom_response, self._color_mapper
-                        )
+                        self._prom_response, self._color_mapper
+                    )
+
             return toggle_callback
 
-        response_variable_menu.on_change("value", cb_select_response_variable(color_bar))
+        response_variable_menu.on_change(
+            "value", cb_select_response_variable(color_bar)
+        )
 
         variables_box = Column(
             response_variable_header,
@@ -519,14 +551,15 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             sizing_mode="stretch_height",
             height_policy="fit",
             width=_left_side_column_width,
-            stylesheets = [_page_styles], css_classes = ['sampled_variables_box']
+            stylesheets=[_page_styles],
+            css_classes=["sampled_variables_box"],
         )
-               
+
         return variables_box
 
     def _make_color_bar(self):
         # can't make just a color bar. It needs to be associated with
-        #  a figure. So make a simple plot, hide it, and 
+        #  a figure. So make a simple plot, hide it, and
         #  add the color bar to this figure
         color_bar = ColorBar(
             color_mapper=self._color_mapper,
@@ -541,8 +574,10 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
 
         # Need the color bar to be associated with a plot figure.
         # So make a basic one and hide it
-        p = figure(height=2 * _grid_plot_height_and_width, width=0, toolbar_location=None)
-        line = p.line([0, 1],[0, 1])
+        p = figure(
+            height=2 * _grid_plot_height_and_width, width=0, toolbar_location=None
+        )
+        line = p.line([0, 1], [0, 1])
         p.grid.grid_line_color = None
         line.visible = False
         p.xaxis.visible = False
@@ -560,7 +595,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
     def _make_plots(self, plots_and_labels_in_grid):
         # x and y here refer to the x axis and y axis of the grid
         # Add plots by row starting from top
-        for i, (var_along_columns,var_along_rows) in enumerate(
+        for i, (var_along_columns, var_along_rows) in enumerate(
             product(self._sampled_variables, self._sampled_variables)
         ):
             icolumn = i % self._num_sampled_variables
@@ -574,7 +609,9 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
                     height=_grid_plot_height_and_width,
                     output_backend="webgl",
                 )
-                self._scatter_plots_figure[(var_along_columns,var_along_rows)] = plot_figure
+                self._scatter_plots_figure[(var_along_columns, var_along_rows)] = (
+                    plot_figure
+                )
                 plot_figure.axis.visible = True
                 self._scatter_plots.append(
                     plot_figure.scatter(
@@ -586,7 +623,8 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
                         fill_color=transform(
                             self._prom_response, self._color_mapper
                         ),  # This maps value ofself._prom_response variable to colors
-                ))
+                    )
+                )
             else:  # on the diagonal
                 # Extract the x column data for the histogram
                 x_data = self._source.data[var_along_columns]
@@ -605,7 +643,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
                     width=_grid_plot_height_and_width,
                     height=_grid_plot_height_and_width,
                     output_backend="webgl",
-               )
+                )
                 # Add the histogram bars using quad glyphs
                 plot_figure.quad(
                     source=self._hist_source[var_along_columns],
@@ -619,11 +657,14 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
                 )
                 self._hist_figures[var_along_columns] = plot_figure
 
-            if icolumn > irow: # only lower half and diagonal
+            if icolumn > irow:  # only lower half and diagonal
                 plot_figure = None
             else:
                 # is it visible based on what the user has selected
-                if self._sampled_variables_visibility[var_along_columns] and self._sampled_variables_visibility[var_along_rows]:
+                if (
+                    self._sampled_variables_visibility[var_along_columns]
+                    and self._sampled_variables_visibility[var_along_rows]
+                ):
                     plot_figure.visible = True
                 else:
                     plot_figure.visible = False
@@ -635,15 +676,17 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         for i, sampled_variable in enumerate(reversed(self._sampled_variables)):
             irow = self._num_sampled_variables - i - 1
             idx = irow * self._num_sampled_variables
-            elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, None)
+            elided_variable_name_with_units = _elide_variable_name_with_units(
+                sampled_variable, None
+            )
             p = Div(
                 text=f"<div title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
-                stylesheets = [_page_styles], css_classes = ['row_labels']
-
+                stylesheets=[_page_styles],
+                css_classes=["row_labels"],
             )
             self._row_labels[sampled_variable] = p
             p.visible = sampled_variable in visible_variables
-            plots_and_labels_in_grid.insert(idx,p)
+            plots_and_labels_in_grid.insert(idx, p)
 
         # need to push one blank one for the bottom left corner in the grid
         p = Div(text=f"")
@@ -652,10 +695,13 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         # column labels
         for sampled_variable in self._sampled_variables:
             units = self._case_tracker._get_units(sampled_variable)
-            elided_variable_name_with_units = _elide_variable_name_with_units(sampled_variable, units)
+            elided_variable_name_with_units = _elide_variable_name_with_units(
+                sampled_variable, units
+            )
             p = Div(
                 text=f"<div title='{sampled_variable}'>{elided_variable_name_with_units}</div>",
-                stylesheets = [_page_styles], css_classes = ['column_labels'],
+                stylesheets=[_page_styles],
+                css_classes=["column_labels"],
                 align="center",
             )
             self._column_labels[sampled_variable] = p
@@ -665,26 +711,30 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
     def _make_analysis_driver_box(self):
         analysis_progress_label = Div(
             text="Analysis Driver Progress",
-            stylesheets = [_page_styles], css_classes = ['div_header']
+            stylesheets=[_page_styles],
+            css_classes=["div_header"],
         )
 
         # placeholder until we have data
         self._analysis_driver_progress_text_box = Div(
             text="""Waiting for data...""",
             width=_left_side_column_width,
-            stylesheets = [_page_styles], css_classes = ['analysis_driver_progress_text_box'],
+            stylesheets=[_page_styles],
+            css_classes=["analysis_driver_progress_text_box"],
         )
 
         quit_button = self._make_quit_button()
 
         analysis_progress_box = Column(
-            Row(analysis_progress_label, 
-                Spacer(), 
+            Row(
+                analysis_progress_label,
+                Spacer(),
                 quit_button,
             ),
             self._analysis_driver_progress_text_box,
             width=_left_side_column_width,
-            stylesheets = [_page_styles], css_classes = ['analysis_progress_box'],
+            stylesheets=[_page_styles],
+            css_classes=["analysis_progress_box"],
         )
         return analysis_progress_box
 
@@ -698,7 +748,9 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         quit_button.on_click(quit_app)
         return quit_button
 
-    def _make_overall_layout(self, analysis_progress_box, sampled_variables_box, color_bar, grid_of_plots):
+    def _make_overall_layout(
+        self, analysis_progress_box, sampled_variables_box, color_bar, grid_of_plots
+    ):
 
         self._overall_layout = Row(
             Column(
@@ -710,8 +762,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
                 sizing_mode="stretch_both",
             ),
             color_bar,
-            Spacer(width=100, height=0), # move the column away from the color bar
+            Spacer(width=100, height=0),  # move the column away from the color bar
             grid_of_plots,
             sizing_mode="stretch_height",
         )
-

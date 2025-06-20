@@ -1,11 +1,11 @@
 """
-  The abstract class for the two forms of real time plot which are for AnalysisDriver and optimizers.
-  Put in a separate class to avoid circular imports
+The abstract class for the two forms of real time plot which are for AnalysisDriver and optimizers.
+Put in a separate class to avoid circular imports
 """
+
+
 class _RealTimePlot(object):
-    def __init__(
-        self, case_tracker, callback_period, doc, pid_of_calling_script
-    ):
+    def __init__(self, case_tracker, callback_period, doc, pid_of_calling_script):
         """
         Construct and initialize _RealTimeOptPlot instance.
         """
@@ -16,7 +16,6 @@ class _RealTimePlot(object):
         self._source = None
         self._source_stream_dict = {}
 
-
     def _setup_data_source(self):
         raise NotImplementedError("_setup_data_source not implemented")
 
@@ -25,6 +24,3 @@ class _RealTimePlot(object):
 
     def _update(self):
         raise NotImplementedError("_update not implemented")
-
-
-

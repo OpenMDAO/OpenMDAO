@@ -17,7 +17,7 @@ try:
         CustomJS,
         Div,
         ScrollBox,
-        SingleIntervalTicker
+        SingleIntervalTicker,
     )
 
     from bokeh.models.tools import (
@@ -32,6 +32,7 @@ try:
     )
     from bokeh.plotting import figure
     from bokeh.palettes import Category20, Colorblind
+
     bokeh_available = True
 except ImportError:
     bokeh_available = False
@@ -44,6 +45,7 @@ except ImportError:
     # If _get_free_port is unavailable, the default port will be used
     def get_free_port():
         return 5000
+
 
 # Constants
 # color of the plot line for the objective function
@@ -217,11 +219,11 @@ def _get_value_for_plotting(value_from_recorder, var_type):
         The value to be used for plotting the variable.
     """
     if value_from_recorder is None or value_from_recorder.size == 0:
-        return (0.0)
-    if var_type == 'cons':
+        return 0.0
+    if var_type == "cons":
         # plot the worst case value
         return np.linalg.norm(value_from_recorder, ord=np.inf)
-    elif var_type == 'objs':
+    elif var_type == "objs":
         return value_from_recorder.item()  # get as scalar
     else:  # for desvars, use L2 norm
         return np.linalg.norm(value_from_recorder)
@@ -272,7 +274,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         """
         # self._case_recorder_filename = case_recorder_filename
         super().__init__(case_tracker, callback_period, doc, pid_of_calling_script)
-        
+
         # self._source = None
         self._lines = []
         self._toggles = []
@@ -291,8 +293,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
 
         doc.add_periodic_callback(self._update, callback_period)
         doc.title = "OpenMDAO Optimization Progress Plot"
-
-
 
     def _update(self):
         # this is the main method of the class. It gets called periodically by Bokeh
@@ -357,10 +357,12 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             for i, obj_name in enumerate(obj_names):
                 units = self._case_tracker._get_units(obj_name)
                 self.plot_figure.yaxis.axis_label = f"{obj_name} ({units})"
-                self._make_variable_button(f"{obj_name} ({units})", _obj_color,
-                                            True, legend_item_callback)
-                self._make_line_and_hover_tool("objs", obj_name, False, _obj_color,
-                                                "solid", True)
+                self._make_variable_button(
+                    f"{obj_name} ({units})", _obj_color, True, legend_item_callback
+                )
+                self._make_line_and_hover_tool(
+                    "objs", obj_name, False, _obj_color, "solid", True
+                )
                 value = new_data["objs"][obj_name]
                 float_value = _get_value_for_plotting(value, "objs")
                 # just give it some non-zero initial range since we only have one point
@@ -426,7 +428,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                     "border": "1px solid #ddd",
                     "padding": "8px",
                     "background-color": "#dddddd",
-                    'max-height': '100vh'  # Ensures it doesn't exceed viewport
+                    "max-height": "100vh",  # Ensures it doesn't exceed viewport
                 },
             )
 
@@ -451,9 +453,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 toggle_column,
                 sizing_mode="stretch_height",
                 height_policy="fit",
-                    styles={
-                        'max-height': '100vh'  # Ensures it doesn't exceed viewport
-                    },
+                styles={"max-height": "100vh"},  # Ensures it doesn't exceed viewport
             )
 
             scroll_box = ScrollBox(
@@ -476,8 +476,9 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         for obj_name, obj_value in new_data["objs"].items():
             float_obj_value = _get_value_for_plotting(obj_value, "objs")
             self._source_stream_dict[obj_name] = [float_obj_value]
-            min_max_changed = _update_y_min_max(obj_name, float_obj_value,
-                                                self._y_min, self._y_max)
+            min_max_changed = _update_y_min_max(
+                obj_name, float_obj_value, self._y_min, self._y_max
+            )
             if min_max_changed:
                 self.plot_figure.y_range.start = self._y_min[obj_name]
                 self.plot_figure.y_range.end = self._y_max[obj_name]
@@ -486,7 +487,9 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         for desvar_name, desvar_value in new_data["desvars"].items():
             if not self._labels_updated_with_units and desvar_value.size > 1:
                 units = self._case_tracker._get_units(desvar_name)
-                self._toggles[iline].label = f"{desvar_name} ({units}) {desvar_value.shape}"
+                self._toggles[iline].label = (
+                    f"{desvar_name} ({units}) {desvar_value.shape}"
+                )
             min_max_changed = False
             min_max_changed = min_max_changed or _update_y_min_max(
                 desvar_name, np.min(desvar_value), self._y_min, self._y_max
@@ -495,9 +498,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 desvar_name, np.max(desvar_value), self._y_min, self._y_max
             )
             if min_max_changed:
-                range = Range1d(
-                    self._y_min[desvar_name], self._y_max[desvar_name]
-                )
+                range = Range1d(self._y_min[desvar_name], self._y_max[desvar_name])
                 self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
             self._source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
             self._source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
@@ -510,20 +511,15 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
             self._source_stream_dict[cons_name] = [float_cons_value]
             min_max_changed = _update_y_min_max(
-                cons_name, float_cons_value, self._y_min, self._y_max)
+                cons_name, float_cons_value, self._y_min, self._y_max
+            )
             if min_max_changed:
-                range = Range1d(
-                    self._y_min[cons_name], self._y_max[cons_name]
-                )
+                range = Range1d(self._y_min[cons_name], self._y_max[cons_name])
                 self.plot_figure.extra_y_ranges[f"extra_y_{cons_name}"] = range
             iline += 1
         self._source.stream(self._source_stream_dict)
         self._labels_updated_with_units = True
         # end of _update method
-
-
-
-
 
     def _setup_data_source(self):
         self._source_dict = {"iteration": []}
@@ -570,7 +566,9 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         ]
         return toggle
 
-    def _make_line_and_hover_tool(self, var_type, varname, use_varea, color, line_dash, visible):
+    def _make_line_and_hover_tool(
+        self, var_type, varname, use_varea, color, line_dash, visible
+    ):
         if use_varea:
             line = self.plot_figure.varea(
                 x="iteration",
@@ -650,7 +648,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             active_drag=None,
             active_scroll="auto",
             active_tap=None,
-            output_backend="webgl"
+            output_backend="webgl",
         )
         self.plot_figure.x_range.follow = "start"
         self.plot_figure.title.text_font_size = "14px"
