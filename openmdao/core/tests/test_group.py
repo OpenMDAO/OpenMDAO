@@ -3437,7 +3437,7 @@ class ConfigGroup(om.Group):
         # retrieve metadata
         for child, kwargs in self.cfgio.items():
             kid = self._get_subsystem(child)
-            if kid is not None:
+            if kid is not None or not kid._is_local:
                 self.io_results[child] = kid.get_io_metadata(**kwargs)
             else:
                 print(f"'{kid}' not found locally.")
@@ -3447,7 +3447,7 @@ class ConfigGroup(om.Group):
             if '.' in child:
                 parent, child = child.rsplit('.', 1)
                 s = self._get_subsystem(parent)
-                if s is None:
+                if s is None or not s._is_local:
                     print(f"'{parent}' not found locally.")
                     continue
             else:
@@ -3459,7 +3459,7 @@ class ConfigGroup(om.Group):
             if '.' in vpath:
                 parent, vname = vpath.rsplit('.', 1)
                 s = self._get_subsystem(parent)
-                if s is None:
+                if s is None or not s._is_local:
                     print(f"'{parent}' not found locally.")
                     continue
                 s.add_input(vname, val, units=units)
@@ -3471,7 +3471,7 @@ class ConfigGroup(om.Group):
             if '.' in vpath:
                 parent, vname = vpath.rsplit('.', 1)
                 s = self._get_subsystem(parent)
-                if s is None:
+                if s is None or not s._is_local:
                     print(f"'{parent}' not found locally.")
                     continue
                 s.add_output(vname, val, units=units)

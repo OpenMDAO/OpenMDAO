@@ -76,7 +76,8 @@ jobs:
 
   tests:
 
-    timeout-minutes: 120
+    # bump this up to 180 temporarily to address a build issue on MacOS
+    timeout-minutes: 180
 
     strategy:
       fail-fast: false
