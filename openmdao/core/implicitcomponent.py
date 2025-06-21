@@ -18,6 +18,7 @@ from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.coloring import _ColSparsityJac
 from openmdao.jacobians.jacobian import JacobianUpdateContext
 from openmdao.jacobians.subjac import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 
 _tuplist = (tuple, list)
 
@@ -567,7 +568,7 @@ class ImplicitComponent(Component):
                 self._jacobian = self._get_assembled_jac()
 
                 if self._jacobian is None:
-                    self._jacobian = self._choose_jac_type(self.options['jac_type'])
+                    self._jacobian = DictionaryJacobian(self)
 
                 if self._declared_residuals:
                     self._jac_wrapper = _JacobianWrapper(self._jacobian,

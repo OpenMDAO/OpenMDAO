@@ -131,7 +131,6 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dict",
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -384,13 +383,12 @@
                 "use_jit": true,
                 "default_shape": [
                     1
-                ],
-                "jac_type": "dict"
+                ]
             }
         }
     ],
     "options": {
-        "assembled_jac_type": "csc",
+        "assembled_jac_type": null,
         "derivs_method": null,
         "auto_order": false
     }

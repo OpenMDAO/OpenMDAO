@@ -105,7 +105,6 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dict",
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -215,20 +214,20 @@
                                     "implicit": true,
                                     "units": "None",
                                     "val": [
-                                        12.058488150803933
+                                        12.058488150803932
                                     ],
                                     "val_min_indices": [
                                         0
                                     ],
-                                    "val_min": 12.058488150803933,
+                                    "val_min": 12.058488150803932,
                                     "val_max_indices": [
                                         0
                                     ],
-                                    "val_max": 12.058488150803933
+                                    "val_max": 12.058488150803932
                                 }
                             ],
                             "options": {
-                                "assembled_jac_type": "csc",
+                                "assembled_jac_type": null,
                                 "derivs_method": null,
                                 "distributed": false,
                                 "run_root_only": false,
@@ -236,13 +235,12 @@
                                 "use_jit": true,
                                 "default_shape": [
                                     1
-                                ],
-                                "jac_type": "dict"
+                                ]
                             }
                         }
                     ],
                     "options": {
-                        "assembled_jac_type": "csc",
+                        "assembled_jac_type": null,
                         "derivs_method": null,
                         "auto_order": false
                     }
@@ -313,16 +311,16 @@
                             "desc": "",
                             "units": "None",
                             "val": [
-                                12.058488150803933
+                                12.058488150803932
                             ],
                             "val_min_indices": [
                                 0
                             ],
-                            "val_min": 12.058488150803933,
+                            "val_min": 12.058488150803932,
                             "val_max_indices": [
                                 0
                             ],
-                            "val_max": 12.058488150803933
+                            "val_max": 12.058488150803932
                         },
                         {
                             "name": "y1",
@@ -355,8 +353,7 @@
                         "use_jit": true,
                         "default_shape": [
                             1
-                        ],
-                        "jac_type": "dict"
+                        ]
                     }
                 },
                 {
@@ -446,13 +443,12 @@
                         "use_jit": true,
                         "default_shape": [
                             1
-                        ],
-                        "jac_type": "dict"
+                        ]
                     }
                 }
             ],
             "options": {
-                "assembled_jac_type": "csc",
+                "assembled_jac_type": null,
                 "derivs_method": null,
                 "auto_order": false
             }
@@ -568,16 +564,16 @@
                     "implicit": false,
                     "units": "None",
                     "val": [
-                        28.58830816498059
+                        28.588308164980585
                     ],
                     "val_min_indices": [
                         0
                     ],
-                    "val_min": 28.58830816498059,
+                    "val_min": 28.588308164980585,
                     "val_max_indices": [
                         0
                     ],
-                    "val_max": 28.58830816498059
+                    "val_max": 28.588308164980585
                 }
             ],
             "options": {
@@ -588,7 +584,6 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dict",
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -663,7 +658,6 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dict",
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -718,16 +712,16 @@
                     "implicit": false,
                     "units": "None",
                     "val": [
-                        -11.941511849196065
+                        -11.941511849196068
                     ],
                     "val_min_indices": [
                         0
                     ],
-                    "val_min": -11.941511849196065,
+                    "val_min": -11.941511849196068,
                     "val_max_indices": [
                         0
                     ],
-                    "val_max": -11.941511849196065
+                    "val_max": -11.941511849196068
                 }
             ],
             "options": {
@@ -738,7 +732,6 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dict",
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -748,7 +741,7 @@
         }
     ],
     "options": {
-        "assembled_jac_type": "csc",
+        "assembled_jac_type": null,
         "derivs_method": null,
         "nonlinear_solver": "NL: Newton",
         "nl_atol": null,

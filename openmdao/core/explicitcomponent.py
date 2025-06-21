@@ -81,27 +81,6 @@ class ExplicitComponent(Component):
         if is_undefined(self.matrix_free):
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
-    def _choose_jac_type(self, jac_type):
-        """
-        Choose the Jacobian type based on the given string.
-
-        Parameters
-        ----------
-        jac_type : str
-            The type of Jacobian to create.
-
-        Returns
-        -------
-        Jacobian
-            The Jacobian object.
-        """
-        if jac_type == 'dict':
-            # special case for explicit components requesting a dictionary jacobian.  dr/do is -I,
-            # so we can just do a simple vector subtraction for all of those subjacs at once.
-            return ExplicitDictionaryJacobian(self)
-        else:
-            return super()._choose_jac_type(jac_type)
-
     def _jac_wrt_iter(self, wrt_matches=None):
         """
         Iterate over (name, start, end, vec, slice, dist_sizes) for each column var in the jacobian.
@@ -191,12 +170,11 @@ class ExplicitComponent(Component):
         if self._relevance_changed():
             self._jacobian = None
 
-        if not self.matrix_free:
-            if self._jacobian is None:
-                self._jacobian = self._choose_jac_type(self.options['jac_type'])
-                if self._has_approx:
-                    self._get_static_wrt_matches()
-                    self._add_approximations(use_relevance=use_relevance)
+        if not self.matrix_free and self._jacobian is None:
+            self._jacobian = ExplicitDictionaryJacobian(self)
+            if self._has_approx:
+                self._get_static_wrt_matches()
+                self._add_approximations(use_relevance=use_relevance)
 
         return self._jacobian
 

@@ -43,20 +43,12 @@ from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.subjac import Subjac
-from openmdao.jacobians.jacobian import GroupJacobianUpdateContext, DenseJacobian, CSCJacobian, \
-    CSRJacobian
+from openmdao.jacobians.jacobian import GroupJacobianUpdateContext
 
 
 # regex to check for valid names.
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
-
-
-_asm_jac_types = {
-    'csc': CSCJacobian,
-    'csr': CSRJacobian,
-    'dense': DenseJacobian,
-}
 
 
 # use a class with slots instead of a namedtuple so that we can
@@ -3998,24 +3990,6 @@ class Group(System):
                 self._get_static_wrt_matches()
 
         return self._jacobian
-
-    def _choose_jac_type(self, sparse_format, assembled=True):
-        """
-        Choose the type of jacobian to use for this group.
-
-        Parameters
-        ----------
-        sparse_format : str
-            The sparse format to use for the jacobian.
-        assembled : bool
-            Whether to use an assembled jacobian.
-
-        Returns
-        -------
-        Jacobian
-            The chosen jacobian type.
-        """
-        return _asm_jac_types[sparse_format](system=self)
 
     def _approx_subjac_keys_iter(self):
         """

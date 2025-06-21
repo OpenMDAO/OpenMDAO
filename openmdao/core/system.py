@@ -42,6 +42,7 @@ from openmdao.utils.general_utils import determine_adder_scaler, is_undefined, \
 from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.jacobians.jacobian import DenseJacobian, CSCJacobian, CSRJacobian
 
 
 # Suppored methods for derivatives
@@ -98,6 +99,12 @@ resp_types = {'con': 'constraint', 'obj': 'objective'}
 default_options = ['always_opt', 'default_shape', 'derivs_method', 'distributed',
                    'run_root_only', 'use_jit', 'assembled_jac_type',
                    'auto_order']
+
+_asm_jac_types = {
+    'csc': CSCJacobian,
+    'csr': CSRJacobian,
+    'dense': DenseJacobian,
+}
 
 
 class _MatchType(IntEnum):
@@ -2614,7 +2621,7 @@ class System(object, metaclass=SystemMetaclass):
                         )
                     sparse_format = option_format
 
-                asm_jac = self._choose_jac_type(sparse_format, assembled=True)
+                asm_jac = _asm_jac_types[sparse_format](system=self)
                 self._assembled_jac = self._jacobian = asm_jac
                 for solver, _ in asm_jac_solvers:
                     solver._assembled_jac = asm_jac

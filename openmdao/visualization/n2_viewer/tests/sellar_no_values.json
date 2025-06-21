@@ -82,7 +82,6 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dict",
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -183,7 +182,7 @@
                                 }
                             ],
                             "options": {
-                                "assembled_jac_type": "csc",
+                                "assembled_jac_type": null,
                                 "derivs_method": null,
                                 "distributed": false,
                                 "run_root_only": false,
@@ -191,13 +190,12 @@
                                 "use_jit": true,
                                 "default_shape": [
                                     1
-                                ],
-                                "jac_type": "dict"
+                                ]
                             }
                         }
                     ],
                     "options": {
-                        "assembled_jac_type": "csc",
+                        "assembled_jac_type": null,
                         "derivs_method": null,
                         "auto_order": false
                     }
@@ -265,8 +263,7 @@
                         "use_jit": true,
                         "default_shape": [
                             1
-                        ],
-                        "jac_type": "dict"
+                        ]
                     }
                 },
                 {
@@ -322,13 +319,12 @@
                         "use_jit": true,
                         "default_shape": [
                             1
-                        ],
-                        "jac_type": "dict"
+                        ]
                     }
                 }
             ],
             "options": {
-                "assembled_jac_type": "csc",
+                "assembled_jac_type": null,
                 "derivs_method": null,
                 "auto_order": false
             }
@@ -408,7 +404,6 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dict",
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -461,7 +456,6 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dict",
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -514,7 +508,6 @@
                 "default_shape": [
                     1
                 ],
-                "jac_type": "dict",
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -524,7 +517,7 @@
         }
     ],
     "options": {
-        "assembled_jac_type": "csc",
+        "assembled_jac_type": null,
         "derivs_method": null,
         "nonlinear_solver": "NL: Newton",
         "nl_atol": null,

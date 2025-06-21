@@ -177,42 +177,6 @@ class Component(System):
                              desc='Default shape for variables that do not set val to a non-scalar '
                              'value or set shape, shape_by_conn, copy_shape, or compute_shape.'
                              ' Default is (1,).')
-        self.options.declare('jac_type', types=str, default='dict',
-                             desc='Type of Jacobian to use.  Options are "dict", "dense", '
-                             '"csc", or "csr". Ignored by matrix free components. Default is '
-                             '"dict".')
-
-    def _choose_jac_type(self, jac_type, assembled=False):
-        """
-        Choose the Jacobian type based on the jac_type option.
-
-        Parameters
-        ----------
-        jac_type : str
-            The type of Jacobian to create.
-        assembled : bool, optional
-            If True, return an assembled Jacobian.  Default is False.
-
-        Returns
-        -------
-        Jacobian
-            The Jacobian object.
-        """
-        if jac_type == 'dict':
-            if assembled:
-                raise ValueError(f"{self.msginfo}: Invalid jac_type: {jac_type} for assembled "
-                                 "Jacobian.")
-            return DictionaryJacobian(self)
-        elif jac_type == 'dense':
-            return SplitJacobian(DenseMatrix, self)
-        elif jac_type == 'coo':
-            return SplitJacobian(COOMatrix, self)
-        elif jac_type == 'csc':
-            return SplitJacobian(CSCMatrix, self)
-        elif jac_type == 'csr':
-            return SplitJacobian(CSRMatrix, self)
-        else:
-            raise ValueError(f"{self.msginfo}: Invalid jac_type: {jac_type}")
 
     def setup(self):
         """
