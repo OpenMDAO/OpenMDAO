@@ -1035,7 +1035,7 @@ class JacobianUpdateContext:
 
     def __init__(self, system):
         """
-        Initialize the JacobianUpdateContext.
+        Initialize the context.
 
         Parameters
         ----------
@@ -1047,7 +1047,7 @@ class JacobianUpdateContext:
 
     def __enter__(self):
         """
-        Enter the JacobianUpdateContext.
+        Enter the context.
 
         Returns
         -------
@@ -1063,7 +1063,7 @@ class JacobianUpdateContext:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
-        Exit the JacobianUpdateContext.
+        Exit the context.
 
         Parameters
         ----------
@@ -1095,30 +1095,37 @@ class GroupJacobianUpdateContext:
     ----------
     group : Group
         The group that owns this jacobian.
+    parent_jac : Jacobian or None
+        The parent jacobian.
 
     Attributes
     ----------
     group : Group
         The group that owns this jacobian.
+    parent_jac : Jacobian or None
+        The parent jacobian.
     jac : Jacobian
         The jacobian that is being updated.
     """
 
-    def __init__(self, group):
+    def __init__(self, group, parent_jac=None):
         """
-        Initialize the GroupJacobianUpdateContext.
+        Initialize the context.
 
         Parameters
         ----------
         group : Group
             The group that owns this jacobian.
+        parent_jac : Jacobian or None
+            The parent jacobian.
         """
         self.group = group
+        self.parent_jac = parent_jac
         self.jac = None
 
     def __enter__(self):
         """
-        Enter the GroupJacobianUpdateContext.
+        Enter the context.
 
         Returns
         -------
@@ -1126,6 +1133,7 @@ class GroupJacobianUpdateContext:
             The jacobian that is being updated.
         """
         if self.group._owns_approx_jac:
+            # don't use parent_jac
             if self.group._tot_jac is not None and not isinstance(self.group._jacobian,
                                                                   _ColSparsityJac):
                 self.jac = self.group._jacobian = self.group._tot_jac
@@ -1135,14 +1143,16 @@ class GroupJacobianUpdateContext:
         else:
             self.jac = self.group._get_assembled_jac()
 
-        if self.jac is not None:
+        if self.jac is None:
+            return self.parent_jac
+        else:
             self.jac._pre_update(self.group._outputs.dtype)
 
         return self.jac  # may be None
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
-        Exit the GroupJacobianUpdateContext.
+        Exit the context.
 
         Parameters
         ----------
@@ -1154,8 +1164,7 @@ class GroupJacobianUpdateContext:
             The traceback object.
         """
         if self.jac is not None:
-            if True:  # not self.group._owns_approx_jac:
-                self.jac._update(self.group)
+            self.jac._update(self.group)
             self.jac._post_update()
 
         if exc_type:

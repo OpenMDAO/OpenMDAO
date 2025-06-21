@@ -5137,7 +5137,7 @@ class System(object, metaclass=SystemMetaclass):
             Flag indicating if the children should call linearize on their linear solvers.
         """
         with self._scaled_context_all():
-            self._linearize(self._assembled_jac, sub_do_ln=self._linear_solver is not None and
+            self._linearize(None, sub_do_ln=self._linear_solver is not None and
                             self._linear_solver._needs_linearize_children())
             if self._linear_solver is not None and sub_do_ln:
                 self._linear_solver._linearize()
@@ -5204,7 +5204,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         pass
 
-    def _linearize(self, jac, sub_do_ln=True):
+    def _linearize(self, jac=None, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 

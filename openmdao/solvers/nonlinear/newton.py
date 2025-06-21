@@ -216,9 +216,7 @@ class NewtonSolver(NonlinearSolver):
         try:
             system._dresiduals.set_vec(system._residuals)
             system._dresiduals *= -1.0
-            my_asm_jac = self.linear_solver._assembled_jac
-
-            system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
+            system._linearize(sub_do_ln=do_sub_ln)
 
             self._linearize()
 
