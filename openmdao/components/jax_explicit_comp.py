@@ -428,12 +428,13 @@ class JaxExplicitComponent(ExplicitComponent):
             The sparsity of the Jacobian.
         """
         if self._sparsity is None:
-            if self.options['derivs_method'] == 'jax':
-                self._sparsity = _compute_sparsity(self, direction, num_iters, perturb_size)
-            else:
+            if self._has_approx:
                 self._sparsity = super().compute_sparsity(direction=direction,
                                                           num_iters=num_iters,
                                                           perturb_size=perturb_size)
+            else:
+                self._sparsity = _compute_sparsity(self, direction, num_iters, perturb_size)
+
         return self._sparsity
 
     def _update_subjac_sparsity(self, sparsity_iter):

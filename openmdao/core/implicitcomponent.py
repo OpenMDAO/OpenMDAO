@@ -391,10 +391,10 @@ class ImplicitComponent(Component):
         """
         self._check_first_linearize()
 
-        with JacobianUpdateContext(self) as jac:
+        if not (self._has_linearize or self._has_approx):
+            return
 
-            if not (self._has_linearize or self._approx_schemes):
-                return
+        with JacobianUpdateContext(self) as jac:
 
             with self._unscaled_context(outputs=[self._outputs]):
                 # Computing the approximation before the call to compute_partials allows users to
@@ -560,7 +560,7 @@ class ImplicitComponent(Component):
         Jacobian
             The initialized jacobian.
         """
-        if self._relevance_changed():
+        if self._relevance_changed() and not isinstance(self._jacobian, _ColSparsityJac):
             self._jac_wrapper = None
 
         if not self.matrix_free:

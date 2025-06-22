@@ -3980,14 +3980,13 @@ class Group(System):
             self._jacobian = None
 
         if self._jacobian is None:
-            self._jacobian = self._get_assembled_jac()
-
-            if self._jacobian is None and self._has_approx:
-                # Group only needs a jacobian if it's approximating derivatives.
-                self._jacobian = DictionaryJacobian(system=self)
-
             if self._has_approx:
+                # Group needs a jacobian if it's approximating derivatives.
+                self._jacobian = DictionaryJacobian(system=self)
                 self._get_static_wrt_matches()
+
+            if self._jacobian is None:
+                self._jacobian = self._get_assembled_jac()
 
         return self._jacobian
 

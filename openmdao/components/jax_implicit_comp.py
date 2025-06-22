@@ -420,11 +420,11 @@ class JaxImplicitComponent(ImplicitComponent):
             The sparsity of the Jacobian.
         """
         if self._sparsity is None:
-            if self.options['derivs_method'] == 'jax':
-                self._sparsity = _compute_sparsity(self, direction, num_iters, perturb_size)[0]
-            else:
+            if self._has_approx:
                 self._sparsity = super().compute_sparsity(direction=direction, num_iters=num_iters,
                                                           perturb_size=perturb_size)[0]
+            else:
+                self._sparsity = _compute_sparsity(self, direction, num_iters, perturb_size)[0]
 
         return self._sparsity
 

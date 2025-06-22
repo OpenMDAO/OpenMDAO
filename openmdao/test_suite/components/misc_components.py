@@ -110,9 +110,9 @@ class ExplicitCounterComp(om.ExplicitComponent):
         self._counts['_solve_linear'] += 1
         super()._solve_linear(mode, scope_out=scope_out, scope_in=scope_in)
 
-    def _compute_partials_wrapper(self):
+    def _compute_partials_wrapper(self, jac):
         self._counts['_compute_partials_wrapper'] += 1
-        super()._compute_partials_wrapper()
+        super()._compute_partials_wrapper(jac)
 
     def _linearize(self, jac=None, sub_do_ln=False):
         self._counts['_linearize'] += 1

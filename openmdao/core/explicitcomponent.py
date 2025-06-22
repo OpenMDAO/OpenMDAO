@@ -167,7 +167,7 @@ class ExplicitComponent(Component):
         Jacobian
             The initialized jacobian.
         """
-        if self._relevance_changed():
+        if self._relevance_changed() and not isinstance(self._jacobian, _ColSparsityJac):
             self._jacobian = None
 
         if not self.matrix_free and self._jacobian is None:
@@ -384,14 +384,14 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        J = self._get_jacobian() if jac is None else jac
+        jac = self._get_jacobian()
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
 
             if not self.matrix_free:
                 # Jacobian and vectors are all scaled, unitless
-                J._apply(self, d_inputs, d_outputs, d_residuals, mode)
+                jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
                 return
 
             # Jacobian and vectors are all unscaled, dimensional
@@ -465,11 +465,11 @@ class ExplicitComponent(Component):
             # ExplicitComponent jacobian defined with -1 on diagonal.
             d_residuals *= -1.0
 
-    def _compute_partials_wrapper(self):
+    def _compute_partials_wrapper(self, jac):
         """
         Call compute_partials based on the value of the "run_root_only" option.
         """
-        jac = self._get_jacobian()
+        # jac = self._get_jacobian()
         with self._call_user_function('compute_partials'):
             if self._run_root_only():
                 if self.comm.rank == 0:
@@ -500,10 +500,10 @@ class ExplicitComponent(Component):
         """
         self._check_first_linearize()
 
-        with JacobianUpdateContext(self) as jac:
+        if self.matrix_free or not (self._has_compute_partials or self._has_approx):
+            return
 
-            if self.matrix_free or not (self._has_compute_partials or self._approx_schemes):
-                return
+        with JacobianUpdateContext(self) as jac:
 
             with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
                 # Computing the approximation before the call to compute_partials allows users to
@@ -513,7 +513,7 @@ class ExplicitComponent(Component):
 
                 if self._has_compute_partials:
                     # We used to negate the jacobian here, and then re-negate after the hook.
-                    self._compute_partials_wrapper()
+                    self._compute_partials_wrapper(jac)
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """
