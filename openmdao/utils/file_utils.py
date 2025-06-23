@@ -1,6 +1,8 @@
 """
 Utilities for working with files.
 """
+import mimetypes
+import sqlite3
 import sys
 import os
 import importlib
@@ -668,3 +670,62 @@ def clean_outputs(obj='.', recurse=False, prompt=True, pattern='*_out', dryrun=F
             removed_count += 1
 
     print(f'Removed {removed_count} OpenMDAO output directories.')
+
+def is_sqlite_file(file_path):
+    """Check if file is a SQLite database by attempting to open it.
+    
+    Parameters
+    ----------
+    file_path : str 
+        The path to a file.
+
+    Returns
+    -------
+    bool
+        True if file is a sqlite file. False, if not.
+    """ 
+    try:
+        # Try to open as SQLite database
+        conn = sqlite3.connect(str(file_path))
+        
+        # Try to execute a simple query to verify it's a valid SQLite file
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master LIMIT 1")
+        
+        conn.close()
+        return True
+        
+    except (sqlite3.Error, sqlite3.DatabaseError):
+        # Not a valid SQLite file
+        return False
+    except (IOError, OSError):
+        # File access issues
+        return False
+    
+def is_python_file(file_path):
+    """
+    Check if file is a Python source file using multiple methods.
+ 
+    Parameters
+    ----------
+    file_path : str 
+        The path to a file.
+
+    Returns
+    -------
+    bool
+        True if file is a python file. False, if not.
+    """ 
+    # Method 1: Check file extension
+    if pathlib.Path(file_path).suffix.lower() in ['.py', '.pyw', '.pyi']:
+        return True
+    
+    # Method 2: Check MIME type
+    try:
+        mime_type, _ = mimetypes.guess_type(str(file_path))
+        if mime_type in ['text/x-python', 'application/x-python-code']:
+            return True
+    except:
+        pass
+    
+    return False
