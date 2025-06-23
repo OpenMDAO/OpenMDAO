@@ -14,8 +14,10 @@ from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 
 try:
     from petsc4py import PETSc
+    DEFAULT_COMM = PETSc.COMM_WORLD
 except ImportError:
     PETSc = None
+    DEFAULT_COMM = None
 
 PC_SERIAL_TYPES = [
     "superlu",
@@ -39,7 +41,7 @@ class PETScLU:
     Wrapper for PETSc LU decomposition, using petsc4py.
     """
     def __init__(self, A: scipy.sparse.spmatrix, sparse_solver_name: str = None,
-                 comm = PETSc.COMM_WORLD):
+                 comm = DEFAULT_COMM):
         """
         Initialize and setup the PETSc LU Direct Solver object.
 
