@@ -1219,7 +1219,7 @@ class CCBladeResidualComp(ImplicitComponent):
 
 
 class MaskingTestCase(unittest.TestCase):
-    def run_asjac_type_test(self, asjac_type):
+    def run_asjac_type_test(self, asjac_type, linslv_type):
         prob = Problem()
         model = prob.model
 
@@ -1229,7 +1229,13 @@ class MaskingTestCase(unittest.TestCase):
 
         comp = CCBladeResidualComp(num_nodes=1, num_radial=4, assembled_jac_type=asjac_type)
 
-        comp.linear_solver = DirectSolver(assemble_jac=True)
+        if linslv_type == 'direct':
+            comp.linear_solver = DirectSolver(assemble_jac=True)
+        elif linslv_type == 'krylov':
+            comp.linear_solver = ScipyKrylov(assemble_jac=True)
+        else:
+            raise ValueError(f"Invalid linear solver type: {linslv_type}")
+
         model.add_subsystem('ccblade_comp', comp, promotes_inputs=['chord'], promotes_outputs=['Tp'])
 
 
@@ -1247,10 +1253,13 @@ class MaskingTestCase(unittest.TestCase):
         np.testing.assert_allclose(totals, expected)
 
     def test_csc_masking(self):
-        self.run_asjac_type_test('csc')
+        self.run_asjac_type_test('csc', 'direct')
+
+    def test_csr_masking(self):
+        self.run_asjac_type_test('csr', 'krylov')
 
     def test_dense_masking(self):
-        self.run_asjac_type_test('dense')
+        self.run_asjac_type_test('dense', 'direct')
 
 
 

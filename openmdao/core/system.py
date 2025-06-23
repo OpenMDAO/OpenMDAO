@@ -395,7 +395,7 @@ class System(object, metaclass=SystemMetaclass):
         self.options = OptionsDictionary(parent_name=type(self).__name__)
 
         self.options.declare('assembled_jac_type', values=['csc', 'csr', 'dense', None],
-                             default=None,
+                             default=None, set_function=self._set_assembled_jac_type,
                              desc='Linear solver(s) in this group or implicit component, '
                                   'if using an assembled jacobian, will use this type.')
         self.options.declare('derivs_method', default=None, values=['jax', 'cs', 'fd', None],
@@ -612,6 +612,16 @@ class System(object, metaclass=SystemMetaclass):
         if self.name:
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
+
+    def _set_assembled_jac_type(self, meta, value):
+        """
+        Set the type of the assembled jacobian.
+        """
+        if value not in ['dense', 'sparse']:
+            issue_warning(f"{self.msginfo}: Use either 'dense' or 'sparse' "
+                          "for the assembled_jac_type option.  Other types are deprecated.",
+                          category=DeprecationWarning)
+        return value
 
     def _get_inst_id(self):
         return self.pathname if self.pathname is not None else ''
@@ -2603,23 +2613,26 @@ class System(object, metaclass=SystemMetaclass):
                                        "subcomponent." % self.msginfo)
 
                 option_format = self.options['assembled_jac_type']
-                preferred = [fmt for _, fmt in asm_jac_solvers if fmt is not None]
-                if len(set(preferred)) == 1:
-                    sparse_format = preferred[0]
-                elif option_format is None:
-                    # use old default of 'csc'
-                    sparse_format = 'csc'
+                if option_format == 'dense':
+                    sparse_format = 'dense'
                 else:
-                    sparse_format = option_format
+                    preferred = [fmt for _, fmt in asm_jac_solvers if fmt is not None]
+                    if len(set(preferred)) == 1:
+                        sparse_format = preferred[0]
+                    elif option_format in (None, 'sparse'):
+                        # use old default of 'csc'
+                        sparse_format = 'csc'
+                    else:
+                        sparse_format = option_format
 
-                if option_format is not None:
-                    if option_format not in (sparse_format, 'dense'):
-                        issue_warning(
-                            f"{self.msginfo}: system is using a '{option_format}' "
-                            "sparse format, but a linear solver in the system prefers "
-                            f"'{sparse_format}'. This may result in performance degradation."
-                        )
-                    sparse_format = option_format
+                    if option_format not in (None, 'sparse'):
+                        if option_format != sparse_format:
+                            issue_warning(
+                                f"{self.msginfo}: system is using a '{option_format}' "
+                                "sparse format, but a linear solver in the system prefers "
+                                f"'{sparse_format}'. This may result in performance degradation."
+                            )
+                        sparse_format = option_format
 
                 asm_jac = _asm_jac_types[sparse_format](system=self)
                 self._assembled_jac = self._jacobian = asm_jac
