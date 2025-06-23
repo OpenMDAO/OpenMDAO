@@ -65,8 +65,9 @@ class PETScLU:
     _x : <petsc4py.PETSc.Vec>
         Sequential (non-distributed) PETSc vector to store the solve solution.
     """
+
     def __init__(self, A: scipy.sparse.spmatrix, sparse_solver_name: str = None,
-                 comm = DEFAULT_COMM):
+                 comm=DEFAULT_COMM):
         """
         Initialize and setup the PETSc LU Direct Solver object.
         """
@@ -103,8 +104,8 @@ class PETScLU:
                 for i in range(rstart, rend):
                     row_start = indptr[i]
                     row_end = indptr[i + 1]
-                    cols = indices[row_start : row_end]
-                    vals = data[row_start : row_end]
+                    cols = indices[row_start: row_end]
+                    vals = data[row_start: row_end]
                     self.A.setValues(i, cols, vals)
 
             else:
@@ -169,7 +170,7 @@ class PETScLU:
         """
         b_petsc = self.A.createVecRight()
         rstart, rend = b_petsc.getOwnershipRange()
-        b_petsc.setValues(range(rstart, rend), b[rstart : rend])
+        b_petsc.setValues(range(rstart, rend), b[rstart: rend])
         b_petsc.assemble()
 
         if transpose:
@@ -193,7 +194,8 @@ class PETScLU:
             # Have to call scatter on all ranks or MPI will error out (each
             # rank is a processing being run in the MPI)
             scatter, _ = PETSc.Scatter.toZero(self._x)
-            scatter.scatter(self._x, x_seq, addv=PETSc.InsertMode.INSERT, mode=PETSc.ScatterMode.FORWARD)
+            scatter.scatter(self._x, x_seq, addv=PETSc.InsertMode.INSERT,
+                            mode=PETSc.ScatterMode.FORWARD)
             scatter.destroy()
 
             # Rank 0 owns x, broadcast (or send a copy) of it to the other ranks
@@ -456,8 +458,7 @@ class PETScDirectSolver(LinearSolver):
 
     def _linearize_children(self):
         """
-        Return a flag that is True when we need to call linearize on our
-        subsystems' solvers.
+        Return a flag that is True when we need to call linearize on our subsystems' solvers.
 
         Returns
         -------
@@ -657,7 +658,7 @@ class PETScDirectSolver(LinearSolver):
 
         return inv_jac
 
-    def solve(self, mode, rel_systems=None): ###
+    def solve(self, mode, rel_systems=None):
         """
         Run the solver.
 
