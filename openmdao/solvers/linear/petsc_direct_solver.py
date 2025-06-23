@@ -38,7 +38,7 @@ class PETScLU:
     """
     Wrapper for PETSc LU decomposition, using petsc4py.
     """
-    def __init__(self, A: scipy.sparse.spmatrix, backend: str = None,
+    def __init__(self, A: scipy.sparse.spmatrix, sparse_solver_name: str = None,
                  comm = PETSc.COMM_WORLD):
         """
         Initialize and setup the PETSc LU Direct Solver object.
@@ -47,7 +47,7 @@ class PETScLU:
         ----------
         A : ndarray or <scipy.sparse.csc_matrix>
             Matrix to use in solving x @ A == b
-        backend : str
+        sparse_solver_name : str
             Name of the direct solver from PETSc to use.
         comm : <mpi4py.MPI.Intracomm>
             The system MPI communicator
@@ -123,20 +123,21 @@ class PETScLU:
 
         # Backends are only for sparse matrices. For dense matrix should by
         # default use LAPACK
-        if backend and not isinstance(A, np.ndarray):
-            if backend in PC_SERIAL_TYPES and self.running_mpi:
+        if sparse_solver_name and not isinstance(A, np.ndarray):
+            if sparse_solver_name in PC_SERIAL_TYPES and self.running_mpi:
                 raise RuntimeError(
-                    f'The "{backend}" backend cannot be used when running the '
-                    'PETScDirectSolver with MPI. The "backend" must be one of '
-                    f'{PC_DISTRIBUTED_TYPES}'
+                    f'The "{sparse_solver_name}" solver cannot be used when '
+                    'running the PETScDirectSolver with MPI. The '
+                    f'"sparse_solver_name" must be one of {PC_DISTRIBUTED_TYPES}'
                 )
-            pc.setFactorSolverType(backend)
+            pc.setFactorSolverType(sparse_solver_name)
 
         elif isinstance(A, np.ndarray) and self.running_mpi:
             raise RuntimeError(
                 f'The "LAPACK" backend which is automatically chosen for dense '
                 'problems cannot be used when running the PETScDirectSolver '
-                f'with MPI. The "backend" must be one of {PC_DISTRIBUTED_TYPES}'
+                'with MPI. The "sparse_solver_name" must be one of '
+                f'{PC_DISTRIBUTED_TYPES}'
             )
 
         # Read and apply the user specified options to configure the solver,
@@ -416,7 +417,7 @@ class PETScDirectSolver(LinearSolver):
         )
 
         self.options.declare(
-            'backend',
+            'sparse_solver_name',
             values=PC_SERIAL_TYPES + PC_DISTRIBUTED_TYPES,
             default='superlu',
             desc="Direct solver algorithm from PETSc that will be used for the "
@@ -449,7 +450,7 @@ class PETScDirectSolver(LinearSolver):
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
-        if self.options['backend'] in PC_SERIAL_TYPES:
+        if self.options['sparse_solver_name'] in PC_SERIAL_TYPES:
             self._disallow_distrib_solve()
         self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
                                                         self.options['rhs_checking'])
@@ -546,7 +547,8 @@ class PETScDirectSolver(LinearSolver):
             # Perform dense or sparse lu factorization.
             elif isinstance(matrix, scipy.sparse.csc_matrix):
                 try:
-                    self._lu = PETScLU(matrix, self.options['backend'], comm=system.comm)
+                    self._lu = PETScLU(matrix, self.options['sparse_solver_name'],
+                                       comm=system.comm)
                 except RuntimeError:
                     # Zero pivot in LU factorization doesn't necessarily guarantee
                     # that the matrix is singular, but not sure what else to raise

@@ -131,7 +131,7 @@ class TestPETScClass(unittest.TestCase):
         """
         lup = PETScLU(
             A=np.array([[1, 2], [3, 4]]),
-            backend='umfpack',
+            sparse_solver_name='umfpack',
         )
         self.assertEqual(lup.A.getType(), 'seqdense')
         self.assertEqual(lup.A.getSize(), (2, 2))
@@ -144,7 +144,7 @@ class TestPETScClass(unittest.TestCase):
         """
         lu = PETScLU(
             A=sparse.csr_matrix(np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])),
-            backend='umfpack',
+            sparse_solver_name='umfpack',
         )
         self.assertEqual(lu.A.getType(), 'seqaij')
         self.assertEqual(lu.A.getSize(), (3, 3))
@@ -157,7 +157,7 @@ class TestPETScClass(unittest.TestCase):
         """
         lu = PETScLU(
             A=sparse.csc_matrix(np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])),
-            backend='umfpack',
+            sparse_solver_name='umfpack',
         )
         self.assertEqual(lu.A.getType(), 'seqaij')
         self.assertEqual(lu.A.getSize(), (3, 3))
@@ -168,11 +168,12 @@ class TestPETScClass(unittest.TestCase):
         Test that each allowable solver type can be used without raising an
         error by PETSc
         """
-        for backend in ["superlu", "klu", "umfpack", "petsc", "mumps", "superlu_dist"]:
-            with self.subTest(backend=backend):
+        for sparse_solver_name in ["superlu", "klu", "umfpack", "petsc",
+                                   "mumps", "superlu_dist"]:
+            with self.subTest(sparse_solver_name=sparse_solver_name):
                 PETScLU(
                     A=sparse.csr_matrix(np.array([[1, 0], [0, 1]])),
-                    backend=backend,
+                    sparse_solver_name=sparse_solver_name,
                 )
 
     def test_serial_solve(self):
@@ -182,7 +183,7 @@ class TestPETScClass(unittest.TestCase):
         """
         lu = PETScLU(
             A=sparse.csc_matrix(np.array([[1, 0, 1], [0, 2, 0], [0, 0, 3]])),
-            backend='umfpack',
+            sparse_solver_name='umfpack',
         )
         x = lu.solve(b=np.array([1, 2, 3]), transpose=False)
         assert_near_equal(x, np.array([0.0, 1.0, 1.0]))
@@ -194,7 +195,7 @@ class TestPETScClass(unittest.TestCase):
         """
         lu = PETScLU(
             A=sparse.csc_matrix(np.array([[1, 0, 1], [0, 2, 0], [0, 0, 3]])),
-            backend='umfpack',
+            sparse_solver_name='umfpack',
         )
         x = lu.solve(b=np.array([1, 2, 3]), transpose=True)
         assert_near_equal(x, np.array([1.0, 1.0, 2.0 / 3.0]))
@@ -215,10 +216,10 @@ class TestPETScClassMPI(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             PETScLU(
                 A=sparse.csr_matrix(np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])),
-                backend='klu',
+                sparse_solver_name='klu',
                 comm=PETSc.COMM_WORLD
             )
-        expected_msg = 'backend cannot be used when running the PETScDirectSolver with MPI.'
+        expected_msg = 'cannot be used when running the PETScDirectSolver with MPI.'
         self.assertIn(expected_msg, str(cm.exception))
 
     def test_dense_mpi_error(self):
@@ -231,7 +232,7 @@ class TestPETScClassMPI(unittest.TestCase):
                 A=np.array([[1, 2], [3, 4]]),
                 comm=PETSc.COMM_WORLD,
             )
-        expected_msg = 'backend cannot be used when running the PETScDirectSolver with MPI.'
+        expected_msg = 'cannot be used when running the PETScDirectSolver with MPI.'
         self.assertIn(expected_msg, str(cm.exception))
 
     def test_mpi_solve(self):
@@ -241,7 +242,7 @@ class TestPETScClassMPI(unittest.TestCase):
         """
         lu = PETScLU(
             A=sparse.csc_matrix(np.array([[1, 0, 1], [0, 2, 0], [0, 0, 3]])),
-            backend='mumps',
+            sparse_solver_name='mumps',
             comm=PETSc.COMM_WORLD,
         )
         x = lu.solve(b=np.array([1, 2, 3]), transpose=False)
