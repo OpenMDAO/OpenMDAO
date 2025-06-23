@@ -39,31 +39,35 @@ PC_DISTRIBUTED_TYPES = [
 class PETScLU:
     """
     Wrapper for PETSc LU decomposition, using petsc4py.
+
+    Parameters
+    ----------
+    A : ndarray or <scipy.sparse.csc_matrix>
+        Matrix to use in solving x @ A == b
+    sparse_solver_name : str
+        Name of the direct solver from PETSc to use.
+    comm : <mpi4py.MPI.Intracomm>
+        The system MPI communicator
+
+    Attributes
+    ----------
+    orig_A : ndarray or <scipy.sparse.csc_matrix>
+        Originally provided matrx.
+    A : <petsc4py.PETSc.Mat>
+        Assembled PETSc AIJ (compressed sparse row format) matrix
+    ksp : <petsc4py.PETSc.KSP>
+        PETSc Krylov Subspace Solver context.
+    running_mpi : bool
+        Is the script currently being run under MPI (True) or not (False).
+    comm : <mpi4py.MPI.Intracomm>
+        The system MPI communicator.
+    _x : <petsc4py.PETSc.Vec>
+        Sequential (non-distributed) PETSc vector to store the solve solution.
     """
     def __init__(self, A: scipy.sparse.spmatrix, sparse_solver_name: str = None,
                  comm = DEFAULT_COMM):
         """
         Initialize and setup the PETSc LU Direct Solver object.
-
-        Parameters
-        ----------
-        A : ndarray or <scipy.sparse.csc_matrix>
-            Matrix to use in solving x @ A == b
-        sparse_solver_name : str
-            Name of the direct solver from PETSc to use.
-        comm : <mpi4py.MPI.Intracomm>
-            The system MPI communicator
-
-        Attributes
-        ----------
-        orig_A : ndarray or <scipy.sparse.csc_matrix>
-            Originally provided matrx.
-        A : <petsc4py.PETSc.Mat>
-            Assembled PETSc AIJ (compressed sparse row format) matrix
-        ksp : <petsc4py.PETSc.KSP>
-            PETSc Krylov Subspace Solver context.
-        _x : <petsc4py.PETSc.Vec>
-            Sequential (non-distributed) PETSc vector to store the solve solution.
         """
         self.comm = comm
         self.running_mpi = not comm.size == 1
