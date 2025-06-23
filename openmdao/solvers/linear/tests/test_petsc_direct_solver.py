@@ -1,10 +1,8 @@
 """Test the PETScDirectSolver linear solver class."""
 
 import unittest
-from unittest.mock import patch
 import numpy as np
 from scipy import sparse
-import os
 import openmdao.api as om
 
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
@@ -16,7 +14,6 @@ from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import SolverWarning
 try:
     from petsc4py import PETSc
     from openmdao.solvers.linear.petsc_direct_solver import PETScLU
