@@ -11,9 +11,10 @@ from openmdao.test_suite.components.expl_comp_simple import TestExplCompSimpleJa
 from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.groups.implicit_group import TestImplicitGroup
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.general_utils import printoptions
 from openmdao.utils.mpi import MPI
+from openmdao.utils.om_warnings import SolverWarning
 try:
     from petsc4py import PETSc
     from openmdao.solvers.linear.petsc_direct_solver import PETScLU
@@ -176,6 +177,19 @@ class TestPETScClass(unittest.TestCase):
                     sparse_solver_name=sparse_solver_name,
                 )
 
+    def test_sparse_mpi_warning(self):
+        """
+        Test that if specifying a backend which is meant to be run distributed,
+        but MPI is not being used, a descriptive warning is shown.
+        """
+        msg = ('The "mumps" solver is meant to be run distributed, but it is '
+               'currently being run sequentially.')
+        with assert_warning(SolverWarning, msg):
+            PETScLU(
+                A=sparse.csr_matrix(np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])),
+                sparse_solver_name='mumps',
+            )
+
     def test_serial_solve(self):
         """
         Test that calling the solve method correctly solves for x when A is not
@@ -208,34 +222,19 @@ class TestPETScClassMPI(unittest.TestCase):
 
     N_PROCS = 2
 
-    def test_sparse_mpi_error(self):
+    def test_mpi_solve_sequential(self):
         """
-        Test that if specifying a backend which does not support MPI, but MPI
-        is being used, a descriptive error is raised
+        Test that calling the solve method correctly solves for x when the
+        problem is running under MPI.
         """
-        with self.assertRaises(RuntimeError) as cm:
-            PETScLU(
-                A=sparse.csr_matrix(np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])),
-                sparse_solver_name='klu',
-                comm=PETSc.COMM_WORLD
-            )
-        expected_msg = 'cannot be used when running the PETScDirectSolver with MPI.'
-        self.assertIn(expected_msg, str(cm.exception))
+        lu = PETScLU(
+            A=sparse.csc_matrix(np.array([[1, 0, 1], [0, 2, 0], [0, 0, 3]])),
+            sparse_solver_name='umfpack',
+        )
+        x = lu.solve(b=np.array([1, 2, 3]), transpose=False)
+        assert_near_equal(x, np.array([0.0, 1.0, 1.0]))
 
-    def test_dense_mpi_error(self):
-        """
-        Test that if specifying a backend which does not support MPI, but MPI
-        is being used, a descriptive error is raised
-        """
-        with self.assertRaises(RuntimeError) as cm:
-            PETScLU(
-                A=np.array([[1, 2], [3, 4]]),
-                comm=PETSc.COMM_WORLD,
-            )
-        expected_msg = 'cannot be used when running the PETScDirectSolver with MPI.'
-        self.assertIn(expected_msg, str(cm.exception))
-
-    def test_mpi_solve(self):
+    def test_mpi_solve_distributed(self):
         """
         Test that calling the solve method correctly solves for x when the
         problem is running under MPI.
@@ -1150,13 +1149,14 @@ class TestPETScDirectSolverRemoteErrors(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
 
+@unittest.skipUnless(PETSc, "only run with PETSc.")
 class TestPETScDirectSolverMPI(unittest.TestCase):
 
     N_PROCS = 2
 
     def test_serial_in_mpi(self):
-        # Tests that we can take an MPI model with a PETScDirectSolver and run it in mpi with more
-        # procs. This verifies fix of a bug.
+        # Tests that we can take an MPI model with a PETScDirectSolver and run
+        # it in mpi with more procs. This verifies fix of a bug.
 
         prob = om.Problem(model=DoubleSellar())
         model = prob.model
@@ -1174,7 +1174,7 @@ class TestPETScDirectSolverMPI(unittest.TestCase):
         g2.options['assembled_jac_type'] = 'dense'
 
         model.nonlinear_solver = om.NewtonSolver()
-        model.linear_solver = om.ScipyKrylov(assemble_jac=True)
+        model.linear_solver = om.PETScDirectSolver(assemble_jac=True)
         model.options['assembled_jac_type'] = 'dense'
 
         model.nonlinear_solver.options['solve_subsystems'] = True

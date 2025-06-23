@@ -11,6 +11,7 @@ from openmdao.solvers.solver import LinearSolver
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.array_utils import identity_column_iter
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
+from openmdao.utils.om_warnings import issue_warning, SolverWarning
 
 try:
     from petsc4py import PETSc
@@ -43,18 +44,18 @@ class PETScLU:
     Parameters
     ----------
     A : ndarray or <scipy.sparse.csc_matrix>
-        Matrix to use in solving x @ A == b
+        Matrix to use in solving x @ A == b.
     sparse_solver_name : str
         Name of the direct solver from PETSc to use.
     comm : <mpi4py.MPI.Intracomm>
-        The system MPI communicator
+        The system MPI communicator.
 
     Attributes
     ----------
     orig_A : ndarray or <scipy.sparse.csc_matrix>
-        Originally provided matrx.
+        Originally provided matrix.
     A : <petsc4py.PETSc.Mat>
-        Assembled PETSc AIJ (compressed sparse row format) matrix
+        Assembled PETSc AIJ (compressed sparse row format) matrix.
     ksp : <petsc4py.PETSc.KSP>
         PETSc Krylov Subspace Solver context.
     running_mpi : bool
@@ -86,7 +87,7 @@ class PETScLU:
             # TODO: Look at how to maybe provide a nnz argument for a rough
             # estimate of number of nonzero rows so it hopefully doesn't have
             # to do frequent reallocations
-            if self.running_mpi:
+            if self.running_mpi and sparse_solver_name in PC_DISTRIBUTED_TYPES:
                 # Parallel: build local CSR
                 self.A = PETSc.Mat().create(comm=comm)
                 self.A.setSizes(A.shape)
@@ -130,21 +131,13 @@ class PETScLU:
         # Backends are only for sparse matrices. For dense matrix should by
         # default use LAPACK
         if sparse_solver_name and not isinstance(A, np.ndarray):
-            if sparse_solver_name in PC_SERIAL_TYPES and self.running_mpi:
-                raise RuntimeError(
-                    f'The "{sparse_solver_name}" solver cannot be used when '
-                    'running the PETScDirectSolver with MPI. The '
-                    f'"sparse_solver_name" must be one of {PC_DISTRIBUTED_TYPES}'
+            if sparse_solver_name in PC_DISTRIBUTED_TYPES and not self.running_mpi:
+                issue_warning(
+                    f'The "{sparse_solver_name}" solver is meant to be run '
+                    'distributed, but it is currently being run sequentially.',
+                    category=SolverWarning
                 )
             pc.setFactorSolverType(sparse_solver_name)
-
-        elif isinstance(A, np.ndarray) and self.running_mpi:
-            raise RuntimeError(
-                f'The "LAPACK" backend which is automatically chosen for dense '
-                'problems cannot be used when running the PETScDirectSolver '
-                'with MPI. The "sparse_solver_name" must be one of '
-                f'{PC_DISTRIBUTED_TYPES}'
-            )
 
         # Read and apply the user specified options to configure the solver,
         # preconditioner, etc., then perform the internal setup and initialization
@@ -160,13 +153,13 @@ class PETScLU:
 
     def solve(self, b: np.ndarray, transpose: bool = False) -> np.ndarray:
         """
-        Solve the linear system using only the preconditioner direct solver
+        Solve the linear system using only the preconditioner direct solver.
 
         Parameters
         ----------
         b : ndarray
             Input data for the right hand side.
-        tranpose : bool
+        transpose : bool
             Is A.T @ x == b being solved (True) or A @ x == b (False).
 
         Returns
@@ -188,7 +181,8 @@ class PETScLU:
         # x and "scatter" it (basically gather it to one rank). Once it's
         # gathered into onen array, it can be converted to a numpy array and
         # passed out.
-        if self.running_mpi:
+        pc = self.ksp.getPC()
+        if self.running_mpi and pc.getFactorSolverType() in PC_DISTRIBUTED_TYPES:
             # Create the sequential vector on COMM_SELF so it's not part of the
             # distributed communication and is only on one process.
             if self._x.comm.getRank() == 0:
@@ -218,8 +212,7 @@ class PETScLU:
 
 def index_to_varname(system, loc):
     """
-    Given a matrix location, return the name of the variable associated with
-    that index.
+    Given a matrix location, return the name of the variable associated with that index.
 
     Parameters
     ----------
