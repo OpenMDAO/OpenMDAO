@@ -21,7 +21,7 @@ PC_SERIAL_TYPES = [
     "superlu",
     "klu",
     "umfpack",
-    "petsc"
+    "petsc",
 ]
 PC_DISTRIBUTED_TYPES = [
     "mumps",
@@ -29,6 +29,7 @@ PC_DISTRIBUTED_TYPES = [
 ]
 # Direct solvers that don't come installed with petsc4py or are not supported
 # for this problem
+# strumpack
 # pardiso
 # cholmod
 
@@ -116,6 +117,8 @@ class PETScLU:
         # iterative solve
         self.ksp.setType('preonly')
         pc = self.ksp.getPC()
+        # In practice, majority of OpenMDAO applications use general, unsymmetric
+        # Jacobians, so LU is usually the only practical choice.
         pc.setType('lu')
 
         # Backends are only for sparse matrices. For dense matrix should by
@@ -415,7 +418,11 @@ class PETScDirectSolver(LinearSolver):
         self.options.declare(
             'backend',
             values=PC_SERIAL_TYPES + PC_DISTRIBUTED_TYPES,
-            default='superlu'
+            default='superlu',
+            desc="Direct solver algorithm from PETSc that will be used for the "
+                 "LU factorization and solve if the matrix is sparse. For a "
+                 "dense matrix, this option will be ignored and LAPACK will "
+                 "be automatically used."
         )
 
         # this solver does not iterate

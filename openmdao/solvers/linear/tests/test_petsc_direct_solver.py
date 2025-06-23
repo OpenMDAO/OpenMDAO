@@ -178,20 +178,7 @@ class TestPETScClass(unittest.TestCase):
                     backend=backend,
                 )
 
-    @patch.dict(os.environ, {'OPENMDAO_USE_MPI': 'false'})
-    def test_distributed_warning(self):
-        """
-        Test that if specifying a backend which is meant to utilize MPI, but
-        the environment variable for using MPI is set to a negative, warn the
-        user.
-        """
-        with self.assertWarns(SolverWarning):
-            PETScLU(
-                A=sparse.csr_matrix(np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])),
-                backend='mumps',
-            )
-
-    def test_solve(self):
+    def test_serial_solve(self):
         """
         Test that calling the solve method correctly solves for x when A is not
         transposed.
@@ -203,7 +190,7 @@ class TestPETScClass(unittest.TestCase):
         x = lu.solve(b=np.array([1, 2, 3]), transpose=False)
         assert_near_equal(x, np.array([0.0, 1.0, 1.0]))
 
-    def test_transpose_solve(self):
+    def test_serial_transpose_solve(self):
         """
         Test that calling the solve method correctly solves for x when A is
         transposed.
@@ -214,6 +201,55 @@ class TestPETScClass(unittest.TestCase):
         )
         x = lu.solve(b=np.array([1, 2, 3]), transpose=True)
         assert_near_equal(x, np.array([1.0, 1.0, 2.0 / 3.0]))
+
+
+# Test the class used to setup and interact with the PETSc solver when it is
+# being run under MPI
+@unittest.skipUnless(MPI and PETSc, "only run with MPI and PETSc.")
+class TestPETScClassMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_sparse_mpi_error(self):
+        """
+        Test that if specifying a backend which does not support MPI, but MPI
+        is being used, a descriptive error is raised
+        """
+        with self.assertRaises(RuntimeError) as cm:
+            PETScLU(
+                A=sparse.csr_matrix(np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])),
+                backend='klu',
+                comm=PETSc.COMM_WORLD
+            )
+        expected_msg = 'backend cannot be used when running the PETScDirectSolver with MPI.'
+        self.assertIn(expected_msg, str(cm.exception))
+
+    def test_dense_mpi_error(self):
+        """
+        Test that if specifying a backend which does not support MPI, but MPI
+        is being used, a descriptive error is raised
+        """
+        with self.assertRaises(RuntimeError) as cm:
+            PETScLU(
+                A=np.array([[1, 2], [3, 4]]),
+                comm=PETSc.COMM_WORLD,
+            )
+        expected_msg = 'backend cannot be used when running the PETScDirectSolver with MPI.'
+        self.assertIn(expected_msg, str(cm.exception))
+
+    def test_mpi_solve(self):
+        """
+        Test that calling the solve method correctly solves for x when the
+        problem is running under MPI.
+        """
+        lu = PETScLU(
+            A=sparse.csc_matrix(np.array([[1, 0, 1], [0, 2, 0], [0, 0, 3]])),
+            backend='mumps',
+            comm=PETSc.COMM_WORLD,
+        )
+        x = lu.solve(b=np.array([1, 2, 3]), transpose=False)
+        assert_near_equal(x, np.array([0.0, 1.0, 1.0]))
+
 
 # Run the same test suite as the DirectSolver since the functionality is very
 # close to the same (except skip "test_raise_no_error_on_singular" PETSc
