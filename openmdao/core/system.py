@@ -1483,7 +1483,7 @@ class System(object, metaclass=SystemMetaclass):
 
         if self._approx_subjac_keys is None:
             linslv = self.linear_solver
-            if use_relevance and linslv is not None and linslv.use_relevance():
+            if use_relevance and (linslv is None or linslv.use_relevance()):
                 lst = []
                 is_relevant = self._relevance.is_relevant
                 with self._relevance.all_seeds_active():
