@@ -420,6 +420,25 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
         self.assertEqual(expected_msg, str(cm.exception))
 
+    def test_raise_error_on_not_installed_solver(self):
+        prob = om.Problem()
+        model = prob.model
+
+        class TestSolver(om.PETScDirectSolver):
+            def _declare_options(self):
+                super()._declare_options()
+                self.options.declare('sparse_solver_name')
+
+        model.add_subsystem('comp', om.ExecComp('y = x * 2.'))
+        model.linear_solver = TestSolver(sparse_solver_name='hello')
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.compute_totals('comp.y', 'comp.x')
+
+        expected_msg = "Specified PETSc sparse solver, 'hello', is not installed."
+        self.assertEqual(expected_msg, str(cm.exception))
+
     def test_raise_error_on_dup_partials(self):
         prob = om.Problem()
         model = prob.model

@@ -80,7 +80,7 @@ class PETScLU:
         # Create PETSc matrix
         # Dense
         if isinstance(A, np.ndarray):
-            self.A = PETSc.Mat().createDense(A.shape, array=A)
+            self.A = PETSc.Mat().createDense(A.shape, array=A, comm=PETSc.COMM_SELF)
 
         # Sparse
         else:
@@ -113,7 +113,7 @@ class PETScLU:
 
             else:
                 # Serial: build full CSR (if you're running a serial solver
-                # while using MPI, then it will solve the full think on each rank)
+                # while using MPI, then it will solve the full thing on each rank)
                 self.A = PETSc.Mat().createAIJ(
                     size=A.shape,
                     csr=(A.indptr, A.indices, A.data),
@@ -494,6 +494,32 @@ class PETScDirectSolver(LinearSolver):
         """
         return False
 
+    def raise_petsc_error(self, e, system, matrix):
+        """
+        Raise an error based on the issue that PETSc had with the linearize.
+
+        Parameters
+        ----------
+        e : Error
+            Error returned by PETSc.
+        system : <System>
+            System containing the Directsolver.
+        matrix : ndarray
+            Matrix of interest.
+        """
+        if "Zero pivot in LU factorization" in str(e):
+            # Zero pivot in LU factorization doesn't necessarily guarantee
+            # that the matrix is singular, but not sure what else to raise
+            raise RuntimeError(format_singular_error(system, matrix)) from e
+
+        elif "Could not locate solver type" in str(e):
+            raise RuntimeError(f"Specified PETSc sparse solver, "
+                                f"'{self.options['sparse_solver_name']}', "
+                                "is not installed.") from e
+
+        else:
+            raise(e)
+
     def _build_mtx(self):
         """
         Assemble a Jacobian matrix by matrix-vector-product with columns of identity.
@@ -554,18 +580,14 @@ class PETScDirectSolver(LinearSolver):
                 try:
                     self._lu = PETScLU(matrix, self.options['sparse_solver_name'],
                                        comm=system.comm)
-                except RuntimeError:
-                    # Zero pivot in LU factorization doesn't necessarily guarantee
-                    # that the matrix is singular, but not sure what else to raise
-                    raise RuntimeError(format_singular_error(system, matrix))
+                except PETSc.Error as e:
+                    self.raise_petsc_error(e, system, matrix)
 
             elif isinstance(matrix, np.ndarray):  # dense
                 try:
                     self._lup = PETScLU(matrix)
-                except PETSc.Error:
-                    # Zero pivot in LU factorization doesn't necessarily guarantee
-                    # that the matrix is singular, but not sure what else to raise
-                    raise RuntimeError(format_singular_error(system, matrix))
+                except PETSc.Error as e:
+                    self.raise_petsc_error(e, system, matrix)
 
             # Note: calling scipy.sparse.linalg.splu on a COO actually transposes
             # the matrix during conversion to csc prior to LU decomp, so we can't use COO.
@@ -582,10 +604,8 @@ class PETScDirectSolver(LinearSolver):
             try:
                 self._lup = PETScLU(matrix)
 
-            except PETSc.Error:
-                # Zero pivot in LU factorization doesn't necessarily guarantee
-                # that the matrix is singular, but not sure what else to raise
-                raise RuntimeError(format_singular_error(system, matrix))
+            except PETSc.Error as e:
+                self.raise_petsc_error(e, system, matrix)
 
         if self._lin_rhs_checker is not None:
             self._lin_rhs_checker.clear()
