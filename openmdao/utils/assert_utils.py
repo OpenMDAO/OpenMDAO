@@ -21,7 +21,6 @@ except ImportError:
         JaxArray = None
 
 from openmdao.core.component import Component
-from openmdao.core.group import Group
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.utils.general_utils import add_border, get_max_widths, strs2row_iter
 from openmdao.utils.om_warnings import reset_warning_registry, issue_warning
@@ -561,6 +560,7 @@ def assert_no_dict_jacobians(system, include_self=True, recurse=True):
     AssertionError
         If a subsystem of group is found to be using approximated partials.
     """
+    from openmdao.core.group import Group
     parts = ['The following groups use dictionary jacobians:\n']
     for s in system.system_iter(include_self=include_self, recurse=recurse, typ=Group):
         if isinstance(s._jacobian, DictionaryJacobian):
@@ -745,6 +745,35 @@ def assert_near_equal(actual, desired, tolerance=1e-15, tol_type='rel'):
             'actual and desired have unexpected types: %s, %s' % (type(actual), type(desired)))
 
     return error
+
+
+def mimic(func, mimicfunc, *args, **kwargs):
+    """
+    Verify that mimicfunc produces the same result as func.
+
+    This can be useful when refactoring to verify that the new version of a function has
+    identical outputs to the original.
+
+    Parameters
+    ----------
+    func : function
+        The function to mimic.
+    mimicfunc : function
+        The mimic function.
+    *args : tuple
+        The arguments to pass to the functions.
+    **kwargs : dict
+        The keyword arguments to pass to the functions.
+
+    Returns
+    -------
+    object, object
+        The return values of func and mimicfunc.
+    """
+    ret1 = func(*args, **kwargs)
+    ret2 = mimicfunc(*args, **kwargs)
+    assert_near_equal(ret1, ret2)
+    return ret1, ret2
 
 
 def assert_sparsity_matches_fd(system, direction='fwd', outstream=sys.stdout):

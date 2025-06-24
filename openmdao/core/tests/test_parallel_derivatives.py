@@ -1077,7 +1077,7 @@ class TestAutoIVCParDerivBug(unittest.TestCase):
 
         prob.run_model()
 
-        assert_check_totals(prob.check_totals(method='cs', out_stream=None))
+        assert_check_totals(prob.check_totals(method='cs', show_only_incorrect=True))
 
 
 class LinearComp(om.ExplicitComponent):

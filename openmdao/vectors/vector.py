@@ -41,6 +41,9 @@ class _VecData(object):
         self.view = v
         self.flat = vflat
 
+    def __repr__(self):
+        return f"VecData(shape={self.shape}, range={self.range})"
+
 
 class Vector(object):
     """
@@ -214,9 +217,14 @@ class Vector(object):
                 else:
                     yield 0.0 if vinfo.is_scalar else np.zeros_like(vinfo.view.real)
 
-    def items(self):
+    def items(self, relative_to=None):
         """
         Return (name, value) for variables contained in this vector.
+
+        Parameters
+        ----------
+        relative_to : str or None
+            If not None, return names relative to this pathname.
 
         Yields
         ------
@@ -225,8 +233,9 @@ class Vector(object):
         ndarray or float
             Value of each variable.
         """
-        if self._resolver._pathname:
-            plen = len(self._resolver._pathname) + 1
+        path = relative_to if relative_to is not None else self._resolver._pathname
+        if path:
+            plen = len(path) + 1
         else:
             plen = 0
 

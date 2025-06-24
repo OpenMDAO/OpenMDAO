@@ -30,8 +30,7 @@ def index_to_varname(system, loc):
         String containing variable absolute name (and promoted name if there is one) and index.
     """
     start = end = 0
-    varsizes = np.sum(system._owned_sizes, axis=0)
-    varname = None
+    varsizes = np.sum(system._owned_output_sizes, axis=0)
     for i, name in enumerate(system._resolver.abs_iter('output')):
         end += varsizes[i]
         if loc < end:
@@ -155,7 +154,7 @@ def format_nan_error(system, matrix):
     """
     # Because of how we built the matrix, a NaN in a comp causes the whole row to be NaN, so we
     # need to associate each index with a variable.
-    varsizes = np.sum(system._owned_sizes, axis=0)
+    varsizes = np.sum(system._owned_output_sizes, axis=0)
 
     nanrows = np.zeros(matrix.shape[0], dtype=bool)
     nanrows[np.where(np.isnan(matrix))[0]] = True
@@ -400,7 +399,7 @@ class DirectSolver(LinearSolver):
 
             if matrix is None:
                 # This happens if we're not rank 0 and owned_sizes are being used
-                sz = np.sum(system._owned_sizes)
+                sz = np.sum(system._owned_output_sizes)
                 inv_jac = np.zeros((sz, sz))
 
             # Dense and Sparse matrices have their own inverse method.

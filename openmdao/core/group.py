@@ -693,6 +693,7 @@ class Group(System):
         # need to set pathname correctly even for non-local subsystems
         for s, _ in self._subsystems_allprocs.values():
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
+            s._problem_meta = prob_meta
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
@@ -812,6 +813,7 @@ class Group(System):
         self._initial_condition_cache = {}
         self._auto_ivc_recorders = []
         self._sys_graph_cache = None
+        self._remote_sets = []
 
         # reset any coloring if a Coloring object was not set explicitly
         if self._coloring_info.dynamic or self._coloring_info.static is not None:
@@ -824,7 +826,7 @@ class Group(System):
         self._post_components = None
 
         # Besides setting up the processors, this method also builds the model hierarchy.
-        self._setup_procs(self.pathname, comm, self._problem_meta)
+        self._setup_procs(self.pathname, comm, prob_meta)
 
         prob_meta['config_info'] = _ConfigInfo()
 
@@ -1131,8 +1133,6 @@ class Group(System):
         This method is called only on the top level Group.
         """
         self._setup_dynamic_shapes()
-
-        self._problem_meta['vars_to_gather'] = self._vars_to_gather
 
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs()
@@ -1830,6 +1830,8 @@ class Group(System):
             self._discrete_inputs = self._discrete_outputs = {}
 
         self._vars_to_gather = self._find_vars_to_gather()
+        if self.pathname == '':
+            self._problem_meta['vars_to_gather'] = self._vars_to_gather
 
         # create mapping of indep var names to their metadata
         self._ivcs = self.get_indep_vars(local=False)
@@ -1845,7 +1847,7 @@ class Group(System):
         show_warnings : bool
             Bool to show or hide the auto_ivc warnings.
         """
-        skip = set(('path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'))
+        skip = {'path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'}
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         abs2meta_in = self._var_allprocs_abs2meta['input']
         resolver = self._resolver
@@ -1980,12 +1982,12 @@ class Group(System):
         Return a mapping of var pathname to owning rank.
 
         The mapping will contain ONLY systems that are remote on at least one proc.
-        Distributed systems are not included.
+        Distributed variables are not included. Discrete variables ARE included.
 
         Returns
         -------
         dict
-            The mapping of variable pathname to owning rank.
+            The mapping of variable pathname to the lowest rank where it's local.
         """
         remote_vars = {}
 
@@ -2063,7 +2065,7 @@ class Group(System):
 
         if self.comm.size > 1:
             owns = self._owning_rank
-            self._owned_sizes = self._var_sizes['output'].copy()
+            self._owned_output_sizes = self._var_sizes['output'].copy()
             abs2idx = self._var_allprocs_abs2idx
             for io in ('input', 'output'):
                 sizes = self._var_sizes[io]
@@ -2074,7 +2076,7 @@ class Group(System):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
                             if not dist and io == 'output':
-                                self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
+                                self._owned_output_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
 
                 if abs2discrete[io]:
@@ -2087,7 +2089,7 @@ class Group(System):
                         for n in toadd:
                             owns[n] = rank
         else:
-            self._owned_sizes = self._var_sizes['output']
+            self._owned_output_sizes = self._var_sizes['output']
 
     def _owned_size(self, abs_name):
         """
@@ -2103,7 +2105,7 @@ class Group(System):
         int
             The size of the variable on this rank, 0 if this is not the owning rank.
         """
-        return self._owned_sizes[self.comm.rank, self._var_allprocs_abs2idx[abs_name]]
+        return self._owned_output_sizes[self.comm.rank, self._var_allprocs_abs2idx[abs_name]]
 
     def _setup_global_connections(self, parent_conns=None):
         """
@@ -3527,6 +3529,19 @@ class Group(System):
             # order has been changed so we need a new full setup
             self._problem_meta['setup_status'] = _SetupStatus.PRE_SETUP
 
+    def _resolve_remote_sets(self):
+        assert self.pathname == ''  # only call this on the top level model
+
+        if self.comm.allreduce(len(self._remote_sets), op=MPI.SUM) > 0:
+            abs2meta_out = self._var_abs2meta['output']
+            abs2meta_in = self._var_abs2meta['input']
+            for setinfo in self.comm.allgather(self._remote_sets):
+                for abs_in, src, val in setinfo:
+                    if src in abs2meta_out and abs_in not in abs2meta_in:
+                        self.set_val(src, val)
+
+        self._remote_sets = []
+
     def _get_subsystem(self, name):
         """
         Return the system called 'name' in the current namespace.
@@ -4630,7 +4645,6 @@ class Group(System):
 
             if self.comm.size > 1:
                 tgt_local_procs = set()
-                # do a preliminary check to avoid the allgather if we can
                 for t in tgts:
                     if t in vars_to_gather:
                         tgt_local_procs.add(vars_to_gather[t])
@@ -5039,9 +5053,8 @@ class Group(System):
                     else:
                         out.update(dvs)
 
-        model = self._problem_meta['model_ref']()
-        if self is model:
-            abs2meta_out = model._var_allprocs_abs2meta['output']
+        if self.pathname == '':  # do this at the top level only
+            abs2meta_out = self._var_allprocs_abs2meta['output']
             for outmeta in out.values():
                 src = outmeta['source']
                 if src in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[src]['tags']:

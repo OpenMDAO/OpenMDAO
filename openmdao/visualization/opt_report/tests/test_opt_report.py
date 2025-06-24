@@ -16,6 +16,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.utils.tests.test_hooks import hooks_active
 
+from openmdao.utils.reports_system import clear_reports
 from openmdao.visualization.opt_report.opt_report import opt_report, \
     _default_optimizer_report_filename
 
@@ -556,6 +557,7 @@ class TestOptimizationReport(unittest.TestCase):
     @hooks_active
     def test_opt_report_hook(self):
         testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
+        clear_reports()
 
         try:
             self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
