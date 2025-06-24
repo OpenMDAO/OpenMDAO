@@ -15,9 +15,12 @@ from openmdao.utils.om_warnings import issue_warning, SolverWarning
 
 try:
     from petsc4py import PETSc
-    DEFAULT_COMM = PETSc.COMM_WORLD
 except ImportError:
     PETSc = None
+try:
+    from mpi4py import MPI
+    DEFAULT_COMM = MPI.COMM_WORLD
+except ImportError:
     DEFAULT_COMM = None
 
 PC_SERIAL_TYPES = [
