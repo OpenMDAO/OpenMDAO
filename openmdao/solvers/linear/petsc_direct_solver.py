@@ -513,12 +513,13 @@ class PETScDirectSolver(LinearSolver):
             raise RuntimeError(format_singular_error(system, matrix)) from e
 
         elif "Could not locate solver type" in str(e):
-            raise RuntimeError(f"Specified PETSc sparse solver, "
-                                f"'{self.options['sparse_solver_name']}', "
-                                "is not installed.") from e
+            raise RuntimeError("Specified PETSc sparse solver, "
+                               f"'{self.options['sparse_solver_name']}', "
+                               "is not installed.") from e
 
         else:
-            raise(e)
+            # Just raise the original exception
+            raise
 
     def _build_mtx(self):
         """
