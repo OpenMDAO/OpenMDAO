@@ -3848,10 +3848,7 @@ class Group(System):
                         do_ln = sub_do_ln and (subsys._linear_solver is not None and
                                                subsys._linear_solver._needs_linearize_children())
                         subsys._linearize(jac, sub_do_ln=do_ln)
-
-                if sub_do_ln:
-                    for subsys in subs:
-                        if subsys._linear_solver is not None:
+                        if sub_do_ln and subsys._linear_solver is not None:
                             subsys._linear_solver._linearize()
 
     def _check_first_linearize(self):

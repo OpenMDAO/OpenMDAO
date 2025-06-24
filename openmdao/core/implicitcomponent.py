@@ -391,10 +391,10 @@ class ImplicitComponent(Component):
         """
         self._check_first_linearize()
 
-        if not (self._has_linearize or self._has_approx):
-            return
-
         with JacobianUpdateContext(self) as jac:
+
+            if not (self._has_linearize or self._has_approx):
+                return
 
             with self._unscaled_context(outputs=[self._outputs]):
                 # Computing the approximation before the call to compute_partials allows users to

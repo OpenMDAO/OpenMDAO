@@ -395,7 +395,7 @@ class System(object, metaclass=SystemMetaclass):
         self.options = OptionsDictionary(parent_name=type(self).__name__)
 
         self.options.declare('assembled_jac_type', values=['csc', 'csr', 'dense', None],
-                             default=None, set_function=self._set_assembled_jac_type,
+                             default=None,
                              desc='Linear solver(s) in this group or implicit component, '
                                   'if using an assembled jacobian, will use this type.')
         self.options.declare('derivs_method', default=None, values=['jax', 'cs', 'fd', None],
@@ -612,16 +612,6 @@ class System(object, metaclass=SystemMetaclass):
         if self.name:
             return f"'{self.name}' <class {type(self).__name__}>"
         return f"<class {type(self).__name__}>"
-
-    def _set_assembled_jac_type(self, meta, value):
-        """
-        Set the type of the assembled jacobian.
-        """
-        if value not in ['dense', 'sparse']:
-            issue_warning(f"{self.msginfo}: Use either 'dense' or 'sparse' "
-                          "for the assembled_jac_type option.  Other types are deprecated.",
-                          category=DeprecationWarning)
-        return value
 
     def _get_inst_id(self):
         return self.pathname if self.pathname is not None else ''
@@ -3013,10 +3003,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         Set this system's nonlinear solver.
         """
-        # from openmdao.core.group import Group
-        # if not isinstance(self, Group):
-        #     raise TypeError("nonlinear_solver can only be set on a Group.")
-
         self._nonlinear_solver = solver
 
     @property
