@@ -2066,9 +2066,10 @@ class TestComponentRelevance(unittest.TestCase):
         self.assertEqual(comp.n_execs - count, 1)
 
         count = comp.n_execs
+        # Because comp1 has declared *, * partials, the relevance graph thinks that all comp1
+        # inputs are relevant to all comp1 outputs, so it executes the component once even though
+        # internally there is no connection between comp1.b and comp1.x.
         J = prob.compute_totals(of=['sink1.x'], wrt=['indep.b'])
-        # since we declared '*','*' partials, all outputs of a component are relevant to all inputs
-        # of that same component, so we expect 1 execution.
         self.assertEqual(comp.n_execs - count, 1)
 
     def test_fd_relevance(self):

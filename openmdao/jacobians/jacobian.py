@@ -208,27 +208,22 @@ class Jacobian(object):
         tuple
             Tuple of (key, meta, dtype) for each subjac.
         """
+        relevance = None
         if self._has_approx:
-            try:
+            if system.linear_solver is None or system.linear_solver.use_relevance():
                 relevance = self._problem_meta['relevance']
                 is_relevant = relevance.is_relevant
-                active = system.linear_solver is None or system.linear_solver.use_relevance()
-            except Exception:
-                relevance = None
-        else:
-            relevance = None
 
         dtype = system._outputs.dtype
 
-        with relevance.active(active) if relevance else do_nothing_context():
-            with relevance.all_seeds_active() if relevance else do_nothing_context():
-                out_slices = self._output_slices
-                in_slices = self._input_slices
-                for key, meta in self._subjacs_info.items():
-                    of, wrt = key
-                    if of in out_slices and (wrt in in_slices or wrt in out_slices):
-                        if relevance is None or is_relevant(wrt):
-                            yield key, meta, dtype
+        with relevance.all_seeds_active() if relevance else do_nothing_context():
+            out_slices = self._output_slices
+            in_slices = self._input_slices
+            for key, meta in self._subjacs_info.items():
+                of, wrt = key
+                if of in out_slices and (wrt in in_slices or wrt in out_slices):
+                    if relevance is None or is_relevant(wrt):
+                        yield key, meta, dtype
 
     def _get_abs_key(self, key):
         try:
