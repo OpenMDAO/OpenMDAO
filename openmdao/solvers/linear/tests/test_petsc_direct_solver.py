@@ -3,6 +3,7 @@
 import unittest
 import numpy as np
 from scipy import sparse
+from sys import platform
 import openmdao.api as om
 
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
@@ -110,7 +111,9 @@ class DistribComp(om.ExplicitComponent):
             outputs['y'] = 3.0 * inputs['x']
 
 # Test the class used to setup and interact with the PETSc solver
-@unittest.skipUnless(PETSc, "only run with PETSc.")
+# OSX doesn't install any of the solvers with PETSc (they have to be manually
+# built, so skip all tests for OSX)
+@unittest.skipUnless(PETSc and platform != "darwin", "only run with PETSc and not on Mac.")
 class TestPETScClass(unittest.TestCase):
 
     def test_instantiate_dense(self):
@@ -217,7 +220,7 @@ class TestPETScClass(unittest.TestCase):
 
 # Test the class used to setup and interact with the PETSc solver when it is
 # being run under MPI
-@unittest.skipUnless(MPI and PETSc, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETSc and platform != "darwin", "only run with MPI and PETSc and not on Mac.")
 class TestPETScClassMPI(unittest.TestCase):
 
     N_PROCS = 2
@@ -251,7 +254,7 @@ class TestPETScClassMPI(unittest.TestCase):
 # Run the same test suite as the DirectSolver since the functionality is very
 # close to the same (except skip "test_raise_no_error_on_singular" PETSc
 # direct solver doesn't do that)
-@unittest.skipUnless(PETSc, "only run with PETSc.")
+@unittest.skipUnless(PETSc and platform != "darwin", "only run with PETSc.")
 class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     linear_solver_class = om.PETScDirectSolver
@@ -416,7 +419,10 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' <class Group> for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
+        expected_msg = ("Singular entry found in 'thrust_equilibrium_group' "
+                        "<class Group> for row associated with state/residual "
+                        "'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') "
+                        "index 0.")
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -452,7 +458,10 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
             with self.assertRaises(Exception) as cm:
                 prob.setup()
 
-        expected_msg = "'dupcomp' <class DupPartialsComp>: d(x)/d(c): declare_partials has been called with rows and cols that specify the following duplicate subjacobian entries: [(4, 11), (10, 2)]."
+        expected_msg = ("'dupcomp' <class DupPartialsComp>: d(x)/d(c): "
+                        "declare_partials has been called with rows and cols "
+                        "that specify the following duplicate subjacobian "
+                        "entries: [(4, 11), (10, 2)].")
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -490,7 +499,10 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' <class Group> for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
+        expected_msg = ("Singular entry found in 'thrust_equilibrium_group' "
+                        "<class Group> for row associated with state/residual "
+                        "'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') "
+                        "index 0.")
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -527,7 +539,10 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected_msg = "Singular entry found in 'thrust_equilibrium_group' <class Group> for row associated with state/residual 'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') index 0."
+        expected_msg = ("Singular entry found in 'thrust_equilibrium_group' "
+                        "<class Group> for row associated with state/residual "
+                        "'thrust' ('thrust_equilibrium_group.thrust_bal.thrust') "
+                        "index 0.")
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -560,7 +575,8 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             print(prob.compute_totals(of=['c5.y'], wrt=['p.x']))
 
-        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = ("NaN entries found in <model> <class Group> for rows "
+                        "associated with states/residuals ['sub.c2.y', 'c4.y'].")
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -593,7 +609,8 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             print(prob.compute_totals(of=['c5.y'], wrt=['p.x']))
 
-        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = ("NaN entries found in <model> <class Group> for rows "
+                        "associated with states/residuals ['sub.c2.y', 'c4.y'].")
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -626,7 +643,8 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['sub.c2.y', 'c4.y']."
+        expected_msg = ("NaN entries found in <model> <class Group> for rows "
+                        "associated with states/residuals ['sub.c2.y', 'c4.y'].")
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -655,7 +673,8 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "NaN entries found in <model> <class Group> for rows associated with states/residuals ['c5.y']."
+        expected_msg = ("NaN entries found in <model> <class Group> for rows "
+                        "associated with states/residuals ['c5.y'].")
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -684,7 +703,8 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "Singular entry found in <model> <class Group> for row associated with state/residual 'c5.y' index 0."
+        expected_msg = ("Singular entry found in <model> <class Group> for row "
+                        "associated with state/residual 'c5.y' index 0.")
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -714,7 +734,8 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.compute_totals(of=['c5.y'], wrt=['p.x'])
 
-        expected_msg = "Singular entry found in <model> <class Group> for row associated with state/residual 'c5.y' index 0."
+        expected_msg = ("Singular entry found in <model> <class Group> for row "
+                        "associated with state/residual 'c5.y' index 0.")
 
         self.assertEqual(expected_msg, str(cm.exception))
 
@@ -781,7 +802,9 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob.run_model()
 
-        expected = "Jacobian in 'sub' is not full rank. The following set of states/residuals contains one or more equations that is a linear combination of the others: \n"
+        expected = ("Jacobian in 'sub' is not full rank. The following set of "
+                    "states/residuals contains one or more equations that is a "
+                    "linear combination of the others: \n")
         expected += " 'gen.I_out' ('sub.gen.I_out') index 0.\n"
         expected += " 'Vm_dc' ('sub.calcs.V_out') index 0.\n"
 
@@ -840,7 +863,8 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
                 self.declare_partials('z', 'aa', val=-1.0)
 
             def apply_nonlinear(self, inputs, outputs, residuals):
-                residuals['z'] = 2.0 * inputs['x'] + inputs['y'] - 4.0 * outputs['z'] - inputs['a'] - inputs['aa']
+                residuals['z'] = (2.0 * inputs['x'] + inputs['y'] - 4.0
+                                  * outputs['z'] - inputs['a'] - inputs['aa'])
 
 
         class E3bad(om.ImplicitComponent):
@@ -859,7 +883,8 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
                 self.declare_partials('z', 'aa', val=-1.0)
 
             def apply_nonlinear(self, inputs, outputs, residuals):
-                residuals['z'] = 2.0 * inputs['x'] + inputs['y'] - 4.0 * outputs['z'] - inputs['a'] - inputs['aa']
+                residuals['z'] = (2.0 * inputs['x'] + inputs['y'] - 4.0
+                                  * outputs['z'] - inputs['a'] - inputs['aa'])
 
         # Configuration 1
         p = om.Problem()
@@ -895,7 +920,9 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.run_model()
 
-        expected = "Jacobian in '' is not full rank. The following set of states/residuals contains one or more equations that is a linear combination of the others: \n"
+        expected = ("Jacobian in '' is not full rank. The following set of "
+                    "states/residuals contains one or more equations that is a "
+                    "linear combination of the others: \n")
         expected += " 'sub2.x' ('sub2.e1.x') index 0.\n"
         expected += " 'sub2.z' ('sub2.e3.z') index 0.\n"
 
@@ -936,7 +963,9 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.run_model()
 
-        expected = "Jacobian in '' is not full rank. The following set of states/residuals contains one or more equations that is a linear combination of the others: \n"
+        expected = ("Jacobian in '' is not full rank. The following set of "
+                    "states/residuals contains one or more equations that is a "
+                    "linear combination of the others: \n")
         expected += " 'sub2.x' ('sub2.e1.x') index 0.\n"
         expected += " 'sub2.z' ('sub2.e3.z') index 0.\n"
 
@@ -975,7 +1004,9 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
         with self.assertRaises(RuntimeError) as cm:
             p.run_model()
 
-        expected = "Jacobian in '' is not full rank. The following set of states/residuals contains one or more equations that is a linear combination of the others: \n"
+        expected = ("Jacobian in '' is not full rank. The following set of "
+                    "states/residuals contains one or more equations that is a "
+                    "linear combination of the others: \n")
         expected += " 'sub1.a' ('_auto_ivc.v0') index 0.\n"
         expected += " 'sub1.aa' ('_auto_ivc.v1') index 0.\n"
         expected += " 'sub1.e3.a' ('_auto_ivc.v2') index 0.\n"
@@ -1015,7 +1046,8 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
                 self.declare_partials('z', 'y', val=-1.0)
                 self.declare_partials('z', 'z', val=-2.0)
 
-            def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None, discrete_outputs=None):
+            def apply_nonlinear(self, inputs, outputs, residuals,
+                                discrete_inputs=None, discrete_outputs=None):
                 a = inputs['a']
                 x, y, z = outputs.values()
 
@@ -1062,7 +1094,7 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
             prob.run_model()
 
 
-@unittest.skipUnless(MPI and PETSc, "only run with MPI and PETSc.")
+@unittest.skipUnless(MPI and PETSc and platform != "darwin", "only run with MPI and PETSc and not on Mac.")
 class TestPETScDirectSolverRemoteErrors(unittest.TestCase):
 
     N_PROCS = 2
@@ -1088,8 +1120,9 @@ class TestPETScDirectSolverRemoteErrors(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        msg = "PETScDirectSolver linear solver in <model> <class Group> cannot be used in or above a ParallelGroup or a " + \
-            "distributed component."
+        msg = ("PETScDirectSolver linear solver in <model> <class Group> "
+               "cannot be used in or above a ParallelGroup or a distributed "
+               "component.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_distrib_direct_subbed(self):
@@ -1113,8 +1146,9 @@ class TestPETScDirectSolverRemoteErrors(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        msg = "PETScDirectSolver linear solver in <model> <class Group> cannot be used in or above a ParallelGroup or a " + \
-            "distributed component."
+        msg = ("PETScDirectSolver linear solver in <model> <class Group> "
+               "cannot be used in or above a ParallelGroup or a distributed "
+               "component.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_par_direct_subbed(self):
@@ -1142,8 +1176,9 @@ class TestPETScDirectSolverRemoteErrors(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        msg = "PETScDirectSolver linear solver in <model> <class Group> cannot be used in or above a ParallelGroup or a " + \
-            "distributed component."
+        msg = ("PETScDirectSolver linear solver in <model> <class Group> "
+               "cannot be used in or above a ParallelGroup or a distributed "
+               "component.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_par_direct(self):
@@ -1163,12 +1198,13 @@ class TestPETScDirectSolverRemoteErrors(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.run_model()
 
-        msg = "PETScDirectSolver linear solver in <model> <class Group> cannot be used in or above a ParallelGroup or a " + \
-            "distributed component."
+        msg = ("PETScDirectSolver linear solver in <model> <class Group> "
+               "cannot be used in or above a ParallelGroup or a distributed "
+               "component.")
         self.assertEqual(str(cm.exception), msg)
 
 
-@unittest.skipUnless(PETSc, "only run with PETSc.")
+@unittest.skipUnless(PETSc and platform != "darwin", "only run with PETSc and not on Mac.")
 class TestPETScDirectSolverMPI(unittest.TestCase):
 
     N_PROCS = 2
