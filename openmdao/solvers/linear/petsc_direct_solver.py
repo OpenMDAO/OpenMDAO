@@ -112,10 +112,12 @@ class PETScLU:
                     self.A.setValues(i, cols, vals)
 
             else:
-                # Serial: build full CSR
+                # Serial: build full CSR (if you're running a serial solver
+                # while using MPI, then it will solve the full think on each rank)
                 self.A = PETSc.Mat().createAIJ(
                     size=A.shape,
-                    csr=(A.indptr, A.indices, A.data)
+                    csr=(A.indptr, A.indices, A.data),
+                    comm=PETSc.COMM_SELF,
                 )
 
             self.A.assemble()

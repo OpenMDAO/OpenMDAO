@@ -242,7 +242,7 @@ class TestPETScClassMPI(unittest.TestCase):
         lu = PETScLU(
             A=sparse.csc_matrix(np.array([[1, 0, 1], [0, 2, 0], [0, 0, 3]])),
             sparse_solver_name='mumps',
-            comm=PETSc.COMM_WORLD,
+            comm=MPI.COMM_WORLD,
         )
         x = lu.solve(b=np.array([1, 2, 3]), transpose=False)
         assert_near_equal(x, np.array([0.0, 1.0, 1.0]))
