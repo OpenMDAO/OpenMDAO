@@ -261,8 +261,8 @@ class System(object, metaclass=SystemMetaclass):
         Array of local sizes of this system's allprocs variables.
         The array has size nproc x num_var where nproc is the number of processors
         owned by this system and num_var is the number of allprocs variables.
-    _owned_sizes : ndarray
-        Array of local sizes for 'owned' or distributed vars only.
+    _owned_output_sizes : ndarray
+        Array of local sizes for 'owned' or distributed outputs only.
     _var_offsets : {<vecname>: {'input': dict of ndarray, 'output': dict of ndarray}, ...} or None
         Dict of distributed offsets, keyed by var name.  Offsets are stored in an array
         of size nproc x num_var where nproc is the number of processors
@@ -462,7 +462,7 @@ class System(object, metaclass=SystemMetaclass):
         self._var_allprocs_abs2idx = {}
 
         self._var_sizes = None
-        self._owned_sizes = None
+        self._owned_output_sizes = None
         self._var_offsets = None
 
         self._full_comm = None
@@ -2256,12 +2256,12 @@ class System(object, metaclass=SystemMetaclass):
         self._var_allprocs_abs2idx = {}
         self._owning_rank = defaultdict(int)
         self._var_sizes = {}
-        self._owned_sizes = None
+        self._owned_output_sizes = None
         self._resolver = NameResolver(self.pathname, self.msginfo)
 
         cfginfo = self._problem_meta['config_info']
-        if cfginfo and self.pathname in cfginfo._modified_systems:
-            cfginfo._modified_systems.remove(self.pathname)
+        if cfginfo:
+            cfginfo._modified_systems.discard(self.pathname)
 
     def _setup_global_shapes(self):
         """
@@ -5669,7 +5669,7 @@ class System(object, metaclass=SystemMetaclass):
         model = self._problem_meta['model_ref']()
 
         try:
-            conns = model._conn_abs_in2out
+            conns = model._conn_global_abs_in2out
         except AttributeError:
             conns = {}
 
@@ -5726,6 +5726,24 @@ class System(object, metaclass=SystemMetaclass):
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
             Indices or slice to set.
         """
+        post_setup = self._problem_meta is not None and \
+            self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP
+
+        if post_setup:
+            if self._is_local:
+                abs_names = self._resolver.absnames(name)
+        else:
+            raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
+                               "completes.")
+
+        if not self._is_local:
+            # we'll do any necessary transfers later
+            return
+
+        has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
+        model = self._problem_meta['model_ref']()
+        nprocs = model.comm.size
+
         try:
             ginputs = self._group_inputs
         except AttributeError:
@@ -5733,21 +5751,22 @@ class System(object, metaclass=SystemMetaclass):
 
         post_setup = self._problem_meta is not None and \
             self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP
+
         if post_setup:
             abs_names = self._resolver.absnames(name)
         else:
             raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
                                "completes.")
 
-        has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
         value = val
 
-        model = self._problem_meta['model_ref']()
         conns = model._conn_global_abs_in2out
 
         all_meta = model._var_allprocs_abs2meta
-        loc_meta = model._var_abs2meta
-        n_proms = 0  # if nonzero, name given was promoted input name w/o a matching prom output
+        all_idx = model._var_allprocs_abs2idx
+        all_sizes = model._var_sizes
+        all_meta_in = model._var_allprocs_abs2meta['input']
+        loc_meta_in = model._var_abs2meta['input']
 
         n_proms = len(abs_names)  # for output this will never be > 1
         if n_proms > 1 and name in ginputs:
@@ -5755,34 +5774,25 @@ class System(object, metaclass=SystemMetaclass):
         else:
             abs_name = abs_names[0]
 
-        if not has_vectors:
-            has_dyn_shape = []
-            for n in abs_names:
-                if n in all_meta['input']:
-                    m = all_meta['input'][n]
-                    if 'shape_by_conn' in m and m['shape_by_conn']:
-                        has_dyn_shape.append(True)
-                else:
-                    has_dyn_shape.append(False)
-
         set_units = None
 
         if abs_name in conns:  # we're setting an input
             src = conns[abs_name]
-            if abs_name not in model._var_allprocs_discrete['input']:  # input is continuous
+
+            if abs_name in all_meta_in:  # input is continuous
                 value = np.asarray(value)
-                tmeta = all_meta['input'][abs_name]
+                tmeta = all_meta_in[abs_name]
                 tunits = tmeta['units']
                 sunits = all_meta['output'][src]['units']
-                if abs_name in loc_meta['input']:
-                    tlocmeta = loc_meta['input'][abs_name]
+                if abs_name in loc_meta_in:
+                    tlocmeta = loc_meta_in[abs_name]
                 else:
                     tlocmeta = None
 
                 gunits = ginputs[name][0].get('units') if name in ginputs else None
                 if n_proms > 1:  # promoted input name was used
                     if gunits is None:
-                        tunit_list = [all_meta['input'][n]['units'] for n in abs_names]
+                        tunit_list = [all_meta_in[n]['units'] for n in abs_names]
                         tu0 = tunit_list[0]
                         for tu in tunit_list:
                             if tu != tu0:
@@ -5808,14 +5818,15 @@ class System(object, metaclass=SystemMetaclass):
                         ivalue = model.convert_units(name, value, units, gunits)
                     value = model.convert_from_units(src, value, units)
                 set_units = sunits
-        else:  # setting an output or an unconnected input
+
+        else:  # setting an output
             src = abs_name
             if units is not None:
                 value = model.convert_from_units(abs_name, np.asarray(value), units)
                 try:
                     set_units = all_meta['output'][abs_name]['units']
                 except KeyError:  # this can happen if a component is the top level System
-                    set_units = all_meta['input'][abs_name]['units']
+                    set_units = all_meta_in[abs_name]['units']
 
         # Caching only needed if vectors aren't allocated yet.
         if not has_vectors:
@@ -5838,14 +5849,24 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 ic_cache[abs_name] = (value, set_units, self.pathname, name)
 
-            for n, dyn in zip(abs_names, has_dyn_shape):
-                if dyn:
-                    val = ic_cache[abs_name][0]
-                    shape = () if np.isscalar(val) else val.shape
-                    all_meta['input'][n]['shape'] = shape
-                    if n in loc_meta['input']:
-                        loc_meta['input'][n]['shape'] = shape
+            for n in abs_names:
+                if n in all_meta_in:
+                    m = all_meta_in[n]
+                    if 'shape_by_conn' in m and m['shape_by_conn']:
+                        val = ic_cache[abs_name][0]
+                        shape = () if np.isscalar(val) else val.shape
+                        all_meta_in[n]['shape'] = shape
+                        if n in loc_meta_in:
+                            loc_meta_in[n]['shape'] = shape
         else:
+            if abs_name in conns and nprocs > 1 and abs_name in all_idx:
+                # check if src exists on a proc where tgt doesn't
+                insizes = all_sizes['input'][:, all_idx[abs_name]]
+                outsizes = all_sizes['output'][:, all_idx[src]]
+                if np.any(insizes != outsizes):
+                    # keep track of this for later setting across all procs
+                    model._remote_sets.append((abs_name, src, value))
+
             myrank = model.comm.rank
 
             if indices is None:
