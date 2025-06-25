@@ -102,9 +102,9 @@ class ExplicitCounterComp(om.ExplicitComponent):
         super()._compute_jacvec_product_wrapper(inputs, d_inputs, d_resids, mode,
                                                 discrete_inputs=discrete_inputs)
 
-    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, mode, scope_out=None, scope_in=None):
         self._counts['_apply_linear'] += 1
-        super()._apply_linear(jac, mode, scope_out=scope_out, scope_in=scope_in)
+        super()._apply_linear(mode, scope_out=scope_out, scope_in=scope_in)
 
     def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         self._counts['_solve_linear'] += 1

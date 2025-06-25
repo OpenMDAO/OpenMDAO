@@ -1111,7 +1111,7 @@ class LinearSolver(Solver):
         scope_out, scope_in = system._get_matvec_scope()
 
         try:
-            system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
+            system._apply_linear(self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.pop()
 
@@ -1258,7 +1258,7 @@ class BlockLinearSolver(LinearSolver):
         self._recording_iter.push(('_run_apply', 0))
         try:
             scope_out, scope_in = system._get_matvec_scope()
-            system._apply_linear(self._assembled_jac, self._mode,
+            system._apply_linear(self._mode,
                                  self._union_matvec_scope(self._scope_out, scope_out),
                                  self._union_matvec_scope(self._scope_in, scope_in))
         finally:

@@ -759,8 +759,8 @@ class ExecComp(ExplicitComponent):
                 # we can use the internal Vector complex arrays
 
                 # set complex_step_mode so we'll get the full complex array
-                self._inputs._set_complex_step_mode(True)
-                self._outputs._set_complex_step_mode(True)
+                self._inputs.set_complex_step_mode(True)
+                self._outputs.set_complex_step_mode(True)
 
                 self._indict = self._inputs._get_local_views()
                 outdict = self._outputs._get_local_views()
@@ -768,8 +768,8 @@ class ExecComp(ExplicitComponent):
                 self._inarray = self._inputs.asarray(copy=False)
                 self._outarray = self._outputs.asarray(copy=False)
 
-                self._inputs._set_complex_step_mode(False)
-                self._outputs._set_complex_step_mode(False)
+                self._inputs.set_complex_step_mode(False)
+                self._outputs.set_complex_step_mode(False)
 
             else:
                 # we make our own complex 'copy' of the Vector arrays

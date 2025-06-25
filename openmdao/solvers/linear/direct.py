@@ -302,7 +302,7 @@ class DirectSolver(LinearSolver):
                 xvec.set_val(seed)
 
                 # apply linear
-                system._apply_linear(self._assembled_jac, 'fwd', scope_out, scope_in)
+                system._apply_linear('fwd', scope_out, scope_in)
 
                 # put new value in out_vec
                 mtx[:, i] = bvec.asarray()

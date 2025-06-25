@@ -322,7 +322,7 @@ class PETScKrylov(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_matvec_scope()
-        system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
+        system._apply_linear(self._mode, scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
         result.array[:] = b_vec.asarray()

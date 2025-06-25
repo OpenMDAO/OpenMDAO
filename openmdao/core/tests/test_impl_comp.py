@@ -47,6 +47,7 @@ class QuadraticComp(om.ImplicitComponent):
 
 
 class QuadraticLinearize(QuadraticComp):
+
     def linearize(self, inputs, outputs, partials):
         a = inputs['a']
         b = inputs['b']
@@ -67,9 +68,6 @@ class QuadraticLinearize(QuadraticComp):
 
 
 class QuadraticJacVec(QuadraticComp):
-
-    def initialize(self):
-        self.inv_jac = 0.0
 
     def setup_partials(self):
         pass  # prevent declaration of partials from base class
@@ -579,7 +577,7 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
 
         assert_near_equal(prob['comp.x'], 3.)
 
-        totals = prob.check_totals(of=['fn.y'], wrt=['p.a'], method='cs', show_only_incorrect=True, rich_print=False)
+        totals = prob.check_totals(of=['fn.y'], wrt=['p.a'], method='cs', out_stream=None)
         assert_check_totals(totals)
 
     def test_guess_nonlinear_residuals(self):

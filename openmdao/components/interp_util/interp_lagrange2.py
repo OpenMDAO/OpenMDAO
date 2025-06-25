@@ -66,7 +66,7 @@ class InterpLagrange2(InterpAlgorithm):
         subtable = self.subtable
 
         # Complex Step
-        if self.values.dtype.kind == 'c':
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -192,7 +192,7 @@ class InterpLagrange2Semi(InterpAlgorithmSemi):
         extrap = flag != 0
 
         # Complex Step
-        if self.values.dtype.kind == 'c':
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -403,7 +403,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         idx = (i_x, i_y, i_z)
 
         # Complex Step
-        if self.values.dtype.kind == 'c':
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -576,7 +576,7 @@ class Interp3DLagrange2(InterpAlgorithmFixed):
         i_z[i_z > nz - 3] = nz - 3
 
         # Complex Step
-        if self.values.dtype.kind == 'c':
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x_vec.dtype
@@ -862,7 +862,7 @@ class Interp2DLagrange2(InterpAlgorithmFixed):
         idx = (i_x, i_y)
 
         # Complex Step
-        if self.values.dtype.kind == 'c':
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -1008,7 +1008,7 @@ class Interp2DLagrange2(InterpAlgorithmFixed):
         i_y[i_y > ny - 3] = ny - 3
 
         # Complex Step
-        if self.values.dtype.kind == 'c':
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x_vec.dtype
@@ -1250,7 +1250,7 @@ class Interp1DLagrange2(InterpAlgorithmFixed):
             i_x = 0
 
         # Complex Step
-        if self.values.dtype.kind == 'c':
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -1360,7 +1360,7 @@ class Interp1DLagrange2(InterpAlgorithmFixed):
         i_x[i_x > nx - 3] = nx - 3
 
         # Complex Step
-        if self.values.dtype.kind == 'c':
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x_vec.dtype

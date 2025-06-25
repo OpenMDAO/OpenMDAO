@@ -3626,9 +3626,9 @@ class Group(System):
             complex_step = self._inputs._under_complex_step
 
             if complex_step:
-                self._inputs._set_complex_step_mode(False)
-                self._residuals._set_complex_step_mode(False)
-                self._outputs._set_complex_step_mode(False)
+                self._inputs.set_complex_step_mode(False)
+                self._residuals.set_complex_step_mode(False)
+                self._outputs.set_complex_step_mode(False)
 
             try:
                 for sname, sinfo in self._subsystems_allprocs.items():
@@ -3647,9 +3647,9 @@ class Group(System):
             finally:
 
                 if complex_step:
-                    self._inputs._set_complex_step_mode(True)
-                    self._residuals._set_complex_step_mode(True)
-                    self._outputs._set_complex_step_mode(True)
+                    self._inputs.set_complex_step_mode(True)
+                    self._residuals.set_complex_step_mode(True)
+                    self._outputs.set_complex_step_mode(True)
 
     def guess_nonlinear(self, inputs, outputs, residuals,
                         discrete_inputs=None, discrete_outputs=None):
@@ -3691,14 +3691,12 @@ class Group(System):
         return (self._owns_approx_jac and self._jacobian is not None) or \
             self._assembled_jac is not None or not self._linear_solver.does_recursive_applies()
 
-    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -3708,12 +3706,9 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        if self._owns_approx_jac:
-            jac = self._get_jacobian()
-        if jac is None and self._get_assembled_jac() is not None:
-            jac = self._assembled_jac
+        jac = self._get_jacobian()
 
-        if jac is not None:
+        if jac is not None and jac is not self._tot_jac:
             with self._matvec_context(scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
@@ -3731,7 +3726,7 @@ class Group(System):
                     s._dresiduals.set_val(0.0)
 
             for s in self._relevance.filter(self._subsystems_myproc, relevant=True):
-                s._apply_linear(jac, mode, scope_out, scope_in)
+                s._apply_linear(mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
@@ -3990,7 +3985,7 @@ class Group(System):
             self._jacobian = None
 
         if self._jacobian is None:
-            if self._has_approx:
+            if self._owns_approx_jac:
                 # Group needs a jacobian if it's approximating derivatives.
                 self._jacobian = DictionaryJacobian(system=self)
                 self._get_static_wrt_matches()

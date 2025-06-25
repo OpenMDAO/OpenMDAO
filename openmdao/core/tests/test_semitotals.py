@@ -314,7 +314,7 @@ class TestSemiTotalsNumCalls(unittest.TestCase):
         self.assertEqual(geom_and_aero.aero._counter, 2)
 
         geom_and_aero.reset_count()
-        data = prob.check_totals(method="fd", form="forward", step=step, step_calc="abs", show_only_incorrect=True, rich_print=False)
+        data = prob.check_totals(method="fd", form="forward", step=step, step_calc="abs", out_stream=None)
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
         self.assertEqual(geom_and_aero.geom._counter, 3)

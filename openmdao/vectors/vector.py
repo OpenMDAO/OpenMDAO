@@ -768,7 +768,7 @@ class Vector(object):
         raise NotImplementedError('_in_matvec_context not defined for vector type '
                                   f'{type(self).__name__}')
 
-    def _set_complex_step_mode(self, active):
+    def set_complex_step_mode(self, active):
         """
         Turn on or off complex stepping mode.
 

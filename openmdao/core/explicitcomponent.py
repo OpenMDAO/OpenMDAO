@@ -367,14 +367,12 @@ class ExplicitComponent(Component):
             if dochk:
                 self._check_consistent_serial_dinputs(nzdresids)
 
-    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use jac.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -469,7 +467,6 @@ class ExplicitComponent(Component):
         """
         Call compute_partials based on the value of the "run_root_only" option.
         """
-        # jac = self._get_jacobian()
         with self._call_user_function('compute_partials'):
             if self._run_root_only():
                 if self.comm.rank == 0:

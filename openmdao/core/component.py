@@ -16,12 +16,7 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
     global_meta_names, collect_errors, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.subjac import Subjac
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian, _CheckingJacobian
-from openmdao.jacobians.jacobian import SplitJacobian
-from openmdao.matrices.coo_matrix import COOMatrix
-from openmdao.matrices.csc_matrix import CSCMatrix
-from openmdao.matrices.csr_matrix import CSRMatrix
-from openmdao.matrices.dense_matrix import DenseMatrix
+from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_key2abs_key
 from openmdao.utils.mpi import MPI

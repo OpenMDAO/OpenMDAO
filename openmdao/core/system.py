@@ -5108,7 +5108,7 @@ class System(object, metaclass=SystemMetaclass):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(None, mode, scope_out, scope_in)
+            self._apply_linear(mode, scope_out, scope_in)
 
     def run_solve_linear(self, mode):
         """
@@ -5169,14 +5169,12 @@ class System(object, metaclass=SystemMetaclass):
         """
         return True
 
-    def _apply_linear(self, jac, mode, scope_in=None, scope_out=None):
+    def _apply_linear(self, mode, scope_in=None, scope_out=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -5402,14 +5400,14 @@ class System(object, metaclass=SystemMetaclass):
             Complex mode flag; set to True prior to commencing complex step.
         """
         self.under_complex_step = active
-        self._inputs._set_complex_step_mode(active)
-        self._outputs._set_complex_step_mode(active)
-        self._residuals._set_complex_step_mode(active)
+        self._inputs.set_complex_step_mode(active)
+        self._outputs.set_complex_step_mode(active)
+        self._residuals.set_complex_step_mode(active)
 
         if self._doutputs._alloc_complex:
-            self._doutputs._set_complex_step_mode(active)
-            self._dinputs._set_complex_step_mode(active)
-            self._dresiduals._set_complex_step_mode(active)
+            self._doutputs.set_complex_step_mode(active)
+            self._dinputs.set_complex_step_mode(active)
+            self._dresiduals.set_complex_step_mode(active)
             if self.nonlinear_solver:
                 self.nonlinear_solver._set_complex_step_mode(active)
 

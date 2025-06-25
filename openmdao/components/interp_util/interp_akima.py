@@ -154,7 +154,7 @@ class InterpAkima(InterpAlgorithm):
         nx = len(x)
 
         # Complex Step
-        if self.values.dtype.kind == 'c':
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -849,7 +849,7 @@ class InterpAkimaSemi(InterpAlgorithmSemi):
         delta_x = self.options['delta_x']
 
         # Complex Step
-        if self.values.dtype.kind == 'c':
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x.dtype
@@ -1394,7 +1394,7 @@ class Interp1DAkima(InterpAlgorithmFixed):
         query_idx = idx
 
         # Complex Step
-        if self.values.dtype.kind == 'c':
+        if self.values.dtype == complex:
             dtype = self.values.dtype
         else:
             dtype = x.dtype

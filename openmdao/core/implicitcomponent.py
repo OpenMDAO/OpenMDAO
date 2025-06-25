@@ -187,9 +187,9 @@ class ImplicitComponent(Component):
             try:
                 with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
                     if complex_step:
-                        self._inputs._set_complex_step_mode(False)
-                        self._outputs._set_complex_step_mode(False)
-                        self._residuals._set_complex_step_mode(False)
+                        self._inputs.set_complex_step_mode(False)
+                        self._outputs.set_complex_step_mode(False)
+                        self._residuals.set_complex_step_mode(False)
 
                     with self._call_user_function('guess_nonlinear', protect_residuals=True):
                         if self._discrete_inputs or self._discrete_outputs:
@@ -201,9 +201,9 @@ class ImplicitComponent(Component):
                                                  self._residuals_wrapper)
             finally:
                 if complex_step:
-                    self._inputs._set_complex_step_mode(True)
-                    self._outputs._set_complex_step_mode(True)
-                    self._residuals._set_complex_step_mode(True)
+                    self._inputs.set_complex_step_mode(True)
+                    self._outputs.set_complex_step_mode(True)
+                    self._residuals.set_complex_step_mode(True)
 
     def _apply_linear_wrapper(self, *args):
         """
@@ -238,14 +238,12 @@ class ImplicitComponent(Component):
             else:
                 self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
 
-    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         mode : str
             Either 'fwd' or 'rev'.
         scope_out : set or None
@@ -255,8 +253,7 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        if jac is None:
-            jac = self._get_jacobian()
+        jac = self._get_jacobian()
 
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs

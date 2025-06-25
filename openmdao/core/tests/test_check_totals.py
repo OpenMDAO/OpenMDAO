@@ -960,7 +960,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         wrt = ['z', 'x']
         of = ['obj', 'con1', 'con2']
 
-        totals = prob.check_totals(of=of, wrt=wrt, method='cs', show_only_incorrect=True, rich_print=False)
+        totals = prob.check_totals(of=of, wrt=wrt, method='cs', compact_print=False)
         assert_check_totals(totals, atol=1e-12, rtol=1e-12)
 
     def test_cs_around_newton_in_comp(self):

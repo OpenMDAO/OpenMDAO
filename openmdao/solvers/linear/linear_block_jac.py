@@ -33,7 +33,7 @@ class LinearBlockJac(BlockLinearSolver):
                 scope_in = self._union_matvec_scope(self._scope_in, scope_in)
                 scopelist[i] = (scope_out, scope_in)
                 if subsys._iter_call_apply_linear():
-                    subsys._apply_linear(None, mode, scope_out, scope_in)
+                    subsys._apply_linear(mode, scope_out, scope_in)
                 else:
                     subsys._dresiduals.set_val(0.0)
 
@@ -51,7 +51,7 @@ class LinearBlockJac(BlockLinearSolver):
                 scope_in = self._union_matvec_scope(self._scope_in, scope_in)
                 scopelist[i] = (scope_out, scope_in)
                 if subsys._iter_call_apply_linear():
-                    subsys._apply_linear(None, mode, scope_out, scope_in)
+                    subsys._apply_linear(mode, scope_out, scope_in)
                 else:
                     subsys._doutputs.set_val(0.0)
 

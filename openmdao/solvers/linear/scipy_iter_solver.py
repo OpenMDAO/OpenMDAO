@@ -165,7 +165,7 @@ class ScipyKrylov(LinearSolver):
 
         x_vec.set_val(in_arr)
         scope_out, scope_in = system._get_matvec_scope()
-        system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
+        system._apply_linear(self._mode, scope_out, scope_in)
 
         # DO NOT REMOVE: frequently used for debugging
         # print('in', in_arr)
