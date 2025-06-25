@@ -74,6 +74,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Fetch tags
+        run: |
+          git fetch --prune --unshallow --tags
+
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
         with:
@@ -194,11 +198,6 @@ jobs:
 
           cd openmdao/docs
 
-          echo "============================================================="
-          echo "Fetch tags to get docs version"
-          echo "============================================================="
-          git fetch --prune --unshallow --tags
-
           if [[ "${{ secrets.SNOPT_LOCATION_72 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
             echo "============================================================="
             echo "Building docs with SNOPT examples."
@@ -242,11 +241,6 @@ jobs:
             echo "============================================================="
             conda create -n upload python=3.11 packaging openssl=3
             conda activate upload
-
-            echo "============================================================="
-            echo "Fetch tags to get docs version"
-            echo "============================================================="
-            git fetch --prune --unshallow --tags
 
             echo "============================================================="
             echo "Publish docs"

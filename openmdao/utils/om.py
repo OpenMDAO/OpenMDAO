@@ -307,7 +307,7 @@ def _clean_setup_parser(parser):
 
 def _clean_cmd(options, user_args):
     """
-    Return the post_setup hook function for 'openmdao summary'.
+    Return the post_setup hook function for 'openmdao clean'.
 
     Parameters
     ----------
