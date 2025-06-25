@@ -88,8 +88,8 @@ def _realtime_plot_cmd(options, user_args):
         )
     else:
         print(
-            "The bokeh library is not installed so the real-time optimizaton "
-            "lot is not available. "
+            "The bokeh library is not installed so the realtime optimizaton "
+            "plot is not available. "
         )
         return
 

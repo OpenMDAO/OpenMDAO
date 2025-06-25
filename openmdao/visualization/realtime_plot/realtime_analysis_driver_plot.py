@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 
 from openmdao.visualization.realtime_plot.realtime_plot_class import _RealTimePlot
 
-
 try:
     from bokeh.models import (
         ColumnDataSource,
@@ -28,9 +27,8 @@ try:
     from bokeh.plotting import figure
     from bokeh.palettes import Viridis256
 
-    bokeh_available = True
 except ImportError:
-    bokeh_available = False
+    raise ImportError("Unable to create analysis plot because the bokeh library is not installed.")
 
 import numpy as np
 
@@ -39,9 +37,7 @@ import numpy as np
 _left_side_column_width = 500
 # how big the individual plots should be in the grid
 _grid_plot_height_and_width = 240
-
 _color_bar_title_font_size = "20px"
-
 _page_styles = InlineStyleSheet(
     css="""
 :host(.div_header) {
@@ -117,29 +113,24 @@ input[type="checkbox"]:checked::after {
 """
 )
 
-
 # some models have a large number of variables. Putting them all in a plot
 #   is not practical. Initially show no more than this number
 _max_number_initial_visible_sampled_variables = 3
 # number of histogram bins in the histogram plots for the sampled variables
 _num_histogram_bins = 30
-
 # variable names can be very long and too large to show completely
 #  in the plot axes. This is the largest number of characters that
 #  can be shown in the axes. The rest are elided. Full variable
 #  shown as a tooltip
 _max_label_length = 25
 _elide_string = "..."
-
 # palette for the color bar
 _color_palette = Viridis256
-
 # the color bar showing response needs an initial value before new data comes in
 _initial_response_range_for_plots = (0, 100)
 
-
-# function to create the labels for the plots, need to elide long variable names
-# include the units, if given
+# function to create the labels for the plots, need to elide long variable names.
+# Include the units, if given
 def _elide_variable_name_with_units(variable_name, units):
     if units:
         un_elided_string_length = len(f"{variable_name} ({units})")
@@ -256,21 +247,18 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
 
         # convert to promoted names
         self._prom_responses = []
+        promoted_outputs = self._case_tracker.get_case_reader()._abs2prom["output"]
         for response in responses:
-            if response in self._case_tracker.get_case_reader()._abs2prom["output"]:
-                self._prom_responses.append(
-                    self._case_tracker.get_case_reader()._abs2prom["output"][response]
-                )
+            if response in promoted_outputs:
+                self._prom_responses.append(promoted_outputs[response])
             else:
-                raise RuntimeError(f"No prom for abs variable {response}")
+                raise RuntimeError(f"No promoted name for abs variable {response}")
 
         if not self._prom_responses:
             raise RuntimeError(f"Need at least one response variable.")
 
         outputs = self._case_tracker.get_case_reader().list_source_vars(
-            "driver", out_stream=None
-        )["outputs"]
-
+            "driver", out_stream=None)["outputs"]
         # Don't include response variables in sampled variabales.
         # Also, split up the remaining sampled variables into scalars and
         # non-scalars
@@ -279,7 +267,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         for varname in outputs:
             if varname not in self._prom_responses:
                 shape = self._case_tracker._get_shape(varname)
-                if shape == () or shape == (1,):  # is scalar ??
+                if shape == () or shape == (1,):  # is scalar?
                     self._sampled_variables.append(varname)
                 else:
                     self._sampled_variables_non_scalar.append(varname)
@@ -310,7 +298,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             if self._sampled_variables_visibility[var]
         ]
 
-        # Create a color mapper using Viridis (colorblind-friendly)
+        # Create a color mapper
         self._color_mapper = LinearColorMapper(
             palette=_color_palette,
             low=_initial_response_range_for_plots[0],
@@ -671,13 +659,8 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
                 plot_figure = None
             else:
                 # is it visible based on what the user has selected
-                if (
-                    self._sampled_variables_visibility[var_along_columns]
+                plot_figure.visible = self._sampled_variables_visibility[var_along_columns] \
                     and self._sampled_variables_visibility[var_along_rows]
-                ):
-                    plot_figure.visible = True
-                else:
-                    plot_figure.visible = False
 
             plots_and_labels_in_grid.append(plot_figure)
 
@@ -698,7 +681,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             p.visible = sampled_variable in visible_variables
             plots_and_labels_in_grid.insert(idx, p)
 
-        # need to push one blank one for the bottom left corner in the grid
+        # need to push one blank Div for the bottom left corner in the grid
         p = Div(text=f"")
         plots_and_labels_in_grid.append(p)
 

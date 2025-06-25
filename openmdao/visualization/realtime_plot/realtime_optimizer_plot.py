@@ -33,9 +33,8 @@ try:
     from bokeh.plotting import figure
     from bokeh.palettes import Category20, Colorblind
 
-    bokeh_available = True
 except ImportError:
-    bokeh_available = False
+    raise ImportError("Unable to create realtime plot because the bokeh library is not installed.")
 
 import numpy as np
 
@@ -64,11 +63,9 @@ _toggle_styles = """
         0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
         inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
-
 # colors used for the plot lines and associated buttons and axes labels
 # start with color-blind friendly colors and then use others if needed
-if bokeh_available:
-    _colorPalette = Colorblind[8] + Category20[20]
+_colorPalette = Colorblind[8] + Category20[20]
 
 # This is the JavaScript code that gets run when a user clicks on
 #   one of the toggle buttons that change what variables are plotted
