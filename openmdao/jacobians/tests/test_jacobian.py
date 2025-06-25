@@ -654,7 +654,7 @@ class TestJacobian(unittest.TestCase):
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.model._linearize(prob.model._get_jacobian())
+            prob.model._linearize()
         # Nested
 
         prob = Problem()
@@ -675,7 +675,7 @@ class TestJacobian(unittest.TestCase):
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.model._linearize(prob.model._get_jacobian())
+            prob.model._linearize()
 
         # Try a component that is derived from a matrix-free one
 
@@ -699,7 +699,7 @@ class TestJacobian(unittest.TestCase):
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.model._linearize(prob.model._get_jacobian())
+            prob.model._linearize()
 
         # Make sure regular comps don't give an error.
 
@@ -746,7 +746,7 @@ class TestJacobian(unittest.TestCase):
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.model._linearize(prob.model._get_jacobian())
+            prob.model._linearize()
 
     def test_access_undeclared_subjac(self):
 

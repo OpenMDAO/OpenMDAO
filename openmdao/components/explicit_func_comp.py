@@ -142,14 +142,12 @@ class ExplicitFuncComp(ExplicitComponent):
             if isinstance(meta['val'], JaxArray):
                 meta['val'] = np.asarray(meta['val'])
 
-    def _linearize(self, jac=None, sub_do_ln=False):
+    def _linearize(self, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            Ignored.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
@@ -162,7 +160,7 @@ class ExplicitFuncComp(ExplicitComponent):
             with JacobianUpdateContext(self):
                 self._jax_linearize()
         else:
-            super()._linearize(jac, sub_do_ln)
+            super()._linearize(sub_do_ln)
 
     def _jax_linearize(self):
         """

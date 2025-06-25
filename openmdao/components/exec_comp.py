@@ -826,18 +826,16 @@ class ExecComp(ExplicitComponent):
                 raise RuntimeError(f"{self.msginfo}: Error occurred evaluating '{self._exprs[i]}':"
                                    f"\n{err}")
 
-    def _linearize(self, jac=None, sub_do_ln=False):
+    def _linearize(self, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            Ignored.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        super()._linearize(jac, sub_do_ln)
+        super()._linearize(sub_do_ln)
 
         # perform complex safe check
         if self._requires_fd:

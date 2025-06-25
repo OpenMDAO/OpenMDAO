@@ -378,16 +378,14 @@ class ImplicitComponent(Component):
                 else:
                     self.linearize(self._inputs, self._outputs, jac)
 
-    def _linearize(self, jac=None, sub_do_ln=True):
+    def _linearize(self, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         sub_do_ln : bool
-            Flag indicating if the children should call linearize on their linear solvers.
+            Ignored.
         """
         self._check_first_linearize()
 

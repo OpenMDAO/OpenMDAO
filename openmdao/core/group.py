@@ -3824,14 +3824,12 @@ class Group(System):
             with self._relevance.active(self._linear_solver.use_relevance()):
                 self._linear_solver.solve(mode, None)
 
-    def _linearize(self, jac=None, sub_do_ln=True):
+    def _linearize(self, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
@@ -3857,12 +3855,12 @@ class Group(System):
             with relevance.active(self._linear_solver.use_relevance()):
                 subs = list(relevance.filter(self._subsystems_myproc))
 
-                with GroupJacobianUpdateContext(self, jac) as jac:
+                with GroupJacobianUpdateContext(self) as jac:
                     # Only linearize subsystems if we aren't approximating the derivs at this level.
                     for subsys in subs:
                         do_ln = sub_do_ln and (subsys._linear_solver is not None and
                                                subsys._linear_solver._needs_linearize_children())
-                        subsys._linearize(jac, sub_do_ln=do_ln)
+                        subsys._linearize(sub_do_ln=do_ln)
                         if sub_do_ln and subsys._linear_solver is not None:
                             subsys._linear_solver._linearize()
 

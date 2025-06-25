@@ -114,9 +114,9 @@ class ExplicitCounterComp(om.ExplicitComponent):
         self._counts['_compute_partials_wrapper'] += 1
         super()._compute_partials_wrapper(jac)
 
-    def _linearize(self, jac=None, sub_do_ln=False):
+    def _linearize(self, sub_do_ln=False):
         self._counts['_linearize'] += 1
-        super()._linearize(jac=jac, sub_do_ln=sub_do_ln)
+        super()._linearize(sub_do_ln=sub_do_ln)
 
 
 class MultComp(ExplicitCounterComp):

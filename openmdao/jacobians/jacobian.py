@@ -1064,20 +1064,16 @@ class GroupJacobianUpdateContext:
     ----------
     group : Group
         The group that owns this jacobian.
-    parent_jac : Jacobian or None
-        The parent jacobian.
 
     Attributes
     ----------
     group : Group
         The group that owns this jacobian.
-    parent_jac : Jacobian or None
-        The parent jacobian.
     jac : Jacobian
         The jacobian that is being updated.
     """
 
-    def __init__(self, group, parent_jac=None):
+    def __init__(self, group):
         """
         Initialize the context.
 
@@ -1085,11 +1081,8 @@ class GroupJacobianUpdateContext:
         ----------
         group : Group
             The group that owns this jacobian.
-        parent_jac : Jacobian or None
-            The parent jacobian.
         """
         self.group = group
-        self.parent_jac = parent_jac
         self.jac = None
 
     def __enter__(self):
@@ -1102,7 +1095,6 @@ class GroupJacobianUpdateContext:
             The jacobian that is being updated.
         """
         if self.group._owns_approx_jac:
-            # don't use parent_jac
             if self.group._tot_jac is not None and not isinstance(self.group._jacobian,
                                                                   _ColSparsityJac):
                 self.jac = self.group._jacobian = self.group._tot_jac
@@ -1112,9 +1104,7 @@ class GroupJacobianUpdateContext:
         else:
             self.jac = self.group._get_assembled_jac()
 
-        if self.jac is None:
-            return self.parent_jac
-        else:
+        if self.jac is not None:
             self.jac._pre_update(self.group._outputs.dtype)
 
         return self.jac  # may be None
