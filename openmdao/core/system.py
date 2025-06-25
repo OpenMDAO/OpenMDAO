@@ -5137,7 +5137,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         with self._scaled_context_all():
             self._linearize(sub_do_ln=self._linear_solver is not None and
-                            self._linear_solver._needs_linearize_children())
+                            self._linear_solver._linearize_children())
             if self._linear_solver is not None and sub_do_ln:
                 self._linear_solver._linearize()
 

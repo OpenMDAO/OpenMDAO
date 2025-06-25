@@ -3859,7 +3859,7 @@ class Group(System):
                     # Only linearize subsystems if we aren't approximating the derivs at this level.
                     for subsys in subs:
                         do_ln = sub_do_ln and (subsys._linear_solver is not None and
-                                               subsys._linear_solver._needs_linearize_children())
+                                               subsys._linear_solver._linearize_children())
                         subsys._linearize(sub_do_ln=do_ln)
                         if sub_do_ln and subsys._linear_solver is not None:
                             subsys._linear_solver._linearize()

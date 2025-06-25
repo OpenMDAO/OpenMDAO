@@ -119,7 +119,7 @@ class ScipyKrylov(LinearSolver):
         if self.precon is not None and type_ != 'NL':
             self.precon._set_solver_print(level=level, type_=type_)
 
-    def _needs_linearize_children(self):
+    def _linearize_children(self):
         """
         Return a flag that is True when we need to call linearize on our subsystems' solvers.
 
@@ -128,7 +128,7 @@ class ScipyKrylov(LinearSolver):
         bool
             Flag for indicating child linerization
         """
-        return (self.precon is not None) and (self.precon._needs_linearize_children())
+        return (self.precon is not None) and (self.precon._linearize_children())
 
     def _linearize(self):
         """
