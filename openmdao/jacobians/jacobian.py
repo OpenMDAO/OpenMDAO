@@ -848,36 +848,6 @@ class SplitJacobian(Jacobian):
             return self._subjac_from_meta(abs_key, meta, out_slices[of], col_slice, False,
                                           dtype, src_indices, factor, src)
 
-    def set_col(self, system, icol, column):
-        """
-        Set a column of the jacobian.
-
-        The column is assumed to be the same size as a column of the jacobian.
-
-        This also assumes that the column does not attempt to set any nonzero values that are
-        outside of specified sparsity patterns for any of the subjacs.
-
-        Parameters
-        ----------
-        system : System
-            The system that owns this jacobian.
-        icol : int
-            Column index.
-        column : ndarray
-            Column value.
-        """
-        if self._col_mapper is None:
-            self._setup_index_maps(system)
-
-        wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
-
-        subjacs = self._subjacs
-
-        for of, start, end, _, _ in system._get_jac_ofs():
-            key = (of, wrt)
-            if key in subjacs:
-                subjacs[key].set_col(loc_idx, column[start:end])
-
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """
         Compute matrix-vector product.

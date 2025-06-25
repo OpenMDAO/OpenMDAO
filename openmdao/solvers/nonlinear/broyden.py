@@ -302,9 +302,9 @@ class BroydenSolver(NonlinearSolver):
             self.xm = self.xm.astype(complex)
             self.fxm = self.fxm.astype(complex)
         elif np.iscomplexobj(self.xm):
-            self.Gm = self.Gm.real
-            self.xm = self.xm.real
-            self.fxm = self.fxm.real
+            self.Gm = np.ascontiguousarray(self.Gm.real)
+            self.xm = np.ascontiguousarray(self.xm.real)
+            self.fxm = np.ascontiguousarray(self.fxm.real)
 
         self._converge_failures = 0
         self._computed_jacobians = 0

@@ -912,8 +912,8 @@ class NonlinearSolver(Solver):
         """
         system = self._system()
 
-        if (self.options['restart_from_successful'] and self.options['maxiter'] > 1 and
-                not system.under_approx):
+        if (not system.under_approx and self.options['restart_from_successful'] and
+                self.options['maxiter'] > 1):
             try:
                 # If we have a previous solver failure, we want to replace
                 # the outputs using the cache.
