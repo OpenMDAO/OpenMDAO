@@ -3,7 +3,6 @@
 import unittest
 import numpy as np
 from scipy import sparse
-from sys import platform
 import openmdao.api as om
 
 from openmdao.solvers.linear.tests.linear_test_base import LinearSolverTests
@@ -111,9 +110,7 @@ class DistribComp(om.ExplicitComponent):
             outputs['y'] = 3.0 * inputs['x']
 
 # Test the class used to setup and interact with the PETSc solver
-# OSX doesn't install any of the solvers with PETSc (they have to be manually
-# built, so skip all tests for OSX)
-@unittest.skipUnless(PETSc and platform != "darwin", "only run with PETSc and not on Mac.")
+@unittest.skipUnless(PETSc, "only run with PETSc.")
 class TestPETScClass(unittest.TestCase):
 
     def test_instantiate_dense(self):
@@ -220,7 +217,7 @@ class TestPETScClass(unittest.TestCase):
 
 # Test the class used to setup and interact with the PETSc solver when it is
 # being run under MPI
-@unittest.skipUnless(MPI and PETSc and platform != "darwin", "only run with MPI and PETSc and not on Mac.")
+@unittest.skipUnless(MPI and PETSc, "only run with MPI and PETSc.")
 class TestPETScClassMPI(unittest.TestCase):
 
     N_PROCS = 2
@@ -254,7 +251,7 @@ class TestPETScClassMPI(unittest.TestCase):
 # Run the same test suite as the DirectSolver since the functionality is very
 # close to the same (except skip "test_raise_no_error_on_singular" PETSc
 # direct solver doesn't do that)
-@unittest.skipUnless(PETSc and platform != "darwin", "only run with PETSc.")
+@unittest.skipUnless(PETSc, "only run with PETSc.")
 class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
     linear_solver_class = om.PETScDirectSolver
@@ -1094,7 +1091,7 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
             prob.run_model()
 
 
-@unittest.skipUnless(MPI and PETSc and platform != "darwin", "only run with MPI and PETSc and not on Mac.")
+@unittest.skipUnless(MPI and PETSc, "only run with MPI and PETSc.")
 class TestPETScDirectSolverRemoteErrors(unittest.TestCase):
 
     N_PROCS = 2
@@ -1204,7 +1201,7 @@ class TestPETScDirectSolverRemoteErrors(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
 
-@unittest.skipUnless(PETSc and platform != "darwin", "only run with PETSc and not on Mac.")
+@unittest.skipUnless(PETSc, "only run with PETSc.")
 class TestPETScDirectSolverMPI(unittest.TestCase):
 
     N_PROCS = 2
