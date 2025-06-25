@@ -149,7 +149,7 @@ class Jacobian(object):
         Returns
         -------
         Subjac
-            The created subjacobian, or None if meta['dependent'] is False.
+            The created subjacobian,.
         """
         of, wrt = abs_key
         row_slice = self._output_slices[of]
@@ -745,8 +745,6 @@ class SplitJacobian(Jacobian):
             for abs_key, meta in self._subjacs_info.items():
                 wrt = abs_key[1]
                 factor = None
-                if not meta['dependent']:
-                    continue
                 if wrt in output_slices and not is_explicit_comp:
                     self._dr_do_subjacs[abs_key] = \
                         self.create_dr_do_subjac(conns, abs_key, wrt, meta, dtype)
@@ -833,20 +831,19 @@ class SplitJacobian(Jacobian):
         Returns
         -------
         Subjac
-            The created subjacobian, or None if meta['dependent'] is False.
+            The created subjacobian.
         """
-        if meta['dependent']:
-            of, wrt = abs_key
-            out_slices = self._output_slices
+        of, wrt = abs_key
+        out_slices = self._output_slices
 
-            if wrt in out_slices:
-                col_slice = out_slices[wrt]
-            else:
-                src = conns[wrt]
-                col_slice = out_slices[src]
+        if wrt in out_slices:
+            col_slice = out_slices[wrt]
+        else:
+            src = conns[wrt]
+            col_slice = out_slices[src]
 
-            return self._subjac_from_meta(abs_key, meta, out_slices[of], col_slice, False,
-                                          dtype, src_indices, factor, src)
+        return self._subjac_from_meta(abs_key, meta, out_slices[of], col_slice, False,
+                                      dtype, src_indices, factor, src)
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """

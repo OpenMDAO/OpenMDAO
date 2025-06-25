@@ -56,9 +56,9 @@ class DictionaryJacobian(Jacobian):
         if not d_out_names and not d_inp_names:
             return
 
-        rflat = d_residuals._abs_get_val
-        oflat = d_outputs._abs_get_val
-        iflat = d_inputs._abs_get_val
+        abs_resids = d_residuals._abs_get_val
+        abs_outs = d_outputs._abs_get_val
+        abs_ins = d_inputs._abs_get_val
         subjacs_info = self._subjacs_info
         subjacs = self._get_subjacs(system)
         randgen = self._randgen
@@ -72,12 +72,12 @@ class DictionaryJacobian(Jacobian):
 
                 res_name, other_name = abs_key
 
-                ofvec = rflat(res_name) if res_name in d_res_names else None
+                ofvec = abs_resids(res_name) if res_name in d_res_names else None
 
                 if other_name in d_out_names:
-                    wrtvec = oflat(other_name)
+                    wrtvec = abs_outs(other_name)
                 elif other_name in d_inp_names:
-                    wrtvec = iflat(other_name)
+                    wrtvec = abs_ins(other_name)
                 else:
                     wrtvec = None
 
@@ -91,14 +91,12 @@ class DictionaryJacobian(Jacobian):
                 if fwd:
                     left_vec = ofvec
                     right_vec = wrtvec
+                    if left_vec is not None and right_vec is not None:
+                        subjacs[abs_key].apply_fwd(d_inputs, d_outputs, d_residuals, randgen)
                 else:  # rev
                     left_vec = wrtvec
                     right_vec = ofvec
-
-                if left_vec is not None and right_vec is not None:
-                    if fwd:
-                        subjacs[abs_key].apply_fwd(d_inputs, d_outputs, d_residuals, randgen)
-                    else:
+                    if left_vec is not None and right_vec is not None:
                         subjacs[abs_key].apply_rev(d_inputs, d_outputs, d_residuals, randgen)
 
                 if abs_key in key_owners:
