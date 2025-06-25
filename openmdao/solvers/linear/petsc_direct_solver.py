@@ -7,9 +7,9 @@ import scipy.linalg
 import scipy.sparse.linalg
 import scipy.sparse
 
-from openmdao.solvers.solver import LinearSolver
+from openmdao.solvers.linear.direct import DirectSolver
+from openmdao.solvers.linear.direct import format_singular_error, format_nan_error
 from openmdao.matrices.dense_matrix import DenseMatrix
-from openmdao.utils.array_utils import identity_column_iter
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
 
@@ -217,168 +217,7 @@ class PETScLU:
             return self._x.getArray().copy()
 
 
-def index_to_varname(system, loc):
-    """
-    Given a matrix location, return the name of the variable associated with that index.
-
-    Parameters
-    ----------
-    system : <System>
-        System containing the Directsolver.
-    loc : int
-        Index of row or column.
-
-    Returns
-    -------
-    str
-        String containing variable absolute name (and promoted name if there is
-        one) and index.
-    """
-    start = end = 0
-    varsizes = np.sum(system._owned_output_sizes, axis=0)
-    for i, name in enumerate(system._resolver.abs_iter('output')):
-        end += varsizes[i]
-        if loc < end:
-            varname = system._resolver.abs2prom(name, 'output')
-            break
-        start = end
-
-    if varname == name:
-        name_string = "'{}' index {}.".format(varname, loc - start)
-    else:
-        name_string = "'{}' ('{}') index {}.".format(varname, name, loc - start)
-
-    return name_string
-
-
-def loc_to_error_msg(system, loc_txt, loc):
-    """
-    Given a matrix location, format a coherent error message when matrix is singular.
-
-    Parameters
-    ----------
-    system : <System>
-        System containing the Directsolver.
-    loc_txt : str
-        Either 'row' or 'col'.
-    loc : int
-        Index of row or column.
-
-    Returns
-    -------
-    str
-        New error string.
-    """
-    names = index_to_varname(system, loc)
-    msg = "Singular entry found in {} for {} associated with state/residual " + names
-    return msg.format(system.msginfo, loc_txt)
-
-
-def format_singular_error(system, matrix):
-    """
-    Format a coherent error message for any ill-conditioned mmatrix.
-
-    Parameters
-    ----------
-    system : <System>
-        System containing the Directsolver.
-    matrix : ndarray
-        Matrix of interest.
-
-    Returns
-    -------
-    str
-        New error string.
-    """
-    if scipy.sparse.issparse(matrix):
-        matrix = matrix.toarray()
-
-    if np.any(np.isnan(matrix)):
-        # There is a nan in the matrix.
-        return format_nan_error(system, matrix)
-
-    zero_rows = np.where(~matrix.any(axis=1))[0]
-    zero_cols = np.where(~matrix.any(axis=0))[0]
-    if zero_cols.size <= zero_rows.size:
-
-        if zero_rows.size == 0:
-            # In this case, some row is a linear combination of the other rows.
-
-            # SVD gives us some information that may help locate the source of
-            # the problem.
-            try:
-                u, _, _ = np.linalg.svd(matrix)
-
-            except Exception:
-                msg = f"Jacobian in '{system.pathname}' is not full rank, but OpenMDAO was " + \
-                      "not able to determine which rows or columns."
-                return msg
-
-            # Nonzero elements in the left singular vector show the rows that
-            # contribute strongly to the singular subspace. Note that sometimes
-            # extra rows/cols are included in the set, currently don't have a
-            # good way to pare them down.
-            tol = 1e-15
-            u_sing = np.abs(u[:, -1])
-            left_idx = np.where(u_sing > tol)[0]
-
-            msg = "Jacobian in '{}' is not full rank. The following set of states/residuals " + \
-                  "contains one or more equations that is a linear combination of the others: \n"
-
-            for loc in left_idx:
-                name = index_to_varname(system, loc)
-                msg += ' ' + name + '\n'
-
-            if len(left_idx) > 2:
-                msg += "Note that the problem may be in a single Component."
-
-            return msg.format(system.pathname)
-
-        loc_txt = "row"
-        loc = zero_rows[0]
-    else:
-        loc_txt = "column"
-        loc = zero_cols[0]
-
-    return loc_to_error_msg(system, loc_txt, loc)
-
-
-def format_nan_error(system, matrix):
-    """
-    Format a coherent error message when the matrix contains NaN.
-
-    Parameters
-    ----------
-    system : <System>
-        System containing the Directsolver.
-    matrix : ndarray
-        Matrix of interest.
-
-    Returns
-    -------
-    str
-        New error string.
-    """
-    # Because of how we built the matrix, a NaN in a comp causes the whole row
-    # to be NaN, so we need to associate each index with a variable.
-    varsizes = np.sum(system._owned_output_sizes, axis=0)
-
-    nanrows = np.zeros(matrix.shape[0], dtype=bool)
-    nanrows[np.where(np.isnan(matrix))[0]] = True
-
-    varnames = []
-    start = end = 0
-    for i, name in enumerate(system._resolver.abs_iter('output')):
-        end += varsizes[i]
-        if np.any(nanrows[start:end]):
-            varnames.append("'%s'" % system._resolver.abs2prom(name, 'output'))
-        start = end
-
-    msg = "NaN entries found in {} for rows associated with states/residuals [{}]."
-    return msg.format(system.msginfo, ', '.join(varnames))
-
-
-class PETScDirectSolver(LinearSolver):
+class PETScDirectSolver(DirectSolver):
     """
     LinearSolver that uses PETSc for LU factor/solve.
 
@@ -404,23 +243,11 @@ class PETScDirectSolver(LinearSolver):
         if PETSc is None:
             raise RuntimeError(f"{self.msginfo}: PETSc is not available. ")
 
-        self._lin_rhs_checker = None
-
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
         """
         super()._declare_options()
-
-        self.options.declare(
-            'rhs_checking',
-            types=(bool, dict),
-            default=False,
-            desc="If True, check RHS vs. cache and/or zero to avoid some solves."
-                 "Can also be set to a dict of options for the LinearRHSChecker to "
-                 "allow finer control over it. Allowed options are: "
-                 f"{LinearRHSChecker.options}"
-        )
 
         self.options.declare(
             'sparse_solver_name',
@@ -432,17 +259,7 @@ class PETScDirectSolver(LinearSolver):
                  "be automatically used."
         )
 
-        # this solver does not iterate
-        self.options.undeclare("maxiter")
-        self.options.undeclare("err_on_non_converge")
-
-        self.options.undeclare("atol")
-        self.options.undeclare("rtol")
-
-        # Use an assembled jacobian by default.
-        self.options['assemble_jac'] = True
-
-        self.supports['implicit_components'] = True
+        self.options.undeclare("err_on_singular")
 
     def _setup_solvers(self, system, depth):
         """
@@ -455,44 +272,11 @@ class PETScDirectSolver(LinearSolver):
         depth : int
             depth of the current system (already incremented).
         """
-        super()._setup_solvers(system, depth)
+        super(DirectSolver, self)._setup_solvers(system, depth)
         if self.options['sparse_solver_name'] in PC_SERIAL_TYPES:
             self._disallow_distrib_solve()
         self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
                                                         self.options['rhs_checking'])
-
-    def _linearize_children(self):
-        """
-        Return a flag that is True when we need to call linearize on our subsystems' solvers.
-
-        Returns
-        -------
-        boolean
-            Flag for indicating child linearization.
-        """
-        return False
-
-    def can_solve_cycle(self):
-        """
-        Return True if this solver can solve groups with cycles.
-
-        Returns
-        -------
-        bool
-            True if this solver can solve groups with cycles.
-        """
-        return True
-
-    def use_relevance(self):
-        """
-        Return True if relevance should be active.
-
-        Returns
-        -------
-        bool
-            True if relevance should be active.
-        """
-        return False
 
     def raise_petsc_error(self, e, system, matrix):
         """
@@ -520,47 +304,6 @@ class PETScDirectSolver(LinearSolver):
         else:
             # Just raise the original exception
             raise
-
-    def _build_mtx(self):
-        """
-        Assemble a Jacobian matrix by matrix-vector-product with columns of identity.
-
-        Returns
-        -------
-        ndarray
-            Jacobian matrix.
-        """
-        system = self._system()
-        bvec = system._dresiduals
-        xvec = system._doutputs
-
-        # First make a backup of the vectors
-        b_data = bvec.asarray(copy=True)
-        x_data = xvec.asarray(copy=True)
-
-        nmtx = x_data.size
-        seed = np.zeros(x_data.size)
-        mtx = np.empty((nmtx, nmtx), dtype=b_data.dtype)
-        scope_out, scope_in = system._get_matvec_scope()
-
-        # temporarily disable relevance to avoid creating a singular matrix
-        with system._relevance.active(False):
-            # Assemble the Jacobian by running the identity matrix through apply_linear
-            for i, seed in enumerate(identity_column_iter(seed)):
-                # set value of x vector to provided value
-                xvec.set_val(seed)
-
-                # apply linear
-                system._apply_linear(self._assembled_jac, 'fwd', scope_out, scope_in)
-
-                # put new value in out_vec
-                mtx[:, i] = bvec.asarray()
-
-        # Restore the backed-up vectors
-        bvec.set_val(b_data)
-        xvec.set_val(x_data)
-
-        return mtx
 
     def _linearize(self):
         """
