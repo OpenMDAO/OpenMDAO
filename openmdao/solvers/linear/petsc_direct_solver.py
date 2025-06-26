@@ -225,11 +225,6 @@ class PETScDirectSolver(DirectSolver):
     ----------
     **kwargs : dict
         Options dictionary.
-
-    Attributes
-    ----------
-    _lin_rhs_checker : LinearRHSChecker or None
-        Object for checking the right-hand side of the linear solve.
     """
 
     SOLVER = 'LN: PETScDirect'
