@@ -156,12 +156,14 @@ def print_cycle_tree(group):
                 _print_tree(lst[idx], len(lst))
 
 
-def are_connected(self, graph, start, end):
+def are_connected(graph, start, end):
     """
     Return True if the given source and target are connected.
 
     Parameters
     ----------
+    graph : networkx.DiGraph
+        Directed graph of Systems and variables.
     start : str
         Name of the starting node.
     end : str
