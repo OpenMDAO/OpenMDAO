@@ -190,8 +190,8 @@ class System(object, metaclass=SystemMetaclass):
         Recording options dictionary
     _problem_meta : dict
         Problem level metadata.
-    _old_relevance : Relevance or None
-        The relevance object from the previous call to _get_approx_subjac_keys.
+    _old_relevance : tuple or None
+        The relevance object and active flag from the previous call to _get_approx_subjac_keys.
     under_complex_step : bool
         When True, this system is undergoing complex step.
     under_finite_difference : bool
@@ -420,7 +420,7 @@ class System(object, metaclass=SystemMetaclass):
 
         self._problem_meta = None
 
-        self._old_relevance = None
+        self._old_relevance = (None, None)
 
         # Counting iterations.
         self.iter_count = 0
@@ -468,8 +468,6 @@ class System(object, metaclass=SystemMetaclass):
 
         self._jacobian = None
         self._approx_schemes = {}
-        # from openmdao.devtools.debug import DebugDict
-        # self._subjacs_info = DebugDict()
         self._subjacs_info = {}
         self._approx_subjac_keys = None
         self.matrix_free = _UNDEFINED
@@ -653,13 +651,21 @@ class System(object, metaclass=SystemMetaclass):
                 yield from self._var_allprocs_discrete[iotype].items()
 
     def _get_jac_ofs(self):
+        """
+        Cache (name, start, end, slice, dist_sizes) for each row var in the jacobian.
+
+        Returns
+        -------
+        list
+            List of (name, start, end, slice, dist_sizes) for each row var in the jacobian.
+        """
         if self._jac_ofs_cache is None:
             self._jac_ofs_cache = list(self._jac_of_iter())
         return self._jac_ofs_cache
 
     def _get_jac_wrts(self, wrt_matches=None):
         """
-        Iterate over (name, start, end, vec, slice, dist_sizes) for each column var in the jacobian.
+        Cache (name, start, end, vec, slice, dist_sizes) for each column var in the jacobian.
 
         Parameters
         ----------
@@ -667,6 +673,11 @@ class System(object, metaclass=SystemMetaclass):
             Only include column vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
+
+        Returns
+        -------
+        list
+            List of (name, start, end, vec, slice, dist_sizes) for each column var in the jacobian.
         """
         if wrt_matches not in self._jac_wrts_cache:
             self._jac_wrts_cache[wrt_matches] = list(self._jac_wrt_iter(wrt_matches))
@@ -674,7 +685,7 @@ class System(object, metaclass=SystemMetaclass):
 
     def _clear_jac_caches(self):
         """
-        Clear the jacobian of and wrtcaches.
+        Clear the jacobian of and wrt caches.
         """
         self._jac_ofs_cache = None
         self._jac_wrts_cache = {}
@@ -1453,9 +1464,9 @@ class System(object, metaclass=SystemMetaclass):
         bool
             True if the relevance has changed.
         """
-        if (self._old_relevance is not self._relevance) or (self._old_relevance._active !=
-                                                            self._relevance._active):
-            self._old_relevance = self._relevance
+        old_rel, active = self._old_relevance
+        if (old_rel is not self._relevance) or (active != self._relevance._active):
+            self._old_relevance = (self._relevance, self._relevance._active)
             return True
         return False
 
@@ -2319,6 +2330,8 @@ class System(object, metaclass=SystemMetaclass):
         if cfginfo:
             cfginfo._modified_systems.discard(self.pathname)
 
+        self._clear_jac_caches()
+
     def _setup_global_shapes(self):
         """
         Compute the global size and shape of all variables on this system.
@@ -2604,27 +2617,27 @@ class System(object, metaclass=SystemMetaclass):
 
                 option_format = self.options['assembled_jac_type']
                 if option_format == 'dense':
-                    sparse_format = 'dense'
+                    jac_format = 'dense'
                 else:
                     preferred = [fmt for _, fmt in asm_jac_solvers if fmt is not None]
                     if len(set(preferred)) == 1:
-                        sparse_format = preferred[0]
+                        jac_format = preferred[0]
                     elif option_format in (None, 'sparse'):
                         # use old default of 'csc'
-                        sparse_format = 'csc'
+                        jac_format = 'csc'
                     else:
-                        sparse_format = option_format
+                        jac_format = option_format
 
                     if option_format not in (None, 'sparse'):
-                        if option_format != sparse_format:
+                        if option_format != jac_format:
                             issue_warning(
                                 f"{self.msginfo}: system is using a '{option_format}' "
                                 "sparse format, but a linear solver in the system prefers "
-                                f"'{sparse_format}'. This may result in performance degradation."
+                                f"'{jac_format}'. This may result in performance degradation."
                             )
-                        sparse_format = option_format
+                        jac_format = option_format
 
-                asm_jac = _asm_jac_types[sparse_format](system=self)
+                asm_jac = _asm_jac_types[jac_format](system=self)
                 self._assembled_jac = self._jacobian = asm_jac
                 for solver, _ in asm_jac_solvers:
                     solver._assembled_jac = asm_jac

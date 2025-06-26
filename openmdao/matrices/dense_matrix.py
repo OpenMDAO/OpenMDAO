@@ -124,9 +124,15 @@ class DenseMatrix(Matrix):
             vector resulting from the product.
         """
         if mode == 'fwd':
-            return self._matrix @ self._get_masked_arr(in_vec, mask)
+            if mask is None:
+                return self._matrix @ in_vec
+            else:
+                return self._matrix @ self._get_masked_arr(in_vec, mask)
         else:  # rev
-            return self.transpose() @ self._get_masked_arr(in_vec, mask)
+            if mask is None:
+                return self.transpose() @ in_vec
+            else:
+                return self.transpose() @ self._get_masked_arr(in_vec, mask)
 
     def _update_dtype(self, dtype):
         """

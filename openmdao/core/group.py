@@ -220,8 +220,6 @@ class Group(System):
         after _auto_ivc is created.
     _is_explicit : bool or None
         True if neither this Group nor any of its descendants contains implicit systems or cycles.
-    _ivcs : dict
-        Dict containing metadata for each independent variable.
     _bad_conn_vars : set
         Set of variables involved in invalid connections.
     _sys_graph_cache : dict
@@ -259,7 +257,6 @@ class Group(System):
         self._fd_rev_xfer_correction_dist = {}
         self._auto_ivc_recorders = []
         self._is_explicit = None
-        self._ivcs = {}
         self._bad_conn_vars = None
         self._sys_graph_cache = None
         self._key_owner = None
@@ -1195,8 +1192,6 @@ class Group(System):
 
         self._setup_solvers()
         self._setup_solver_print()
-        # if self._use_derivatives:
-        #     self._setup_jacobians()
 
         self._setup_recording()
 
@@ -1675,7 +1670,6 @@ class Group(System):
         abs2meta = self._var_abs2meta
 
         allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._ivcs = {}
 
         for n, lst in self._group_inputs.items():
             lst[0]['path'] = self.pathname  # used for error reporting
@@ -1832,9 +1826,6 @@ class Group(System):
         self._vars_to_gather = self._find_vars_to_gather()
         if self.pathname == '':
             self._problem_meta['vars_to_gather'] = self._vars_to_gather
-
-        # create mapping of indep var names to their metadata
-        self._ivcs = self.get_indep_vars(local=False)
 
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
@@ -2321,7 +2312,7 @@ class Group(System):
         self._conn_global_abs_in2out = {name: srcs.pop()
                                         for name, srcs in global_abs_in2out.items()}
 
-    def get_indep_vars(self, local):
+    def get_indep_vars(self, local, include_discrete=False):
         """
         Return a dict of independant variables contained in this group or any of its subgroups.
 
@@ -2329,6 +2320,8 @@ class Group(System):
         ----------
         local : bool
             If True, return only the variables local to the current process.
+        include_discrete : bool
+            If True, include discrete variables in the returned dict.
 
         Returns
         -------
@@ -2336,7 +2329,17 @@ class Group(System):
             Dict of all independant variables in this group and their corresponding metadata.
         """
         abs2meta = self._var_abs2meta['output'] if local else self._var_allprocs_abs2meta['output']
-        return {n: meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
+        ivcs = {n: meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
+        if include_discrete:
+            if local:
+                # local discrete vars use relative names
+                prefix = self.pathname + '.' if self.pathname else ''
+                ivcs.update({prefix + n: meta for n, meta in self._var_discrete['output'].items()
+                             if 'openmdao:indep_var' in meta['tags']})
+            else:
+                ivcs.update({n: meta for n, meta in self._var_allprocs_discrete['output'].items()
+                             if 'openmdao:indep_var' in meta['tags']})
+        return ivcs
 
     def _setup_jax(self):
         if jax is None:
@@ -3744,7 +3747,7 @@ class Group(System):
         system doutput variables, taking into account distributed inputs.
         Since the transfers are not correcting for those issues, we need to do it here.
 
-        If we have a distributed constraint/obj within the FD group and that con/obj is,
+        If we have a distributed constraint/obj within the FD group and that con/obj is
         active, we perform essentially an allreduce on the d_inputs vars that connect to
         outside systems so they'll include the contribution from all procs.
         """
@@ -3918,8 +3921,6 @@ class Group(System):
         """
         Call setup_partials in components.
         """
-        # from openmdao.devtools.debug import DebugDict
-        # self._subjacs_info = info = DebugDict()
         self._subjacs_info = info = {}
 
         for subsys in self._sorted_sys_iter():
@@ -4053,8 +4054,8 @@ class Group(System):
         # get rid of any old stuff in here
         self._owns_approx_of = self._owns_approx_wrt = None
 
-        ivc = self.get_indep_vars(local=False)
-        of = [name for name in self._var_allprocs_abs2meta['output'] if name not in ivc]
+        ivcs = self.get_indep_vars(local=False)
+        of = [name for name in self._var_allprocs_abs2meta['output'] if name not in ivcs]
 
         yield from product(of, wrt)
 
@@ -4115,7 +4116,7 @@ class Group(System):
 
                 start = end
         else:
-            yield from super()._get_jac_ofs()
+            yield from super()._jac_of_iter()
 
     def _jac_wrt_iter(self, wrt_matches=None):
         """
@@ -4731,9 +4732,6 @@ class Group(System):
         for sysname in self._sorted_sys_iter_all_procs():
             self._var_allprocs_abs2meta[io].update(
                 self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
-
-        # add all auto_ivc vars to our _loc_ivcs
-        self._ivcs.update(auto_ivc._var_abs2meta[io])
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True

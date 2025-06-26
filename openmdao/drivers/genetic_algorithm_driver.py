@@ -892,7 +892,7 @@ class GeneticAlgorithm(object):
         new_obj = []
 
         idx = np.array(range(0, npop - 1, nobj))
-        for j in range(nobj):
+        for j in np.arange(nobj):
             old_gen, i_shuffled = self.shuffle(old_gen)
             obj_val = obj_val[i_shuffled]
 

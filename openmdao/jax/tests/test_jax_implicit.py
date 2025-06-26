@@ -199,14 +199,11 @@ class TestJaxImplicitComp(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob['lingrp.lin.x'], np.array([-4, 9, -4]), tolerance=1e-14)
-        J = prob.compute_totals(of=['lingrp.lin.x'], wrt=['ivc.b', 'ivc.A'])
-        print(J)
 
-        assert_check_partials(prob.check_partials(show_only_incorrect=True, rich_print=False), rtol=1e-5)
         assert_check_totals(prob.check_totals(of=['lingrp.lin.x'], wrt=['ivc.b', 'ivc.A'],
-                                              abs_err_tol=2e-4, rel_err_tol=3e-6, show_only_incorrect=True,
-                                              rich_print=False),
+                                              abs_err_tol=2e-4, rel_err_tol=3e-6, show_only_incorrect=True),
                             atol=2e-4, rtol=3e-6)
+        assert_check_partials(prob.check_partials(show_only_incorrect=True), rtol=1e-5)
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], ['matfree', '']), name_func=parameterized_name)
     def test_jax_lin_system_primal_w_option(self, mode, matrix_free):

@@ -174,7 +174,7 @@ class TestJacobianFeatures(unittest.TestCase):
         model = problem.model
         model.add_subsystem('simple', SimpleCompConst(),
                             promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
-        problem.setup(mode='fwd')
+        problem.setup()
         problem.run_model()
 
         # Note: since this test is looking for something not user-facing, it is inherently fragile

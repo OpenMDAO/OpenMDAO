@@ -3628,9 +3628,11 @@ class _ColSparsityJac(object):
         self._coloring_info = system._coloring_info
 
         nrows = sum([end - start for _, start, end, _, _ in system._get_jac_ofs()])
-        end = 0
-        for _, _, end, _, _, _ in system._get_jac_wrts(self._coloring_info.wrt_matches):
-            pass
+        jac_wrts = system._get_jac_wrts(self._coloring_info.wrt_matches)
+        if jac_wrts:
+            end = jac_wrts[-1][2]
+        else:
+            end = 0
 
         self._nrows = nrows
         self._randgen = None

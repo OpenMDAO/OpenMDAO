@@ -2073,7 +2073,6 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.driver = om.pyOptSparseDriver()
         prob.driver.options['optimizer'] = "IPOPT"
-        # prob.driver.opt_settings['max_iter'] = 3
         prob.driver.opt_settings['print_level'] = 0
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
@@ -2085,7 +2084,6 @@ class TestPyoptSparse(unittest.TestCase):
         prob.set_solver_print(level=0)
 
         prob.setup(check=False, mode='rev')
-        # prob.setup(check=False, mode='fwd')
         prob.run_driver()
 
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)

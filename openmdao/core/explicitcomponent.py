@@ -382,14 +382,12 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        jac = self._get_jacobian()
-
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
 
             if not self.matrix_free:
                 # Jacobian and vectors are all scaled, unitless
-                jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
+                self._get_jacobian()._apply(self, d_inputs, d_outputs, d_residuals, mode)
                 return
 
             # Jacobian and vectors are all unscaled, dimensional

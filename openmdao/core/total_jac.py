@@ -132,6 +132,9 @@ class _TotalJacInfo(object):
         if driver is None:
             driver = problem.driver
         self.model = model = problem.model
+
+        # reset the of and wrt caches just in case we've previously built a total jac with
+        # linear constraints (which will have different ofs and wrts than the nl total jac).
         model._clear_jac_caches()
 
         self.comm = model.comm

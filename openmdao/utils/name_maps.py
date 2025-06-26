@@ -89,8 +89,6 @@ class NameResolver(object):
         If True, all promoted names map to a single absolute name.
     _conns : dict or None
         The connections dictionary.
-    _has_remote : bool
-        If True, the name resolver has remote variables.
     msginfo : str
         The message information for the system.
     """
@@ -117,7 +115,6 @@ class NameResolver(object):
         self._prom2abs_out = self._prom2abs['output']
         self._prom_no_multi_abs = True
         self._conns = None
-        self._has_remote = False
         self.msginfo = msginfo if msginfo else pathname
 
     def reset_prom_maps(self):
@@ -149,8 +146,6 @@ class NameResolver(object):
             If True, the variable is distributed.
         """
         _, flags = _get_flags(local=local, continuous=continuous, distributed=distributed)
-        if not flags & LOCAL:
-            self._has_remote = True
 
         self._abs2prom[iotype][absname] = (promname, flags)
         p2a = self._prom2abs[iotype]
@@ -213,8 +208,6 @@ class NameResolver(object):
         self._abs2prom_out.update(old_abs2prom_out)
         self._prom2abs_out.update(old_prom2abs_out)
 
-        self._has_remote |= auto_ivc_resolver._has_remote
-
     def update_from_ranks(self, myrank, others):
         """
         Update the name resolver with name resolvers from multiple ranks.
@@ -248,7 +241,6 @@ class NameResolver(object):
                                     flags |= LOCAL
                                 else:
                                     flags &= ~LOCAL
-                                    self._has_remote = True
                                 my_abs2prom[absname] = (promname, flags)
 
         self._populate_prom2abs()

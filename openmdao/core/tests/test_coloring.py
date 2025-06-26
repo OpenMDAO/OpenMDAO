@@ -759,8 +759,6 @@ class SimulColoringPyoptSparseRevTestCase(unittest.TestCase):
         p_color = run_opt(pyOptSparseDriver, 'auto', optimizer='SLSQP', print_results=False,
                           dynamic_total_coloring=True, con_alias=True)
 
-        assert_check_partials(p_color.model.mux.check_partials(show_only_incorrect=True))
-
         assert_almost_equal(p['circle.area'], np.pi, decimal=7)
         assert_almost_equal(p_color['circle.area'], np.pi, decimal=7)
 

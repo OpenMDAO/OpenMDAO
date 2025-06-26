@@ -691,26 +691,6 @@ class Relevance(object):
         else:
             return set()
 
-    def current_relevant_vars(self, inputs=True, outputs=True):
-        """
-        Return a set of variables relevant to the current seeds.
-
-        Parameters
-        ----------
-        inputs : bool
-            If True, include inputs.
-        outputs : bool
-            If True, include outputs.
-
-        Returns
-        -------
-        set
-            Set of names of the relevant variables.
-        """
-        return self._apply_node_filter(self._rel_names_iter(self._current_rel_varray,
-                                                            self._var2idx),
-                                       _get_io_filter(inputs, outputs))
-
     @contextmanager
     def all_seeds_active(self):
         """
@@ -1103,19 +1083,6 @@ class Relevance(object):
             True if the given source and target are connected.
         """
         if start in self._graph and end in self._graph:
-            if self._active:
-                # if we've already computed the relevance arrays, we can use them as a quick way
-                # to prove that the two nodes are connected.  Unfortunately we can only prove
-                # connection, not disconnection, because the two nodes could be connected but
-                # one or both could be irrelevant to all seeds.
-                start_idx = self._var2idx[start]
-                end_idx = self._var2idx[end]
-                single_seed_rel_arrays = self._single_seed2relvars['fwd']
-                for fwd_seed in self._all_seed_vars['fwd']:
-                    arr = single_seed_rel_arrays[fwd_seed]
-                    if arr[start_idx] and arr[end_idx]:
-                        return True
-
             successors = self._graph.successors
 
             stack = [start]

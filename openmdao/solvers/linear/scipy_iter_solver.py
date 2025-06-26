@@ -316,7 +316,7 @@ class ScipyKrylov(LinearSolver):
         bool
             True if relevance should be active.
         """
-        return False
+        return True
 
     def preferred_sparse_format(self):
         """
