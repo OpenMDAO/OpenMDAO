@@ -30,7 +30,7 @@ from openmdao.utils.general_utils import common_subpath, \
     meta2src_iter, get_rev_conns, is_undefined
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo
+from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, are_connected
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -1175,6 +1175,7 @@ class Group(System):
                                                                   use_prom_ivc=True))
 
         self._dataflow_graph = self._get_dataflow_graph()
+        self._problem_meta['dataflow_graph'] = self._dataflow_graph
 
         # figure out if we can remove any edges based on zero partials we find
         # in components.  By default all component connected outputs
@@ -4234,6 +4235,7 @@ class Group(System):
         approx_keys = self._get_approx_subjac_keys(initialize=True)
         wrt_seen = set()
         compute_cross_keys = not total and self.comm.size > 1 and self._has_fd_group
+        graph = self._problem_meta['dataflow_graph']
 
         for key in approx_keys:
             of, wrt = key
@@ -4242,7 +4244,7 @@ class Group(System):
                 meta = self._subjacs_info[key]
             else:
                 # check connection between of and wrt before creating a subjac
-                if not self._relevance.are_connected(wrt, of):
+                if not are_connected(graph, wrt, of):
                     continue
 
                 meta = SUBJAC_META_DEFAULTS.copy()

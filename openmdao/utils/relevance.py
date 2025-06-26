@@ -1066,39 +1066,6 @@ class Relevance(object):
 
         return inputs, outputs, relevant_systems
 
-    def are_connected(self, start, end):
-        """
-        Return True if the given source and target are connected.
-
-        Parameters
-        ----------
-        start : str
-            Name of the starting node.
-        end : str
-            Name of the ending node.
-
-        Returns
-        -------
-        bool
-            True if the given source and target are connected.
-        """
-        if start in self._graph and end in self._graph:
-            successors = self._graph.successors
-
-            stack = [start]
-            visited = set(stack)
-
-            while stack:
-                start = stack.pop()
-                for node in successors(start):
-                    if node == end:
-                        return True
-                    if node not in visited:
-                        visited.add(node)
-                        stack.append(node)
-
-        return False
-
     def _dependent_nodes(self, start, direction, local=False):
         """
         Return set of all connected nodes in the given direction starting at the given node.
