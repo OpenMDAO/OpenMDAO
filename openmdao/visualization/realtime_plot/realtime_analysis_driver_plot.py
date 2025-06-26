@@ -124,10 +124,15 @@ _num_histogram_bins = 30
 #  shown as a tooltip
 _max_label_length = 25
 _elide_string = "..."
+
+# color bar constants
 # palette for the color bar
 _color_palette = Viridis256
 # the color bar showing response needs an initial value before new data comes in
 _initial_response_range_for_plots = (0, 100)
+_colorbar_width = 20
+_colorbar_label_standoff = 14
+_colorbar_min_border_right = 100
 
 # function to create the labels for the plots, need to elide long variable names.
 # Include the units, if given
@@ -503,12 +508,9 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             section_separator,
             sampled_variables_non_scalar_label,
             sampled_variables_non_scalar_column,
-            sizing_mode="stretch_height",
-            height_policy="fit",
         )
         sampled_variables_box = ScrollBox(
             child=sampled_variables_column,
-            sizing_mode="stretch_height",
             height_policy="max",
         )
 
@@ -547,7 +549,6 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             section_separator,
             sampled_variables_box,
             sizing_mode="stretch_height",
-            height_policy="fit",
             width=_left_side_column_width,
             stylesheets=[_page_styles],
             css_classes=["sampled_variables_box"],
@@ -563,8 +564,8 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             color_mapper=self._color_mapper,
             title=f"Response variable: '{self._prom_response}'",
             border_line_color=None,
-            width=20,
-            label_standoff=14,
+            width=_colorbar_width,
+            label_standoff=_colorbar_label_standoff,
             title_text_font_size=_color_bar_title_font_size,
             ticker=BasicTicker(),
             location=(0, 0),
@@ -573,18 +574,15 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         # Need the color bar to be associated with a plot figure.
         # So make a basic one and hide it
         p = figure(
-            height=2 * _grid_plot_height_and_width, width=0, toolbar_location=None
+            height=2 * _grid_plot_height_and_width, 
+            width=0, 
+            toolbar_location=None,
+            x_axis_type=None,
+            y_axis_type=None
         )
-        line = p.line([0, 1], [0, 1])
-        p.grid.grid_line_color = None
-        line.visible = False
-        p.xaxis.visible = False
-        p.yaxis.visible = False
-        p.xgrid.visible = False
-        p.ygrid.visible = False
-        p.title.visible = False
+        p.grid.visible = False
         p.outline_line_alpha = 0
-        p.min_border_right = 100
+        p.min_border_right = _colorbar_min_border_right        
 
         p.add_layout(color_bar, "right")
 
@@ -649,9 +647,6 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
                     bottom="bottom",
                     left="left",
                     right="right",
-                    fill_color="#3288bd",
-                    line_color="white",
-                    alpha=0.7,
                 )
                 self._hist_figures[var_along_columns] = plot_figure
 
