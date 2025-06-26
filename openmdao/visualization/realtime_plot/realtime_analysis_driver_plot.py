@@ -310,9 +310,9 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             high=_initial_response_range_for_plots[1],
         )
 
-        color_bar = self._make_color_bar()
+        color_bar_figure = self._make_color_bar()
 
-        variables_box = self._make_variables_box(color_bar)
+        variables_box = self._make_variables_box(color_bar_figure)
 
         plots_and_labels_in_grid = []
         self._make_plots(plots_and_labels_in_grid)
@@ -325,7 +325,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         )
 
         self._make_overall_layout(
-            analysis_progress_box, variables_box, color_bar, grid_of_plots
+            analysis_progress_box, variables_box, color_bar_figure, grid_of_plots
         )
 
     def _update_source_stream(self, new_case):
@@ -401,7 +401,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             else:
                 self._sampled_variables_visibility[sampled_var] = False
 
-    def _make_variables_box(self, color_bar):
+    def _make_variables_box(self, color_bar_figure):
         # Make all the checkboxes for the Sample Variables area to the left of the plot
         #   that lets the user select what to plot. Also include the non scalar
         #   variables at the bottom of this box
@@ -525,9 +525,10 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             css_classes=["div_header"],
         )
 
-        def cb_select_response_variable(color_bar):
+        def cb_select_response_variable(color_bar_figure):
             def toggle_callback(attr, old, new):
                 self._prom_response = new
+                color_bar = color_bar_figure.right[0]
                 color_bar.title = f"Response variable: '{new}'"
                 self._color_mapper.low = self._prom_response_min[self._prom_response]
                 self._color_mapper.high = self._prom_response_max[self._prom_response]
@@ -540,7 +541,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             return toggle_callback
 
         response_variable_menu.on_change(
-            "value", cb_select_response_variable(color_bar)
+            "value", cb_select_response_variable(color_bar_figure)
         )
 
         variables_box = Column(
