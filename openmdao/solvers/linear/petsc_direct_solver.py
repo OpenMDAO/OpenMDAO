@@ -185,7 +185,7 @@ class PETScLU:
 
         # OpenMDAO needs x to be a numpy array, so we need to take the distributed
         # x and "scatter" it (basically gather it to one rank). Once it's
-        # gathered into onen array, it can be converted to a numpy array and
+        # gathered into one array, it can be converted to a numpy array and
         # passed out.
         pc = self.ksp.getPC()
         if self.running_mpi and pc.getFactorSolverType() in PC_DISTRIBUTED_TYPES:
@@ -197,13 +197,13 @@ class PETScLU:
                 x_seq = PETSc.Vec().createSeq(0, comm=PETSc.COMM_SELF)
 
             # Have to call scatter on all ranks or MPI will error out (each
-            # rank is a processing being run in the MPI)
+            # rank is a process being run in the MPI)
             scatter, _ = PETSc.Scatter.toZero(self._x)
             scatter.scatter(self._x, x_seq, addv=PETSc.InsertMode.INSERT,
                             mode=PETSc.ScatterMode.FORWARD)
             scatter.destroy()
 
-            # Rank 0 owns x, broadcast (or send a copy) of it to the other ranks
+            # Rank 0 owns x, broadcast (or send a copy of) it to the other ranks
             # so that they don't break what OpenMDAO expects from the linear solver
             if self._x.comm.getRank() == 0:
                 x_array = x_seq.getArray().copy()
