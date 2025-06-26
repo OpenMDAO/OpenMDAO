@@ -78,38 +78,16 @@ _page_styles = InlineStyleSheet(
     font-size:20px;
 }
 
-.bk-input-group .bk-checkbox input[type="checkbox"]:checked {
-    background-color: #4CAF50 !important;
-    border-color: #4CAF50 !important;
-}
-
-.bk-checkbox input[type="checkbox"]:checked {
-    background-color: #4CAF50 !important;
-    border-color: #4CAF50 !important;
-    accent-color: #2E7D32 !important;
-}
-
 input[type="checkbox"]:checked {
     background-color: #4CAF50 !important;
     border-color: #4CAF50 !important;
     accent-color: #2E7D32 !important;
 }
 
-input[type="checkbox"]:checked::after {
-    color: white !important;
-}
-
-.bk-checkbox input[type="checkbox"]:checked::after {
-    color: white !important;
-}
-
 .bk-input-group label {
     font-size: 20px !important;
 }
 
-.bk-checkbox label {
-    font-size: 20px !important;
-}
 """
 )
 
