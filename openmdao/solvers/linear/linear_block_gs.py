@@ -109,18 +109,18 @@ class LinearBlockGS(BlockLinearSolver):
                 subslice = b_vec._parent_slice
 
                 scope_out, scope_in = system._get_matvec_scope(subsys)
-                # we use _vars_union to combine relevant variables from the current solve
+                # we use _union_matvec_scope to combine relevant variables from the current solve
                 # with those of the subsystem solve, because for recursive block linear solves
                 # we'll be skipping a direct call to _apply_linear and instead counting on
                 # _apply_linear to be called once at the bottom of the recursive block linear
                 # solve on the component, using the full set of relevant variables from the
                 # top group in the block linear solve and all intervening groups (assuming all
                 # of those groups are doing block linear solves).
-                scope_out = self._vars_union(self._scope_out, scope_out)
-                scope_in = self._vars_union(self._scope_in, scope_in)
+                scope_out = self._union_matvec_scope(self._scope_out, scope_out)
+                scope_in = self._union_matvec_scope(self._scope_in, scope_in)
 
                 if subsys._iter_call_apply_linear():
-                    subsys._apply_linear(None, mode, scope_out, scope_in)
+                    subsys._apply_linear(mode, scope_out, scope_in)
                     b_vec *= -1.0
                     b_vec += self._rhs_vec[subslice]
                 else:
@@ -144,13 +144,13 @@ class LinearBlockGS(BlockLinearSolver):
                     b_vec += self._rhs_vec[subslice]
 
                     scope_out, scope_in = system._get_matvec_scope(subsys)
-                    scope_out = self._vars_union(self._scope_out, scope_out)
-                    scope_in = self._vars_union(self._scope_in, scope_in)
+                    scope_out = self._union_matvec_scope(self._scope_out, scope_out)
+                    scope_in = self._union_matvec_scope(self._scope_in, scope_in)
 
                     subsys._solve_linear(mode, scope_out, scope_in)
 
                     if subsys._iter_call_apply_linear():
-                        subsys._apply_linear(None, mode, scope_out, scope_in)
+                        subsys._apply_linear(mode, scope_out, scope_in)
                     else:
                         b_vec.set_val(0.0)
                 else:   # subsys not local

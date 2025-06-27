@@ -73,9 +73,7 @@ class LinearSystemComp(ImplicitComponent):
         mat_size = size * size
         full_size = size * vec_size
 
-        row_col = np.arange(full_size, dtype="int")
-
-        self.declare_partials('x', 'b', val=np.full(full_size, -1.0), rows=row_col, cols=row_col)
+        self.declare_partials('x', 'b', val=np.full(full_size, -1.0), diagonal=True)
 
         rows = np.repeat(np.arange(full_size), size)
 

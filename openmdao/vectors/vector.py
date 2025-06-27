@@ -3,8 +3,8 @@ import hashlib
 
 import numpy as np
 
-from openmdao.utils.indexer import Indexer, indexer
-from openmdao.utils.array_utils import shape_to_len
+from openmdao.utils.indexer import Indexer, indexer, combine_ranges
+
 
 _full_slice = slice(None)
 _flat_full_indexer = indexer(_full_slice, flat_src=True)
@@ -26,11 +26,20 @@ class _VecData(object):
 
     def __init__(self, shape, rng):
         self.shape = shape
-        self.size = shape_to_len(shape)
+        self.size = rng[1] - rng[0]
         self.is_scalar = shape == ()
         self.range = rng
         self.view = None
         self.flat = None
+
+    def set_view(self, data):
+        start, end = self.range
+        vflat = v = data[start:end]
+        if self.shape != vflat.shape and self.shape != ():
+            v = vflat.view().reshape(self.shape)
+
+        self.view = v
+        self.flat = vflat
 
     def __repr__(self):
         return f"VecData(shape={self.shape}, range={self.range})"
@@ -64,20 +73,20 @@ class Vector(object):
         Function to lookup a name in the name resolver.
     _name : str
         The name of the vector: 'nonlinear' or 'linear'.
-    _typ : str
+    _iotype : str
         Type: 'input' for input vectors; 'output' for output/residual vectors.
     _kind : str
         Specific kind of vector, either 'input', 'output', or 'residual'.
     _views : dict
         Dictionary mapping absolute variable names to the ndarray views.
+    _isroot : bool
+        Whether this vector is the root vector.
     _names : set([str, ...])
         Set of variables that are relevant in the current context.
     _alloc_complex : bool
         If True, then space for the complex vector is also allocated.
     _data : ndarray
         Actual allocated data.
-    _slices : dict
-        Dictionary mapping absolute variable names to slices into the data array.
     _parent_slice : slice
         Slice of the parent vector that this vector represents.
     _under_complex_step : bool
@@ -104,16 +113,16 @@ class Vector(object):
         self._resolver = system._resolver
         self._lookup = self._resolver.prom_or_rel2abs
         self._name = name
-        self._typ = _type_map[kind]
+        self._iotype = _type_map[kind]
         self._kind = kind
         self._views = {}
+        self._isroot = parent_vector is None
 
         # self._names will either contain the same names as self._views or to the
         # set of variables relevant to the current matvec product.
         self._names = self._views
 
         self._data = None
-        self._slices = None
         self._parent_slice = None
 
         # Support for Complex Step
@@ -126,7 +135,6 @@ class Vector(object):
         self._nlvec = None
 
         self._initialize_data(parent_vector, system)
-        self._initialize_views(parent_vector, system)
 
         self.read_only = False
 
@@ -234,11 +242,15 @@ class Vector(object):
         if self._under_complex_step:
             for n, vinfo in self._views.items():
                 if n in self._names:
-                    yield n[plen:], vinfo.view.item() if vinfo.is_scalar else vinfo.view
+                    yield n[plen:], vinfo.item() if vinfo.is_scalar else vinfo.view
+                else:
+                    yield n[plen:], 0.0j if vinfo.is_scalar else np.zeros_like(vinfo.view)
         else:
             for n, vinfo in self._views.items():
                 if n in self._names:
-                    yield n[plen:], vinfo.view.item().real if vinfo.is_scalar else vinfo.view.real
+                    yield n[plen:], vinfo.item().real if vinfo.is_scalar else vinfo.view.real
+                else:
+                    yield n[plen:], 0.0 if vinfo.is_scalar else np.zeros_like(vinfo.view.real)
 
     def ranges(self):
         """
@@ -346,7 +358,7 @@ class Vector(object):
         bool
             True or False.
         """
-        return self._lookup(name, self._typ) in self._names
+        return self._lookup(name, self._iotype) in self._names
 
     def _contains_abs(self, name):
         """
@@ -378,7 +390,36 @@ class Vector(object):
         float or ndarray
             variable value.
         """
-        return self._abs_get_val(self._lookup(name, self._typ, True), flat=False)
+        return self._abs_get_val(self._lookup(name, self._iotype, True), flat=False)
+
+    def get_slice(self, slc):
+        """
+        Get a slice of the vector.
+
+        Parameters
+        ----------
+        slc : slice
+            Slice of the vector.
+
+        Returns
+        -------
+        ndarray
+            Slice of the vector.
+        """
+        return self.asarray()[slc]
+
+    def add_to_slice(self, slc, val):
+        """
+        Add a value to a slice of the vector.
+
+        Parameters
+        ----------
+        slc : slice
+            Slice of the vector.
+        val : float or ndarray
+            Value to add.
+        """
+        self.asarray()[slc] += val.flat
 
     def get_val(self, name, flat=True):
         """
@@ -475,15 +516,6 @@ class Vector(object):
         raise NotImplementedError('_initialize_data not defined for vector type '
                                   f'{type(self).__name__}')
 
-    def _initialize_views(self, parent_vector, system):
-        """
-        Internally assemble views onto the vectors.
-
-        Must be implemented by the subclass.
-        """
-        raise NotImplementedError('_initialize_views not defined for vector type '
-                                  f'{type(self).__name__}')
-
     def __iadd__(self, vec):
         """
         Perform in-place vector addition.
@@ -557,6 +589,41 @@ class Vector(object):
         """
         raise NotImplementedError(f'asarray not defined for vector type {type(self).__name__}')
         return None  # silence lint warning
+
+    @property
+    def dtype(self):
+        """
+        Return the dtype of this vector.
+
+        Returns
+        -------
+        dtype
+            The dtype of this vector.
+        """
+        return self.asarray().dtype
+
+    def get_mask(self):
+        """
+        Return a mask for the vector based on the current matvec context.
+
+        Returns
+        -------
+        slice or index array
+            Values at this index will be zeroed out.
+        """
+        if not self._in_matvec_context():
+            return None
+
+        ranges = combine_ranges([vinfo.range for name, vinfo in self._views.items()
+                                 if name not in self._names])
+        if len(ranges) == 1:
+            mask = slice(ranges[0][0], ranges[0][1])
+        elif len(ranges) == 0:
+            mask = None
+        else:
+            mask = np.concatenate([range(start, end) for start, end in ranges])
+
+        return mask
 
     def iscomplex(self):
         """
@@ -632,7 +699,7 @@ class Vector(object):
             If specified, the variable name to use when reporting errors. This is useful
             when setting an AutoIVC value that the user only knows by a connected input name.
         """
-        abs_name = self._lookup(name, self._typ)
+        abs_name = self._lookup(name, self._iotype)
         if abs_name is None:
             raise KeyError(f"{self._resolver.msginfo}: Variable name "
                            f"'{var_name if var_name else name}' not found.")

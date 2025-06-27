@@ -744,7 +744,7 @@ class TestFuncCompWrapped(unittest.TestCase):
         p.run_model()
 
         # make sure only what is needed was computed
-        subjacs_info = comp._jacobian._subjacs_info
+        subjacs_info = comp._get_jacobian()._subjacs_info
         self.assertListEqual(sorted([('comp.y1', 'comp.x1'), ('comp.y2', 'comp.x2'),
                                      ('comp.y1', 'comp.y1'),('comp.y2', 'comp.y2')]),
                              sorted(subjacs_info.keys()))

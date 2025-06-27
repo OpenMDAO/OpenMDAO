@@ -9,7 +9,6 @@ from numpy import ndarray, imag
 
 from openmdao.core.system import _DEFAULT_COLORING_META
 from openmdao.utils.coloring import _ColSparsityJac, _compute_coloring
-from openmdao.core.constants import INT_DTYPE
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
 from openmdao.utils import cs_safe
@@ -709,10 +708,9 @@ class ExecComp(ExplicitComponent):
                                         "is not square (shape=(%d, %d))." %
                                         (self.msginfo, out, inp, oval.size, ival.size))
                                 # partial will be declared as diagonal
-                                inds = np.arange(oval.size, dtype=INT_DTYPE)
+                                decl_partials(of=out, wrt=inp, diagonal=True)
                             else:
-                                inds = None
-                            decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
+                                decl_partials(of=out, wrt=inp)
                         else:
                             decl_partials(of=out, wrt=inp)
 
@@ -807,7 +805,7 @@ class ExecComp(ExplicitComponent):
                 self._inarray[:] = self._inputs.asarray(copy=False)
                 self._exec()
                 outs = outputs.asarray(copy=False)
-                if outs.dtype == self._outarray.dtype:
+                if outs.dtype.kind == self._outarray.dtype.kind:
                     outs[:] = self._outarray
                 else:
                     outs[:] = self._outarray.real
@@ -828,17 +826,18 @@ class ExecComp(ExplicitComponent):
                 raise RuntimeError(f"{self.msginfo}: Error occurred evaluating '{self._exprs[i]}':"
                                    f"\n{err}")
 
-    def _linearize(self, jac=None, sub_do_ln=False):
+    def _linearize(self, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            Ignored.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
+        super()._linearize(sub_do_ln)
+
+        # perform complex safe check
         if self._requires_fd:
             if 'fd' in self._approx_schemes:
                 fdins = {wrt.rsplit('.', 1)[1] for wrt in self._approx_schemes['fd']._wrt_meta}
@@ -853,8 +852,6 @@ class ExecComp(ExplicitComponent):
                                        f"call declare_partials('*', {sorted(diff)}, method='fd') "
                                        f"on this component prior to setup.")
             self._requires_fd = False  # only need to do this check the first time around
-
-        super()._linearize(jac, sub_do_ln)
 
     def declare_coloring(self,
                          wrt=_DEFAULT_COLORING_META['wrt_patterns'],

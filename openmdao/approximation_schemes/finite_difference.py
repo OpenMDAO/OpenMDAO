@@ -92,14 +92,14 @@ class FiniteDifference(ApproximationScheme):
         super().__init__()
         self._starting_ins = self._starting_outs = self._results_tmp = None
 
-    def add_approximation(self, abs_key, system, kwargs, vector=None):
+    def add_approximation(self, wrt, system, kwargs, vector=None):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
         Parameters
         ----------
-        abs_key : tuple(str,str)
-            Absolute name pairing of (of, wrt) for the derivative.
+        wrt : str
+            Absolute name of wrt variable.
         system : System
             Containing System.
         kwargs : dict
@@ -131,7 +131,6 @@ class FiniteDifference(ApproximationScheme):
                                  "'step_calc' is set to 'rel_element.'")
 
         options['vector'] = vector
-        wrt = abs_key[1]
         if wrt in self._wrt_meta:
             self._wrt_meta[wrt].update(options)
         else:
