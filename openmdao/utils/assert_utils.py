@@ -718,7 +718,7 @@ def assert_near_equal(actual, desired, tolerance=1e-15, tol_type='rel'):
             # check to see if the entire array is made of floats. If not, loop through all values
 
             if not np.all(np.isnan(actual) == np.isnan(desired)):
-                if actual.size == 1 and desired.size == 1:
+                if True:  # actual.size == 1 and desired.size == 1:
                     raise ValueError('actual %s, desired %s' % (actual, desired))
                 else:
                     raise ValueError('actual and desired values have non-matching nan'

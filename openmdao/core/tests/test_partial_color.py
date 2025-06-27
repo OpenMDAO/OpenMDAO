@@ -19,7 +19,7 @@ from openmdao.core.problem import _clear_problem_names
 import openmdao.func_api as omf
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.array_utils import evenly_distrib_idxs
-from openmdao.utils.testing_utils import require_pyoptsparse, use_tempdirs
+from openmdao.utils.testing_utils import require_pyoptsparse, use_tempdirs, parameterized_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import compute_total_coloring
 
@@ -1038,58 +1038,57 @@ class TestColoring(unittest.TestCase):
                 _check_total_matrix(model, derivs, sparsity[rows, :], method)
 
     @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
-    def test_totals_of_wrt_indices(self, method='cs', sparse_partials=True):
-        for method, sparse_partials in itertools.product(['fd', 'cs'],[True, False]):
-            with self.subTest(msg=f'{method=} {sparse_partials=}'):
-                prob = Problem(name=f'test_totals_of_wrt_indices_{method}_{sparse_partials}')
-                model = prob.model = CounterGroup()
-                prob.driver = pyOptSparseDriver(optimizer='SLSQP')
-                prob.driver.declare_coloring()
+    @parameterized.expand(itertools.product(['fd', 'cs'],[True, False]), name_func=parameterized_name)
+    def test_totals_of_wrt_indices(self, method, sparse_partials):
+        prob = Problem(name=f'test_totals_of_wrt_indices_{method}_{sparse_partials}')
+        model = prob.model = CounterGroup()
+        prob.driver = pyOptSparseDriver(optimizer='SLSQP')
+        prob.driver.declare_coloring()
 
-                mask = np.array(
-                    [[1, 0, 0, 1, 1],
-                    [0, 1, 0, 1, 1],
-                    [0, 1, 0, 1, 1],
-                    [1, 0, 0, 0, 0],
-                    [0, 1, 1, 0, 0]]
-                )
+        mask = np.array(
+            [[1, 0, 0, 1, 1],
+            [0, 1, 0, 1, 1],
+            [0, 1, 0, 1, 1],
+            [1, 0, 0, 0, 0],
+            [0, 1, 1, 0, 0]]
+        )
 
-                isplit=2
-                sparsity = setup_sparsity(mask)
-                indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
+        isplit=2
+        sparsity = setup_sparsity(mask)
+        indeps, conns = setup_indeps(isplit, mask.shape[1], 'indeps', 'comp')
 
-                model.add_subsystem('indeps', indeps)
-                model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
-                                                               isplit=isplit, osplit=2,
-                                                               sparse_partials=sparse_partials))
+        model.add_subsystem('indeps', indeps)
+        model.add_subsystem('comp', SparseCompExplicit(sparsity, method,
+                                                        isplit=isplit, osplit=2,
+                                                        sparse_partials=sparse_partials))
 
-                model.connect('indeps.x0', 'comp.x0')
-                model.connect('indeps.x1', 'comp.x1')
+        model.connect('indeps.x0', 'comp.x0')
+        model.connect('indeps.x1', 'comp.x1')
 
-                model.comp.add_objective('y0', index=1)
-                model.comp.add_constraint('y1', lower=[1., 2.])
-                model.add_design_var('indeps.x0',  indices=[0,2], lower=np.ones(2), upper=np.ones(2)+.1)
-                model.add_design_var('indeps.x1', lower=np.ones(2), upper=np.ones(2)+.1)
+        model.comp.add_objective('y0', index=1)
+        model.comp.add_constraint('y1', lower=[1., 2.])
+        model.add_design_var('indeps.x0',  indices=[0,2], lower=np.ones(2), upper=np.ones(2)+.1)
+        model.add_design_var('indeps.x1', lower=np.ones(2), upper=np.ones(2)+.1)
 
-                model.approx_totals(method=method)
+        model.approx_totals(method=method)
 
-                prob.setup(check=False, mode='fwd')
+        prob.setup(check=False, mode='fwd')
 
-                prob.set_val('indeps.x0', [1.03, 1.04, 1.05])
-                prob.set_val('indeps.x1', [1.06, 1.07])
+        prob.set_val('indeps.x0', [1.03, 1.04, 1.05])
+        prob.set_val('indeps.x1', [1.06, 1.07])
 
-                prob.set_solver_print(level=0)
-                prob.run_driver()  # need this to trigger the dynamic coloring
+        prob.set_solver_print(level=0)
+        prob.run_driver()  # need this to trigger the dynamic coloring
 
-                prob.driver._total_jac = None
+        prob.driver._total_jac = None
 
-                start_nruns = model._nruns
-                derivs = prob.driver._compute_totals()  # colored
+        start_nruns = model._nruns
+        derivs = prob.driver._compute_totals()  # colored
 
-                self.assertEqual(model._nruns - start_nruns, 2)
-                cols = [0,2,3,4]
-                rows = [1,3,4]
-                _check_total_matrix(model, derivs, sparsity[rows, :][:, cols], method)
+        self.assertEqual(model._nruns - start_nruns, 2)
+        cols = [0,2,3,4]
+        rows = [1,3,4]
+        _check_total_matrix(model, derivs, sparsity[rows, :][:, cols], method)
 
     def test_no_solver_linearize(self):
         # this raised a singularity error before the fix
