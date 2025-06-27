@@ -287,6 +287,15 @@ class TestPETScDirectSolver(LinearSolverTests.LinearSolverTestCase):
 
             self.assertEqual(str(context.exception), msg % option)
 
+    def test_err_on_singular_option(self):
+        # Test that "err_on_singular" option will raise an error if not True
+        msg = ('The PETScDirectSolver must always have its "err_on_singular" '
+               'option set to True. This option is only maintained for '
+               'compatibility with parent solver methods.')
+        with self.assertRaises(ValueError) as context:
+            om.PETScDirectSolver(err_on_singular=False)
+        self.assertEqual(str(context.exception), msg)
+
     def test_solve_on_subsystem(self):
         """solve an implicit system with PETScDirectSolver attached to a subsystem"""
 

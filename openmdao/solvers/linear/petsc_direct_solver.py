@@ -40,6 +40,25 @@ PC_DISTRIBUTED_TYPES = [
 # cholmod
 
 
+def check_err_on_singular(name, value):
+    """
+    Check the value of the "err_on_singular" option on the PETScDirectSolver.
+
+    Parameters
+    ----------
+    name : str
+        Name of the option being checked.
+    value : bool
+        Value of the option being checked.
+    """
+    if not value:
+        raise ValueError(
+            f'The PETScDirectSolver must always have its "{name}" option set to '
+            'True. This option is only maintained for compatibility with parent '
+            'solver methods.'
+        )
+
+
 class PETScLU:
     """
     Wrapper for PETSc LU decomposition, using petsc4py.
@@ -254,7 +273,19 @@ class PETScDirectSolver(DirectSolver):
                  "be automatically used."
         )
 
+        # Undeclare and redeclare the "err_on_singular" option so that it's
+        # still compatible with shared parent methods. Must always be True
+        # because during factorization solvers will always error with a singular.
         self.options.undeclare("err_on_singular")
+        self.options.declare(
+            'err_on_singular',
+            default=True,
+            types=bool,
+            check_valid=check_err_on_singular,
+            desc="Raise an error if LU decomposition is singular. Must always "
+                 "be 'True' for the PETScDirectSolver. This option is only "
+                 "maintained for compatibility with parent solver methods."
+        )
 
     def _setup_solvers(self, system, depth):
         """
@@ -349,79 +380,6 @@ class PETScDirectSolver(DirectSolver):
         if self._lin_rhs_checker is not None:
             self._lin_rhs_checker.clear()
 
-    def _inverse(self):
-        """
-        Return the inverse Jacobian.
-
-        This is only used by the Broyden solver when calculating a full model
-        Jacobian. Since it is only done for a single RHS, no need for LU.
-
-        Returns
-        -------
-        ndarray
-            Inverse Jacobian.
-        """
-        system = self._system()
-        nproc = system.comm.size
-
-        if self._assembled_jac is not None:
-
-            matrix = self._assembled_jac._int_mtx._matrix
-
-            if matrix is None:
-                # This happens if we're not rank 0 and owned_sizes are being used
-                sz = np.sum(system._owned_output_sizes)
-                inv_jac = np.zeros((sz, sz))
-
-            # Dense and Sparse matrices have their own inverse method.
-            elif isinstance(matrix, np.ndarray):
-                # Detect singularities and warn user.
-                with warnings.catch_warnings():
-                    try:
-                        inv_jac = scipy.linalg.inv(matrix)
-                    except RuntimeWarning:
-                        raise RuntimeError(format_singular_error(system, matrix))
-
-                    # NaN in matrix.
-                    except ValueError:
-                        raise RuntimeError(format_nan_error(system, matrix))
-
-            elif isinstance(matrix, scipy.sparse.csc_matrix):
-                try:
-                    inv_jac = scipy.sparse.linalg.inv(matrix)
-                except RuntimeError:
-                    raise RuntimeError(format_singular_error(system, matrix))
-
-                # to prevent broadcasting errors later, make sure inv_jac is 2D
-                # scipy.sparse.linalg.inv returns a shape (1,) array if matrix
-                # is shape (1,1)
-                if inv_jac.size == 1:
-                    inv_jac = inv_jac.reshape((1, 1))
-            else:
-                raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in %s." % (type(matrix), system.msginfo))
-
-        else:
-            if nproc > 1:
-                raise RuntimeError("BroydenSolvers without an assembled jacobian "
-                                   "are not supported when running under MPI if "
-                                   "comm.size > 1.")
-            mtx = self._build_mtx()
-
-            # During inversion detect singularities and warn user.
-            with warnings.catch_warnings():
-                try:
-                    inv_jac = scipy.linalg.inv(mtx)
-
-                except RuntimeWarning:
-                    raise RuntimeError(format_singular_error(system, mtx))
-
-                # NaN in matrix.
-                except ValueError:
-                    raise RuntimeError(format_nan_error(system, mtx))
-
-        return inv_jac
-
     def solve(self, mode, rel_systems=None):
         """
         Run the solver.
@@ -479,8 +437,8 @@ class PETScDirectSolver(DirectSolver):
             x_vec[:] = sol_array = self._lup.solve(b_vec, transpose=transpose)
             matrix = self._lup.orig_A
 
-        # Detect singularities (PETSc linear solvers don't error out with NaN
-        # and inf so need to check for them).
+        # Detect singularities (PETSc linear solver "solve" doesn't error out
+        # with NaN and inf so need to check for them).
         if np.isinf(x_vec).any() or np.isnan(x_vec).any():
             raise RuntimeError(format_singular_error(system, matrix))
 
