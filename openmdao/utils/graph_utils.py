@@ -220,12 +220,12 @@ def get_actives(graph, knowns, meta_name):
     """
     Return all active single edges and active multi nodes.
 
-    Active edges are those that are connected on one end to a known shape variable
-    and on the other end to an unknown shape variable.  Active nodes are those that
-    have unknown shape but are connected to a known shape variable.
+    Active edges are those that are connected on one end to a variable with 'known' metadata
+    and on the other end to a variable with 'unknown' metadata.  Active nodes are those that
+    have 'unknown' metadata but are connected to a variable with 'known' metadata.
 
-    Single edges correspond to 'shape_by_conn' and 'copy_shape' connections.
-    Multi nodes are variables that have 'compute_shape' set to True so they
+    Single edges correspond to '???_by_conn' and 'copy_???' connections.
+    Multi nodes are variables that have 'compute_???' set to True so they
     connect to multiple nodes of the opposite io type in a component. For example
     a 'compute_shape' output variable will connect to all inputs in the component and
     each of those edges will be labeled as 'multi'. So a multi node is a node that
@@ -234,30 +234,49 @@ def get_actives(graph, knowns, meta_name):
     Parameters
     ----------
     graph : nx.DiGraph
-        Graph containing all variables with shape info.
+        Graph containing all variables with known/unknown info.
     knowns : list of str
-        List of nodes with known shape.
+        List of nodes with 'known' metadata.
     meta_name : str
-        The name of the node metadata variable to check.
+        The name of the node metadata to check for 'known'/'unknown' status.
 
     Returns
     -------
     active_single_edges : set of (str, str)
-        Set of active 'single' edges (for copy_shape and shape_by_conn).
-    computed_shape_nodes : set of str
-        Set of active nodes with 'multi' edges (for compute_shape).
+        Set of active 'single' edges (for copy_??? and ???_by_conn).
+    computed_nodes : set of str
+        Set of active nodes with 'multi' edges (for compute_???).
     """
     nodes = graph.nodes
     edges = graph.edges
     active_single_edges = set()
-    computed_shape_nodes = set()
+    computed_nodes = set()
 
     for known in knowns:
         for succ in graph.successors(known):
             if nodes[succ][meta_name] is None:
                 if edges[known, succ]['multi']:
-                    computed_shape_nodes.add(succ)
+                    computed_nodes.add(succ)
                 else:
                     active_single_edges.add((known, succ))
 
-    return active_single_edges, computed_shape_nodes
+    return active_single_edges, computed_nodes
+
+
+def meta2node_data(meta, to_extract):
+    """
+    Return a dict containing select metadata for the given variable.
+
+    Parameters
+    ----------
+    meta : dict
+        Metadata for the variable.
+    to_extract : tuple of str
+        Tuple of metadata names to extract.
+
+    Returns
+    -------
+    dict
+        Dict containing select metadata for the variable.
+    """
+    return {k: meta[k] for k in to_extract}

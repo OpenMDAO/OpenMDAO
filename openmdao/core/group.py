@@ -31,7 +31,7 @@ from openmdao.utils.general_utils import common_subpath, \
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
-    get_unresolved_knowns, is_unresolved, get_actives
+    get_unresolved_knowns, is_unresolved, get_actives, meta2node_data
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -2462,28 +2462,6 @@ class Group(System):
 
             return from_shape
 
-        def meta2node_data(meta):
-            """
-            Return a dict containing select metadata for the given variable.
-
-            Parameters
-            ----------
-            meta : dict
-                Metadata for the variable.
-
-            Returns
-            -------
-            dict
-                Dict containing select metadata for the variable.
-            """
-            return {
-                'distributed': meta['distributed'],
-                'shape': meta['shape'],
-                'compute_shape': meta['compute_shape'],
-                'shape_by_conn': meta['shape_by_conn'],
-                'copy_shape': meta['copy_shape'],
-            }
-
         nprocs = self.comm.size
         conn = self._conn_global_abs_in2out
         rev_conn = None
@@ -2499,6 +2477,7 @@ class Group(System):
         compute_shape_functs = {}
         component_io = defaultdict(list)
         resolver = self._resolver
+        to_extract = ('distributed', 'shape', 'compute_shape', 'shape_by_conn', 'copy_shape')
 
         # find all variables that have an unknown shape (across all procs) and connect them
         # to other unknown and known shape variables to form a directed graph.
@@ -2508,12 +2487,13 @@ class Group(System):
                 component_io[compname, io].append(name)
 
                 if meta['shape_by_conn']:
-                    graph.add_node(name, io=io, **meta2node_data(meta))
+                    graph.add_node(name, io=io, **meta2node_data(meta, to_extract))
                     if name in conn:  # it's a connected input
                         abs_from = conn[name]
                         if abs_from not in graph:
                             from_meta = all_abs2meta_out[abs_from]
-                            graph.add_node(abs_from, io='output', **meta2node_data(from_meta))
+                            graph.add_node(abs_from, io='output', **meta2node_data(from_meta,
+                                                                                   to_extract))
                         graph.add_edge(abs_from, name, multi=False)
                     else:
                         if rev_conn is None:
@@ -2521,7 +2501,8 @@ class Group(System):
                         if name in rev_conn:  # connected output
                             for inp in rev_conn[name]:
                                 inmeta = all_abs2meta_in[inp]
-                                graph.add_node(inp, io='input', **meta2node_data(inmeta))
+                                graph.add_node(inp, io='input', **meta2node_data(inmeta,
+                                                                                 to_extract))
                                 graph.add_edge(inp, name, multi=False)
                         elif not meta['compute_shape'] and not meta['copy_shape']:
                             # check to see if we can get shape from _group_inputs
@@ -2547,7 +2528,8 @@ class Group(System):
                                                     or m['copy_shape']):
                                                 fail = False
                                                 graph.add_node(n, io='input', known_count=0,
-                                                               **meta2node_data(all_abs2meta_in[n]))
+                                                               **meta2node_data(all_abs2meta_in[n],
+                                                                                to_extract))
                                                 graph.add_edge(n, name, multi=False)
                                                 break
                             if fail and name not in self._bad_conn_vars:
@@ -2562,11 +2544,12 @@ class Group(System):
                     if abs_from in all_abs2meta_in or abs_from in all_abs2meta_out:
                         a2m = all_abs2meta_in if abs_from in all_abs2meta_in else all_abs2meta_out
                         if name not in graph:
-                            graph.add_node(name, io=io, **meta2node_data(meta))
+                            graph.add_node(name, io=io, **meta2node_data(meta, to_extract))
                         if abs_from not in graph:
                             from_io = 'input' if abs_from in all_abs2meta_in else 'output'
                             from_meta = a2m[abs_from]
-                            graph.add_node(abs_from, io=from_io, **meta2node_data(from_meta))
+                            graph.add_node(abs_from, io=from_io, **meta2node_data(from_meta,
+                                                                                  to_extract))
 
                         graph.add_edge(abs_from, name, multi=False)
                     else:
@@ -2600,7 +2583,7 @@ class Group(System):
             for abs_name in component_io[comp_name, io]:
                 meta = self._var_allprocs_abs2meta[io][abs_name]
                 if abs_name not in graph:
-                    graph.add_node(abs_name, io=io, **meta2node_data(meta))
+                    graph.add_node(abs_name, io=io, **meta2node_data(meta, to_extract))
 
                 graph.add_edge(abs_name, name, multi=True)
 
@@ -2620,7 +2603,6 @@ class Group(System):
         all_knowns = knowns.copy()
 
         nodes = graph.nodes
-        edges = graph.edges
 
         # connected_components needs an undirected graph, so create a temporary one here
         for comps in nx.connected_components(nx.Graph(graph)):
@@ -2669,16 +2651,16 @@ class Group(System):
         mismatches = set()
         for u, v, data in graph.edges(data=True):
             if not data['multi']:
-                ushape = nodes[u]['shape']
-                if ushape is None:
-                    continue
-                vshape = nodes[v]['shape']
-                if vshape is None:
-                    continue
-                if ushape != vshape:
-                    udist = nodes[u]['distributed']
-                    vdist = nodes[v]['distributed']
-                    if not (udist ^ vdist):
+                udist = nodes[u]['distributed']
+                vdist = nodes[v]['distributed']
+                if not (udist ^ vdist):
+                    ushape = nodes[u]['shape']
+                    if ushape is None:
+                        continue
+                    vshape = nodes[v]['shape']
+                    if vshape is None:
+                        continue
+                    if ushape != vshape:
                         mismatches.add(tuple(sorted((u, v))))
 
         if mismatches:
