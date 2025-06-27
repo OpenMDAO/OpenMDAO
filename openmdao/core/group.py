@@ -30,7 +30,8 @@ from openmdao.utils.general_utils import common_subpath, \
     meta2src_iter, get_rev_conns, is_undefined
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo
+from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
+    get_unresolved_knowns, is_unresolved, get_actives
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -2461,104 +2462,6 @@ class Group(System):
 
             return from_shape
 
-        def get_unresolved_knowns(graph, nodes=None):
-            """
-            Return all unresolved nodes with known shape.
-
-            Unresolved means that the node has known shape and at least one successor
-            with unknown shape.
-
-            Parameters
-            ----------
-            graph : nx.DiGraph
-                Graph containing all variables with shape info.
-            nodes : list of str or None
-                List of nodes to check.  If None, check all nodes in the graph.
-
-            Returns
-            -------
-            set of str
-                Set of nodes with known shape but at least one successor with unknown shape.
-            """
-            gnodes = graph.nodes
-            if nodes is None:
-                nodes = graph.nodes()
-
-            unresolved = set()
-            for node in nodes:
-                if gnodes[node]['shape'] is not None:  # node has known shape
-                    for succ in graph.successors(node):
-                        if gnodes[succ]['shape'] is None:
-                            unresolved.add(node)
-                            break
-
-            return unresolved
-
-        def get_actives(graph, knowns):
-            """
-            Return all active single edges and active multi nodes.
-
-            Active edges are those that are connected on one end to a known shape variable
-            and on the other end to an unknown shape variable.  Active nodes are those that
-            have unknown shape but are connected to a known shape variable.
-
-            Single edges correspond to 'shape_by_conn' and 'copy_shape' connections.
-            Multi nodes are variables that have 'compute_shape' set to True so they
-            connect to multiple nodes of the opposite io type in a component. For example
-            a 'compute_shape' output variable will connect to all inputs in the component and
-            each of those edges will be labeled as 'multi'. So a multi node is a node that
-            has 'multi' incoming edges.
-
-            Parameters
-            ----------
-            graph : nx.DiGraph
-                Graph containing all variables with shape info.
-            knowns : list of str
-                List of nodes with known shape.
-
-            Returns
-            -------
-            active_single_edges : set of (str, str)
-                Set of active 'single' edges (for copy_shape and shape_by_conn).
-            computed_shape_nodes : set of str
-                Set of active nodes with 'multi' edges (for compute_shape).
-            """
-            active_single_edges = set()
-            computed_shape_nodes = set()
-
-            for known in knowns:
-                for succ in graph.successors(known):
-                    if nodes[succ]['shape'] is None:
-                        if edges[known, succ]['multi']:
-                            computed_shape_nodes.add(succ)
-                        else:
-                            active_single_edges.add((known, succ))
-
-            return active_single_edges, computed_shape_nodes
-
-        def is_unresolved(graph, node):
-            """
-            Return True if the given node is unresolved.
-
-            Unresolved means that the node has at least one successor with unknown shape.
-
-            Parameters
-            ----------
-            graph : nx.DiGraph
-                Graph containing all variables with shape info.
-            node : str
-                Node to check.
-
-            Returns
-            -------
-            bool
-                True if the node is unresolved.
-            """
-            for s in graph.successors(node):
-                if graph.nodes[s]['shape'] is None:
-                    return True
-            return False
-
         def meta2node_data(meta):
             """
             Return a dict containing select metadata for the given variable.
@@ -2731,13 +2634,14 @@ class Group(System):
             progress = True
             while progress:
                 progress = False
-                unresolved_knowns = get_unresolved_knowns(graph, unresolved_knowns)
+                unresolved_knowns = get_unresolved_knowns(graph, 'shape', unresolved_knowns)
 
-                active_single_edges, computed_shape_nodes = get_actives(graph, unresolved_knowns)
+                active_single_edges, computed_shape_nodes = get_actives(graph, unresolved_knowns,
+                                                                        'shape')
                 for k, u in active_single_edges:
                     shp = copy_var_shape(graph, k, u, distrib_sizes)
                     if shp is not None:
-                        if is_unresolved(graph, u):
+                        if is_unresolved(graph, u, 'shape'):
                             unresolved_knowns.add(u)
 
                         all_knowns.add(u)
@@ -2756,7 +2660,7 @@ class Group(System):
                         shp = compute_var_shape(mnode, shapes, nodes[mnode]['compute_shape'])
                         if shp is not None:
                             graph.nodes[mnode]['shape'] = shp
-                            if is_unresolved(graph, mnode):
+                            if is_unresolved(graph, mnode, 'shape'):
                                 unresolved_knowns.add(mnode)
                             all_knowns.add(mnode)
                             progress = True

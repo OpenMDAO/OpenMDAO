@@ -154,3 +154,110 @@ def print_cycle_tree(group):
         for _, _, _, idx, _, parpath in lst:
             if parpath is None:  # this is a top level scc
                 _print_tree(lst[idx], len(lst))
+
+
+def get_unresolved_knowns(graph, meta_name, nodes):
+    """
+    Return all unresolved nodes with known shape.
+
+    Unresolved means that the node has known shape and at least one successor
+    with unknown shape.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph containing all variables with shape info.
+    meta_name : str
+        The name of the node metadata variable to check.
+    nodes : set of str
+        Set of nodes to check.  All nodes must be in the graph.
+
+    Returns
+    -------
+    set of str
+        Set of nodes with known shape but at least one successor with unknown shape.
+    """
+    gnodes = graph.nodes
+
+    unresolved = set()
+    for node in nodes:
+        if gnodes[node][meta_name] is not None:  # node has known shape
+            for succ in graph.successors(node):
+                if gnodes[succ][meta_name] is None:
+                    unresolved.add(node)
+                    break
+
+    return unresolved
+
+
+def is_unresolved(graph, node, meta_name):
+    """
+    Return True if the given node is unresolved.
+
+    Unresolved means that the node has at least one successor with unknown shape.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph containing all variables with shape info.
+    node : str
+        Node to check.
+    meta_name : str
+        The name of the node metadata variable to check.
+
+    Returns
+    -------
+    bool
+        True if the node is unresolved.
+    """
+    for s in graph.successors(node):
+        if graph.nodes[s][meta_name] is None:
+            return True
+    return False
+
+
+def get_actives(graph, knowns, meta_name):
+    """
+    Return all active single edges and active multi nodes.
+
+    Active edges are those that are connected on one end to a known shape variable
+    and on the other end to an unknown shape variable.  Active nodes are those that
+    have unknown shape but are connected to a known shape variable.
+
+    Single edges correspond to 'shape_by_conn' and 'copy_shape' connections.
+    Multi nodes are variables that have 'compute_shape' set to True so they
+    connect to multiple nodes of the opposite io type in a component. For example
+    a 'compute_shape' output variable will connect to all inputs in the component and
+    each of those edges will be labeled as 'multi'. So a multi node is a node that
+    has 'multi' incoming edges.
+
+    Parameters
+    ----------
+    graph : nx.DiGraph
+        Graph containing all variables with shape info.
+    knowns : list of str
+        List of nodes with known shape.
+    meta_name : str
+        The name of the node metadata variable to check.
+
+    Returns
+    -------
+    active_single_edges : set of (str, str)
+        Set of active 'single' edges (for copy_shape and shape_by_conn).
+    computed_shape_nodes : set of str
+        Set of active nodes with 'multi' edges (for compute_shape).
+    """
+    nodes = graph.nodes
+    edges = graph.edges
+    active_single_edges = set()
+    computed_shape_nodes = set()
+
+    for known in knowns:
+        for succ in graph.successors(known):
+            if nodes[succ][meta_name] is None:
+                if edges[known, succ]['multi']:
+                    computed_shape_nodes.add(succ)
+                else:
+                    active_single_edges.add((known, succ))
+
+    return active_single_edges, computed_shape_nodes
