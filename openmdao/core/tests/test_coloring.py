@@ -25,7 +25,7 @@ from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
 from openmdao.test_suite.tot_jac_builder import TotJacBuilder, check_sparsity_tot_coloring
 from openmdao.utils.general_utils import run_driver, printoptions
-from openmdao.utils.assert_utils import assert_check_totals, assert_check_partials
+from openmdao.utils.assert_utils import assert_check_totals
 
 import openmdao.test_suite
 

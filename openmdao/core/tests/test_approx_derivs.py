@@ -2028,7 +2028,7 @@ class TestComponentRelevance(unittest.TestCase):
 
         indep = model.add_subsystem('indep', om.IndepVarComp('a', val=0.0))
         indep.add_output('b', val=0.0)
-        comp = model.add_subsystem('comp1', CompOne())
+        model.add_subsystem('comp1', CompOne())
         model.add_subsystem('sink1', om.ExecComp('x=a'))
         model.add_subsystem('sink2', om.ExecComp('y=a'))
 
