@@ -112,6 +112,7 @@ _colorbar_width = 20
 _colorbar_label_standoff = 14
 _colorbar_min_border_right = 100
 
+
 # function to create the labels for the plots, need to elide long variable names.
 # Include the units, if given
 def _elide_variable_name_with_units(variable_name, units):
@@ -553,15 +554,15 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         # Need the color bar to be associated with a plot figure.
         # So make a basic one and hide it
         p = figure(
-            height=2 * _grid_plot_height_and_width, 
-            width=0, 
+            height=2 * _grid_plot_height_and_width,
+            width=0,
             toolbar_location=None,
             x_axis_type=None,
             y_axis_type=None
         )
         p.grid.visible = False
         p.outline_line_alpha = 0
-        p.min_border_right = _colorbar_min_border_right        
+        p.min_border_right = _colorbar_min_border_right
 
         p.add_layout(color_bar, "right")
 

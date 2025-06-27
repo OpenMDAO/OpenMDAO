@@ -502,7 +502,6 @@ def _rtplot_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-
     file_path = options.file[0]
     if is_python_file(file_path):
         script_path = file_path
@@ -540,10 +539,16 @@ def _rtplot_cmd(options, user_args):
                 f"Failed to start up the realtime plot server with code {quick_check}: {stderr}.")
 
     def _view_realtime_plot(case_recorder_file):
-        cmd = ['openmdao', 'realtime_plot', '--pid', str(os.getpid()), case_recorder_file]
+        cmd = [
+            "openmdao",
+            "realtime_plot",
+            "--pid",
+            str(os.getpid()),
+            case_recorder_file,
+        ]
         if not options.show:
-            cmd.insert(-1, '--no-display')
-            
+            cmd.insert(-1, "--no-display")
+
         cp = subprocess.Popen(cmd)  # nosec: trusted input
 
         # Do a quick non-blocking check to see if it immediately failed
@@ -553,20 +558,25 @@ def _rtplot_cmd(options, user_args):
             # Process already terminated with an error
             stderr = cp.stderr.read().decode()
             raise RuntimeError(
-                f"Failed to start up the realtime plot server with code {quick_check}: {stderr}.")
-    
+                f"Failed to start up the realtime plot server with code {quick_check}: {stderr}."
+            )
+
     # check to see if options.file is python script, sqlite file or neither
     file_path = options.file[0]
     if is_sqlite_file(file_path):
         _view_realtime_plot(file_path)
     elif is_python_file(file_path):
         # register the hook
-        hooks._register_hook('_setup_recording', 'Problem', post=_view_realtime_plot_hook, ncalls=1)
+        hooks._register_hook(
+            "_setup_recording", "Problem", post=_view_realtime_plot_hook, ncalls=1
+        )
         # run the script
         _load_and_exec(file_path, user_args)
     else:
-        raise RuntimeError(f"The argument to the openmdao rtplot command must be either a case recorder file or an OpenMDAO python script.")
-
+        raise RuntimeError(
+            "The argument to the openmdao rtplot command must be either a "
+            "case recorder file or an OpenMDAO python script."
+        )
 
 
 def _get_deps(dep_dict: dict, package_name: str) -> None:

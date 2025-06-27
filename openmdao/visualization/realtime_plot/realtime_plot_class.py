@@ -1,7 +1,9 @@
 """
 The abstract class for the two forms of real time plot which are for AnalysisDriver and optimizers.
+
 Put in a separate class to avoid circular imports
 """
+
 
 class _RealTimePlot(object):
     def __init__(self, case_tracker, callback_period, doc, pid_of_calling_script, script):

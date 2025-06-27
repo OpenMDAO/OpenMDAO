@@ -38,13 +38,6 @@ except ImportError:
 
 import numpy as np
 
-try:
-    from openmdao.utils.gui_testing_utils import get_free_port
-except ImportError:
-    # If _get_free_port is unavailable, the default port will be used
-    def get_free_port():
-        return 5000
-
 
 # Constants
 # color of the plot line for the objective function
@@ -637,7 +630,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         if self._script:
             title = f"Optimization Progress Plot for: {self._script}"
         else:
-            title = f"Optimization Progress Plot for: {self._case_tracker.get_case_recorder_filename()}"
+            title = "Optimization Progress Plot for: " \
+                f"{self._case_tracker.get_case_recorder_filename()}"
         self.plot_figure = figure(
             tools=[
                 PanTool(),

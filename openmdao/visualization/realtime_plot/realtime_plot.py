@@ -6,7 +6,9 @@ import sqlite3
 
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.case import Case
-from openmdao.visualization.realtime_plot.realtime_analysis_driver_plot import _RealTimeAnalysisDriverPlot
+from openmdao.utils.gui_testing_utils import get_free_port
+from openmdao.visualization.realtime_plot.realtime_analysis_driver_plot \
+    import _RealTimeAnalysisDriverPlot
 from openmdao.visualization.realtime_plot.realtime_optimizer_plot import _RealTimeOptimizerPlot
 
 try:
@@ -25,13 +27,6 @@ _time_between_callbacks_in_ms = 1000
 
 # Number of milliseconds for unused session lifetime
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10
-
-try:
-    from openmdao.utils.gui_testing_utils import get_free_port
-except ImportError:
-    # If get_free_port is unavailable, the default port will be used
-    def get_free_port():
-        return 5000
 
 
 def _realtime_plot_setup_parser(parser):
@@ -63,7 +58,7 @@ def _realtime_plot_setup_parser(parser):
         help="Do not launch browser showing plot. Used for CI testing",
     )
 
-    parser.add_argument('--script', type=str, default=None, 
+    parser.add_argument('--script', type=str, default=None,
                         help='The name of the script that created the case recorder file.')
 
 
@@ -98,7 +93,7 @@ class _CaseRecorderTracker:
     """
     A class that is used to get information from a case recorder.
 
-    This class was created to handle the realtime reading of a case recorder file. 
+    This class was created to handle the realtime reading of a case recorder file.
     These features are not provided by the SqliteCaseReader class.
     """
 
@@ -228,7 +223,7 @@ class _CaseRecorderTracker:
         return item.shape
 
 
-def realtime_plot(case_recorder_filename, callback_period, 
+def realtime_plot(case_recorder_filename, callback_period,
                   pid_of_calling_script, show, script):
     """
     Visualize the objectives, desvars, and constraints during an optimization or analysis process.

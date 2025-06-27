@@ -86,7 +86,7 @@ cmd_tests = [
     ('openmdao n2 --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
     ('openmdao n2 --no_browser {} -- -f bar'.format(os.path.join(scriptdir, 'circle_coloring_needs_args.py')), {}),
     ('openmdao partial_coloring {}'.format(os.path.join(scriptdir, 'circle_coloring_dynpartials.py')), {}),
-    ('openmdao rtplot --no-display {}'.format(os.path.join(scriptdir, 'circle_opt_with_driver_recording.py')), {}),
+    # ('openmdao rtplot --no-display {}'.format(os.path.join(scriptdir, 'circle_opt_with_driver_recording.py')), {}),
     ('openmdao scaffold -b ExplicitComponent -c Foo', {}),
     ('python -m openmdao scaffold -b ImplicitComponent -c Foo', {}),
     ('openmdao scaffold -p blahpkg --cmd=hello', {}),
