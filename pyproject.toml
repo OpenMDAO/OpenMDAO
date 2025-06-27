@@ -149,6 +149,7 @@ linearrunoncec = "openmdao.solvers.linear.linear_runonce:LinearRunOnce"
 petsckrylov = "openmdao.solvers.linear.petsc_ksp:PETScKrylov"
 scipykrylov = "openmdao.solvers.linear.scipy_iter_solver:ScipyKrylov"
 userdefined = "openmdao.solvers.linear.user_defined:LinearUserDefined"
+petscdirectsolver = "openmdao.solvers.linear.petsc_direct_solver:PETScDirectSolver"
 
 [project.entry-points.openmdao_nl_solver]
 armijogoldsteinls = "openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS"
