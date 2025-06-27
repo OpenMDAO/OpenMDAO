@@ -1,14 +1,12 @@
 """LinearSolver that uses PETSc for LU factor/solve."""
 
-import warnings
-
 import numpy as np
 import scipy.linalg
 import scipy.sparse.linalg
 import scipy.sparse
 
 from openmdao.solvers.linear.direct import DirectSolver
-from openmdao.solvers.linear.direct import format_singular_error, format_nan_error
+from openmdao.solvers.linear.direct import format_singular_error
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
