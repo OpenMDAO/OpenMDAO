@@ -2,6 +2,7 @@
 Classes and functions to support the realtime plotting.
 """
 
+import os
 import sqlite3
 
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
@@ -19,6 +20,8 @@ try:
     bokeh_available = True
 except ImportError:
     bokeh_available = False
+
+from tornado.ioloop import PeriodicCallback
 
 # the time between calls to the udpate method
 # if this is too small, the GUI interactions get delayed because
@@ -51,12 +54,6 @@ def _realtime_plot_setup_parser(parser):
         help="Process ID of calling optimization script, "
         "defaults to None if called by the user directly",
     )
-    parser.add_argument(
-        "--no-display",
-        action="store_false",
-        dest="show",
-        help="Do not launch browser showing plot. Used for CI testing",
-    )
 
     parser.add_argument('--script', type=str, default=None,
                         help='The name of the script that created the case recorder file.')
@@ -78,7 +75,6 @@ def _realtime_plot_cmd(options, user_args):
             options.case_recorder_filename,
             _time_between_callbacks_in_ms,
             options.pid,
-            options.show,
             options.script,
         )
     else:
@@ -224,7 +220,7 @@ class _CaseRecorderTracker:
 
 
 def realtime_plot(case_recorder_filename, callback_period,
-                  pid_of_calling_script, show, script):
+                  pid_of_calling_script, script):
     """
     Visualize the objectives, desvars, and constraints during an optimization or analysis process.
 
@@ -236,8 +232,6 @@ def realtime_plot(case_recorder_filename, callback_period,
         The time period between when the application calls the update method.
     pid_of_calling_script : int
         The process id of the calling optimization script, if called this way.
-    show : bool
-        If true, launch the browser display of the plot.
     script : str or None
         If not None, the file path of the script that created the case recorder file.
     """
@@ -270,8 +264,19 @@ def realtime_plot(case_recorder_filename, callback_period,
             unused_session_lifetime_milliseconds=_unused_session_lifetime_milliseconds,
         )
         server.start()
-        if show:
+        
+        testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
+
+        if not testflo_running:
             server.io_loop.add_callback(server.show, "/")
+        else:
+            # for testing, we are, for now, just testing that the command runs. 
+            # So can stop the plot process right away
+            def update_data():
+                raise KeyboardInterrupt("end plotting process when in testing mode")
+                
+            periodic_callback = PeriodicCallback(update_data, 1000)  # 1 second
+            periodic_callback.start()
 
         print(
             f"Real-time optimization plot server running on http://localhost:{_port_number}"
