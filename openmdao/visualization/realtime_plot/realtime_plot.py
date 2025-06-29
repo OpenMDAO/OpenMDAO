@@ -264,17 +264,17 @@ def realtime_plot(case_recorder_filename, callback_period,
             unused_session_lifetime_milliseconds=_unused_session_lifetime_milliseconds,
         )
         server.start()
-        
+
         testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
 
         if not testflo_running:
             server.io_loop.add_callback(server.show, "/")
         else:
-            # for testing, we are, for now, just testing that the command runs. 
+            # for testing, we are, for now, just testing that the command runs.
             # So can stop the plot process right away
             def update_data():
                 raise KeyboardInterrupt("end plotting process when in testing mode")
-                
+
             periodic_callback = PeriodicCallback(update_data, 1000)  # 1 second
             periodic_callback.start()
 
