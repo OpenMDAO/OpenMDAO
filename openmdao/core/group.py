@@ -1116,7 +1116,7 @@ class Group(System):
         This part of setup is called automatically at the start of run_model or run_driver.
         This method is called only on the top level Group.
         """
-        self._setup_dynamic_shapes()
+        self._setup_dynamic_properties()
 
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs()
@@ -2334,12 +2334,12 @@ class Group(System):
             if isinstance(subsys, Group) or subsys.options['derivs_method'] == 'jax':
                 subsys._setup_jax()
 
-    def _setup_dynamic_shapes(self):
+    def _setup_dynamic_properties(self):
         """
-        Dynamically add shape/size metadata for variables.
+        Dynamically add shape/size/units metadata for variables.
 
-        This only happens if the user has set shape_by_conn, copy_shape, or compute_shape
-        for a variable.
+        This only happens if the user has set shape_by_conn, units_by_conn, copy_shape, copy_units,
+        compute_shape, or compute_units for a variable.
         """
         def get_group_input_shape(prom, gshapes):
             """
@@ -2368,37 +2368,39 @@ class Group(System):
                     elif 'val' in d:
                         return np.asarray(d['val']).shape
 
-        def compute_var_shape(to_var, shapes, func):
+        def compute_var_property(to_var, prop_dict, func, prop_name):
             """
             Compute shape info for the given variable using the given function.
 
             Parameters
             ----------
             to_var : str
-                Name of variable to compute shape info for.
-            shapes : dict
-                Mapping of variable name to shape.
+                Name of variable to compute property for.
+            prop_dict : dict
+                Mapping of variable name to property.
             func : function
-                Function to use to compute the shape.
+                Function to use to compute the property.
+            prop_name : str
+                Name of the property to compute.
 
             Returns
             -------
             tuple or None
-                If the shape of the variable is known, return the shape.
+                If the property of the variable is known, return it.
                 Otherwise, return None.
             """
             try:
-                from_shape = func(shapes)
+                from_prop = func(prop_dict)
             except KeyError:
-                self._collect_error(f"{self.msginfo}: Can't compute shape of variable '{to_var}': "
-                                    f"variable '{to_var}' doesn't exist.")
+                self._collect_error(f"{self.msginfo}: Can't compute {prop_name} of variable "
+                                    f"'{to_var}': variable '{to_var}' doesn't exist.")
                 return
             except Exception as err:
-                self._collect_error(f"{self.msginfo}: Error occurred while computing the shape "
-                                    f"of variable '{to_var}': {err}")
+                self._collect_error(f"{self.msginfo}: Error occurred while computing the "
+                                    f"{prop_name} of variable '{to_var}': {err}")
                 return
 
-            return from_shape
+            return from_prop
 
         def copy_var_shape(graph, from_var, to_var, distrib_sizes):
             """
@@ -2639,7 +2641,8 @@ class Group(System):
                             n.rpartition('.')[-1]: nodes[n]['shape']
                             for n in graph.predecessors(mnode)
                         }
-                        shp = compute_var_shape(mnode, shapes, nodes[mnode]['compute_shape'])
+                        shp = compute_var_property(mnode, shapes, nodes[mnode]['compute_shape'],
+                                                   'shape')
                         if shp is not None:
                             graph.nodes[mnode]['shape'] = shp
                             if is_unresolved(graph, mnode, 'shape'):
