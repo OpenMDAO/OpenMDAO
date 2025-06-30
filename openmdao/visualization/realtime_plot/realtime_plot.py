@@ -4,9 +4,12 @@ Classes and functions to support the realtime plotting.
 
 import os
 import sqlite3
+import subprocess
 
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.case import Case
+from openmdao.utils import hooks
+from openmdao.utils.file_utils import _load_and_exec, is_python_file, is_sqlite_file
 from openmdao.utils.gui_testing_utils import get_free_port
 from openmdao.visualization.realtime_plot.realtime_analysis_driver_plot \
     import _RealTimeAnalysisDriverPlot
@@ -79,10 +82,115 @@ def _realtime_plot_cmd(options, user_args):
         )
     else:
         print(
-            "The bokeh library is not installed so the realtime optimizaton "
+            "The bokeh library is not installed so the realtime "
             "plot is not available. "
         )
         return
+
+
+def _rtplot_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao rtplot' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+
+
+def _rtplot_cmd(options, user_args):
+    """
+    Return the post_setup hook function for 'openmdao rtplot'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+    """
+    if not bokeh_available:
+        print(
+            "The bokeh library is not installed so the rtplot "
+            "command is not available. "
+        )
+        return
+
+    file_path = options.file[0]
+    if is_python_file(file_path):
+        script_path = file_path
+    else:
+        script_path = None
+
+    def _view_realtime_plot_hook(problem):
+        driver = problem.driver
+        if not driver:
+            raise RuntimeError(
+                "Unable to run realtime optimization progress plot because no Driver")
+        if len(problem.driver._rec_mgr._recorders) == 0:
+            raise RuntimeError(
+                "Unable to run realtime optimization progress plot "
+                    "because no case recorder attached to Driver"
+            )
+
+        case_recorder_file = str(problem.driver._rec_mgr._recorders[0]._filepath)
+
+        cmd = ['openmdao', 'realtime_plot', '--pid', str(os.getpid()), case_recorder_file]
+        # if not options.show:
+        #     cmd.insert(-1, '--no-display')
+        if script_path:
+            cmd.insert(-1, '--script')
+            cmd.insert(-1, script_path)
+        cp = subprocess.Popen(cmd)  # nosec: trusted input
+
+        # Do a quick non-blocking check to see if it immediately failed
+        # This will catch immediate failures but won't wait for the process to finish
+        quick_check = cp.poll()
+        if quick_check is not None and quick_check != 0:
+            # Process already terminated with an error
+            stderr = cp.stderr.read().decode()
+            raise RuntimeError(
+                f"Failed to start up the realtime plot server with code {quick_check}: {stderr}.")
+
+    def _view_realtime_plot(case_recorder_file):
+        cmd = [
+            "openmdao",
+            "realtime_plot",
+            "--pid",
+            str(os.getpid()),
+            case_recorder_file,
+        ]
+
+        cp = subprocess.Popen(cmd)  # nosec: trusted input
+
+        # Do a quick non-blocking check to see if it immediately failed
+        # This will catch immediate failures but won't wait for the process to finish
+        quick_check = cp.poll()
+        if quick_check is not None and quick_check != 0:
+            # Process already terminated with an error
+            stderr = cp.stderr.read().decode()
+            raise RuntimeError(
+                f"Failed to start up the realtime plot server with code {quick_check}: {stderr}."
+            )
+
+    # check to see if options.file is python script, sqlite file or neither
+    file_path = options.file[0]
+    if is_sqlite_file(file_path):
+        _view_realtime_plot(file_path)
+    elif is_python_file(file_path):
+        # register the hook
+        hooks._register_hook(
+            "_setup_recording", "Problem", post=_view_realtime_plot_hook, ncalls=1
+        )
+        # run the script
+        _load_and_exec(file_path, user_args)
+    else:
+        raise RuntimeError(
+            "The argument to the openmdao rtplot command must be either a "
+            "case recorder file or an OpenMDAO python script."
+        )
 
 
 class _CaseRecorderTracker:

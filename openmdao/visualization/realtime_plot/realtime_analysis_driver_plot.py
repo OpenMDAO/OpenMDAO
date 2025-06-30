@@ -26,9 +26,9 @@ try:
     from bokeh.transform import transform
     from bokeh.plotting import figure
     from bokeh.palettes import Viridis256
-
+    bokeh_available = True
 except ImportError:
-    raise ImportError("Unable to create analysis plot because the bokeh library is not installed.")
+    bokeh_available = False
 
 import numpy as np
 
@@ -38,58 +38,59 @@ _left_side_column_width = 500
 # how big the individual plots should be in the grid
 _grid_plot_height_and_width = 240
 _color_bar_title_font_size = "20px"
-_page_styles = InlineStyleSheet(
-    css="""
-:host(.div_header) {
-    font-size: 20px;
-    font-weight: bold;
-}
+if bokeh_available:
+    _page_styles = InlineStyleSheet(
+        css="""
+    :host(.div_header) {
+        font-size: 20px;
+        font-weight: bold;
+    }
 
-:host(.row_labels) {
-    font-size: 20px;
-    text-align:center;
-    font-size:12px;
-    writing-mode:vertical-lr;
-    transform:rotate(180deg);
-    cursor:help;
-}
+    :host(.row_labels) {
+        font-size: 20px;
+        text-align:center;
+        font-size:12px;
+        writing-mode:vertical-lr;
+        transform:rotate(180deg);
+        cursor:help;
+    }
 
-:host(.column_labels) {
-    cursor:help;
-    text-align:center;
-    font-size:14px;
-}
+    :host(.column_labels) {
+        cursor:help;
+        text-align:center;
+        font-size:14px;
+    }
 
-:host(.analysis_driver_progress_text_box) {
-    padding: 10px;
-    border-radius: 5px;
-    font-size:16px;
-}
+    :host(.analysis_driver_progress_text_box) {
+        padding: 10px;
+        border-radius: 5px;
+        font-size:16px;
+    }
 
-:host(.analysis_progress_box) {
-    border: 5px solid black;
-}
+    :host(.analysis_progress_box) {
+        border: 5px solid black;
+    }
 
-:host(.sampled_variables_box) {
-    border: 5px solid black;
-}
+    :host(.sampled_variables_box) {
+        border: 5px solid black;
+    }
 
-:host(.sampled_variables_text) {
-    font-size:20px;
-}
+    :host(.sampled_variables_text) {
+        font-size:20px;
+    }
 
-input[type="checkbox"]:checked {
-    background-color: #4CAF50 !important;
-    border-color: #4CAF50 !important;
-    accent-color: #2E7D32 !important;
-}
+    input[type="checkbox"]:checked {
+        background-color: #4CAF50 !important;
+        border-color: #4CAF50 !important;
+        accent-color: #2E7D32 !important;
+    }
 
-.bk-input-group label {
-    font-size: 20px !important;
-}
+    .bk-input-group label {
+        font-size: 20px !important;
+    }
 
-"""
-)
+    """
+    )
 
 # some models have a large number of variables. Putting them all in a plot
 #   is not practical. Initially show no more than this number
@@ -105,7 +106,8 @@ _elide_string = "..."
 
 # color bar constants
 # palette for the color bar
-_color_palette = Viridis256
+if bokeh_available:
+    _color_palette = Viridis256
 # the color bar showing response needs an initial value before new data comes in
 _initial_response_range_for_plots = (0, 100)
 _colorbar_width = 20

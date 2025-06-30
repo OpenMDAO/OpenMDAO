@@ -51,7 +51,7 @@ from openmdao.devtools.iprof_mem import _mem_prof_exec, _mem_prof_setup_parser, 
     _mempost_exec, _mempost_setup_parser
 from openmdao.error_checking.check_config import _check_config_cmd, _check_config_setup_parser
 from openmdao.utils.mpi import MPI
-from openmdao.utils.file_utils import clean_outputs, is_python_file, is_sqlite_file
+from openmdao.utils.file_utils import clean_outputs
 from openmdao.utils.find_cite import print_citations
 from openmdao.utils.code_utils import _calltree_setup_parser, _calltree_exec
 from openmdao.utils.jax_utils import _to_compute_primal_setup_parser, \
@@ -68,7 +68,7 @@ from openmdao.utils.reports_system import _list_reports_setup_parser, _list_repo
     _view_reports_setup_parser, _view_reports_cmd
 from openmdao.visualization.graph_viewer import _graph_setup_parser, _graph_cmd
 from openmdao.visualization.realtime_plot.realtime_plot import \
-    _realtime_plot_setup_parser, _realtime_plot_cmd
+    _realtime_plot_setup_parser, _realtime_plot_cmd, _rtplot_cmd, _rtplot_setup_parser
 from openmdao.recorders.view_cases import _view_cases_setup_parser, _view_cases_cmd
 
 
@@ -475,106 +475,6 @@ def _list_pre_post_cmd(options, user_args):
                          post=_list_pre_post, exit=True)
 
     _load_and_exec(options.file[0], user_args)
-
-
-def _rtplot_setup_parser(parser):
-    """
-    Set up the openmdao subparser for the 'openmdao rtplot' command.
-
-    Parameters
-    ----------
-    parser : argparse subparser
-        The parser we're adding options to.
-    """
-    parser.add_argument('file', nargs=1, help='Python file containing the model.')
-
-
-def _rtplot_cmd(options, user_args):
-    """
-    Return the post_setup hook function for 'openmdao rtplot'.
-
-    Parameters
-    ----------
-    options : argparse Namespace
-        Command line options.
-    user_args : list of str
-        Args to be passed to the user script.
-    """
-    file_path = options.file[0]
-    if is_python_file(file_path):
-        script_path = file_path
-    else:
-        script_path = None
-
-    def _view_realtime_plot_hook(problem):
-        driver = problem.driver
-        if not driver:
-            raise RuntimeError(
-                "Unable to run realtime optimization progress plot because no Driver")
-        if len(problem.driver._rec_mgr._recorders) == 0:
-            raise RuntimeError(
-                "Unable to run realtime optimization progress plot "
-                    "because no case recorder attached to Driver"
-            )
-
-        case_recorder_file = str(problem.driver._rec_mgr._recorders[0]._filepath)
-
-        cmd = ['openmdao', 'realtime_plot', '--pid', str(os.getpid()), case_recorder_file]
-        # if not options.show:
-        #     cmd.insert(-1, '--no-display')
-        if script_path:
-            cmd.insert(-1, '--script')
-            cmd.insert(-1, script_path)
-        cp = subprocess.Popen(cmd)  # nosec: trusted input
-
-        # Do a quick non-blocking check to see if it immediately failed
-        # This will catch immediate failures but won't wait for the process to finish
-        quick_check = cp.poll()
-        if quick_check is not None and quick_check != 0:
-            # Process already terminated with an error
-            stderr = cp.stderr.read().decode()
-            raise RuntimeError(
-                f"Failed to start up the realtime plot server with code {quick_check}: {stderr}.")
-
-    def _view_realtime_plot(case_recorder_file):
-        cmd = [
-            "openmdao",
-            "realtime_plot",
-            "--pid",
-            str(os.getpid()),
-            case_recorder_file,
-        ]
-        # if not options.show:
-        #     cmd.insert(-1, "--no-display")
-
-        cp = subprocess.Popen(cmd)  # nosec: trusted input
-
-        # Do a quick non-blocking check to see if it immediately failed
-        # This will catch immediate failures but won't wait for the process to finish
-        quick_check = cp.poll()
-        if quick_check is not None and quick_check != 0:
-            # Process already terminated with an error
-            stderr = cp.stderr.read().decode()
-            raise RuntimeError(
-                f"Failed to start up the realtime plot server with code {quick_check}: {stderr}."
-            )
-
-    # check to see if options.file is python script, sqlite file or neither
-    file_path = options.file[0]
-    if is_sqlite_file(file_path):
-        _view_realtime_plot(file_path)
-    elif is_python_file(file_path):
-        # register the hook
-        hooks._register_hook(
-            "_setup_recording", "Problem", post=_view_realtime_plot_hook, ncalls=1
-        )
-        # run the script
-        _load_and_exec(file_path, user_args)
-    else:
-        raise RuntimeError(
-            "The argument to the openmdao rtplot command must be either a "
-            "case recorder file or an OpenMDAO python script."
-        )
 
 
 def _get_deps(dep_dict: dict, package_name: str) -> None:
