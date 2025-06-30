@@ -328,3 +328,25 @@ class ExplicitDictionaryJacobian(Jacobian):
                     for key, subjac in self._get_subjacs(system).items():
                         if key[1] in d_inp_names:
                             subjac.apply_rev(d_inputs, d_outputs, d_residuals, randgen)
+
+    def todense(self):
+        """
+        Return a dense version of the jacobian.
+
+        Returns
+        -------
+        ndarray
+            Dense version of the jacobian.
+        """
+        if self._subjacs:
+            lst = [-np.eye(self.shape[0])]
+            drdi_shape = (self.shape[0], self.shape[1] - self.shape[0])
+            J_dr_di = np.zeros(drdi_shape)
+            lst.append(J_dr_di)
+
+            for subjac in self._subjacs.values():
+                J_dr_di[subjac.row_slice, subjac.col_slice] = subjac.todense()
+
+            return np.hstack(lst)
+
+        return -np.eye(self.shape[0])

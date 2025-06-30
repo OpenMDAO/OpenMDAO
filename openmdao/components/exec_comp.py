@@ -1029,7 +1029,7 @@ class ExecComp(ExplicitComponent):
         out_names = self._var_rel_names['output']
 
         inarr[:] = self._inputs.asarray(copy=False)
-        scratch = np.zeros(oarr.size)
+        scratch = np.empty(oarr.size)
         idx2name = self._col_idx2name
         out_slices = self._out_slices
         in_slices = self._in_slices
@@ -1042,16 +1042,17 @@ class ExecComp(ExplicitComponent):
             self._exec()
 
             imag_oar = imag(oarr * inv_stepsize)
+            scratch[:] = 0.
 
             for icol, rows in zip(icols, nzrowlists):
                 scratch[rows] = imag_oar[rows]
-                input_name = idx2name[icol]
-                loc_i = icol - in_slices[input_name].start
-                for u in out_names:
-                    key = (u, input_name)
+                in_name = idx2name[icol]
+                loc_i = icol - in_slices[in_name].start
+                for out_name in out_names:
+                    key = (out_name, in_name)
                     if key in partials:
                         # set the column in the Jacobian entry
-                        part = scratch[out_slices[u]]
+                        part = scratch[out_slices[out_name]]
                         partials[key][:, loc_i] = part
                         part[:] = 0.
 
