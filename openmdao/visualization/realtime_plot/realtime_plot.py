@@ -19,12 +19,12 @@ try:
     from bokeh.server.server import Server
     from bokeh.application.application import Application
     from bokeh.application.handlers import FunctionHandler
+    from tornado.ioloop import PeriodicCallback
 
-    bokeh_available = True
+    bokeh_and_dependencies_available = True
 except ImportError:
-    bokeh_available = False
+    bokeh_and_dependencies_available = False
 
-from tornado.ioloop import PeriodicCallback
 
 # the time between calls to the udpate method
 # if this is too small, the GUI interactions get delayed because
@@ -73,7 +73,7 @@ def _realtime_plot_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    if bokeh_available:
+    if bokeh_and_dependencies_available:
         realtime_plot(
             options.case_recorder_filename,
             _time_between_callbacks_in_ms,
@@ -111,7 +111,7 @@ def _rtplot_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    if not bokeh_available:
+    if not bokeh_and_dependencies_available:
         print(
             "The bokeh library is not installed so the rtplot "
             "command is not available. "
