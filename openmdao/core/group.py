@@ -1116,7 +1116,7 @@ class Group(System):
         This part of setup is called automatically at the start of run_model or run_driver.
         This method is called only on the top level Group.
         """
-        self._setup_dynamic_properties()
+        self._setup_dynamic_properties('shape')
 
         self._resolve_group_input_defaults()
         self._setup_auto_ivcs()
@@ -2334,12 +2334,17 @@ class Group(System):
             if isinstance(subsys, Group) or subsys.options['derivs_method'] == 'jax':
                 subsys._setup_jax()
 
-    def _setup_dynamic_properties(self):
+    def _setup_dynamic_properties(self, prop):
         """
-        Dynamically add shape/size/units metadata for variables.
+        Dynamically add property metadata for variables.
 
         This only happens if the user has set shape_by_conn, units_by_conn, copy_shape, copy_units,
         compute_shape, or compute_units for a variable.
+
+        Parameters
+        ----------
+        prop : str
+            Name of the property to compute.
         """
         def get_group_input_shape(prom, gshapes):
             """
@@ -2368,7 +2373,7 @@ class Group(System):
                     elif 'val' in d:
                         return np.asarray(d['val']).shape
 
-        def compute_var_property(to_var, prop_dict, func, prop_name):
+        def compute_var_property(to_var, prop_dict, func, prop):
             """
             Compute shape info for the given variable using the given function.
 
@@ -2380,7 +2385,7 @@ class Group(System):
                 Mapping of variable name to property.
             func : function
                 Function to use to compute the property.
-            prop_name : str
+            prop : str
                 Name of the property to compute.
 
             Returns
@@ -2392,12 +2397,12 @@ class Group(System):
             try:
                 from_prop = func(prop_dict)
             except KeyError:
-                self._collect_error(f"{self.msginfo}: Can't compute {prop_name} of variable "
+                self._collect_error(f"{self.msginfo}: Can't compute {prop} of variable "
                                     f"'{to_var}': variable '{to_var}' doesn't exist.")
                 return
             except Exception as err:
                 self._collect_error(f"{self.msginfo}: Error occurred while computing the "
-                                    f"{prop_name} of variable '{to_var}': {err}")
+                                    f"{prop} of variable '{to_var}': {err}")
                 return
 
             return from_prop
@@ -2464,31 +2469,72 @@ class Group(System):
 
             return from_shape
 
+        def copy_var_units(graph, from_var, to_var):
+            """
+            Copy units info from from_var's metadata to to_var's metadata in the graph.
+
+            Parameters
+            ----------
+            graph : nx.DiGraph
+                Graph containing all variables with units info.
+            from_var : str
+                Name of variable to copy units info from.
+            to_var : str
+                Name of variable to copy units info to.
+
+            Returns
+            -------
+            tuple or None
+                If the units of the variable are known, return the units.
+                Otherwise, return None.
+            """
+            if to_var.startswith('#'):
+                return
+
+            from_meta = graph.nodes[from_var]
+            to_meta = graph.nodes[to_var]
+
+            from_units = from_meta['units']
+            to_meta['units'] = from_units
+
+            return from_units
+
         nprocs = self.comm.size
         conn = self._conn_global_abs_in2out
         rev_conn = None
 
-        self._shapes_graph = graph = nx.DiGraph()
         knowns = set()
-        dist_sz = {}  # local distrib sizes
         my_abs2meta_out = self._var_abs2meta['output']
         my_abs2meta_in = self._var_abs2meta['input']
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
-        grp_shapes = {}
-        compute_shape_functs = {}
+        compute_prop_functs = {}
         component_io = defaultdict(list)
         resolver = self._resolver
-        to_extract = ('distributed', 'shape', 'compute_shape', 'shape_by_conn', 'copy_shape')
 
-        # find all variables that have an unknown shape (across all procs) and connect them
-        # to other unknown and known shape variables to form a directed graph.
+        if prop == 'shape':
+            to_extract = ('distributed', 'shape', 'compute_shape', 'shape_by_conn', 'copy_shape')
+            dist_sz = {}  # local distrib sizes
+            grp_shapes = {}
+            self._shapes_graph = graph = nx.DiGraph()
+        elif prop == 'units':
+            to_extract = ('units', 'compute_units', 'units_by_conn', 'copy_units')
+            self._units_graph = graph = nx.DiGraph()
+        else:
+            raise ValueError(f"Invalid property name: {prop}")
+
+        prop_by_conn = f"{prop}_by_conn"
+        copy_prop = f"copy_{prop}"
+        compute_prop = f"compute_{prop}"
+
+        # find all variables that have an unknown property (across all procs) and connect them
+        # to other unknown and known property variables to form a directed graph.
         for io in ('input', 'output'):
             for name, meta in self._var_allprocs_abs2meta[io].items():
                 compname = name.rpartition('.')[0]
                 component_io[compname, io].append(name)
 
-                if meta['shape_by_conn']:
+                if meta[prop_by_conn]:
                     graph.add_node(name, io=io, **meta2node_data(meta, to_extract))
                     if name in conn:  # it's a connected input
                         abs_from = conn[name]
@@ -2506,7 +2552,7 @@ class Group(System):
                                 graph.add_node(inp, io='input', **meta2node_data(inmeta,
                                                                                  to_extract))
                                 graph.add_edge(inp, name, multi=False)
-                        elif not meta['compute_shape'] and not meta['copy_shape']:
+                        elif prop == 'shape' and not meta[compute_prop] and not meta[copy_prop]:
                             # check to see if we can get shape from _group_inputs
                             fail = meta['shape'] is None
                             if fail and io == 'input':
@@ -2526,8 +2572,8 @@ class Group(System):
                                         if n != name:
                                             m = all_abs2meta_in[n]
                                             if not (m['distributed'] or m['has_src_indices']
-                                                    or m['shape_by_conn'] or m['compute_shape']
-                                                    or m['copy_shape']):
+                                                    or m[prop_by_conn] or m[compute_prop]
+                                                    or m[copy_prop]):
                                                 fail = False
                                                 graph.add_node(n, io='input', known_count=0,
                                                                **meta2node_data(all_abs2meta_in[n],
@@ -2539,10 +2585,10 @@ class Group(System):
                                     f"{self.msginfo}: 'shape_by_conn' was set for "
                                     f"unconnected variable '{name}'.")
 
-                if meta['copy_shape']:
+                if meta[copy_prop]:
                     # variable whose shape is being copied must be on the same component, and
-                    # name stored in 'copy_shape' entry must be the relative name.
-                    abs_from = name.rpartition('.')[0] + '.' + meta['copy_shape']
+                    # name stored in copy_prop entry must be the relative name.
+                    abs_from = name.rpartition('.')[0] + '.' + meta[copy_prop]
                     if abs_from in all_abs2meta_in or abs_from in all_abs2meta_out:
                         a2m = all_abs2meta_in if abs_from in all_abs2meta_in else all_abs2meta_out
                         if name not in graph:
@@ -2558,25 +2604,25 @@ class Group(System):
                         self._collect_error(f"{self.msginfo}: Can't copy shape of variable "
                                             f"'{abs_from}'. Variable doesn't exist or is not "
                                             "continuous.")
-                elif meta['compute_shape']:
-                    compute_shape_functs[name] = meta['compute_shape']
+                elif meta[compute_prop]:
+                    compute_prop_functs[name] = meta[compute_prop]
+                    kwargs = meta2node_data(meta, to_extract)
                     if name not in graph:
-                        graph.add_node(name, shape=meta['shape'], io=io,
-                                       compute_shape=meta['compute_shape'],
-                                       distributed=meta['distributed'])
+                        graph.add_node(name, io=io, **kwargs)
 
-                # store known distributed size info needed for computing shapes
-                if nprocs > 1:
-                    my_abs2meta = my_abs2meta_in if name in my_abs2meta_in else my_abs2meta_out
-                    if name in my_abs2meta:
-                        sz = my_abs2meta[name]['size']
-                        if sz is not None:
-                            dist_sz[name] = sz
-                    else:
-                        dist_sz[name] = 0
+                if prop == 'shape':
+                    # store known distributed size info needed for computing shapes
+                    if nprocs > 1:
+                        my_abs2meta = my_abs2meta_in if name in my_abs2meta_in else my_abs2meta_out
+                        if name in my_abs2meta:
+                            sz = my_abs2meta[name]['size']
+                            if sz is not None:
+                                dist_sz[name] = sz
+                        else:
+                            dist_sz[name] = 0
 
-        # loop over any 'compute_shape' variables and add edges to the graph
-        for name in compute_shape_functs:
+        # loop over any 'compute_property' variables and add edges to the graph
+        for name in compute_prop_functs:
             comp_name = name.rpartition('.')[0]
 
             # get 'opposite' io variables to use as inputs to compute_shape function
@@ -2593,7 +2639,7 @@ class Group(System):
             # we don't have any shape_by_conn or copy_shape variables, so we're done
             return
 
-        if nprocs > 1:
+        if nprocs > 1 and prop == 'shape':
             distrib_sizes = defaultdict(lambda: np.zeros(nprocs, dtype=INT_DTYPE))
             for rank, dsz in enumerate(self.comm.allgather(dist_sz)):
                 for n, sz in dsz.items():
@@ -2601,7 +2647,7 @@ class Group(System):
         else:
             distrib_sizes = {}
 
-        knowns = {n for n, d in graph.nodes(data=True) if d['shape'] is not None}
+        knowns = {n for n, d in graph.nodes(data=True) if d[prop] is not None}
         all_knowns = knowns.copy()
 
         nodes = graph.nodes
@@ -2618,14 +2664,14 @@ class Group(System):
             progress = True
             while progress:
                 progress = False
-                unresolved_knowns = get_unresolved_knowns(graph, 'shape', unresolved_knowns)
+                unresolved_knowns = get_unresolved_knowns(graph, prop, unresolved_knowns)
 
                 active_single_edges, computed_shape_nodes = get_actives(graph, unresolved_knowns,
-                                                                        'shape')
+                                                                        prop)
                 for k, u in active_single_edges:
                     shp = copy_var_shape(graph, k, u, distrib_sizes)
                     if shp is not None:
-                        if is_unresolved(graph, u, 'shape'):
+                        if is_unresolved(graph, u, prop):
                             unresolved_knowns.add(u)
 
                         all_knowns.add(u)
@@ -2633,77 +2679,78 @@ class Group(System):
 
                 for mnode in computed_shape_nodes:
                     for k, _, data in graph.in_edges(mnode, data=True):
-                        if nodes[k]['shape'] is None and data['multi']:
+                        if nodes[k][prop] is None and data['multi']:
                             break
                     else:
-                        # all 'compute_shape' preds are known so compute shape
+                        # all compute_prop preds are known so compute shape
                         shapes = {
-                            n.rpartition('.')[-1]: nodes[n]['shape']
+                            n.rpartition('.')[-1]: nodes[n][prop]
                             for n in graph.predecessors(mnode)
                         }
-                        shp = compute_var_property(mnode, shapes, nodes[mnode]['compute_shape'],
-                                                   'shape')
+                        shp = compute_var_property(mnode, shapes, nodes[mnode][compute_prop],
+                                                   prop)
                         if shp is not None:
-                            graph.nodes[mnode]['shape'] = shp
-                            if is_unresolved(graph, mnode, 'shape'):
+                            graph.nodes[mnode][prop] = shp
+                            if is_unresolved(graph, mnode, prop):
                                 unresolved_knowns.add(mnode)
                             all_knowns.add(mnode)
                             progress = True
 
-        # now perform a consistency check on all computed/copied shapes
-        mismatches = set()
-        for u, v, data in graph.edges(data=True):
-            if not data['multi']:
-                udist = nodes[u]['distributed']
-                vdist = nodes[v]['distributed']
-                if not (udist ^ vdist):
-                    ushape = nodes[u]['shape']
-                    if ushape is None:
-                        continue
-                    vshape = nodes[v]['shape']
-                    if vshape is None:
-                        continue
-                    if ushape != vshape:
-                        mismatches.add(tuple(sorted((u, v))))
+        if prop == 'shape':
+            # now perform a consistency check on all computed/copied shapes
+            mismatches = set()
+            for u, v, data in graph.edges(data=True):
+                if not data['multi']:
+                    udist = nodes[u]['distributed']
+                    vdist = nodes[v]['distributed']
+                    if not (udist ^ vdist):
+                        ushape = nodes[u]['shape']
+                        if ushape is None:
+                            continue
+                        vshape = nodes[v]['shape']
+                        if vshape is None:
+                            continue
+                        if ushape != vshape:
+                            mismatches.add(tuple(sorted((u, v))))
 
-        if mismatches:
-            for u, v in mismatches:
-                self._collect_error(f"{self.msginfo}: Shape mismatch, {nodes[u]['shape']} vs. "
-                                    f"{nodes[v]['shape']} for variables '{u}' and '{v}' during "
-                                    "dynamic shape determination.")
+            if mismatches:
+                for u, v in mismatches:
+                    self._collect_error(f"{self.msginfo}: Shape mismatch, {nodes[u]['shape']} vs. "
+                                        f"{nodes[v]['shape']} for variables '{u}' and '{v}' during "
+                                        "dynamic shape determination.")
 
         # update variable metadata based on graph shapes
         for node, data in graph.nodes(data=True):
-            if node.startswith('#'):
+            if node.startswith('#'):  # not a real variable node
                 continue
             io = data['io']
             allmeta = self._var_allprocs_abs2meta[io][node]
 
-            shape = data['shape']
-            size = shape_to_len(shape)
-            allmeta['shape'] = shape
-            allmeta['size'] = size
+            propval = data[prop]
+            allmeta[prop] = propval
+            if prop == 'shape':
+                size = shape_to_len(propval)
+                allmeta['size'] = size
 
             try:
                 meta = self._var_abs2meta[io][node]
             except KeyError:
                 pass  # node is not local, so no need to update local metadata
             else:
-                meta['shape'] = shape
-                meta['size'] = size
-                # Passing None into shape arguments as an alias for () is deprecated (Numpy 1.20)
-                shape = shape if shape is not None else ()
-                meta['val'] = np.full(shape, meta['val'], dtype=float)
-
-        # save graph info for possible later plotting
-        self._shapes_graph = graph
+                meta[prop] = propval
+                if prop == 'shape':
+                    meta['size'] = size
+                    # Passing None into shape arguments as an alias for () is deprecated (Numpy 1.20)
+                    shape = propval if propval is not None else ()
+                    meta['val'] = np.full(shape, meta['val'], dtype=float)
 
         unresolved = set(graph.nodes()) - all_knowns
         if unresolved:
             unresolved = sorted(unresolved)
-            self._collect_error(f"{self.msginfo}: Failed to resolve shapes for {unresolved}. "
-                                "To see the dynamic shape dependency graph, "
-                                "do 'openmdao view_dyn_shapes <your_py_file>'.")
+            propstr = 'shapes' if prop == 'shape' else 'units'
+            self._collect_error(f"{self.msginfo}: Failed to resolve {propstr} for {unresolved}. "
+                                f"To see the dynamic {propstr} dependency graph, "
+                                f"do 'openmdao view_dyn_{propstr} <your_py_file>'.")
 
     @collect_errors
     @check_mpi_exceptions

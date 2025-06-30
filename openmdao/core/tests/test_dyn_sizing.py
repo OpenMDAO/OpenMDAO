@@ -190,7 +190,7 @@ class TestPassSize(unittest.TestCase):
         self.assertEqual(exception.args[0],
             "\nCollected errors for problem 'unresolved_err':"
             "\n   <model> <class Group>: Failed to resolve shapes for "
-            "['B.in', 'B.out', 'C.in', 'C.out']. To see the dynamic shape dependency graph, do "
+            "['B.in', 'B.out', 'C.in', 'C.out']. To see the dynamic shapes dependency graph, do "
             "'openmdao view_dyn_shapes <your_py_file>'.")
 
 
@@ -478,7 +478,7 @@ class TestDynShapes(unittest.TestCase):
             p.setup()
             p.final_setup()
 
-        msg = "\nCollected errors for problem 'copy_shape_in_in_unresolvable':\n   <model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'comp.x1'. The source shape is (2, 3) but the target shape is None.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x2' to 'comp.x2'. The source shape is (2, 3) but the target shape is None."
+        msg = "\nCollected errors for problem 'copy_shape_in_in_unresolvable':\n   <model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'comp.x1'. The source shape is (2, 3) but the target shape is None.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x2' to 'comp.x2'. The source shape is (2, 3) but the target shape is None."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_mismatched_dyn_shapes(self):
@@ -616,7 +616,7 @@ class TestDynShapes(unittest.TestCase):
            "\nCollected errors for problem 'cycle_unresolved':"
            "\n   <model> <class Group>: Failed to resolve shapes for "
            "['Gdyn.C1.x2', 'Gdyn.C1.y2', 'Gdyn.C2.x2', 'Gdyn.C2.y2', 'Gdyn.C3.x2', 'Gdyn.C3.y2', "
-           "'sink.x2', 'sink.y2']. To see the dynamic shape dependency graph, do "
+           "'sink.x2', 'sink.y2']. To see the dynamic shapes dependency graph, do "
            "'openmdao view_dyn_shapes <your_py_file>'.")
 
     def test_bad_copy_shape_name(self):
@@ -633,7 +633,7 @@ class TestDynShapes(unittest.TestCase):
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'bad_copy_shape_name':"
            "\n   <model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist or is not continuous."
-           "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
+           "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
 
     def test_unconnected_var_dyn_shape(self):
         p = om.Problem(name='unconnected_var_dyn_shape')
@@ -649,7 +649,7 @@ class TestDynShapes(unittest.TestCase):
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'unconnected_var_dyn_shape':"
            "\n   <model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'."
-           "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
+           "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
