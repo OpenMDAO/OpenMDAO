@@ -16,7 +16,6 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.coloring import _ColSparsityJac
-from openmdao.utils.iter_utils import meta2range_iter
 
 _tuplist = (tuple, list)
 
@@ -517,16 +516,16 @@ class ImplicitComponent(Component):
         """
         self.setup_residuals()
 
-    def _setup_vectors(self, root_vectors):
+    def _setup_vectors(self, parent_vectors=None):
         """
         Compute all vectors for all vec names and assign excluded variables lists.
 
         Parameters
         ----------
-        root_vectors : dict of dict of Vector
-            Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vectors : dict or None
+            Parent vectors.  Same structure as root_vectors.
         """
-        super()._setup_vectors(root_vectors)
+        super()._setup_vectors(parent_vectors)
         if self._jacobian is None:
             self._init_jacobian()
 
@@ -736,16 +735,16 @@ class ImplicitComponent(Component):
             raise ValueError(f"{self.msginfo}: residual units '{units}' for residual '{resid}' != "
                              f"output res_units '{res_units}' for output '{output}'.")
 
-    def _get_partials_wrts(self):
+    def _column_iotypes(self):
         """
-        Get the list of wrt variables that form the partial jacobian.
+        Return a tuple of the iotypes that make up columns of the jacobian.
 
         Returns
         -------
-        list
-            List of wrt variable names (relative names).
+        tuple of the form ('output', 'input')
+            The iotypes that make up columns of the jacobian.
         """
-        return list(self._var_rel_names['output']) + list(self._var_rel_names['input'])
+        return ('output', 'input')
 
     def _get_partials_ofs(self, use_resname=False):
         """
@@ -918,7 +917,7 @@ class ImplicitComponent(Component):
 
     def _list_states(self):
         """
-        Return list of all states at and below this system.
+        Return list of all states in this system.
 
         If final setup has not been performed yet, return relative names for this system only.
 
@@ -927,9 +926,7 @@ class ImplicitComponent(Component):
         list
             List of all states.
         """
-        prefix = self.pathname + '.'
-        return list(self._var_abs2meta['output']) + \
-            [prefix + n for n in self._var_discrete['output']]
+        return list(self._resolver.abs_iter('output', local=True))
 
     def _list_states_allprocs(self):
         """
@@ -1008,31 +1005,6 @@ class ImplicitComponent(Component):
             self._apply_nonlinear()
             self.compute_fd_jac(jac=jac, method=method)
         return jac.get_sparsity()
-
-
-def _overlap_range_iter(meta_dict1, meta_dict2, names1=None, names2=None):
-    """
-    Yield names and ranges of overlapping variables from two metadata dictionaries.
-
-    The metadata dicts are assumed to contain a 'shape' entry, and the total size of the
-    variables in meta_dict1 must equal the total size of the variables in meta_dict2.
-    """
-    iter2 = meta2range_iter(meta_dict2, names=names2)
-    start2 = end2 = -1
-
-    for name1, start1, end1 in meta2range_iter(meta_dict1, names=names1):
-        try:
-            while not (start2 <= start1 < end2 or start2 <= end1 < end2):
-                name2, start2, end2 = next(iter2)
-
-            if end1 < end2:
-                yield name1, start1, end1, name2, start2, end2
-            else:
-                while end1 >= end2:
-                    yield name1, start1, end1, name2, start2, end2
-                    name2, start2, end2 = next(iter2)
-        except StopIteration:
-            return
 
 
 class _ResidsWrapper(object):

@@ -62,7 +62,7 @@ def _get_array_info(system, vec, name, prom, var_dict, from_src=True):
 def _get_var_dict(system, typ, name, is_parallel, is_implicit, values):
     if name in system._var_abs2meta[typ]:
         meta = system._var_abs2meta[typ][name]
-        prom = system._var_abs2prom[typ][name]
+        prom = system._resolver.abs2prom(name, typ)
         val = np.asarray(meta['val'])
         is_dist = MPI is not None and meta['distributed']
 
@@ -539,7 +539,10 @@ def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):
 
     data_dict['sys_pathnames_list'] = list(sys_idx)
     data_dict['connections_list'] = connections_list
-    data_dict['abs2prom'] = root_group._var_abs2prom
+    data_dict['abs2prom'] = {
+        'input': {k: v for k, v in root_group._resolver.abs2prom_iter('input', local=True)},
+        'output': {k: v for k, v in root_group._resolver.abs2prom_iter('output', local=True)},
+    }
 
     data_dict['driver'] = {
         'name': driver_name,

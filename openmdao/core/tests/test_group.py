@@ -18,7 +18,6 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_warning, asser
     assert_check_totals
 from openmdao.utils.logger_utils import TestLogger
 from openmdao.utils.om_warnings import PromotionWarning
-from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.testing_utils import set_env_vars_context
 
 try:
@@ -202,45 +201,6 @@ class TestGroup(unittest.TestCase):
         p.setup()
 
         self.assertEqual(p.model._conn_global_abs_in2out['gouter.g.c0.x'], 'gouter.g.ivc.x')
-
-    def test_hide_group_input(self):
-        p = om.Problem()
-        g1 = p.model.add_subsystem('g1', om.Group())
-        g2 = g1.add_subsystem('g2', om.Group(), promotes=['g3.c1.x'])  # make g2 disappear using promotes
-        g3 = g2.add_subsystem('g3', om.Group())
-        g3.add_subsystem('c1', om.ExecComp('y=2.*x', x=2.))
-
-        g3_ = g1.add_subsystem('g3', om.Group(), promotes=['x'])  # second g3, but directly under g1
-        g3_.add_subsystem('c1', om.ExecComp('y=3.*x', x=3.), promotes=['x'])
-
-        with self.assertRaises(Exception) as cm:
-            p.setup()
-            p.final_setup()
-        self.assertEqual(cm.exception.args[0], f"{p.model.msginfo}: Absolute variable name 'g1.g3.c1.x'"
-                                               " is masked by a matching promoted name. Try"
-                                               " promoting to a different name. This can be caused"
-                                               " by promoting '*' at group level or promoting using"
-                                               " dotted names.")
-
-    def test_hide_group_output(self):
-        p = om.Problem()
-        g1 = p.model.add_subsystem('g1', om.Group())
-        g2 = g1.add_subsystem('g2', om.Group(), promotes=['g3.c1.y'])  # make g2 disappear using promotes
-        g3 = g2.add_subsystem('g3', om.Group())
-        g3.add_subsystem('c1', om.ExecComp('y=2.*x', x=2.))
-
-        g3_ = g1.add_subsystem('g3', om.Group(), promotes=['y'])  # second g3, but directly under g1
-        g3_.add_subsystem('c1', om.ExecComp('y=3.*x', x=3.), promotes=['y'])
-
-        with self.assertRaises(Exception) as cm:
-            p.setup()
-            p.final_setup()
-
-        self.assertEqual(cm.exception.args[0], f"{p.model.msginfo}: Absolute variable name 'g1.g3.c1.y'"
-                                               " is masked by a matching promoted name. Try"
-                                               " promoting to a different name. This can be caused"
-                                               " by promoting '*' at group level or promoting using"
-                                               " dotted names.")
 
     def test_invalid_subsys_name(self):
         p = om.Problem()
@@ -484,16 +444,24 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(p['group2.comp1.b'], 20.0)
         self.assertEqual(p['group2.comp2.b'], 40.0)
 
+        src = p.model.group1.get_source('comp1.x')
+        self.assertEqual(src, 'group1.comp1.x')
+
+        src = p.model.get_source('group2.comp1.a')
+        self.assertEqual(src, 'group1.comp2.b')
+
     def test_reused_output_promoted_names(self):
         prob = om.Problem()
         prob.model.add_subsystem('px1', om.IndepVarComp('x1', 100.0))
         G1 = prob.model.add_subsystem('G1', om.Group())
         G1.add_subsystem("C1", om.ExecComp("y=2.0*x"), promotes=['y'])
         G1.add_subsystem("C2", om.ExecComp("y=2.0*x"), promotes=['y'])
-        msg = r"Output name 'y' refers to multiple outputs: \['G1.C1.y', 'G1.C2.y'\]."
-        with self.assertRaisesRegex(Exception, msg):
-            prob.setup()
+        msg = "<model> <class Group>: Output name 'G1.y' refers to multiple outputs: ['G1.C1.y', 'G1.C2.y']."
+        prob.setup()
+        with self.assertRaises(Exception) as cm:
             prob.final_setup()
+
+        self.assertEqual(cm.exception.args[0], msg)
 
     def test_required_connection_input_unconnected(self):
         class RequiredConnComp(om.ExplicitComponent):
@@ -1834,8 +1802,8 @@ class TestGroupPromotes(unittest.TestCase):
         with self.assertRaises(KeyError) as cm:
             top['a']
 
-        self.assertEqual(str(cm.exception),
-                         "\"<model> <class SimpleGroup>: Could not find 'a'. Perhaps you meant one of the following variables: ['comp2.a']\"")
+        self.assertEqual(cm.exception.args[0],
+                         "<model> <class SimpleGroup>: Variable 'a' not found. Perhaps you meant one of the following variables: ['comp2.a'].")
 
     def test_promotes_inputs_in_config(self):
 
@@ -1854,8 +1822,8 @@ class TestGroupPromotes(unittest.TestCase):
         with self.assertRaises(KeyError) as cm:
             top['b']
 
-        self.assertEqual(str(cm.exception),
-                         "\"<model> <class SimpleGroup>: Could not find 'b'. Perhaps you meant one of the following variables: ['comp2.b']\"")
+        self.assertEqual(cm.exception.args[0],
+                         "<model> <class SimpleGroup>: Variable 'b' not found. Perhaps you meant one of the following variables: ['comp2.b'].")
 
     def test_promotes_any_in_config(self):
 
@@ -1874,8 +1842,8 @@ class TestGroupPromotes(unittest.TestCase):
         with self.assertRaises(KeyError) as cm:
             top['a']
 
-        self.assertEqual(str(cm.exception),
-                         "\"<model> <class SimpleGroup>: Could not find 'a'. Perhaps you meant one of the following variables: ['comp2.a']\"")
+        self.assertEqual(cm.exception.args[0],
+                         "<model> <class SimpleGroup>: Variable 'a' not found. Perhaps you meant one of the following variables: ['comp2.a'].")
 
     def test_promotes_alias(self):
         class SubGroup(om.Group):
@@ -2031,8 +1999,37 @@ class TestGroupPromotes(unittest.TestCase):
         with self.assertRaises(KeyError) as cm:
             top['Branch1.G1.comp1.a']
 
-        self.assertEqual(str(cm.exception),
-                           "\"<model> <class BranchGroup>: Could not find 'Branch1.G1.comp1.a'. Perhaps you meant one of the following variables: ['Branch1.G1.comp1.b', 'Branch1.G1.a']\"")
+        self.assertEqual(cm.exception.args[0],
+                         "<model> <class BranchGroup>: Variable 'Branch1.G1.comp1.a' not found. Perhaps you meant one of the following variables: ['Branch1.G1.a', 'Branch1.G1.comp1.b'].")
+
+    def test_promotes_ivc_bug(self):
+        # This used to fail with an index error
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem("ivc", om.IndepVarComp(), promotes=["*"])
+        model.ivc.add_output("in1", [1.,1.])
+        model.add_subsystem("comp1", om.ExecComp("out1 = in1 * 2.0"))
+        model.add_subsystem("comp2", om.ExecComp("out1 = in1 * 3.0"))
+
+        model.connect("in1", "comp1.in1", src_indices=[0])
+        model.connect("in1", "comp2.in1", src_indices=[1])
+
+        prob.setup(mode='rev')
+        om.n2(prob, show_browser=False, outfile='n2.html')
+        prob.run_model()
+
+    def test_promotes_auto_ivc_bug(self):
+        # This used to fail with an index error
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem("comp1", om.ExecComp("out1 = in1 * 2.0"))
+        model.add_subsystem("comp2", om.ExecComp("out1 = in1 * 3.0"))
+
+        prob.setup(mode='rev')
+        om.n2(prob, show_browser=False, outfile='n2.html')
+        prob.run_model()
 
     def test_multiple_promotes_collision(self):
 
@@ -2535,9 +2532,11 @@ class TestConnect(unittest.TestCase):
         msg = "Output and input are in the same System for connection " + \
               "from 'tgt.y' to 'tgt.x'."
 
+        p.model.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
+
         with set_env_vars_context(OPENMDAO_FAIL_FAST='1'):
             with self.assertRaisesRegex(Exception, msg):
-                p.model.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
+                p.setup()
 
     def test_connect_within_system_with_promotes(self):
         prob = om.Problem(name='connect_within_system_with_promotes')
@@ -2555,6 +2554,50 @@ class TestConnect(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(ctx.exception), msg)
+
+    def test_subgroup_promoted_connection(self):
+
+        class Comp1(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 3 * inputs['x']
+
+        class Comp2(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('w', val=1.0)
+                self.add_output('z', val=1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['z'] = 4 * inputs['w']
+
+        class Group2(om.Group):
+
+            def setup(self):
+                self.add_subsystem('comp1', Comp1(), promotes=['*'])
+                self.add_subsystem('comp2', Comp2(), promotes=['*'])
+
+        class Group1(om.Group):
+            def setup(self):
+                self.add_subsystem('group2', Group2())
+                self.connect('group2.y', 'group2.w')
+
+        prob = om.Problem()
+        prob.model = Group1()
+        prob.model.add_subsystem('group1', Group1())
+        prob.setup()
+
+        prob.set_val('group2.x', 2)
+
+        prob.run_model()
+
+        z = prob.get_val('group2.z')
+
+        assert_near_equal(z, 2 * 3 * 4)
 
     def test_connect_units_with_unitless(self):
         prob = om.Problem()
@@ -3394,7 +3437,7 @@ class ConfigGroup(om.Group):
         # retrieve metadata
         for child, kwargs in self.cfgio.items():
             kid = self._get_subsystem(child)
-            if kid is not None:
+            if kid is not None or not kid._is_local:
                 self.io_results[child] = kid.get_io_metadata(**kwargs)
             else:
                 print(f"'{kid}' not found locally.")
@@ -3404,7 +3447,7 @@ class ConfigGroup(om.Group):
             if '.' in child:
                 parent, child = child.rsplit('.', 1)
                 s = self._get_subsystem(parent)
-                if s is None:
+                if s is None or not s._is_local:
                     print(f"'{parent}' not found locally.")
                     continue
             else:
@@ -3416,7 +3459,7 @@ class ConfigGroup(om.Group):
             if '.' in vpath:
                 parent, vname = vpath.rsplit('.', 1)
                 s = self._get_subsystem(parent)
-                if s is None:
+                if s is None or not s._is_local:
                     print(f"'{parent}' not found locally.")
                     continue
                 s.add_input(vname, val, units=units)
@@ -3428,7 +3471,7 @@ class ConfigGroup(om.Group):
             if '.' in vpath:
                 parent, vname = vpath.rsplit('.', 1)
                 s = self._get_subsystem(parent)
-                if s is None:
+                if s is None or not s._is_local:
                     print(f"'{parent}' not found locally.")
                     continue
                 s.add_output(vname, val, units=units)
@@ -4387,174 +4430,6 @@ class TestFeatureGuessNonlinear(unittest.TestCase):
         self.assertEqual(p.model.nonlinear_solver._iter_count, 0)
 
         assert_near_equal(p.get_val('discipline.x'), 1.41421356, 1e-6)
-
-
-class TestNaturalNaming(unittest.TestCase):
-
-    def test_buried_proms(self):
-        p = om.Problem()
-        model = p.model
-        g1 = model.add_subsystem('g1', om.Group())
-        g2 = g1.add_subsystem('g2', om.Group(), promotes=['*'])
-        g3 = g2.add_subsystem('g3', om.Group())
-        g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
-        g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
-        p.setup()
-        p.final_setup()
-
-        full_in = 'g1.g2.g3.g4.c1.x'
-        full_out = 'g1.g2.g3.g4.c1.y'
-
-        prom_ins = ['g1.g2.g3.g4.x', 'g1.g2.g3.x', 'g1.g3.x']
-        for prom in prom_ins:
-            self.assertEqual(name2abs_names(model, prom), [full_in])
-
-        prom_outs = ['g1.g2.g3.g4.y', 'g1.g2.g3.y', 'g1.g3.y']
-        for prom in prom_outs:
-            self.assertEqual(name2abs_names(model, prom), [full_out])
-
-        # check setting/getting before final setup
-
-        for name in prom_ins + [full_in]:
-            self.assertEqual(p[name], 7.)
-
-        self.assertEqual(g3.get_val('x', get_remote=True), 7.)
-
-        # we allow 'g1.g3.x' here even though it isn't relative to g3,
-        # because it maps to an absolute name that is contained in g3.
-        self.assertEqual(g3.get_val('g1.g3.x', get_remote=True), 7.)
-
-        for name in prom_outs + [full_out]:
-            self.assertEqual(p[name], 9.)
-
-        incount = 0
-        for name in prom_ins + [full_in]:
-            incount += 1
-            p[name] = 77. + incount
-            self.assertEqual(p[name], 77. + incount)
-
-        outcount = 0
-        for name in prom_outs + [full_out]:
-            outcount += 1
-            p[name] = 99. + outcount
-            self.assertEqual(p[name], 99. + outcount)
-
-        p.final_setup()
-
-        # now check after final setup
-
-        for name in prom_ins + [full_in]:
-            self.assertEqual(p[name], 77. + incount)
-
-        self.assertEqual(g3.get_val('x', get_remote=True), 77. + incount)
-
-        for name in prom_outs + [full_out]:
-            self.assertEqual(p[name], 99. + outcount)
-
-        incount = 0
-        for name in prom_ins + [full_in]:
-            incount += 1
-            p[name] = 7. + incount
-            self.assertEqual(p[name], 7. + incount)
-
-        outcount = 0
-        for name in prom_outs + [full_out]:
-            outcount += 1
-            p[name] = 9. + outcount
-            self.assertEqual(p[name], 9. + outcount)
-
-
-@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestNaturalNamingMPI(unittest.TestCase):
-    N_PROCS = 2
-
-    def test_buried_proms(self):
-        p = om.Problem()
-        model = p.model
-        par = model.add_subsystem('par', om.ParallelGroup())
-        g1 = par.add_subsystem('g1', om.Group())
-        g2 = g1.add_subsystem('g2', om.Group(), promotes=['*'])
-        g3 = g2.add_subsystem('g3', om.Group())
-        g4 = g3.add_subsystem('g4', om.Group(), promotes=['*'])
-        g4.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
-
-        g1a = par.add_subsystem('g1a', om.Group())
-        g2a = g1a.add_subsystem('g2', om.Group(), promotes=['*'])
-        g3a = g2a.add_subsystem('g3', om.Group())
-        g4a = g3a.add_subsystem('g4', om.Group(), promotes=['*'])
-        g4a.add_subsystem('c1', om.ExecComp('y=2.0*x', x=7., y=9.), promotes=['x','y'])
-
-        p.setup()
-        p.final_setup()
-
-        for gtop in ['par.g1', 'par.g1a']:
-            full_in = f'{gtop}.g2.g3.g4.c1.x'
-            full_out = f'{gtop}.g2.g3.g4.c1.y'
-
-            prom_ins = [f'{gtop}.g2.g3.g4.x', f'{gtop}.g2.g3.x', f'{gtop}.g3.x']
-            for prom in prom_ins:
-                self.assertEqual(name2abs_names(model, prom), [full_in])
-
-            prom_outs = [f'{gtop}.g2.g3.g4.y', f'{gtop}.g2.g3.y', f'{gtop}.g3.y']
-            for prom in prom_outs:
-                self.assertEqual(name2abs_names(model, prom), [full_out])
-
-            # check setting/getting before final setup
-
-            for name in prom_ins + [full_in]:
-                self.assertEqual(p.get_val(name, get_remote=True), 7.)
-
-            for name in prom_outs + [full_out]:
-                self.assertEqual(p.get_val(name, get_remote=True), 9.)
-
-            incount = 0
-            for name in prom_ins + [full_in]:
-                incount += 1
-                p[name] = 77. + incount
-                p.model.comm.barrier()
-                self.assertEqual(p.get_val(name, get_remote=True), 77. + incount)
-
-            outcount = 0
-            for name in prom_outs + [full_out]:
-                outcount += 1
-                p[name] = 99. + outcount
-                p.model.comm.barrier()
-                self.assertEqual(p.get_val(name, get_remote=True), 99. + outcount)
-
-        p.final_setup()
-
-        # now check after final setup
-
-        for gtop in ['par.g1', 'par.g1a']:
-            full_in = f'{gtop}.g2.g3.g4.c1.x'
-            full_out = f'{gtop}.g2.g3.g4.c1.y'
-
-            for name in prom_ins + [full_in]:
-                self.assertEqual(p.get_val(name, get_remote=True), 77. + incount)
-
-            for name in prom_outs + [full_out]:
-                self.assertEqual(p.get_val(name, get_remote=True), 99. + outcount)
-
-        for gtop in ['par.g1', 'par.g1a']:
-            full_in = f'{gtop}.g2.g3.g4.c1.x'
-            full_out = f'{gtop}.g2.g3.g4.c1.y'
-
-            incount = 0
-            for name in prom_ins + [full_in]:
-                incount += 1
-                p[name] = 7. + incount
-                p.model.comm.barrier()
-                self.assertEqual(p.get_val(name, get_remote=True), 7. + incount)
-
-            outcount = 0
-            for name in prom_outs + [full_out]:
-                outcount += 1
-                p[name] = 9. + outcount
-                p.model.comm.barrier()
-                self.assertEqual(p.get_val(name, get_remote=True), 9. + outcount)
-
-        self.assertEqual(set(p.model._vars_to_gather),
-                         {'par.g1.g2.g3.g4.c1.x', 'par.g1a.g2.g3.g4.c1.x', 'par.g1.g2.g3.g4.c1.y', 'par.g1a.g2.g3.g4.c1.y'})
 
 
 class TestConfigureUpdate(unittest.TestCase):

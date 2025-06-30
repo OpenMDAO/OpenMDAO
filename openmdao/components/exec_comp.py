@@ -736,7 +736,7 @@ class ExecComp(ExplicitComponent):
                               f"declared so they are assumed to be zero: [{undeclared}].",
                               prefix=self.msginfo, category=DerivativesWarning)
 
-    def _setup_vectors(self, root_vectors):
+    def _setup_vectors(self, parent_vectors=None):
         """
         Compute all vectors for all vec names.
 
@@ -744,8 +744,10 @@ class ExecComp(ExplicitComponent):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vectors : dict or None
+            Parent vectors.  Same structure as root_vectors.
         """
-        super()._setup_vectors(root_vectors)
+        super()._setup_vectors(parent_vectors)
 
         if not self._use_derivatives:
             self._manual_decl_partials = True  # prevents attempts to use _viewdict in compute
@@ -1001,14 +1003,16 @@ class ExecComp(ExplicitComponent):
         # compute mapping of col index to wrt varname
         self._col_idx2name = idxnames = [None] * len(self._inputs)
         plen = len(self.pathname) + 1
-        for name, slc in self._inputs.get_slice_dict().items():
+        for name, start, stop in self._inputs.ranges():
             name = name[plen:]
-            for i in range(slc.start, slc.stop):
+            for i in range(start, stop):
                 idxnames[i] = name
 
         # get slice dicts using relative name keys
-        self._out_slices = {n[plen:]: slc for n, slc in self._outputs.get_slice_dict().items()}
-        self._in_slices = {n[plen:]: slc for n, slc in self._inputs.get_slice_dict().items()}
+        self._out_slices = {
+            n[plen:]: slice(start, stop) for n, start, stop in self._outputs.ranges()
+        }
+        self._in_slices = {n[plen:]: slice(start, stop) for n, start, stop in self._inputs.ranges()}
 
         return [coloring]
 
@@ -1085,7 +1089,7 @@ class ExecComp(ExplicitComponent):
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
         inarr = self._inarray
-        vdict = self._viewdict
+        vdict = self._viewdict.dct
 
         inarr[:] = self._inputs.asarray(copy=False)
 
@@ -1101,7 +1105,11 @@ class ExecComp(ExplicitComponent):
 
                 for u in out_names:
                     if (u, inp) in partials:
-                        partials[u, inp] = imag(vdict[u] * inv_stepsize).flat
+                        subval, subval_is_scalar = vdict[u]
+                        if subval_is_scalar:
+                            partials[u, inp] = imag(subval * inv_stepsize)
+                        else:
+                            partials[u, inp] = imag(subval * inv_stepsize).flat
 
                 # restore old input value
                 ival -= step
@@ -1116,7 +1124,11 @@ class ExecComp(ExplicitComponent):
                     for u in out_names:
                         if (u, inp) in partials:
                             # set the column in the Jacobian entry
-                            partials[u, inp][:, i] = imag(vdict[u] * inv_stepsize).flat
+                            subval, subval_is_scalar = vdict[u]
+                            if subval_is_scalar:
+                                partials[u, inp][:, i] = imag(subval * inv_stepsize)
+                            else:
+                                partials[u, inp][:, i] = imag(subval * inv_stepsize).flat
 
                     # restore old input value
                     ival[idx] -= step
@@ -1128,7 +1140,7 @@ class _ViewDict(object):
 
     def __getitem__(self, name):
         val, is_scalar = self.dct[name]
-        return val[0] if is_scalar else val
+        return val.item() if is_scalar else val
 
     def __setitem__(self, name, value):
         val, _ = self.dct[name]

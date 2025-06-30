@@ -4,7 +4,7 @@ import sys
 import inspect
 from collections import defaultdict
 from collections.abc import Iterable
-from itertools import product
+from itertools import product, chain
 from io import StringIO
 
 from numbers import Integral
@@ -17,8 +17,7 @@ from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_M
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
 from openmdao.utils.units import simplify_unit
-from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_name2abs_name, \
-    rel_key2abs_key
+from openmdao.utils.name_maps import abs_key_iter, abs_key2rel_key, rel_key2abs_key
 from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, sparsity_diff_viz
 from openmdao.utils.deriv_display import _deriv_display, _deriv_display_compact
@@ -78,7 +77,7 @@ class Component(System):
     _var_rel2meta : dict
         Dictionary mapping relative names to metadata.
         This is only needed while adding inputs and outputs. During setup, these are used to
-        build the dictionaries of metadata.
+        build the dictionaries of metadata.  This contains both continuous and discrete variables.
     _static_var_rel2meta : dict
         Static version of above - stores data for variables added outside of setup.
     _var_rel_names : {'input': [str, ...], 'output': [str, ...]}
@@ -282,9 +281,6 @@ class Component(System):
         global global_meta_names
         super()._setup_var_data()
 
-        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
-        abs2prom = self._var_allprocs_abs2prom = self._var_abs2prom
-
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.'
 
@@ -296,10 +292,8 @@ class Component(System):
             for prom_name in self._var_rel_names[io]:
                 abs_name = prefix + prom_name
                 abs2meta[abs_name] = metadata = self._var_rel2meta[prom_name]
-
-                # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[io][prom_name] = [abs_name]
-                abs2prom[io][abs_name] = prom_name
+                self._resolver.add_mapping(abs_name, prom_name, io,
+                                           local=True, distributed=metadata['distributed'])
 
                 allprocs_abs2meta[abs_name] = {
                     meta_name: metadata[meta_name]
@@ -311,10 +305,8 @@ class Component(System):
 
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
-
-                # Compute allprocs_prom2abs_list, abs2prom
-                allprocs_prom2abs_list[io][prom_name] = [abs_name]
-                abs2prom[io][abs_name] = prom_name
+                self._resolver.add_mapping(abs_name, prom_name, io,
+                                           local=True, continuous=False)
 
                 # Compute allprocs_discrete (metadata for discrete vars)
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
@@ -394,7 +386,7 @@ class Component(System):
                 my_sizes = sizes[iproc, :].copy()
                 self.comm.Allgather(my_sizes, sizes)
 
-        self._owned_sizes = self._var_sizes['output']
+        self._owned_output_sizes = self._var_sizes['output']
 
     def _setup_partials(self):
         """
@@ -1035,9 +1027,10 @@ class Component(System):
         all_abs2meta : dict
             Mapping of absolute names to metadata for all variables in the model.
         all_abs2idx : dict
-            Dictionary mapping an absolute name to its allprocs variable index.
+            Dictionary mapping an absolute name to its allprocs variable index for the
+            whole model.
         all_sizes : dict
-            Mapping of types to sizes of each variable in all procs.
+            Mapping of types to sizes of each variable in all procs for the whole model.
 
         Returns
         -------
@@ -1051,11 +1044,14 @@ class Component(System):
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         sizes_in = self._var_sizes['input']
+        # src is outside of this component, so we need to use the all_sizes dict to get the sizes
+        # of the output variables
         sizes_out = all_sizes['output']
         added_src_inds = []
         # loop over continuous inputs
-        for i, (iname, meta_in) in enumerate(abs2meta_in.items()):
+        for iname, meta_in in abs2meta_in.items():
             if meta_in['src_indices'] is None and iname not in abs_in2prom_info:
+                i = self._var_allprocs_abs2idx[iname]
                 src = abs_in2out[iname]
                 dist_in = meta_in['distributed']
                 dist_out = all_abs2meta_out[src]['distributed']
@@ -1065,8 +1061,7 @@ class Component(System):
                     vout_sizes = sizes_out[:, all_abs2idx[src]]
 
                     offset = None
-                    if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes)
-                                                 == gsize_in):
+                    if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes) == gsize_in):
                         # This assumes one of:
                         # 1) a distributed output with total size matching the total size of a
                         #    distributed input
@@ -1638,6 +1633,17 @@ class Component(System):
 
             self._subjacs_info[abs_key] = meta
 
+    def _column_iotypes(self):
+        """
+        Return a tuple of the iotypes that make up columns of the jacobian.
+
+        Returns
+        -------
+        tuple of the form ('input',)
+            The iotypes that make up columns of the jacobian.
+        """
+        return ('input',)
+
     def _get_partials_wrts(self):
         """
         Get list of 'wrt' variables that form the partial jacobian.
@@ -1647,11 +1653,8 @@ class Component(System):
         list
             List of 'wrt' relative variable names.
         """
-        # filter out any discrete inputs or outputs
-        if self._discrete_inputs:
-            return [n for n in self._var_rel_names['input'] if n not in self._discrete_inputs]
-
-        return list(self._var_rel_names['input'])
+        namelists = [self._var_rel_names[io] for io in self._column_iotypes()]
+        return [n for n in chain(*namelists)]
 
     def _get_partials_ofs(self, use_resname=False):
         """
@@ -1667,10 +1670,6 @@ class Component(System):
         list
             List of 'of' relative variable names.
         """
-        # filter out any discrete inputs or outputs
-        if self._discrete_outputs:
-            return [n for n in self._var_rel_names['output'] if n not in self._discrete_outputs]
-
         return list(self._var_rel_names['output'])
 
     def _matching_key_iter(self, of_patterns, wrt_patterns, use_resname=False):
@@ -1740,8 +1739,8 @@ class Component(System):
             List of tuples of the form (abs_name, meta) where abs_name is the absolute name of the
             matching variable and meta is the metadata for that variable.
         """
-        wrt_list = [pattern] if isinstance(pattern, str) else pattern
-        return [(pattern, find_matches(pattern, self._get_partials_wrts())) for pattern in wrt_list]
+        patterns = [pattern] if isinstance(pattern, str) else pattern
+        return [(pattern, find_matches(pattern, self._get_partials_wrts())) for pattern in patterns]
 
     def _check_partials_meta(self, abs_key, val, shape):
         """
@@ -1815,7 +1814,7 @@ class Component(System):
                     self._jacobian._restore_approx_sparsity()
 
     def _resolve_src_inds(self):
-        abs2prom = self._var_abs2prom['input']
+        abs2prom = self._resolver.abs2prom
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
         abs2meta_in = self._var_abs2meta['input']
@@ -1842,7 +1841,8 @@ class Component(System):
                             else:
                                 meta['src_indices'] = inds = inds.copy()
                                 inds.set_src_shape(shape)
-                                self._var_prom2inds[abs2prom[tgt]] = [shape, inds, flat]
+                                self._var_prom2inds[abs2prom(tgt, iotype='input')] = \
+                                    [shape, inds, flat]
                         except Exception:
                             type_exc, exc, tb = sys.exc_info()
                             self._collect_error(f"When accessing '{conns[tgt]}' with src_shape "
@@ -1893,8 +1893,8 @@ class Component(System):
                 bad_inds = np.arange(len(v), dtype=INT_DTYPE)[inds][result]
                 bad_mask = np.zeros(len(v), dtype=bool)
                 bad_mask[bad_inds] = True
-                for inname, slc in v.get_slice_dict().items():
-                    if np.any(bad_mask[slc]):
+                for inname, start, stop in v.ranges():
+                    if np.any(bad_mask[start:stop]):
                         for outname in nz_dist_outputs:
                             key = (outname, inname)
                             self._inconsistent_keys.add(key)
@@ -1925,17 +1925,6 @@ class Component(System):
 
         self.comm.gather(nzresids, root=0)
         return nzresids
-
-    def _has_fast_rel_lookup(self):
-        """
-        Return True if this System should have fast relative variable name lookup in vectors.
-
-        Returns
-        -------
-        bool
-            True if this System should have fast relative variable name lookup in vectors.
-        """
-        return True
 
     def _get_graph_node_meta(self):
         """
@@ -1974,13 +1963,13 @@ class Component(System):
             raise ValueError(f"Method '{method}' is not a recognized finite difference method.")
 
         # these are relative names
-        of = self._get_partials_ofs()
-        wrt = self._get_partials_wrts()
+        ofs = self._get_partials_ofs()
+        wrts = self._get_partials_wrts()
 
         local_opts = self._get_check_partial_options()
         added_wrts = set()
 
-        for rel_key in product(of, wrt):
+        for rel_key in product(ofs, wrts):
             fd_options = self._get_approx_partial_options(rel_key, method=method,
                                                           checkopts=local_opts)
             abs_key = rel_key2abs_key(self, rel_key)
@@ -2210,7 +2199,7 @@ class Component(System):
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
 
-        if self._problem_meta is None:
+        if self._problem_meta is not None:
             if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
                 raise RuntimeError(f"{self.msginfo}: Can't check_partials before final_setup. Also,"
                                    " make sure to set valid input values before calling "
@@ -2244,6 +2233,7 @@ class Component(System):
         partials_data = defaultdict(dict)
         requested_method = method
         probmeta = self._problem_meta
+        prefix = self.pathname + '.'
 
         for mode in directions:
             jac_key = 'J_' + mode
@@ -2265,7 +2255,7 @@ class Component(System):
                         out_list = wrt_list
 
                     for inp in in_list:
-                        inp_abs = rel_name2abs_name(self, inp)
+                        inp_abs = prefix + inp
                         if mode == 'fwd':
                             directional = inp in local_opts and local_opts[inp]['directional']
                         else:
@@ -2309,7 +2299,7 @@ class Component(System):
                                 probmeta['checking'] = False
 
                             for out in out_list:
-                                out_abs = rel_name2abs_name(self, out)
+                                out_abs = prefix + out
 
                                 try:
                                     derivs = doutputs._abs_get_val(out_abs)

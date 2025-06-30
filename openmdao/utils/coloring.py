@@ -29,7 +29,6 @@ from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning, Deri
 from openmdao.utils.reports_system import register_report
 from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.devtools.memory import mem_usage
-from openmdao.utils.name_maps import rel_name2abs_name
 
 try:
     import matplotlib as mpl
@@ -626,7 +625,8 @@ class Partial_ColoringMeta(ColoringMeta):
             self.wrt_matches = None  # None means match everything
             return
 
-        self.wrt_matches = set(rel_name2abs_name(system, n) for n in
+        prefix = system.pathname + '.' if system.pathname else ''
+        self.wrt_matches = set(prefix + n for n in
                                pattern_filter(self.wrt_patterns, system._promoted_wrt_iter()))
 
         # error if nothing matched
@@ -666,6 +666,8 @@ class Coloring(object):
         Names of variables corresponding to columns.
     col_var_sizes : ndarray or None
         Sizes of column variables.
+    resolver : NameResolver or None
+        NameResolver for the system corresponding to the coloring.
 
     Attributes
     ----------
@@ -695,14 +697,16 @@ class Coloring(object):
         Names of total jacobian rows or columns.
     _local_array : ndarray or None:
         Indices of total jacobian rows or columns.
-    _abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names.
+    _resolver : NameResolver
+        NameResolver for the system corresponding to the coloring.
     _subtractions : list
         List of subtraction tuples. Only used for the substitution method of bidirectional coloring.
+    _color_arrays : dict
+        Dictionary of color arrays for each direction.
     """
 
     def __init__(self, sparsity, row_vars=None, row_var_sizes=None, col_vars=None,
-                 col_var_sizes=None):
+                 col_var_sizes=None, resolver=None):
         """
         Initialize data structures.
         """
@@ -733,8 +737,9 @@ class Coloring(object):
         self._names_array = {'fwd': None, 'rev': None}
         self._local_array = {'fwd': None, 'rev': None}
 
-        self._abs2prom = None
+        self._resolver = resolver
         self._subtractions = None
+        self._color_arrays = {}
 
     def get_renamed_copy(self, row_translate, col_translate):
         """
@@ -754,13 +759,13 @@ class Coloring(object):
         """
         row_vars = [row_translate[v] for v in self._row_vars]
         col_vars = [col_translate[v] for v in self._col_vars]
-        c = Coloring(self.sparsity, row_vars, self._row_var_sizes, col_vars, self._col_var_sizes)
+        c = Coloring(self.sparsity, row_vars, self._row_var_sizes, col_vars, self._col_var_sizes,
+                     resolver=self._resolver)
         c._fwd = self._fwd
         c._rev = self._rev
         c._meta = self._meta.copy()
         c._names_array = self._names_array
         c._local_array = self._local_array
-        c._abs2prom = self._abs2prom
 
         return c
 
@@ -786,6 +791,40 @@ class Coloring(object):
             raise RuntimeError("Invalid direction '%s' in color_iter" % direction)
 
         yield from colors
+
+    def _get_color_array(self, direction):
+        """
+        Return the color array for the given direction.
+
+        The size of the array is the number of nonzero values in the sparsity matrix.
+
+        Parameters
+        ----------
+        direction : str
+            Derivative direction ('fwd' or 'rev').
+
+        Returns
+        -------
+        ndarray
+            Color array for the given direction.
+        """
+        if direction not in self._color_arrays:
+            if direction == 'fwd':
+                color_array = np.zeros(self._shape[1], dtype=int)
+                for i, color_list in enumerate(self._fwd[0]):
+                    color_array[color_list] = i
+                colors_nz = color_array[self._nzcols]
+            elif direction == 'rev':
+                color_array = np.zeros(self._shape[0], dtype=int)
+                for i, color_list in enumerate(self._rev[0]):
+                    color_array[color_list] = i
+                colors_nz = color_array[self._nzrows]
+            else:
+                raise RuntimeError(f"Invalid direction '{direction}' in _get_color_array.")
+
+            self._color_arrays[direction] = colors_nz
+
+        return self._color_arrays[direction]
 
     def color_nonzero_iter(self, direction):
         """
@@ -841,9 +880,9 @@ class Coloring(object):
                 for jac_irow, nzpart in zip(nzs, nzparts):
                     yield compressed_j[i, nzpart], nzpart, jac_irow
 
-    def expand_jac(self, compressed_j, direction):
+    def _expand_jac(self, compressed_j, direction):
         """
-        Expand the given compressed jacobian into a full jacobian.
+        Expand the given compressed dense jacobian into a full CSC jacobian.
 
         Parameters
         ----------
@@ -854,11 +893,16 @@ class Coloring(object):
 
         Returns
         -------
-        ndarray
+        csc_matrix
             The full jacobian.
         """
-        sparsity = self.get_sparsity_of_type(bool).toarray()
-        return colored2full_jac(compressed_j, sparsity, self.color_iter(direction), direction)
+        colors_coo = self._get_color_array(direction)
+        if direction == 'fwd':
+            data = compressed_j[self._nzrows, colors_coo]
+        elif direction == 'rev':
+            data = compressed_j[colors_coo, self._nzcols]
+
+        return csc_matrix((data, (self._nzrows, self._nzcols)), shape=self._shape)
 
     def get_row_col_map(self, direction):
         """
@@ -1329,19 +1373,16 @@ class Coloring(object):
         else:
             # we have var name/size info, so mark rows/cols with their respective variable names
             rowstart = rowend = 0
-            for rv, rvsize in zip(self._row_vars, self._row_var_sizes):
+            for row_var_name, rvsize in zip(self.get_row_var_names(use_prom_names),
+                                            self._row_var_sizes):
                 rowend += rvsize
                 for r in range(rowstart, rowend):
                     colstart = colend = 0
-                    for _, cvsize in zip(self._col_vars, self._col_var_sizes):
+                    for cvsize in self._col_var_sizes:
                         colend += cvsize
                         for c in range(colstart, colend):
                             print(charr[r, c], end='', file=out_stream)
                         colstart = colend
-                    if use_prom_names and self._abs2prom:
-                        row_var_name = self._get_prom_name(rv)
-                    else:
-                        row_var_name = rv
                     # include row variable with row
                     print(' %d  %s' % (r, row_var_name), file=out_stream)
                 rowstart = rowend
@@ -1350,12 +1391,9 @@ class Coloring(object):
             # with the appropriate starting column of the matrix ('|' marks the start of each var)
             start = 0
 
-            for name, size in zip(self._col_vars, self._col_var_sizes):
+            for col_var_name, size in zip(self.get_col_var_names(use_prom_names),
+                                          self._col_var_sizes):
                 tab = ' ' * start
-                if use_prom_names and self._abs2prom:
-                    col_var_name = self._get_prom_name(name)
-                else:
-                    col_var_name = name
                 print('%s|%s' % (tab, col_var_name), file=out_stream)
                 start += size
 
@@ -1729,7 +1767,7 @@ class Coloring(object):
                     desvar_name = coloring._col_vars[np.digitize(col_idx, desvar_idx_bins)]
                     desvar_col_map[desvar_name].add(col_idx)
 
-                if use_prom_names and coloring._abs2prom:
+                if use_prom_names and coloring._resolver:
                     desvar_col_map = {coloring._get_prom_name(k): v
                                       for k, v in desvar_col_map.items()}
 
@@ -1738,7 +1776,7 @@ class Coloring(object):
                     resvar_name = coloring._row_vars[np.digitize(row_idx, response_idx_bins)]
                     resvar_col_map[resvar_name].add(row_idx)
 
-                if use_prom_names and coloring._abs2prom:
+                if use_prom_names and coloring._resolver:
                     resvar_col_map = {coloring._get_prom_name(k): v
                                       for k, v in resvar_col_map.items()}
 
@@ -2054,23 +2092,54 @@ class Coloring(object):
 
         return tangent
 
-    def _get_prom_name(self, abs_name):
+    def _get_prom_name(self, name):
         """
         Get promoted name for specified variable.
         """
-        abs2prom = self._abs2prom
+        if self._resolver:
+            return self._resolver.any2prom(name, default=name)
 
-        # if we don't have prom names, just return abs name
-        if not abs2prom:
-            return abs_name
+        return name
 
-        # if we can't find a prom name, just return abs name
-        if abs_name in abs2prom['input']:
-            return abs2prom['input'][abs_name]
-        elif abs_name in abs2prom['output']:
-            return abs2prom['output'][abs_name]
+    def get_row_var_names(self, use_prom_names=True):
+        """
+        Yield the row variable names.
+
+        Parameters
+        ----------
+        use_prom_names : bool
+            If True, use promoted names.
+
+        Yields
+        ------
+        name : str
+            Name of the row variable.
+        """
+        if self._resolver is None or not use_prom_names:
+            yield from self._row_vars
         else:
-            return abs_name
+            for name in self._row_vars:
+                yield self._resolver.any2prom(name, default=name)
+
+    def get_col_var_names(self, use_prom_names=True):
+        """
+        Yield the column variable names.
+
+        Parameters
+        ----------
+        use_prom_names : bool
+            If True, use promoted names.
+
+        Yields
+        ------
+        name : str
+            Name of the column variable.
+        """
+        if self._resolver is None or not use_prom_names:
+            yield from self._col_vars
+        else:
+            for name in self._col_vars:
+                yield self._resolver.any2prom(name, default=name)
 
     def _apply_subtractions(self, J):
         for pos, subs in self._subtractions:
@@ -2209,105 +2278,6 @@ class Coloring(object):
         return _sort_subtractions(subtractions)
 
 
-def _get_colormap(color_array):
-    """
-    Get a map of colors to column indices.
-
-    Parameters
-    ----------
-    color_array : ndarray
-        Array of colors.
-
-    Returns
-    -------
-    dict
-        Map of colors to column indices.
-    """
-    colmap = {}
-    for i, c in enumerate(color_array):
-        if c not in colmap:
-            colmap[c] = []
-        colmap[c].append(i)
-    return colmap
-
-
-def _get_expander_matrix(sparsity_shape, color_iter, direction):
-    """
-    Get a matrix to expand a colored jacobian to an expanded colored jacobian.
-
-    The expanded colored jacobian is the shape of the full jacobian but columns sharing
-    the same color are summed together.
-
-    Parameters
-    ----------
-    sparsity_shape : tuple
-        Shape of the sparsity pattern of the jacobian.
-    color_iter : iterator
-        Iterator over columns for each color.
-    direction : str
-        Direction of the jacobian to expand.
-
-    Returns
-    -------
-    csc_matrix
-        Matrix to expand a colored jacobian to an expanded colored jacobian.
-    """
-    # Ic looks like an identity matrix (ncols x nncols for fwd) with all columns corresponding
-    # to the same color being summed together and combined into a single column.
-    # Ic = csc_matrix((np.array([]), (np.array([], dtype=np.int), np.array([], dtype=np.int))),
-    #                 shape=(I.shape[1], np.unique(color_array).size))
-    Ic_rows = []
-    Ic_cols = []
-    ncolors = 0
-    for c, cols in enumerate(color_iter):
-        ncolors += 1
-        for col in cols:
-            Ic_cols.append(c)
-            Ic_rows.append(col)
-
-    if direction == 'rev':
-        Ic_cols, Ic_rows = Ic_rows, Ic_cols
-        nrows = ncolors
-        ncolors = sparsity_shape[0]
-    else:
-        nrows = sparsity_shape[1]
-
-    Ic = coo_matrix((np.ones(len(Ic_rows)), (Ic_rows, Ic_cols)),
-                    shape=(nrows, ncolors)).T
-
-    if direction == 'fwd':
-        return Ic.tocsc()
-    else:
-        return Ic.tocsr()
-
-
-def colored2full_jac(Jc, sparsity, color_iter, direction):
-    """
-    Expand a colored jacobian to a full jacobian.
-
-    Parameters
-    ----------
-    Jc : csc_matrix
-        Colored jacobian.
-    sparsity : csc_matrix
-        Sparsity pattern of the jacobian.
-    color_iter : iterator
-        Iterator over columns for each color.
-    direction : str
-        Direction of the jacobian to expand.
-
-    Returns
-    -------
-    csc_matrix
-        Full jacobian.
-    """
-    X = _get_expander_matrix(sparsity.shape, color_iter, direction).toarray()
-    if direction == 'fwd':
-        return np.where(sparsity, Jc @ X, 0.)
-    else:
-        return np.where(sparsity, X @ Jc, 0.)
-
-
 def _order_by_ID(col_adj_matrix):
     """
     Return columns in order of incidence degree (ID).
@@ -2335,7 +2305,7 @@ def _order_by_ID(col_adj_matrix):
     colored_degrees = np.zeros(ncols, dtype=INT_DTYPE)
     colored_degrees[col_adj_matrix.indices] = 1  # make sure zero cols aren't considered
 
-    for i in range(np.nonzero(colored_degrees)[0].size):
+    for _ in range(np.nonzero(colored_degrees)[0].size):
         col = colored_degrees.argmax()
         colnzrows = col_adj_matrix.getcol(col).indices
         colored_degrees[colnzrows] += 1
@@ -2599,7 +2569,8 @@ def _color_partition(J, Jprows, Jpcols, direct=True, overlap=None):
     Jpcols : ndarray
         Nonzero columns of a partition of the matrix being colored.
     direct : bool
-        If True, use the direct method to compute the column adjacency matrix.
+        If True, use the direct method to compute the column adjacency matrix. Otherwise, use the
+        substitution method.
     overlap : set or None
         Nonzero entries indicate overlapping columns.
 
@@ -3213,11 +3184,8 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                         (model._full_comm is None and model.comm.rank == 0)):
                     coloring.save(fname)
 
-    # save a copy of the abs2prom dict on the coloring object
-    # so promoted names can be used when displaying coloring data
-    # (also map auto_ivc names to the prom name of their connected input)
     if coloring is not None:
-        coloring._abs2prom = model._var_allprocs_abs2prom.copy()
+        coloring._resolver = model._resolver
 
     # if we're running under MPI, make sure the coloring object is identical on all ranks
     # by broadcasting rank 0's coloring to the other ranks.

@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "OpenMDAO framework infrastructure"
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     { name = "OpenMDAO Team", email = "openmdao@openmdao.org" },
 ]
@@ -36,7 +36,7 @@ dependencies = [
     "numpy",
     "packaging",
     "requests",
-    "scipy",
+    "scipy>=1.12",
 ]
 
 [project.optional-dependencies]
@@ -149,6 +149,7 @@ linearrunoncec = "openmdao.solvers.linear.linear_runonce:LinearRunOnce"
 petsckrylov = "openmdao.solvers.linear.petsc_ksp:PETScKrylov"
 scipykrylov = "openmdao.solvers.linear.scipy_iter_solver:ScipyKrylov"
 userdefined = "openmdao.solvers.linear.user_defined:LinearUserDefined"
+petscdirectsolver = "openmdao.solvers.linear.petsc_direct_solver:PETScDirectSolver"
 
 [project.entry-points.openmdao_nl_solver]
 armijogoldsteinls = "openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS"

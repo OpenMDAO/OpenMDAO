@@ -291,11 +291,11 @@ def _check_hanging_inputs(problem, logger):
     if isinstance(model, Component):
         return
 
-    abs2prom_in = model._var_allprocs_abs2prom['input']
+    abs2prom = model._resolver.abs2prom
     desvars = problem.driver._designvars
     unconns = []
     for tgts in model._auto_ivc.auto2tgt.values():
-        prom_tgt = abs2prom_in[tgts[0]]
+        prom_tgt = abs2prom(tgts[0], 'input')
         # Ignore inputs that are declared as design vars.
         if desvars and prom_tgt in desvars:
             continue
@@ -324,7 +324,7 @@ def _check_comp_has_no_outputs(problem, logger):
     msg = []
 
     for comp in problem.model.system_iter(include_self=True, recurse=True, typ=Component):
-        if len(list(comp.abs_name_iter('output', local=False, discrete=True))) == 0:
+        if len(list(comp._resolver.abs_iter('output'))) == 0:
             msg.append("   %s\n" % comp.pathname)
 
     if msg:
@@ -586,11 +586,10 @@ def _get_promoted_connected_ins(g):
     defaultdict
         Absolute input name keyed to [promoting_groups, manually_connecting_groups]
     """
-    prom2abs_list = g._var_allprocs_prom2abs_list['input']
-    abs2prom_in = g._var_abs2prom['input']
+    resolver = g._resolver
     prom_conn_ins = defaultdict(lambda: ([], []))
     for prom_in in g._manual_connections:
-        for abs_in in prom2abs_list[prom_in]:
+        for abs_in in resolver.absnames(prom_in, 'input'):
             prom_conn_ins[abs_in][1].append((prom_in, g.pathname))
 
     for subsys in g._subgroups_myproc:
@@ -601,10 +600,8 @@ def _get_promoted_connected_ins(g):
             mytup[0].extend(proms)
             mytup[1].extend(mans)
 
-        sub_abs2prom_in = subsys._var_abs2prom['input']
-
-        for inp, sub_prom_inp in sub_abs2prom_in.items():
-            if abs2prom_in[inp] == sub_prom_inp:  # inp is promoted up from sub
+        for inp, sub_prom_inp in subsys._resolver.abs2prom_iter('input', local=True):
+            if resolver.abs2prom(inp, 'input') == sub_prom_inp:  # inp is promoted up from sub
                 if inp in sub_prom_conn_ins and len(sub_prom_conn_ins[inp][1]) > 0:
                     prom_conn_ins[inp][0].append(subsys.pathname)
 

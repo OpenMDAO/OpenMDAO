@@ -40,7 +40,6 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
     record_model_options
 from openmdao.utils.deriv_display import _print_deriv_table, _deriv_display, _deriv_display_compact
 from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
-from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.logger_utils import get_logger, TestLogger
@@ -57,6 +56,7 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_d
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.file_utils import _get_outputs_dir, text2html, _get_work_dir
 from openmdao.utils.testing_utils import _fix_comp_check_data
+from openmdao.utils.name_maps import DISTRIBUTED
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -388,22 +388,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return name in self._reports
 
-    def _get_var_abs_name(self, name):
-        if name in self.model._var_allprocs_abs2meta:
-            return name
-        elif name in self.model._var_allprocs_prom2abs_list['output']:
-            return self.model._var_allprocs_prom2abs_list['output'][name][0]
-        elif name in self.model._var_allprocs_prom2abs_list['input']:
-            abs_names = self.model._var_allprocs_prom2abs_list['input'][name]
-            if len(abs_names) == 1:
-                return abs_names[0]
-            else:
-                raise KeyError(f"{self.msginfo}: Using promoted name `{name}' is ambiguous and "
-                               f"matches unconnected inputs {sorted(abs_names)}. Use absolute name "
-                               "to disambiguate.")
-
-        raise KeyError(f'{self.msginfo}: Variable "{name}" not found.')
-
     @property
     def driver(self):
         """
@@ -481,15 +465,12 @@ class Problem(object, metaclass=ProblemMetaclass):
             raise RuntimeError(f"{self.msginfo}: is_local('{name}') was called before setup() "
                                "completed.")
 
-        try:
-            abs_name = self._get_var_abs_name(name)
-        except KeyError:
+        abs_name = self.model._resolver.any2abs(name)
+        if abs_name is None:  # no variable found
             sub = self.model._get_subsystem(name)
             return sub is not None and sub._is_local
 
-        # variable exists, but may be remote
-        return abs_name in self.model._var_abs2meta['input'] or \
-            abs_name in self.model._var_abs2meta['output']
+        return self.model._resolver.is_local(abs_name)
 
     @property
     def _recording_iter(self):
@@ -511,7 +492,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return self.get_val(name, get_remote=None)
 
-    def get_val(self, name, units=None, indices=None, get_remote=False):
+    def get_val(self, name, units=None, indices=None, get_remote=False, copy=False):
         """
         Get an output/input variable.
 
@@ -532,6 +513,8 @@ class Problem(object, metaclass=ProblemMetaclass):
             If False, only retrieve the value if it is on the current process, or only the part
             of the value that's on the current process for a distributed variable.
             If None and the variable is remote or distributed, a RuntimeError will be raised.
+        copy : bool, optional
+            If True, return a copy of the value.  If False, return a reference to the value.
 
         Returns
         -------
@@ -539,7 +522,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             The value of the requested output/input variable.
         """
         if self._metadata['setup_status'] <= _SetupStatus.POST_SETUP2:
-            abs_names = name2abs_names(self.model, name)
+            abs_names = self.model._resolver.absnames(name)
             val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
             if not is_undefined(val):
                 if indices is not None:
@@ -558,7 +541,10 @@ class Problem(object, metaclass=ProblemMetaclass):
                                    f"rank {self.comm.rank}. You can retrieve values from "
                                    "other processes using `get_val(<name>, get_remote=True)`.")
 
-        return val
+        if copy:
+            return deepcopy(val)
+        else:
+            return val
 
     def __setitem__(self, name, value):
         """
@@ -602,8 +588,8 @@ class Problem(object, metaclass=ProblemMetaclass):
         for value, set_units, pathname, name in self.model._initial_condition_cache.values():
             if pathname:
                 system = self.model._get_subsystem(pathname)
-                if system is None:
-                    self.model.set_val(pathname + '.' + name, value, units=set_units)
+                if system is None or not system._is_local:
+                    pass
                 else:
                     system.set_val(name, value, units=set_units)
             else:
@@ -976,7 +962,6 @@ class Problem(object, metaclass=ProblemMetaclass):
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,  # forces allocation of complex vectors
             'vars_to_gather': {},  # vars that are remote somewhere. does not include distrib vars
-            'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
             'static_mode': False,  # used to determine where various 'static'
                                    # and 'dynamic' data structures are stored.
                                    # Dynamic ones are added during System
@@ -1085,8 +1070,9 @@ class Problem(object, metaclass=ProblemMetaclass):
             first = True
             self._metadata['static_mode'] = False
             try:
-                model._setup_part2()
-                self._check_collected_errors()
+                if self._metadata['setup_status'] < _SetupStatus.POST_SETUP2:
+                    model._setup_part2()
+                    self._check_collected_errors()
 
                 responses = model.get_responses(recurse=True, use_prom_ivc=True)
                 designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
@@ -1155,6 +1141,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP
             self._set_initial_conditions()
 
+        if self.model.comm.size > 1:
+            # this updates any source values that are attached to remote inputs
+            self.model._resolve_remote_sets()
+
         if self._check and 'checks' not in self._reports:
             if self._check is True:
                 checks = _default_checks
@@ -1180,24 +1170,23 @@ class Problem(object, metaclass=ProblemMetaclass):
         **setup_kwargs : dict
             Keyword arguments to pass to the setup method if it hasn't already been called.
         """
-        current_status = self._metadata['setup_status']
-        if current_status >= status:
+        if self._metadata['setup_status'] >= status:
             return
 
         if status >= _SetupStatus.POST_SETUP:
-            if current_status < _SetupStatus.POST_SETUP:
+            if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
                 self.setup(**setup_kwargs)
-                current_status = _SetupStatus.POST_SETUP
+                self._metadata['setup_status'] = _SetupStatus.POST_SETUP
 
         if status >= _SetupStatus.POST_SETUP2:
-            if current_status < _SetupStatus.POST_SETUP2:
+            if self._metadata['setup_status'] < _SetupStatus.POST_SETUP2:
                 self.model._setup_part2()
-                current_status = _SetupStatus.POST_SETUP2
+                self._metadata['setup_status'] = _SetupStatus.POST_SETUP2
 
         if status >= _SetupStatus.POST_FINAL_SETUP:
-            if current_status < _SetupStatus.POST_FINAL_SETUP:
+            if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
                 self.final_setup()
-                current_status = _SetupStatus.POST_FINAL_SETUP
+                self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP
 
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=0.0, rel_err_tol=1e-6,
@@ -1785,7 +1774,8 @@ class Problem(object, metaclass=ProblemMetaclass):
                          desvar_opts=[],
                          cons_opts=[],
                          objs_opts=[],
-                         out_stream=_DEFAULT_OUT_STREAM
+                         out_stream=_DEFAULT_OUT_STREAM,
+                         return_format='list'
                          ):
         """
         Print all design variables and responses (objectives and constraints).
@@ -1822,6 +1812,10 @@ class Problem(object, metaclass=ProblemMetaclass):
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
+        return_format : str
+            Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
+            If 'dict', the return value is a dictionary mapping {kind: {name: metadata}}.
+            If 'list', the return value is a dictionary mapping {kind: [(name, metadata), ...]}.
 
         Returns
         -------
@@ -1911,9 +1905,14 @@ class Problem(object, metaclass=ProblemMetaclass):
             o[1]['val'] = vals[o[0]]
         obj_vars = [tuple(o) for o in obj_vars]
 
-        prob_vars = {'design_vars': des_vars,
-                     'constraints': cons_vars,
-                     'objectives': obj_vars}
+        if return_format == 'dict':
+            prob_vars = {'design_vars': {k: v for k, v in des_vars},
+                         'constraints': {k: v for k, v in cons_vars},
+                         'objectives': {k: v for k, v in obj_vars}}
+        else:
+            prob_vars = {'design_vars': des_vars,
+                         'constraints': cons_vars,
+                         'objectives': obj_vars}
 
         return prob_vars
 
@@ -1954,7 +1953,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         elif not isinstance(out_stream, TextIOBase):
             raise TypeError("Invalid output stream specified for 'out_stream'")
 
-        abs2prom = self.model._var_abs2prom
+        resolver = self.model._resolver
 
         # Gets the current numpy print options for consistent decimal place
         #   printing between arrays and floats
@@ -1971,10 +1970,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             for col_name in col_names:
                 if col_name == 'name':
                     if show_promoted_name:
-                        if vname in abs2prom['input']:
-                            row[col_name] = abs2prom['input'][vname]
-                        elif vname in abs2prom['output']:
-                            row[col_name] = abs2prom['output'][vname]
+                        if resolver.is_local(vname, 'input'):
+                            row[col_name] = resolver.abs2prom(vname, 'input')
+                        elif resolver.is_local(vname, 'output'):
+                            row[col_name] = resolver.abs2prom(vname, 'output')
                         else:
                             # Promoted auto_ivc name. Keep it promoted
                             row[col_name] = vname
@@ -2077,7 +2076,9 @@ class Problem(object, metaclass=ProblemMetaclass):
                     return True
             return False
 
-        if isinstance(case, dict):
+        case_is_dict = isinstance(case, dict)
+
+        if case_is_dict:
             # case data comes from list_inputs/list_outputs, keyed on absolute pathname
             # we need it to be keyed on promoted name
             if 'inputs' in case:
@@ -2093,37 +2094,26 @@ class Problem(object, metaclass=ProblemMetaclass):
             outputs = case.outputs
 
         abs2idx = model._var_allprocs_abs2idx
-        prom2abs_in = model._var_allprocs_prom2abs_list['input']
-        prom2abs_out = model._var_allprocs_prom2abs_list['output']
-        abs2meta_in = model._var_allprocs_abs2meta['input']
-        abs2meta_out = model._var_allprocs_abs2meta['output']
-        abs2meta_disc_in = model._var_allprocs_discrete['input']
-        abs2meta_disc_out = model._var_allprocs_discrete['output']
+        resolver = self.model._resolver
 
         if inputs:
-            for name in inputs:
-                if set_later(name):
+            for abs_name in inputs:
+                if set_later(abs_name):
                     continue
 
-                if name in abs2meta_in or name in abs2meta_disc_in:
-                    abs_name = name
-
-                    if isinstance(case, dict):
-                        val = inputs[name]['val']
+                if resolver.is_abs(abs_name, 'input'):
+                    if case_is_dict:
+                        val = inputs[abs_name]['val']
                     else:
                         val = case.inputs[abs_name]
-                    try:
-                        varmeta = abs2meta_in[abs_name]
-                    except KeyError:
-                        # Var may be discrete
-                        varmeta = abs2meta_disc_in[abs_name]
-                    if varmeta.get('distributed') and model.comm.size > 1:
+
+                    if model.comm.size > 1 and resolver.flags(abs_name, 'input') & DISTRIBUTED:
                         sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
                         model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                     else:
                         model.set_val(abs_name, val)
                 else:
-                    issue_warning(f"{model.msginfo}: Input variable, '{name}', recorded "
+                    issue_warning(f"{model.msginfo}: Input variable, '{abs_name}', recorded "
                                   "in the case is not found in the model.")
 
         if outputs:
@@ -2131,35 +2121,17 @@ class Problem(object, metaclass=ProblemMetaclass):
                 if set_later(name):
                     continue
 
-                # auto_ivc output may point to a promoted input name
-                if name in prom2abs_out:
-                    prom2abs = prom2abs_out
-                    is_output = True
-                else:
-                    prom2abs = prom2abs_in
-                    is_output = False
-
-                if name in prom2abs:
-                    if isinstance(case, dict):
+                if resolver.is_prom(name):
+                    if case_is_dict:
                         val = outputs[name]['val']
                     else:
                         val = outputs[name]
 
-                    for abs_name in prom2abs[name]:
+                    for abs_name in resolver.absnames(name):
                         if set_later(abs_name):
                             continue
 
-                        if is_output:
-                            try:
-                                varmeta = abs2meta_out[abs_name]
-                            except KeyError:
-                                varmeta = abs2meta_disc_out[abs_name]
-                        else:
-                            try:
-                                varmeta = abs2meta_in[abs_name]
-                            except KeyError:
-                                varmeta = abs2meta_disc_in[abs_name]
-                        if varmeta.get('distributed') and model.comm.size > 1:
+                        if model.comm.size > 1 and resolver.flags(abs_name) & DISTRIBUTED:
                             sizes = model._var_sizes['output'][:, abs2idx[abs_name]]
                             model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                         else:
@@ -2368,9 +2340,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             raise RuntimeError("list_indep_vars requires that final_setup has been "
                                "run for the Problem.")
 
-        design_vars = model.get_design_vars(recurse=True,
-                                            use_prom_ivc=True,
-                                            get_sizes=False)
+        design_vars = model.get_design_vars(recurse=True, use_prom_ivc=True, get_sizes=False)
 
         problem_indep_vars = []
 
@@ -2379,13 +2349,13 @@ class Problem(object, metaclass=ProblemMetaclass):
             col_names.extend(options)
 
         abs2meta = model._var_allprocs_abs2meta['output']
-        abs2prom = model._var_allprocs_abs2prom['output']
         abs2disc = model._var_allprocs_discrete['output']
+        abs2prom = model._resolver.abs2prom
 
         seen = set()
         for absname, meta in chain(abs2meta.items(), abs2disc.items()):
             if 'openmdao:indep_var' in meta['tags']:
-                name = abs2prom[absname]
+                name = abs2prom(absname, 'output')
                 if (include_design_vars or name not in design_vars) and name not in seen:
                     meta = {key: meta[key] for key in col_names if key in meta}
                     meta['val'] = self.get_val(name)

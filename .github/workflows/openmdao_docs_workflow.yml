@@ -32,12 +32,12 @@ jobs:
 
           # build docs (baseline versions)
           - NAME: Build Docs
-            OS: ubuntu-latest
-            PY: '3.11'
+            OS: ubuntu-24.04
+            PY: '3.12'
             NUMPY: '1.26'
-            SCIPY: '1.13'
-            PETSc: '3.19'
-            PYOPTSPARSE: 'v2.13.0'
+            SCIPY: '1.15'
+            PETSc: '3.20'
+            PYOPTSPARSE: 'v2.13.1'
             SNOPT: '7.7'
             OPTIONAL: '[all]'
             PUBLISH: true
@@ -73,6 +73,10 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Fetch tags
+        run: |
+          git fetch --prune --unshallow --tags
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
@@ -193,6 +197,7 @@ jobs:
           export PYDEVD_DISABLE_FILE_VALIDATION=1
 
           cd openmdao/docs
+
           if [[ "${{ secrets.SNOPT_LOCATION_72 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
             echo "============================================================="
             echo "Building docs with SNOPT examples."
@@ -232,14 +237,10 @@ jobs:
         run: |
           if [[ "${#DOCS_LOCATION}" ]]; then
             echo "============================================================="
-            echo "Install version of openssl compatible with hosting service"
+            echo "Create env with openssl compatible with hosting service"
             echo "============================================================="
-            conda install -c conda-forge 'openssl=3.0'
-
-            echo "============================================================="
-            echo "Fetch tags to get docs version"
-            echo "============================================================="
-            git fetch --prune --unshallow --tags
+            conda create -n upload python=3.11 packaging openssl=3
+            conda activate upload
 
             echo "============================================================="
             echo "Publish docs"

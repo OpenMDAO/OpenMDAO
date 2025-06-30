@@ -89,7 +89,10 @@ def ensure_compatible(name, value, shape=None, indices=None, default_shape=(1,))
     else:
         # shape is determined, if value is scalar assign it to array of shape
         # otherwise make sure value is an array of the determined shape
-        if np.ndim(value) == 0 or value.shape == (1,):
+        if np.ndim(value) == 0:
+            if shape != ():
+                value = np.full(shape, value)
+        elif value.shape == (1,):
             value = np.full(shape, value)
         else:
             value = np.atleast_1d(value).astype(np.float64)
@@ -404,7 +407,7 @@ def pattern_filter(patterns, var_iter, name_index=None):
     Yields
     ------
     str
-        Variable name that matches a pattern.
+        Variable name or corresponding tuple where the name matches a pattern.
     """
     if '*' in patterns:
         yield from var_iter
@@ -1260,16 +1263,16 @@ def get_connection_owner(system, tgt):
 
     model = system._problem_meta['model_ref']()
     src = model._conn_global_abs_in2out[tgt]
-    abs2prom = model._var_allprocs_abs2prom
+    resolver = model._resolver
 
-    if src in abs2prom['output'] and tgt in abs2prom['input'][tgt]:
-        if abs2prom['input'][tgt] != abs2prom['output'][src]:
+    if resolver.is_abs(src, 'output') and resolver.is_abs(tgt, 'input'):
+        if resolver.abs2prom(tgt, 'input') != resolver.abs2prom(src, 'output'):
             # connection is explicit
             for g in model.system_iter(include_self=True, recurse=True, typ=Group):
                 if g._manual_connections:
-                    tprom = g._var_allprocs_abs2prom['input'][tgt]
+                    tprom = g._resolver.abs2prom(tgt, 'input')
                     if tprom in g._manual_connections:
-                        return g, g._var_allprocs_abs2prom['output'][src], tprom
+                        return g, g._resolver.abs2prom(src, 'output'), tprom
 
     return system, src, tgt
 
@@ -1339,12 +1342,12 @@ class LocalRangeIterable(object):
         all_abs2meta = system._var_allprocs_abs2meta['output']
         if vname in all_abs2meta:
             sizes = system._var_sizes['output']
-            slices = system._outputs.get_slice_dict()
+            vec = system._outputs
             abs2meta = system._var_abs2meta['output']
         else:
             all_abs2meta = system._var_allprocs_abs2meta['input']
             sizes = system._var_sizes['input']
-            slices = system._inputs.get_slice_dict()
+            vec = system._inputs
             abs2meta = system._var_abs2meta['input']
 
         if all_abs2meta[vname]['distributed']:
@@ -1361,10 +1364,11 @@ class LocalRangeIterable(object):
             self._var_size = all_abs2meta[vname]['global_size']
         else:
             self._iter = self._serial_iter
+            start, stop = vec.get_range(vname)
             if use_vec_offset:
-                self._inds = range(slices[vname].start, slices[vname].stop)
+                self._inds = range(start, stop)
             else:
-                self._inds = range(slices[vname].stop - slices[vname].start)
+                self._inds = range(stop - start)
             self._var_size = all_abs2meta[vname]['global_size']
 
     def __repr__(self):

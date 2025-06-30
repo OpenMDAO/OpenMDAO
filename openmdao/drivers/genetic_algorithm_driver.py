@@ -32,7 +32,7 @@ except ModuleNotFoundError:
 
 from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.concurrent import concurrent_eval
+from openmdao.utils.concurrent_utils import concurrent_eval
 from openmdao.utils.mpi import MPI
 from openmdao.core.analysis_error import AnalysisError
 
@@ -339,13 +339,13 @@ class SimpleGADriver(Driver):
             x0[i:j] = desvar_vals[name]
 
         # Bits of resolution
-        abs2prom = model._var_abs2prom['output']
+        resolver = model._resolver
 
         for name, meta in desvars.items():
             i, j = self._desvar_idx[name]
 
-            if name in abs2prom:
-                prom_name = abs2prom[name]
+            if resolver.is_abs(name, 'output'):
+                prom_name = resolver.abs2prom(name, 'output')
             else:
                 prom_name = name
 

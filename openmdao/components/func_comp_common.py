@@ -6,7 +6,6 @@ import sys
 import traceback
 import re
 from functools import partial
-from collections.abc import Iterable
 
 import numpy as np
 try:
@@ -241,6 +240,6 @@ def _ensure_iter(val):
     -------
     tuple or iterable
     """
-    if isinstance(val, Iterable):
+    if isinstance(val, tuple):
         return val
     return val,

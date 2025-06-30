@@ -308,12 +308,12 @@ class ExplCompTestCase(unittest.TestCase):
                                           out_stream=stream)
 
         self.assertEqual([
-            ('comp.z', {'val': 24., 'resids': [0.], 'units': 'inch', 'shape': (), 'desc': '',
+            ('comp.z', {'val': 24., 'resids': 0., 'units': 'inch', 'shape': (), 'desc': '',
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
-            ('p1.x', {'val': 12., 'resids': [0.], 'units': 'inch', 'shape': (), 'desc': 'indep x',
-                      'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
-            ('p2.y', {'val': 1., 'resids': [0.], 'units': 'ft', 'shape': (), 'desc': 'indep y',
-                      'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
+            ('p1.x', {'val': 12., 'resids': 0., 'units': 'inch', 'shape': (), 'desc': 'indep x',
+                      'lower': 1., 'upper': 100., 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
+            ('p2.y', {'val': 1., 'resids': 0., 'units': 'ft', 'shape': (), 'desc': 'indep y',
+                      'lower': 2., 'upper': 200., 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
         ], sorted(outputs))
 
         text = stream.getvalue().split('\n')

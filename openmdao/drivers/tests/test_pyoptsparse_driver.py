@@ -157,7 +157,7 @@ class TestNotInstalled(unittest.TestCase):
         from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
         # but we get a RuntimeError if we try to instantiate
-        with self.assertRaises(RuntimeError) as ctx:
+        with self.assertRaises(ImportError) as ctx:
             pyOptSparseDriver()
 
         self.assertEqual(str(ctx.exception),
@@ -3484,6 +3484,7 @@ class TestLinearOnlyDVs(unittest.TestCase):
 
         return prob
 
+    @require_pyoptsparse('IPOPT')
     def test_lin_only_dvs(self):
         shape = (2, 5)
         # do first opt without coloring

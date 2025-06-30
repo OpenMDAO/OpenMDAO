@@ -93,12 +93,12 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
     with printoptions(formatter={'float': functools.partial(_arr_fmt, '{:.6g}')},
                       suppress=True, threshold=10000):
         for target, meta in model._var_allprocs_abs2meta['input'].items():
-            prom = model._var_allprocs_abs2prom['input'][target]
+            prom = model._resolver.abs2prom(target, 'input')
             src = connections[target]
             if src.startswith('_auto_ivc.'):
                 sprom = src
             else:
-                sprom = model._var_allprocs_abs2prom['output'][src]
+                sprom = model._resolver.abs2prom(src, 'output')
             val = model.get_val(target, get_remote=True, from_src=not src.startswith('_auto_ivc.'))
             smeta = model._var_allprocs_abs2meta['output'][src]
             src_is_ivc = 'openmdao:indep_var' in smeta['tags']
@@ -109,7 +109,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
                          meta['shape'], sorted(meta['tags']), vcell, mincell, maxcell, src])
 
     for target, meta in model._var_discrete['input'].items():
-        prom = model._var_allprocs_abs2prom['input'][target]
+        prom = model._resolver.abs2prom(target, 'input')
         src = connections[target]
         val = model.get_val(target, get_remote=True, from_src=not src.startswith('_auto_ivc.'))
         smeta = model._var_discrete['output'][src]

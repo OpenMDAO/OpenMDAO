@@ -191,7 +191,7 @@ class pyOptSparseDriver(Driver):
         """
         if pyoptsparse is None:
             # pyoptsparse is not installed
-            raise RuntimeError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
+            raise ImportError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
 
         if isinstance(pyoptsparse, Exception):
             # there is some other issue with the pyoptsparse installation
@@ -411,7 +411,7 @@ class pyOptSparseDriver(Driver):
         # Add all objectives
         objs = self.get_objective_values()
         for name in objs:
-            opt_prob.addObj(model._get_prom_name(name))
+            opt_prob.addObj(name)
             self._nl_responses.append(name)
 
         lin_dvs = self._get_lin_dvs()
@@ -629,7 +629,7 @@ class pyOptSparseDriver(Driver):
         # framework is left in the right final state
         dv_dict = sol.getDVs()
         for name in self._designvars:
-            self.set_design_var(name, dv_dict[model._get_prom_name(name)])
+            self.set_design_var(name, dv_dict[name])
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
@@ -705,7 +705,7 @@ class pyOptSparseDriver(Driver):
 
         try:
             for name in self._designvars:
-                self.set_design_var(name, dv_dict[model._get_prom_name(name)])
+                self.set_design_var(name, dv_dict[name])
 
             # print("Setting DV")
             # print(dv_dict)
@@ -857,18 +857,15 @@ class pyOptSparseDriver(Driver):
             for okey in self._nl_responses:
                 if okey not in sens_dict:
                     sens_dict[okey] = {}
-                oval = func_dict[model._get_prom_name(okey)]
+                oval = func_dict[okey]
                 osize = len(oval)
                 for ikey in nl_dvs.keys():
-                    ival = dv_dict[model._get_prom_name(ikey)]
+                    ival = dv_dict[ikey]
                     isize = len(ival)
                     if ikey not in sens_dict[okey] or self._fill_NANs:
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
                         if self._fill_NANs:
                             sens_dict[okey][ikey].fill(np.nan)
-
-        # convert sens_dict to use promoted names
-        # sens_dict = model._prom_names_jac(sens_dict)
 
         # print("Derivatives calculated")
         # print(dv_dict)

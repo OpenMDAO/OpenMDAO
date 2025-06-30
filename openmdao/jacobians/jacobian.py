@@ -6,7 +6,6 @@ import numpy as np
 from scipy.sparse import issparse
 
 from openmdao.core.constants import INT_DTYPE
-from openmdao.utils.name_maps import key2abs_key
 from openmdao.matrices.matrix import sparse_types
 
 SUBJAC_META_DEFAULTS = {
@@ -63,7 +62,7 @@ class Jacobian(object):
         try:
             return self._abs_keys[key]
         except KeyError:
-            abskey = key2abs_key(self._system(), key)
+            abskey = self._system()._resolver.any2abs_key(key)
             if abskey is not None:
                 self._abs_keys[key] = abskey
             return abskey
@@ -384,6 +383,30 @@ class Jacobian(object):
                     match_inds = np.nonzero(subjac['cols'] == loc_idx)[0]
                     if match_inds.size > 0:
                         subjac['val'][match_inds] = column[start:end][subjac['rows'][match_inds]]
+
+    def set_csc_jac(self, system, jac):
+        """
+        Assign a CSC jacobian to this jacobian.
+
+        Parameters
+        ----------
+        system : System
+            The system that owns this jacobian.
+        jac : csc_matrix
+            CSC jacobian.
+        """
+        ofiter = list(system._jac_of_iter())
+        for wrt, wstart, wend, _, _, _ in system._jac_wrt_iter():
+            wjac = jac[:, wstart:wend]
+            for of, start, end, _, _ in ofiter:
+                key = (of, wrt)
+                if key in self._subjacs_info:
+                    subjac = self.get_metadata(key)
+                    if subjac['cols'] is None:  # dense
+                        subjac['val'][:, :] = wjac[start:end, :]
+                    else:  # our COO format
+                        subj = wjac[start:end, :]
+                        subjac['val'][:] = subj[subjac['rows'], subjac['cols']]
 
     def set_dense_jac(self, system, jac):
         """

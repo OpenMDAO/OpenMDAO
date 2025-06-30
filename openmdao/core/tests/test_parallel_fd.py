@@ -7,6 +7,7 @@ import openmdao.api as om
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.test_suite.components.matmultcomp import MatMultComp
+from openmdao.utils.testing_utils import use_tempdirs
 
 try:
     from parameterized import parameterized
@@ -122,6 +123,7 @@ class SerialSimpleFDTestCase(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class ParallelSimpleFDTestCase2(unittest.TestCase):
 
     N_PROCS = 2
@@ -148,6 +150,7 @@ class ParallelSimpleFDTestCase2(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class ParallelFDTestCase5(unittest.TestCase):
 
     N_PROCS = 5
@@ -171,6 +174,7 @@ class ParallelFDTestCase5(unittest.TestCase):
         assert_near_equal(J['C1.y']['P1.x'], np.eye(size)*mult, 1e-6)
 
 
+@use_tempdirs
 class SerialDiamondFDTestCase(unittest.TestCase):
 
     def test_diamond_fd_totals(self):
@@ -197,6 +201,7 @@ class SerialDiamondFDTestCase(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class ParallelDiamondFDTestCase(unittest.TestCase):
 
     N_PROCS = 4
@@ -262,6 +267,7 @@ def _test_func_name(func, num, param):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class MatMultTestCase(unittest.TestCase):
     N_PROCS = 4
 
@@ -310,6 +316,7 @@ class MatMultTestCase(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class MatMultParallelTestCase(unittest.TestCase):
     N_PROCS = 8
 
@@ -465,6 +472,7 @@ class ParFDWarningsTestCase(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class ParFDErrorsMPITestCase(unittest.TestCase):
     N_PROCS = 3
 
@@ -487,6 +495,7 @@ class ParFDErrorsMPITestCase(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class ParFDFeatureTestCase(unittest.TestCase):
     N_PROCS = 3
 

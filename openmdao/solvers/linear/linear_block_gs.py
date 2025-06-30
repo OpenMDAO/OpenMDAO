@@ -98,8 +98,6 @@ class LinearBlockGS(BlockLinearSolver):
         relevance = system._relevance
 
         if mode == 'fwd':
-            parent_offset = system._dresiduals._root_offset
-
             for subsys in relevance.filter(system._all_subsystem_iter()):
                 # must always do the transfer on all procs even if subsys not local
                 system._transfer('linear', mode, subsys.name)
@@ -108,6 +106,7 @@ class LinearBlockGS(BlockLinearSolver):
                     continue
 
                 b_vec = subsys._dresiduals
+                subslice = b_vec._parent_slice
 
                 scope_out, scope_in = system._get_matvec_scope(subsys)
                 # we use _vars_union to combine relevant variables from the current solve
@@ -119,32 +118,30 @@ class LinearBlockGS(BlockLinearSolver):
                 # of those groups are doing block linear solves).
                 scope_out = self._vars_union(self._scope_out, scope_out)
                 scope_in = self._vars_union(self._scope_in, scope_in)
-                off = b_vec._root_offset - parent_offset
 
                 if subsys._iter_call_apply_linear():
                     subsys._apply_linear(None, mode, scope_out, scope_in)
                     b_vec *= -1.0
-                    b_vec += self._rhs_vec[off:off + len(b_vec)]
+                    b_vec += self._rhs_vec[subslice]
                 else:
-                    b_vec.set_val(self._rhs_vec[off:off + len(b_vec)])
+                    b_vec.set_val(self._rhs_vec[subslice])
 
                 subsys._solve_linear(mode, scope_out, scope_in)
 
         else:  # rev
             subsystems = list(relevance.filter(system._all_subsystem_iter()))
             subsystems.reverse()
-            parent_offset = system._doutputs._root_offset
 
             for subsys in subsystems:
                 if subsys._is_local:
                     b_vec = subsys._doutputs
+                    subslice = b_vec._parent_slice
                     b_vec.set_val(0.0)
 
                     system._transfer('linear', mode, subsys.name)
 
                     b_vec *= -1.0
-                    off = b_vec._root_offset - parent_offset
-                    b_vec += self._rhs_vec[off:off + len(b_vec)]
+                    b_vec += self._rhs_vec[subslice]
 
                     scope_out, scope_in = system._get_matvec_scope(subsys)
                     scope_out = self._vars_union(self._scope_out, scope_out)

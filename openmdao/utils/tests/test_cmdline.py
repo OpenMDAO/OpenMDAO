@@ -1,5 +1,6 @@
 
 import os
+import sys
 import unittest
 import subprocess
 import re
@@ -126,6 +127,7 @@ class CmdlineTestCase(unittest.TestCase):
             self.fail(f"Command '{cmd}' failed.  Return code: {err.returncode}: "
                       f"Output was: \n{err.output.decode('utf-8')}")
 
+    @unittest.skipIf(sys.platform == 'win32', 'problematic on Windows due to the interaction between python and the OS')
     def test_clean(self):
         import openmdao.api as om
 
