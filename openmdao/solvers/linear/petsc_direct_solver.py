@@ -337,7 +337,7 @@ class PETScDirectSolver(DirectSolver):
         nproc = system.comm.size
 
         if self._assembled_jac is not None:
-            matrix = self._assembled_jac._int_mtx._matrix
+            matrix = system._assembled_jac.get_dr_do_matrix()
 
             if matrix is None:
                 # this happens if we're not rank 0 when using owned_sizes
@@ -361,8 +361,7 @@ class PETScDirectSolver(DirectSolver):
             # the matrix during conversion to csc prior to LU decomp, so we can't use COO.
             else:
                 raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in %s." % (type(self._assembled_jac._int_mtx),
-                                                system.msginfo))
+                                   " in %s." % (type(matrix), system.msginfo))
         else:
             if nproc > 1:
                 raise RuntimeError("DirectSolvers without an assembled jacobian are not supported "
@@ -417,11 +416,11 @@ class PETScDirectSolver(DirectSolver):
                     return
 
         # AssembledJacobians are unscaled.
-        if self._assembled_jac is not None:
+        if system._get_assembled_jac() is not None:
             full_b = b_vec
 
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
+                if isinstance(self._assembled_jac._dr_do_mtx, DenseMatrix):
                     sol_array = self._lup.solve(full_b, transpose=transpose)
                     matrix = self._lup.orig_A
                 else:
