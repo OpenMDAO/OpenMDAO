@@ -241,7 +241,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
                 raise RuntimeError(f"No promoted name for abs variable {response}")
 
         if not self._prom_responses:
-            raise RuntimeError(f"Need at least one response variable.")
+            raise RuntimeError("Need at least one response variable.")
 
         outputs = self._case_tracker.get_case_reader().list_source_vars(
             "driver", out_stream=None)["outputs"]
@@ -659,7 +659,7 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
             plots_and_labels_in_grid.insert(idx, p)
 
         # need to push one blank Div for the bottom left corner in the grid
-        p = Div(text=f"")
+        p = Div(text="")
         plots_and_labels_in_grid.append(p)
 
         # column labels

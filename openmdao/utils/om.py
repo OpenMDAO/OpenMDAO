@@ -8,7 +8,6 @@ import argparse
 import importlib.metadata as ilmd
 
 import re
-import subprocess
 
 from openmdao import __version__ as version
 
