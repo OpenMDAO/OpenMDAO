@@ -1002,8 +1002,10 @@ class System(object, metaclass=SystemMetaclass):
         if are_new_scaling and are_existing_scaling and are_existing_bounds and not are_new_bounds:
             # need to unscale bounds using the existing scaling so the new scaling can
             # be applied. But if no new bounds, no need to
-            existing_scaler = existing_dv_meta['scaler'] if existing_dv_meta['scaler'] is not None else 1.0
-            existing_adder = existing_dv_meta['adder'] if existing_dv_meta['adder'] is not None else 0.0
+            existing_scaler = existing_dv_meta['scaler'] \
+                if existing_dv_meta['scaler'] is not None else 1.0
+            existing_adder = existing_dv_meta['adder'] \
+                if existing_dv_meta['adder'] is not None else 0.0
             if lower is not None:
                 lower = lower / existing_scaler - existing_adder
             if upper is not None:
@@ -1175,8 +1177,10 @@ class System(object, metaclass=SystemMetaclass):
         if are_new_scaling and are_existing_scaling and are_existing_bounds and not are_new_bounds:
             # need to unscale bounds using the existing scaling so the new scaling can
             # be applied
-            existing_scaler = existing_cons_meta['scaler'] if existing_cons_meta['scaler'] is not None else 1.0
-            existing_adder = existing_cons_meta['adder'] if existing_cons_meta['adder'] is not None else 0.0
+            existing_scaler = existing_cons_meta['scaler'] \
+                if existing_cons_meta['scaler'] is not None else 1.0
+            existing_adder = existing_cons_meta['adder'] \
+                if existing_cons_meta['adder'] is not None else 0.0
             if lower is not None:
                 lower = lower / existing_scaler - existing_adder
             if upper is not None:
