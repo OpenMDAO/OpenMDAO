@@ -344,7 +344,7 @@ class PETScDirectSolver(DirectSolver):
                 self._lu = self._lup = None
 
             # Perform dense or sparse lu factorization.
-            elif isinstance(matrix, scipy.sparse.csc_matrix):
+            elif isinstance(matrix, (scipy.sparse.csc_matrix, scipy.sparse.csr_matrix)):
                 try:
                     self._lu = PETScLU(matrix, self.options['sparse_solver_name'],
                                        comm=system.comm)
