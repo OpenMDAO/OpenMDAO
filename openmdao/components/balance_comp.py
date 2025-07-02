@@ -16,37 +16,46 @@ class BalanceComp(ImplicitComponent):
 
     Parameters
     ----------
-    name : str
-        The name of the state variable to be created.
-    eq_units : str or None
-        Units for the left-hand-side and right-hand-side of the equation to be balanced.
-    lhs_name : str or None
-        Optional name for the LHS variable associated with the implicit state variable.  If
-        None, the default will be used:  'lhs:{name}'.
-    rhs_name : str or None
-        Optional name for the RHS variable associated with the implicit state variable.  If
-        None, the default will be used:  'rhs:{name}'.
-    rhs_val : int, float, or np.array
-        Default value for the RHS of the given state.  Must be compatible
-        with the shape (optionally) given by the val or shape option in kwargs.
-    use_mult : bool
-        Specifies whether the LHS multiplier is to be used.  If True, then an additional
-        input `mult_name` is created, with the default value given by `mult_val`, that
-        multiplies lhs.  Default is False.
-    mult_name : str or None
-        Optional name for the LHS multiplier variable associated with the implicit state
-        variable. If None, the default will be used: 'mult:{name}'.
-    mult_val : int, float, or np.array
-        Default value for the LHS multiplier of the given state.  Must be compatible
-        with the shape (optionally) given by the val or shape option in kwargs.
-    normalize : bool
-        Specifies whether or not the resulting residual should be normalized by a quadratic
-        function of the RHS.
-    val : float, int, or np.ndarray
-        Set initial value for the state.
-    **kwargs : dict
-        Additional arguments to be passed for the creation of the implicit state variable.
-        (see `add_output` method).
+        name : str
+            The name of the state variable to be created.
+        eq_units : str or None
+            Units for the left-hand-side and right-hand-side of the equation to be balanced.
+        lhs_name : str or None
+            Optional name for the LHS variable associated with the implicit state variable.  If
+            None, the default will be used:  'lhs:{name}'.
+        rhs_name : str or None
+            Optional name for the RHS variable associated with the implicit state variable.  If
+            None, the default will be used:  'rhs:{name}'.
+        rhs_val : int, float, or np.array
+            Default value for the RHS.  Must be compatible with the shape (optionally)
+            given by the val or shape option in kwargs.
+        use_mult : bool
+            Specifies whether the LHS multiplier is to be used.  If True, then an additional
+            input `mult_name` is created, with the default value given by `mult_val`, that
+            multiplies lhs.  Default is False.
+        mult_name : str or None
+            Optional name for the LHS multiplier variable associated with the implicit state
+            variable. If None, the default will be used: 'mult:{name}'.
+        mult_val : int, float, or np.array
+            Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
+            given by the val or shape option in kwargs.
+        normalize : bool
+            Specifies whether or not the resulting residual should be normalized by a quadratic
+            function of the RHS.
+        val : float, int, or np.ndarray
+            Set initial value for the state.
+        lhs_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the left-hand-side input
+            of the equation (see `add_input` method).
+        rhs_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the right-hand-side input
+            of the equation (see `add_input` method).
+        mult_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the multiplier input
+            of the equation, if used (see `add_input` method).
+        **kwargs : dict
+            Additional arguments to be passed for the creation of the implicit state variable.
+            (see `add_output` method).
 
     Attributes
     ----------
@@ -132,17 +141,17 @@ class BalanceComp(ImplicitComponent):
             prob.set_val('exec.x', 2)
             prob.run_model()
         """
-        if 'guess_func' in kwargs:
-            super().__init__(guess_func=kwargs['guess_func'])
-            kwargs.pop('guess_func')
-        else:
-            super().__init__()
+        comp_kwargs = {'distributed', 'run_root_only', 'always_opt',
+                       'use_jit', 'default_shape', 'guess_func'}
+        super().__init__(**{k: v for k, v in kwargs.items() if k in comp_kwargs})
+
+        _kwargs = {k: v for k, v in kwargs.items() if k not in comp_kwargs}
 
         self._state_vars = {}
 
         if name is not None:
             self.add_balance(name, eq_units=eq_units, use_mult=use_mult, normalize=normalize,
-                             **kwargs)
+                             **_kwargs)
 
         self._no_check_partials = True
 
@@ -286,23 +295,42 @@ class BalanceComp(ImplicitComponent):
             The name of the state variable to be created.
         eq_units : str or None
             Units for the left-hand-side and right-hand-side of the equation to be balanced.
-            This argument may be used in place of specifying `lhs_units` and `rhs_units` in
-            the keyword arguments. If both are specified, `lhs_units` and `rhs_units` take
-            precedence.
+        lhs_name : str or None
+            Optional name for the LHS variable associated with the implicit state variable.  If
+            None, the default will be used:  'lhs:{name}'.
+        rhs_name : str or None
+            Optional name for the RHS variable associated with the implicit state variable.  If
+            None, the default will be used:  'rhs:{name}'.
+        rhs_val : int, float, or np.array
+            Default value for the RHS.  Must be compatible with the shape (optionally)
+            given by the val or shape option in kwargs.
         use_mult : bool
             Specifies whether the LHS multiplier is to be used.  If True, then an additional
             input `mult_name` is created, with the default value given by `mult_val`, that
             multiplies lhs.  Default is False.
+        mult_name : str or None
+            Optional name for the LHS multiplier variable associated with the implicit state
+            variable. If None, the default will be used: 'mult:{name}'.
+        mult_val : int, float, or np.array
+            Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
+            given by the val or shape option in kwargs.
         normalize : bool
             Specifies whether or not the resulting residual should be normalized by a quadratic
             function of the RHS.
+        val : float, int, or np.ndarray
+            Set initial value for the state.
+        lhs_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the left-hand-side input
+            of the equation (see `add_input` method).
+        rhs_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the right-hand-side input
+            of the equation (see `add_input` method).
+        mult_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the multiplier input
+            of the equation, if used (see `add_input` method).
         **kwargs : dict
-            Additional arguments to be passed for the creation of the inputs and outputs.
-            Keys pertaining to the implicit output are those arguents of the standard `add_output`
-            method. Keyword arguments for the addition of the lhs, rhs, and mult inputs should be
-            prepended with 'lhs_', 'rhs_', or 'mult_', respecitvely.  For instance, to specify
-            an alternative name instead of `f'lhs:{name}'`, one would specify a keyword argument
-            `lhs_name='foo'`.
+            Additional arguments to be passed for the creation of the implicit state variable.
+            (see `add_output` method).
         """
         options = {'name': name,
                    'eq_units': eq_units,
@@ -368,7 +396,9 @@ class BalanceComp(ImplicitComponent):
             self.add_input(**mult_kwargs)
 
     def setup_partials(self):
-
+        """
+        Declare the partials for outputs once all variable shapes are known.
+        """
         io_meta = self.get_io_metadata()
 
         for name, options in self._state_vars.items():
