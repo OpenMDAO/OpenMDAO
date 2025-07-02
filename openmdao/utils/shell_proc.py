@@ -381,7 +381,7 @@ def _is_process_running(pid):
             return False
     else:
         try:
-            os.kill(pid, 0)
+            os.kill(pid, 0)  # Signal 0 checks if process exists without actually killing it
         except OSError as err:
             if err.errno == errno.ESRCH:  # No such process
                 return False
