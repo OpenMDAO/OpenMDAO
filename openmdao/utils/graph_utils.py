@@ -3,6 +3,7 @@ Various graph related utilities.
 """
 import networkx as nx
 from openmdao.utils.general_utils import all_ancestors, common_subpath
+from openmdao.utils.units import _find_unit
 
 
 def get_sccs_topo(graph):
@@ -280,3 +281,48 @@ def meta2node_data(meta, to_extract):
         Dict containing select metadata for the variable.
     """
     return {k: meta[k] for k in to_extract}
+
+
+_shape_extract = ('distributed', 'shape', 'compute_shape', 'shape_by_conn', 'copy_shape')
+_units_extract = ('units', 'compute_units', 'units_by_conn', 'copy_units')
+
+
+def add_shape_node(graph, name, io, meta):
+    """
+    Add a shape node to the graph.
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        Graph to add the shape node to.
+    name : str
+        Name of the shape node.
+    io : str
+        Input or output.
+    meta : dict
+        Metadata for the variable.
+    """
+    kwargs = {k: meta[k] for k in _shape_extract}
+    graph.add_node(name, io=io, **kwargs)
+
+
+def add_units_node(graph, name, io, meta):
+    """
+    Add a units node to the graph.
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        Graph to add the units node to.
+    name : str
+        Name of the units node.
+    io : str
+        Input or output.
+    meta : dict
+        Metadata for the variable.
+    """
+    kwargs = {k: meta[k] for k in _units_extract}
+    if kwargs['units'] is not None:
+        # Turn units data into a PhysicalUnit so units of expressions can be computed.
+        kwargs['units'] = _find_unit(kwargs['units'])
+    graph.add_node(name, io=io, **kwargs)

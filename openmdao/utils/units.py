@@ -1053,7 +1053,7 @@ def convert_units(val, old_units, new_units=None):
     return (val + offset) * factor
 
 
-def _has_val_mismatch(units1, val1, units2, val2):
+def _has_val_mismatch(units1, val1, units2, val2, rtol=1e-10):
     """
     Return True if values differ after unit conversion or if values differ when units are None.
 
@@ -1067,26 +1067,48 @@ def _has_val_mismatch(units1, val1, units2, val2):
         Units for second value.
     val2 : float or ndarray
         Second value.
+    rtol : float
+        Tolerance for relative difference.
     """
     if units1 != units2:
-        if units1 is None or units2 is None:
-            return True
+        if units1 is not None and units2 is not None:
+            # convert units
+            try:
+                val1 = convert_units(val1, units1, new_units=units2)
+            except TypeError:
+                return True  # units are not compatible
 
-        # convert units
-        try:
-            val1 = convert_units(val1, units1, new_units=units2)
-        except TypeError:
-            return True  # units are not compatible
-
-    rtol = 1e-10
     val1 = np.asarray(val1)
     val2 = np.asarray(val2)
 
-    norm1 = np.linalg.norm(val1)
-    if norm1 == 0.:
-        return np.linalg.norm(val2) > rtol
-    else:
-        return np.linalg.norm(val2 - val1) / norm1 > rtol
+    if val1.shape != val2.shape:
+        return True
+
+    absdiff = np.abs(val2 - val1)
+
+    # Determine the denominator for the relative difference calculation.
+    # To handle cases where neither array is a clear "reference" and to provide
+    # a symmetric check, we use the maximum of the absolute values of the
+    # corresponding elements as the basis for the relative difference.
+    # This means we are checking if |val1[i] - val2[i]| / max(|val1[i]|, |val2[i]|) > tolerance.
+    #
+    # We re-arrange this to: |val1[i] - val2[i]| > tolerance * max(|val1[i]|, |val2[i]|)
+    #
+    # Handling of zeros:
+    # - If both val1[i] and val2[i] are 0:
+    #   max(|0|, |0|) = 0.
+    #   abs_diff[i] = 0.
+    #   The condition (0 > tolerance * 0) simplifies to (0 > 0), which is False. Correct.
+    # - If one is zero and the other is non-zero (e.g., val1[i]=0, val2[i]=X != 0):
+    #   max(|0|, |X|) = |X|.
+    #   abs_diff[i] = |0 - X| = |X|.
+    #   The condition (|X| > tolerance * |X|) simplifies to (1 > tolerance).
+    #   This means a difference from zero is considered significant if tolerance < 1. Correct.
+    # - If both are non-zero:
+    #   The check becomes |val1[i] - val2[i]| / max(|val1[i]|, |val2[i]|) > tolerance. Correct.
+    denominator_basis = np.maximum(np.abs(val1), np.abs(val2))
+    threshold = rtol * denominator_basis
+    return np.any(absdiff > threshold)
 
 
 def simplify_unit(old_unit_str, msginfo=''):

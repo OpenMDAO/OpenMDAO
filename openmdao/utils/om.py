@@ -33,6 +33,8 @@ from openmdao.visualization.scaling_viewer.scaling_report import _scaling_setup_
 from openmdao.visualization.timing_viewer.timing_viewer import _timing_setup_parser, _timing_cmd
 from openmdao.visualization.dyn_shape_plot import _view_dyn_shapes_setup_parser, \
     _view_dyn_shapes_cmd
+from openmdao.visualization.dyn_units_plot import _view_dyn_units_setup_parser, \
+    _view_dyn_units_cmd
 try:
     import bokeh
     from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
@@ -768,6 +770,11 @@ _command_map = {
         _view_dyn_shapes_setup_parser,
         _view_dyn_shapes_cmd,
         "View the dynamic shape dependency graph.",
+    ),
+    "view_dyn_units": (
+        _view_dyn_units_setup_parser,
+        _view_dyn_units_cmd,
+        "View the dynamic units dependency graph.",
     ),
     "view_mm": (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
     "view_reports": (

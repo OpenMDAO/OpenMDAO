@@ -855,7 +855,7 @@ class MPITests(unittest.TestCase):
                 "\n   <model> <class Group>: Attempted to connect from 'ivc.x0' to 'adder.x', but "
                 "'ivc.x0' doesn't exist. Perhaps you meant to connect to one of the following outputs: ['ivc.x']."
                 "\n   <model> <class Group>: Failed to resolve shapes for ['adder.x']. To see the "
-                "dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'." in str(err))
+                "dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'." in str(err))
         else:
             self.fail("Exception expected.")
 

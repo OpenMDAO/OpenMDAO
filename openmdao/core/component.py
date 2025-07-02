@@ -529,6 +529,7 @@ class Component(System):
 
     def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
                   shape_by_conn=False, copy_shape=None, compute_shape=None,
+                  units_by_conn=False, copy_units=None, compute_units=None,
                   require_connection=False, distributed=None, primal_name=None):
         """
         Add an input variable to the component.
@@ -558,6 +559,14 @@ class Component(System):
         compute_shape : function
             A function taking a dict arg containing names and shapes of this component's outputs
             and returning the shape of this input.
+        units_by_conn : bool
+            If True, units this input to match its connected output.
+        copy_units : str or None
+            If a str, that str is the name of a variable. Units this input to match that of
+            the named variable.
+        compute_units : function
+            A function taking a dict arg containing names and PhysicalUnits of this component's
+            outputs and returning the PhysicalUnits of this input.
         require_connection : bool
             If True and this input is not a design variable, it must be connected to an output.
         distributed : bool
@@ -595,14 +604,23 @@ class Component(System):
         if copy_shape and compute_shape:
             raise ValueError(f"{self.msginfo}: Only one of 'copy_shape' or 'compute_shape' can "
                              "be specified.")
+        if copy_units and compute_units:
+            raise ValueError(f"{self.msginfo}: Only one of 'copy_units' or 'compute_units' can "
+                             "be specified.")
 
         if copy_shape and not isinstance(copy_shape, str):
             raise TypeError(f"{self.msginfo}: The copy_shape argument should be a str or None but "
                             f"a '{type(copy_shape).__name__}' was given.")
+        if copy_units and not isinstance(copy_units, str):
+            raise TypeError(f"{self.msginfo}: The copy_units argument should be a str or None but "
+                            f"a '{type(copy_units).__name__}' was given.")
 
         if compute_shape and not callable(compute_shape):
             raise TypeError(f"{self.msginfo}: The compute_shape argument should be callable but "
                             f"a '{type(compute_shape).__name__}' was given.")
+        if compute_units and not callable(compute_units):
+            raise TypeError(f"{self.msginfo}: The compute_units argument should be callable but "
+                            f"a '{type(compute_units).__name__}' was given.")
 
         if shape_by_conn or copy_shape or compute_shape:
             if shape or ndim(val) > 0:
@@ -613,6 +631,12 @@ class Component(System):
             # value, shape: based on args, making sure they are compatible
             val, shape = ensure_compatible(name, val, shape,
                                            default_shape=self.options['default_shape'])
+
+        if (units_by_conn or copy_units or compute_units) and units is not None:
+            raise ValueError("%s: If units is to be set dynamically using 'units_by_conn', "
+                             "'copy_units', or 'compute_units', 'units' should be None, but "
+                             "units of '%s' was given for variable '%s'."
+                             % (self.msginfo, units, name))
 
         # until we get rid of component level distributed option, handle the case where
         # component distributed has been set to True but variable distributed has been set
@@ -626,6 +650,8 @@ class Component(System):
 
         if compute_shape is not None and is_lambda(compute_shape):
             compute_shape = LambdaPickleWrapper(compute_shape)
+        if compute_units is not None and is_lambda(compute_units):
+            compute_units = LambdaPickleWrapper(compute_units)
 
         if primal_name is not None:
             self._valid_name_map[name] = primal_name
@@ -642,6 +668,9 @@ class Component(System):
             'shape_by_conn': shape_by_conn,
             'compute_shape': compute_shape,
             'copy_shape': copy_shape,
+            'units_by_conn': units_by_conn,
+            'compute_units': compute_units,
+            'copy_units': copy_units,
             'require_connection': require_connection,
             'distributed': distributed,
         }
@@ -731,8 +760,9 @@ class Component(System):
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
-                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None,
-                   primal_name=None):
+                   shape_by_conn=False, copy_shape=None, compute_shape=None,
+                   units_by_conn=False, copy_units=None, compute_units=None,
+                   distributed=None, primal_name=None):
         """
         Add an output variable to the component.
 
@@ -783,6 +813,14 @@ class Component(System):
         compute_shape : function
             A function taking a dict arg containing names and shapes of this component's inputs
             and returning the shape of this output.
+        units_by_conn : bool
+            If True, units this output to match its connected input(s).
+        copy_units : str or None
+            If a str, that str is the name of a variable. Units this output to match that of
+            the named variable.
+        compute_units : function
+            A function taking a dict arg containing names and PhysicalUnits of this component's
+            inputs and returning the PhysicalUnits of this output.
         distributed : bool
             If True, this variable is a distributed variable, so it can have different sizes/values
             across MPI processes.
@@ -803,6 +841,12 @@ class Component(System):
                              "'copy_shape', or 'compute_shape', 'shape' and 'val' should be scalar,"
                              " but shape of '%s' and val of '%s' was given for variable '%s'."
                              % (self.msginfo, shape, val, name))
+
+        if (units_by_conn or copy_units or compute_units) and units is not None:
+            raise ValueError("%s: If units is to be set dynamically using 'units_by_conn', "
+                             "'copy_units', or 'compute_units', 'units' should be None, but "
+                             "units of '%s' was given for variable '%s'."
+                             % (self.msginfo, units, name))
 
         if not isinstance(name, str):
             raise TypeError('%s: The name argument should be a string.' % self.msginfo)
@@ -886,17 +930,28 @@ class Component(System):
         if copy_shape and compute_shape:
             raise ValueError(f"{self.msginfo}: Only one of 'copy_shape' or 'compute_shape' can "
                              "be specified.")
+        if copy_units and compute_units:
+            raise ValueError(f"{self.msginfo}: Only one of 'copy_units' or 'compute_units' can "
+                             "be specified.")
 
         if copy_shape and not isinstance(copy_shape, str):
             raise TypeError(f"{self.msginfo}: The copy_shape argument should be a str or None but "
                             f"a '{type(copy_shape).__name__}' was given.")
+        if copy_units and not isinstance(copy_units, str):
+            raise TypeError(f"{self.msginfo}: The copy_units argument should be a str or None but "
+                            f"a '{type(copy_units).__name__}' was given.")
 
         if compute_shape and not callable(compute_shape):
             raise TypeError(f"{self.msginfo}: The compute_shape argument should be callable but "
                             f"a '{type(compute_shape).__name__}' was given.")
+        if compute_units and not callable(compute_units):
+            raise TypeError(f"{self.msginfo}: The compute_units argument should be callable but "
+                            f"a '{type(compute_units).__name__}' was given.")
 
         if compute_shape is not None and is_lambda(compute_shape):
             compute_shape = LambdaPickleWrapper(compute_shape)
+        if compute_units is not None and is_lambda(compute_units):
+            compute_units = LambdaPickleWrapper(compute_units)
 
         if primal_name is not None:
             self._valid_name_map[name] = primal_name
@@ -918,6 +973,9 @@ class Component(System):
             'shape_by_conn': shape_by_conn,
             'compute_shape': compute_shape,
             'copy_shape': copy_shape,
+            'units_by_conn': units_by_conn,
+            'compute_units': compute_units,
+            'copy_units': copy_units,
         }
 
         # this will get reset later if comm size is 1

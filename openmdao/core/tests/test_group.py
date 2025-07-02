@@ -1502,8 +1502,8 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
                          "\nCollected errors for problem 'promote_units_and_none':\n   "
                          "<model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', "
-                         "are connected but their metadata entries ['units', 'val'] differ. "
-                         "Call <group>.set_input_defaults('x', units=?, val=?), "
+                         "are connected but their metadata entries ['units'] differ. "
+                         "Call <group>.set_input_defaults('x', units=?), "
                          "where <group> is the model to remove the ambiguity.")
 
     def test_double_set_input_defaults(self):
