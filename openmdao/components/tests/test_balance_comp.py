@@ -355,37 +355,30 @@ class TestBalanceComp(unittest.TestCase):
 
         bal = om.BalanceComp()
 
-        bal.add_balance('x', val=1, shape_by_conn=True)
+        bal.add_balance('x', shape_by_conn=True, rhs_name='y_tgt',
+                        rhs_kwargs={'shape_by_conn': True},
+                        lhs_kwargs={'shape_by_conn': True})
 
         exec_comp = om.ExecComp('y=x**2', x={'shape_by_conn': True}, y={'copy_shape': 'x'})
 
-        prob.model.add_subsystem(name='ivc',
-                                 subsys=om.IndepVarComp(name='y_tgt', val=4 * np.ones(n)))
-
         prob.model.add_subsystem(name='exec', subsys=exec_comp)
 
-        # prob.model.add_subsystem(name='balance', subsys=bal)
+        prob.model.add_subsystem(name='balance', subsys=bal)
 
-        # prob.model.connect('ivc.y_tgt', 'balance.rhs:x')
-        # prob.model.connect('balance.x', 'exec.x')
-        # prob.model.connect('exec.y', 'balance.lhs:x')
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
         prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
-        prob['ivc.y_tgt'] = 4. * np.ones(n)
+        prob['balance.y_tgt'] = 4. * np.ones(n)
         prob['exec.x'] = np.random.rand(n)
-        # prob['balance.x'] = np.random.rand(n)
 
         prob.run_model()
 
-        # assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
-
-        # cpd = force_check_partials(prob, out_stream=None)
-
-        # assert_check_partials(cpd, atol=2e-5, rtol=2e-5)
+        assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
 
     def test_shape(self):
         n = 100
@@ -826,7 +819,7 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.connect('exec.y', 'balance.lhs:x')
 
         prob.model.linear_solver = om.DirectSolver(assemble_jac=True)
-        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=2)
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=100, iprint=0)
 
         prob.setup()
 
@@ -836,16 +829,7 @@ class TestBalanceComp(unittest.TestCase):
 
         b = prob.get_val('exec.b')
         c = prob.get_val('exec.c')
-        # x = prob.get_val('exec.x')
-        # y = prob.get_val('exec.y')
-        lhs = prob.get_val('balance.lhs:x')
-        rhs = prob.get_val('balance.rhs:x')
 
-        print(50*'-')
-        print(lhs)
-        print(rhs)
-
-        assert_almost_equal(prob.get_val('balance.x'), -c/b, decimal=6)
         assert_almost_equal(-c/b, prob.get_val('balance.x'), decimal=6)  # expected
 
     def test_specified_shape(self):

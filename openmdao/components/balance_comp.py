@@ -1,6 +1,5 @@
 """Define the BalanceComp class."""
 
-import fnmatch
 from types import FunctionType
 
 import numpy as np
@@ -142,7 +141,8 @@ class BalanceComp(ImplicitComponent):
         self._state_vars = {}
 
         if name is not None:
-            self.add_balance(name, eq_units=eq_units, use_mult=use_mult, normalize=normalize, **kwargs)
+            self.add_balance(name, eq_units=eq_units, use_mult=use_mult, normalize=normalize,
+                             **kwargs)
 
         self._no_check_partials = True
 
@@ -189,9 +189,6 @@ class BalanceComp(ImplicitComponent):
                 residuals[name] = (inputs[options['mult_name']] * lhs - rhs) * _scale_factor
             else:
                 residuals[name] = (lhs - rhs) * _scale_factor
-                print(lhs)
-                print(rhs)
-                print(_scale_factor)
 
     def linearize(self, inputs, outputs, jacobian):
         """
@@ -273,8 +270,9 @@ class BalanceComp(ImplicitComponent):
         if self.options['guess_func'] is not None:
             self.options['guess_func'](inputs, outputs, residuals)
 
-    def add_balance(self, name, eq_units=None, use_mult=False, normalize=True,
-                    **kwargs):
+    def add_balance(self, name, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
+                    use_mult=False, mult_name=None, mult_val=1.0, normalize=True, val=None,
+                    lhs_kwargs=None, rhs_kwargs=None, mult_kwargs=None, **kwargs):
         """
         Add a new state variable and associated equation to be balanced.
 
@@ -311,52 +309,43 @@ class BalanceComp(ImplicitComponent):
                    'use_mult': use_mult,
                    'normalize': normalize}
 
-        # Separate kwargs
-        lhs_kwargs = {k.partition('_')[-1]: v for k, v in kwargs.items() if k.startswith('lhs_')}
-        rhs_kwargs = {k.partition('_')[-1]: v for k, v in kwargs.items() if k.startswith('rhs_')}
-        mult_kwargs = {k.partition('_')[-1]: v for k, v in kwargs.items() if k.startswith('mult_')}
-        output_kwargs = {k: v for k, v in kwargs.items() if
-                         not k.startswith('lhs_') and
-                         not k.startswith('rhs_') and
-                         not k.startswith('mult_')}
+        lhs_kwargs = lhs_kwargs or {}
+        rhs_kwargs = rhs_kwargs or {}
+        mult_kwargs = mult_kwargs or {}
+        output_kwargs = kwargs
 
-        # Store the name of the inputs
-        lhs_kwargs['name'] = options['lhs_name'] = lhs_kwargs.get('name', f'lhs:{name}')
-        rhs_kwargs['name'] = options['rhs_name'] = rhs_kwargs.get('name', f'rhs:{name}')
-        mult_kwargs['name'] = options['mult_name'] = mult_kwargs.get('name', f'mult:{name}')
+        # Put the legacy arguments in the kwarg dictionaries
+        lhs_kwargs['name'] = options['lhs_name'] = lhs_kwargs.get('name',
+                                                                  lhs_name or f'lhs:{name}')
+        rhs_kwargs['name'] = options['rhs_name'] = rhs_kwargs.get('name',
+                                                                  rhs_name or f'rhs:{name}')
+        mult_kwargs['name'] = options['mult_name'] = mult_kwargs.get('name',
+                                                                     mult_name or f'mult:{name}')
+
+        lhs_kwargs['units'] = lhs_kwargs.get('units', eq_units)
+        rhs_kwargs['units'] = rhs_kwargs.get('units', eq_units)
+
+        rhs_kwargs['val'] = rhs_val = rhs_kwargs.get('val', rhs_val)
+        mult_kwargs['val'] = mult_kwargs.get('val', mult_val)
 
         # Store options
         self._state_vars[name] = options
 
-        # Override eq units if specified
-        lhs_kwargs['units'] = lhs_kwargs.get('units', eq_units)
-        rhs_kwargs['units'] = rhs_kwargs.get('units', eq_units)
-
-        val = kwargs.get('val', 1.0)
-        rhs_val = rhs_kwargs.get('val', 1.0)
-
         if val is None:
             # If user doesn't specify initial guess for val, we can size problem from initial
             # rhs_val.
-            if 'shape' not in kwargs and np.ndim(rhs_val) > 0:
-                kwargs['shape'] = rhs_val.shape
+            if 'shape' not in output_kwargs and np.ndim(rhs_val) > 0:
+                output_kwargs['shape'] = rhs_val.shape
+            else:
+                output_kwargs['val'] = 1.0
         else:
             output_kwargs['val'] = val
 
-        output_has_explicit_shape = 'shape' in output_kwargs or np.ndim(output_kwargs.get('val', 0)) > 0
-        rhs_has_explicit_shape = 'shape' in rhs_kwargs or np.ndim(rhs_kwargs.get('val', 0)) > 0
-        lhs_has_explicit_shape = 'shape' in rhs_kwargs or np.ndim(lhs_kwargs.get('val', 0)) > 0
-        mult_has_explicit_shape = 'shape' in rhs_kwargs or np.ndim(mult_kwargs.get('val', 0)) > 0
+        output_has_explicit_shape = 'shape' in output_kwargs or \
+            np.ndim(output_kwargs.get('val', 0)) > 0
+        rhs_has_explicit_shape = 'shape' in rhs_kwargs or \
+            np.ndim(rhs_kwargs.get('val', 0)) > 0
 
-        output_has_shape = any(fnmatch.fnmatch(k, '*shape*') for k in output_kwargs) or output_has_explicit_shape
-        lhs_has_shape = any(fnmatch.fnmatch(k, '*shape*') for k in lhs_kwargs) or lhs_has_explicit_shape
-        rhs_has_shape = any(fnmatch.fnmatch(k, '*shape*') for k in rhs_kwargs) or rhs_has_explicit_shape
-        mult_has_shape = any(fnmatch.fnmatch(k, '*shape*') for k in mult_kwargs) or mult_has_explicit_shape
-
-        # Precedence in shape is given by:
-        # 1. The shape of the output.
-        # 2. If the output shape is unspecified and the val is a scalar, use rhs_val.shape
-        # 3. If neither of those are avaialble
         shape = None
         if output_has_explicit_shape:
             _, shape = ensure_compatible(name, output_kwargs.get('val', 1.),
@@ -366,8 +355,6 @@ class BalanceComp(ImplicitComponent):
             _, shape = ensure_compatible(name, rhs_kwargs.get('val', 1.),
                                          shape=rhs_kwargs.get('shape', None),
                                          default_shape=self.options['default_shape'])
-        elif not(output_has_shape or lhs_has_shape or rhs_has_shape or mult_has_shape):
-            shape = self.options['default_shape']
 
         if shape is not None:
             for _kwargs in (output_kwargs, lhs_kwargs, rhs_kwargs, mult_kwargs):
@@ -379,10 +366,6 @@ class BalanceComp(ImplicitComponent):
 
         if use_mult:
             self.add_input(**mult_kwargs)
-
-        print(output_kwargs)
-        print(lhs_kwargs)
-        print(rhs_kwargs)
 
     def setup_partials(self):
 
