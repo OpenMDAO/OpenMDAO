@@ -6,6 +6,7 @@ import numpy as np
 
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils import cs_safe
+from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.general_utils import ensure_compatible
 
@@ -141,19 +142,28 @@ class BalanceComp(ImplicitComponent):
             prob.set_val('exec.x', 2)
             prob.run_model()
         """
-        comp_kwargs = {'distributed', 'run_root_only', 'always_opt',
-                       'use_jit', 'default_shape', 'guess_func'}
+        # Pre-declare options so we can separate component kwargs from output kwargs.
+        self.options = OptionsDictionary()
+        self._declare_options()
+        comp_kwargs = set(self.options._dict.keys())
         super().__init__(**{k: v for k, v in kwargs.items() if k in comp_kwargs})
-
-        _kwargs = {k: v for k, v in kwargs.items() if k not in comp_kwargs}
 
         self._state_vars = {}
 
         if name is not None:
+            _kwargs = {k: v for k, v in kwargs.items() if k not in comp_kwargs}
             self.add_balance(name, eq_units=eq_units, use_mult=use_mult, normalize=normalize,
                              **_kwargs)
 
         self._no_check_partials = True
+
+    def _declare_options(self):
+        super()._declare_options()
+        self.options.declare('guess_func', types=FunctionType, allow_none=True, default=None,
+                             recordable=False, desc='A callable function in the form '
+                             'f(inputs, outputs, residuals) that can provide an initial "guess" '
+                             'value of the state variable(s) based on the inputs, outputs and '
+                             'residuals.')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
