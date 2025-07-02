@@ -1209,6 +1209,130 @@ class TestScaling(unittest.TestCase):
         totals = problem.check_totals(compact_print=True)
         assert_check_totals(totals)
 
+    def test_total_adder_with_no_total_scaler(self):
+        for g_ref in [2.0000001, 2.0]:
+            with self.subTest(f'{g_ref=}'):
+
+                prob = om.Problem()
+
+                prob.model.add_subsystem('paraboloid', om.ExecComp(['f = (x-3)**2 + x*y + (y+4)**2 - 3',
+                                                                    'g = y - x'],
+                                                                    x = {'shape_by_conn': True},
+                                                                    y = {'shape_by_conn': True},
+                                                                    f = {'copy_shape': 'x'},
+                                                                    g = {'copy_shape': 'x'}))
+
+                # setup the optimization
+                prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+
+                prob.model.add_design_var('paraboloid.x', lower=-50, upper=50)
+                prob.model.add_design_var('paraboloid.y', lower=-50, upper=50)
+                prob.model.add_constraint('paraboloid.g', lower=0.0, ref0=1., ref=g_ref)
+                prob.model.add_objective('paraboloid.f')
+
+                prob.setup()
+
+                prob.set_val('paraboloid.x', 3.)
+                prob.set_val('paraboloid.y', 4.)
+
+                prob.run_driver()
+
+                g = prob.get_val('paraboloid.g')
+                # g should be active on its lower bound of 0.0
+                assert_near_equal(g, 0.0, tolerance=1.0E-8)
+
+
+
+                prob = om.Problem()
+
+                prob.model.add_subsystem('paraboloid', om.ExecComp(['f = (x-3)**2 + x*y + (y+4)**2 - 3',
+                                                                    'g = y - x'],
+                                                                    x = {'shape_by_conn': True},
+                                                                    y = {'shape_by_conn': True},
+                                                                    f = {'copy_shape': 'x'},
+                                                                    g = {'copy_shape': 'x'}))
+
+                # setup the optimization
+                prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+
+                prob.model.add_design_var('paraboloid.x', lower=-50, upper=50)
+                prob.model.add_design_var('paraboloid.y', lower=-50, upper=50)
+                prob.model.add_constraint('paraboloid.g', lower=0.0, ref0=1., ref=2.)
+                prob.model.add_objective('paraboloid.f')
+
+                prob.setup()
+
+                prob.set_val('paraboloid.x', 3.)
+                prob.set_val('paraboloid.y', 4.)
+
+                prob.run_driver()
+
+                g = prob.get_val('paraboloid.g')
+                # g should be active on its lower bound of 0.0
+                assert_near_equal(g, 0.0, tolerance=1.0E-8)
+
+    def test_total_adder_with_no_total_scaler_via_options(self):
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('paraboloid', om.ExecComp(['f = (x-3)**2 + x*y + (y+4)**2 - 3',
+                                                            'g = y - x'],
+                                                            x = {'shape_by_conn': True},
+                                                            y = {'shape_by_conn': True},
+                                                            f = {'copy_shape': 'x'},
+                                                            g = {'copy_shape': 'x'}))
+
+        # setup the optimization
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+
+        prob.model.add_design_var('paraboloid.x', lower=-50, upper=50)
+        prob.model.add_design_var('paraboloid.y', lower=-50, upper=50)
+        prob.model.add_constraint('paraboloid.g', lower=0.0, ref0=1., ref=2.01)
+        prob.model.add_objective('paraboloid.f')
+
+        prob.setup()
+
+        prob.set_val('paraboloid.x', 3.)
+        prob.set_val('paraboloid.y', 4.)
+
+        prob.run_driver()
+
+        g = prob.get_val('paraboloid.g')
+        # g should be active on its lower bound of 0.0
+        assert_near_equal(g, 0.0, tolerance=1.0E-8)
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem('paraboloid', om.ExecComp(['f = (x-3)**2 + x*y + (y+4)**2 - 3',
+                                                            'g = y - x'],
+                                                            x = {'shape_by_conn': True},
+                                                            y = {'shape_by_conn': True},
+                                                            f = {'copy_shape': 'x'},
+                                                            g = {'copy_shape': 'x'}))
+
+        # setup the optimization
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+
+        prob.model.add_design_var('paraboloid.x', lower=-50, upper=50)
+        prob.model.add_design_var('paraboloid.y', lower=-50, upper=50)
+        prob.model.add_constraint('paraboloid.g', lower=0.0, ref0=1., ref=2.)
+        prob.model.add_objective('paraboloid.f')
+
+        prob.setup()
+
+        prob.set_val('paraboloid.x', 3.)
+        prob.set_val('paraboloid.y', 4.)
+
+        for g_ref in [2.0000001, 2.0]:
+            with self.subTest(f'{g_ref=}'):
+
+                prob.model.set_constraint_options('paraboloid.g', ref=g_ref)
+                prob.run_driver()
+
+                g = prob.get_val('paraboloid.g')
+                # g should be active on its lower bound of 0.0
+                assert_near_equal(g, 0.0, tolerance=1.0E-8)
+
 
 class MyComp(om.ExplicitComponent):
 
