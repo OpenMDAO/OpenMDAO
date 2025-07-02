@@ -75,7 +75,9 @@ class BalanceComp(ImplicitComponent):
                              'value of the state variable(s) based on the inputs, outputs and '
                              'residuals.')
 
-    def __init__(self, name=None, eq_units=None, use_mult=False, normalize=True, **kwargs):
+    def __init__(self, name=None, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
+                 use_mult=False, mult_name=None, mult_val=1.0, normalize=True, val=None,
+                 lhs_kwargs=None, rhs_kwargs=None, mult_kwargs=None, **kwargs):
         r"""
         Initialize a BalanceComp, optionally creating a new implicit state variable.
 
