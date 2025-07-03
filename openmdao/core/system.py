@@ -4139,7 +4139,7 @@ class System(object, metaclass=SystemMetaclass):
                             except KeyError:
                                 ret_meta[key] = NA
 
-                    if meta['shape'] is None and 'val' in ret_meta:
+                    if 'shape' in meta and meta['shape'] is None and 'val' in ret_meta:
                         issue_warning(f"{self.msginfo}: Can't retrieve 'val' for '{prom}' because "
                                       "shape isn't known yet.  Try calling final_setup() first.")
                         keyset.discard('val')
