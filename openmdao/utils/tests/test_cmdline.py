@@ -128,6 +128,7 @@ class CmdlineTestCase(unittest.TestCase):
                       f"Output was: \n{err.output.decode('utf-8')}")
 
     @unittest.skipIf(sys.platform == 'win32', 'problematic on Windows due to the interaction between python and the OS')
+    @unittest.skipIf(sys.platform == 'darwin', 'problematic on MacOS due to the interaction between python and the OS')
     def test_clean(self):
         import openmdao.api as om
 
