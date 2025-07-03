@@ -1366,8 +1366,6 @@ def _init_meta(pattern_meta, prev_inst_meta):
         meta['dependent'] = False
         meta.update(pattern_meta)
 
-    meta['refcount'] = 1
-
     return meta
 
 

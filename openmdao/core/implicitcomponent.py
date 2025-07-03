@@ -661,13 +661,13 @@ class ImplicitComponent(Component):
                     if (oabs_name, wabs) in self._subjacs_info:
                         existing_metas.append(self._subjacs_info[oabs_name, wabs])
 
-                newmeta = SUBJAC_META_DEFAULTS.copy()
                 if not existing_metas:
-                    existing_metas.append(newmeta)
+                    newmeta = SUBJAC_META_DEFAULTS.copy()
                     if 'method' in pattern_meta:
                         method = pattern_meta['method']
                         if method in ('fd', 'cs'):
-                            existing_metas[0]['method'] = method
+                            newmeta['method'] = method
+                    existing_metas.append(newmeta)
 
                 if pattern_rows is not None:
                     rows = []
@@ -718,8 +718,7 @@ class ImplicitComponent(Component):
                             meta['val'] = val
 
                 else:
-                    outsize = shape_to_len(self._var_abs2meta['output'][self.pathname + '.' +
-                                                                        oname]['shape'])
+                    outsize = shape_to_len(self._var_abs2meta['output'][oabs_name]['shape'])
                     for meta in existing_metas:
                         if pattern_val is not None:
                             val, r, c = _subjac_meta2value(meta)
