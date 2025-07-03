@@ -4,7 +4,7 @@ import unittest
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
-from openmdao.utils.testing_utils import use_tempdirs
+from openmdao.utils.testing_utils import require_pyoptsparse, use_tempdirs
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -13,6 +13,7 @@ except ImportError:
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@require_pyoptsparse(optimizer='SLSQP')
 @use_tempdirs
 class MPISetvalBug(unittest.TestCase):
     N_PROCS = 2
@@ -99,5 +100,3 @@ class MPISetvalBug(unittest.TestCase):
 
         assert_near_equal(p.model.get_val(p.model.get_source('x1')), 2.5)
         assert_near_equal(p.model.get_val(p.model.get_source('x2')), 2.6)
-
-

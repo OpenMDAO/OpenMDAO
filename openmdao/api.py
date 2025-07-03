@@ -42,6 +42,7 @@ from openmdao.components.jax_implicit_comp import JaxImplicitComponent
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.linear.linear_block_jac import LinearBlockJac
 from openmdao.solvers.linear.direct import DirectSolver
+from openmdao.solvers.linear.petsc_direct_solver import PETScDirectSolver
 from openmdao.solvers.linear.petsc_ksp import PETScKrylov
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov

@@ -1004,10 +1004,14 @@ class System(object, metaclass=SystemMetaclass):
         if are_new_scaling and are_existing_scaling and are_existing_bounds and not are_new_bounds:
             # need to unscale bounds using the existing scaling so the new scaling can
             # be applied. But if no new bounds, no need to
+            existing_scaler = existing_dv_meta['scaler'] \
+                if existing_dv_meta['scaler'] is not None else 1.0
+            existing_adder = existing_dv_meta['adder'] \
+                if existing_dv_meta['adder'] is not None else 0.0
             if lower is not None:
-                lower = lower / existing_dv_meta['scaler'] - existing_dv_meta['adder']
+                lower = lower / existing_scaler - existing_adder
             if upper is not None:
-                upper = upper / existing_dv_meta['scaler'] - existing_dv_meta['adder']
+                upper = upper / existing_scaler - existing_adder
 
         # Now figure out scaling
         if are_new_scaling:
@@ -1175,12 +1179,16 @@ class System(object, metaclass=SystemMetaclass):
         if are_new_scaling and are_existing_scaling and are_existing_bounds and not are_new_bounds:
             # need to unscale bounds using the existing scaling so the new scaling can
             # be applied
+            existing_scaler = existing_cons_meta['scaler'] \
+                if existing_cons_meta['scaler'] is not None else 1.0
+            existing_adder = existing_cons_meta['adder'] \
+                if existing_cons_meta['adder'] is not None else 0.0
             if lower is not None:
-                lower = lower / existing_cons_meta['scaler'] - existing_cons_meta['adder']
+                lower = lower / existing_scaler - existing_adder
             if upper is not None:
-                upper = upper / existing_cons_meta['scaler'] - existing_cons_meta['adder']
+                upper = upper / existing_scaler - existing_adder
             if equals is not None:
-                equals = equals / existing_cons_meta['scaler'] - existing_cons_meta['adder']
+                equals = equals / existing_scaler - existing_adder
 
         # Now figure out scaling
         if are_new_scaling:
@@ -2354,7 +2362,7 @@ class System(object, metaclass=SystemMetaclass):
                 meta['total_adder'] = unit_adder + declared_adder / unit_scaler
                 meta['total_scaler'] = declared_scaler * unit_scaler
 
-            if meta['total_scaler'] is not None:
+            if meta['total_scaler'] is not None or meta['total_adder'] is not None:
                 has_scaling = True
 
         resp = self._responses
@@ -2397,7 +2405,7 @@ class System(object, metaclass=SystemMetaclass):
                 meta['total_scaler'] = declared_scaler * unit_scaler
                 meta['total_adder'] = unit_adder + declared_adder / unit_scaler
 
-            if meta['total_scaler'] is not None:
+            if meta['total_scaler'] is not None or meta['total_adder'] is not None:
                 has_scaling = True
 
         for s in self._subsystems_myproc:
