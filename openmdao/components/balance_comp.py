@@ -413,8 +413,6 @@ class BalanceComp(ImplicitComponent):
         """
         Declare the partials for outputs once all variable shapes are known.
         """
-        io_meta = self.get_io_metadata()
-
         for name, options in self._state_vars.items():
             self.declare_partials(of=name, wrt=options['lhs_name'], diagonal=True, val=1.0)
             self.declare_partials(of=name, wrt=options['rhs_name'], diagonal=True, val=1.0)
