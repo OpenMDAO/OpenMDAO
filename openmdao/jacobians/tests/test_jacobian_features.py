@@ -180,7 +180,7 @@ class TestJacobianFeatures(unittest.TestCase):
         # Note: since this test is looking for something not user-facing, it is inherently fragile
         # w.r.t. internal implementations.
         model._linearize(model._assembled_jac)
-        jac = model._assembled_jac._int_mtx._matrix
+        jac = model._assembled_jac._dr_do_mtx._matrix
 
         # Testing dependence by examining the number of entries in the Jacobian. If non-zeros are
         # removed during array creation (e.g. `eliminate_zeros` function on scipy.sparse matrices),
@@ -199,20 +199,20 @@ class TestJacobianFeatures(unittest.TestCase):
 
     @parameterized.expand([
         ({'of': 'f', 'wrt': 'z', 'val': np.ones((1, 5))},
-         r"'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): Expected 1x4 but val is 1x5"),
+         "'simple' <class SimpleCompKwarg>: d(f)/d(z), Expected shape (1, 4) but got (1, 5)."),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, -1, 4], 'cols': [0, 0, 0]},
-         r"'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): row indices must be non-negative"),
+         "'simple' <class SimpleCompKwarg>: d(f)/d(z): row indices must be non-negative"),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, -1, 4]},
-         r"'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): col indices must be non-negative"),
+         "'simple' <class SimpleCompKwarg>: d(f)/d(z): col indices must be non-negative"),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0], 'cols': [0, 4]},
-         r"'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): Expected 1x4 but declared at least 1x5"),
+         "'simple' <class SimpleCompKwarg>: d(f)/d(z): Expected 1x4 but declared at least 1x5."),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 10]},
-         r"'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): If one of rows/cols is specified, then both must be specified."),
+         "'simple' <class SimpleCompKwarg>: d(f)/d(z): If one of rows/cols is specified, then both must be specified."),
         ({'of': 'f', 'wrt': 'z', 'cols': [0, 10]},
-         r"'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): If one of rows/cols is specified, then both must be specified."),
+         "'simple' <class SimpleCompKwarg>: d(f)/d(z): If one of rows/cols is specified, then both must be specified."),
         ({'of': 'f', 'wrt': 'z', 'rows': [0, 0, 0], 'cols': [0, 1, 3], 'val': [0, 1]},
-         r"'simple' <class SimpleCompKwarg>: d\(f\)/d\(z\): If rows and cols are specified, val must be a scalar or have the same shape, "
-         r"val: \(2L?,\), rows/cols: \(3L?,\)"),
+         "'simple' <class SimpleCompKwarg>: d(f)/d(z): If rows and cols are specified, val must be a scalar or have the same shape, "
+         "val: (2,), rows/cols: (3,)"),
     ])
     def test_bad_sizes(self, partials_kwargs, error_msg):
         # This tests various shape mismatches. Basic size mismatch is now tested earlier in the
@@ -224,10 +224,10 @@ class TestJacobianFeatures(unittest.TestCase):
 
         # Some of the tests are expected to fail in setup, and some in final_setup, so put them
         # both under the assert.
-        with self.assertRaises(ValueError) as ex:
+        with self.assertRaises(Exception) as ex:
             problem.setup()
             problem.run_model()
-        self.assertRegex(str(ex.exception), error_msg)
+        self.assertEqual(ex.exception.args[0], error_msg)
 
     @parameterized.expand([
         ({'of': 'q', 'wrt': 'z'}, r"'simple' <class SimpleCompKwarg>: " + 'No matches were found for of="q"'),

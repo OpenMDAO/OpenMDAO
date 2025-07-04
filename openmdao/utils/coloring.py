@@ -469,8 +469,9 @@ class ColoringMeta(object):
         bool
             True if coloring should be used.
         """
-        return not self._failed and (self.coloring is not None or self.dynamic or
-                                     self.has_static_coloring())
+        return not self._failed and _use_total_sparsity and (self.coloring is not None or
+                                                             self.dynamic or
+                                                             self.has_static_coloring())
 
     def has_static_coloring(self):
         """
@@ -607,6 +608,21 @@ class Partial_ColoringMeta(ColoringMeta):
                                        f"{pattern} instead.")
             self._wrt_patterns = tuple(newpats)
 
+    def use_coloring(self):
+        """
+        Return True if coloring should be used.
+
+        It may not have been computed yet.
+
+        Returns
+        -------
+        bool
+            True if coloring should be used.
+        """
+        return not self._failed and _use_partial_sparsity and (self.coloring is not None or
+                                                               self.dynamic or
+                                                               self.has_static_coloring())
+
     def _update_wrt_matches(self, system):
         """
         Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
@@ -626,8 +642,8 @@ class Partial_ColoringMeta(ColoringMeta):
             return
 
         prefix = system.pathname + '.' if system.pathname else ''
-        self.wrt_matches = set(prefix + n for n in
-                               pattern_filter(self.wrt_patterns, system._promoted_wrt_iter()))
+        self.wrt_matches = frozenset(prefix + n for n in
+                                     pattern_filter(self.wrt_patterns, system._promoted_wrt_iter()))
 
         # error if nothing matched
         if not self.wrt_matches:
@@ -1135,12 +1151,15 @@ class Coloring(object):
         info._update_wrt_matches(system)
         if system.pathname:
             # for partial and semi-total derivs, convert to promoted names
-            ordered_of_info = system._jac_var_info_abs2prom(system._jac_of_iter())
-            ordered_wrt_info = \
-                system._jac_var_info_abs2prom(system._jac_wrt_iter(info.wrt_matches))
+            abs2prom = system._resolver.abs2prom
+            ordered_of_info = [(abs2prom(name), offset, end, idxs, dsizes)
+                               for name, offset, end, idxs, dsizes in system._get_jac_ofs()]
+            ordered_wrt_info = [(abs2prom(name), offset, end, vec, idxs, dsizes)
+                                for name, offset, end, vec, idxs, dsizes in
+                                system._get_jac_wrts(info.wrt_matches)]
         else:
-            ordered_of_info = list(system._jac_of_iter())
-            ordered_wrt_info = list(system._jac_wrt_iter(info.wrt_matches))
+            ordered_of_info = system._get_jac_ofs()
+            ordered_wrt_info = system._get_jac_wrts(info.wrt_matches)
 
         of_names = [t[0] for t in ordered_of_info]
         wrt_names = [t[0] for t in ordered_wrt_info]
@@ -2967,18 +2986,18 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
         fullJ = None
         for _ in range(num_full_jacs):
             if needs_scaling:
-                Jabs = driver._compute_totals(of=of, wrt=wrt, return_format='array')
+                J = driver._compute_totals(of=of, wrt=wrt, return_format='array')
             else:
-                Jabs = prob.compute_totals(of=of, wrt=wrt, return_format='array',
-                                           coloring_info=False)
+                J = prob.compute_totals(of=of, wrt=wrt, return_format='array', coloring_info=False)
             if fullJ is None:
-                fullJ = np.abs(Jabs)
+                fullJ = np.abs(J)
             else:
-                fullJ += np.abs(Jabs)
+                fullJ += np.abs(J)
 
         if driver:
             driver._total_jac = None
-        Jabs = None
+
+        J = None
 
     if driver:
         # force driver to recreate total jacobian using coloring
@@ -3608,16 +3627,19 @@ class _ColSparsityJac(object):
     def __init__(self, system):
         self._coloring_info = system._coloring_info
 
-        nrows = sum([end - start for _, start, end, _, _ in system._jac_of_iter()])
-        end = 0
-        for _, _, end, _, _, _ in system._jac_wrt_iter(self._coloring_info.wrt_matches):
-            pass
+        nrows = sum([end - start for _, start, end, _, _ in system._get_jac_ofs()])
+        jac_wrts = system._get_jac_wrts(self._coloring_info.wrt_matches)
+        if jac_wrts:
+            end = jac_wrts[-1][2]
+        else:
+            end = 0
 
         self._nrows = nrows
         self._randgen = None
         self._ncols = end
         self.shape = (nrows, end)
         self._col_list = [None] * self._ncols
+        self._scratch = np.zeros(nrows)
 
     def set_col(self, system, i, column):
         # record only the nonzero part of the column.
@@ -3628,14 +3650,11 @@ class _ColSparsityJac(object):
                 self._col_list[i] = [nzs, np.abs(column[nzs])]
             else:
                 oldnzs, olddata = self._col_list[i]
-                if oldnzs.size == nzs.size and np.all(nzs == oldnzs):
-                    olddata += np.abs(column[nzs])
-                else:  # nonzeros don't match
-                    scratch = np.zeros(column.size)
-                    scratch[oldnzs] = olddata
-                    scratch[nzs] += np.abs(column[nzs])
-                    newnzs = np.nonzero(scratch)[0]
-                    self._col_list[i] = [newnzs, scratch[newnzs]]
+                self._scratch[:] = 0.0
+                self._scratch[oldnzs] = olddata
+                self._scratch[nzs] += np.abs(column[nzs])
+                newnzs = np.nonzero(self._scratch)[0]
+                self._col_list[i] = [newnzs, self._scratch[newnzs]]
 
     def set_dense_jac(self, system, jac):
         """
@@ -3653,6 +3672,29 @@ class _ColSparsityJac(object):
 
     def __setitem__(self, key, value):
         # ignore any setting of subjacs based on analytic derivs
+        pass
+
+    def _update(self, system):
+        """
+        Update the sparsity matrix.
+        """
+        pass
+
+    def _pre_update(self, dtype):
+        """
+        Pre-update the sparsity matrix.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The dtype of the jacobian.
+        """
+        pass
+
+    def _post_update(self):
+        """
+        Post-update the sparsity matrix.
+        """
         pass
 
     def get_sparsity(self):
@@ -3679,9 +3721,9 @@ class _ColSparsityJac(object):
             data.append(d)
 
         if rows:
-            rows = np.hstack(rows)
-            cols = np.hstack(cols)
-            data = np.hstack(data)
+            rows = np.concatenate(rows)
+            cols = np.concatenate(cols)
+            data = np.concatenate(data)
 
             # scale the data
             data *= (1. / np.max(data))

@@ -67,8 +67,7 @@ class TestNameResolver(unittest.TestCase):
         self.assertEqual(absnames, ['test_system.x', 'test_system.y', 'test_system.z'])
 
     def test_check_dups(self):
-        # Create resolver with check_dups=True
-        resolver = NameResolver('test_system', check_dups=True)
+        resolver = NameResolver('test_system')
 
         # Add mappings with duplicate promoted names
         resolver.add_mapping('test_system.x1', 'x', 'output', local=True)

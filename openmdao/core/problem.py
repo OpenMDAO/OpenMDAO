@@ -202,8 +202,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         Problem level metadata.
     _run_counter : int
         The number of times run_driver or run_model has been called.
-    _warned : bool
-        Bool to check if `value` deprecation warning has occured yet
     _computing_coloring : bool
         When True, we are computing coloring.
     """
@@ -222,7 +220,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         self._reports = get_reports_to_activate(reports)
 
         self.cite = CITATION
-        self._warned = False
         self._computing_coloring = False
 
         if comm is None:
@@ -1191,7 +1188,8 @@ class Problem(object, metaclass=ProblemMetaclass):
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
                        compact_print=False, abs_err_tol=0.0, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
-                       minimum_step=1e-12, force_dense=True, show_only_incorrect=False):
+                       minimum_step=1e-12, force_dense=True, show_only_incorrect=False,
+                       rich_print=True):
         """
         Check partial derivatives comprehensively for all components in your model.
 
@@ -1236,6 +1234,8 @@ class Problem(object, metaclass=ProblemMetaclass):
             If True, analytic derivatives will be coerced into arrays. Default is True.
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
+        rich_print : bool, optional
+            If True, print using rich if available.
 
         Returns
         -------
@@ -1302,7 +1302,8 @@ class Problem(object, metaclass=ProblemMetaclass):
                                                  minimum_step=minimum_step,
                                                  force_dense=force_dense,
                                                  show_only_incorrect=show_only_incorrect,
-                                                 show_worst=False)
+                                                 show_worst=False,
+                                                 rich_print=rich_print)
 
             if out_stream is not None:
                 comp_content = comp_stream.getvalue()
@@ -1335,7 +1336,7 @@ class Problem(object, metaclass=ProblemMetaclass):
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
                      driver_scaling=False, abs_err_tol=0.0, rel_err_tol=1e-6, method='fd',
                      step=None, form=None, step_calc='abs', show_progress=False,
-                     show_only_incorrect=False, directional=False, sort=True):
+                     show_only_incorrect=False, directional=False, sort=True, rich_print=True):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1387,6 +1388,8 @@ class Problem(object, metaclass=ProblemMetaclass):
             'wrt' in fwd mode.
         sort : bool
             If True, sort the subjacobian keys alphabetically.
+        rich_print : bool, optional
+            If True, print using rich if available.
 
         Returns
         -------
@@ -1619,11 +1622,12 @@ class Problem(object, metaclass=ProblemMetaclass):
         if out_stream is not None:
             if compact_print:
                 _deriv_display_compact(model, err_iter, data[''], out_stream,
-                                       totals=True, show_only_incorrect=show_only_incorrect)
+                                       totals=True, show_only_incorrect=show_only_incorrect,
+                                       rich_print=rich_print)
             else:
                 _deriv_display(model, err_iter, data[''], rel_err_tol, abs_err_tol,
                                out_stream, fd_args, totals=True, lcons=lcons,
-                               show_only_incorrect=show_only_incorrect)
+                               show_only_incorrect=show_only_incorrect, rich_print=rich_print)
 
         if not do_steps:
             _fix_check_data(data)
@@ -2378,47 +2382,6 @@ class Problem(object, metaclass=ProblemMetaclass):
                 print('None found', file=out_stream)
 
         return problem_indep_vars
-
-    def iter_count_iter(self, include_driver=True, include_solvers=True, include_systems=False):
-        """
-        Yield iteration counts for driver, solvers and/or systems.
-
-        Parameters
-        ----------
-        include_driver : bool
-            If True, include the driver in the iteration counts.
-        include_solvers : bool
-            If True, include solvers in the iteration counts.
-        include_systems : bool
-            If True, include systems in the iteration counts.
-
-        Yields
-        ------
-        str
-            Name of the object.
-        str
-            Name of the counter.
-        int
-            Value of the counter.
-        """
-        if include_driver:
-            yield ('Driver', 'iter_count', self.driver.iter_count)
-        if include_solvers or include_systems:
-            for s in self.model.system_iter(include_self=True, recurse=True):
-                if include_systems:
-                    for it in ('iter_count', 'iter_count_apply'):
-                        val = getattr(s, it)
-                        if val > 0:
-                            yield (s.pathname, it, val)
-
-                if include_solvers:
-                    prefix = s.pathname + '.' if s.pathname else ''
-                    if s.nonlinear_solver is not None and s.nonlinear_solver._iter_count > 0:
-                        yield (prefix + 'nonlinear_solver', '_iter_count',
-                               s.nonlinear_solver._iter_count)
-                    if s.linear_solver is not None and s.linear_solver._iter_count > 0:
-                        yield (prefix + 'linear_solver', '_iter_count',
-                               s.linear_solver._iter_count)
 
     def list_pre_post(self, outfile=None):
         """

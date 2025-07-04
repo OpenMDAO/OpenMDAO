@@ -18,7 +18,7 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
-from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.subjac import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
@@ -30,7 +30,7 @@ from openmdao.utils.general_utils import common_subpath, \
     meta2src_iter, get_rev_conns, is_undefined
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo
+from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, are_connected
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -41,6 +41,10 @@ from openmdao.utils.class_util import overrides_method
 from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.jacobians.subjac import Subjac
+from openmdao.jacobians.jacobian import GroupJacobianUpdateContext
+
 
 # regex to check for valid names.
 import re
@@ -216,12 +220,12 @@ class Group(System):
         after _auto_ivc is created.
     _is_explicit : bool or None
         True if neither this Group nor any of its descendants contains implicit systems or cycles.
-    _ivcs : dict
-        Dict containing metadata for each independent variable.
     _bad_conn_vars : set
         Set of variables involved in invalid connections.
     _sys_graph_cache : dict
         Cache for the system graph.
+    _key_owner : dict
+        The owning rank keyed by absolute jacobian key.
     """
 
     def __init__(self, **kwargs):
@@ -253,9 +257,9 @@ class Group(System):
         self._fd_rev_xfer_correction_dist = {}
         self._auto_ivc_recorders = []
         self._is_explicit = None
-        self._ivcs = {}
         self._bad_conn_vars = None
         self._sys_graph_cache = None
+        self._key_owner = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -396,18 +400,19 @@ class Group(System):
             # A value of None will be interpreted as 'all outputs'.
             scope_out = None
 
-            # All inputs connected to an output in this system
+            # All inputs that are connected to outputs within this group.  Use only local inputs
+            # because only local inputs exist in our input vector.
             scope_in = frozenset(self._conn_global_abs_in2out).intersection(
-                self._var_allprocs_abs2meta['input'])
+                self._var_abs2meta['input'])
 
         else:
             # Empty for the excl_sub
             scope_out = frozenset()
 
-            # All inputs connected to an output in this system but not in excl_sub
+            # All inputs connected to an output in this Group but not in excl_sub.
             # allins is used to filter out discrete variables that might be found in
             # self._conn_global_abs_in2out.
-            allins = self._var_allprocs_abs2meta['input']
+            allins = self._var_abs2meta['input']
             exvars = excl_sub._var_allprocs_abs2idx
             scope_in = frozenset(abs_in for abs_in, abs_out in self._conn_global_abs_in2out.items()
                                  if abs_out not in exvars and abs_in in allins)
@@ -714,19 +719,28 @@ class Group(System):
 
         self._setup_procs_finished = True
 
-    def is_explicit(self):
+    def is_explicit(self, is_comp=True):
         """
         Return True if this Group contains only explicit systems and has no cycles.
+
+        Parameters
+        ----------
+        is_comp : bool
+            If True, return True if this is an explicit component.
+            If False, return True if this is an explicit component or group.
 
         Returns
         -------
         bool
             True if this is an explicit component.
         """
+        if is_comp:
+            return False
+
         if self._is_explicit is None:
             self._is_explicit = True
             for subsys in self._subsystems_myproc:
-                if not subsys.is_explicit():
+                if not subsys.is_explicit(is_comp=False):
                     self._is_explicit = False
                     break
 
@@ -1044,7 +1058,7 @@ class Group(System):
         abs2meta = self._var_abs2meta['output']
         sizes = self._var_sizes['output']
         global_offsets = self._get_var_offsets()['output']
-        oflist = list(self._jac_of_iter())
+        oflist = self._get_jac_ofs()
         tsize = oflist[-1][2]
         toffset = myrank * tsize
         has_dist_data = False
@@ -1157,9 +1171,11 @@ class Group(System):
         self._fd_rev_xfer_correction_dist = {}
 
         desvars = self.get_design_vars(get_sizes=False)
-        responses = self._check_alias_overlaps(self.get_responses(get_sizes=False))
+        responses = self._check_alias_overlaps(self.get_responses(get_sizes=False,
+                                                                  use_prom_ivc=True))
 
         self._dataflow_graph = self._get_dataflow_graph()
+        self._problem_meta['dataflow_graph'] = self._dataflow_graph
 
         # figure out if we can remove any edges based on zero partials we find
         # in components.  By default all component connected outputs
@@ -1172,15 +1188,11 @@ class Group(System):
 
         self._problem_meta['relevance'] = get_relevance(self, responses, desvars)
 
-        # Transfers do not require recursion, but they have to be set up after the vector setup.
+        # Transfers have to be set up after the vector setup.
         self._setup_transfers()
 
-        # Same situation with solvers, partials, and Jacobians.
-        # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers()
         self._setup_solver_print()
-        if self._use_derivatives:
-            self._setup_jacobians()
 
         self._setup_recording()
 
@@ -1304,7 +1316,7 @@ class Group(System):
 
         # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
         # linear root vec
-        self._root_vecs = root_vectors = {'input': {}, 'output': {}, 'residual': {}}
+        root_vectors = {'input': {}, 'output': {}, 'residual': {}}
 
         for kind in ['input', 'output', 'residual']:
             rvec = root_vectors[kind]
@@ -1410,20 +1422,19 @@ class Group(System):
         abs2idx = self._var_allprocs_abs2idx
         for io in ('input', 'output'):
             sizes = self._var_sizes[io]
-            for abs_name, meta in self._var_allprocs_abs2meta[io].items():
-                if not meta['distributed']:
-                    vsizes = sizes[:, abs2idx[abs_name]]
-                    unique = set(vsizes)
-                    unique.discard(0)
-                    if len(unique) > 1:
-                        # sizes differ, now find which procs don't agree
-                        rnklist = []
-                        for sz in unique:
-                            rnklist.append((sz, [i for i, s in enumerate(vsizes) if s == sz]))
-                        msg = ', '.join([f"rank(s) {r} have size {s}" for s, r in rnklist])
-                        self._collect_error(f"{self.msginfo}: Size of {io} '{abs_name}' "
-                                            f"differs between processes ({msg}).",
-                                            ident=('size', abs_name))
+            for abs_name in self._resolver.abs_iter(io, continuous=True, distributed=False):
+                vsizes = sizes[:, abs2idx[abs_name]]
+                unique = set(vsizes)
+                unique.discard(0)
+                if len(unique) > 1:
+                    # sizes differ, now find which procs don't agree
+                    rnklist = []
+                    for sz in unique:
+                        rnklist.append((sz, [i for i, s in enumerate(vsizes) if s == sz]))
+                    msg = ', '.join([f"rank(s) {r} have size {s}" for s, r in rnklist])
+                    self._collect_error(f"{self.msginfo}: Size of {io} '{abs_name}' "
+                                        f"differs between processes ({msg}).",
+                                        ident=('size', abs_name))
 
     def _top_level_post_sizes(self):
         # this runs after the variable sizes are known
@@ -1593,7 +1604,7 @@ class Group(System):
                     try:
                         if pinfo.src_shape is None:
                             pinfo.set_src_shape(current_pinfo.src_indices.indexed_src_shape)
-                        sinds = convert_src_inds(current_pinfo.src_indices, current_pinfo.src_shape,
+                        sinds = convert_src_inds(current_pinfo.src_indices,
                                                  pinfo.src_indices, pinfo.src_shape)
                     except Exception:
                         type_exc, exc, tb = sys.exc_info()
@@ -1652,13 +1663,14 @@ class Group(System):
         super()._setup_var_data()
 
         resolver = self._resolver
+        self._cross_keys = set()
+
         var_discrete = self._var_discrete
         allprocs_discrete = self._var_allprocs_discrete
 
         abs2meta = self._var_abs2meta
 
         allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._ivcs = {}
 
         for n, lst in self._group_inputs.items():
             lst[0]['path'] = self.pathname  # used for error reporting
@@ -1733,6 +1745,7 @@ class Group(System):
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             proc_resolvers = [None] * self.comm.size
+            resolver.reset_prom_maps()  # no use sending prom2abs to other procs
             if self._gather_full_data():
                 raw = (allprocs_discrete, resolver, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
@@ -1814,9 +1827,6 @@ class Group(System):
         self._vars_to_gather = self._find_vars_to_gather()
         if self.pathname == '':
             self._problem_meta['vars_to_gather'] = self._vars_to_gather
-
-        # create mapping of indep var names to their metadata
-        self._ivcs = self.get_indep_vars(local=False)
 
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
@@ -1977,15 +1987,14 @@ class Group(System):
             myproc = self.comm.rank
             nprocs = self.comm.size
 
-            respflags = self._resolver.flags
+            resflags = self._resolver.flags
             for io in ('input', 'output'):
-                abs2meta = self._var_allprocs_abs2meta[io]
 
                 # var order must be same on all procs
-                sorted_names = sorted(self._resolver.abs_iter(io))
+                sorted_names = sorted(self._resolver.abs_iter(io, distributed=False))
                 locality = np.zeros((nprocs, len(sorted_names)), dtype=bool)
                 for i, name in enumerate(sorted_names):
-                    if respflags(name, io) & LOCAL:
+                    if resflags(name, io) & LOCAL:
                         locality[myproc, i] = True
 
                 my_loc = locality[myproc, :].copy()
@@ -1993,9 +2002,7 @@ class Group(System):
 
                 for i, name in enumerate(sorted_names):
                     nzs = np.nonzero(locality[:, i])[0]
-                    if name in abs2meta and abs2meta[name]['distributed']:
-                        pass
-                    elif 0 < nzs.size < nprocs:
+                    if 0 < nzs.size < nprocs:
                         remote_vars[name] = nzs[0]
 
         return remote_vars
@@ -2306,7 +2313,7 @@ class Group(System):
         self._conn_global_abs_in2out = {name: srcs.pop()
                                         for name, srcs in global_abs_in2out.items()}
 
-    def get_indep_vars(self, local):
+    def get_indep_vars(self, local, include_discrete=False):
         """
         Return a dict of independant variables contained in this group or any of its subgroups.
 
@@ -2314,6 +2321,8 @@ class Group(System):
         ----------
         local : bool
             If True, return only the variables local to the current process.
+        include_discrete : bool
+            If True, include discrete variables in the returned dict.
 
         Returns
         -------
@@ -2321,7 +2330,17 @@ class Group(System):
             Dict of all independant variables in this group and their corresponding metadata.
         """
         abs2meta = self._var_abs2meta['output'] if local else self._var_allprocs_abs2meta['output']
-        return {n: meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
+        ivcs = {n: meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
+        if include_discrete:
+            if local:
+                # local discrete vars use relative names
+                prefix = self.pathname + '.' if self.pathname else ''
+                ivcs.update({prefix + n: meta for n, meta in self._var_discrete['output'].items()
+                             if 'openmdao:indep_var' in meta['tags']})
+            else:
+                ivcs.update({n: meta for n, meta in self._var_allprocs_discrete['output'].items()
+                             if 'openmdao:indep_var' in meta['tags']})
+        return ivcs
 
     def _setup_jax(self):
         if jax is None:
@@ -3606,14 +3625,6 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for sname, sinfo in self._subsystems_allprocs.items():
-                sub = sinfo.system
-                # TODO: could gather 'has_guess' information during setup and be able to
-                # skip transfer for subs that don't have guesses...
-                self._transfer('nonlinear', 'fwd', sname)
-                if sub._is_local and sub._has_guess:
-                    sub._guess_nonlinear()
-
             # call our own guess_nonlinear method, after the recursion is done to
             # all the lower level systems and the data transfers have happened
             complex_step = self._inputs._under_complex_step
@@ -3624,6 +3635,14 @@ class Group(System):
                 self._outputs.set_complex_step_mode(False)
 
             try:
+                for sname, sinfo in self._subsystems_allprocs.items():
+                    sub = sinfo.system
+                    # TODO: could gather 'has_guess' information during setup and be able to
+                    # skip transfer for subs that don't have guesses...
+                    self._transfer('nonlinear', 'fwd', sname)
+                    if sub._is_local and sub._has_guess:
+                        sub._guess_nonlinear()
+
                 if self._discrete_inputs or self._discrete_outputs:
                     self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
                                          self._discrete_inputs, self._discrete_outputs)
@@ -3676,14 +3695,12 @@ class Group(System):
         return (self._owns_approx_jac and self._jacobian is not None) or \
             self._assembled_jac is not None or not self._linear_solver.does_recursive_applies()
 
-    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -3693,54 +3710,16 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        if self._owns_approx_jac:
-            jac = self._jacobian
-        elif jac is None and self._assembled_jac is not None:
-            jac = self._assembled_jac
+        jac = self._get_jacobian()
 
-        if jac is not None:
+        if jac is not None and jac is not self._tot_jac:
             with self._matvec_context(scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
                 jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
-                # _fd_rev_xfer_correction_dist is used to correct for the fact that we don't
-                # do reverse transfers internal to an FD group.  Reverse transfers
-                # are constructed such that derivative values are correct when transferred into
-                # system doutput variables, taking into account distributed inputs.
-                # Since the transfers are not correcting for those issues, we need to do it here.
-
-                # If we have a distributed constraint/obj within the FD group and that con/obj is,
-                # active, we perform essentially an allreduce on the d_inputs vars that connect to
-                # outside systems so they'll include the contribution from all procs.
                 if self._fd_rev_xfer_correction_dist and mode == 'rev':
-                    seed_vars = self._problem_meta['seed_vars']
-                    if seed_vars is not None:
-                        seed_vars = [n for n in seed_vars if n in self._fd_rev_xfer_correction_dist]
-                        dinvec = self._dinputs
-                        inarr = dinvec.asarray()
-                        data = {}
-                        for seed_var in seed_vars:
-                            for inp in self._fd_rev_xfer_correction_dist[seed_var]:
-                                if inp not in data:
-                                    if dinvec._contains_abs(inp):  # inp is a local input
-                                        start, stop = dinvec.get_range(inp)
-                                        arr = inarr[start:stop]
-                                        if np.any(arr):
-                                            data[inp] = arr
-                                        else:
-                                            data[inp] = None  # don't send an array of zeros
-                                    else:
-                                        data[inp] = None  # prevent possible MPI hangs
-
-                        if data:
-                            myrank = self.comm.rank
-                            for rank, d in enumerate(self.comm.allgather(data)):
-                                if rank != myrank:
-                                    for n, val in d.items():
-                                        if val is not None and dinvec._contains_abs(n):
-                                            start, stop = dinvec.get_range(n)
-                                            inarr[start:stop] += val
+                    self._apply_fd_rev_xfer_correction()
 
         # Apply recursion
         else:
@@ -3751,13 +3730,55 @@ class Group(System):
                     s._dresiduals.set_val(0.0)
 
             for s in self._relevance.filter(self._subsystems_myproc, relevant=True):
-                s._apply_linear(jac, mode, scope_out, scope_in)
+                s._apply_linear(mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
                 for s in self._relevance.filter(self._subsystems_myproc, relevant=False):
                     # zero out dvecs of irrelevant subsystems
                     s._doutputs.set_val(0.0)
+
+    def _apply_fd_rev_xfer_correction(self):
+        """
+        Apply the fd reverse transfer correction.
+
+        FD reverse transfer correction is used to correct for the fact that we don't
+        do reverse transfers internal to an FD group.  Reverse transfers
+        are constructed such that derivative values are correct when transferred into
+        system doutput variables, taking into account distributed inputs.
+        Since the transfers are not correcting for those issues, we need to do it here.
+
+        If we have a distributed constraint/obj within the FD group and that con/obj is
+        active, we perform essentially an allreduce on the d_inputs vars that connect to
+        outside systems so they'll include the contribution from all procs.
+        """
+        seed_vars = self._problem_meta['seed_vars']
+        if seed_vars is not None:
+            seed_vars = [n for n in seed_vars if n in self._fd_rev_xfer_correction_dist]
+            dinvec = self._dinputs
+            inarr = dinvec.asarray()
+            data = {}
+            for seed_var in seed_vars:
+                for inp in self._fd_rev_xfer_correction_dist[seed_var]:
+                    if inp not in data:
+                        if dinvec._contains_abs(inp):  # inp is a local input
+                            start, stop = dinvec.get_range(inp)
+                            arr = inarr[start:stop]
+                            if np.any(arr):
+                                data[inp] = arr
+                            else:
+                                data[inp] = None  # don't send an array of zeros
+                        else:
+                            data[inp] = None  # prevent possible MPI hangs
+
+            if data:
+                myrank = self.comm.rank
+                for rank, d in enumerate(self.comm.allgather(data)):
+                    if rank != myrank:
+                        for n, val in d.items():
+                            if val is not None and dinvec._contains_abs(n):
+                                start, stop = dinvec.get_range(n)
+                                inarr[start:stop] += val
 
     def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
@@ -3802,60 +3823,44 @@ class Group(System):
             with self._relevance.active(self._linear_solver.use_relevance()):
                 self._linear_solver.solve(mode, None)
 
-    def _linearize(self, jac, sub_do_ln=True):
+    def _linearize(self, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if (self._tot_jac is not None and self._owns_approx_jac and
-                not isinstance(self._jacobian, coloring_mod._ColSparsityJac)):
-            self._jacobian = self._tot_jac
-        elif self._jacobian is None:
-            self._init_jacobian()
-
         self._check_first_linearize()
 
         # Group finite difference
         if self._owns_approx_jac:
 
-            jac = self._jacobian
-            if self.pathname == "":
-                for approximation in self._approx_schemes.values():
-                    approximation.compute_approximations(self, jac=jac)
-            else:
-                # When an approximation exists in a submodel (instead of in root), the model is
-                # in a scaled state.
-                with self._unscaled_context(outputs=[self._outputs]):
+            with GroupJacobianUpdateContext(self) as jac:
+                if self.pathname == "":
                     for approximation in self._approx_schemes.values():
                         approximation.compute_approximations(self, jac=jac)
+                else:
+                    # When an approximation exists in a submodel (instead of in root), the model is
+                    # in a scaled state.
+                    with self._unscaled_context(outputs=[self._outputs]):
+                        for approximation in self._approx_schemes.values():
+                            approximation.compute_approximations(self, jac=jac)
 
         else:
-            if self._assembled_jac is not None:
-                jac = self._assembled_jac
 
             relevance = self._relevance
             with relevance.active(self._linear_solver.use_relevance()):
                 subs = list(relevance.filter(self._subsystems_myproc))
 
-                # Only linearize subsystems if we aren't approximating the derivs at this level.
-                for subsys in subs:
-                    do_ln = sub_do_ln and (subsys._linear_solver is not None and
-                                           subsys._linear_solver._linearize_children())
-                    subsys._linearize(jac, sub_do_ln=do_ln)
-
-                # Update jacobian
-                if self._assembled_jac is not None:
-                    self._assembled_jac._update(self)
-
-                if sub_do_ln:
+                with GroupJacobianUpdateContext(self) as jac:
+                    # Only linearize subsystems if we aren't approximating the derivs at this level.
                     for subsys in subs:
-                        if subsys._linear_solver is not None:
+                        do_ln = sub_do_ln and (subsys._linear_solver is not None and
+                                               subsys._linear_solver._linearize_children())
+                        subsys._linearize(sub_do_ln=do_ln)
+                        if sub_do_ln and subsys._linear_solver is not None:
                             subsys._linear_solver._linearize()
 
     def _check_first_linearize(self):
@@ -3863,14 +3868,14 @@ class Group(System):
             self._first_call_to_linearize = False  # only do this once
             coloring = self._get_coloring() if coloring_mod._use_partial_sparsity else None
 
-            if coloring is not None:
+            if coloring is None:
+                if self._approx_schemes:
+                    # TODO: for top level FD, call below is unnecessary, but we need this
+                    # for some tests that just call run_linearize directly without calling
+                    # compute_totals.
+                    self._setup_approx_derivs()
+            else:
                 self._setup_approx_coloring()
-
-            # TODO: for top level FD, call below is unnecessary, but we need this
-            # for some tests that just call run_linearize directly without calling
-            # compute_totals.
-            elif self._approx_schemes:
-                self._setup_approx_derivs()
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
@@ -3967,65 +3972,93 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._get_missing_partials(missing)
 
+    def _get_jacobian(self):
+        """
+        Initialize the jacobian if it is not already initialized.
+
+        Override this in a subclass to use a different jacobian type.
+
+        Returns
+        -------
+        Jacobian
+            The initialized jacobian.
+        """
+        if self._relevance_changed():
+            self._jacobian = None
+
+        if self._jacobian is None:
+            if self._owns_approx_jac:
+                # Group needs a jacobian if it's approximating derivatives.
+                self._jacobian = DictionaryJacobian(system=self)
+                self._get_static_wrt_matches()
+
+            if self._jacobian is None:
+                self._jacobian = self._get_assembled_jac()
+
+        return self._jacobian
+
     def _approx_subjac_keys_iter(self):
-        yield from self._subjac_keys_iter()
+        """
+        Iterate over all approx subjacobian keys needed for this Group.
 
-    def _subjac_keys_iter(self):
-        # yields absolute keys (no aliases)
-        totals = self.pathname == ''
+        These keys include all declared at the Component level below this group, plus any added
+        at this group level for approximations, etc.
 
-        wrt = set()
-        ivc = set(self.get_indep_vars(local=False))
+        Relevance is not considered for these, but will be used later when using these to
+        construct a Jacobian.
 
-        if totals:
-            # When computing totals, weed out inputs connected to anything inside our system unless
-            # the source is an indepvarcomp.
-            if self._owns_approx_wrt:
-                wrt = {m['source'] for m in self._owns_approx_wrt.values()}
-                diff = wrt.difference(ivc)
-                if diff:
-                    bad = [n for n, m in self._owns_approx_wrt.items() if m['source'] in diff]
-                    raise RuntimeError("When computing total derivatives for the model, the "
-                                       "following wrt variables are not independent variables or "
-                                       "do not have an independant variable as a source: "
-                                       f"{sorted(bad)}")
-                wrt = wrt.intersection(ivc)
+        Yields
+        ------
+        tuple
+            A tuple of the form (of_name, wrt_name).  Names are absolute (no aliases).
+        """
+        if self.pathname == '':  # totals
+            yield from self._approx_total_subjac_keys_iter()
+        else:
+            yield from self._approx_semitotal_subjac_keys_iter()
+
+    def _approx_total_subjac_keys_iter(self):
+        """
+        Iterate over all approx total subjacobian keys needed for this Group.
+        """
+        if self._owns_approx_of is None:
+            return
+
+        ivc = self.get_indep_vars(local=False)
+
+        # When computing totals, weed out inputs connected to anything inside our system unless
+        # the source is an indepvarcomp.
+        wrt = []
+        for name, m in self._owns_approx_wrt.items():
+            src = m['source']
+            if src in ivc:
+                wrt.append(src)
             else:
-                wrt = ivc
+                raise RuntimeError("When computing total derivatives for the model, the "
+                                   f"wrt variable '{name}' is not an independent variable "
+                                   "or does not have an independant variable as a source.")
 
-        else:
-            for _, abs_inps in self._resolver.prom2abs_iter('input'):
-                if abs_inps[0] not in self._conn_abs_in2out:
-                    # If connection is inside of this Group, perturbation of all implicitly
-                    # connected inputs will be handled properly via internal transfers.
-                    # Otherwise, we need to add all implicitly connected inputs separately.
-                    wrt.update(abs_inps)
+        of = [m['source'] for m in self._owns_approx_of.values()]
 
-            # get rid of any old stuff in here
-            self._owns_approx_of = self._owns_approx_wrt = None
+        yield from product(of, wrt)
 
-        if self._owns_approx_of:  # can only be total at this point
-            of = set(m['source'] for m in self._owns_approx_of.values())
-        else:
-            of = set(self._var_allprocs_abs2meta['output'])
-            # Skip indepvarcomp res wrt other srcs
-            of -= ivc
+    def _approx_semitotal_subjac_keys_iter(self):
+        wrt = []
 
-        if totals:
-            yield from product(of, wrt.union(of))
-        else:
-            for key in product(of, wrt.union(of)):
-                # Create approximations for the ones we need.
+        for _, abs_inps in self._resolver.prom2abs_iter('input'):
+            if abs_inps[0] not in self._conn_abs_in2out:
+                # If connection is inside of this Group, perturbation of all implicitly
+                # connected inputs will be handled properly via internal transfers.
+                # Otherwise, we need to add all implicitly connected inputs separately.
+                wrt.extend(abs_inps)
 
-                _of, _wrt = key
-                # Skip res wrt outputs
-                if _wrt in of and _wrt not in ivc:
+        # get rid of any old stuff in here
+        self._owns_approx_of = self._owns_approx_wrt = None
 
-                    # Support for specifying a desvar as an obj/con.
-                    if _wrt not in wrt or _of == _wrt:
-                        continue
+        ivcs = self.get_indep_vars(local=False)
+        of = [name for name in self._var_allprocs_abs2meta['output'] if name not in ivcs]
 
-                yield key
+        yield from product(of, wrt)
 
     def _jac_of_iter(self):
         """
@@ -4064,6 +4097,7 @@ class Group(System):
                 else:
                     src = name
 
+                # for semi-totals, only include outputs that are local
                 if not total and src not in self._var_abs2meta['output']:
                     continue
 
@@ -4107,7 +4141,8 @@ class Group(System):
         Vector
             Either the _outputs or _inputs vector.
         slice or ndarray
-            A full slice or indices for the 'wrt' variable.
+            A full slice or indices for the corresponding design variable when computing total
+            derivatives.
         ndarray or None
             Distributed sizes if var is distributed else None
         """
@@ -4124,19 +4159,11 @@ class Group(System):
 
             seen = set()
             start = end = 0
-            if self.pathname:  # doing semitotals, so include output columns
-                for of, _start, _end, _, dist_sizes in self._jac_of_iter():
-                    if wrt_matches is None or of in wrt_matches:
-                        seen.add(of)
-                        end += (_end - _start)
-                        vec = self._outputs if of in local_outs else None
-                        yield of, start, end, vec, _full_slice, dist_sizes
-                        start = end
 
-            for wrt, wrtmeta in self._owns_approx_wrt.items():
+            for wrt, approx_meta in self._owns_approx_wrt.items():
                 if total:
-                    wrt = wrtmeta['source']
-                    if wrtmeta['remote']:
+                    wrt = approx_meta['source']
+                    if approx_meta['remote']:
                         vec = None
                     else:
                         vec = self._outputs
@@ -4151,10 +4178,9 @@ class Group(System):
                 if (wrt_matches is None or wrt in wrt_matches) and wrt not in seen:
                     io = 'input' if wrt in abs2meta['input'] else 'output'
                     meta = abs2meta[io][wrt]
-                    if total and wrtmeta['indices'] is not None:
-                        sub_wrt_idx = wrtmeta['indices'].as_array()
+                    if total and approx_meta['indices'] is not None:
+                        sub_wrt_idx = approx_meta['indices'].as_array()
                         size = sub_wrt_idx.size
-                        sub_wrt_idx = sub_wrt_idx
                     else:
                         sub_wrt_idx = _full_slice
                         size = abs2meta[io][wrt][szname]
@@ -4165,7 +4191,7 @@ class Group(System):
                     yield wrt, start, end, vec, sub_wrt_idx, dist_sizes
                     start = end
         else:
-            yield from super()._jac_wrt_iter(wrt_matches)
+            yield from super()._get_jac_wrts(wrt_matches)
 
     def _promoted_wrt_iter(self):
         if not (self._owns_approx_of or self.pathname):
@@ -4185,12 +4211,9 @@ class Group(System):
         """
         Add approximations for all approx derivs.
         """
-        if self._jacobian is None:
-            self._init_jacobian()
-
-        abs2meta = self._var_allprocs_abs2meta
         total = self.pathname == ''
-        nprocs = self.comm.size
+        abs2meta_out = self._var_allprocs_abs2meta['output']
+        abs2meta_in = self._var_allprocs_abs2meta['input']
 
         if self._coloring_info.coloring is not None and (self._owns_approx_of is None or
                                                          self._owns_approx_wrt is None):
@@ -4209,80 +4232,75 @@ class Group(System):
         sizes_in = self._var_sizes['input']
         abs2idx = self._var_allprocs_abs2idx
 
-        self._cross_keys = set()
-        approx_keys = self._get_approx_subjac_keys()
+        approx_keys = self._get_approx_subjac_keys(initialize=True)
+        wrt_seen = set()
+        compute_cross_keys = not total and self.comm.size > 1 and self._has_fd_group
+        graph = self._problem_meta['dataflow_graph']
+
         for key in approx_keys:
-            left, right = key
-            if not total and nprocs > 1 and self._has_fd_group:
-                sout = sizes_out[:, abs2idx[left]]
-                sin = sizes_in[:, abs2idx[right]]
-                if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
-                    # we have of and wrt that exist on different procs. Now see if they're relevant
-                    # to each other
-                    for _, _, rel in self._relevance.iter_seed_pair_relevance(inputs=True,
-                                                                              outputs=True):
-                        if left in rel and right in rel:
-                            self._cross_keys.add(key)
-                            break
+            of, wrt = key
 
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
             else:
-                meta = SUBJAC_META_DEFAULTS.copy()
+                # check connection between of and wrt before creating a subjac
+                if not are_connected(graph, wrt, of):
+                    continue
 
-                if left == right:
-                    size = abs2meta['output'][left]['size']
-                    meta['rows'] = meta['cols'] = np.arange(size)
+                meta = SUBJAC_META_DEFAULTS.copy()
+                osize = abs2meta_out[of]['size']
+                if wrt in abs2meta_in:
+                    isize = abs2meta_in[wrt]['size']
+                else:
+                    isize = abs2meta_out[wrt]['size']
+
+                if of == wrt:
+                    meta['diagonal'] = True
                     # All group approximations are treated as explicit components, so we
                     # have a -1 on the diagonal.
-                    meta['val'] = np.full(size, -1.0)
-                self._subjacs_info[key] = meta
+                    meta['val'] = np.full(osize, -1.0)
+
+                self._subjacs_info[key] = meta = Subjac.get_instance_metadata(meta, None,
+                                                                              (osize, isize),
+                                                                              self, key)
+
+            if compute_cross_keys:
+                sout = sizes_out[:, abs2idx[of]]
+                sin = sizes_in[:, abs2idx[wrt]]
+                if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
+                    self._cross_keys.add(key)
 
             meta['method'] = method
 
             meta.update(self._owns_approx_jac_meta)
 
-            if wrt_matches is None or right in wrt_matches:
+            if wrt_matches is None or wrt in wrt_matches:
                 self._update_approx_coloring_meta(meta)
 
-            if meta['val'] is None:
-                if not total and right in abs2meta['input']:
-                    sz = abs2meta['input'][right]['size']
-                else:
-                    sz = abs2meta['output'][right]['size']
-                shape = (abs2meta['output'][left]['size'], sz)
-                meta['shape'] = shape
-                if meta['rows'] is not None:  # subjac is sparse
-                    meta['val'] = np.zeros(len(meta['rows']))
-                else:
-                    meta['val'] = np.zeros(shape)
-
-            approx.add_approximation(key, self, meta)
+            if wrt not in wrt_seen:
+                wrt_seen.add(wrt)
+                approx.add_approximation(wrt, self, meta)
 
         if not total:
             # we're taking semi-total derivs for this group. Update _owns_approx_of
             # and _owns_approx_wrt so we can use the same approx code for totals and
             # semi-totals.  Also, the order must match order of vars in the output and
             # input vectors.
-            abs_outs = self._var_allprocs_abs2meta['output']
-            abs_ins = self._var_allprocs_abs2meta['input']
-
             resolver = self._resolver
+
             self._owns_approx_of = {}
-            for n, m in abs_outs.items():
+            for n, m in self._var_allprocs_abs2meta['output'].items():
                 self._owns_approx_of[n] = dct = m.copy()
                 dct['name'] = resolver.abs2prom(n, 'output')
                 dct['source'] = n
                 dct['indices'] = None
 
-            wrtset = set([k[1] for k in approx_keys])
+            wrtset = set([wrt for _, wrt in approx_keys])
+
             self._owns_approx_wrt = {}
-            for n, m in abs_ins.items():
+            for n, m in self._var_allprocs_abs2meta['input'].items():
                 if n in wrtset:
-                    self._owns_approx_wrt[n] = dct = m.copy()
-                    dct['name'] = resolver.abs2prom(n, 'input')
-                    dct['source'] = n
-                    dct['indices'] = None
+                    self._owns_approx_wrt[n] = {'distributed': m['distributed']}
 
             self._owns_approx_jac = True
 
@@ -4460,7 +4478,7 @@ class Group(System):
                             if src_indices is None:
                                 src_indices = inds
                             else:
-                                sinds = convert_src_inds(src_indices, newshape, inds, shape)
+                                sinds = convert_src_inds(src_indices, inds, shape)
                                 # final src_indices are wrt original full sized source and are flat,
                                 # so use val_shape and flat_src=True
                                 src_indices = indexer(sinds, src_shape=val_shape, flat_src=True)
@@ -4597,11 +4615,11 @@ class Group(System):
         conns.update(auto_conns)
         auto_ivc.auto2tgt = auto2tgt
 
-        vars2gather = self._vars_to_gather
+        vars_to_gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
             prom = resolver.abs2prom(tgts[0], 'input')
-            ret = self._get_auto_ivc_out_val(tgts, vars2gather)
+            ret = self._get_auto_ivc_out_val(tgts, vars_to_gather)
             if ret is None:  # setup error occurred. Try to continue
                 continue
             tgt, val, remote = ret
@@ -4624,16 +4642,16 @@ class Group(System):
             if self.comm.size > 1:
                 tgt_local_procs = set()
                 for t in tgts:
-                    if t in vars2gather:
-                        tgt_local_procs.add(vars2gather[t])
+                    if t in vars_to_gather:
+                        tgt_local_procs.add(vars_to_gather[t])
                     else:   # t is duplicated in all procs
                         break
                 else:
                     if len(tgt_local_procs) < self.comm.size:  # don't have a local var in each proc
                         tgt_local_procs = set()
                         for t in self.comm.allgather(tgt):
-                            if t in vars2gather:
-                                tgt_local_procs.add(vars2gather[t])
+                            if t in vars_to_gather:
+                                tgt_local_procs.add(vars_to_gather[t])
                         if len(tgt_local_procs) > 1:
                             # the 'local' val can only exist on 1 proc (distrib auto_ivcs not
                             # allowed), so must consolidate onto one proc
@@ -4669,11 +4687,11 @@ class Group(System):
                         val = self._var_discrete['input'][abs_in]['val']
                     else:
                         val = None
-                    if abs_in in vars2gather:
-                        if vars2gather[abs_in] == self.comm.rank:
-                            self.comm.bcast(val, root=vars2gather[abs_in])
+                    if abs_in in vars_to_gather:
+                        if vars_to_gather[abs_in] == self.comm.rank:
+                            self.comm.bcast(val, root=vars_to_gather[abs_in])
                         else:
-                            val = self.comm.bcast(None, root=vars2gather[abs_in])
+                            val = self.comm.bcast(None, root=vars_to_gather[abs_in])
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
                 src = conns[abs_in]
@@ -4707,18 +4725,15 @@ class Group(System):
                                        auto_ivc._var_discrete[io].items()})
         self._var_allprocs_discrete[io].update(auto_ivc._var_allprocs_discrete[io])
 
-        old = self._var_abs2meta[io]
         self._var_abs2meta[io] = {}
-        self._var_abs2meta[io].update(auto_ivc._var_abs2meta[io])
-        self._var_abs2meta[io].update(old)
+        # rebuild _var_abs2meta in the correct order
+        for s in self._sorted_sys_iter():
+            self._var_abs2meta[io].update(s._var_abs2meta[io])
 
-        old = self._var_allprocs_abs2meta[io]
         self._var_allprocs_abs2meta[io] = {}
-        self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
-        self._var_allprocs_abs2meta[io].update(old)
-
-        # add all auto_ivc vars to our _loc_ivcs
-        self._ivcs.update(auto_ivc._var_abs2meta[io])
+        for sysname in self._sorted_sys_iter_all_procs():
+            self._var_allprocs_abs2meta[io].update(
+                self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True
@@ -5325,6 +5340,72 @@ class Group(System):
         # inside of the group or its children.
         meta['base'] = 'Group'
         return meta
+
+    def _column_iotypes(self):
+        """
+        Return a tuple of the iotypes that make up columns of the jacobian.
+
+        Returns
+        -------
+        tuple of the form ('input',)
+            The iotypes that make up columns of the jacobian.
+        """
+        return ('input',)
+
+    def _get_subjac_owners(self):
+        """
+        Return a dictionary of owning rank keyed by subjac key.
+
+        This only applies to groups approximating a jacobian using FD or CS, and is empty unless
+        there are of or wrt variables that are not local in at least one rank.
+
+        It is also empty in the top level group, because when computing total jacobians, the
+        subjacobians exist locally on each process.
+
+        The return value is cached in self._key_owner.
+
+        Returns
+        -------
+        dict
+            Dictionary of owning rank keyed by subjac key.
+        """
+        if self._key_owner is None:
+            if self.pathname and self.comm.size > 1 and self._owns_approx_jac:
+                allouts = self._var_allprocs_abs2meta['output']
+                local_out = self._var_abs2meta['output']
+                local_in = self._var_abs2meta['input']
+                remote_keys = []
+                for key in self._jacobian._get_ordered_subjac_keys(self):
+                    of, wrt = key
+                    if of not in local_out or (wrt not in local_in and wrt not in local_out):
+                        remote_keys.append(key)
+
+                abs2idx = self._var_allprocs_abs2idx
+                sizes_out = self._var_sizes['output']
+                sizes_in = self._var_sizes['input']
+                owner_dict = {}
+                for keys in self.comm.allgather(remote_keys):
+                    for key in keys:
+                        if key not in owner_dict:
+                            of, wrt = key
+                            ofsizes = sizes_out[:, abs2idx[of]]
+                            if wrt in allouts:
+                                wrtsizes = sizes_out[:, abs2idx[wrt]]
+                            else:
+                                wrtsizes = sizes_in[:, abs2idx[wrt]]
+                            for rank, (ofsz, wrtsz) in enumerate(zip(ofsizes, wrtsizes)):
+                                # find first rank where both of and wrt are local
+                                if ofsz and wrtsz:
+                                    owner_dict[key] = rank
+                                    break
+                            else:  # no rank was found where both were local. Use 'of' local rank
+                                owner_dict[key] = np.min(np.nonzero(ofsizes)[0])
+
+                self._key_owner = owner_dict
+            else:
+                self._key_owner = {}
+
+        return self._key_owner
 
 
 def iter_solver_info(system):

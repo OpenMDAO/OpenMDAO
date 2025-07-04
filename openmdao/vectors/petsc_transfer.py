@@ -150,37 +150,32 @@ else:
         def _setup_transfers_rev(group):
             abs2meta_in = group._var_abs2meta['input']
             abs2meta_out = group._var_abs2meta['output']
-            resolver = group._resolver
 
             # for an FD group, we use the relevance graph to determine which inputs on the
             # boundary of the group are upstream of responses within the group so
             # that we can perform any necessary corrections to the derivative inputs.
             if group._owns_approx_jac:
                 if group.comm.size > 1 and group.pathname != '' and group._has_distrib_vars:
-                    all_abs2meta_out = group._var_allprocs_abs2meta['output']
-                    all_abs2meta_in = group._var_allprocs_abs2meta['input']
-
                     # connections internal to this group and all direct/indirect subsystems
                     conns = group._conn_global_abs_in2out
-
-                    inp_boundary_set = set(all_abs2meta_in).difference(conns)
+                    inp_boundary_set = set(group._var_allprocs_abs2meta['input']).difference(conns)
 
                     if inp_boundary_set:
-                        for dv, resp, rel in group._relevance.iter_seed_pair_relevance(inputs=True):
-                            # FIXME: the previous code was doing 'dv not in allprocs_abs2prom'
-                            # which is not correct because the top level keys of allprocs_abs2prom
-                            # are 'input' and 'output' so dv would never match.  Was this being
-                            # tested?  Will doing the dv check correctly now actually break
-                            # something?
-                            if resp in all_abs2meta_out and not resolver.is_abs(dv):
-                                # response is continuous and inside this group and
-                                # dv is outside this group
-                                if all_abs2meta_out[resp]['distributed']:  # a distributed response
-                                    for inp in inp_boundary_set.intersection(rel):
-                                        if inp in abs2meta_in:
-                                            if resp not in group._fd_rev_xfer_correction_dist:
-                                                group._fd_rev_xfer_correction_dist[resp] = set()
-                                            group._fd_rev_xfer_correction_dist[resp].add(inp)
+                        prefix = group.pathname + '.'
+                        iter_seed_pair_relevance = group._relevance.iter_seed_pair_relevance
+                        all_abs2meta_out = group._var_allprocs_abs2meta['output']
+                        all_dvs, all_resp = group._relevance.get_full_seeds()
+                        # response is continuous and inside this group and dv is outside this group
+                        dvs = tuple(sorted([d for d in all_dvs if not d.startswith(prefix)]))
+                        resps = tuple(sorted([r for r in all_resp if r in all_abs2meta_out and
+                                              all_abs2meta_out[r]['distributed']]))
+                        for _, resp, rel in iter_seed_pair_relevance(fwd_seeds=dvs,
+                                                                     rev_seeds=resps, inputs=True):
+                            for inp in inp_boundary_set.intersection(rel):
+                                if inp in abs2meta_in:
+                                    if resp not in group._fd_rev_xfer_correction_dist:
+                                        group._fd_rev_xfer_correction_dist[resp] = set()
+                                    group._fd_rev_xfer_correction_dist[resp].add(inp)
 
                 # FD groups don't need reverse transfers
                 return {}

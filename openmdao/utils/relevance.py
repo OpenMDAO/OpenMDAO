@@ -314,12 +314,12 @@ class Relevance(object):
             local = nprocs > 1 and meta['parallel_deriv_color'] is not None
             if local:
                 if src in group._var_abs2meta['output']:  # src is local
-                    depnodes = self._dependent_nodes(src, direction, local=local)
+                    depnodes = self._dependent_nodes(src, direction, local=True)
                     group.comm.bcast(depnodes, root=group._owning_rank[src])
                 else:
                     depnodes = group.comm.bcast(None, root=group._owning_rank[src])
             else:
-                depnodes = self._dependent_nodes(src, direction, local=local)
+                depnodes = self._dependent_nodes(src, direction, local=False)
 
             rel_systems = _vars2systems(depnodes)
             rel_vars = depnodes - all_systems
@@ -489,9 +489,6 @@ class Relevance(object):
         self._seed_var_map = seed_var_map = {}
         self._seed_sys_map = seed_sys_map = {}
 
-        self._current_var_array = np.zeros(0, dtype=bool)
-        self._current_sys_array = np.zeros(0, dtype=bool)
-
         self._all_seed_vars['fwd'] = fwd_seeds
         self._all_seed_vars['rev'] = rev_seeds
 
@@ -591,6 +588,17 @@ class Relevance(object):
         self._no_dv_responses = \
             [rsrc for rsrc in self._single_seed2relvars['rev'] if rsrc not in found]
 
+    def get_full_seeds(self):
+        """
+        Get the full forward and reverse seeds.
+
+        Returns
+        -------
+        tuple
+            Tuple of forward and reverse seeds.
+        """
+        return self._all_seed_vars['fwd'], self._all_seed_vars['rev']
+
     def get_redundant_adjoint_systems(self):
         """
         Find any systems that depend on responses that depend on other responses.
@@ -631,9 +639,8 @@ class Relevance(object):
         effect, i.e., calling this with active=True will not activate an inactive relevance object,
         but calling it with active=False will deactivate an active relevance object.
 
-        The only way to activate an otherwise inactive relevance object is to use the
-        all_seeds_active, seeds_active, or nonlinear_active context managers and this will only
-        work if _active is None or True.
+        If _active is None, then all_seeds_active, seeds_active, or nonlinear_active context
+        managers can be used to activate the relevance object.
 
         Parameters
         ----------
@@ -644,15 +651,15 @@ class Relevance(object):
         ------
         None
         """
-        if not self._active:  # if already inactive from higher level, don't change it
-            yield
-        else:
+        if self._active or (not active and self._active is None):
             save = self._active
             self._active = active
             try:
                 yield
             finally:
                 self._active = save
+        else:  # self._active is None, so we can be activated but aren't currently active
+            yield
 
     def relevant_vars(self, name, direction, inputs=True, outputs=True):
         """
@@ -850,7 +857,7 @@ class Relevance(object):
         bool
             True if the given variable is relevant.
         """
-        if not self._active:
+        if not self._active or self._current_rel_varray is None:
             return True
 
         return self._current_rel_varray[self._var2idx[name]]
@@ -895,7 +902,7 @@ class Relevance(object):
         bool
             True if the given system is relevant.
         """
-        if not self._active:
+        if not self._active or self._current_rel_sarray is None:
             return True
 
         try:
