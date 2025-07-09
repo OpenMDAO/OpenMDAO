@@ -361,7 +361,10 @@ def _list_installed_cmd(options, user_args):
     list_installed(options.types, options.includes, options.excludes, options.show_docs)
 
 
-def find_repos(types=None, tablefmt='tabulator' if not notebook_mode() else 'text'):
+default_tablefmt = 'tabulator' if not notebook_mode() else 'text'
+
+
+def find_repos(types=None, tablefmt=default_tablefmt):
     """
     Search github for repositories containing OpenMDAO plugins.
 
