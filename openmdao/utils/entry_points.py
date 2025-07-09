@@ -482,4 +482,3 @@ def _find_repos_exec(options, user_args):
         The hook function.
     """
     find_repos(options.topics, options.tablefmt)
-
