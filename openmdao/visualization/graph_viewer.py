@@ -43,6 +43,53 @@ _base_display_map = {
 }
 
 
+def escape_dot_label(label_string):
+    """
+    Escapes special characters in a string to be used as a label in a DOT graph.
+
+    Graphviz/DOT requires certain characters to be escaped when they appear
+    within string literals (labels, node names, etc.) to avoid syntax errors.
+
+    Args:
+        label_string (str): The string to escape.
+
+    Returns:
+        str: The escaped string suitable for a DOT label.
+    """
+    if not isinstance(label_string, str):
+        label_string = str(label_string) # Ensure it's a string, e.g., if it's a number
+
+    # Escape backslashes first, otherwise escaping other characters will add
+    # more backslashes that might then need to be re-escaped.
+    escaped_string = label_string.replace("\\", "\\\\")
+
+    # Escape double quotes
+    escaped_string = escaped_string.replace('"', '\\"')
+
+    # Escape newlines for explicit literal display if not intended as actual newlines.
+    # Often, '\n' *is* intended as a newline in Graphviz, so be careful here.
+    # If you want a literal "\n" in your label (i.e., the text '\n' appears),
+    # you'd need "\\n". If you want a line break, just use "\n".
+    # For general safety, it's often better to *not* escape \n unless explicitly needed,
+    # as Graphviz handles it as a newline by default.
+    # However, if you have a literal `\n` or `\r` that you don't want interpreted as a newline/justification:
+    escaped_string = escaped_string.replace("\n", "\\n") # Convert actual newline char to \n literal
+    escaped_string = escaped_string.replace("\r", "\\r") # Convert actual carriage return to \r literal
+
+    # Escape angle brackets if not using HTML-like labels.
+    # If you ARE using HTML-like labels, you would need HTML entities (&lt;, &gt;)
+    # instead of backslash escapes for these.
+    # For standard string labels, backslash is correct.
+    escaped_string = escaped_string.replace("<", "\\<")
+    escaped_string = escaped_string.replace(">", "\\>")
+
+    # You might also consider escaping other characters like `|` if using record shapes,
+    # or `{}` if using specific node shapes that interpret them.
+    # For general string labels, the above are the most common culprits.
+
+    return escaped_string
+
+
 class GraphViewer(object):
     """
     A class for viewing the model hierarchy and connections in a group.

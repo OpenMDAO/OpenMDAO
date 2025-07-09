@@ -1885,7 +1885,7 @@ class TestGroupPromotes(unittest.TestCase):
         with assert_no_warning(PromotionWarning):
             top.setup()
 
-    def test_promotes_alias_from_parent(self):
+    def test_promotes_alias_from_parent_err(self):
         class SubGroup(om.Group):
             def setup(self):
                 self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b+c', a=3.0, b=4.0))
@@ -1978,7 +1978,7 @@ class TestGroupPromotes(unittest.TestCase):
         # Runs without exception.
         p.setup()
 
-    def test_multiple_promotes(self):
+    def test_multiple_promotes_missing_var(self):
 
         class BranchGroup(om.Group):
             def setup(self):

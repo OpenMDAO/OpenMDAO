@@ -303,6 +303,8 @@ def add_shape_node(graph, name, io, meta):
         Metadata for the variable.
     """
     kwargs = {k: meta[k] for k in _shape_extract}
+    if io == 'input':
+        kwargs['src_indices'] = meta.get('src_indices')
     graph.add_node(name, io=io, **kwargs)
 
 

@@ -2447,6 +2447,15 @@ class Group(System):
 
             from_shape = from_meta['shape']
 
+            if to_meta['io'] == 'input':
+                src_indices = to_meta['src_indices']
+            else:
+                # TODO: what if from node is a '#' node (fake node created for a group input)?
+                src_indices = from_meta.get('src_indices')
+                if src_indices is not None:
+                    raise RuntimeError(f"Input '{from_var}' has src_indices so the shape of "
+                                       f"connected output '{to_var}' cannot be determined.")
+
             # known dist output to/from non-distributed input.  We don't allow this case because
             # non-distributed variables must have the same value on all procs and the only way
             # this is possible is if the src_indices on each proc are identical, but that's not
@@ -2473,10 +2482,16 @@ class Group(System):
                             f"(sizes={distrib_sizes[from_var]}).", ident=ident)
                         return
 
-            to_meta['shape'] = from_shape
+            if src_indices is None:
+                to_meta['shape'] = from_shape
+            else:
+                to_meta['shape'] = from_shape.indexed_src_shape
 
             if from_var in distrib_sizes:
-                distrib_sizes[to_var] = distrib_sizes[from_var]
+                if src_indices is None:
+                    distrib_sizes[to_var] = distrib_sizes[from_var]
+                else:
+                    distrib_sizes[to_var] = distrib_sizes[from_var].indexed_src_size
 
             return from_shape
 
@@ -2545,7 +2560,10 @@ class Group(System):
         # find all variables that have an unknown property (across all procs) and connect them
         # to other unknown and known property variables to form a directed graph.
         for io in ('input', 'output'):
+            abs2meta_loc = self._var_abs2meta[io]
             for name, meta in self._var_allprocs_abs2meta[io].items():
+                if name in abs2meta_loc:
+                    meta = abs2meta_loc[name]
                 compname = name.rpartition('.')[0]
                 component_io[compname, io].append(name)
 
@@ -3132,6 +3150,11 @@ class Group(System):
         src_shape : int or tuple
             Assumed shape of any connected source or higher level promoted input.
         """
+        try:
+            subsys = getattr(self, subsys_name)
+        except AttributeError:
+            raise AttributeError(f"{self.msginfo}: subsystem '{subsys_name}' does not exist.")
+
         if isinstance(any, str):
             self._collect_error(f"{self.msginfo}: Trying to promote any='{any}', "
                                 "but an iterator of strings and/or tuples is required.")
@@ -3170,7 +3193,8 @@ class Group(System):
                 return
 
             try:
-                prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
+                prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape,
+                                         promoted_from=subsys.pathname)
             except Exception as err:
                 lst = []
                 if any is not None:
@@ -3180,11 +3204,6 @@ class Group(System):
                 self._collect_error(f"{self.msginfo}: When promoting {sorted(lst)}: {err}",
                                     ident=(self.pathname, tuple(lst)))
                 return
-
-        try:
-            subsys = getattr(self, subsys_name)
-        except AttributeError:
-            raise AttributeError(f"{self.msginfo}: subsystem '{subsys_name}' does not exist.")
 
         if any:
             subsys._var_promotes['any'].extend((a, prominfo) for a in any)
@@ -3304,13 +3323,13 @@ class Group(System):
         # To make this work, we sort the promotes lists for this subsystem to put the wild card
         # entries at the beginning.
         if promotes:
-            subsys._var_promotes['any'] = [(p, prominfo) for p in
+            subsys._var_promotes['any'] = [(p, None) for p in
                                            sorted(promotes, key=lambda x: '*' not in x)]
         if promotes_inputs:
-            subsys._var_promotes['input'] = [(p, prominfo) for p in
+            subsys._var_promotes['input'] = [(p, None) for p in
                                              sorted(promotes_inputs, key=lambda x: '*' not in x)]
         if promotes_outputs:
-            subsys._var_promotes['output'] = [(p, prominfo) for p in
+            subsys._var_promotes['output'] = [(p, None) for p in
                                               sorted(promotes_outputs, key=lambda x: '*' not in x)]
 
         if self._static_mode:
