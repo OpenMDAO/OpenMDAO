@@ -189,6 +189,7 @@ J_fd - J_fwd:
         prob.model = SellarNoDerivativesCS()
 
         prob.setup()
+        prob.final_setup()
         prob.model.cycle._jacobian = DictionaryJacobian(prob.model.cycle)
 
         try:

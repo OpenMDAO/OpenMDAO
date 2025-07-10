@@ -110,7 +110,7 @@ else:
                 # Here, we find the indices that are not locally owned so that we can
                 # temporarilly zero them out for the norm calculation.
                 dup_inds = []
-                abs2meta = system._var_allprocs_abs2meta[self._typ]
+                abs2meta = system._var_allprocs_abs2meta[self._iotype]
                 for name, start, stop in self.ranges():
                     owning_rank = system._owning_rank[name]
                     if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:

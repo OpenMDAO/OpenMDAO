@@ -2,7 +2,7 @@
 
 import unittest
 import numpy as np
-from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup
+from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup, NewtonSolver
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.om_warnings import OpenMDAOWarning
@@ -114,6 +114,8 @@ class TestGetSetVariables(unittest.TestCase):
         model = p.model
         g = model.add_subsystem('g', Group(assembled_jac_type='dense'))
         g.linear_solver = DirectSolver(assemble_jac=True)
+        # add a NewtonSolver so run_model will initialize Group g's jacobian.
+        g.nonlinear_solver = NewtonSolver(solve_subsystems=False)
         g.add_subsystem('c', ExecComp('y=2*x'))
         p.setup()
 
@@ -161,6 +163,7 @@ class TestGetSetVariables(unittest.TestCase):
            inputs['g.c.x']
         self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c.x' not found. Perhaps you meant one of the following variables: ['c.x', 'c.y'].")
 
+        p.run_model()
 
         # outputs
         with self.assertRaises(KeyError) as cm:
@@ -179,30 +182,25 @@ class TestGetSetVariables(unittest.TestCase):
            outputs['g.c.y']
         self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c.y' not found. Perhaps you meant one of the following variables: ['c.x', 'c.y'].")
 
-        msg = r'Variable name pair \("{}", "{}"\) not found.'
+        msg = "DenseJacobian in 'g'<class Group>: Variable name pair {} not found."
         jac = g.linear_solver._assembled_jac
 
         # d(output)/d(input)
-        with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
+        with self.assertRaises(KeyError) as cm:
             jac['y', 'x'] = 5.0
-        with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'x') not found.")
+        with self.assertRaises(KeyError) as cm:
             jac['y', 'x']
-        # allow absolute keys now
-        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.x')):
-        #     jac['g.c.y', 'g.c.x'] = 5.0
-        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.x')):
-        #     deriv = jac['g.c.y', 'g.c.x']
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'x') not found.")
 
         # d(output)/d(output)
-        with self.assertRaisesRegex(KeyError, msg.format('y', 'y')):
+        with self.assertRaises(KeyError) as cm:
             jac['y', 'y'] = 5.0
-        with self.assertRaisesRegex(KeyError, msg.format('y', 'y')):
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'y') not found.")
+        with self.assertRaises(KeyError) as cm:
             jac['y', 'y']
-        # allow absoute keys now
-        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.y')):
-        #     jac['g.c.y', 'g.c.y'] = 5.0
-        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.y')):
-        #     deriv = jac['g.c.y', 'g.c.y']
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'y') not found.")
+
 
     def test_with_promotion_errors(self):
         """
@@ -222,6 +220,8 @@ class TestGetSetVariables(unittest.TestCase):
 
         # Conclude setup but don't run model.
         p.final_setup()
+
+        g._get_jacobian()
 
         # -------------------------------------------------------------------
 

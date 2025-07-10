@@ -37,6 +37,35 @@ class MyCompApprox(om.ImplicitComponent):
         residuals['res'][1] = (1.0 / (1.0 +  comb * temp ** 3 / CFL) + temp) * 0.5 - temp
 
 
+class MyCompApproxNoManualResids(om.ImplicitComponent):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        self.linear_solver = om.DirectSolver()
+
+    def setup(self):
+        self.add_input('mm', np.ones(1))
+        self.add_output('Re', np.ones((1, 1)))
+        self.add_output('temp', np.ones((1, 1)) * 2.)
+
+    def setup_partials(self):
+        self.declare_partials(['*'], ['*'], method='fd')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        mm = inputs['mm'].item()
+        Re = outputs['Re'].item()
+        temp = outputs['temp'][0][0].item()
+
+        T = 389.97
+        cf = 0.01
+        RE = 1.479301E9 * .0260239151 * (T / 1.8 + 110.4) / (T / 1.8) ** 2
+        comb = 4.593153E-6 * 0.8 * (T + 198.72) / (RE * mm * T ** 1.5)
+        temp_ratio = 1.0 + 0.035 * mm * mm + 0.45 * (temp / T - 1.0)
+        CFL = cf / (1.0 + 3.59 * np.sqrt(cf) * temp_ratio)
+        residuals['Re'] = Re - RE * mm
+        residuals['temp'] = (1.0 / (1.0 +  comb * temp ** 3 / CFL) + temp) * 0.5 - temp
+
+
 class MyCompAnalytic(MyCompApprox):
     def setup_partials(self):
         self.declare_partials('res', ['*'])
@@ -248,6 +277,15 @@ class ResidNamingTestCase(unittest.TestCase):
 
     def test_approx(self):
         prob = self._build_model(MyCompApprox)
+        assert_check_partials(prob.check_partials(method='cs', out_stream=None), atol=1e-5)
+
+        totals = prob.check_totals(method='cs', out_stream=None)
+        assert_check_totals(totals)
+
+    def test_approx_no_resids(self):
+        # this test uses the same model as test_approx but without the renamed resids, so if this
+        # and test_approx fail then the problem is not with the renamed resids.
+        prob = self._build_model(MyCompApproxNoManualResids)
         assert_check_partials(prob.check_partials(method='cs', out_stream=None), atol=1e-5)
 
         totals = prob.check_totals(method='cs', out_stream=None)

@@ -1,15 +1,15 @@
 """Define the ExplicitComponent class."""
 
-import numpy as np
 from itertools import chain
 
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.jacobians.dictionary_jacobian import ExplicitDictionaryJacobian
+from openmdao.jacobians.jacobian import JacobianUpdateContext
 from openmdao.utils.coloring import _ColSparsityJac
 from openmdao.core.component import Component
 from openmdao.vectors.vector import _full_slice
 from openmdao.utils.class_util import overrides_method
 from openmdao.recorders.recording_iteration_stack import Recording
-from openmdao.core.constants import INT_DTYPE, _UNDEFINED
+from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import is_undefined
 
 
@@ -103,7 +103,9 @@ class ExplicitComponent(Component):
         Vector
             The _inputs vector.
         slice
-            A full slice.
+            A full slice.  In the total derivative version of this function, which only is called
+            on the top level Group, this may not be a full slice, but rather indices specified
+            for the corresponding design variable.
         ndarray or None
             Distributed sizes if var is distributed else None
         """
@@ -141,29 +143,40 @@ class ExplicitComponent(Component):
 
             size = meta['size']
             if size > 0:
-
                 # ExplicitComponent jacobians have -1 on the diagonal.
-                arange = np.arange(size, dtype=INT_DTYPE)
-
                 self._subjacs_info[out_abs, out_abs] = {
-                    'rows': arange,
-                    'cols': arange,
+                    'rows': None,
+                    'cols': None,
+                    'diagonal': True,
                     'shape': (size, size),
-                    'val': np.full(size, -1.),
+                    'val': -1.0,
                     'dependent': True,
                 }
 
-    def _setup_jacobians(self, recurse=True):
+    def _get_jacobian(self, use_relevance=True):
         """
-        Set and populate jacobian.
+        Initialize the jacobian if it is not already initialized.
 
         Parameters
         ----------
-        recurse : bool
-            If True, setup jacobians in all descendants. (ignored)
+        use_relevance : bool
+            If True, use relevance to determine which partials to approximate.
+
+        Returns
+        -------
+        Jacobian
+            The initialized jacobian.
         """
-        if self._has_approx and self._use_derivatives:
-            self._set_approx_partials_meta()
+        if self._relevance_changed() and not isinstance(self._jacobian, _ColSparsityJac):
+            self._jacobian = None
+
+        if not self.matrix_free and self._jacobian is None:
+            self._jacobian = ExplicitDictionaryJacobian(self)
+            if self._has_approx:
+                self._get_static_wrt_matches()
+                self._add_approximations(use_relevance=use_relevance)
+
+        return self._jacobian
 
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
@@ -245,11 +258,11 @@ class ExplicitComponent(Component):
                                   distributed=distributed, primal_name=primal_name)
 
     def _approx_subjac_keys_iter(self):
-        is_output = self._outputs._contains_abs
+        is_input = self._inputs._contains_abs
         for abs_key, meta in self._subjacs_info.items():
-            if 'method' in meta and not is_output(abs_key[1]):
+            if 'method' in meta and is_input(abs_key[1]):
                 method = meta['method']
-                if (method is not None and method in self._approx_schemes):
+                if method in self._approx_schemes:
                     yield abs_key
 
     def _compute_wrapper(self):
@@ -354,14 +367,12 @@ class ExplicitComponent(Component):
             if dochk:
                 self._check_consistent_serial_dinputs(nzdresids)
 
-    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use jac.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -371,17 +382,12 @@ class ExplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        J = self._jacobian if jac is None else jac
-
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
 
             if not self.matrix_free:
-                # if we're not matrix free, we can skip the rest because
-                # compute_jacvec_product does nothing.
-
                 # Jacobian and vectors are all scaled, unitless
-                J._apply(self, d_inputs, d_outputs, d_residuals, mode)
+                self._get_jacobian()._apply(self, d_inputs, d_outputs, d_residuals, mode)
                 return
 
             # Jacobian and vectors are all unscaled, dimensional
@@ -395,24 +401,22 @@ class ExplicitComponent(Component):
 
                 try:
                     # handle identity subjacs (output_or_resid wrt itself)
-                    if J is None or isinstance(J, DictionaryJacobian):
-                        if d_outputs._names:
-                            rflat = d_residuals._abs_get_val
-                            oflat = d_outputs._abs_get_val
-                            subjacs_empty = len(self._subjacs_info) == 0
+                    if d_outputs._names:
+                        get_dresid = d_residuals._abs_get_val
+                        get_doutput = d_outputs._abs_get_val
 
-                            # 'val' in the code below is a reference to the part of the
-                            # output or residual array corresponding to the variable 'v'
-                            if mode == 'fwd':
-                                for v in d_outputs._names:
-                                    if subjacs_empty or (v, v) not in self._subjacs_info:
-                                        val = rflat(v)
-                                        val -= oflat(v)
-                            else:  # rev
-                                for v in d_outputs._names:
-                                    if subjacs_empty or (v, v) not in self._subjacs_info:
-                                        val = oflat(v)
-                                        val -= rflat(v)
+                        # 'val' in the code below is a reference to the part of the
+                        # output or residual array corresponding to the variable 'v'
+                        if mode == 'fwd':
+                            for v in d_outputs._names:
+                                if (v, v) not in self._subjacs_info:
+                                    val = get_dresid(v)
+                                    val -= get_doutput(v)
+                        else:  # rev
+                            for v in d_outputs._names:
+                                if (v, v) not in self._subjacs_info:
+                                    val = get_doutput(v)
+                                    val -= get_dresid(v)
 
                     # We used to negate the residual here, and then re-negate after the hook
                     with self._call_user_function('compute_jacvec_product'):
@@ -457,7 +461,7 @@ class ExplicitComponent(Component):
             # ExplicitComponent jacobian defined with -1 on diagonal.
             d_residuals *= -1.0
 
-    def _compute_partials_wrapper(self):
+    def _compute_partials_wrapper(self, jac):
         """
         Call compute_partials based on the value of the "run_root_only" option.
         """
@@ -465,44 +469,44 @@ class ExplicitComponent(Component):
             if self._run_root_only():
                 if self.comm.rank == 0:
                     if self._discrete_inputs:
-                        self.compute_partials(self._inputs, self._jacobian, self._discrete_inputs)
+                        self.compute_partials(self._inputs, jac, self._discrete_inputs)
                     else:
-                        self.compute_partials(self._inputs, self._jacobian)
-                    self.comm.bcast(list(self._jacobian.items()), root=0)
+                        self.compute_partials(self._inputs, jac)
+                    self.comm.bcast(list(jac.items()), root=0)
                 else:
                     for key, val in self.comm.bcast(None, root=0):
-                        self._jacobian[key] = val
+                        jac[key] = val
             else:
                 if self._discrete_inputs:
-                    self.compute_partials(self._inputs, self._jacobian, self._discrete_inputs)
+                    self.compute_partials(self._inputs, jac, self._discrete_inputs)
                 else:
-                    self.compute_partials(self._inputs, self._jacobian)
+                    self.compute_partials(self._inputs, jac)
 
-    def _linearize(self, jac=None, sub_do_ln=False):
+    def _linearize(self, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            Ignored.
         sub_do_ln : bool
-            Flag indicating if the children should call linearize on their linear solvers.
+            Ignored.
         """
-        if self.matrix_free or not (self._has_compute_partials or self._approx_schemes):
-            return
-
         self._check_first_linearize()
 
-        with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
-            # Computing the approximation before the call to compute_partials allows users to
-            # override FD'd values.
-            for approximation in self._approx_schemes.values():
-                approximation.compute_approximations(self, jac=self._jacobian)
+        if self.matrix_free or not (self._has_compute_partials or self._has_approx):
+            return
 
-            if self._has_compute_partials:
-                # We used to negate the jacobian here, and then re-negate after the hook.
-                self._compute_partials_wrapper()
+        with JacobianUpdateContext(self) as jac:
+
+            with self._unscaled_context(outputs=[self._outputs], residuals=[self._residuals]):
+                # Computing the approximation before the call to compute_partials allows users to
+                # override FD'd values.
+                for approximation in self._approx_schemes.values():
+                    approximation.compute_approximations(self, jac=jac)
+
+                if self._has_compute_partials:
+                    # We used to negate the jacobian here, and then re-negate after the hook.
+                    self._compute_partials_wrapper(jac)
 
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """
@@ -522,8 +526,6 @@ class ExplicitComponent(Component):
         discrete_outputs : dict-like or None
             If not None, dict-like object containing discrete output values.
         """
-        global _tuplist
-
         if self.compute_primal is None:
             return
 
@@ -577,9 +579,15 @@ class ExplicitComponent(Component):
         """
         pass
 
-    def is_explicit(self):
+    def is_explicit(self, is_comp=True):
         """
         Return True if this is an explicit component.
+
+        Parameters
+        ----------
+        is_comp : bool
+            If True, return True if this is an explicit component.
+            If False, return True if this is an explicit component or group.
 
         Returns
         -------

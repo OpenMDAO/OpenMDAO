@@ -7,7 +7,6 @@ import numpy as np
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils import cs_safe
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.general_utils import ensure_compatible
 
 
@@ -414,13 +413,9 @@ class BalanceComp(ImplicitComponent):
         """
         Declare the partials for outputs once all variable shapes are known.
         """
-        io_meta = self.get_io_metadata()
-
         for name, options in self._state_vars.items():
-            shape = io_meta[name]['shape']
-            ar = np.arange(shape_to_len(shape))
-            self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)
-            self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar, val=1.0)
+            self.declare_partials(of=name, wrt=options['lhs_name'], diagonal=True, val=1.0)
+            self.declare_partials(of=name, wrt=options['rhs_name'], diagonal=True, val=1.0)
 
             if options['use_mult']:
-                self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
+                self.declare_partials(of=name, wrt=options['mult_name'], diagonal=True, val=1.0)

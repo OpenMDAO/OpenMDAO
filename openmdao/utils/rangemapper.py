@@ -72,6 +72,22 @@ class RangeMapper(object):
         """
         return self._key2range[key]
 
+    def key2offset(self, key):
+        """
+        Get the offset corresponding to the given key.
+
+        Parameters
+        ----------
+        key : object (must be hashable)
+            Data corresponding to an index range.
+
+        Returns
+        -------
+        int
+            The offset corresponding to the given key.
+        """
+        return self._key2range[key][0]
+
     def key2size(self, key):
         """
         Get the size corresponding to the given key.

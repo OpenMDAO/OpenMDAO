@@ -16,7 +16,6 @@ from openmdao.utils.jax_utils import jax, jit, _jax_register_pytree_class, \
     _update_add_output_kwargs, _re_init, _get_differentiable_compute_primal, \
     _jax2np, _compute_output_shapes
 from openmdao.utils.code_utils import get_return_names, get_function_deps
-import openmdao.utils.coloring as coloring_mod
 
 
 class JaxImplicitComponent(ImplicitComponent):
@@ -148,11 +147,8 @@ class JaxImplicitComponent(ImplicitComponent):
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
-            if not self.matrix_free and self._coloring_info.use_coloring() and \
-                    coloring_mod._use_partial_sparsity:
+            if not self.matrix_free and self._coloring_info.use_coloring():
                 self._get_coloring()
-                if self._jacobian is not None:
-                    self._jacobian._restore_approx_sparsity()
             elif self._do_sparsity and self.options['derivs_method'] == 'jax':
                 self.compute_sparsity()
 
@@ -330,6 +326,8 @@ class JaxImplicitComponent(ImplicitComponent):
                              "but got '{kwargs['method']}'.")
         kwargs['method'] = self.options['derivs_method']
         super().declare_coloring(**kwargs)
+        if kwargs['method'] == 'jax':
+            self._has_approx = False
 
     def _jax_linearize(self, inputs, outputs, partials, discrete_inputs=None,
                        discrete_outputs=None):
@@ -422,17 +420,19 @@ class JaxImplicitComponent(ImplicitComponent):
             The sparsity of the Jacobian.
         """
         if self._sparsity is None:
-            if self.options['derivs_method'] == 'jax':
-                self._sparsity = _compute_sparsity(self, direction, num_iters, perturb_size)[0]
-            else:
+            if self._has_approx:
                 self._sparsity = super().compute_sparsity(direction=direction, num_iters=num_iters,
                                                           perturb_size=perturb_size)[0]
+            else:
+                self._sparsity = _compute_sparsity(self, direction, num_iters, perturb_size)[0]
 
         return self._sparsity
 
     def _update_subjac_sparsity(self, sparsity_iter):
         if self.options['derivs_method'] == 'jax':
             _update_subjac_sparsity(sparsity_iter, self.pathname, self._subjacs_info)
+            if self._jacobian is not None:
+                self._jacobian._reset_subjacs(self)
         else:
             super()._update_subjac_sparsity(sparsity_iter)
 

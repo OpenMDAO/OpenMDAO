@@ -337,14 +337,14 @@ class PETScDirectSolver(DirectSolver):
         nproc = system.comm.size
 
         if self._assembled_jac is not None:
-            matrix = self._assembled_jac._int_mtx._matrix
+            matrix = system._assembled_jac.get_dr_do_matrix()
 
             if matrix is None:
                 # this happens if we're not rank 0 when using owned_sizes
                 self._lu = self._lup = None
 
             # Perform dense or sparse lu factorization.
-            elif isinstance(matrix, scipy.sparse.csc_matrix):
+            elif isinstance(matrix, (scipy.sparse.csc_matrix, scipy.sparse.csr_matrix)):
                 try:
                     self._lu = PETScLU(matrix, self.options['sparse_solver_name'],
                                        comm=system.comm)
@@ -361,8 +361,7 @@ class PETScDirectSolver(DirectSolver):
             # the matrix during conversion to csc prior to LU decomp, so we can't use COO.
             else:
                 raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in %s." % (type(self._assembled_jac._int_mtx),
-                                                system.msginfo))
+                                   " in %s." % (type(matrix), system.msginfo))
         else:
             if nproc > 1:
                 raise RuntimeError("DirectSolvers without an assembled jacobian are not supported "
@@ -417,11 +416,11 @@ class PETScDirectSolver(DirectSolver):
                     return
 
         # AssembledJacobians are unscaled.
-        if self._assembled_jac is not None:
+        if system._get_assembled_jac() is not None:
             full_b = b_vec
 
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
+                if isinstance(self._assembled_jac._dr_do_mtx, DenseMatrix):
                     sol_array = self._lup.solve(full_b, transpose=transpose)
                     matrix = self._lup.orig_A
                 else:
@@ -442,3 +441,14 @@ class PETScDirectSolver(DirectSolver):
 
         if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
             self._lin_rhs_checker.add_solution(b_vec, sol_array, copy=True)
+
+    def preferred_sparse_format(self):
+        """
+        Return the preferred sparse format for the dr/do matrix of a split jacobian.
+
+        Returns
+        -------
+        str
+            The preferred sparse format for the dr/do matrix of a split jacobian.
+        """
+        return 'csr'
