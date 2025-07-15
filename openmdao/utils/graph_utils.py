@@ -161,7 +161,7 @@ def get_unresolved_knowns(graph, meta_name, nodes):
     """
     Return all unresolved nodes with known shape.
 
-    Unresolved means that the node has known shape and at least one successor
+    Unresolved means that the node has known shape and at least one neighbor
     with unknown shape.
 
     Parameters
@@ -176,15 +176,18 @@ def get_unresolved_knowns(graph, meta_name, nodes):
     Returns
     -------
     set of str
-        Set of nodes with known shape but at least one successor with unknown shape.
+        Set of nodes with known shape but at least one neighbor with unknown shape.
     """
     gnodes = graph.nodes
-
     unresolved = set()
     for node in nodes:
         if gnodes[node][meta_name] is not None:  # node has known shape
             for succ in graph.successors(node):
                 if gnodes[succ][meta_name] is None:
+                    unresolved.add(node)
+                    break
+            for pred in graph.predecessors(node):
+                if gnodes[pred][meta_name] is None:
                     unresolved.add(node)
                     break
 
@@ -195,7 +198,7 @@ def is_unresolved(graph, node, meta_name):
     """
     Return True if the given node is unresolved.
 
-    Unresolved means that the node has at least one successor with unknown shape.
+    Unresolved means that the node has at least one neighbor with unknown shape.
 
     Parameters
     ----------
@@ -211,13 +214,17 @@ def is_unresolved(graph, node, meta_name):
     bool
         True if the node is unresolved.
     """
+    nodes = graph.nodes
     for s in graph.successors(node):
-        if graph.nodes[s][meta_name] is None:
+        if nodes[s][meta_name] is None:
+            return True
+    for p in graph.predecessors(node):
+        if nodes[p][meta_name] is None:
             return True
     return False
 
 
-def get_actives(graph, knowns, meta_name):
+def get_active_edges(graph, knowns, meta_name):
     """
     Return all active single edges and active multi nodes.
 
@@ -260,6 +267,12 @@ def get_actives(graph, knowns, meta_name):
                     computed_nodes.add(succ)
                 else:
                     active_single_edges.add((known, succ))
+        # for pred in graph.predecessors(known):
+        #     if nodes[pred][meta_name] is None:
+        #         if edges[pred, known]['multi']:
+        #             computed_nodes.add(pred)
+        #         else:
+        #             active_single_edges.add((pred, known))
 
     return active_single_edges, computed_nodes
 

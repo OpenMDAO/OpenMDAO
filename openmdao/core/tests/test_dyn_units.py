@@ -4,7 +4,7 @@ import sys
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
 
 
 class DynUnitsComp(om.ExplicitComponent):
@@ -334,13 +334,21 @@ class TestDynUnits(unittest.TestCase):
                                                   x1={'units_by_conn': True, 'copy_units': 'y1'},
                                                   y1={'units_by_conn': True, 'copy_units': 'x11'}))
         p.model.connect('indep.x1', 'sink.x1')
+        p.setup()
+        
+        expected_warnings = (
+            (om.OpenMDAOWarning, "<model> <class Group>: 'units_by_conn' was set for unconnected variable 'sink.y1'."),
+            (om.OpenMDAOWarning, "<model> <class Group>: Can't copy units of variable 'sink.x11'. Variable doesn't exist or is not continuous.")
+        )
+        
+        with assert_warnings(expected_warnings):
+            p.model._setup_dynamic_properties()
+
         with self.assertRaises(Exception) as cm:
-            p.setup()
             p.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'bad_copy_units_name':"
-           "\n   <model> <class Group>: Can't copy units of variable 'sink.x11'. Variable doesn't exist or is not continuous."
            "\n   <model> <class Group>: Failed to resolve units for ['sink.x1', 'sink.y1']. To see the dynamic units dependency graph, do 'openmdao view_dyn_units <your_py_file>'.")
 
     def test_unconnected_var_dyn_units(self):
@@ -350,13 +358,20 @@ class TestDynUnits(unittest.TestCase):
                                                   x1={'units_by_conn': True, 'copy_units': 'y1'},
                                                   y1={'units_by_conn': True}))
         p.model.connect('indep.x1', 'sink.x1')
+        p.setup()
+      
+        expected_warnings = (
+            (om.OpenMDAOWarning, "<model> <class Group>: 'units_by_conn' was set for unconnected variable 'sink.y1'."),
+        )
+        
+        with assert_warnings(expected_warnings):
+            p.model._setup_dynamic_properties()
+        
         with self.assertRaises(Exception) as cm:
-            p.setup()
             p.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'unconnected_var_dyn_units':"
-           "\n   <model> <class Group>: 'units_by_conn' was set for unconnected variable 'sink.y1'."
            "\n   <model> <class Group>: Failed to resolve units for ['sink.y1']. To see the dynamic units dependency graph, do 'openmdao view_dyn_units <your_py_file>'.")
 
 

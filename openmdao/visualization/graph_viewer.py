@@ -50,44 +50,18 @@ def escape_dot_label(label_string):
     Graphviz/DOT requires certain characters to be escaped when they appear
     within string literals (labels, node names, etc.) to avoid syntax errors.
 
-    Args:
-        label_string (str): The string to escape.
+    Parameters
+    ----------
+    label_string : str
+        The string to escape.
 
-    Returns:
-        str: The escaped string suitable for a DOT label.
+    Returns
+    -------
+    str
+        The escaped string suitable for a DOT label.
     """
-    if not isinstance(label_string, str):
-        label_string = str(label_string) # Ensure it's a string, e.g., if it's a number
-
-    # Escape backslashes first, otherwise escaping other characters will add
-    # more backslashes that might then need to be re-escaped.
-    escaped_string = label_string.replace("\\", "\\\\")
-
-    # Escape double quotes
-    escaped_string = escaped_string.replace('"', '\\"')
-
-    # Escape newlines for explicit literal display if not intended as actual newlines.
-    # Often, '\n' *is* intended as a newline in Graphviz, so be careful here.
-    # If you want a literal "\n" in your label (i.e., the text '\n' appears),
-    # you'd need "\\n". If you want a line break, just use "\n".
-    # For general safety, it's often better to *not* escape \n unless explicitly needed,
-    # as Graphviz handles it as a newline by default.
-    # However, if you have a literal `\n` or `\r` that you don't want interpreted as a newline/justification:
-    escaped_string = escaped_string.replace("\n", "\\n") # Convert actual newline char to \n literal
-    escaped_string = escaped_string.replace("\r", "\\r") # Convert actual carriage return to \r literal
-
-    # Escape angle brackets if not using HTML-like labels.
-    # If you ARE using HTML-like labels, you would need HTML entities (&lt;, &gt;)
-    # instead of backslash escapes for these.
-    # For standard string labels, backslash is correct.
-    escaped_string = escaped_string.replace("<", "\\<")
-    escaped_string = escaped_string.replace(">", "\\>")
-
-    # You might also consider escaping other characters like `|` if using record shapes,
-    # or `{}` if using specific node shapes that interpret them.
-    # For general string labels, the above are the most common culprits.
-
-    return escaped_string
+    escaped_string = label_string.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    return escaped_string.replace("\r", "\\r").replace("<", "\\<").replace(">", "\\>")
 
 
 class GraphViewer(object):
@@ -907,8 +881,8 @@ def _graph_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    def _view_graph(problem):
-        group = problem.model._get_subsystem(options.group) if options.group else problem.model
+    def _view_graph(model):
+        group = model._get_subsystem(options.group) if options.group else model
         if not options.auto_ivc:
             exclude = {'_auto_ivc'}
         else:
@@ -919,5 +893,15 @@ def _graph_cmd(options, user_args):
                                        outfile=options.outfile)
 
     # register the hooks
-    hooks._register_hook('final_setup', 'Problem', post=_view_graph, exit=True)
+    def _set_dyn_hook(prob):
+        # we can't wait until the end of Problem.setup because we'll die in _setup_sizes
+        # if there were any unresolved dynamic shapes, so put the hook immediately after
+        # _setup_dynamic_properties.  inst_id is None here because no system's pathname will
+        # have been set at the time this hook is triggered.
+        hooks._register_hook('_setup_part2', class_name='Group', inst_id=None,
+                             pre=_view_graph, exit=True)
+        hooks._setup_hooks(prob.model)
+
+    # register the hooks
+    hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook, ncalls=1)
     _load_and_exec(options.file[0], user_args)
