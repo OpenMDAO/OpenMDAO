@@ -35,7 +35,7 @@ from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
     add_units_node
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.indexer import indexer, Indexer
+from openmdao.utils.indexer import indexer, Indexer, _flat_full_indexer
 from openmdao.utils.relevance import get_relevance
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
@@ -2457,15 +2457,11 @@ class Group(System):
                 else:  # serial_out <- dist_in
                     # all input rank sizes must be the same
                     if not np.all(distrib_sizes[from_var] == distrib_sizes[from_var][0]):
-                        if from_io == 'output':
-                            ident = (from_var, to_var)
-                        else:
-                            ident = (to_var, from_var)
                         self._collect_error(
                             f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
                             f"from distributed {from_io} '{from_var}' is not supported because not "
                             f"all {from_var} ranks are the same size "
-                            f"(sizes={distrib_sizes[from_var]}).", ident=ident)
+                            f"(sizes={distrib_sizes[from_var]}).", ident=(from_var, to_var))
                         return
 
             if to_io == 'input':
@@ -2475,10 +2471,8 @@ class Group(System):
             elif not internal:
                 # raise an error if from node has src_indices and this isn't an internal
                 # component copy of an input shape
-
-                # TODO: what if from node is a '#' node (fake node created for a group input)?
                 src_indices = from_meta.get('src_indices')
-                if src_indices is not None:
+                if src_indices is not None:  #  and src_indices != _flat_full_indexer:
                     self._collect_error(f"Input '{from_var}' has src_indices so the shape of "
                                         f"connected output '{to_var}' cannot be determined.")
 
