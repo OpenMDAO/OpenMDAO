@@ -7249,16 +7249,16 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, ato
                 if totals:
                     mhatdotm, dhatdotd = derivative_info['directional_fd_fwd'][i]
                     errs.forward, err_vals.forward, above, abs_errs.forward, rel_errs.forward = \
-                        get_tol_violation(mhatdotm, dhatdotd, atol, rtol)
+                        get_tol_violation(dhatdotd, mhatdotm, atol, rtol)
                 else:
                     errs.forward, err_vals.forward, above, abs_errs.forward, rel_errs.forward = \
                         get_tol_violation(Jforward, Jfd, atol, rtol)
                 above_tol |= above
 
             if Jreverse is not None and 'directional_fd_rev' in derivative_info:
-                mhatdotm, dhatdotd = derivative_info['directional_fd_rev'][i]
+                dhatdotd, mhatdotm = derivative_info['directional_fd_rev'][i]
                 errs.reverse, err_vals.reverse, above, abs_errs.reverse, rel_errs.reverse = \
-                    get_tol_violation(mhatdotm, dhatdotd, atol, rtol)
+                    get_tol_violation(dhatdotd, mhatdotm, atol, rtol)
                 above_tol |= above
         else:
             if Jforward is not None:
