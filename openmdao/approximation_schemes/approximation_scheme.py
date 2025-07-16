@@ -90,7 +90,6 @@ class ApproximationScheme(object):
         """
         Get rid of any existing approx groups.
         """
-        print(f"{self.__class__.__name__}: RESETTING approximation scheme")
         self._colored_approx_groups = None
         self._approx_groups = None
 
@@ -502,9 +501,6 @@ class ApproximationScheme(object):
         mycomm = system._full_comm if use_parallel_fd else system.comm
         abs2prom = system._resolver.abs2prom
 
-        import pprint
-        pprint.pprint(approx_groups)
-
         # now do uncolored solves
         for group_i, tup in enumerate(approx_groups):
             wrt, data, jcol_idxs, vec_ind_list, directional, direction = tup
@@ -541,8 +537,6 @@ class ApproximationScheme(object):
 
                     if total:
                         result = self._get_total_result(result, tot_result)
-
-                    print(f"result: {result}")
 
                     if vecidxs is None and not total_or_semi:
                         tosend = (group_i, None, None)
@@ -599,8 +593,6 @@ class ApproximationScheme(object):
         if not self._wrt_meta:
             return
 
-        print("jac: ", jac.__class__.__name__)
-        print(f"{self.__class__.__name__}: {system.msginfo}: computing approximations")
         for ic, col in self.compute_approx_col_iter(system,
                                                     under_cs=system._outputs._under_complex_step):
             jac.set_col(system, ic, col)

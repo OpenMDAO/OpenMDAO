@@ -1543,7 +1543,6 @@ class _TotalJacInfo(object):
 
                     if model._approx_schemes:
                         for scheme in model._approx_schemes.values():
-                            print(f"{model.msginfo}: (totals) resetting approximation scheme")
                             scheme._reset()
                         method = list(model._approx_schemes)[0]
                         kwargs = model._owns_approx_jac_meta
