@@ -4226,6 +4226,7 @@ class Group(System):
         approx = self._get_approx_scheme(method)
         # reset the approx if necessary
         approx._wrt_meta = {}
+        print(f"{self.msginfo}: _setup_approx_derivs")
         print(f"{self.msginfo}: resetting approximation scheme")
         approx._reset()
 

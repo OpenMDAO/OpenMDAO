@@ -135,7 +135,7 @@ class FiniteDifference(ApproximationScheme):
             self._wrt_meta[wrt].update(options)
         else:
             self._wrt_meta[wrt] = options
-        print(f"{self.__class__.__name__}: adding approximation for {wrt}: {options}")
+        print(f"{self.__class__.__name__}: system {system.msginfo} adding approximation for {wrt}: {options}")
         self._reset()  # force later regen of approx_groups
 
     def _get_approx_data(self, system, wrt, meta):
