@@ -501,6 +501,9 @@ class ApproximationScheme(object):
         mycomm = system._full_comm if use_parallel_fd else system.comm
         abs2prom = system._resolver.abs2prom
 
+        import pprint
+        pprint.pprint(approx_groups)
+
         # now do uncolored solves
         for group_i, tup in enumerate(approx_groups):
             wrt, data, jcol_idxs, vec_ind_list, directional, direction = tup
@@ -595,8 +598,8 @@ class ApproximationScheme(object):
         if not self._wrt_meta:
             return
 
-        print("jac: ", jac)
-        print(f"{system.msginfo}: computing approximations")
+        print("jac: ", jac.__class__.__name__)
+        print(f"{self.__class__.__name__}: {system.msginfo}: computing approximations")
         for ic, col in self.compute_approx_col_iter(system,
                                                     under_cs=system._outputs._under_complex_step):
             jac.set_col(system, ic, col)
