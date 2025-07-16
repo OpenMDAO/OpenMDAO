@@ -538,6 +538,8 @@ class ApproximationScheme(object):
                     if total:
                         result = self._get_total_result(result, tot_result)
 
+                    print(f"result: {result}")
+
                     if vecidxs is None and not total_or_semi:
                         tosend = (group_i, None, None)
                     else:
@@ -593,6 +595,7 @@ class ApproximationScheme(object):
         if not self._wrt_meta:
             return
 
+        print(f"{system.msginfo}: computing approximations")
         for ic, col in self.compute_approx_col_iter(system,
                                                     under_cs=system._outputs._under_complex_step):
             jac.set_col(system, ic, col)
