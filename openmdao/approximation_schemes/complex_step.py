@@ -117,7 +117,8 @@ class ComplexStep(ApproximationScheme):
                 for wrt in self._wrt_meta:
                     fd.add_approximation(wrt, system, empty)
 
-            yield from self._fd.compute_approx_col_iter(system)
+            yield from self._fd.compute_approx_col_iter(system, under_cs=True)
+
             return
 
         saved_inputs = system._inputs._get_data().copy()

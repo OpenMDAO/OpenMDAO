@@ -919,7 +919,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
     def test_cs_around_newton_new_method(self):
         # The old method of nudging the Newton and forcing it to reconverge could not achieve the
-        # same accuracy on this model. (1e8 vs 1e12)
+        # same accuracy on this model. (1e-8 vs 1e-12)
 
         class SellarDerivatives(om.Group):
 
@@ -937,14 +937,14 @@ class TestProblemCheckTotals(unittest.TestCase):
                 obj = sub.add_subsystem('obj_cmp', om.ExecComp('obj = x**2 + z[1] + y1 + exp(-y2)', obj=0.0,
                                                          x=0.0, z=np.array([0.0, 0.0]), y1=0.0, y2=0.0),
                                   promotes=['obj', 'x', 'z', 'y1', 'y2'])
-                obj.declare_partials(of='*', wrt='*', method='fd')
+                obj.declare_partials(of='*', wrt='*', method='cs')
 
                 con1 = sub.add_subsystem('con_cmp1', om.ExecComp('con1 = 3.16 - y1', con1=0.0, y1=0.0),
                                   promotes=['con1', 'y1'])
                 con2 = sub.add_subsystem('con_cmp2', om.ExecComp('con2 = y2 - 24.0', con2=0.0, y2=0.0),
                                   promotes=['con2', 'y2'])
-                con1.declare_partials(of='*', wrt='*', method='fd')
-                con2.declare_partials(of='*', wrt='*', method='fd')
+                con1.declare_partials(of='*', wrt='*', method='cs')
+                con2.declare_partials(of='*', wrt='*', method='cs')
 
                 self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
                 self.linear_solver = om.DirectSolver(assemble_jac=False)
