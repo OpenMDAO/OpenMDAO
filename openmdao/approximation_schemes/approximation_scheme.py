@@ -595,6 +595,7 @@ class ApproximationScheme(object):
         if not self._wrt_meta:
             return
 
+        print("jac: ", jac)
         print(f"{system.msginfo}: computing approximations")
         for ic, col in self.compute_approx_col_iter(system,
                                                     under_cs=system._outputs._under_complex_step):
