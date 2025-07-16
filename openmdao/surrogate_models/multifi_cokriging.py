@@ -623,7 +623,10 @@ class MultiFiCoKriging(object):
         constraints = tuple(constraints)
         sol = minimize(rlf_transform, x0, method='COBYLA',
                        constraints=constraints,
-                       options={'disp': False, 'rhoend': tol, 'tol': tol})
+                       options={'disp': False,
+                                'rhobeg': initial_range,
+                                'rhoend': tol,
+                                'tol': tol})
 
         log10_optimal_x = sol['x']
         optimal_rlf_value = sol['fun']
