@@ -90,6 +90,7 @@ class ApproximationScheme(object):
         """
         Get rid of any existing approx groups.
         """
+        print(f"{self.__class__.__name__}: RESETTING approximation scheme")
         self._colored_approx_groups = None
         self._approx_groups = None
 

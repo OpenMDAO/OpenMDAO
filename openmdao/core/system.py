@@ -1566,6 +1566,7 @@ class System(object, metaclass=SystemMetaclass):
             if isinstance(coloring, Coloring):
                 approx = self._get_approx_scheme(coloring._meta['method'])
                 # force regen of approx groups on next call to compute_approximations
+                print(f"{self.msginfo}: resetting approximation scheme")
                 approx._reset()
             return
 
@@ -1777,6 +1778,7 @@ class System(object, metaclass=SystemMetaclass):
         if use_approx:
             # revert uncolored approx back to normal
             for scheme in self._approx_schemes.values():
+                print(f"{self.msginfo}: resetting approximation scheme")
                 scheme._reset()
 
         # restore original Vectors
@@ -1830,6 +1832,7 @@ class System(object, metaclass=SystemMetaclass):
 
         # tell approx scheme to limit itself to only colored columns
         if uses_approx:
+            print(f"{self.msginfo}: resetting approximation scheme")
             approx_scheme._reset()
             self._during_coloring = True
 
@@ -2138,6 +2141,7 @@ class System(object, metaclass=SystemMetaclass):
             if self.uses_approx():
                 approx = self._get_approx_scheme(info['method'])
                 # force regen of approx groups during next compute_approximations
+                print(f"{self.msginfo}: resetting approximation scheme")
                 approx._reset()
         elif isinstance(static, Coloring):
             info.coloring = coloring = static
