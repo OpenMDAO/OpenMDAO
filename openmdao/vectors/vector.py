@@ -149,6 +149,12 @@ class Vector(object):
         """
         return str(self.asarray())
 
+    def __repr__(self):
+        """
+        Return a simple string representation.
+        """
+        return f"{self.__class__.__name__}: {self.asarray()}"
+
     def __len__(self):
         """
         Return the flattened length of this Vector.
