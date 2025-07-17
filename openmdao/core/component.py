@@ -2473,7 +2473,7 @@ class Component(System):
                     # Perform the FD here.
                     approximation.compute_approximations(self, jac=approx_jac)
 
-                for abs_key, partial in approx_jac.items():
+                for abs_key, fd_partial in approx_jac.items():
                     rel_key = abs_key2rel_key(self, abs_key)
                     deriv = partials_data[rel_key]
                     subjacs_info = approx_jac._subjacs[abs_key].info
@@ -2482,7 +2482,7 @@ class Component(System):
                     if 'J_fd' not in deriv:
                         deriv['J_fd'] = []
                         deriv['steps'] = []
-                    deriv['J_fd'].append(partial)
+                    deriv['J_fd'].append(fd_partial)
                     deriv['steps'] = actual_steps[rel_key]
                     deriv['rows'] = subjacs_info['rows']
                     deriv['cols'] = subjacs_info['cols']
@@ -2496,12 +2496,12 @@ class Component(System):
                             # Dot product test for adjoint validity.
                             m = mfree_directions[_of].flatten()
                             d = mfree_directions[_wrt].flatten()
-                            mhat = partial.flatten()
+                            mhat = fd_partial.flatten()
                             dhat = deriv['J_rev'].flatten()
 
                             if 'directional_fd_rev' not in deriv:
                                 deriv['directional_fd_rev'] = []
-                            deriv['directional_fd_rev'].append((mhat.dot(m), dhat.dot(d)))
+                            deriv['directional_fd_rev'].append((dhat.dot(d), mhat.dot(m)))
 
         # convert to regular dict from defaultdict
         partials_data = {key: dict(d) for key, d in partials_data.items()}

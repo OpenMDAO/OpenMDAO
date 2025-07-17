@@ -1600,7 +1600,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                         mhat_dot_m = mhat.dot(m)
 
                         # Dot product test for adjoint validity.
-                        meta['directional_fd_rev'].append((mhat_dot_m, dhat_dot_d))
+                        meta['directional_fd_rev'].append((dhat_dot_d, mhat_dot_m))
                         meta['J_rev'] = dhat_dot_d
                         meta['J_fd'].append(mhat_dot_m)
                 else:
