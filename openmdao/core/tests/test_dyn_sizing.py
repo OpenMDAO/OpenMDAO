@@ -764,7 +764,7 @@ class TestDynShapeFeature(unittest.TestCase):
         p.model.add_subsystem('comp', DynPartialsComp())
         p.model.add_subsystem('sink', om.ExecComp('y=x',
                                                   x={'shape_by_conn': True, 'copy_shape': 'y'},
-                                                  y={'shape_by_conn': True, 'copy_shape': 'x'}))
+                                                  y={'copy_shape': 'x'}))
         p.model.connect('indeps.x', 'comp.x')
         p.model.connect('comp.y', 'sink.x')
         p.setup()
@@ -802,7 +802,7 @@ class TestDynShapeFeature(unittest.TestCase):
         p.model.add_subsystem('comp', PartialsComp())
         p.model.add_subsystem('sink', om.ExecComp('y=x',
                                                   x={'shape_by_conn': True, 'copy_shape': 'y'},
-                                                  y={'shape_by_conn': True, 'copy_shape': 'x'}))
+                                                  y={'copy_shape': 'x'}))
         p.model.connect('comp.y', 'sink.x')
         p.setup()
         p.run_model()

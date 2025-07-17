@@ -24,7 +24,7 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
-    shape_to_len, ValueRepeater
+    shape_to_len, ValueRepeater, evenly_distrib_idxs
 from openmdao.utils.general_utils import common_subpath, \
     convert_src_inds, shape2tuple, get_connection_owner, ensure_compatible, \
     meta2src_iter, get_rev_conns, is_undefined
@@ -825,6 +825,7 @@ class Group(System):
         self._configure_check()
 
         self._setup_var_data()
+        self._setup_var_existence()
 
         # have to do this again because we are passed the point in _setup_var_data when this happens
         self._has_output_scaling = False
@@ -2006,6 +2007,29 @@ class Group(System):
 
         return remote_vars
 
+    def _setup_var_existence(self):
+        """
+        Compute the arrays of variable existence for all variables/procs on this system.
+        """
+        abs2idx = self._var_allprocs_abs2idx = {}
+        all_abs2meta = self._var_allprocs_abs2meta
+        self._var_existence = {
+            'input': np.zeros((self.comm.size, len(all_abs2meta['input'])), dtype=int),
+            'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=int),
+        }
+
+        iproc = self.comm.rank
+        for io, existence in self._var_existence.items():
+            abs2meta = self._var_abs2meta[io]
+            for i, name in enumerate(self._var_allprocs_abs2meta[io]):
+                abs2idx[name] = i
+                if name in abs2meta:
+                    existence[iproc, i] = 1
+
+            if self.comm.size > 1:
+                scratch = existence.copy()
+                self.comm.Allreduce(scratch, existence, MPI.SUM)
+
     @collect_errors
     def _setup_var_sizes(self):
         """
@@ -2409,7 +2433,7 @@ class Group(System):
 
             return from_prop
 
-        def copy_var_shape(graph, from_var, to_var, distrib_sizes):
+        def copy_var_shape(graph, from_var, to_var, distrib_shapes, distrib_sizes):
             """
             Copy shape info from from_var's metadata to to_var's metadata in the graph.
 
@@ -2421,6 +2445,8 @@ class Group(System):
                 Name of variable to copy shape info from.
             to_var : str
                 Name of variable to copy shape info to.
+            distrib_shapes : dict
+                Mapping of distributed variable name to shapes in each rank.
             distrib_sizes : dict
                 Mapping of distributed variable name to sizes in each rank.
 
@@ -2443,18 +2469,86 @@ class Group(System):
             from_io = from_meta['io']
             to_io = to_meta['io']
             src_indices = None
+            fwd = from_io == 'output'
+            rev = not fwd
+            flat_from = from_meta.get('flat_src_indices')
+            flat_to = to_meta.get('flat_src_indices')
+            is_full_slice = False
+            if self.comm.size > 1:
+                dist_from = from_meta['distributed']
+                dist_to = to_meta['distributed']
+            else:
+                dist_from = dist_to = False
+
+            if not internal:  # if internal to a component, src_indices isn't used
+                if fwd:
+                    src_indices = to_meta['src_indices']
+                else: # rev
+                    src_indices = from_meta.get('src_indices')
+
+                if src_indices is not None:
+                    ind = src_indices()
+                    is_full_slice = (isinstance(ind, slice) and ind.start == None and
+                                     ind.stop == None and ind.step in (1, None))
+
+                if rev and src_indices is not None:
+                    if is_full_slice:
+                        if dist_to and dist_from:
+                            self._collect_error(f"Using a full slice [:] as src_indices between"
+                                                f" distributed variables '{from_var}' and "
+                                                f"'{to_var}' is invalid.")
+                            return
+
+                        if dist_to and not dist_from:
+                            abs2idx = self._var_allprocs_abs2idx
+                            # serial input is using full slice here, so contains the full
+                            # distributed value of the distributed output.
+
+                            # dist input may not exist on all procs...
+                            exist_procs = self._var_existence['output'][:, abs2idx[to_var]]
+                            split_num = np.sum(exist_procs)
+
+                            sz, _ = evenly_distrib_idxs(split_num, shape_to_len(from_shape))
+                            sizes = np.zeros(self.comm.size, dtype=int)
+                            idx = 0
+                            for i, exists in enumerate(exist_procs):
+                                if exists:
+                                    sizes[i] = sz[idx]
+                                    idx += 1
+                            distrib_sizes[to_var] = sizes.copy()
+                            if len(from_shape) > 1:
+                                if from_shape[0] != self.comm.size:
+                                    self._collect_error(f"Serial input '{from_var}' has shape "
+                                                        f"{from_shape} but output '{to_var}' "
+                                                        f"is distributed over {self.comm.size} "
+                                                        f"procs and {from_shape[0]} != "
+                                                        f"{self.comm.size}.")
+                                    return
+                                else:
+                                    distrib_shapes[to_var] = [from_shape[1:]] * self.comm.size
+                                    shp = to_meta['shape'] = from_shape[1:]
+                            else:
+                                distrib_shapes[to_var] = [(s,) for s in sizes]
+                                shp = to_meta['shape'] = (sizes[sizes != 0][0],)
+
+                        return shp
+
+                    else:
+                        self._collect_error(f"Input '{from_var}' has src_indices so the shape "
+                                            f"of connected output '{to_var}' cannot be "
+                                            "determined.")
 
             # known dist output to/from non-distributed input.  We don't allow this case because
             # non-distributed variables must have the same value on all procs and the only way
             # this is possible is if the src_indices on each proc are identical, but that's not
             # possible if we assume 'always local' transfer (see POEM 46).
-            if (self.comm.size > 1 and from_meta['distributed']) and not to_meta['distributed']:
-                if from_io == 'output':
+            if dist_from and not dist_to:
+                if fwd:  # dist_out -> serial_in
                     self._collect_error(
                         f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
                         f"from distributed {from_io} '{from_var}' is not supported.")
                     return
-                else:  # serial_out <- dist_in
+                else:  # reverse: serial_out <- dist_in
                     # all input rank sizes must be the same
                     if not np.all(distrib_sizes[from_var] == distrib_sizes[from_var][0]):
                         self._collect_error(
@@ -2464,34 +2558,22 @@ class Group(System):
                             f"(sizes={distrib_sizes[from_var]}).", ident=(from_var, to_var))
                         return
 
-            if to_io == 'input':
-                if not internal:
-                    src_indices = to_meta['src_indices']
-
-            elif not internal:
-                # raise an error if from node has src_indices and this isn't an internal
-                # component copy of an input shape
-                src_indices = from_meta.get('src_indices')
-                if src_indices is not None:  #  and src_indices != _flat_full_indexer:
-                    self._collect_error(f"Input '{from_var}' has src_indices so the shape of "
-                                        f"connected output '{to_var}' cannot be determined.")
-
             if from_shape is None:
                 return from_shape
 
             if src_indices is None:
                 shp = to_meta['shape'] = from_shape
-                if from_var in distrib_sizes:
-                    distrib_sizes[to_var] = distrib_sizes[from_var].copy()
+                if dist_from:
+                    distrib_shapes[to_var] = distrib_shapes[from_var].copy()
             else:
-                if from_var in distrib_sizes:
+                if dist_from:
                     from_shape = np.sum(distrib_sizes[from_var])
                     src_indices.set_src_shape(from_shape)
                     if to_meta.get('distributed'):
                         dist_sizes = np.zeros_like(distrib_sizes[from_var])
                         dist_sizes[self.comm.rank] = src_indices.indexed_src_size
-                        distrib_sizes[to_var] = dist_sizes.copy()
                         self.comm.Allreduce(dist_sizes, distrib_sizes[to_var], op=MPI.SUM)
+                        distrib_shapes[to_var] = [(s,) for s in distrib_sizes[to_var]]
                 else:
                     src_indices.set_src_shape(from_shape)
 
@@ -2499,7 +2581,7 @@ class Group(System):
 
             return shp
 
-        def copy_var_units(graph, from_var, to_var, ignored):
+        def copy_var_units(graph, from_var, to_var, ignored, ignored2):
             """
             Copy units info from from_var's metadata to to_var's metadata in the graph.
 
@@ -2512,6 +2594,8 @@ class Group(System):
             to_var : str
                 Name of variable to copy units info to.
             ignored : dict
+                Ignored argument.
+            ignored2 : dict
                 Ignored argument.
 
             Returns
@@ -2666,12 +2750,8 @@ class Group(System):
                     # store known distributed size info needed for computing shapes
                     if nprocs > 1:
                         my_abs2meta = my_abs2meta_in if name in my_abs2meta_in else my_abs2meta_out
-                        if name in my_abs2meta:
-                            sz = my_abs2meta[name]['size']
-                            if sz is not None:
-                                dist_sz[name] = sz
-                        else:
-                            dist_sz[name] = 0
+                        if name in my_abs2meta and my_abs2meta[name]['distributed']:
+                            dist_sz[name] = my_abs2meta[name]['shape']
 
         # loop over any 'compute_property' variables and add edges to the graph
         # This is done separately from the loop above because we need the component_io dict
@@ -2697,13 +2777,17 @@ class Group(System):
             # so we're done
             return
 
-        if nprocs > 1 and prop == 'shape':
-            distrib_sizes = defaultdict(lambda: np.zeros(nprocs, dtype=INT_DTYPE))
-            for rank, dsz in enumerate(self.comm.allgather(dist_sz)):
-                for n, sz in dsz.items():
-                    distrib_sizes[n][rank] = sz
+        if nprocs > 1 and prop == 'shape' and dist_sz:
+            distrib_shapes = defaultdict(lambda: [None] * nprocs)
+            for rank, dshp in enumerate(self.comm.allgather(dist_sz)):
+                for n, shp in dshp.items():
+                    distrib_shapes[n][rank] = shp
         else:
-            distrib_sizes = {}
+            distrib_shapes = {}
+
+        distrib_sizes = {}
+        for n, shapes in distrib_shapes.items():
+            distrib_sizes[n] = np.array([0 if s is None else shape_to_len(s) for s in shapes])
 
         knowns = {n for n, d in graph.nodes(data=True) if d[prop] is not None}
         all_knowns = knowns.copy()
@@ -2739,7 +2823,7 @@ class Group(System):
                 # print("ACTIVE EDGES", active_single_edges)
                 # print("COMPUTE NODES:", sorted(computed_nodes))
                 for k, u in active_single_edges:
-                    shp = copy_var_property(graph, k, u, distrib_sizes)
+                    shp = copy_var_property(graph, k, u, distrib_shapes, distrib_sizes)
                     # print((k, u), 'GOT SHAPE:', shp)
                     if shp is not None:
                         if is_unresolved(graph, u, prop):
@@ -2821,13 +2905,14 @@ class Group(System):
             allmeta = self._var_allprocs_abs2meta[io][node]
 
             propval = data[prop]
-            if isinstance(propval, PhysicalUnit):
-                propval = propval.name()
 
-            allmeta[prop] = propval
             if prop == 'shape':
                 size = shape_to_len(propval)
                 allmeta['size'] = size
+            elif isinstance(propval, PhysicalUnit):
+                propval = propval.name()
+
+            allmeta[prop] = propval
 
             try:
                 meta = self._var_abs2meta[io][node]
@@ -2988,7 +3073,7 @@ class Group(System):
                     # full distributed shape, i.e., treat it in this regard as a distributed output
                     out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'])
 
-                in_shape = meta_in['shape']
+                in_shape = meta_in['global_shape']
                 src_indices = meta_in['src_indices']
 
                 if src_indices is None and out_shape != in_shape:
