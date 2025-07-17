@@ -149,8 +149,8 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                                  f'{stepstrs[i]} : {err}')
                     parts.append(f'      abs error: {abs_errs[i].forward:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].forward:.6e}')
-                    parts.append(f'      fwd value: {vals_at_max_err[i].forward[0]:.6e}')
-                    parts.append(f'      fd value: {vals_at_max_err[i].forward[1]:.6e} '
+                    parts.append(f'      fwd value @ max viol: {vals_at_max_err[i].forward[0]:.6e}')
+                    parts.append(f'      fd value @ max viol: {vals_at_max_err[i].forward[1]:.6e} '
                                  f'({fd_desc}{stepstrs[i]})\n')
 
                 if ('directional_fd_rev' in derivative_info and
@@ -161,9 +161,9 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                                  f'{stepstrs[i]} : {err}')
                     parts.append(f'      abs error: {abs_errs[i].reverse:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].reverse:.6e}')
-                    fd, rev = derivative_info['directional_fd_rev'][i]
-                    parts.append(f'      rev value: {rev:.6e}')
-                    parts.append(f'      fd value: {fd:.6e} ({fd_desc}{stepstrs[i]})\n')
+                    rev, fd = derivative_info['directional_fd_rev'][i]
+                    parts.append(f'      rev value @ max viol: {rev:.6e}')
+                    parts.append(f'      fd value @ max viol: {fd:.6e} ({fd_desc}{stepstrs[i]})\n')
             else:
                 if tol_violations[i].forward is not None:
                     err = _format_error(tol_violations[i].forward, 0.0)
@@ -171,8 +171,8 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                                  f'{stepstrs[i]} : {err}')
                     parts.append(f'      abs error: {abs_errs[i].forward:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].forward:.6e}')
-                    parts.append(f'      fwd value: {vals_at_max_err[i].forward[0]:.6e}')
-                    parts.append(f'      fd value: {vals_at_max_err[i].forward[1]:.6e} '
+                    parts.append(f'      fwd value @ max viol: {vals_at_max_err[i].forward[0]:.6e}')
+                    parts.append(f'      fd value @ max viol: {vals_at_max_err[i].forward[1]:.6e} '
                                  f'({fd_desc}{stepstrs[i]})\n')
 
                 if tol_violations[i].reverse is not None:
@@ -181,8 +181,8 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                                  f'{stepstrs[i]} : {err}')
                     parts.append(f'      abs error: {abs_errs[i].reverse:.6e}')
                     parts.append(f'      rel error: {rel_errs[i].reverse:.6e}')
-                    parts.append(f'      rev value: {vals_at_max_err[i].reverse[0]:.6e}')
-                    parts.append(f'      fd value: {vals_at_max_err[i].reverse[1]:.6e} '
+                    parts.append(f'      rev value @ max viol: {vals_at_max_err[i].reverse[0]:.6e}')
+                    parts.append(f'      fd value @ max viol: {vals_at_max_err[i].reverse[1]:.6e} '
                                  f'({fd_desc}{stepstrs[i]})\n')
 
         if directional:
@@ -194,16 +194,16 @@ def _deriv_display(system, err_iter, derivatives, rel_error_tol, abs_error_tol, 
                 parts.append(f'      abs error: {abs_errs[0].fwd_rev:.6e}')
                 parts.append(f'      rel error: {rel_errs[0].fwd_rev:.6e}')
                 fwd, rev = derivative_info['directional_fwd_rev']
-                parts.append(f'      rev value: {rev:.6e}')
-                parts.append(f'      fwd value: {fwd:.6e}\n')
+                parts.append(f'      rev value @ max viol: {rev:.6e}')
+                parts.append(f'      fwd value @ max viol: {fwd:.6e}\n')
         elif tol_violations[0].fwd_rev is not None:
             err = _format_error(tol_violations[0].fwd_rev, 0.0)
             parts.append(f'    Max Tolerance Violation {tol_violation_str("Jrev", "Jfwd")}'
                          f' : {err}')
             parts.append(f'      abs error: {abs_errs[0].fwd_rev:.6e}')
             parts.append(f'      rel error: {rel_errs[0].fwd_rev:.6e}')
-            parts.append(f'      rev value: {vals_at_max_err[0].fwd_rev[0]:.6e}')
-            parts.append(f'      fwd value: {vals_at_max_err[0].fwd_rev[1]:.6e}\n')
+            parts.append(f'      rev value @ max viol: {vals_at_max_err[0].fwd_rev[0]:.6e}')
+            parts.append(f'      fwd value @ max viol: {vals_at_max_err[0].fwd_rev[1]:.6e}\n')
 
         if inconsistent:
             parts.append('\n    * Inconsistent value across ranks *\n')
@@ -487,13 +487,13 @@ def _deriv_display_compact(system, err_iter, derivatives, out_stream, totals=Fal
             column_meta[4] = {'align': 'right'}
             column_meta[7] = {'align': 'right'}
             column_meta[10] = {'align': 'right'}
-            headers.extend(['fwd val', 'fd val', '(fwd-fd) - (a + r*fd)',
-                            'rev val', 'fd val', '(rev-fd) - (a + r*fd)',
-                            'fwd val', 'rev val', '(fwd-rev) - (a + r*rev)',
+            headers.extend(['fwd val @ max viol', 'fd val @ max viol', '(fwd-fd) - (a + r*fd)',
+                            'rev val @ max viol', 'fd val @ max viol', '(rev-fd) - (a + r*fd)',
+                            'fwd val @ max viol', 'rev val @ max viol', '(fwd-rev) - (a + r*rev)',
                             'error desc'])
         else:
             column_meta[4] = {'align': 'right'}
-            headers.extend(['calc val', 'fd val', '(calc-fd) - (a + r*fd)',
+            headers.extend(['calc val @ max viol', 'fd val @ max viol', '(calc-fd) - (a + r*fd)',
                             'error desc'])
 
         _print_deriv_table(table_data, headers, sys_buffer, col_meta=column_meta)
