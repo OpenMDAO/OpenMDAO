@@ -38,6 +38,12 @@ if Version(scipy_version) >= Version("1.4"):
     _constraint_optimizers.add('differential_evolution')
     _constraint_grad_optimizers.add('differential_evolution')
 
+if Version(scipy_version) >= Version("1.14"):
+    # COBYLA supports bounds starting with SciPy Version 1.14
+    _optimizers.add('COBYQA')
+    _bounds_optimizers |= {'COBYQA'}
+    _constraint_optimizers |= {'COBYQA'}
+
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
 _global_optimizers = {'differential_evolution', 'basinhopping'}
 if Version(scipy_version) >= Version("1.2"):  # Only available in newer versions
@@ -58,6 +64,8 @@ _unsupported_optimizers = {'dogleg', 'trust-ncg'}
 _supports_new_style = {'trust-constr'}
 if Version(scipy_version) >= Version("1.4"):
     _supports_new_style.add('differential_evolution')
+if Version(scipy_version) >= Version("1.14"):
+    _supports_new_style.add('COBYQA')
 _use_new_style = True  # Recommended to set to True
 
 CITATIONS = """
@@ -673,7 +681,7 @@ class ScipyOptimizeDriver(Driver):
         float
             Value of the constraint function.
         """
-        if self.options['optimizer'] == 'differential_evolution':
+        if self.options['optimizer'] in ['differential_evolution', 'COBYQA']:
             # the DE opt will not have called this, so we do it here to update DV/resp values
             self._objfunc(x_new)
 
