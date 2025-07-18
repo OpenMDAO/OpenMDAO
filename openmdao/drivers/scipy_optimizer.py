@@ -64,6 +64,8 @@ _unsupported_optimizers = {'dogleg', 'trust-ncg'}
 _supports_new_style = {'trust-constr'}
 if Version(scipy_version) >= Version("1.4"):
     _supports_new_style.add('differential_evolution')
+if Version(scipy_version) >= Version("1.14"):
+    _supports_new_style.add('COBYQA')
 _use_new_style = True  # Recommended to set to True
 
 CITATIONS = """
@@ -679,7 +681,7 @@ class ScipyOptimizeDriver(Driver):
         float
             Value of the constraint function.
         """
-        if self.options['optimizer'] == 'differential_evolution':
+        if self.options['optimizer'] in ['differential_evolution', 'COBYQA']:
             # the DE opt will not have called this, so we do it here to update DV/resp values
             self._objfunc(x_new)
 
