@@ -141,7 +141,7 @@ def _setup_func_group():
             ('_build', (Matrix,)),
             ('_add_submat', (Matrix,)),
             ('_get_promotion_maps', (System,)),
-            ('_set_approx_partials_meta', (System,)),
+            ('_add_approximations', (System,)),
             ('_get_initial_*', (System,)),
             ('_initialize_*', (DefaultVector,)),
             ('_create_*', (DefaultVector,)),
@@ -159,7 +159,7 @@ def _setup_func_group():
             ('_solve_linear', (System,)),
             ('apply_linear', (System,)),
             ('solve_linear', (System,)),
-            ('_set_approx_partials_meta', (System, Jacobian)),
+            ('_add_approximations', (System,)),
             ('_linearize', (System, Solver)),
             # include NewtonSolver to provide some context
             ('solve', (LinearSolver, NewtonSolver)),
@@ -233,7 +233,7 @@ def _setup_func_group():
         from petsc4py import PETSc  # noqa: F401
         from openmdao.vectors.petsc_vector import PETScVector, PETScTransfer
 
-        #TODO: this needs work.  Still lots of MPI calls not covered here...
+        # TODO: this needs work.  Still lots of MPI calls not covered here...
         func_group['mpi'] = [
             ('*', (PETScTransfer,)),
             ('get_norm', (PETScVector,)),

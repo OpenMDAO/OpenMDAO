@@ -927,11 +927,11 @@ class TestDirectSolver(LinearSolverTests.LinearSolverTestCase):
         prob.setup(check=False, mode='fwd')
 
         prob['width'] = 2.0
+        prob.run_model()
 
-        msg = "AssembledJacobian not supported for matrix-free subcomponent."
-        with self.assertRaisesRegex(Exception, msg):
-            prob.run_model()
-
+        with self.assertRaises(Exception) as ctx:
+            prob.model.run_linearize()
+        self.assertEqual(ctx.exception.args[0], '<model> <class Group>: AssembledJacobian not supported for matrix-free subcomponent.')
 
 @unittest.skipUnless(MPI and PETScVector, "only run with MPI and PETSc.")
 class TestDirectSolverRemoteErrors(unittest.TestCase):

@@ -590,7 +590,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 outputs['g'] = 3.0*inputs['x']
 
             def compute_partials(self, inputs, partials):
-                partials['g', 'x'] = 3.
+                partials['g', 'x'] = 3. * np.eye(4)
 
         prob = om.Problem()
 
@@ -628,7 +628,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 outputs['g'] = 3.0*inputs['x']
 
             def compute_partials(self, inputs, partials):
-                partials['g', 'x'] = 3.
+                partials['g', 'x'] = 3. * np.eye(4)
 
         prob = om.Problem()
 
@@ -666,7 +666,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 outputs['g'] = 2.0*inputs['z'] + 3.0*inputs['x']
 
             def compute_partials(self, inputs, partials):
-                partials['g', 'x'] = 3.
+                partials['g', 'x'] = 3. * np.eye(4)
 
         prob = om.Problem()
 
