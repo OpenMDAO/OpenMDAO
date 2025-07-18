@@ -2014,8 +2014,8 @@ class Group(System):
         abs2idx = self._var_allprocs_abs2idx = {}
         all_abs2meta = self._var_allprocs_abs2meta
         self._var_existence = {
-            'input': np.zeros((self.comm.size, len(all_abs2meta['input'])), dtype=int),
-            'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=int),
+            'input': np.zeros((self.comm.size, len(all_abs2meta['input'])), dtype=bool),
+            'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=bool),
         }
 
         iproc = self.comm.rank
@@ -2024,7 +2024,7 @@ class Group(System):
             for i, name in enumerate(self._var_allprocs_abs2meta[io]):
                 abs2idx[name] = i
                 if name in abs2meta:
-                    existence[iproc, i] = 1
+                    existence[iproc, i] = True
 
             if self.comm.size > 1:
                 scratch = existence.copy()
@@ -2463,6 +2463,8 @@ class Group(System):
             to_meta = graph.nodes[to_var]
 
             from_shape = from_meta['shape']
+            if from_shape is None:
+                return
 
             # is this a connection internal to a component?
             internal = to_var.rpartition('.')[0] == from_var.rpartition('.')[0]
@@ -2480,18 +2482,19 @@ class Group(System):
             else:
                 dist_from = dist_to = False
 
-            if not internal:  # if internal to a component, src_indices isn't used
-                if fwd:
-                    src_indices = to_meta['src_indices']
-                else:  # rev
-                    src_indices = from_meta.get('src_indices')
+            if internal:  # if internal to a component, src_indices isn't used
+                src_indices = None
+            elif fwd:
+                src_indices = to_meta['src_indices']
+            else:  # rev
+                src_indices = from_meta.get('src_indices')
 
-                if src_indices is not None:
-                    ind = src_indices()
-                    is_full_slice = (isinstance(ind, slice) and ind.start is None and
-                                     ind.stop is None and ind.step in (1, None))
+            if src_indices is not None:
+                ind = src_indices()
+                is_full_slice = (isinstance(ind, slice) and ind.start is None and
+                                    ind.stop is None and ind.step in (1, None))
 
-                if rev and src_indices is not None:
+                if rev:
                     if is_full_slice:
                         if dist_to and dist_from:
                             self._collect_error(f"Using a full slice [:] as src_indices between"
@@ -2499,22 +2502,20 @@ class Group(System):
                                                 f"'{to_var}' is invalid.")
                             return
 
-                        if dist_to and not dist_from:
+                        if dist_to and not dist_from:  # dist_out <-- serial_in
                             abs2idx = self._var_allprocs_abs2idx
                             # serial input is using full slice here, so contains the full
-                            # distributed value of the distributed output.
+                            # distributed value of the distributed output (and serial input will
+                            # have the same value on all procs).
 
-                            # dist input may not exist on all procs...
+                            # dist input may not exist on all procs, so distribute the serial
+                            # entries across only the procs where the dist output exists.
                             exist_procs = self._var_existence['output'][:, abs2idx[to_var]]
-                            split_num = np.sum(exist_procs)
+                            split_num = np.count_nonzero(exist_procs)
 
                             sz, _ = evenly_distrib_idxs(split_num, shape_to_len(from_shape))
                             sizes = np.zeros(self.comm.size, dtype=int)
-                            idx = 0
-                            for i, exists in enumerate(exist_procs):
-                                if exists:
-                                    sizes[i] = sz[idx]
-                                    idx += 1
+                            sizes[exist_procs] = sz
                             distrib_sizes[to_var] = sizes.copy()
                             if len(from_shape) > 1:
                                 if from_shape[0] != self.comm.size:
@@ -2558,22 +2559,29 @@ class Group(System):
                             f"(sizes={distrib_sizes[from_var]}).", ident=(from_var, to_var))
                         return
 
-            if from_shape is None:
-                return from_shape
-
             if src_indices is None:
                 shp = to_meta['shape'] = from_shape
-                if dist_from:
-                    distrib_shapes[to_var] = distrib_shapes[from_var].copy()
+                if dist_to:
+                    if dist_from:
+                        distrib_shapes[to_var] = distrib_shapes[from_var].copy()
+                        distrib_sizes[to_var] = distrib_sizes[from_var].copy()
+                    else:
+                        distrib_shapes[to_var] = [from_shape] * self.comm.size
+                        distrib_sizes[to_var] = np.array([shape_to_len(from_shape)] * self.comm.size)
             else:
                 if dist_from:
                     from_shape = np.sum(distrib_sizes[from_var])
                     src_indices.set_src_shape(from_shape)
-                    if to_meta.get('distributed'):
+                    if dist_to:
                         dist_sizes = np.zeros_like(distrib_sizes[from_var])
                         dist_sizes[self.comm.rank] = src_indices.indexed_src_size
                         self.comm.Allreduce(dist_sizes, distrib_sizes[to_var], op=MPI.SUM)
                         distrib_shapes[to_var] = [(s,) for s in distrib_sizes[to_var]]
+                elif dist_to:
+                    if flat_to:
+                        pass
+                    else:
+                        pass
                 else:
                     src_indices.set_src_shape(from_shape)
 

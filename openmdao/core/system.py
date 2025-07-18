@@ -6556,7 +6556,7 @@ class System(object, metaclass=SystemMetaclass):
         if exist_procs is None:
             global_size = np.sum(scope._var_sizes[io][:, var_idx])
         else:
-            global_size = np.sum(scope._var_sizes[io][:, var_idx] * exist_procs)
+            global_size = np.sum(scope._var_sizes[io][:, var_idx][exist_procs])
 
         # assume that all but the first dimension of the shape of a
         # distributed variable is the same on all procs

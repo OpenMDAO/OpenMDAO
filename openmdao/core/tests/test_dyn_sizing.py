@@ -673,10 +673,10 @@ class TestDynShapes(unittest.TestCase):
 
         with assert_warnings(expected_warnings):
             p.model._setup_dynamic_properties()
-            
+
         with self.assertRaises(Exception) as cm:
             p.final_setup()
-            
+
         self.assertEqual(cm.exception.args[0],
                          "\nCollected errors for problem 'bad_copy_shape_name':"
                          "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
@@ -689,11 +689,11 @@ class TestDynShapes(unittest.TestCase):
                                                   y1={'shape_by_conn': True}))
         p.model.connect('indep.x1', 'sink.x1')
         p.setup()
-        
+
         expected_warnings = (
-            (om.OpenMDAOWarning, "<model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'."), 
+            (om.OpenMDAOWarning, "<model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'."),
         )
-        
+
         with assert_warnings(expected_warnings):
             p.model._setup_dynamic_properties()
 
@@ -1158,6 +1158,81 @@ class TestComputeShape(unittest.TestCase):
         p.run_model()
 
         self.assertEqual(model.C3._outputs['out'].shape, (3, 7))
+
+
+class TestDynShapeSrcIndices(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_serial_serial_fwd(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', val=np.ones((2, 3)))
+
+        model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                x={'shape_by_conn': True}, y={'copy_shape': 'x'}))
+
+        model.connect('indep.x', 'comp.x')
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.y'), np.ones((2, 3)) * 2)
+
+    def test_serial_serial_fwd_src_inds(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', val=np.ones((2, 3)))
+
+        model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                x={'shape_by_conn': True}, y={'copy_shape': 'x'}))
+
+        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:, [[0,2]]], flat_src_indices=False)
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.y'), np.ones((2, 2)) * 2)
+
+    def test_serial_dist_fwd(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', val=np.ones((2, 3)))
+
+        model.add_subsystem('comp', DistribDynShapeComp(n_inputs=1))
+
+        model.connect('indep.x', 'comp.x1')
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.y1', get_remote=False), np.ones((2, 3)) * 2)
+
+        # serial --> dist results in dist value in each proc being equivalent to the serial value,
+        # so the full dist value across 2 procs is (4, 3)
+        assert_near_equal(p.get_val('comp.y1', get_remote=True), np.ones((4, 3)) * 2)
+
+    def test_dist_serial_fwd(self):
+        self.fail("foo")
+
+    def test_dist_dist_fwd(self):
+        self.fail("foo")
+
+    def test_serial_serial_rev(self):
+        self.fail("foo")
+
+    def test_serial_dist_rev(self):
+        self.fail("foo")
+
+    def test_dist_serial_rev(self):
+        self.fail("foo")
+
+    def test_dist_dist_rev(self):
+        self.fail("foo")
+
+
 
 
 
