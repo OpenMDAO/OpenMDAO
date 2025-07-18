@@ -443,6 +443,37 @@ class TestMetaModelSemiStructured(unittest.TestCase):
         assert_near_equal(prob.get_val('interp.f'), 3.39415716, 1e-7)
         assert_near_equal(prob.get_val('interp.g'), 2.0 * 3.39415716, 1e-7)
 
+    def test_simple_initial_input_and_output(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        interp = om.MetaModelSemiStructuredComp(method='lagrange2', training_data_gradients=True)
+        interp.add_input('x', data_x, 10.0)
+        interp.add_input('y', data_y)
+        interp.add_output('f', training_data=data_values, val=5.0)
+
+        model.add_subsystem('interp', interp)
+
+        prob.setup(force_alloc_complex=True)
+
+        assert_near_equal(prob.get_val('interp.x'), 10.0)
+        assert_near_equal(prob.get_val('interp.f'), 5.0)
+
+    def test_simple_invalid_initial_input_and_output(self):
+
+        interp = om.MetaModelSemiStructuredComp(method='lagrange2', training_data_gradients=True)
+
+        msg = ('<class MetaModelSemiStructuredComp>: Input x must either be '
+               'scalar, or of length equal to vec_size.')
+        with self.assertRaisesRegex(ValueError, msg):
+            interp.add_input('x', data_x, np.array([10.0, 3.0]))
+
+        msg = ('<class MetaModelSemiStructuredComp>: Output f must either be '
+               'scalar, or of length equal to vec_size.')
+        with self.assertRaisesRegex(ValueError, msg):
+            interp.add_output('f', training_data=data_values, val=np.array([5.0, 1.0]))
+
     def test_simple_training_inputs(self):
         prob = om.Problem()
         model = prob.model
