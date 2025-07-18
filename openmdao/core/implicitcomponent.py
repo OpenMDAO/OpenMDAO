@@ -16,6 +16,9 @@ from openmdao.utils.units import simplify_unit
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.coloring import _ColSparsityJac
+from openmdao.jacobians.jacobian import JacobianUpdateContext
+from openmdao.jacobians.subjac import SUBJAC_META_DEFAULTS
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 
 _tuplist = (tuple, list)
 
@@ -235,14 +238,12 @@ class ImplicitComponent(Component):
             else:
                 self.apply_linear(inputs, outputs, d_inputs, d_outputs, d_residuals, mode)
 
-    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         mode : str
             Either 'fwd' or 'rev'.
         scope_out : set or None
@@ -252,9 +253,6 @@ class ImplicitComponent(Component):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        if jac is None:
-            jac = self._assembled_jac if self._assembled_jac is not None else self._jacobian
-
         with self._matvec_context(scope_out, scope_in, mode) as vecs:
             d_inputs, d_outputs, d_residuals = vecs
             d_residuals = self._dresiduals_wrapper
@@ -263,7 +261,7 @@ class ImplicitComponent(Component):
             # this loop because apply_linear does nothing.
             if not self.matrix_free:
                 # Jacobian and vectors are all scaled, unitless
-                jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
+                self._get_jacobian()._apply(self, d_inputs, d_outputs, d_residuals, mode)
                 return
 
             # Jacobian and vectors are all unscaled, dimensional
@@ -348,10 +346,10 @@ class ImplicitComponent(Component):
         for abs_key, meta in self._subjacs_info.items():
             if 'method' in meta:
                 method = meta['method']
-                if method is not None and method in self._approx_schemes:
+                if method in self._approx_schemes:
                     yield abs_key
 
-    def _linearize_wrapper(self):
+    def _linearize_wrapper(self, jac):
         """
         Call linearize based on the value of the "run_root_only" option.
         """
@@ -359,45 +357,45 @@ class ImplicitComponent(Component):
             if self._run_root_only():
                 if self.comm.rank == 0:
                     if self._discrete_inputs or self._discrete_outputs:
-                        self.linearize(self._inputs, self._outputs, self._jac_wrapper,
+                        self.linearize(self._inputs, self._outputs, jac,
                                        self._discrete_inputs, self._discrete_outputs)
                     else:
-                        self.linearize(self._inputs, self._outputs, self._jac_wrapper)
+                        self.linearize(self._inputs, self._outputs, jac)
                     if self._jacobian is not None:
                         self.comm.bcast(list(self._jacobian.items()), root=0)
                 elif self._jacobian is not None:
                     for key, val in self.comm.bcast(None, root=0):
-                        self._jac_wrapper[key] = val
+                        jac[key] = val
             else:
                 if self._discrete_inputs or self._discrete_outputs:
-                    self.linearize(self._inputs, self._outputs, self._jac_wrapper,
+                    self.linearize(self._inputs, self._outputs, jac,
                                    self._discrete_inputs, self._discrete_outputs)
                 else:
-                    self.linearize(self._inputs, self._outputs, self._jac_wrapper)
+                    self.linearize(self._inputs, self._outputs, jac)
 
-    def _linearize(self, jac=None, sub_do_ln=True):
+    def _linearize(self, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         sub_do_ln : bool
-            Flag indicating if the children should call linearize on their linear solvers.
+            Ignored.
         """
         self._check_first_linearize()
 
-        with self._unscaled_context(outputs=[self._outputs]):
-            # Computing the approximation before the call to compute_partials allows users to
-            # override FD'd values.
-            for approximation in self._approx_schemes.values():
-                approximation.compute_approximations(self, jac=self._jacobian)
+        with JacobianUpdateContext(self) as jac:
 
-            self._linearize_wrapper()
+            if not (self._has_linearize or self._has_approx):
+                return
 
-        if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
-            self._assembled_jac._update(self)
+            with self._unscaled_context(outputs=[self._outputs]):
+                # Computing the approximation before the call to compute_partials allows users to
+                # override FD'd values.
+                for approximation in self._approx_schemes.values():
+                    approximation.compute_approximations(self, jac=jac)
+
+                self._linearize_wrapper(jac)
 
     def add_output(self, name, val=1.0, **kwargs):
         """
@@ -526,9 +524,8 @@ class ImplicitComponent(Component):
             Parent vectors.  Same structure as root_vectors.
         """
         super()._setup_vectors(parent_vectors)
-        if self._jacobian is None:
-            self._init_jacobian()
 
+        self._jac_wrapper = None
         if self._declared_residuals:
             name2slcshape = _get_slice_shape_dict(self._resid_name_shape_iter())
 
@@ -536,11 +533,47 @@ class ImplicitComponent(Component):
                 self._dresiduals_wrapper = _ResidsWrapper(self._dresiduals, name2slcshape)
 
             self._residuals_wrapper = _ResidsWrapper(self._residuals, name2slcshape)
-            self._jac_wrapper = _JacobianWrapper(self._jacobian, self._resid2out_subjac_map)
         else:
             self._residuals_wrapper = self._residuals
             self._dresiduals_wrapper = self._dresiduals
-            self._jac_wrapper = self._jacobian
+
+    def _get_jacobian(self, use_relevance=True):
+        """
+        Initialize the jacobian if it is not already initialized.
+
+        Override this in a subclass to use a different jacobian type.
+
+        Parameters
+        ----------
+        use_relevance : bool
+            If True, use relevance to determine which partials to approximate.
+
+        Returns
+        -------
+        Jacobian
+            The initialized jacobian.
+        """
+        if self._relevance_changed() and not isinstance(self._jacobian, _ColSparsityJac):
+            self._jac_wrapper = None
+
+        if not self.matrix_free:
+            if self._jac_wrapper is None:
+                self._jacobian = self._get_assembled_jac()
+
+                if self._jacobian is None:
+                    self._jacobian = DictionaryJacobian(self)
+
+                if self._declared_residuals:
+                    self._jac_wrapper = _JacobianWrapper(self._jacobian,
+                                                         self._resid2out_subjac_map)
+                else:
+                    self._jac_wrapper = self._jacobian
+
+                if self._has_approx:
+                    self._get_static_wrt_matches()
+                    self._add_approximations(use_relevance=use_relevance)
+
+        return self._jac_wrapper
 
     def _resolve_partials_patterns(self, of, wrt, pattern_meta):
         """
@@ -628,13 +661,13 @@ class ImplicitComponent(Component):
                     if (oabs_name, wabs) in self._subjacs_info:
                         existing_metas.append(self._subjacs_info[oabs_name, wabs])
 
-                newmeta = {'dependent': True, 'rows': None, 'cols': None}
                 if not existing_metas:
-                    existing_metas.append(newmeta)
+                    newmeta = SUBJAC_META_DEFAULTS.copy()
                     if 'method' in pattern_meta:
                         method = pattern_meta['method']
                         if method in ('fd', 'cs'):
-                            existing_metas[0]['method'] = method
+                            newmeta['method'] = method
+                    existing_metas.append(newmeta)
 
                 if pattern_rows is not None:
                     rows = []
@@ -684,9 +717,8 @@ class ImplicitComponent(Component):
                             meta['cols'] = cols
                             meta['val'] = val
 
-                else:  # resid partials are all dense
-                    outsize = shape_to_len(self._var_abs2meta['output'][self.pathname + '.' +
-                                                                        oname]['shape'])
+                else:
+                    outsize = shape_to_len(self._var_abs2meta['output'][oabs_name]['shape'])
                     for meta in existing_metas:
                         if pattern_val is not None:
                             val, r, c = _subjac_meta2value(meta)
@@ -785,7 +817,6 @@ class ImplicitComponent(Component):
         discrete_outputs : dict or None
             If not None, dict containing discrete output values.
         """
-        global _tuplist
         if self.compute_primal is None:
             return
 

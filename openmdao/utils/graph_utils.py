@@ -154,3 +154,39 @@ def print_cycle_tree(group):
         for _, _, _, idx, _, parpath in lst:
             if parpath is None:  # this is a top level scc
                 _print_tree(lst[idx], len(lst))
+
+
+def are_connected(graph, start, end):
+    """
+    Return True if the given source and target are connected.
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        Directed graph of Systems and variables.
+    start : str
+        Name of the starting node.
+    end : str
+        Name of the ending node.
+
+    Returns
+    -------
+    bool
+        True if the given source and target are connected.
+    """
+    if start in graph and end in graph:
+        successors = graph.successors
+
+        stack = [start]
+        visited = set(stack)
+
+        while stack:
+            start = stack.pop()
+            for node in successors(start):
+                if node == end:
+                    return True
+                if node not in visited:
+                    visited.add(node)
+                    stack.append(node)
+
+    return False

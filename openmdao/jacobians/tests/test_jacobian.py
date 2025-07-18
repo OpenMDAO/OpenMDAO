@@ -56,7 +56,6 @@ class MyExplicitComp(ExplicitComponent):
         if isinstance(jac1, list):
             jac1 = jac1[0]
 
-
         partials['f', 'x'] = jac1
 
         jac2 = self._jac_type(np.array([
@@ -230,7 +229,7 @@ def _test_func_name(func, num, param):
 class TestJacobian(unittest.TestCase):
 
     @parameterized.expand(itertools.product(
-        ['dense', 'csc'],
+        ['dense', 'csr'],
         [np.array, coo_matrix, csr_matrix, inverted_coo, inverted_csr, arr2list, arr2revlist],
         [False, True],  # not nested, nested
         [0, 1],  # extra calls to linearize
@@ -651,11 +650,11 @@ class TestJacobian(unittest.TestCase):
         model.connect('p2.y', 'comp.y')
 
         prob.setup()
+        prob.run_model()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.run_model()
-
+            prob.model._linearize()
         # Nested
 
         prob = Problem()
@@ -672,10 +671,11 @@ class TestJacobian(unittest.TestCase):
         model.connect('p2.y', 'sub.comp.y')
 
         prob.setup()
+        prob.run_model()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.run_model()
+            prob.model._linearize()
 
         # Try a component that is derived from a matrix-free one
 
@@ -695,10 +695,11 @@ class TestJacobian(unittest.TestCase):
         model.connect('p2.y', 'comp.y')
 
         prob.setup()
+        prob.run_model()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.run_model()
+            prob.model._linearize()
 
         # Make sure regular comps don't give an error.
 
@@ -741,10 +742,11 @@ class TestJacobian(unittest.TestCase):
         model.connect('p2.y', 'comp.y')
 
         prob.setup()
+        prob.run_model()
 
         msg = "AssembledJacobian not supported for matrix-free subcomponent."
         with self.assertRaisesRegex(Exception, msg):
-            prob.run_model()
+            prob.model._linearize()
 
     def test_access_undeclared_subjac(self):
 
@@ -772,9 +774,10 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        msg = r'Variable name pair \("{}", "{}"\) must first be declared.'
-        with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
+        with self.assertRaises(KeyError) as ctx:
             prob.compute_totals(of=['comp.y'], wrt=['p1.x'])
+
+        self.assertEqual(ctx.exception.args[0], '\'comp\' <class Undeclared>: Error calling compute_partials(), "Variable name pair (\'y\', \'x\') must first be declared."')
 
     def test_one_src_2_tgts_with_src_indices_densejac(self):
         size = 4
@@ -844,7 +847,6 @@ class TestJacobian(unittest.TestCase):
         prob.run_driver()
 
         expected = [
-            (('paraboloid.f_xy', 'paraboloid.f_xy'),[-1.]),
             (('paraboloid.f_xy', 'paraboloid.x'),[[0.]]),
             (('paraboloid.f_xy', 'paraboloid.y'),[[0.]]),
         ]
@@ -943,7 +945,7 @@ class TestJacobian(unittest.TestCase):
         p.run_model()
 
         p.compute_totals()
-        keys = p.model.ode._jacobian._subjacs_info
+        keys = p.model.ode._get_jacobian()._subjacs_info
         self.assertTrue(('ode.x', 'ode.y') not in keys)
         self.assertTrue(('ode.y', 'ode.x') not in keys)
 
@@ -1035,9 +1037,11 @@ class TestJacobian(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        msg = r"'comp' \<class MyComp\>: Error calling compute_partials\(\), DictionaryJacobian in 'comp' \<class MyComp\>: Sub-jacobian for key \('comp.y', 'comp.x'\) has the wrong shape \(\(3,\)\), expected \(\(2,\)\)."
-        with self.assertRaisesRegex(ValueError, msg):
+        msg = "'comp' <class MyComp>: Error calling compute_partials(), For subjacobian ('y', 'x'): could not broadcast input array from shape (3,) into shape (2,)"
+        with self.assertRaises(ValueError) as ctx:
             prob.compute_totals(of=['comp.y'], wrt=['comp.x'])
+
+        self.assertEqual(ctx.exception.args[0], msg)
 
 
 class MySparseComp(ExplicitComponent):
@@ -1094,7 +1098,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
+        np.testing.assert_almost_equal(p.model._assembled_jac._dr_do_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  0.],
                                                  [ 0., -1.,  0.],
                                                  [ 0., 13., -1.]]))
@@ -1114,7 +1118,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix,
+        np.testing.assert_almost_equal(p.model._assembled_jac._dr_do_mtx._matrix,
                                        np.array([[-1.,  0.,  0.],
                                                  [ 0., -1.,  0.],
                                                  [ 0., 13., -1.]]))
@@ -1133,7 +1137,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
+        np.testing.assert_almost_equal(p.model._jacobian._dr_do_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  0.,  0.],
                                                  [ 0., -1.,  0.,  0.],
                                                  [ 9.,  8., -1.,  0.],
@@ -1152,7 +1156,7 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
+        np.testing.assert_almost_equal(p.model._assembled_jac._dr_do_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  0.,  0.],
                                                  [ 0., -1.,  0.,  0.],
                                                  [ 9.,  8., -1.,  0.],
@@ -1171,78 +1175,92 @@ class OverlappingPartialsTestCase(unittest.TestCase):
         p.run_model()
 
         p.compute_totals(of=['C1.z'], wrt=['indeps.x'], return_format='array')
-        np.testing.assert_almost_equal(p.model._assembled_jac._int_mtx._matrix.toarray(),
+        np.testing.assert_almost_equal(p.model._assembled_jac._dr_do_mtx._matrix.toarray(),
                                        np.array([[-1.,  0.,  9.,  8.],
                                                  [ 0., -1.,  5., 10.],
                                                  [ 0.,  0., -1.,  0.],
                                                  [ 0.,  0.,  0., -1.]]))
 
 
+class CCBladeResidualComp(ImplicitComponent):
+
+    def initialize(self):
+        self.options.declare('num_nodes', types=int)
+        self.options.declare('num_radial', types=int)
+
+    def setup(self):
+        num_nodes = self.options['num_nodes']
+        num_radial = self.options['num_radial']
+
+        self.add_input('chord', shape=(1, num_radial))
+        self.add_input('theta', shape=(1, num_radial))
+
+        self.add_output('phi', lower=-0.5*np.pi, upper=0.0,
+                        shape=(num_nodes, num_radial))
+        self.add_output('Tp', shape=(num_nodes, num_radial))
+
+        of_names = ('phi', 'Tp')
+        row_col = np.arange(num_radial)
+
+        for name in of_names:
+            self.declare_partials(name, 'chord', rows=row_col, cols=row_col)
+            self.declare_partials(name, 'theta', rows=row_col, cols=row_col, val=0.0)
+            self.declare_partials(name, 'phi', rows=row_col, cols=row_col)
+
+        self.declare_partials('Tp', 'Tp', rows=row_col, cols=row_col, val=1.)
+
+    def linearize(self, inputs, outputs, partials):
+
+        partials['phi', 'chord'] = np.array([1., 2, 3, 4])
+        partials['phi', 'phi'] = np.array([5., 6, 7, 8])
+
+        partials['Tp', 'chord'] = np.array([9., 10, 11, 12])
+        partials['Tp', 'phi'] = np.array([13., 14, 15, 16])
+
+
 class MaskingTestCase(unittest.TestCase):
+    def run_asjac_type_test(self, asjac_type, linslv_type):
+        prob = Problem()
+        model = prob.model
+
+        ivc = IndepVarComp()
+        ivc.add_output('chord', val=np.ones((4, )))
+        model.add_subsystem('indep_var_comp', ivc, promotes=['*'])
+
+        comp = CCBladeResidualComp(num_nodes=1, num_radial=4, assembled_jac_type=asjac_type)
+
+        if linslv_type == 'direct':
+            comp.linear_solver = DirectSolver(assemble_jac=True)
+        elif linslv_type == 'krylov':
+            comp.linear_solver = ScipyKrylov(assemble_jac=True)
+        else:
+            raise ValueError(f"Invalid linear solver type: {linslv_type}")
+
+        model.add_subsystem('ccblade_comp', comp, promotes_inputs=['chord'], promotes_outputs=['Tp'])
+
+
+        prob.setup(mode='fwd')
+        prob.run_model()
+        totals = prob.compute_totals(of=['Tp'], wrt=['chord'], return_format='array')
+
+        expected = np.array([
+        [-6.4,0.,0.,0.],
+        [ 0.,-5.33333333,0.,0.],
+        [ 0.,0.,-4.57142857,0.],
+        [ 0.,0.,0.,-4.]]
+        )
+
+        np.testing.assert_allclose(totals, expected)
+
     def test_csc_masking(self):
-        class CCBladeResidualComp(ImplicitComponent):
+        self.run_asjac_type_test('csc', 'direct')
 
-            def initialize(self):
-                self.options.declare('num_nodes', types=int)
-                self.options.declare('num_radial', types=int)
+    def test_csr_masking(self):
+        self.run_asjac_type_test('csr', 'krylov')
 
-            def setup(self):
-                num_nodes = self.options['num_nodes']
-                num_radial = self.options['num_radial']
+    def test_dense_masking(self):
+        self.run_asjac_type_test('dense', 'direct')
 
-                self.add_input('chord', shape=(1, num_radial))
-                self.add_input('theta', shape=(1, num_radial))
-
-                self.add_output('phi', lower=-0.5*np.pi, upper=0.0,
-                                shape=(num_nodes, num_radial))
-                self.add_output('Tp', shape=(num_nodes, num_radial))
-
-                of_names = ('phi', 'Tp')
-                row_col = np.arange(num_radial)
-
-                for name in of_names:
-                    self.declare_partials(name, 'chord', rows=row_col, cols=row_col)
-                    self.declare_partials(name, 'theta', rows=row_col, cols=row_col, val=0.0)
-                    self.declare_partials(name, 'phi', rows=row_col, cols=row_col)
-
-                self.declare_partials('Tp', 'Tp', rows=row_col, cols=row_col, val=1.)
-
-            def linearize(self, inputs, outputs, partials):
-
-                partials['phi', 'chord'] = np.array([1., 2, 3, 4])
-                partials['phi', 'phi'] = np.array([5., 6, 7, 8])
-
-                partials['Tp', 'chord'] = np.array([9., 10, 11, 12])
-                partials['Tp', 'phi'] = np.array([13., 14, 15, 16])
-
-        for asjac_type in ('csc', 'dense'):
-            with self.subTest(asjac_type=asjac_type):
-
-                prob = Problem()
-                model = prob.model
-
-                ivc = IndepVarComp()
-                ivc.add_output('chord', val=np.ones((4, )))
-                model.add_subsystem('indep_var_comp', ivc, promotes=['*'])
-
-                comp = CCBladeResidualComp(num_nodes=1, num_radial=4, assembled_jac_type=asjac_type)
-
-                comp.linear_solver = DirectSolver(assemble_jac=True)
-                model.add_subsystem('ccblade_comp', comp, promotes_inputs=['chord'], promotes_outputs=['Tp'])
-
-
-                prob.setup(mode='fwd')
-                prob.run_model()
-                totals = prob.compute_totals(of=['Tp'], wrt=['chord'], return_format='array')
-
-                expected = np.array([
-                [-6.4,0.,0.,0.],
-                [ 0.,-5.33333333,0.,0.],
-                [ 0.,0.,-4.57142857,0.],
-                [ 0.,0.,0.,-4.]]
-                )
-
-                np.testing.assert_allclose(totals, expected)
 
 
 if __name__ == '__main__':

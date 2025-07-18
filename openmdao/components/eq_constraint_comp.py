@@ -5,7 +5,6 @@ import numpy as np
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils import cs_safe
-from openmdao.utils.array_utils import shape_to_len
 
 
 class EQConstraintComp(ExplicitComponent):
@@ -317,12 +316,11 @@ class EQConstraintComp(ExplicitComponent):
                            val=options['mult_val'] * np.ones(shape),
                            units=None)
 
-        ar = np.arange(shape_to_len(shape))
-        self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)
-        self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar, val=1.0)
+        self.declare_partials(of=name, wrt=options['lhs_name'], diagonal=True, val=1.0)
+        self.declare_partials(of=name, wrt=options['rhs_name'], diagonal=True, val=1.0)
 
         if options['use_mult']:
-            self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
+            self.declare_partials(of=name, wrt=options['mult_name'], diagonal=True, val=1.0)
 
         if options['add_constraint']:
             self.add_constraint(name, equals=0., ref0=options['ref0'], ref=options['ref'],
