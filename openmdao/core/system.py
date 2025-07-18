@@ -6521,7 +6521,7 @@ class System(object, metaclass=SystemMetaclass):
 
         return hash
 
-    def _get_full_dist_shape(self, abs_name, local_shape):
+    def _get_full_dist_shape(self, abs_name, local_shape, exist_procs=None):
         """
         Get the full 'distributed' shape for a variable.
 
@@ -6531,9 +6531,10 @@ class System(object, metaclass=SystemMetaclass):
         ----------
         abs_name : str
             Absolute name of the variable.
-
         local_shape : tuple
             Local shape of the variable, used in error reporting.
+        exist_procs : array of int or None
+            Array of integers indicating ranks where the variable exists.
 
         Returns
         -------
@@ -6552,7 +6553,10 @@ class System(object, metaclass=SystemMetaclass):
 
         meta = scope._var_allprocs_abs2meta[io][abs_name]
         var_idx = scope._var_allprocs_abs2idx[abs_name]
-        global_size = np.sum(scope._var_sizes[io][:, var_idx])
+        if exist_procs is None:
+            global_size = np.sum(scope._var_sizes[io][:, var_idx])
+        else:
+            global_size = np.sum(scope._var_sizes[io][:, var_idx] * exist_procs)
 
         # assume that all but the first dimension of the shape of a
         # distributed variable is the same on all procs

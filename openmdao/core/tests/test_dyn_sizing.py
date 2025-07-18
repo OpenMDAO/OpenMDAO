@@ -226,11 +226,10 @@ class TestPassSizeDistributed(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'serial_start':"
-            "\n   <model> <class Group>: Input 'C.in' has src_indices so the shape of connected output 'B.out' cannot be determined."
             "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported."
             "\n   <model> <class Group>: Failed to resolve shapes for ['E.in', 'E.out']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
             "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices."
-            "\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'B.out' to 'C.in'. The target shape is (4,) but indices are shape (12,).")
+            "\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'B.out' to 'C.in'. The target shape is (4,) but indices are shape (6,).")
 
     def test_distributed_start(self):
         """the size information starts in the distributed component C"""
@@ -269,7 +268,7 @@ class TestPassSizeDistributed(unittest.TestCase):
             "\n   <model> <class Group>: Failed to resolve shapes for ['E.in', 'E.out']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
             "\n   <model> <class Group>: Size of output 'A.out' differs between processes (rank(s) [0] have size 1, rank(s) [1] have size 2)."
             "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices."
-            "\n   <model> <class Group>: The source indices slice(1, 3, 1) do not specify a valid shape for the connection 'A.out' to 'B.in'. The target shape is (2,) but indices are shape (1,).")
+            "\n   <model> <class Group>: The source indices slice(1, 3, 1) do not specify a valid shape for the connection 'A.out' to 'B.in'. The target shape is (3,) but indices are shape (1,).")
 
 class ResizableComp(om.ExplicitComponent):
     # this is just a component that allows us to resize between setups
@@ -733,11 +732,7 @@ class TestDistribDynShapes(unittest.TestCase):
         self.assertTrue(
             "Collected errors for problem 'remote_distrib':\n"
             "   'par.G1.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.G1.C1.x1'. They must be supplied manually.\n"
-            "   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'par.G1.C1.x1'. The source shape is (32,) but the target shape is (8,).\n"
-            "   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'par.G1.C2.y1' to 'sink.x1'. The target shape is (8,) but indices are shape (16,).\n"
-            "   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'par.G2.C2.y1' to 'sink.x2'. The target shape is (8,) but indices are shape (16,).\n"
-            "   'par.G2.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.G2.C1.x1'. They must be supplied manually.\n"
-            "   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'par.G2.C1.x1'. The source shape is (32,) but the target shape is (8,)."
+            "   'par.G2.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.G2.C1.x1'. They must be supplied manually."
            in str(cm.exception))
 
 
@@ -886,7 +881,8 @@ class TestDistribDynShapeCombos(unittest.TestCase):
            "\nCollected errors for problem 'ser_unknown_dist_known_err':"
            "\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same size (sizes=[3 6 9])."
            "\n   <model> <class Group>: Failed to resolve shapes for ['indeps.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-           "\n   'comp' <class DistCompDiffSizeKnownInput>: Can't determine src_indices automatically for input 'comp.x'. They must be supplied manually.")
+           "\n   'comp' <class DistCompDiffSizeKnownInput>: Can't determine src_indices automatically for input 'comp.x'. They must be supplied manually."
+           "\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indeps.x' to 'comp.x'. The source shape is (0,) but the target shape is (18,).")
 
     def test_dist_known_ser_unknown(self):
         p = om.Problem(name='dist_known_ser_unknown')

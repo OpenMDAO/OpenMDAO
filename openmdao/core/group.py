@@ -2483,13 +2483,13 @@ class Group(System):
             if not internal:  # if internal to a component, src_indices isn't used
                 if fwd:
                     src_indices = to_meta['src_indices']
-                else: # rev
+                else:  # rev
                     src_indices = from_meta.get('src_indices')
 
                 if src_indices is not None:
                     ind = src_indices()
-                    is_full_slice = (isinstance(ind, slice) and ind.start == None and
-                                     ind.stop == None and ind.step in (1, None))
+                    is_full_slice = (isinstance(ind, slice) and ind.start is None and
+                                     ind.stop is None and ind.step in (1, None))
 
                 if rev and src_indices is not None:
                     if is_full_slice:
@@ -2971,6 +2971,7 @@ class Group(System):
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
+        abs2idx = self._var_allprocs_abs2idx
 
         nproc = self.comm.size
 
@@ -3069,9 +3070,14 @@ class Group(System):
                 # get input shape and src_indices from the local meta dict
                 # (input is always local)
                 if meta_in['distributed']:
+                    if self.pathname == '':
+                        exist_procs = self._var_existence['input'][:, abs2idx[abs_in]]
+                    else:
+                        exist_procs = None
                     # if output is non-distributed and input is distributed, make output shape the
                     # full distributed shape, i.e., treat it in this regard as a distributed output
-                    out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'])
+                    out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'],
+                                                          exist_procs)
 
                 in_shape = meta_in['global_shape']
                 src_indices = meta_in['src_indices']
