@@ -208,6 +208,17 @@ class Subjac(object):
     def _init_val(self):
         pass
 
+    def get_val(self):
+        """
+        Get the value of the subjacobian.
+
+        Returns
+        -------
+        ndarray
+            Subjac data.
+        """
+        return self.info['val']
+
     def set_dtype(self, dtype):
         """
         Set the dtype of the subjacobian.
@@ -244,7 +255,7 @@ class Subjac(object):
             self._in_view = d_inputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        val = self.info['val'] if randgen is None else self.get_rand_val(randgen)
         self._res_view += val @ self._in_view
 
     def _apply_fwd_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
@@ -252,7 +263,7 @@ class Subjac(object):
             self._out_view = d_outputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        val = self.info['val'] if randgen is None else self.get_rand_val(randgen)
         self._res_view += val @ self._out_view
 
     def _apply_rev_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
@@ -260,7 +271,7 @@ class Subjac(object):
             self._in_view = d_inputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'].T if randgen is None else self.get_val(randgen).T
+        val = self.info['val'].T if randgen is None else self.get_rand_val(randgen).T
         self._in_view += val @ self._res_view
 
     def _apply_rev_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
@@ -268,7 +279,7 @@ class Subjac(object):
             self._out_view = d_outputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'].T if randgen is None else self.get_val(randgen).T
+        val = self.info['val'].T if randgen is None else self.get_rand_val(randgen).T
         self._out_view += val @ self._res_view
 
 
@@ -349,7 +360,7 @@ class DenseSubjac(Subjac):
 
         return meta
 
-    def get_val(self, randgen=None):
+    def get_rand_val(self, randgen):
         """
         Get the value of the subjacobian.
 
@@ -358,7 +369,7 @@ class DenseSubjac(Subjac):
 
         Parameters
         ----------
-        randgen : RandomNumberGenerator or None
+        randgen : RandomNumberGenerator
             Random number generator.
 
         Returns
@@ -366,9 +377,6 @@ class DenseSubjac(Subjac):
         ndarray
             Subjacobian value.
         """
-        if randgen is None:
-            return self.info['val']
-
         # we're generating a random subjac during total derivative sparsity computation, so we need
         # to check on the value of the 'sparsity' metadata so that our actual sparsity will be
         # reported up to the top level.  Otherwise we'll report a fully dense subjac and the
@@ -447,7 +455,10 @@ class DenseSubjac(Subjac):
         ndarray
             Subjac data.
         """
-        return self.get_val(randgen).ravel()
+        if randgen is None:
+            return self.info['val'].ravel()
+
+        return self.get_rand_val(randgen).ravel()
 
     def get_coo_data_size(self):
         """
@@ -495,7 +506,10 @@ class DenseSubjac(Subjac):
 
         cols = np.tile(colrange, nrows)
 
-        return self.get_val(randgen).ravel(), rows, cols
+        if randgen is None:
+            return self.info['val'].ravel(), rows, cols
+
+        return self.get_rand_val(randgen).ravel(), rows, cols
 
 
 class SparseSubjac(Subjac):
@@ -702,13 +716,13 @@ class COOSubjac(SparseSubjac):
         Source name for the subjacobian.
     """
 
-    def get_val(self, randgen=None):
+    def get_rand_val(self, randgen):
         """
         Get the value of the subjacobian.
 
         Parameters
         ----------
-        randgen : RandomNumberGenerator or None
+        randgen : RandomNumberGenerator
             Random number generator.
 
         Returns
@@ -716,9 +730,6 @@ class COOSubjac(SparseSubjac):
         coo_matrix
             Subjacobian value.
         """
-        if randgen is None:
-            return self.info['val']
-
         submat = self.info['val']
         randval = randgen.random(submat.data.size)
         randval += 1.0
@@ -840,13 +851,13 @@ class CSRSubjac(SparseSubjac):
         Source name for the subjacobian.
     """
 
-    def get_val(self, randgen=None):
+    def get_rand_val(self, randgen):
         """
         Get the value of the subjacobian.
 
         Parameters
         ----------
-        randgen : RandomNumberGenerator or None
+        randgen : RandomNumberGenerator
             Random number generator.
 
         Returns
@@ -854,9 +865,6 @@ class CSRSubjac(SparseSubjac):
         csr_matrix
             Subjacobian value.
         """
-        if randgen is None:
-            return self.info['val']
-
         submat = self.info['val']
         randval = randgen.random(submat.data.size)
         randval += 1.0
@@ -919,13 +927,13 @@ class CSCSubjac(SparseSubjac):
         Source name for the subjacobian.
     """
 
-    def get_val(self, randgen=None):
+    def get_rand_val(self, randgen):
         """
         Get the value of the subjacobian.
 
         Parameters
         ----------
-        randgen : RandomNumberGenerator or None
+        randgen : RandomNumberGenerator
             Random number generator.
 
         Returns
@@ -933,9 +941,6 @@ class CSCSubjac(SparseSubjac):
         csc_matrix
             Subjacobian value.
         """
-        if randgen is None:
-            return self.info['val']
-
         submat = self.info['val']
         randval = randgen.random(submat.data.size)
         randval += 1.0
@@ -1108,7 +1113,11 @@ class OMCOOSubjac(COOSubjac):
         tuple
             (data, rows, cols).
         """
-        data, rows, cols = self.get_val(randgen), self.rows, self.cols
+        if randgen is None:
+            data = self.info['val']
+        else:
+            data = self.get_rand_val(randgen)
+        rows, cols = self.rows, self.cols
 
         if self.src_indices is not None:
             # if src_indices is not None, we are part of the dr/do matrix, so columns correspond
@@ -1121,13 +1130,13 @@ class OMCOOSubjac(COOSubjac):
 
         return data, rows, cols
 
-    def get_val(self, randgen=None):
+    def get_rand_val(self, randgen):
         """
         Get the value of the subjacobian.
 
         Parameters
         ----------
-        randgen : RandomNumberGenerator or None
+        randgen : RandomNumberGenerator
             Random number generator.
 
         Returns
@@ -1135,9 +1144,6 @@ class OMCOOSubjac(COOSubjac):
         coo_matrix
             Subjacobian value.
         """
-        if randgen is None:
-            return self.info['val']
-
         randval = randgen.random(self.info['val'].size)
         randval += 1.0
 
@@ -1175,7 +1181,7 @@ class OMCOOSubjac(COOSubjac):
             self._in_view = d_inputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        val = self.info['val'] if randgen is None else self.get_rand_val(randgen)
         # bincount allows rows and cols to contain repeated (row, col) pairs.
         self._res_view += bincount(self.rows, self._in_view[self.cols] * val, minlength=self.nrows)
 
@@ -1184,7 +1190,7 @@ class OMCOOSubjac(COOSubjac):
             self._out_view = d_outputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        val = self.info['val'] if randgen is None else self.get_rand_val(randgen)
         # bincount allows rows and cols to contain repeated (row, col) pairs.
         self._res_view += bincount(self.rows, self._out_view[self.cols] * val, minlength=self.nrows)
 
@@ -1193,7 +1199,7 @@ class OMCOOSubjac(COOSubjac):
             self._in_view = d_inputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        val = self.info['val'] if randgen is None else self.get_rand_val(randgen)
         self._in_view += bincount(self.cols, self._res_view[self.rows] * val,
                                   minlength=self.parent_ncols)
 
@@ -1202,7 +1208,7 @@ class OMCOOSubjac(COOSubjac):
             self._out_view = d_outputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        val = self.info['val'] if randgen is None else self.get_rand_val(randgen)
         self._out_view += bincount(self.cols, self._res_view[self.rows] * val,
                                    minlength=self.parent_ncols)
 
@@ -1324,11 +1330,32 @@ class DiagonalSubjac(SparseSubjac):
             if self.src_indices is not None:
                 cols = self.src_indices
 
-        return self.get_val(randgen), rows, cols
+        if randgen is None:
+            return self.info['val'], rows, cols
 
-    def get_val(self, randgen=None):
+        return self.get_rand_val(randgen), rows, cols
+
+    def get_rand_val(self, randgen):
         """
         Get the value of the subjacobian.
+
+        Parameters
+        ----------
+        randgen : RandomNumberGenerator
+            Random number generator.
+
+        Returns
+        -------
+        ndarray
+            Subjac data.
+        """
+        val = randgen.random(self.info['val'].size)
+        val += 1.0
+        return val
+
+    def get_as_coo_data(self, randgen=None):
+        """
+        Get the subjac as COO data.
 
         Parameters
         ----------
@@ -1338,16 +1365,12 @@ class DiagonalSubjac(SparseSubjac):
         Returns
         -------
         ndarray
-            Subjac data.
+            Subjacobian data.
         """
         if randgen is None:
             return self.info['val']
 
-        val = randgen.random(self.info['val'].size)
-        val += 1.0
-        return val
-
-    get_as_coo_data = get_val
+        return self.get_rand_val(randgen)
 
     def set_val(self, val):
         """
@@ -1389,7 +1412,7 @@ class DiagonalSubjac(SparseSubjac):
             self._in_view = d_inputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        val = self.info['val'] if randgen is None else self.get_rand_val(randgen)
         self._res_view += self._in_view * val
 
     def _apply_fwd_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
@@ -1397,7 +1420,7 @@ class DiagonalSubjac(SparseSubjac):
             self._out_view = d_outputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        val = self.info['val'] if randgen is None else self.get_rand_val(randgen)
         self._res_view += self._out_view * val
 
     def _apply_rev_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
@@ -1405,7 +1428,7 @@ class DiagonalSubjac(SparseSubjac):
             self._in_view = d_inputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        val = self.info['val'] if randgen is None else self.get_rand_val(randgen)
         self._in_view += self._res_view * val
 
     def _apply_rev_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
@@ -1413,7 +1436,7 @@ class DiagonalSubjac(SparseSubjac):
             self._out_view = d_outputs.get_slice(self.col_slice)
             self._res_view = d_residuals.get_slice(self.row_slice)
 
-        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        val = self.info['val'] if randgen is None else self.get_rand_val(randgen)
         self._out_view += self._res_view * val
 
     def set_dtype(self, dtype):
