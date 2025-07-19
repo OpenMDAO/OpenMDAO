@@ -108,6 +108,5 @@ class BM(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # tname = 'benchmark_comp200_var5_newton_direct_assembled_fd'
-    tname = 'benchmark_comp200_var5_newton_lings'
+    tname = 'benchmark_comp200_var5_newton_direct_assembled_fd'
     getattr(BM(tname), tname)()
