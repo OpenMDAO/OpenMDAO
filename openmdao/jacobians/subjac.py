@@ -1094,7 +1094,7 @@ class OMCOOSubjac(COOSubjac):
         int
             Size of the subjacobian in COO format.
         """
-        return self.info['val'].size
+        return self.rows.size
 
     def as_coo_info(self, full=False, randgen=None):
         """
@@ -1304,7 +1304,7 @@ class DiagonalSubjac(SparseSubjac):
 
     def as_coo_info(self, full=False, randgen=None):
         """
-        Get the subjac as COO data.
+        Get the subjac as COO data, rows, and cols.
 
         Parameters
         ----------
