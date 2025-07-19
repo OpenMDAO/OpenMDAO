@@ -163,10 +163,11 @@ class DenseMatrix(Matrix):
         if self._coo is None:
             if subjac.dense:
                 view = self._matrix[subjac.row_slice, subjac.col_slice]
+                val = subjac.info['val'] if randgen is None else subjac.get_rand_val(randgen)
                 if subjac.src_indices is not None:
-                    view[:, subjac.src_indices] = subjac.get_val(randgen)
+                    view[:, subjac.src_indices] = val
                 else:
-                    view[:, :] = subjac.get_val(randgen)
+                    view[:, :] = val
                 if subjac.factor is not None:
                     view *= subjac.factor
             else:

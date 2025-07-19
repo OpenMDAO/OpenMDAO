@@ -289,7 +289,7 @@ class Jacobian(object):
             sub-Jacobian as an array or sparse matrix.
         """
         try:
-            return self._subjacs[self._get_abs_key(key)].get_val()
+            return self._subjacs[self._get_abs_key(key)].info['val']
         except KeyError:
             raise KeyError(f'Variable name pair {key} not found.')
 
@@ -345,7 +345,7 @@ class Jacobian(object):
         str
         """
         for key, subjac in self._subjacs.items():
-            yield key, subjac.get_val()
+            yield key, subjac.info['val']
 
     @property
     def _randgen(self):
