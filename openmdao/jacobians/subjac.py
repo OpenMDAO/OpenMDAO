@@ -10,6 +10,7 @@ OpenMDAO's internal COO format.
 from pprint import pformat
 
 import numpy as np
+from numpy import bincount, isscalar
 from scipy.sparse import coo_matrix, csr_matrix, csc_matrix, issparse
 
 # from openmdao.devtools.debug import DebugDict
@@ -72,6 +73,12 @@ class Subjac(object):
     parent_ncols : int
         Number of columns this subjacobian occupies in the parent jacobian.  If this subjac has
         src_indices then parent_ncols may differ from ncols.
+    _in_view : ndarray or None
+        View of this subjac's slice of the input vector.
+    _out_view : ndarray or None
+        View of this subjac's slice of the output vector.
+    _res_view : ndarray or None
+        View of this subjac's slice of the residual vector.
     """
 
     def __init__(self, key, info, row_slice, col_slice, wrt_is_input, dtype, src_indices=None,
@@ -115,6 +122,10 @@ class Subjac(object):
         self.factor = factor
         self.src = src
         self.dense = False
+
+        self._in_view = None
+        self._out_view = None
+        self._res_view = None
 
         self._map_functions(wrt_is_input)
         self._init_val()
@@ -209,6 +220,10 @@ class Subjac(object):
         if dtype.kind == self.info['val'].dtype.kind:
             return
 
+        self._in_view = None
+        self._out_view = None
+        self._res_view = None
+
         if dtype.kind == 'f':
             self.info['val'] = np.ascontiguousarray(self.info['val'].real)
         elif dtype.kind == 'c':
@@ -224,27 +239,37 @@ class Subjac(object):
             self.apply_fwd = self._apply_fwd_output
             self.apply_rev = self._apply_rev_output
 
-    def _matvec_fwd(self, vec, randgen=None):
-        return self.get_val(randgen) @ vec
-
-    def _matvec_rev(self, vec, randgen=None):
-        return self.get_val(randgen).T @ vec
-
     def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
-        d_residuals.add_to_slice(self.row_slice,
-                                 self._matvec_fwd(d_inputs.get_slice(self.col_slice), randgen))
+        if self._in_view is None:
+            self._in_view = d_inputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
+
+        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        self._res_view += val @ self._in_view
 
     def _apply_fwd_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
-        d_residuals.add_to_slice(self.row_slice,
-                                 self._matvec_fwd(d_outputs.get_slice(self.col_slice), randgen))
+        if self._out_view is None:
+            self._out_view = d_outputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
+
+        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        self._res_view += val @ self._out_view
 
     def _apply_rev_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
-        d_inputs.add_to_slice(self.col_slice,
-                              self._matvec_rev(d_residuals.get_slice(self.row_slice), randgen))
+        if self._in_view is None:
+            self._in_view = d_inputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
+
+        val = self.info['val'].T if randgen is None else self.get_val(randgen).T
+        self._in_view += val @ self._res_view
 
     def _apply_rev_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
-        d_outputs.add_to_slice(self.col_slice,
-                               self._matvec_rev(d_residuals.get_slice(self.row_slice), randgen))
+        if self._out_view is None:
+            self._out_view = d_outputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
+
+        val = self.info['val'].T if randgen is None else self.get_val(randgen).T
+        self._out_view += val @ self._res_view
 
 
 class DenseSubjac(Subjac):
@@ -300,7 +325,7 @@ class DenseSubjac(Subjac):
         val = meta['val']
         if val is None:
             meta['val'] = np.zeros(meta['shape'])
-        elif np.isscalar(val):
+        elif isscalar(val):
             meta['val'] = np.full(meta['shape'], val, dtype=float)
         else:
             if val.shape == meta['shape']:
@@ -370,7 +395,7 @@ class DenseSubjac(Subjac):
         val : ndarray
             Value to set the subjacobian to.
         """
-        if np.isscalar(val):
+        if isscalar(val):
             self.info['val'][:] = val
         else:
             myval = self.info['val']
@@ -538,6 +563,10 @@ class SparseSubjac(Subjac):
         """
         if dtype.kind == self.info['val'].dtype.kind:
             return
+
+        self._in_view = None
+        self._out_view = None
+        self._res_view = None
 
         if dtype.kind == 'f':
             self.info['val'].data = np.ascontiguousarray(self.info['val'].data.real, dtype=dtype)
@@ -773,6 +802,10 @@ class COOSubjac(SparseSubjac):
         if dtype.kind == self.info['val'].dtype.kind:
             return
 
+        self._in_view = None
+        self._out_view = None
+        self._res_view = None
+
         if dtype.kind == 'f':
             self.info['val'] = np.ascontiguousarray(self.info['val'].real, dtype=dtype)
         elif dtype.kind == 'c':
@@ -961,6 +994,13 @@ class OMCOOSubjac(COOSubjac):
         Unit conversion factor for the subjacobian.
     src : str or None
         Source name for the subjacobian.
+
+    Attributes
+    ----------
+    rows : ndarray
+        Row indices of the subjacobian.
+    cols : ndarray
+        Column indices of the subjacobian.
     """
 
     def __init__(self, key, info, row_slice, col_slice, wrt_is_input, dtype, src_indices=None,
@@ -991,6 +1031,8 @@ class OMCOOSubjac(COOSubjac):
         """
         super().__init__(key, info, row_slice, col_slice, wrt_is_input, dtype, src_indices,
                          factor, src)
+        self.rows = info['rows']
+        self.cols = info['cols']
         self.set_val(info['val'])
 
     @classmethod
@@ -1016,7 +1058,7 @@ class OMCOOSubjac(COOSubjac):
         rows = meta['rows']
         if val is None:
             val = np.zeros(rows.size)
-        elif np.isscalar(val):
+        elif isscalar(val):
             val = np.full(rows.size, val, dtype=float)
         else:
             val = np.asarray(val, dtype=float).copy().reshape(rows.size)
@@ -1035,7 +1077,7 @@ class OMCOOSubjac(COOSubjac):
             Subjacobian as a dense array.
         """
         arr = np.zeros(self.info['shape'])
-        arr[self.info['rows'], self.info['cols']] = self.info['val']
+        arr[self.rows, self.cols] = self.info['val']
         return arr
 
     def get_coo_data_size(self):
@@ -1066,7 +1108,7 @@ class OMCOOSubjac(COOSubjac):
         tuple
             (data, rows, cols).
         """
-        data, rows, cols = self.get_val(randgen), self.info['rows'], self.info['cols']
+        data, rows, cols = self.get_val(randgen), self.rows, self.cols
 
         if self.src_indices is not None:
             # if src_indices is not None, we are part of the dr/do matrix, so columns correspond
@@ -1125,17 +1167,44 @@ class OMCOOSubjac(COOSubjac):
         uncovered_threshold : float or None
             Threshold for uncovered elements. Only used in _CheckingJacobian.
         """
-        self._set_coo_col(icol, column, self.info['val'], self.info['rows'], self.info['cols'],
+        self._set_coo_col(icol, column, self.info['val'], self.rows, self.cols,
                           uncovered_threshold)
 
-    def _matvec_fwd(self, vec, randgen=None):
-        # bincount allows rows and cols to contain repeated (row, col) pairs.
-        return np.bincount(self.info['rows'], vec[self.info['cols']] * self.get_val(randgen),
-                           minlength=self.nrows)
+    def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
+        if self._in_view is None:
+            self._in_view = d_inputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
 
-    def _matvec_rev(self, vec, randgen=None):
-        return np.bincount(self.info['cols'], vec[self.info['rows']] * self.get_val(randgen),
-                           minlength=self.parent_ncols)
+        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        # bincount allows rows and cols to contain repeated (row, col) pairs.
+        self._res_view += bincount(self.rows, self._in_view[self.cols] * val, minlength=self.nrows)
+
+    def _apply_fwd_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
+        if self._out_view is None:
+            self._out_view = d_outputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
+
+        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        # bincount allows rows and cols to contain repeated (row, col) pairs.
+        self._res_view += bincount(self.rows, self._out_view[self.cols] * val, minlength=self.nrows)
+
+    def _apply_rev_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
+        if self._in_view is None:
+            self._in_view = d_inputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
+
+        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        self._in_view += bincount(self.cols, self._res_view[self.rows] * val,
+                                  minlength=self.parent_ncols)
+
+    def _apply_rev_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
+        if self._out_view is None:
+            self._out_view = d_outputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
+
+        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        self._out_view += bincount(self.cols, self._res_view[self.rows] * val,
+                                   minlength=self.parent_ncols)
 
 
 class DiagonalSubjac(SparseSubjac):
@@ -1170,7 +1239,7 @@ class DiagonalSubjac(SparseSubjac):
         """
         if self.info['val'] is None:
             self.info['val'] = np.zeros(self.nrows)
-        elif np.isscalar(self.info['val']):
+        elif isscalar(self.info['val']):
             self.info['val'] = np.full(self.nrows, self.info['val'])
 
     @classmethod
@@ -1196,7 +1265,7 @@ class DiagonalSubjac(SparseSubjac):
         meta['rows'] = meta['cols'] = None
         if val is None:
             val = np.zeros(meta['shape'][0])
-        elif np.isscalar(val):
+        elif isscalar(val):
             val = np.full(meta['shape'][0], val, dtype=float)
         else:
             val = np.asarray(val, dtype=float).copy().reshape(meta['shape'][0])
@@ -1315,10 +1384,37 @@ class DiagonalSubjac(SparseSubjac):
                 self.info['uncovered_nz'].extend(list(zip(nzs, icol * np.ones_like(nzs))))
             column[icol] = save
 
-    def _matvec_fwd(self, vec, randgen=None):
-        return self.get_val(randgen) * vec
+    def _apply_fwd_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
+        if self._in_view is None:
+            self._in_view = d_inputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
 
-    _matvec_rev = _matvec_fwd
+        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        self._res_view += self._in_view * val
+
+    def _apply_fwd_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
+        if self._out_view is None:
+            self._out_view = d_outputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
+
+        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        self._res_view += self._out_view * val
+
+    def _apply_rev_input(self, d_inputs, d_outputs, d_residuals, randgen=None):
+        if self._in_view is None:
+            self._in_view = d_inputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
+
+        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        self._in_view += self._res_view * val
+
+    def _apply_rev_output(self, d_inputs, d_outputs, d_residuals, randgen=None):
+        if self._out_view is None:
+            self._out_view = d_outputs.get_slice(self.col_slice)
+            self._res_view = d_residuals.get_slice(self.row_slice)
+
+        val = self.info['val'] if randgen is None else self.get_val(randgen)
+        self._out_view += self._res_view * val
 
     def set_dtype(self, dtype):
         """
@@ -1331,6 +1427,10 @@ class DiagonalSubjac(SparseSubjac):
         """
         if dtype.kind == self.info['val'].dtype.kind:
             return
+
+        self._in_view = None
+        self._out_view = None
+        self._res_view = None
 
         if dtype.kind == 'f':
             self.info['val'] = np.ascontiguousarray(self.info['val'].real, dtype=dtype)
