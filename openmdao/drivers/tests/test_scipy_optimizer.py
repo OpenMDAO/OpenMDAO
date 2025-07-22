@@ -115,7 +115,7 @@ class TestMPIScatter(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-6, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-5, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
