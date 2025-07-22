@@ -1,8 +1,15 @@
+from packaging.version import Version
+
+from scipy import __version__ as scipy_version
+
 import numpy as np
 import unittest
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
+
+
+ScipyVersion = Version(scipy_version)
 
 
 class MockSurrogate(om.MultiFiSurrogateModel):
@@ -253,6 +260,8 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr_y2.ytrain[0], expected_y2train[0])
         np.testing.assert_array_equal(surr_y2.ytrain[1], expected_y2train[1])
 
+    @unittest.skipIf(ScipyVersion >= Version("1.16.0"),
+                     "COBYLA in Scipy >= 1.16.0 fails in this example.")
     def test_array_multi_vectorize(self):
         def branin(x):
             x1 = 15*x[0]-5
@@ -267,7 +276,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.add_input('x', np.zeros((1, 2)))
         mm.add_output('y', np.zeros((1, )))
 
-        mm.options['default_surrogate'] = om.MultiFiCoKrigingSurrogate(normalize=False)
+        mm.options['default_surrogate'] = om.MultiFiCoKrigingSurrogate(normalize=False, tolerance=1.0E-12)
 
         prob = om.Problem()
         prob.model.add_subsystem('mm', mm)

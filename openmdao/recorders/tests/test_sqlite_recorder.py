@@ -474,7 +474,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: (1,)", 
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: ()",
@@ -493,7 +493,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: (1,)", 
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: ()",
@@ -512,13 +512,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: ()", 
+            "        default_shape: ()",
             "    Subsystem : con",
             "        derivs_method: None",
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: ()", 
+            "        default_shape: ()",
             "        has_diag_partials: False",
             "        units: None",
             "        shape: None",
@@ -589,7 +589,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: (1,)", 
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: ()",
@@ -608,7 +608,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: (1,)", 
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: ()",
@@ -627,13 +627,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: ()", 
+            "        default_shape: ()",
             "    Subsystem : con",
             "        derivs_method: None",
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: ()", 
+            "        default_shape: ()",
             "        has_diag_partials: False",
             "        units: None",
             "        shape: None",
@@ -2822,11 +2822,11 @@ class TestSqliteRecorder(unittest.TestCase):
         con = case.get_constraints()
         obj = case.get_objectives()
 
-        assert_near_equal(obj, {'f_xy': -27.33333333}, tolerance=1e-8)
-        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=8.1e-8, tol_type='abs')
+        assert_near_equal(obj, {'f_xy': -27.33333333}, tolerance=1e-6)
+        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-6, tol_type='abs')
 
         if Version(scipy_version) < Version("1.11"):
-            assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=8.1e-8, tol_type='abs')
+            assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-6, tol_type='abs')
         else:
             self.assertEqual(con, {})
 

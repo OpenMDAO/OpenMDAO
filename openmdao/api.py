@@ -123,7 +123,7 @@ from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWa
     OMInvalidCheckDerivativesOptionsWarning
 
 # Utils
-from openmdao.utils.general_utils import wing_dbg, env_truthy, om_dump, is_undefined
+from openmdao.utils.general_utils import setup_dbg, env_truthy, om_dump, is_undefined
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.jax_utils import register_jax_component
 
@@ -133,7 +133,7 @@ from openmdao.utils.reports_system import register_report, unregister_report, ge
 
 import os
 
-wing_dbg()
+setup_dbg()
 
 # set up tracing or memory profiling if env vars are set.
 if env_truthy('OPENMDAO_TRACE'):  # pragma: no cover
