@@ -2020,15 +2020,18 @@ class Group(System):
 
         iproc = self.comm.rank
         for io, existence in self._var_existence.items():
+            existence = np.asarray(existence, dtype=int)
             abs2meta = self._var_abs2meta[io]
             for i, name in enumerate(self._var_allprocs_abs2meta[io]):
                 abs2idx[name] = i
                 if name in abs2meta:
-                    existence[iproc, i] = True
+                    existence[iproc, i] = 1
 
             if self.comm.size > 1:
                 scratch = existence.copy()
                 self.comm.Allreduce(scratch, existence, MPI.SUM)
+                # convert back to bool
+                self._var_existence[io] = existence.astype(bool)
 
     @collect_errors
     def _setup_var_sizes(self):
