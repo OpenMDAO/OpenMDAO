@@ -13,7 +13,7 @@ import shutil
 import tempfile
 
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.testing_utils import set_env_vars_context, env_truthy, get_tempdir
+from openmdao.utils.testing_utils import set_env_vars_context, env_truthy
 
 
 def get_module_path(fpath):
@@ -437,7 +437,7 @@ def image2html(imagefile, title='', alt=''):
 
 
 if env_truthy('TESTFLO_RUNNING'):
-    TESTFLO_WORKDIR = get_tempdir()
+    TESTFLO_WORKDIR = tempfile.mkdtemp()
 else:
     TESTFLO_WORKDIR = ''
 
