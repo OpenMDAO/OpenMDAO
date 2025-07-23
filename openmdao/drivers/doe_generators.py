@@ -414,7 +414,7 @@ class _pyDOE_Generator(DOEGenerator):
         Parameters
         ----------
         size : int
-            The number of factors for the design.
+            The total size (sum of sizes) of all factors for the design.
 
         Returns
         -------

@@ -63,7 +63,7 @@ class AnalysisDriver(Driver):
             self._generator = samples
         elif samples is not None:
             raise ValueError('If given, samples must be a list, tuple, '
-                             f'or derived from AnalysisDriver but got {type(samples)}')
+                             f'or derived from AnalysisGenerator but got {type(samples)}')
 
         super().__init__(**kwargs)
 
