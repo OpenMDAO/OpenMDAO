@@ -18,10 +18,9 @@ import numpy as np
 
 from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
     _UNDEFINED, INT_DTYPE, INF_BOUND, _SetupStatus
-from openmdao.jacobians.dictionary_jacobian import Jacobian, DictionaryJacobian
-from openmdao.jacobians.assembled_jacobian import DenseJacobian, CSCJacobian
+from openmdao.jacobians.dictionary_jacobian import Jacobian
 from openmdao.recorders.recording_manager import RecordingManager
-from openmdao.vectors.vector import _full_slice, _type_map
+from openmdao.vectors.vector import _full_slice
 from openmdao.utils.mpi import MPI, multi_proc_exception_check
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
@@ -43,14 +42,8 @@ from openmdao.utils.general_utils import determine_adder_scaler, is_undefined, \
 from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
+from openmdao.jacobians.jacobian import DenseJacobian, CSCJacobian, CSRJacobian
 
-
-_empty_frozen_set = frozenset()
-
-_asm_jac_types = {
-    'csc': CSCJacobian,
-    'dense': DenseJacobian,
-}
 
 # Suppored methods for derivatives
 _supported_methods = {
@@ -109,6 +102,12 @@ default_options = ['always_opt', 'default_shape', 'derivs_method', 'distributed'
                    'run_root_only', 'use_jit', 'assembled_jac_type',
                    'auto_order']
 
+_asm_jac_types = {
+    'csc': CSCJacobian,
+    'csr': CSRJacobian,
+    'dense': DenseJacobian,
+}
+
 
 class _MatchType(IntEnum):
     """
@@ -127,25 +126,6 @@ class _MatchType(IntEnum):
     NAME = 0
     RENAME = 1
     PATTERN = 2
-
-
-class _OptStatus(IntEnum):
-    """
-    Class used to define different states during the optimization process.
-
-    Attributes
-    ----------
-    PRE : int
-        Before the optimization.
-    OPTIMIZING : int
-        During the optimization.
-    POST : int
-        After the optimization.
-    """
-
-    PRE = 0
-    OPTIMIZING = 1
-    POST = 2
 
 
 def collect_errors(method):
@@ -212,6 +192,8 @@ class System(object, metaclass=SystemMetaclass):
         Recording options dictionary
     _problem_meta : dict
         Problem level metadata.
+    _old_relevance : tuple or None
+        The relevance object and active flag from the previous call to _get_approx_subjac_keys.
     under_complex_step : bool
         When True, this system is undergoing complex step.
     under_finite_difference : bool
@@ -414,7 +396,8 @@ class System(object, metaclass=SystemMetaclass):
         # System options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
 
-        self.options.declare('assembled_jac_type', values=['csc', 'dense'], default='csc',
+        self.options.declare('assembled_jac_type', values=['csc', 'csr', 'dense', None],
+                             default=None,
                              desc='Linear solver(s) in this group or implicit component, '
                                   'if using an assembled jacobian, will use this type.')
         self.options.declare('derivs_method', default=None, values=['jax', 'cs', 'fd', None],
@@ -438,6 +421,8 @@ class System(object, metaclass=SystemMetaclass):
                                        desc='User-defined metadata to exclude in recording')
 
         self._problem_meta = None
+
+        self._old_relevance = (None, None)
 
         # Counting iterations.
         self.iter_count = 0
@@ -667,6 +652,46 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 yield from self._var_allprocs_discrete[iotype].items()
 
+    def _get_jac_ofs(self):
+        """
+        Cache (name, start, end, slice, dist_sizes) for each row var in the jacobian.
+
+        Returns
+        -------
+        list
+            List of (name, start, end, slice, dist_sizes) for each row var in the jacobian.
+        """
+        if self._jac_ofs_cache is None:
+            self._jac_ofs_cache = list(self._jac_of_iter())
+        return self._jac_ofs_cache
+
+    def _get_jac_wrts(self, wrt_matches=None):
+        """
+        Cache (name, start, end, vec, slice, dist_sizes) for each column var in the jacobian.
+
+        Parameters
+        ----------
+        wrt_matches : frozenset or None
+            Only include column vars that are contained in this set.  This will determine what
+            the actual offsets are, i.e. the offsets will be into a reduced jacobian
+            containing only the matching columns.
+
+        Returns
+        -------
+        list
+            List of (name, start, end, vec, slice, dist_sizes) for each column var in the jacobian.
+        """
+        if wrt_matches not in self._jac_wrts_cache:
+            self._jac_wrts_cache[wrt_matches] = list(self._jac_wrt_iter(wrt_matches))
+        return self._jac_wrts_cache[wrt_matches]
+
+    def _clear_jac_caches(self):
+        """
+        Clear the jacobian of and wrt caches.
+        """
+        self._jac_ofs_cache = None
+        self._jac_wrts_cache = {}
+
     def _jac_of_iter(self):
         """
         Iterate over (name, offset, end, slice, dist_sizes) for each 'of' (row) var in the jacobian.
@@ -701,7 +726,7 @@ class System(object, metaclass=SystemMetaclass):
         Parameters
         ----------
         wrt_matches : set or None
-            Only include row vars that are contained in this set.  This will determine what
+            Only include column vars that are contained in this set.  This will determine what
             the actual offsets are, i.e. the offsets will be into a reduced jacobian
             containing only the matching columns.
 
@@ -716,7 +741,9 @@ class System(object, metaclass=SystemMetaclass):
         Vector or None
             Either the _outputs or _inputs vector if var is local else None.
         slice
-            A full slice.
+            A full slice.  In the total derivative version of this function, which only is called
+            on the top level Group, this may not be a full slice, but rather indices specified
+            for the corresponding design variable.
         ndarray or None
             Distributed sizes if var is distributed else None
         """
@@ -732,7 +759,7 @@ class System(object, metaclass=SystemMetaclass):
         szname = 'global_size' if total else 'size'
 
         start = end = 0
-        for of, _start, _end, _, dist_sizes in self._jac_of_iter():
+        for of, _start, _end, _, dist_sizes in self._get_jac_ofs():
             if wrt_matches is None or of in wrt_matches:
                 end += (_end - _start)
                 vec = self._outputs if of in local_outs else None
@@ -746,14 +773,6 @@ class System(object, metaclass=SystemMetaclass):
                 dist_sizes = sizes_in[:, toidx[wrt]] if tometa_in[wrt]['distributed'] else None
                 yield wrt, start, end, vec, _full_slice, dist_sizes
                 start = end
-
-    def _init_jacobian(self):
-        """
-        Initialize the jacobian.
-
-        Override this in a subclass to use a different jacobian type than DictionaryJacobian.
-        """
-        self._jacobian = DictionaryJacobian(system=self)
 
     def _declare_options(self):
         """
@@ -1431,7 +1450,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         return {
             'classname': type(self).__name__,
-            'implicit': not self.is_explicit(),
+            'implicit': not self.is_explicit(is_comp=False),
         }
 
     def _setup_check(self):
@@ -1446,20 +1465,56 @@ class System(object, metaclass=SystemMetaclass):
         """
         pass
 
-    def _get_approx_subjac_keys(self):
+    def _relevance_changed(self):
+        """
+        Return True if the relevance has changed since the last call to this method.
+
+        Returns
+        -------
+        bool
+            True if the relevance has changed.
+        """
+        old_rel, active = self._old_relevance
+        if (old_rel is not self._relevance) or (active != self._relevance._active):
+            self._old_relevance = (self._relevance, self._relevance._active)
+            return True
+        return False
+
+    def _get_approx_subjac_keys(self, use_relevance=True, initialize=False):
         """
         Return a list of (of, wrt) keys needed for approx derivs for this system.
 
         All keys are absolute names. If this system is the top level Group, the keys will be source
         names.  If not, they will be absolute input and output names.
 
+        Parameters
+        ----------
+        use_relevance : bool
+            If True, use relevance to determine which partials to approximate.
+        initialize : bool
+            If True, initialize the list of approx subjac keys.
+
         Returns
         -------
         list
             List of approx derivative subjacobian keys.
         """
+        if initialize:
+            self._approx_subjac_keys = None
+
         if self._approx_subjac_keys is None:
-            self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
+            linslv = self.linear_solver
+            if use_relevance and (linslv is None or linslv.use_relevance()):
+                lst = []
+                is_relevant = self._relevance.is_relevant
+                with self._relevance.all_seeds_active():
+                    for key in self._approx_subjac_keys_iter():
+                        _, wrt = key
+                        if is_relevant(wrt):
+                            lst.append(key)
+                self._approx_subjac_keys = lst
+            else:
+                self._approx_subjac_keys = list(self._approx_subjac_keys_iter())
 
         return self._approx_subjac_keys
 
@@ -1627,12 +1682,15 @@ class System(object, metaclass=SystemMetaclass):
         sp_info['class'] = type(self).__name__
         sp_info['type'] = 'semi-total' if self._subsystems_allprocs else 'partial'
 
-        ordered_wrt_info = list(self._jac_wrt_iter(info.wrt_matches))
-        ordered_of_info = list(self._jac_of_iter())
+        ordered_wrt_info = self._get_jac_wrts(info.wrt_matches)
+        ordered_of_info = self._get_jac_ofs()
 
         if self.pathname:
-            ordered_of_info = self._jac_var_info_abs2prom(ordered_of_info)
-            ordered_wrt_info = self._jac_var_info_abs2prom(ordered_wrt_info)
+            abs2prom = self._resolver.abs2prom
+            ordered_of_info = [(abs2prom(name), offset, end, idxs, dsizes)
+                               for name, offset, end, idxs, dsizes in ordered_of_info]
+            ordered_wrt_info = [(abs2prom(name), offset, end, vec, idxs, dsizes)
+                                for name, offset, end, vec, idxs, dsizes in ordered_wrt_info]
 
         coloring._row_vars = [t[0] for t in ordered_of_info]
         coloring._col_vars = [t[0] for t in ordered_wrt_info]
@@ -1760,6 +1818,8 @@ class System(object, metaclass=SystemMetaclass):
             if method is None:
                 method = 'fd'
 
+        self._get_jacobian()
+
         uses_approx = self.uses_approx()
         if uses_approx:
             approx_scheme = self._get_approx_scheme(method)
@@ -1777,12 +1837,7 @@ class System(object, metaclass=SystemMetaclass):
 
         self._coloring_info._update_wrt_matches(self)
 
-        save_jac = self._jacobian
-
-        # use special sparse jacobian to collect sparsity info
-        self._jacobian = _ColSparsityJac(self)
-
-        if self.is_explicit():
+        if self.is_explicit(is_comp=True):
             pvecs = (self._inputs,)
             save_vecs = (self._outputs, self._residuals)
         else:
@@ -1790,6 +1845,10 @@ class System(object, metaclass=SystemMetaclass):
             save_vecs = (self._residuals,)
 
         from openmdao.core.group import Group
+
+        # use special sparse jacobian to collect sparsity info
+        save_jac = self._jacobian
+        self._jacobian = _ColSparsityJac(self)
 
         if isinstance(self, Group):
             for _ in self._perturbation_iter(num_iters, perturb_size, pvecs, save_vecs):
@@ -1835,6 +1894,9 @@ class System(object, metaclass=SystemMetaclass):
             if abs_key in self._subjacs_info:
                 self._subjacs_info[abs_key]['sparsity'] = (rows, cols, shape)
 
+        if isinstance(self._jacobian, Jacobian):
+            self._jacobian._reset_subjacs(self)
+
     def subjac_sparsity_iter(self, sparsity, wrt_matches=None):
         """
         Iterate over sparsity for each subjac in the jacobian.
@@ -1862,9 +1924,9 @@ class System(object, metaclass=SystemMetaclass):
         rows = sparsity.row
         cols = sparsity.col
         plen = len(self.pathname) + 1 if self.pathname else 0
-        for of, ofstart, ofend, _, _ in self._jac_of_iter():
+        for of, ofstart, ofend, _, _ in self._get_jac_ofs():
             subrows = np.logical_and(sparsity.row >= ofstart, sparsity.row < ofend)
-            for wrt, wrtstart, wrtend, _, _, _ in self._jac_wrt_iter(wrt_matches):
+            for wrt, wrtstart, wrtend, _, _, _ in self._get_jac_wrts(wrt_matches):
                 matching = np.logical_and(sparsity.col >= wrtstart, sparsity.col < wrtend)
                 matching &= subrows
                 nzrows = rows[matching] - ofstart
@@ -2075,9 +2137,10 @@ class System(object, metaclass=SystemMetaclass):
                                    (self.msginfo, coloring._meta['wrt_patterns'],
                                     info.wrt_patterns))
             info.update(info.coloring._meta)
-            approx = self._get_approx_scheme(info['method'])
-            # force regen of approx groups during next compute_approximations
-            approx._reset()
+            if self.uses_approx():
+                approx = self._get_approx_scheme(info['method'])
+                # force regen of approx groups during next compute_approximations
+                approx._reset()
         elif isinstance(static, Coloring):
             info.coloring = coloring = static
 
@@ -2233,6 +2296,10 @@ class System(object, metaclass=SystemMetaclass):
         self._design_vars.update(self._static_design_vars)
         self._responses.update(self._static_responses)
 
+        self._jacobian = self._assembled_jac = None
+        self._jac_ofs_cache = None
+        self._jac_wrts_cache = {}
+
     def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
@@ -2273,6 +2340,8 @@ class System(object, metaclass=SystemMetaclass):
         if cfginfo:
             cfginfo._modified_systems.discard(self.pathname)
 
+        self._clear_jac_caches()
+
     def _setup_global_shapes(self):
         """
         Compute the global size and shape of all variables on this system.
@@ -2290,7 +2359,7 @@ class System(object, metaclass=SystemMetaclass):
 
                     # assume that all but the first dimension of the shape of a
                     # distributed variable is the same on all procs
-                    mymeta['global_shape'] = self._get_full_dist_shape(abs_name, local_shape)
+                    mymeta['global_shape'] = self._get_full_dist_shape(abs_name, local_shape, io)
                 else:
                     # not distributed, just use local shape and size
                     mymeta['global_size'] = mymeta['size']
@@ -2486,15 +2555,20 @@ class System(object, metaclass=SystemMetaclass):
             self._doutputs = vectors['output']['linear']
             self._dresiduals = vectors['residual']['linear']
 
-    def _name_shape_iter(self, vectype, subset=None):
+    def _name_shape_iter(self, iotype, local=True, subset=None):
         """
         Yield variable names and shapes for a given iotype of vector.
         """
+        if local:
+            abs2meta = self._var_abs2meta[iotype]
+        else:
+            abs2meta = self._var_allprocs_abs2meta[iotype]
+
         if subset is None:
-            for name, meta in self._var_abs2meta[_type_map[vectype]].items():
+            for name, meta in abs2meta.items():
                 yield name, meta['shape']
         else:
-            for name, meta in self._var_abs2meta[_type_map[vectype]].items():
+            for name, meta in abs2meta.items():
                 if name in subset:
                     yield name, meta['shape']
 
@@ -2524,49 +2598,61 @@ class System(object, metaclass=SystemMetaclass):
         for subsys in self._subsystems_myproc:
             subsys._setup_solvers()
 
-    def _setup_jacobians(self, recurse=True):
+    def _get_asm_jac_solvers(self):
         """
-        Set and populate jacobians down through the system tree.
-
-        Parameters
-        ----------
-        recurse : bool
-            If True, setup jacobians in all descendants.
+        Get the solvers that need an assembled jacobian.
         """
         asm_jac_solvers = set()
         if self._linear_solver is not None:
             asm_jac_solvers.update(self._linear_solver._assembled_jac_solver_iter())
 
-        nl_asm_jac_solvers = set()
         if self.nonlinear_solver is not None:
-            nl_asm_jac_solvers.update(self.nonlinear_solver._assembled_jac_solver_iter())
+            asm_jac_solvers.update(self.nonlinear_solver._assembled_jac_solver_iter())
 
-        asm_jac = None
-        if asm_jac_solvers:
-            asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
-            self._assembled_jac = asm_jac
-            for s in asm_jac_solvers:
-                s._assembled_jac = asm_jac
+        return asm_jac_solvers
 
-        if nl_asm_jac_solvers:
-            if asm_jac is None:
-                asm_jac = _asm_jac_types[self.options['assembled_jac_type']](system=self)
-            for s in nl_asm_jac_solvers:
-                s._assembled_jac = asm_jac
+    def _get_assembled_jac(self):
+        """
+        Get the assembled jacobian if there is one.
+        """
+        if self._jacobian is None:
+            asm_jac_solvers = self._get_asm_jac_solvers()
 
-        if self._has_approx:
-            self._set_approx_partials_meta()
+            if asm_jac_solvers:
+                if self.matrix_free:
+                    # At present, we don't support a AssembledJacobian if the component is
+                    # matrix-free.
+                    raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
+                                       "subcomponent." % self.msginfo)
 
-        # At present, we don't support a AssembledJacobian in a group
-        # if any subcomponents are matrix-free.
-        if asm_jac is not None:
-            if self.matrix_free:
-                raise RuntimeError("%s: AssembledJacobian not supported for matrix-free "
-                                   "subcomponent." % self.msginfo)
+                option_format = self.options['assembled_jac_type']
+                if option_format == 'dense':
+                    jac_format = 'dense'
+                else:
+                    preferred = [fmt for _, fmt in asm_jac_solvers if fmt is not None]
+                    if len(set(preferred)) == 1:
+                        jac_format = preferred[0]
+                    elif option_format in (None, 'sparse'):
+                        # use old default of 'csc'
+                        jac_format = 'csc'
+                    else:
+                        jac_format = option_format
 
-        if recurse:
-            for subsys in self._subsystems_myproc:
-                subsys._setup_jacobians()
+                    if option_format not in (None, 'sparse'):
+                        if option_format != jac_format:
+                            issue_warning(
+                                f"{self.msginfo}: system is using a '{option_format}' "
+                                "sparse format, but a linear solver in the system prefers "
+                                f"'{jac_format}'. This may result in performance degradation."
+                            )
+                        jac_format = option_format
+
+                asm_jac = _asm_jac_types[jac_format](system=self)
+                self._assembled_jac = self._jacobian = asm_jac
+                for solver, _ in asm_jac_solvers:
+                    solver._assembled_jac = asm_jac
+
+        return self._assembled_jac
 
     def _get_promotion_maps(self):
         """
@@ -2744,21 +2830,6 @@ class System(object, metaclass=SystemMetaclass):
 
         return maps
 
-    def _get_matvec_scope(self):
-        """
-        Find the input and output variables that are needed for a particular matvec product.
-
-        Returns
-        -------
-        (set, set)
-            Sets of output and input variables.
-        """
-        try:
-            return self._scope_cache[None]
-        except KeyError:
-            self._scope_cache[None] = (None, _empty_frozen_set)
-            return self._scope_cache[None]
-
     @contextmanager
     def _unscaled_context(self, outputs=(), residuals=()):
         """
@@ -2821,7 +2892,7 @@ class System(object, metaclass=SystemMetaclass):
                     vec.scale_to_phys()
 
     @contextmanager
-    def _matvec_context(self, scope_out, scope_in, mode, clear=True):
+    def _matvec_context(self, scope_out, scope_in, mode):
         """
         Context manager for vectors.
 
@@ -2839,9 +2910,6 @@ class System(object, metaclass=SystemMetaclass):
         mode : str
             Key for specifying derivative direction. Values are 'fwd'
             or 'rev'.
-        clear : bool(True)
-            If True, zero out residuals (in fwd mode) or inputs and outputs
-            (in rev mode).
 
         Yields
         ------
@@ -2854,12 +2922,11 @@ class System(object, metaclass=SystemMetaclass):
         d_outputs = self._doutputs
         d_residuals = self._dresiduals
 
-        if clear:
-            if mode == 'fwd':
-                d_residuals.set_val(0.0)
-            else:  # rev
-                d_inputs.set_val(0.0)
-                d_outputs.set_val(0.0)
+        if mode == 'fwd':
+            d_residuals.set_val(0.0)
+        else:  # rev
+            d_inputs.set_val(0.0)
+            d_outputs.set_val(0.0)
 
         if scope_out is None and scope_in is None:
             yield d_inputs, d_outputs, d_residuals
@@ -2959,10 +3026,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         Set this system's nonlinear solver.
         """
-        # from openmdao.core.group import Group
-        # if not isinstance(self, Group):
-        #     raise TypeError("nonlinear_solver can only be set on a Group.")
-
         self._nonlinear_solver = solver
 
     @property
@@ -3110,11 +3173,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         if (level, depth, type_) not in self._solver_print_cache:
             self._solver_print_cache.append((level, depth, type_))
-
-    def _set_approx_partials_meta(self):
-        # this will load a static coloring (if any) and will populate wrt_matches if
-        # there is any coloring (static or dynamic).
-        self._get_static_wrt_matches()
 
     def _get_static_wrt_matches(self):
         """
@@ -5079,7 +5137,7 @@ class System(object, metaclass=SystemMetaclass):
             If None, all are in the scope.
         """
         with self._scaled_context_all():
-            self._apply_linear(None, mode, scope_out, scope_in)
+            self._apply_linear(mode, scope_out, scope_in)
 
     def run_solve_linear(self, mode):
         """
@@ -5107,7 +5165,7 @@ class System(object, metaclass=SystemMetaclass):
             Flag indicating if the children should call linearize on their linear solvers.
         """
         with self._scaled_context_all():
-            self._linearize(self._assembled_jac, sub_do_ln=self._linear_solver is not None and
+            self._linearize(sub_do_ln=self._linear_solver is not None and
                             self._linear_solver._linearize_children())
             if self._linear_solver is not None and sub_do_ln:
                 self._linear_solver._linearize()
@@ -5140,14 +5198,12 @@ class System(object, metaclass=SystemMetaclass):
         """
         return True
 
-    def _apply_linear(self, jac, mode, scope_in=None, scope_out=None):
+    def _apply_linear(self, mode, scope_in=None, scope_out=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -5174,14 +5230,12 @@ class System(object, metaclass=SystemMetaclass):
         """
         pass
 
-    def _linearize(self, jac, sub_do_ln=True):
+    def _linearize(self, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
@@ -5246,8 +5300,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         Record an iteration of the current System.
         """
-        global _recordable_funcs
-
         if self._rec_mgr._recorders:
             parallel = self._rec_mgr._check_parallel() if self.comm.size > 1 else False
             do_gather = self._rec_mgr._check_gather()
@@ -5391,12 +5443,6 @@ class System(object, metaclass=SystemMetaclass):
             if self.linear_solver:
                 self.linear_solver._set_complex_step_mode(active)
 
-            if isinstance(self._jacobian, Jacobian):
-                self._jacobian.set_complex_step_mode(active)
-
-            if self._assembled_jac:
-                self._assembled_jac.set_complex_step_mode(active)
-
         for sub in self._subsystems_myproc:
             sub._set_complex_step_mode(active)
 
@@ -5424,30 +5470,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         return set(s for s in self.system_iter(include_self=True, recurse=True)
                    if s.nonlinear_solver and s.nonlinear_solver.supports['gradients'])
-
-    def _jac_var_info_abs2prom(self, var_info):
-        """
-        Return a new list with tuples' [0] entry converted from absolute to promoted names.
-
-        Parameters
-        ----------
-        var_info : list of (name, offset, end, idxs)
-            The list that uses absolute names.
-
-        Returns
-        -------
-        list
-            The new list with promoted names.
-        """
-        new_list = []
-        abs2prom = self._resolver.abs2prom
-
-        for tup in var_info:
-            lst = list(tup)
-            lst[0] = abs2prom(tup[0])
-            new_list.append(lst)
-
-        return new_list
 
     def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,
                      flat=False, from_root=False):
@@ -6527,7 +6549,7 @@ class System(object, metaclass=SystemMetaclass):
 
         return hash
 
-    def _get_full_dist_shape(self, abs_name, local_shape, exist_procs=None):
+    def _get_full_dist_shape(self, abs_name, local_shape, io):
         """
         Get the full 'distributed' shape for a variable.
 
@@ -6539,30 +6561,24 @@ class System(object, metaclass=SystemMetaclass):
             Absolute name of the variable.
         local_shape : tuple
             Local shape of the variable, used in error reporting.
-        exist_procs : array of int or None
-            Array of integers indicating ranks where the variable exists.
+        io : str
+            'input' or 'output'.
 
         Returns
         -------
         tuple
             The distributed shape for the given variable.
         """
-        if abs_name in self._var_allprocs_abs2meta['output']:
-            io = 'output'
+        abs2meta = self._var_allprocs_abs2meta[io]
+        if abs_name in abs2meta:
             scope = self
-        elif abs_name in self._problem_meta['model_ref']()._var_allprocs_abs2meta['output']:
-            io = 'output'
+        else:
             scope = self._problem_meta['model_ref']()
-        else:
-            io = 'input'
-            scope = self
+            abs2meta = scope._var_allprocs_abs2meta[io]
 
-        meta = scope._var_allprocs_abs2meta[io][abs_name]
+        meta = abs2meta[abs_name]
         var_idx = scope._var_allprocs_abs2idx[abs_name]
-        if exist_procs is None:
-            global_size = np.sum(scope._var_sizes[io][:, var_idx])
-        else:
-            global_size = np.sum(scope._var_sizes[io][:, var_idx][exist_procs])
+        global_size = np.sum(scope._var_sizes[io][:, var_idx])
 
         # assume that all but the first dimension of the shape of a
         # distributed variable is the same on all procs
@@ -6651,9 +6667,15 @@ class System(object, metaclass=SystemMetaclass):
                     keys.update(proc_keys)
         return keys
 
-    def is_explicit(self):
+    def is_explicit(self, is_comp=True):
         """
         Return True if this is an explicit component.
+
+        Parameters
+        ----------
+        is_comp : bool
+            If True, return True if this is an explicit component.
+            If False, return True if this is an explicit component or group.
 
         Returns
         -------
@@ -6661,6 +6683,22 @@ class System(object, metaclass=SystemMetaclass):
             True if this is an explicit component.
         """
         return False
+
+    def total_local_size(self, io):
+        """
+        Return the total local size of the given variable.
+
+        Parameters
+        ----------
+        io : str
+            Either 'input' or 'output'.
+
+        Returns
+        -------
+        int
+            The total local size of the given input or output vector.
+        """
+        return np.sum(self._var_sizes[io][self.comm.rank, :])
 
     def best_partial_deriv_direction(self):
         """
@@ -6671,8 +6709,8 @@ class System(object, metaclass=SystemMetaclass):
         str
             The best direction for derivative calculations, 'fwd' or 'rev'.
         """
-        nouts = np.sum(self._var_sizes['output'][self.comm.rank, :])
-        nins = np.sum(self._var_sizes['input'][self.comm.rank, :])
+        nouts = self.total_local_size('output')
+        nins = self.total_local_size('input')
         return 'fwd' if nouts >= nins else 'rev'
 
     def _get_sys_promotion_tree(self, tree=None):
@@ -6890,27 +6928,6 @@ class System(object, metaclass=SystemMetaclass):
                 if sz > 0:
                     yield (vname, mytopranks[rank]), sz
 
-    def local_range_iter(self, io):
-        """
-        Yield names and local ranges of all local variables in this system.
-
-        Parameters
-        ----------
-        io : str
-            Either 'input' or 'output'.
-
-        Yields
-        ------
-        tuple
-            A tuple of the form (abs_name, start, end).
-        """
-        offset = 0
-        for vname, size in zip(self._var_allprocs_abs2meta[io],
-                               self._var_sizes[io][self.comm.rank]):
-            if size > 0:
-                yield vname, offset, offset + size
-            offset += size
-
     def get_var_dup_info(self, name, io):
         """
         Return information about how the given variable is duplicated across MPI processes.
@@ -7064,6 +7081,9 @@ class System(object, metaclass=SystemMetaclass):
             if path not in seen:
                 seen.add(path)
                 yield path
+
+    def _get_subjac_owners(self):
+        return {}
 
 
 class _ErrorData(object):
@@ -7255,16 +7275,16 @@ def _compute_deriv_errors(derivative_info, matrix_free, directional, totals, ato
                 if totals:
                     mhatdotm, dhatdotd = derivative_info['directional_fd_fwd'][i]
                     errs.forward, err_vals.forward, above, abs_errs.forward, rel_errs.forward = \
-                        get_tol_violation(mhatdotm, dhatdotd, atol, rtol)
+                        get_tol_violation(dhatdotd, mhatdotm, atol, rtol)
                 else:
                     errs.forward, err_vals.forward, above, abs_errs.forward, rel_errs.forward = \
                         get_tol_violation(Jforward, Jfd, atol, rtol)
                 above_tol |= above
 
             if Jreverse is not None and 'directional_fd_rev' in derivative_info:
-                mhatdotm, dhatdotd = derivative_info['directional_fd_rev'][i]
+                dhatdotd, mhatdotm = derivative_info['directional_fd_rev'][i]
                 errs.reverse, err_vals.reverse, above, abs_errs.reverse, rel_errs.reverse = \
-                    get_tol_violation(mhatdotm, dhatdotd, atol, rtol)
+                    get_tol_violation(dhatdotd, mhatdotm, atol, rtol)
                 above_tol |= above
         else:
             if Jforward is not None:

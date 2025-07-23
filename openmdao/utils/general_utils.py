@@ -126,8 +126,19 @@ def _subjac_meta2value(meta):
     val = meta['val'] if 'val' in meta else None
     rows = meta['rows'] if 'rows' in meta else None
     cols = meta['cols'] if 'cols' in meta else None
+    diagonal = meta['diagonal'] if 'diagonal' in meta else False
+    shape = meta['shape'] if 'shape' in meta else None
 
-    if rows is not None:
+    if diagonal:
+        if shape is None:
+            raise ValueError("Shape is required for diagonal subjacobian.")
+        rows = np.arange(shape_to_len(shape))
+        cols = rows
+        if val is not None:
+            val = np.full(shape_to_len(shape), val)
+        else:
+            val = None
+    elif rows is not None:
         if val is not None and np.isscalar(val):
             val = np.full(len(rows), val)
     elif np.isscalar(val):
@@ -1143,24 +1154,7 @@ def _src_or_alias_item_iter(proms):
             yield name, meta
 
 
-def _src_or_alias_dict(prom_dict):
-    """
-    Convert a dict with promoted input names into one with source or alias names.
-
-    Parameters
-    ----------
-    prom_dict : dict
-        Original dict with some promoted paths.
-
-    Returns
-    -------
-    dict
-        New dict with source pathnames or alias names.
-    """
-    return {name: meta for name, meta in _src_or_alias_item_iter(prom_dict)}
-
-
-def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shape):
+def convert_src_inds(parent_src_inds, my_src_inds, my_src_shape):
     """
     Compute lower level src_indices based on parent src_indices.
 
@@ -1168,8 +1162,6 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
     ----------
     parent_src_inds : ndarray
         Parent src_indices.
-    parent_src_shape : tuple
-        Shape of source expected by parent.
     my_src_inds : ndarray or fancy index
         Src_indices at the current system level, before conversion.
     my_src_shape : tuple
@@ -1579,34 +1571,6 @@ def make_traceback():
     return TracebackType(None, finfo.frame, finfo.frame.f_lasti, finfo.frame.f_lineno)
 
 
-if env_truthy('OM_DBG'):
-    def dprint(*args, **kwargs):
-        """
-        Print only if OM_DBG is truthy in the environment.
-
-        Parameters
-        ----------
-        args : list
-            Positional args.
-        kwargs : dict
-            Named args.
-        """
-        print(*args, **kwargs)
-else:
-    def dprint(*args, **kwargs):
-        """
-        Print only if OM_DBG is truthy in the environment.
-
-        Parameters
-        ----------
-        args : list
-            Positional args.
-        kwargs : dict
-            Named args.
-        """
-        pass
-
-
 def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):
     """
     Check serial deriv values across ranks.
@@ -1780,6 +1744,9 @@ def om_dump(*args, **kwargs):
     pass
 
 
+om_dump_indent = om_dump
+
+
 def dbg(funct):
     """
     Do nothing.
@@ -1820,21 +1787,51 @@ _om_dump = env_truthy('OPENMDAO_DUMP')
 if _om_dump:
     parts = [s.strip() for s in os.environ['OPENMDAO_DUMP'].split(',')]
     trace = 'trace' in parts
+    use_rank = 'rank' in parts
 
     if 'stdout' in parts:
         _dump_stream = sys.stdout
     elif 'stderr' in parts:
         _dump_stream = sys.stderr
     else:
+        dirname = None
+
+        for p in parts:
+            if p.startswith('dir='):
+                dirname = p.partition('=')[2]
+                break
+        else:
+            dirname = os.path.join(os.getcwd(), 'dump_dir')
+
+        if not os.path.exists(dirname):
+            try:
+                os.makedirs(dirname)
+            except Exception:
+                dirname = os.getcwd()
+
+        for p in parts:
+            if p.startswith('file='):
+                fname = p.partition('=')[2]
+                break
+        else:
+            testspec = os.environ.get('TESTFLO_SPEC')
+            if testspec:
+                tpath, ident = testspec.split(':')
+                tfile = os.path.basename(tpath)
+                fname = f'om_dump_{tfile}:{ident}'
+                use_rank = True  # always use rank for testflo tests
+            else:
+                fname = 'om_dump'
+
         rankstr = pidstr = ''
-        if 'rank' in parts:
+        if use_rank:
             from openmdao.utils.mpi import MPI
             rankstr = f"_{MPI.COMM_WORLD.rank if MPI else 0}"
 
         if 'pid' in parts:
             pidstr = f"_{os.getpid()}"
 
-        _dump_stream = open(f'om_dump{rankstr}{pidstr}.out', 'w')
+        _dump_stream = open(os.path.join(dirname, f'{fname}{rankstr}{pidstr}.out'), 'w')
 
     _show_args = 'args' in parts
 
@@ -1851,6 +1848,39 @@ if _om_dump:
         kwargs : dict
             Named args.
         """
+        kwargs['file'] = _dump_stream
+        kwargs['flush'] = True
+        print(*args, **kwargs)
+
+    def om_dump_indent(pathobj, *args, **kwargs):
+        """
+        Dump to a stream with indent if OPENMDAO_DUMP is truthy in the environment.
+
+        Depending on the value of OPENMDAO_DUMP, output will go to file(s), stdout, or stderr.
+
+        Parameters
+        ----------
+        pathobj : object
+            The object to get the pathname from.
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        pathname = pathobj.pathname
+        if pathname:
+            indent = ' ' * (len(pathname.split('.')) * 3)
+            newargs = []
+            for arg in args:
+                if isinstance(arg, str):
+                    newargs.append(arg)
+                else:
+                    newargs.append(str(arg))
+
+            args = ' '.join(newargs)
+            args = textwrap.indent(args, indent)
+            args = (args,)
+
         kwargs['file'] = _dump_stream
         kwargs['flush'] = True
         print(*args, **kwargs)
@@ -1977,6 +2007,13 @@ if _om_dump:
             if isinstance(comm, _DebugComm):
                 return comm._comm
             return comm
+
+# if OPENMDAO_DUMP is set to anything, even a falsey value, make om_dump and om_dump_indent
+# available as builtins so we don't have to import them anywhere
+if os.environ.get('OPENMDAO_DUMP') is not None:
+    import builtins
+    builtins.om_dump = om_dump
+    builtins.om_dump_indent = om_dump_indent
 
 
 def call_depth2indent(tabsize=2, offset=-1):

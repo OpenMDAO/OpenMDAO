@@ -211,7 +211,6 @@ def is_unresolved(graph, node, meta_name):
 
     Returns
     -------
-    bool
         True if the node is unresolved.
     """
     nodes = graph.nodes
@@ -221,6 +220,42 @@ def is_unresolved(graph, node, meta_name):
     for p in graph.predecessors(node):
         if nodes[p][meta_name] is None:
             return True
+    return False
+
+
+def are_connected(graph, start, end):
+    """
+    Return True if the given source and target are connected.
+
+    Parameters
+    ----------
+    graph : networkx.DiGraph
+        Directed graph of Systems and variables.
+    start : str
+        Name of the starting node.
+    end : str
+        Name of the ending node.
+
+    Returns
+    -------
+    bool
+        True if the given source and target are connected.
+    """
+    if start in graph and end in graph:
+        successors = graph.successors
+
+        stack = [start]
+        visited = set(stack)
+
+        while stack:
+            start = stack.pop()
+            for node in successors(start):
+                if node == end:
+                    return True
+                if node not in visited:
+                    visited.add(node)
+                    stack.append(node)
+
     return False
 
 

@@ -1,5 +1,4 @@
 """Define the default Vector class."""
-from collections import defaultdict
 import hashlib
 import numpy as np
 
@@ -54,18 +53,18 @@ class DefaultVector(Vector):
         system : <System>
             The owning system.
         """
-        self._views = {}
+        self._views = views = {}
         start = end = 0
-        for name, shape in system._name_shape_iter(self._kind):
+        for name, shape in system._name_shape_iter(self._iotype):
             end += shape_to_len(shape)
-            self._views[name] = _VecData(shape, (start, end))
+            views[name] = _VecData(shape, (start, end))
             start = end
 
         if parent_vector is None:  # this is a root vector
             self._parent_slice = slice(0, end)
             self._data = np.zeros(end, dtype=complex if self._alloc_complex else float)
         else:
-            for name in self._views:
+            for name in views:
                 # just get our first name to get the starting index in the parent vector
                 start = parent_vector._views[name].range[0]
                 self._parent_slice = slice(start, start + end)
@@ -80,6 +79,15 @@ class DefaultVector(Vector):
                 if parent_adder is not None:
                     parent_adder = parent_adder[self._parent_slice]
                 self._scaling = (parent_scaler[self._parent_slice], parent_adder)
+
+        data = self._data
+        for vinfo in views.values():
+            vinfo.set_view(data)
+
+        if self._name == 'linear' and self._kind in ('input', 'output'):
+            self._names = frozenset(views)
+        else:
+            self._names = views
 
     def _set_scaling(self, system, do_adder, nlvec=None):
         """
@@ -105,14 +113,12 @@ class DefaultVector(Vector):
         self._nlvec = nlvec
 
         # if root, allocate space for scaling vectors
-        if system.pathname == '':  # root system
+        if self._isroot:
             self._allocate_scaling_data(do_adder, nlvec)
 
         scaler_array, adder_array = self._scaling
 
-        start = end = 0
         for abs_name, vinfo in self._views.items():
-            end += vinfo.size
             if abs_name in factors:
                 factor = factors[abs_name]
                 if kind in factor:
@@ -136,11 +142,10 @@ class DefaultVector(Vector):
                             scale0 = a0
                             scale1 = a1
 
+                    start, end = vinfo.range
                     if adder_array is not None:
                         adder_array[start:end] = scale0
                     scaler_array[start:end] = scale1
-
-            start = end
 
     def _allocate_scaling_data(self, do_adder, nlvec):
         """
@@ -170,27 +175,6 @@ class DefaultVector(Vector):
                 self._scaling = (nlvec._scaling[0], None)
         else:
             raise NameError(f"Invalid vector name: {self._name}.")
-
-    def _initialize_views(self, parent_vector, system):
-        """
-        Internally assemble views onto the vectors.
-        """
-        islinear = self._name == 'linear'
-
-        views = self._views
-        start = end = 0
-        for vinfo in self._views.values():
-            end += vinfo.size
-            vflat = v = self._data[start:end]
-            if vinfo.shape != vflat.shape and vinfo.shape != ():
-                v = vflat.view().reshape(vinfo.shape)
-
-            vinfo.view = v
-            vinfo.flat = vflat
-
-            start = end
-
-        self._names = frozenset(views) if islinear else views
 
     def __len__(self):
         """
@@ -506,33 +490,6 @@ class DefaultVector(Vector):
             Start and stop indices of the variable in the local data array.
         """
         return self._views[name].range
-
-    def idxs2nameloc(self, idxs):
-        """
-        Given some indices, return a dict mapping variable name to corresponding local indices.
-
-        This is slow and is meant to be used only for debugging or maybe error messages.
-
-        Parameters
-        ----------
-        idxs : list of int
-            Vector indices to be converted to local indices for each corresponding variable.
-
-        Returns
-        -------
-        dict
-            Mapping of variable name to a list of local indices into that variable.
-        """
-        name2inds = defaultdict(list)
-        start = end = 0
-        for name, vinfo in self._views.items():
-            start, end = vinfo.range
-            for idx in idxs:
-                if start <= idx < end:
-                    name2inds[name].append(idx - start)
-            start = end
-
-        return name2inds
 
     def get_hash(self, alg=hashlib.sha1):
         """

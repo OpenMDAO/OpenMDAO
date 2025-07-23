@@ -590,7 +590,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 outputs['g'] = 3.0*inputs['x']
 
             def compute_partials(self, inputs, partials):
-                partials['g', 'x'] = 3.
+                partials['g', 'x'] = 3. * np.eye(4)
 
         prob = om.Problem()
 
@@ -628,7 +628,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 outputs['g'] = 3.0*inputs['x']
 
             def compute_partials(self, inputs, partials):
-                partials['g', 'x'] = 3.
+                partials['g', 'x'] = 3. * np.eye(4)
 
         prob = om.Problem()
 
@@ -666,7 +666,7 @@ class TestProblemCheckPartials(unittest.TestCase):
                 outputs['g'] = 2.0*inputs['z'] + 3.0*inputs['x']
 
             def compute_partials(self, inputs, partials):
-                partials['g', 'x'] = 3.
+                partials['g', 'x'] = 3. * np.eye(4)
 
         prob = om.Problem()
 
@@ -1202,7 +1202,7 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         prob.check_partials(out_stream=stream, compact_print=False)
-        self.assertEqual(stream.getvalue().count('rev value:'), 8)
+        self.assertEqual(stream.getvalue().count('rev value @ max viol:'), 8)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 4)
         self.assertEqual(stream.getvalue().count('Jrev'), 12)
 
@@ -1238,8 +1238,8 @@ class TestProblemCheckPartials(unittest.TestCase):
         dz_dx2_fd = partials_data['comp'][('z', 'x2')]['J_fd']
 
         # So for this case, they do all provide them, so rev should not be shown
-        self.assertEqual(stream.getvalue().count('fwd value'), 2)
-        self.assertEqual(stream.getvalue().count('rev value'), 0)
+        self.assertEqual(stream.getvalue().count('fwd value @ max viol'), 2)
+        self.assertEqual(stream.getvalue().count('rev value @ max viol'), 0)
         self.assertEqual(stream.getvalue().count('Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd)'), 2)
         self.assertEqual(stream.getvalue().count('Relative Error'), 0)
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 2)
@@ -1291,8 +1291,8 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         stream = StringIO()
         partials_data = prob.check_partials(out_stream=stream, compact_print=False)
-        self.assertEqual(stream.getvalue().count('fwd value:'), 6)
-        self.assertEqual(stream.getvalue().count('rev value'), 4)
+        self.assertEqual(stream.getvalue().count('fwd value @ max viol:'), 6)
+        self.assertEqual(stream.getvalue().count('rev value @ max viol'), 4)
         self.assertEqual(stream.getvalue().count('Max Tolerance Violation'), 8)
         self.assertEqual(stream.getvalue().count('Raw Forward Derivative'), 4)
         self.assertEqual(stream.getvalue().count('Raw Reverse Derivative'), 2)
@@ -2825,7 +2825,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         nderivs = ncomps * 2
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("fwd value:"), nderivs)
+        self.assertEqual(contents.count("fwd value @ max viol:"), nderivs)
         self.assertEqual(contents.count("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd), step="), 0)
         self.assertEqual(contents.count("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd)"), nderivs)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), 0)
@@ -2880,7 +2880,7 @@ class TestCheckPartialsMultipleSteps(unittest.TestCase):
         nderivs = ncomps * 2
         self.assertEqual(contents.count("Component: CompGoodPartials 'good'"), 1)
         self.assertEqual(contents.count("Component: CompBadPartials 'bad'"), 1)
-        self.assertEqual(contents.count("fwd value:"), nderivs * 2)
+        self.assertEqual(contents.count("fwd value @ max viol:"), nderivs * 2)
         self.assertEqual(contents.count("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd), step="), nderivs * 2)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), nderivs * 2)
 

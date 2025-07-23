@@ -12,6 +12,8 @@ if MPI:
         from openmdao.vectors.petsc_vector import PETScVector
     except ImportError:
         PETScVector = None
+else:
+    PETScVector = None
 
 
 class L2(om.ExplicitComponent):
@@ -1160,6 +1162,7 @@ class TestComputeShape(unittest.TestCase):
         self.assertEqual(model.C3._outputs['out'].shape, (3, 7))
 
 
+@unittest.skipIf(PETScVector is None, 'test requires PETSc')
 class TestDynShapeSrcIndices(unittest.TestCase):
     N_PROCS = 2
 
@@ -1189,7 +1192,7 @@ class TestDynShapeSrcIndices(unittest.TestCase):
         model.add_subsystem('comp', om.ExecComp('y = x * 2',
                                                 x={'shape_by_conn': True}, y={'copy_shape': 'x'}))
 
-        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:, [[0,2]]], flat_src_indices=False)
+        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:, [0,2]], flat_src_indices=False)
 
         p.setup()
         p.run_model()
@@ -1214,7 +1217,7 @@ class TestDynShapeSrcIndices(unittest.TestCase):
         # so the full dist value across 2 procs is (4, 3)
         assert_near_equal(p.get_val('comp.y1', get_remote=True), np.ones((4, 3)) * 2)
 
-    def test_dist_serial_fwd(self):
+    def test_dist_serial_fwd_flat(self):
         p = om.Problem()
         model = p.model
 
@@ -1228,37 +1231,75 @@ class TestDynShapeSrcIndices(unittest.TestCase):
 
         p.setup()
         p.run_model()
-        assert_near_equal(p.get_val('comp.y'), np.ones((3,)) * 2)
+        assert_near_equal(p.get_val('comp.y'), np.ones((9,)) * 2)
+
+    def test_dist_serial_fwd_nonflat(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', val=np.ones((2, 3)), distributed=True)
+
+        model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                x={'shape_by_conn': True}, y={'copy_shape': 'x'}))
+
+        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:, [0,2]], flat_src_indices=False)
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.y'), np.ones((4,2)) * 2)
 
     def test_dist_dist_fwd(self):
         p = om.Problem()
         model = p.model
 
-        self.fail("foo")
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        val = np.array([[2, 3, 2, 3],
+                        [2, 3, 2, 3]], dtype=float)
+        indep.add_output('x', val=val, distributed=True)
 
-    def test_serial_serial_rev(self):
-        p = om.Problem()
-        model = p.model
+        model.add_subsystem('comp', DistribDynShapeComp(n_inputs=1))  # comp multiplies by 2
 
-        self.fail("foo")
+        if p.comm.rank == 0:
+            model.connect('indep.x', 'comp.x1', src_indices=om.slicer[:, [0,2]], flat_src_indices=False)
+        else:
+            model.connect('indep.x', 'comp.x1', src_indices=om.slicer[:, [1,3]], flat_src_indices=False)
 
-    def test_serial_dist_rev(self):
-        p = om.Problem()
-        model = p.model
+        p.setup()
+        p.run_model()
+        if p.comm.rank == 0:
+            assert_near_equal(p.get_val('comp.y1', get_remote=False), np.ones((4, 2)) * 4)
+        else:
+            assert_near_equal(p.get_val('comp.y1', get_remote=False), np.ones((4, 2)) * 6)
 
-        self.fail("foo")
+        global_val = np.ones((8, 2))
+        global_val[:4] *= 4
+        global_val[4:] *= 6
+        assert_near_equal(p.get_val('comp.y1', get_remote=True), global_val)
 
-    def test_dist_serial_rev(self):
-        p = om.Problem()
-        model = p.model
+    # def test_serial_serial_rev(self):
+    #     p = om.Problem()
+    #     model = p.model
 
-        self.fail("foo")
+    #     self.fail("foo")
 
-    def test_dist_dist_rev(self):
-        p = om.Problem()
-        model = p.model
+    # def test_serial_dist_rev(self):
+    #     p = om.Problem()
+    #     model = p.model
 
-        self.fail("foo")
+    #     self.fail("foo")
+
+    # def test_dist_serial_rev(self):
+    #     p = om.Problem()
+    #     model = p.model
+
+    #     self.fail("foo")
+
+    # def test_dist_dist_rev(self):
+    #     p = om.Problem()
+    #     model = p.model
+
+    #     self.fail("foo")
 
 
 

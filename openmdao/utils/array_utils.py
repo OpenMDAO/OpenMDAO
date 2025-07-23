@@ -1058,44 +1058,6 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
             yield (of, wrt, submat.row, submat.col, submat.shape)
 
 
-def idxs2minmax_tuples(idxs):
-    """
-    Convert a flat array of indices into a list of contiguous (min, max) tuples.
-
-    Note that to convert these tuples to slices or ranges, you would use slice(min, max+1)
-    or range(min, max+1).
-
-    Parameters
-    ----------
-    idxs : ndarray
-        Array of indices.
-
-    Returns
-    -------
-    list
-        List of contiguous ranges.
-    """
-    # TODO: make a fast version of this using numba or cython
-    ranges = []
-    if idxs.size > 0:
-        # handle negative indices
-        if np.min(idxs) < 0:
-            idxs = idxs.copy()
-            idxs[idxs < 0] += idxs.size
-        idxs = np.sort(idxs)
-        diff = np.empty(idxs.size, dtype=int)
-        diff[0] = 1
-        diff[1:] = np.diff(idxs)
-        range_bounds = np.nonzero(diff > 1)[0]
-        start = 0
-        for end in range_bounds:
-            ranges.append((idxs[start], idxs[end - 1]))
-            start = end
-        ranges.append((idxs[start], idxs[-1]))
-
-    return ranges
-
-
 def safe_norm(arr):
     """
     Return the norm of the given array, or 0 if the array is None or empty.
@@ -1157,3 +1119,30 @@ def get_tol_violation(x, ref, atol=0.0, rtol=1e-5):
         rel_at_max = np.inf
 
     return max_error, (max_error_x, max_error_ref), np.any(diff > 0.), abs_at_max, rel_at_max
+
+
+_unsigned = (np.uint8, np.uint16, np.uint32, np.uint64)
+_signed = (np.int8, np.int16, np.int32, np.int64)
+
+
+def get_index_dtype(size, allow_negative=False):
+    """
+    Return the dtype of the index array for the given size.
+
+    Parameters
+    ----------
+    size : int
+        The size of the array.
+    allow_negative : bool
+        If True, allow negative indices.
+
+    Returns
+    -------
+    dtype
+        The dtype of the index array.
+    """
+    dtypes = _signed if allow_negative else _unsigned
+    for dtype in dtypes:
+        if size <= np.iinfo(dtype).max + 1:
+            return dtype
+    raise ValueError(f"size {size} is too large to be represented as an index")
