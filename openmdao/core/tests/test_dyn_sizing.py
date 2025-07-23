@@ -1215,21 +1215,49 @@ class TestDynShapeSrcIndices(unittest.TestCase):
         assert_near_equal(p.get_val('comp.y1', get_remote=True), np.ones((4, 3)) * 2)
 
     def test_dist_serial_fwd(self):
-        self.fail("foo")
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', val=np.ones((2, 3)), distributed=True)
+
+        model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                x={'shape_by_conn': True}, y={'copy_shape': 'x'}))
+
+        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:-3], flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.y'), np.ones((3,)) * 2)
 
     def test_dist_dist_fwd(self):
+        p = om.Problem()
+        model = p.model
+
         self.fail("foo")
 
     def test_serial_serial_rev(self):
+        p = om.Problem()
+        model = p.model
+
         self.fail("foo")
 
     def test_serial_dist_rev(self):
+        p = om.Problem()
+        model = p.model
+
         self.fail("foo")
 
     def test_dist_serial_rev(self):
+        p = om.Problem()
+        model = p.model
+
         self.fail("foo")
 
     def test_dist_dist_rev(self):
+        p = om.Problem()
+        model = p.model
+
         self.fail("foo")
 
 
