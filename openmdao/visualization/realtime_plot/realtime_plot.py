@@ -9,8 +9,9 @@ import subprocess
 from openmdao.recorders.sqlite_reader import SqliteCaseReader
 from openmdao.recorders.case import Case
 from openmdao.utils import hooks
-from openmdao.utils.file_utils import _load_and_exec, is_python_file, is_sqlite_file
+from openmdao.utils.file_utils import _load_and_exec, is_python_file
 from openmdao.utils.gui_testing_utils import get_free_port
+from openmdao.utils.record_util import check_valid_sqlite3_db
 from openmdao.visualization.realtime_plot.realtime_analysis_driver_plot \
     import _RealTimeAnalysisDriverPlot
 from openmdao.visualization.realtime_plot.realtime_optimizer_plot import _RealTimeOptimizerPlot
@@ -124,6 +125,7 @@ def _rtplot_cmd(options, user_args):
     else:
         script_path = None
 
+
     def _view_realtime_plot_hook(problem):
         driver = problem.driver
         if not driver:
@@ -177,9 +179,13 @@ def _rtplot_cmd(options, user_args):
 
     # check to see if options.file is python script, sqlite file or neither
     file_path = options.file[0]
-    if is_sqlite_file(file_path):
+    try:
+        check_valid_sqlite3_db(file_path)
         _view_realtime_plot(file_path)
-    elif is_python_file(file_path):
+        return
+    except IOError:
+        pass
+    if is_python_file(file_path):
         # register the hook
         hooks._register_hook(
             "_setup_recording", "Problem", post=_view_realtime_plot_hook, ncalls=1
@@ -325,6 +331,10 @@ class _CaseRecorderTracker:
     def _get_shape(self, name):
         item = self._initial_case[name]
         return item.shape
+    
+    def _get_size(self, name):
+        item = self._initial_case[name]
+        return item.size
 
 
 def realtime_plot(case_recorder_filename, callback_period,
@@ -343,7 +353,6 @@ def realtime_plot(case_recorder_filename, callback_period,
     script : str or None
         If not None, the file path of the script that created the case recorder file.
     """
-
     def _make_realtime_plot_doc(doc):
         case_tracker = _CaseRecorderTracker(case_recorder_filename)
         if case_tracker.is_driver_optimizer():
