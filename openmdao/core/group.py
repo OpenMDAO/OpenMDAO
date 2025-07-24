@@ -2504,11 +2504,9 @@ class Group(System):
             if src_indices is not None:
                 ind = src_indices()
                 if isinstance(ind, slice):
-                    from_size = shape_to_len(from_shape)
-                    start, stop, step = ind.indices(from_size)
-                    is_full_slice = step == 1 and start == 0 and stop == from_size
-
-                src_indices.set_src_shape(from_shape)
+                    slc = src_indices._slice
+                    is_full_slice = (slc.start in (None, 0) and slc.stop is None and
+                                     slc.step in (1, None))
 
             if self.comm.size > 1:
                 dist_from = from_meta['distributed']
@@ -2562,6 +2560,7 @@ class Group(System):
             if src_indices is None:
                 shp = graph.nodes[from_var]['shape']
             else:
+                src_indices.set_src_shape(graph.nodes[from_var]['shape'])
                 shp = src_indices.indexed_src_shape
 
             graph.nodes[to_var]['shape'] = shp
@@ -2783,7 +2782,7 @@ class Group(System):
         group_props = {}
 
         if prop == 'shape':
-            dist_sz = {}  # local distrib sizes
+            dist_shp = {}  # local distrib sizes
             self._shapes_graph = graph = nx.DiGraph()
             add_node = add_shape_node
             copy_var_property = copy_var_shape
@@ -2904,7 +2903,7 @@ class Group(System):
                     if nprocs > 1:
                         my_abs2meta = my_abs2meta_in if name in my_abs2meta_in else my_abs2meta_out
                         if name in my_abs2meta and my_abs2meta[name]['distributed']:
-                            dist_sz[name] = my_abs2meta[name]['shape']
+                            dist_shp[name] = my_abs2meta[name]['shape']
 
         # loop over any 'compute_property' variables and add edges to the graph
         # This is done separately from the loop above because we need the component_io dict
@@ -2930,9 +2929,9 @@ class Group(System):
             # so we're done
             return
 
-        if nprocs > 1 and prop == 'shape' and dist_sz:
+        if nprocs > 1 and prop == 'shape' and dist_shp:
             dist_shapes = defaultdict(lambda: [None] * nprocs)
-            for rank, dshp in enumerate(self.comm.allgather(dist_sz)):
+            for rank, dshp in enumerate(self.comm.allgather(dist_shp)):
                 for n, shp in dshp.items():
                     dist_shapes[n][rank] = shp
         else:

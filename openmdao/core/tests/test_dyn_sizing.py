@@ -1249,7 +1249,7 @@ class TestDynShapeSrcIndices(unittest.TestCase):
         p.run_model()
         assert_near_equal(p.get_val('comp.y'), np.ones((4,2)) * 2)
 
-    def test_dist_dist_fwd(self):
+    def test_dist_dist_fwd_nonflat(self):
         p = om.Problem()
         model = p.model
 
@@ -1275,6 +1275,36 @@ class TestDynShapeSrcIndices(unittest.TestCase):
         global_val = np.ones((8, 2))
         global_val[:4] *= 4
         global_val[4:] *= 6
+        assert_near_equal(p.get_val('comp.y1', get_remote=True), global_val)
+
+    def test_dist_dist_fwd_flat(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        if p.comm.rank == 0:
+            val = np.array([2,2,2,2], dtype=float)
+        else:
+            val = np.array([3,3,3,3], dtype=float)
+        indep.add_output('x', val=val, distributed=True)
+
+        model.add_subsystem('comp', DistribDynShapeComp(n_inputs=1))  # comp multiplies by 2
+
+        if p.comm.rank == 0:
+            model.connect('indep.x', 'comp.x1', src_indices=om.slicer[4:], flat_src_indices=True)
+        else:
+            model.connect('indep.x', 'comp.x1', src_indices=om.slicer[:4], flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+        if p.comm.rank == 0:
+            assert_near_equal(p.get_val('comp.y1', get_remote=False), np.ones(4) * 6)
+        else:
+            assert_near_equal(p.get_val('comp.y1', get_remote=False), np.ones(4) * 4)
+
+        global_val = np.ones((8,))
+        global_val[:4] *= 6
+        global_val[4:] *= 4
         assert_near_equal(p.get_val('comp.y1', get_remote=True), global_val)
 
     # def test_serial_serial_rev(self):
