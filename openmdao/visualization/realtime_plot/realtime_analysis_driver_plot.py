@@ -5,6 +5,8 @@ from itertools import product
 import time
 from datetime import datetime, timedelta
 
+from tornado.ioloop import IOLoop
+
 from openmdao.visualization.realtime_plot.realtime_plot_class import _RealTimePlot
 
 try:
@@ -199,8 +201,16 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         self._start_time = time.time()
         self._num_samples_plotted = 0
 
-        doc.add_periodic_callback(self._update, callback_period)
+        doc.add_periodic_callback(self._update_wrapped_in_try, callback_period)
         doc.title = "OpenMDAO Analysis Driver Progress Plot"
+
+    def _update_wrapped_in_try(self):
+        try:
+            self._update()
+        except Exception as e:
+            print(f"Fatal error in periodic callback: {e}")
+            IOLoop.current().stop()
+            return
 
     def _update(self):
         # this is the main method of the class. It gets called periodically by Bokeh
@@ -245,15 +255,15 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
 
         outputs = self._case_tracker.get_case_reader().list_source_vars(
             "driver", out_stream=None)["outputs"]
-        # Don't include response variables in sampled variabales.
+        # Don't include response variables in sampled variables.
         # Also, split up the remaining sampled variables into scalars and
         # non-scalars
         self._sampled_variables = []
         self._sampled_variables_non_scalar = []
         for varname in outputs:
             if varname not in self._prom_responses:
-                shape = self._case_tracker._get_shape(varname)
-                if shape == () or shape == (1,):  # is scalar?
+                size = self._case_tracker._get_size(varname)
+                if size == 1:  # is scalar?
                     self._sampled_variables.append(varname)
                 else:
                     self._sampled_variables_non_scalar.append(varname)
@@ -313,21 +323,21 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
         # fill up the stream dict with the values.
         # These are fed to the bokeh source stream
         for response in self._prom_responses:
-            self._source_stream_dict[response] = new_case.get_val(response)[:1]
+            self._source_stream_dict[response] = np.array([new_case.get_val(response).item()])
         for sampled_variable in self._sampled_variables:
-            self._source_stream_dict[sampled_variable] = new_case.get_val(
+            self._source_stream_dict[sampled_variable] = np.array([new_case.get_val(
                 sampled_variable
-            )[:1]
+            ).item()])
         self._source.stream(self._source_stream_dict)
 
     def _update_scatter_plots(self, new_case):
         # update the min and max for the response variable
         for response in self._prom_responses:
             self._prom_response_min[response] = min(
-                self._prom_response_min[response], new_case.get_val(response)[:1][0]
+                self._prom_response_min[response], new_case.get_val(response).item()
             )
             self._prom_response_max[response] = max(
-                self._prom_response_max[response], new_case.get_val(response)[:1][0]
+                self._prom_response_max[response], new_case.get_val(response).item()
             )
 
         # update the color mapper that is used to color the dots in the scatter plots
