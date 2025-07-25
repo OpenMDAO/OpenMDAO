@@ -2204,7 +2204,8 @@ class TestPyoptSparse(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).')
+                         'Constraints or objectives [parab.z] cannot be impacted by the design variables'
+                         ' of the problem because no partials were defined for them in their parent component(s).')
 
     def test_singular_jac_error_desvars(self):
         prob = om.Problem()
@@ -2292,7 +2293,8 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        msg = 'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).'
+        msg = ('Constraints or objectives [parab.z] cannot be impacted by the design variables of'
+               ' the problem because no partials were defined for them in their parent component(s).')
 
         with assert_warning(UserWarning, msg):
             prob.run_driver()
