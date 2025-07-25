@@ -16,7 +16,7 @@ from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
-from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver, printoptions
+from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.mpi import MPI
@@ -2235,12 +2235,11 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        with printoptions(legacy="1.13"):
-            with self.assertRaises(RuntimeError) as msg:
-                prob.run_driver()
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
+                         "The following design variables have no impact on the constraints or objective at the current design point:\n  z, inds=[0]\n")
 
     def test_singular_jac_ignore(self):
         prob = om.Problem()
