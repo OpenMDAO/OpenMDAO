@@ -912,8 +912,8 @@ class NonlinearSolver(Solver):
         """
         system = self._system()
 
-        if (self.options['restart_from_successful'] and self.options['maxiter'] > 1 and
-                not system.under_approx):
+        if (not system.under_approx and self.options['restart_from_successful'] and
+                self.options['maxiter'] > 1):
             try:
                 # If we have a previous solver failure, we want to replace
                 # the outputs using the cache.
@@ -992,7 +992,7 @@ class LinearSolver(Solver):
         Return a generator of linear solvers using assembled jacs.
         """
         if self.options['assemble_jac']:
-            yield self
+            yield self, self.preferred_sparse_format()
 
     def add_recorder(self, recorder):
         """
@@ -1026,6 +1026,7 @@ class LinearSolver(Solver):
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
+        self._assembled_jac = None
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
             raise RuntimeError("Linear solver %s doesn't support assembled "
                                "jacobians." % self.msginfo)
@@ -1110,9 +1111,20 @@ class LinearSolver(Solver):
         scope_out, scope_in = system._get_matvec_scope()
 
         try:
-            system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
+            system._apply_linear(self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.pop()
+
+    def preferred_sparse_format(self):
+        """
+        Return the preferred sparse format for the dr/do matrix of a split jacobian.
+
+        Returns
+        -------
+        str or None
+            The preferred sparse format for the dr/do matrix of a split jacobian.
+        """
+        return None
 
 
 class BlockLinearSolver(LinearSolver):
@@ -1205,9 +1217,9 @@ class BlockLinearSolver(LinearSolver):
         if active:
             self._rhs_vec = self._rhs_vec.astype(complex)
         else:
-            self._rhs_vec = self._rhs_vec.real
+            self._rhs_vec = np.ascontiguousarray(self._rhs_vec.real, dtype=float)
 
-    def _vars_union(self, slv_vars, sys_vars):
+    def _union_matvec_scope(self, slv_vars, sys_vars):
         """
         Return the union of the two 'set's of variables.
 
@@ -1222,7 +1234,7 @@ class BlockLinearSolver(LinearSolver):
         slv_vars : set, None, or _UNDEFINED
             First variable set, from the current solver.
         sys_vars : set, None, or _UNDEFINED
-            Second variable set, from above.
+            Second variable set, from the parent solver.
 
         Returns
         -------
@@ -1246,9 +1258,9 @@ class BlockLinearSolver(LinearSolver):
         self._recording_iter.push(('_run_apply', 0))
         try:
             scope_out, scope_in = system._get_matvec_scope()
-            system._apply_linear(self._assembled_jac, self._mode,
-                                 self._vars_union(self._scope_out, scope_out),
-                                 self._vars_union(self._scope_in, scope_in))
+            system._apply_linear(self._mode,
+                                 self._union_matvec_scope(self._scope_out, scope_out),
+                                 self._union_matvec_scope(self._scope_in, scope_in))
         finally:
             self._recording_iter.pop()
 

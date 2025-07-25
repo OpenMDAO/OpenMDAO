@@ -1255,6 +1255,53 @@ class TestCompDistVarErrors(unittest.TestCase):
                          "same order on all ranks, even if the size of the variable is 0 on some ranks.")
 
 
+class SourceComponent(om.ExplicitComponent):
+    """
+    A simple component that acts as the source for a distributed variable.
+    """
+
+    def setup(self):
+        self.add_output("y", shape=10, distributed=True)
+
+    def compute(self, inputs, outputs):
+        num_nodes = self.options["num_nodes"]
+        outputs["y"] = np.arange(num_nodes, dtype=float) * 2.0
+
+
+class DistributedComponent(om.ExplicitComponent):
+    """
+    This component has a distributed input. Its shape is not defined here
+    but is inferred from the source of the connection during the setup phase.
+    """
+
+    def setup(self):
+        self.add_input("x", distributed=True, shape_by_conn=True)
+
+        self.add_output("sum_x", distributed=True, copy_shape="x")
+
+    def compute(self, inputs, outputs):
+        outputs["sum_x"] = np.sum(inputs["x"])
+
+
+# --- Assemble the Model ---
+# Create a Group to contain and connect the components.
+class MyModel(om.Group):
+    def setup(self):
+        self.add_subsystem("source_comp", SourceComponent(), promotes_outputs=["y"])
+        self.add_subsystem("distributed_comp", DistributedComponent(), promotes_inputs=["x"])
+        self.connect("y", "x")
+
+
+class TestDistDynShapesListOutputs(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_dist_dyn_shapes_list_outputs(self):
+        # this test passes if it doesn't raise an exception
+        prob = om.Problem(model=MyModel())
+        prob.setup()
+        prob.model.list_outputs()
+
+
 
 if __name__ == '__main__':
     from openmdao.utils.mpi import mpirun_tests

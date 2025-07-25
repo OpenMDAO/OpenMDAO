@@ -446,7 +446,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
-        self.assertTrue(cr._system_options['root']['component_options']['assembled_jac_type'], 'csc')
+        self.assertEqual(cr._system_options['root']['component_options']['assembled_jac_type'], None)
 
         # New option and re-run of run_driver
         prob.model.options['assembled_jac_type'] = 'dense'
@@ -454,7 +454,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
 
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename,)
-        self.assertTrue(cr._system_options['root!1']['component_options']['assembled_jac_type'], 'dense')
+        self.assertEqual(cr._system_options['root!1']['component_options']['assembled_jac_type'], 'dense')
 
         stream = StringIO()
 
@@ -465,7 +465,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected = [
             "Run Number: 0",
             "    Subsystem : root",
-            "        assembled_jac_type: csc",
+            "        assembled_jac_type: None",
             "        derivs_method: None",
             "        auto_order: False",
             "    Subsystem : p1",
@@ -474,7 +474,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: (1,)", 
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: ()",
@@ -493,7 +493,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: (1,)", 
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: ()",
@@ -512,13 +512,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: ()", 
+            "        default_shape: ()",
             "    Subsystem : con",
             "        derivs_method: None",
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: ()", 
+            "        default_shape: ()",
             "        has_diag_partials: False",
             "        units: None",
             "        shape: None",
@@ -561,7 +561,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
-        self.assertTrue(cr._system_options['root']['component_options']['assembled_jac_type'], 'csc')
+        self.assertEqual(cr._system_options['root']['component_options']['assembled_jac_type'], None)
 
         # New option and re-run of run_driver
         prob.model.options['assembled_jac_type'] = 'dense'
@@ -580,7 +580,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected = [
             "Run Number: 0",
             "    Subsystem : root",
-            "        assembled_jac_type: csc",
+            "        assembled_jac_type: None",
             "        derivs_method: None",
             "        auto_order: False",
             "    Subsystem : p1",
@@ -589,7 +589,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: (1,)", 
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: ()",
@@ -608,7 +608,7 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: (1,)", 
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
             "        shape: ()",
@@ -627,13 +627,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: ()", 
+            "        default_shape: ()",
             "    Subsystem : con",
             "        derivs_method: None",
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
-            "        default_shape: ()", 
+            "        default_shape: ()",
             "        has_diag_partials: False",
             "        units: None",
             "        shape: None",
@@ -874,7 +874,7 @@ class TestSqliteRecorder(unittest.TestCase):
             self.assertTrue(key in cr._system_options.keys())
 
         value = cr._system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+        self.assertEqual(value, None)  # quick check only. Too much to check exhaustively
 
     def test_record_system_options(self):
         # Regardless what object the case recorder is attached to, system options
@@ -897,7 +897,7 @@ class TestSqliteRecorder(unittest.TestCase):
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
         value = cr._system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual('csc', value)  # quick check only. Too much to check exhaustively
+        self.assertEqual(None, value)  # quick check only. Too much to check exhaustively
 
         # Recorder on Problem
         prob = om.Problem(SellarDerivatives(nonlinear_solver=om.NonlinearBlockGS,
@@ -913,7 +913,7 @@ class TestSqliteRecorder(unittest.TestCase):
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
         value = cr._system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+        self.assertEqual(value, None)  # quick check only. Too much to check exhaustively
 
         # Recorder on a subsystem
         prob = om.Problem(SellarDerivatives(nonlinear_solver=om.NonlinearBlockGS,
@@ -929,7 +929,7 @@ class TestSqliteRecorder(unittest.TestCase):
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
         value = cr._system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+        self.assertEqual(value, None)  # quick check only. Too much to check exhaustively
 
         # Recorder on a solver
         prob = om.Problem(SellarDerivatives(nonlinear_solver=om.NonlinearBlockGS,
@@ -945,7 +945,7 @@ class TestSqliteRecorder(unittest.TestCase):
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
         value = cr._system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+        self.assertEqual(value, None)  # quick check only. Too much to check exhaustively
 
     def test_warning_system_options_overwriting(self):
 

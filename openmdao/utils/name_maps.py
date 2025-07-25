@@ -53,14 +53,17 @@ class NameResolver(object):
     """
     Resolve names between absolute and promoted names.
 
+    For absolute names, the name resolver also allows checking if a variable is local, continuous,
+    and/or distributed.  Some methods that take iotype as an argument also accept None, and a
+    lookup is performed to determine the iotype in that case.  This means that the iotype should be
+    provided when available in order to avoid the extra lookup.
+
     Parameters
     ----------
     pathname : str
         The pathname of the system.
     msginfo : str
         The message information for the system.
-    check_dups : bool
-        If True, check for duplicate names.
 
     Attributes
     ----------
@@ -88,11 +91,9 @@ class NameResolver(object):
         The connections dictionary.
     msginfo : str
         The message information for the system.
-    has_remote : bool
-        If True, the name resolver has remote variables.
     """
 
-    def __init__(self, pathname, msginfo='', check_dups=False):
+    def __init__(self, pathname, msginfo=''):
         """
         Initialize the name resolver.
 
@@ -102,8 +103,6 @@ class NameResolver(object):
             The pathname of the system.
         msginfo : str
             The message information for the system.
-        check_dups : bool
-            If True, check for duplicate names.
         """
         self._pathname = pathname
         self._prefix = pathname + '.' if pathname else ''
@@ -117,7 +116,14 @@ class NameResolver(object):
         self._prom_no_multi_abs = True
         self._conns = None
         self.msginfo = msginfo if msginfo else pathname
-        self.has_remote = False
+
+    def reset_prom_maps(self):
+        """
+        Reset the _prom2abs dictionary.
+        """
+        self._prom2abs = {'input': {}, 'output': {}}
+        self._prom2abs_in = self._prom2abs['input']
+        self._prom2abs_out = self._prom2abs['output']
 
     def add_mapping(self, absname, promname, iotype, local=True, continuous=True,
                     distributed=False):
@@ -140,8 +146,6 @@ class NameResolver(object):
             If True, the variable is distributed.
         """
         _, flags = _get_flags(local=local, continuous=continuous, distributed=distributed)
-        if not flags & LOCAL:
-            self.has_remote = True
 
         self._abs2prom[iotype][absname] = (promname, flags)
         p2a = self._prom2abs[iotype]
@@ -168,7 +172,7 @@ class NameResolver(object):
             True if the name resolver contains the given name, False otherwise.
         """
         if iotype is None:
-            return self.contains(name, 'input') or self.contains(name, 'output')
+            return self.contains(name, 'output') or self.contains(name, 'input')
 
         return name in self._prom2abs[iotype] or name in self._abs2prom[iotype] or \
             self._prefix + name in self._abs2prom[iotype]
@@ -204,8 +208,6 @@ class NameResolver(object):
         self._abs2prom_out.update(old_abs2prom_out)
         self._prom2abs_out.update(old_prom2abs_out)
 
-        self.has_remote |= auto_ivc_resolver.has_remote
-
     def update_from_ranks(self, myrank, others):
         """
         Update the name resolver with name resolvers from multiple ranks.
@@ -239,7 +241,6 @@ class NameResolver(object):
                                     flags |= LOCAL
                                 else:
                                     flags &= ~LOCAL
-                                    self.has_remote = True
                                 my_abs2prom[absname] = (promname, flags)
 
         self._populate_prom2abs()

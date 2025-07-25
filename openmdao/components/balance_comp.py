@@ -6,7 +6,8 @@ import numpy as np
 
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils import cs_safe
-from openmdao.utils.array_utils import shape_to_len
+from openmdao.utils.options_dictionary import OptionsDictionary
+from openmdao.utils.general_utils import ensure_compatible
 
 
 class BalanceComp(ImplicitComponent):
@@ -15,37 +16,46 @@ class BalanceComp(ImplicitComponent):
 
     Parameters
     ----------
-    name : str
-        The name of the state variable to be created.
-    eq_units : str or None
-        Units for the left-hand-side and right-hand-side of the equation to be balanced.
-    lhs_name : str or None
-        Optional name for the LHS variable associated with the implicit state variable.  If
-        None, the default will be used:  'lhs:{name}'.
-    rhs_name : str or None
-        Optional name for the RHS variable associated with the implicit state variable.  If
-        None, the default will be used:  'rhs:{name}'.
-    rhs_val : int, float, or np.array
-        Default value for the RHS of the given state.  Must be compatible
-        with the shape (optionally) given by the val or shape option in kwargs.
-    use_mult : bool
-        Specifies whether the LHS multiplier is to be used.  If True, then an additional
-        input `mult_name` is created, with the default value given by `mult_val`, that
-        multiplies lhs.  Default is False.
-    mult_name : str or None
-        Optional name for the LHS multiplier variable associated with the implicit state
-        variable. If None, the default will be used: 'mult:{name}'.
-    mult_val : int, float, or np.array
-        Default value for the LHS multiplier of the given state.  Must be compatible
-        with the shape (optionally) given by the val or shape option in kwargs.
-    normalize : bool
-        Specifies whether or not the resulting residual should be normalized by a quadratic
-        function of the RHS.
-    val : float, int, or np.ndarray
-        Set initial value for the state.
-    **kwargs : dict
-        Additional arguments to be passed for the creation of the implicit state variable.
-        (see `add_output` method).
+        name : str
+            The name of the state variable to be created.
+        eq_units : str or None
+            Units for the left-hand-side and right-hand-side of the equation to be balanced.
+        lhs_name : str or None
+            Optional name for the LHS variable associated with the implicit state variable.  If
+            None, the default will be used:  'lhs:{name}'.
+        rhs_name : str or None
+            Optional name for the RHS variable associated with the implicit state variable.  If
+            None, the default will be used:  'rhs:{name}'.
+        rhs_val : int, float, or np.array
+            Default value for the RHS.  Must be compatible with the shape (optionally)
+            given by the val or shape option in kwargs.
+        use_mult : bool
+            Specifies whether the LHS multiplier is to be used.  If True, then an additional
+            input `mult_name` is created, with the default value given by `mult_val`, that
+            multiplies lhs.  Default is False.
+        mult_name : str or None
+            Optional name for the LHS multiplier variable associated with the implicit state
+            variable. If None, the default will be used: 'mult:{name}'.
+        mult_val : int, float, or np.array
+            Default value for the LHS multiplier.  Must be compatible with the shape (optionally)
+            given by the val or shape option in kwargs.
+        normalize : bool
+            Specifies whether or not the resulting residual should be normalized by a quadratic
+            function of the RHS.
+        val : float, int, or np.ndarray
+            Set initial value for the state.
+        lhs_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the left-hand-side input
+            of the equation (see `add_input` method).
+        rhs_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the right-hand-side input
+            of the equation (see `add_input` method).
+        mult_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the multiplier input
+            of the equation, if used (see `add_input` method).
+        **kwargs : dict
+            Additional arguments to be passed for the creation of the implicit state variable.
+            (see `add_output` method).
 
     Attributes
     ----------
@@ -65,7 +75,8 @@ class BalanceComp(ImplicitComponent):
                              'residuals.')
 
     def __init__(self, name=None, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
-                 use_mult=False, mult_name=None, mult_val=1.0, normalize=True, val=None, **kwargs):
+                 use_mult=False, mult_name=None, mult_val=1.0, normalize=True, val=None,
+                 lhs_kwargs=None, rhs_kwargs=None, mult_kwargs=None, **kwargs):
         r"""
         Initialize a BalanceComp, optionally creating a new implicit state variable.
 
@@ -132,19 +143,31 @@ class BalanceComp(ImplicitComponent):
             prob.set_val('exec.x', 2)
             prob.run_model()
         """
-        if 'guess_func' in kwargs:
-            super().__init__(guess_func=kwargs['guess_func'])
-            kwargs.pop('guess_func')
-        else:
-            super().__init__()
+        # Pre-declare options so we can separate component kwargs from output kwargs.
+        self.options = OptionsDictionary()
+        self._declare_options()
+        comp_kwargs = set(self.options._dict.keys())
+        super().__init__(**{k: v for k, v in kwargs.items() if k in comp_kwargs})
 
         self._state_vars = {}
 
         if name is not None:
-            self.add_balance(name, eq_units, lhs_name, rhs_name, rhs_val,
-                             use_mult, mult_name, mult_val, normalize, val, **kwargs)
+            _kwargs = {k: v for k, v in kwargs.items() if k not in comp_kwargs}
+            self.add_balance(name, eq_units=eq_units, lhs_name=lhs_name,
+                             rhs_name=rhs_name, rhs_val=rhs_val, use_mult=use_mult,
+                             mult_name=mult_name, mult_val=mult_val, normalize=normalize,
+                             val=val, lhs_kwargs=lhs_kwargs, rhs_kwargs=lhs_kwargs,
+                             mult_kwargs=mult_kwargs, **_kwargs)
 
         self._no_check_partials = True
+
+    def _declare_options(self):
+        super()._declare_options()
+        self.options.declare('guess_func', types=FunctionType, allow_none=True, default=None,
+                             recordable=False, desc='A callable function in the form '
+                             'f(inputs, outputs, residuals) that can provide an initial "guess" '
+                             'value of the state variable(s) based on the inputs, outputs and '
+                             'residuals.')
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         """
@@ -272,7 +295,7 @@ class BalanceComp(ImplicitComponent):
 
     def add_balance(self, name, eq_units=None, lhs_name=None, rhs_name=None, rhs_val=0.0,
                     use_mult=False, mult_name=None, mult_val=1.0, normalize=True, val=None,
-                    **kwargs):
+                    lhs_kwargs=None, rhs_kwargs=None, mult_kwargs=None, **kwargs):
         """
         Add a new state variable and associated equation to be balanced.
 
@@ -310,55 +333,89 @@ class BalanceComp(ImplicitComponent):
             function of the RHS.
         val : float, int, or np.ndarray
             Set initial value for the state.
+        lhs_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the left-hand-side input
+            of the equation (see `add_input` method).
+        rhs_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the right-hand-side input
+            of the equation (see `add_input` method).
+        mult_kwargs : dict
+            Keyword arguments to be passed to the add_input call for the multiplier input
+            of the equation, if used (see `add_input` method).
         **kwargs : dict
             Additional arguments to be passed for the creation of the implicit state variable.
             (see `add_output` method).
         """
-        options = {'kwargs': kwargs,
+        options = {'name': name,
                    'eq_units': eq_units,
-                   'lhs_name': lhs_name,
-                   'rhs_name': rhs_name,
-                   'rhs_val': rhs_val,
                    'use_mult': use_mult,
-                   'mult_name': mult_name,
-                   'mult_val': mult_val,
                    'normalize': normalize}
 
+        lhs_kwargs = lhs_kwargs or {}
+        rhs_kwargs = rhs_kwargs or {}
+        mult_kwargs = mult_kwargs or {}
+        output_kwargs = kwargs
+
+        # Put the legacy arguments in the kwarg dictionaries
+        lhs_kwargs['name'] = options['lhs_name'] = lhs_kwargs.get('name',
+                                                                  lhs_name or f'lhs:{name}')
+        rhs_kwargs['name'] = options['rhs_name'] = rhs_kwargs.get('name',
+                                                                  rhs_name or f'rhs:{name}')
+        mult_kwargs['name'] = options['mult_name'] = mult_kwargs.get('name',
+                                                                     mult_name or f'mult:{name}')
+
+        lhs_kwargs['units'] = lhs_kwargs.get('units', eq_units)
+        rhs_kwargs['units'] = rhs_kwargs.get('units', eq_units)
+
+        rhs_kwargs['val'] = rhs_val = rhs_kwargs.get('val', rhs_val)
+        mult_kwargs['val'] = mult_kwargs.get('val', mult_val)
+
+        # Store options
         self._state_vars[name] = options
 
         if val is None:
             # If user doesn't specify initial guess for val, we can size problem from initial
             # rhs_val.
-            if 'shape' not in kwargs and np.ndim(rhs_val) > 0:
-                kwargs['shape'] = rhs_val.shape
-
+            if 'shape' not in output_kwargs and np.ndim(rhs_val) > 0:
+                output_kwargs['shape'] = rhs_val.shape
+            else:
+                output_kwargs['val'] = 1.0
         else:
-            options['kwargs']['val'] = val
+            output_kwargs['val'] = val
 
-        meta = self.add_output(name, **options['kwargs'])
+        output_has_explicit_shape = 'shape' in output_kwargs or \
+            np.ndim(output_kwargs.get('val', 0)) > 0
+        rhs_has_explicit_shape = 'shape' in rhs_kwargs or \
+            np.ndim(rhs_kwargs.get('val', 0)) > 0
 
-        shape = meta['shape']
+        shape = None
+        if output_has_explicit_shape:
+            _, shape = ensure_compatible(name, output_kwargs.get('val', 1.),
+                                         shape=output_kwargs.get('shape', None),
+                                         default_shape=self.options['default_shape'])
+        elif rhs_has_explicit_shape:
+            _, shape = ensure_compatible(name, rhs_kwargs.get('val', 1.),
+                                         shape=rhs_kwargs.get('shape', None),
+                                         default_shape=self.options['default_shape'])
 
-        for s in ('lhs', 'rhs', 'mult'):
-            if options['{0}_name'.format(s)] is None:
-                options['{0}_name'.format(s)] = '{0}:{1}'.format(s, name)
+        if shape is not None:
+            for _kwargs in (output_kwargs, lhs_kwargs, rhs_kwargs, mult_kwargs):
+                _kwargs['shape'] = shape
 
-        self.add_input(options['lhs_name'],
-                       val=np.ones(shape),
-                       units=options['eq_units'])
+        self.add_output(name, **output_kwargs)
+        self.add_input(**lhs_kwargs)
+        self.add_input(**rhs_kwargs)
 
-        self.add_input(options['rhs_name'],
-                       val=options['rhs_val'] * np.ones(shape),
-                       units=options['eq_units'])
+        if use_mult:
+            self.add_input(**mult_kwargs)
 
-        if options['use_mult']:
-            self.add_input(options['mult_name'],
-                           val=options['mult_val'] * np.ones(shape),
-                           units=None)
+    def setup_partials(self):
+        """
+        Declare the partials for outputs once all variable shapes are known.
+        """
+        for name, options in self._state_vars.items():
+            self.declare_partials(of=name, wrt=options['lhs_name'], diagonal=True, val=1.0)
+            self.declare_partials(of=name, wrt=options['rhs_name'], diagonal=True, val=1.0)
 
-        ar = np.arange(shape_to_len(shape))
-        self.declare_partials(of=name, wrt=options['lhs_name'], rows=ar, cols=ar, val=1.0)
-        self.declare_partials(of=name, wrt=options['rhs_name'], rows=ar, cols=ar, val=1.0)
-
-        if options['use_mult']:
-            self.declare_partials(of=name, wrt=options['mult_name'], rows=ar, cols=ar, val=1.0)
+            if options['use_mult']:
+                self.declare_partials(of=name, wrt=options['mult_name'], diagonal=True, val=1.0)

@@ -309,12 +309,7 @@ def _get_declare_partials(system):
         A list containing all the declared partials (strings in the form "of > wrt" )
         beginning from the given system on down.
     """
-    declare_partials_list = []
-    for of, wrt in system._declared_partials_iter():
-        if of != wrt:
-            declare_partials_list.append(f"{of} > {wrt}")
-
-    return declare_partials_list
+    return [f"{of} > {wrt}" for of, wrt in system._declared_partials_iter() if of != wrt]
 
 
 def _get_viewer_data(data_source, values=_UNDEFINED, case_id=None):

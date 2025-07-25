@@ -101,7 +101,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
 
         self.pnames.append(name)
 
-    def add_output(self, name, training_data=None, **kwargs):
+    def add_output(self, name, training_data=None, val=1.0, **kwargs):
         """
         Add an output to this component and a corresponding training output.
 
@@ -112,11 +112,21 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         training_data : ndarray
             Training data sample points for this output variable. Must be of length m, where m is
             the total number of points in the table.
+        val : float or ndarray
+            Initial value for the output.
         **kwargs : dict
             Additional agruments for add_output.
         """
         n = self.options['vec_size']
-        super().add_output(name, np.ones(n), **kwargs)
+
+        # Currently no support for vector outputs, apart from vec_size
+        if not np.isscalar(val):
+
+            if len(val) not in [1, n] or len(val.shape) > 1:
+                msg = "{}: Output {} must either be scalar, or of length equal to vec_size."
+                raise ValueError(msg.format(self.msginfo, name))
+
+        super().add_output(name, val * np.ones(n), **kwargs)
 
         if self.options['training_data_gradients']:
             if training_data is None:
@@ -164,11 +174,9 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
         Metamodel needs to declare its partials after inputs and outputs are known.
         """
         super()._setup_partials()
-        arange = np.arange(self.options['vec_size'])
         wrtnames = tuple(self.pnames)
         pattern_meta = {
-            'rows': arange,
-            'cols': arange,
+            'diagonal': True,
             'dependent': True,
         }
 

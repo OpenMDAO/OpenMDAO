@@ -25,7 +25,7 @@ class TestJaxUtils(unittest.TestCase):
     def test_jit_with_jax(self):
         """Make sure the jit stub test case also works with jax."""
         try:
-            import jax.numpy as np
+            import jax.numpy as jnp
             from jax import jit
             try:
                 from jax import Array as JaxArray
@@ -38,9 +38,9 @@ class TestJaxUtils(unittest.TestCase):
 
             @partial(jit, static_argnums=(0,))
             def f(self, x):
-                return np.sqrt(x)
+                return jnp.sqrt(x)
 
-        x = np.linspace(0, 10, 11)
+        x = jnp.linspace(0, 10, 11)
         result = TestClass().f(x)
         assert_near_equal(result**2, x)
         self.assertIsInstance(result, JaxArray)

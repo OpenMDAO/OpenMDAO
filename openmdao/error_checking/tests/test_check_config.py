@@ -573,7 +573,7 @@ class TestCheckConfig(unittest.TestCase):
         p.run_model()
         full = ''.join(testlogger.get('warning'))
         self.assertTrue("'C1' <class ExecComp>:" in full)
-        self.assertTrue("(D)eclared sparsity pattern != (c)omputed sparsity pattern for sub-jacobian (y, x) with shape (10, 10) and 10.00% nonzeros:" in full)
+        self.assertTrue("(D)eclared sparsity pattern != (C)omputed sparsity pattern for sub-jacobian (y, x) with shape (10, 10) and 10.00% nonzeros:" in full)
         arraystr = """
 C.........  0
 .C........  1
