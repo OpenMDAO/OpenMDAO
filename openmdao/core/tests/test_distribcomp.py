@@ -33,6 +33,7 @@ class InOutArrayComp(om.ExplicitComponent):
         self.add_input('invec', np.ones(arr_size, float))
         self.add_output('outvec', np.ones(arr_size, float))
         self.declare_partials('outvec', 'invec', rows=np.arange(arr_size), cols=np.arange(arr_size))
+
     def compute(self, inputs, outputs):
         time.sleep(self.options['delay'])
         outputs['outvec'] = inputs['invec'] * 2.

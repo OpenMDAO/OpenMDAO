@@ -254,7 +254,9 @@ else:
                                 oidxlist.append(output_inds)
                                 iidxlist.append(input_inds)
                                 size += len(input_inds)
-                            elif osize > 0 and isize == 0:
+                                print(myrank, 'rnk', rnk, '-output_inds', output_inds, 'input_inds', input_inds)
+                            elif osize > 0 and (isize == 0 or (distrib_in and
+                                                               not has_par_coloring)):
                                 # dup output exists on this rank but there is no corresponding
                                 # input, so we send the owning/distrib input to the dup output
                                 offset = offsets_out[rnk, idx_out]
@@ -264,6 +266,11 @@ else:
                                     oarr = np.asarray(src_indices + offset, dtype=INT_DTYPE)
                                 else:
                                     continue
+
+                                # print('myrank', myrank, 'rnk', rnk, abs_out, '-->', abs_in,'offset', offset, 'src_indices', src_indices)
+                                print(myrank, 'rnk', rnk, 'output_inds', oarr, 'input_inds', input_inds)
+                                # print('sizes', group.get_var_sizes(abs_out, 'output'),
+                                #       group.get_var_sizes(abs_in, 'input'))
 
                                 if has_par_coloring:
                                     # these transfers will only happen if parallel coloring is

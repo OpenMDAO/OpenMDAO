@@ -1074,7 +1074,7 @@ class Component(System):
         if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
             self._problem_meta['config_info']._var_added(self.pathname, name)
 
-    def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes):
+    def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes, all_exist):
         """
         Set default src_indices for any distributed inputs where they aren't set.
 
@@ -1089,6 +1089,8 @@ class Component(System):
             whole model.
         all_sizes : dict
             Mapping of types to sizes of each variable in all procs for the whole model.
+        all_exist : ndarray
+            Array of booleans indicating which variables are present in which procs in the model.
 
         Returns
         -------
@@ -1105,18 +1107,22 @@ class Component(System):
         # src is outside of this component, so we need to use the all_sizes dict to get the sizes
         # of the output variables
         sizes_out = all_sizes['output']
+        exist_ins = all_exist['input']
+        exist_outs = all_exist['output']
         added_src_inds = []
         # loop over continuous inputs
         for iname, meta_in in abs2meta_in.items():
             if meta_in['src_indices'] is None and iname not in abs_in2prom_info:
-                i = self._var_allprocs_abs2idx[iname]
                 src = abs_in2out[iname]
                 dist_in = meta_in['distributed']
                 dist_out = all_abs2meta_out[src]['distributed']
                 if dist_in or dist_out:
+                    i = self._var_allprocs_abs2idx[iname]
                     gsize_out = all_abs2meta_out[src]['global_size']
                     gsize_in = all_abs2meta_in[iname]['global_size']
                     vout_sizes = sizes_out[:, all_abs2idx[src]]
+                    exins = exist_ins[:, all_abs2idx[iname]]
+                    vout_sizes = vout_sizes[exins]
 
                     offset = None
                     if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes) == gsize_in):
@@ -1128,7 +1134,10 @@ class Component(System):
                         # 3) a non-distributed output with total size matching the total size of a
                         #    distributed input
                         if dist_in:
-                            offset = np.sum(sizes_in[:iproc, i])
+                            if dist_out:
+                                offset = np.sum(sizes_in[:iproc, i])
+                            else:
+                                offset = 0
                             end = offset + sizes_in[iproc, i]
 
                     # total sizes differ and output is distributed, so can't determine mapping
@@ -1148,6 +1157,7 @@ class Component(System):
                         idx = np.zeros(0, dtype=INT_DTYPE)
                     else:
                         idx = slice(offset, end)
+
                     meta_in['src_indices'] = indexer(idx, flat_src=True, src_shape=src_shape)
                     meta_in['flat_src_indices'] = True
                     added_src_inds.append(iname)

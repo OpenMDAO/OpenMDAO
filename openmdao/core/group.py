@@ -1470,11 +1470,13 @@ class Group(System):
             dcomp_names = set(d.rpartition('.')[0] for d in dist_ins)
             if dcomp_names:
                 added_src_inds = []
+                exists = self._var_existence
+
                 for comp in self.system_iter(recurse=True, typ=Component):
                     if comp.pathname in dcomp_names:
                         added_src_inds.extend(
                             comp._update_dist_src_indices(conns, all_abs2meta, abs2idx,
-                                                          self._var_sizes))
+                                                          self._var_sizes, exists))
 
                 updated = set()
                 for alist in self.comm.allgather(added_src_inds):
@@ -2582,28 +2584,34 @@ class Group(System):
         def serial2distfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
                            is_full_slice):
             from_shape = graph.nodes[from_var]['shape']
+            exist_outs = self._var_existence['output'][:, self._var_allprocs_abs2idx[from_var]]
+            exist_ins = self._var_existence['input'][:, self._var_allprocs_abs2idx[to_var]]
             if src_indices is None:
-                shp = from_shape
+                shape = from_shape
             else:
                 to_meta = graph.nodes[to_var]
-                exist_procs = self._var_existence['output'][:, self._var_allprocs_abs2idx[from_var]]
-                num_exist = np.count_nonzero(exist_procs)
+                num_exist = np.count_nonzero(exist_outs)
 
                 if to_meta.get('flat_src_indices') or len(from_shape) < 2:
-                    global_shape = (num_exist * shape_to_len(from_shape),)
+                    global_src_shape = (num_exist * shape_to_len(from_shape),)
                 else:
-                    shplst = list(from_shape)
+                    shapelst = list(from_shape)
                     # stack the shapes across procs
-                    first_dim = shplst[0] * num_exist
-                    shplst[0] = first_dim
-                    global_shape = tuple(shplst)
+                    first_dim = shapelst[0] * num_exist
+                    shapelst[0] = first_dim
+                    global_src_shape = tuple(shapelst)
 
-                src_indices.set_src_shape(global_shape)
+                src_indices.set_src_shape(global_src_shape)
 
-                shp = to_meta['shape'] = src_indices.indexed_src_shape
+                shape = to_meta['shape'] = src_indices.indexed_src_shape
 
-            graph.nodes[to_var]['shape'] = shp
-            return shp
+            size = shape_to_len(shape)
+            sizes = np.zeros(self.comm.size, dtype=int)
+            sizes[exist_ins] = size
+            dist_sizes[to_var] = sizes
+            dist_shapes[to_var] = [shape if exist_ins[i] else None for i in range(self.comm.size)]
+            graph.nodes[to_var]['shape'] = shape
+            return shape
 
         def serial2distrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
                            is_full_slice):
