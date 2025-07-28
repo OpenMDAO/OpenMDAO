@@ -547,7 +547,7 @@ class TestErrors(unittest.TestCase):
             prob.driver = om.AnalysisDriver(om.Problem())
 
         self.assertEqual(str(err.exception),
-                         "If given, samples must be a list, tuple, or derived from AnalysisGenerator "
+                         "samples must be a list, tuple, or derived from AnalysisGenerator "
                          "but got <class 'openmdao.core.problem.Problem'>")
 
 

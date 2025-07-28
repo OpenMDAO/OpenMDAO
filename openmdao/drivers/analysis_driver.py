@@ -62,7 +62,7 @@ class AnalysisDriver(Driver):
         elif isinstance(samples, AnalysisGenerator):
             self._generator = samples
         elif samples is not None:
-            raise ValueError('If given, samples must be a list, tuple, '
+            raise ValueError('samples must be a list, tuple, '
                              f'or derived from AnalysisGenerator but got {type(samples)}')
 
         super().__init__(**kwargs)

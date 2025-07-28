@@ -17,7 +17,7 @@ _LEVELS = 2  # default number of levels for pyDOE generators
 
 class _pyDOE_AnalysisGenerator(AnalysisGenerator):
     """
-    Base class for DOE generators implementing methods from pyDOE3.
+    Base class for Analysis generators implementing methods from pyDOE3.
 
     Parameters
     ----------
