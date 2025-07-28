@@ -7098,11 +7098,12 @@ class System(object, metaclass=SystemMetaclass):
         """
         Call validate based on whether there are discrete inputs / outputs or not.
         """
-        if self._discrete_inputs or self._discrete_outputs:
-            self.validate(self._inputs, self._outputs,
-                          self._discrete_inputs, self._discrete_outputs)
-        else:
-            self.validate(self._inputs, self._outputs)
+        with self._call_user_function('validate', protect_outputs=True):
+            if self._discrete_inputs or self._discrete_outputs:
+                self.validate(self._inputs, self._outputs,
+                              self._discrete_inputs, self._discrete_outputs)
+            else:
+                self.validate(self._inputs, self._outputs)
 
     def validate(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         """
