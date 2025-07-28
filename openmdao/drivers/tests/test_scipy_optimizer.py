@@ -2100,7 +2100,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).')
+                         'Constraints or objectives [parab.z] cannot be impacted by the design'
+                         ' variables of the problem because no partials were defined for them in their parent component(s).')
 
     def test_singular_jac_error_desvars(self):
         prob = om.Problem()
@@ -2130,12 +2131,12 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with printoptions(legacy='1.21'):
-            with self.assertRaises(RuntimeError) as msg:
-                prob.run_driver()
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
+                         'The following design variables have no impact on the constraints or '
+                         'objective at the current design point:\n  z, inds=[0]\n')
 
     def test_singular_jac_ignore(self):
         prob = om.Problem()
@@ -2187,15 +2188,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        msg = "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design variables of the problem."
+        expected_msg = ('The following constraints or objectives cannot be impacted by'
+                        ' the design variables of the problem at the current design point:\n  parab.z, inds=[0]\n')
 
-        with printoptions(legacy='1.21'):
-            with assert_warning(UserWarning, msg):
-                prob.run_driver()
+        with assert_warning(DerivativesWarning, expected_msg):
+            prob.run_driver()
 
     def test_singular_jac_desvars_multidim_indices_dv(self):
-        expected_msg = "Design variables [('z', inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)])] " \
-                       "have no impact on the constraints or objective."
+        expected_msg = "The following design variables " \
+                       "have no impact on the constraints or objective at the current design point:\n  z, inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)]\n"
 
         for option in ['error', 'warn', 'ignore']:
             with self.subTest(f'singular_jac_behavior = {option}'):
@@ -2268,7 +2269,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                 prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
+                         'The following constraints or objectives cannot be impacted by the design'
+                         ' variables of the problem at the current design point:\n  parab.f_z, inds=[(1, 1, 0)]\n')
 
     @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
