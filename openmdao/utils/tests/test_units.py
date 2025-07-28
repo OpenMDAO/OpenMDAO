@@ -403,10 +403,10 @@ class TestUnitless(unittest.TestCase):
         margin_percent = p.get_val('margin_of_safety', units='percent')[0]
         assert_near_equal(margin_percent, 5)
 
-    def test_dragC(self):
+    def test_drag_count(self):
         p = om.Problem()
         ivc = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
-        ivc.add_output('drag', val=10, units='dragC')
+        ivc.add_output('drag', val=10, units='drag_count')
         p.setup()
         p.final_setup()
         drag_val = p.get_val('drag', units='unitless')[0]
