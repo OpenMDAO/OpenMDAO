@@ -776,6 +776,97 @@ class TestSystem(unittest.TestCase):
         d = prob.get_outputs_dir('subdir')
         self.assertEqual(str(pathlib.Path(_get_work_dir(), 'test_prob_name_out', 'subdir')), str(d))
 
+    def test_validate_protected(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar import SellarDis1
+
+        class MySellar1(SellarDis1):
+            def validate(self, inputs, outputs):
+                outputs['y1'] = 20.0
+
+        prob = om.Problem(model=om.Group())
+        prob.model.add_subsystem('sellar', MySellar1())
+        prob.setup()
+        prob.run_model()
+
+        msg = "Attempt to set value of 'y1' in output vector when it is read only."
+        with self.assertRaises(ValueError, msg=msg):
+            prob.model.run_validation()
+
+    def test_validate_wrapper(self):
+        import openmdao.api as om
+
+        class MyComp1(om.ExplicitComponent):
+            def setup(self):
+                self.add_discrete_input('my_input', val=1)
+
+            def validate(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                pass
+
+        class MyComp2(om.ImplicitComponent):
+            def setup(self):
+                self.add_input('my_input', val=1.0)
+                self.add_output('my_output', val=1.0)
+
+            def validate(self, inputs, outputs):
+                pass
+
+        prob = om.Problem(model=om.Group())
+        prob.model.add_subsystem('my_comp_1', MyComp1())
+        prob.model.add_subsystem('my_comp_2', MyComp2())
+        prob.setup()
+        prob.run_model()
+        prob.model.my_comp_1._validate_wrapper()
+        prob.model.my_comp_2._validate_wrapper()
+
+    def test_run_validation(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
+
+        check1 = False
+        check2 = False
+        check3 = False
+
+        class MySellar1(SellarDis1):
+            def validate(self, inputs, outputs):
+                if outputs['y1'] > 20.0:
+                    nonlocal check1
+                    check1 = True
+
+        class MySellar2(SellarDis2):
+            def validate(self, inputs, outputs):
+                if inputs['y1'] < 25.0:
+                    nonlocal check2
+                    check2 = True
+
+        class SellarMDA(om.Group):
+            def setup(self):
+                cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
+                cycle.add_subsystem('d1', MySellar1(), promotes_inputs=['x', 'z', 'y2'],
+                                    promotes_outputs=['y1'])
+                cycle.add_subsystem('d2', MySellar2(), promotes_inputs=['z', 'y1'],
+                                    promotes_outputs=['y2'])
+
+                cycle.set_input_defaults('x', 1.0)
+                cycle.set_input_defaults('z', np.array([5.0, 2.0]))
+
+                # Nonlinear Block Gauss Seidel is a gradient free solver
+                cycle.nonlinear_solver = om.NonlinearBlockGS()
+
+            def validate(self, inputs, outputs):
+                if outputs['y1'] > 10.0:
+                    nonlocal check3
+                    check3 = True
+
+        prob = om.Problem(model=om.Group())
+        prob.model.add_subsystem('cycle', SellarMDA())
+        prob.setup()
+        prob.run_model()
+        prob.model.run_validation()
+
+        self.assertEqual(check1, True)
+        self.assertEqual(check2, False)
+        self.assertEqual(check3, True)
 
 if __name__ == "__main__":
     unittest.main()
