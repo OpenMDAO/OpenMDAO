@@ -1015,6 +1015,9 @@ class Group(System):
         """
         Compute global offsets for variables.
 
+        These are the offsets into the global arrays that combine all variables of a certain
+        iotype across all ranks.
+
         Returns
         -------
         dict
@@ -1022,15 +1025,15 @@ class Group(System):
         """
         if self._var_offsets is None:
             offsets = self._var_offsets = {}
-            for type_ in ['input', 'output']:
-                vsizes = self._var_sizes[type_]
+            for io in ['input', 'output']:
+                vsizes = self._var_sizes[io]
                 if vsizes.size > 0:
                     csum = np.empty(vsizes.size, dtype=INT_DTYPE)
                     csum[0] = 0
                     csum[1:] = np.cumsum(vsizes)[:-1]
-                    offsets[type_] = csum.reshape(vsizes.shape)
+                    offsets[io] = csum.reshape(vsizes.shape)
                 else:
-                    offsets[type_] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
+                    offsets[io] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
 
         return self._var_offsets
 

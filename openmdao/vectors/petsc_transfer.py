@@ -491,12 +491,12 @@ def _get_output_inds(group, abs_out, abs_in):
 
         src_indices = src_indices.shaped_array()
         orig_src_inds = src_indices
-        if not out_dist and not meta_in['distributed']:
-            # convert from local to distributed src_indices
-            off = np.sum(sizes[:rank])
-            if off > 0.:  # adjust for local offsets
-                # don't do += to avoid modifying stored value
-                src_indices = src_indices + off
+
+        if not (out_dist or meta_in['distributed']):  # serial --> serial
+            if offsets[rank] > 0.:
+                return src_indices + offsets[rank], orig_src_inds
+            else:
+                return src_indices, orig_src_inds
 
         output_inds = np.empty(src_indices.size, INT_DTYPE)
         start = end = 0
