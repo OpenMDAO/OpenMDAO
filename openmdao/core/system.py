@@ -7087,8 +7087,10 @@ class System(object, metaclass=SystemMetaclass):
 
     def run_validation(self):
         """
-        Run validate method on all systems below this system, which can be used
-        to check any final input / output values after a run.
+        Run validate method on all systems below this system.
+
+        The validate method on each system can be used to check any final
+        input / output values after a run.
         """
         if (self._problem_meta is None or
                 self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP):
