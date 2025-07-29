@@ -746,11 +746,11 @@ class DistParModel(om.Group):
 class TestRemoteDistribDynShapes(unittest.TestCase):
     N_PROCS = 4
 
-    def _build_model(self, fwd):
+    def _build_model(self, solve_dyn_fwd):
         # this test has remote distributed components (distributed comps under parallel groups)
         p = om.Problem(name='remote_distrib_err')
         indep = p.model.add_subsystem('indep', om.IndepVarComp())
-        if fwd:
+        if solve_dyn_fwd:
             indep.add_output('x1', val=np.random.random(4))
         else:
             indep.add_output('x1', shape_by_conn=True)
@@ -759,7 +759,7 @@ class TestRemoteDistribDynShapes(unittest.TestCase):
         par.add_subsystem('G1', SeriesGroup(2,1, DistribDynShapeComp))
         par.add_subsystem('G2', SeriesGroup(2,1, DistribDynShapeComp))
 
-        if fwd:
+        if solve_dyn_fwd:
             p.model.add_subsystem('sink', om.ExecComp(['y1=x1+x2'], x1={'shape_by_conn': True},
                                                       x2={'shape_by_conn': True},
                                                       y1={'copy_shape': 'x1'}))
@@ -771,8 +771,23 @@ class TestRemoteDistribDynShapes(unittest.TestCase):
         p.model.connect('par.G2.C2.y1', 'sink.x2', src_indices=om.slicer[:])
         return p
 
-    def test_remote_distrib(self):
-        p = self._build_model(fwd=True)
+    def test_remote_distrib_fwd(self):
+        # dynamic shapes solved moving fwd (from IVC -->).  Deriv mode = fwd
+        p = self._build_model(solve_dyn_fwd=True)
+        p.setup(mode='fwd')
+        p.run_model()
+        for name, meta in p.model._var_abs2meta['input'].items():
+            print('input', name, meta.get('distributed'), meta.get('shape'), meta.get('src_indices'))
+        for name, meta in p.model._var_abs2meta['output'].items():
+            print('output', name, meta.get('distributed'), meta.get('shape'))
+
+        # np.testing.assert_allclose(np.tile(p.get_val('indep.x1'), 2)*8, p.get_val('sink.y1'))
+        assert_check_partials(p.check_partials(method='fd', show_only_incorrect=True))
+        assert_check_totals(p.check_totals(of=['sink.y1'], wrt=['indep.x1'], rich_print=False))
+
+    def test_remote_distrib_rev(self):
+        # dynamic shapes solved moving fwd (from IVC -->).  Deriv mode = rev
+        p = self._build_model(solve_dyn_fwd=True)
         p.setup(mode='rev')
         p.run_model()
         for name, meta in p.model._var_abs2meta['input'].items():

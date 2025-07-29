@@ -1476,7 +1476,7 @@ class Group(System):
                     if comp.pathname in dcomp_names:
                         added_src_inds.extend(
                             comp._update_dist_src_indices(conns, all_abs2meta, abs2idx,
-                                                          self._var_sizes, exists))
+                                                          self._var_sizes, exists, self.comm.rank))
 
                 updated = set()
                 for alist in self.comm.allgather(added_src_inds):
@@ -2507,8 +2507,8 @@ class Group(System):
                 ind = src_indices()
                 if isinstance(ind, slice):
                     slc = src_indices._slice
-                    is_full_slice = (slc.start in (None, 0) and slc.stop is None and
-                                     slc.step in (1, None))
+                    is_full_slice = ((slc.start is None or slc.start == 0) and slc.stop is None and
+                                     (slc.step is None or slc.step == 0))
 
             if self.comm.size > 1:
                 dist_from = from_meta['distributed']

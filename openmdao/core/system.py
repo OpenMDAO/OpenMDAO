@@ -6207,7 +6207,7 @@ class System(object, metaclass=SystemMetaclass):
                 val = np.reshape(val, abs2meta_all_ins[abs_name]['global_shape'])
             elif not flat and val.size > 0 and vshape is not None:
                 val = np.reshape(val, vshape)
-        elif vshape not in (None, ()):
+        elif vshape is not None and vshape != ():
             val = val.reshape(vshape)
 
         if indices is not None:

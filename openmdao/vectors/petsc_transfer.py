@@ -254,7 +254,7 @@ else:
                                 oidxlist.append(output_inds)
                                 iidxlist.append(input_inds)
                                 size += len(input_inds)
-                                print(myrank, 'rnk', rnk, '-output_inds', output_inds, 'input_inds', input_inds)
+                                # print('same rank', myrank, 'rnk', rnk, abs_out, '-->', abs_in, '-output_inds', oidxlist[-1], 'input_inds', input_inds)
                             elif osize > 0 and (isize == 0 or (distrib_in and
                                                                not has_par_coloring)):
                                 # dup output exists on this rank but there is no corresponding
@@ -268,7 +268,7 @@ else:
                                     continue
 
                                 # print('myrank', myrank, 'rnk', rnk, abs_out, '-->', abs_in,'offset', offset, 'src_indices', src_indices)
-                                print(myrank, 'rnk', rnk, 'output_inds', oarr, 'input_inds', input_inds)
+                                # print(myrank, 'rnk', rnk, abs_out, '-->', abs_in, 'output_inds', oarr, 'input_inds', input_inds)
                                 # print('sizes', group.get_var_sizes(abs_out, 'output'),
                                 #       group.get_var_sizes(abs_in, 'input'))
 
@@ -283,6 +283,10 @@ else:
                                     oidxlist.append(oarr)
                                     iidxlist.append(input_inds)
                                     size += len(input_inds)
+
+                            # outs = oidxlist[-1] if oidxlist else []
+                            # ins = iidxlist[-1] if iidxlist else []
+                            # print('same rank', myrank, 'rnk', rnk, abs_out, '-->', abs_in, 'output_inds', outs, 'input_inds', ins)
 
                         if len(iidxlist) > 1:
                             input_inds = _merge(iidxlist, size)
@@ -320,6 +324,7 @@ else:
 
                         xfer_in[sub_out].append(input_inds)
                         xfer_out[sub_out].append(output_inds)
+                        # print(abs_out, '-->', abs_in, 'output_inds', xfer_out[sub_out][-1], 'input_inds', xfer_in[sub_out][-1])
                 else:
                     # remote input but still need entries in the transfer dicts to avoid hangs
                     xfer_in[sub_out]
@@ -329,6 +334,9 @@ else:
                         xfer_out_nocolor[sub_out]
 
             full_xfer_in, full_xfer_out = _setup_index_views(total_size, xfer_in, xfer_out)
+
+            # print('xfers_in', full_xfer_in)
+            # print('xfers_out', full_xfer_out)
 
             transfers = {
                 None: PETScTransfer(vectors['input']['nonlinear'],
@@ -452,27 +460,15 @@ def _merge(inds_list, tot_size):
 
 
 def _get_output_inds(group, abs_out, abs_in):
-    owner = group._owning_rank[abs_out]
     meta_in = group._var_abs2meta['input'][abs_in]
     out_dist = group._var_allprocs_abs2meta['output'][abs_out]['distributed']
-    in_dist = meta_in['distributed']
     src_indices = meta_in['src_indices']
 
-    rank = group.comm.rank if abs_out in group._var_abs2meta['output'] else owner
+    rank = group.comm.rank if abs_out in group._var_abs2meta['output'] else \
+        group._owning_rank[abs_out]
     out_idx = group._var_allprocs_abs2idx[abs_out]
     offsets = group._get_var_offsets()['output'][:, out_idx]
     sizes = group._var_sizes['output'][:, out_idx]
-
-    if src_indices is None:
-        orig_src_inds = src_indices
-    else:
-        src_indices = src_indices.shaped_array()
-        orig_src_inds = src_indices
-        if not out_dist and not in_dist:  # convert from local to distributed src_indices
-            off = np.sum(sizes[:rank])
-            if off > 0.:  # adjust for local offsets
-                # don't do += to avoid modifying stored value
-                src_indices = src_indices + off
 
     # NOTE: src_indices are relative to a single, possibly distributed variable,
     # while the output_inds that we compute are relative to the full distributed
@@ -488,7 +484,20 @@ def _get_output_inds(group, abs_out, abs_in):
         else:
             offset = offsets[rank]
             output_inds = range(offset, offset + sizes[rank])
+
+        return output_inds, None
+
     else:
+
+        src_indices = src_indices.shaped_array()
+        orig_src_inds = src_indices
+        if not out_dist and not meta_in['distributed']:
+            # convert from local to distributed src_indices
+            off = np.sum(sizes[:rank])
+            if off > 0.:  # adjust for local offsets
+                # don't do += to avoid modifying stored value
+                src_indices = src_indices + off
+
         output_inds = np.empty(src_indices.size, INT_DTYPE)
         start = end = 0
         for iproc in range(group.comm.size):
@@ -505,4 +514,4 @@ def _get_output_inds(group, abs_out, abs_in):
 
             start = end
 
-    return output_inds, orig_src_inds
+        return output_inds, orig_src_inds
