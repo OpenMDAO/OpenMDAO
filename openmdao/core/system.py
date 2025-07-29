@@ -7090,7 +7090,10 @@ class System(object, metaclass=SystemMetaclass):
         Run validate method on all systems below this system, which can be used
         to check any final input / output values after a run.
         """
-
+        if (self._problem_meta is None or
+                self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP):
+            raise RuntimeError("Either 'run_model' or 'final_setup' must be "
+                               "called before 'run_validation' can be called.")
         for system in self.system_iter(include_self=True, recurse=True):
             system._validate_wrapper()
 
@@ -7098,6 +7101,8 @@ class System(object, metaclass=SystemMetaclass):
         """
         Call validate based on whether there are discrete inputs / outputs or not.
         """
+        # Protect both the inputs and outputs, just want the user to be able
+        # to check values, not change them.
         with self._call_user_function('validate', protect_outputs=True):
             if self._discrete_inputs or self._discrete_outputs:
                 self.validate(self._inputs, self._outputs,
