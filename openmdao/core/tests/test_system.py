@@ -793,6 +793,19 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(ValueError, msg=msg):
             prob.model.run_validation()
 
+    def test_premature_validate(self):
+        import openmdao.api as om
+        from openmdao.test_suite.components.paraboloid import Paraboloid
+
+        prob = om.Problem(name='test_prob_name')
+        model = prob.model
+        model.add_subsystem('comp', Paraboloid())
+
+        msg = ("Either 'run_model' or 'final_setup' must be called before "
+               "'run_validation' can be called.")
+        with self.assertRaises(RuntimeError, msg=msg):
+            prob.model.run_validation()
+
     def test_validate_wrapper(self):
         import openmdao.api as om
 
