@@ -223,7 +223,7 @@ else:
 
                     output_inds, src_indices = _get_output_inds(group, abs_out, abs_in)
 
-                    # 2. Compute the input indices
+                    # Compute the input indices
                     input_inds = range(offsets_in[myrank, idx_in],
                                        offsets_in[myrank, idx_in] + sizes_in[myrank, idx_in])
 
@@ -254,9 +254,7 @@ else:
                                 oidxlist.append(output_inds)
                                 iidxlist.append(input_inds)
                                 size += len(input_inds)
-                                # print('same rank', myrank, 'rnk', rnk, abs_out, '-->', abs_in, '-output_inds', oidxlist[-1], 'input_inds', input_inds)
-                            elif osize > 0 and (isize == 0 or (distrib_in and
-                                                               not has_par_coloring)):
+                            elif osize > 0 and isize == 0:
                                 # dup output exists on this rank but there is no corresponding
                                 # input, so we send the owning/distrib input to the dup output
                                 offset = offsets_out[rnk, idx_out]
@@ -499,19 +497,88 @@ def _get_output_inds(group, abs_out, abs_in):
                 return src_indices, orig_src_inds
 
         output_inds = np.empty(src_indices.size, INT_DTYPE)
+        if output_inds.size == 0:
+            return output_inds, orig_src_inds
+
+        min_sind = src_indices.min()
+        max_sind = src_indices.max()
         start = end = 0
         for iproc in range(group.comm.size):
             end += sizes[iproc]
             if start == end:
                 continue
 
-            # The part of src on iproc
-            on_iproc = np.logical_and(start <= src_indices, src_indices < end)
+            if not (min_sind >= end or max_sind < start):
+                # The part of src on iproc
+                on_iproc = np.logical_and(start <= src_indices, src_indices < end)
 
-            if np.any(on_iproc):
-                # This converts from global to variable specific ordering
-                output_inds[on_iproc] = src_indices[on_iproc] + (offsets[iproc] - start)
+                if np.any(on_iproc):
+                    # This converts from global to variable specific ordering
+                    output_inds[on_iproc] = src_indices[on_iproc] + (offsets[iproc] - start)
 
             start = end
 
         return output_inds, orig_src_inds
+
+
+def _rev_xfer_iter(group, abs_out, abs_in):
+    """
+    Yield output ranks where the given input will transfer to the given output (reverse transfer).
+
+    Parameters
+    ----------
+    group : Group
+        The Group where the transfers will be performed.
+    abs_out : str
+        Absolute name of output variable.
+    abs_in : str
+        Absolute name of input variable.
+
+    Yields
+    ------
+    int
+        Output rank to transfer to.
+    """
+    myrank = group.comm.rank
+
+    try:
+        idx_in = group._var_allprocs_abs2idx[abs_in]
+    except KeyError:
+        if abs_in in group._var_allprocs_discrete['input']:
+            return
+        raise KeyError(f"{group.msginfo}: variable '{abs_in}' not found.")
+    sizes_in = group._var_sizes['input'][:, idx_in]
+    if sizes_in[myrank] == 0:
+        return
+
+    try:
+        idx_out = group._var_allprocs_abs2idx[abs_out]
+    except KeyError:
+        if abs_out in group._var_allprocs_discrete['output']:
+            return
+        raise KeyError(f"{group.msginfo}: variable '{abs_out}' not found.")
+    sizes_out = group._var_sizes['output'][:, idx_out]
+
+    dist_out = group._var_allprocs_abs2meta['output']['distributed']
+    dist_in = group._var_allprocs_abs2meta['input']['distributed']
+
+    if dist_in:
+        if dist_out:  # dist <-- dist
+            yield myrank
+        else:  # serial <-- dist
+            for rnk, (osize, isize) in enumerate(zip(sizes_out, sizes_in)):
+                if osize > 0:
+                    if rnk == myrank or isize == 0:
+                        yield rnk  # myrank will transfer to this rank
+    elif dist_out:  # dist <-- serial
+        pass
+    else:  # serial <-- serial
+        iown = myrank == np.nonzero(sizes_in)[0].min()
+        if iown:
+            for rnk, (osize, isize) in enumerate(zip(sizes_out, sizes_in)):
+                if osize > 0:
+                    if rnk == myrank or isize == 0:
+                        yield rnk  # myrank will transfer to this rank
+        else:
+            if sizes_out[myrank] > 0 and sizes_in[myrank] > 0:
+                yield myrank
