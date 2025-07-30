@@ -1847,7 +1847,6 @@ class Problem(object, metaclass=ProblemMetaclass):
                 if 'upper' in meta:
                     meta['upper'] = meta['upper'] / scaler - adder
         header = "Design Variables"
-
         if desvar_opts is None:
             desvar_opts = ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler',
                            'parallel_deriv_color','cache_linear_solution', 'units', 'min', 'max']
