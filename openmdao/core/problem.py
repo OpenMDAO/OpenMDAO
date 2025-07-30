@@ -1799,17 +1799,20 @@ class Problem(object, metaclass=ProblemMetaclass):
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
         desvar_opts : list of str
-            List of optional columns to be displayed in the desvars table.
+            List of optional columns to be displayed in the desvars table. All are displayed by
+            defualt.
             Allowed values are:
             ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
             'cache_linear_solution', 'units', 'min', 'max'].
         cons_opts : list of str
-            List of optional columns to be displayed in the cons table.
+            List of optional columns to be displayed in the cons table. All are displayed by
+            defualt.
             Allowed values are:
             ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'adder', 'scaler',
             'linear', 'parallel_deriv_color', 'cache_linear_solution', 'units', 'min', 'max'].
         objs_opts : list of str
-            List of optional columns to be displayed in the objs table.
+            List of optional columns to be displayed in the objs table. All are displayed by
+            defualt.
             Allowed values are:
             ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
             'parallel_deriv_color', 'cache_linear_solution'].
