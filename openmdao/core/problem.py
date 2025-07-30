@@ -1775,9 +1775,9 @@ class Problem(object, metaclass=ProblemMetaclass):
                          show_promoted_name=True,
                          print_arrays=False,
                          driver_scaling=True,
-                         desvar_opts=[],
-                         cons_opts=[],
-                         objs_opts=[],
+                         desvar_opts=None,
+                         cons_opts=None,
+                         objs_opts=None,
                          out_stream=_DEFAULT_OUT_STREAM,
                          return_format='list'
                          ):
@@ -1847,6 +1847,10 @@ class Problem(object, metaclass=ProblemMetaclass):
                 if 'upper' in meta:
                     meta['upper'] = meta['upper'] / scaler - adder
         header = "Design Variables"
+
+        if desvar_opts is None:
+            desvar_opts = ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler',
+                           'parallel_deriv_color','cache_linear_solution', 'units', 'min', 'max']
         def_desvar_opts = [opt for opt in ('indices',) if opt not in desvar_opts and
                            _find_dict_meta(desvars, opt)]
         col_names = default_col_names + def_desvar_opts + desvar_opts
@@ -1875,6 +1879,10 @@ class Problem(object, metaclass=ProblemMetaclass):
                 if 'upper' in meta:
                     meta['upper'] = meta['upper'] / scaler - adder
         header = "Constraints"
+        if cons_opts is None:
+            cons_opts = ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'adder', 'scaler',
+                        'linear', 'parallel_deriv_color', 'cache_linear_solution', 'units', 'min',
+                        'max']
         # detect any cons that use aliases
         def_cons_opts = [opt for opt in ('indices', 'alias') if opt not in cons_opts and
                          _find_dict_meta(cons, opt)]
@@ -1894,6 +1902,9 @@ class Problem(object, metaclass=ProblemMetaclass):
         objs = self.driver._objs
         vals = self.driver.get_objective_values(driver_scaling=driver_scaling)
         header = "Objectives"
+        if objs_opts is None:
+            objs_opts = ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
+                         'parallel_deriv_color', 'cache_linear_solution']
         def_obj_opts = [opt for opt in ('indices',) if opt not in objs_opts and
                         _find_dict_meta(objs, opt)]
         col_names = default_col_names + def_obj_opts + objs_opts
