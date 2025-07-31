@@ -8,6 +8,7 @@ import re
 from itertools import zip_longest
 from contextlib import contextmanager
 from pathlib import Path
+import tempfile
 
 import numpy as np
 
@@ -41,21 +42,33 @@ def _cleanup_workdir(self):
                 pass
 
 
+def get_tempdir():
+    """
+    Return the same tempdir across all MPI processes.
+
+    Returns
+    -------
+    str
+        The tempdir.
+    """
+    if MPI is None:
+        return tempfile.mkdtemp()
+    elif MPI.COMM_WORLD.rank == 0:
+        tempdir = tempfile.mkdtemp()
+        MPI.COMM_WORLD.bcast(tempdir, root=0)
+        return tempdir
+    else:
+        return MPI.COMM_WORLD.bcast(None, root=0)
+
+
 def _new_setup(self):
     import os
-    import tempfile
 
     from openmdao.utils.mpi import MPI, multi_proc_exception_check
     self.startdir = os.getcwd()
     self.old_workdir = os.environ.get('OPENMDAO_WORKDIR', '')
 
-    if MPI is None:
-        self.tempdir = tempfile.mkdtemp()
-    elif MPI.COMM_WORLD.rank == 0:
-        self.tempdir = tempfile.mkdtemp()
-        MPI.COMM_WORLD.bcast(self.tempdir, root=0)
-    else:
-        self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
+    self.tempdir = get_tempdir()
 
     os.chdir(self.tempdir)
     # on mac tempdir is a symlink which messes some things up, so

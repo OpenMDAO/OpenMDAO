@@ -49,6 +49,7 @@ class OmStyle extends Style {
         ['LN: USER',        null,              '#fccde5'],
         [null,              'NL: Newton',      '#d9d9d9'],
         [null,              'NL: BROYDEN',     '#bc80bd'],
+        ['LN: PETScDirect', null,              '#636b2f'],
         ['solve_linear',    'solve_nonlinear', '#ccebc5'],
         ['other',           'other',           '#ffed6f'],
     ];
