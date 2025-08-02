@@ -1321,6 +1321,14 @@ def generate_launch_json_file(vscode_dir, base_port, ranks):
 
 
 def vscode_env_error(env_var):
+    """
+    Generate error message.
+
+    Parameters
+    ----------
+    env_var : str
+        Value of VSCODE_DBG environment variable.
+    """
     print("Invalid VSCODE_DBG environment variable. Expected ':<port>' or "
           f"'<rank1,rank2,...>:<port>' but got '{env_var}'. Debugging aborted.", flush=True)
     sys.exit(1)
@@ -1381,7 +1389,7 @@ def setup_dbg():
                     badranks.append(r)
             if badranks:
                 print("The following ranks are outside of the valid range of "
-                      f"(0-{MPI.COMM_WORLD.size-1}): {badranks}. Debugging aborted.", flush=True)
+                      f"(0-{MPI.COMM_WORLD.size - 1}): {badranks}. Debugging aborted.", flush=True)
                 sys.exit(1)
 
         debug_port = base_port + myrank
@@ -1399,7 +1407,7 @@ def setup_dbg():
         if myrank in ranks:
             import debugpy
             debugpy.listen(('0.0.0.0', debug_port))
-            debugpy.wait_for_client() # This will block until a debugger connects
+            debugpy.wait_for_client()  # This will block until a debugger connects
             print(f"Rank {myrank}: Debugger listening on port {debug_port}", flush=True)
 
     elif env_truthy('WING_DBG'):

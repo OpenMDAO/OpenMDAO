@@ -620,6 +620,8 @@ class Problem(object, metaclass=ProblemMetaclass):
                     else:
                         raise exc_type('\n'.join(final_msg)).with_traceback(tback)
 
+            print('\n'.join(final_msg))
+
             raise RuntimeError('\n'.join(final_msg))
 
     def run_model(self, case_prefix=None, reset_iter_counts=True):

@@ -211,6 +211,7 @@ def is_unresolved(graph, node, meta_name):
 
     Returns
     -------
+    bool
         True if the node is unresolved.
     """
     nodes = graph.nodes

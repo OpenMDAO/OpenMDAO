@@ -229,10 +229,10 @@ class TestPassSizeDistributed(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'serial_start_err':"
-            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported."
-            "\n   <model> <class Group>: Failed to resolve shapes for ['E.in', 'E.out']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-            "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices."
-            "\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'B.out' to 'C.in'. The target shape is (4,) but indices are shape (6,).")
+            "\n   <model> <class Group>: Input 'C.in' has src_indices so the shape of connected output 'B.out' cannot be determined."
+            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' without src_indices is not supported."
+            "\n   <model> <class Group>: Failed to resolve shapes for ['A.out', 'B.in', 'B.out', 'E.in', 'E.out']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+            "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices.")
 
     def test_distributed_start_err(self):
         """the size information starts in the distributed component C"""
@@ -264,14 +264,13 @@ class TestPassSizeDistributed(unittest.TestCase):
             prob.setup()
             prob.final_setup()
 
-        self.assertEqual(str(cm.exception),
+        self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'distributed_start_err':"
             "\n   <model> <class Group>: Input 'C.in' has src_indices so the shape of connected output 'B.out' cannot be determined."
-            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported."
-            "\n   <model> <class Group>: Failed to resolve shapes for ['E.in', 'E.out']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-            "\n   <model> <class Group>: Size of output 'A.out' differs between processes (rank(s) [0] have size 1, rank(s) [1] have size 2)."
-            "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices."
-            "\n   <model> <class Group>: The source indices slice(1, 3, 1) do not specify a valid shape for the connection 'A.out' to 'B.in'. The target shape is (3,) but indices are shape (1,).")
+            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' without src_indices is not supported."
+            "\n   <model> <class Group>: Failed to resolve shapes for ['A.out', 'B.in', 'B.out', 'E.in', 'E.out']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+            "\n   <model> <class Group>: When connecting 'B.out' to 'C.in': index 0 is out of bounds for source dimension of size 0."
+            "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices.")
 
 
 class ResizableComp(om.ExplicitComponent):
@@ -801,17 +800,21 @@ class TestRemoteDistribDynShapes(unittest.TestCase):
 
     def test_remote_distrib_err(self):
         # this test has remote distributed components (distributed comps under parallel groups)
-        p = self._build_model(fwd=False)
+        p = self._build_model(solve_dyn_fwd=False)
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
             p.final_setup()
 
+        print(cm.exception.args[0])
+
         self.assertTrue(
             "Collected errors for problem 'remote_distrib_err':\n"
-            "   'par.G1.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.G1.C1.x1'. They must be supplied manually.\n"
-            "   'par.G2.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.G2.C1.x1'. They must be supplied manually."
-           in str(cm.exception))
+            "   <model> <class Group>: Input 'sink.x1' has src_indices so the shape of connected output 'par.G1.C2.y1' cannot be determined.\n"
+            "   <model> <class Group>: Input 'sink.x2' has src_indices so the shape of connected output 'par.G2.C2.y1' cannot be determined.\n"
+            "   <model> <class Group>: Failed to resolve shapes for ['indep.x1', 'par.G1.C1.x1', 'par.G1.C1.y1', 'par.G1.C2.x1', 'par.G1.C2.y1', "
+            "'par.G2.C1.x1', 'par.G2.C1.y1', 'par.G2.C2.x1', 'par.G2.C2.y1']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+           in cm.exception.args[0])
 
 
 class TestDynShapeFeature(unittest.TestCase):
@@ -978,10 +981,10 @@ class TestDistribDynShapeComboNoSrcIndsErrs(unittest.TestCase):
             p.setup()
             p.final_setup()
         self.assertEqual(cm.exception.args[0],
-            "\nCollected errors for problem 'dist_serial_fwd_err':"
-            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'comp.x' from distributed output 'indeps.x' is not supported."
-            "\n   <model> <class Group>: Failed to resolve shapes for ['comp.x', 'comp.y']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-            "\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to non-distributed input 'comp.x' without specifying src_indices.")
+            "\nCollected errors for problem 'dist_serial_fwd_err':\n"
+            "   <model> <class Group>: dynamic sizing of non-distributed input 'comp.x' from distributed output 'indeps.x' without src_indices is not supported.\n"
+            "   <model> <class Group>: Failed to resolve shapes for ['comp.x', 'comp.y']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n"
+            "   <model> <class Group>: Can't connect distributed output 'indeps.x' to non-distributed input 'comp.x' without specifying src_indices.")
 
     def test_dist_serial_rev_err(self):
         p = om.Problem(name='dist_serial_rev_err')
@@ -994,8 +997,9 @@ class TestDistribDynShapeComboNoSrcIndsErrs(unittest.TestCase):
             p.final_setup()
         self.assertTrue(
             "\nCollected errors for problem 'dist_serial_rev_err':"
-            "\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to "
-            "non-distributed input 'comp.x' without specifying src_indices." in cm.exception.args[0])
+            "\n   <model> <class Group>: Input 'comp.x' has src_indices so the shape of connected output 'indeps.x' cannot be determined."
+            "\n   <model> <class Group>: Failed to resolve shapes for ['indeps.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+            "\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to non-distributed input 'comp.x' without specifying src_indices." in cm.exception.args[0])
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

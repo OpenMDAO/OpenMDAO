@@ -265,11 +265,6 @@ else:
                                 else:
                                     continue
 
-                                # print('myrank', myrank, 'rnk', rnk, abs_out, '-->', abs_in,'offset', offset, 'src_indices', src_indices)
-                                # print(myrank, 'rnk', rnk, abs_out, '-->', abs_in, 'output_inds', oarr, 'input_inds', input_inds)
-                                # print('sizes', group.get_var_sizes(abs_out, 'output'),
-                                #       group.get_var_sizes(abs_in, 'input'))
-
                                 if has_par_coloring:
                                     # these transfers will only happen if parallel coloring is
                                     # not active for the current seed response
@@ -281,10 +276,6 @@ else:
                                     oidxlist.append(oarr)
                                     iidxlist.append(input_inds)
                                     size += len(input_inds)
-
-                            # outs = oidxlist[-1] if oidxlist else []
-                            # ins = iidxlist[-1] if iidxlist else []
-                            # print('same rank', myrank, 'rnk', rnk, abs_out, '-->', abs_in, 'output_inds', outs, 'input_inds', ins)
 
                         if len(iidxlist) > 1:
                             input_inds = _merge(iidxlist, size)
@@ -322,7 +313,6 @@ else:
 
                         xfer_in[sub_out].append(input_inds)
                         xfer_out[sub_out].append(output_inds)
-                        # print(abs_out, '-->', abs_in, 'output_inds', xfer_out[sub_out][-1], 'input_inds', xfer_in[sub_out][-1])
                 else:
                     # remote input but still need entries in the transfer dicts to avoid hangs
                     xfer_in[sub_out]
@@ -332,9 +322,6 @@ else:
                         xfer_out_nocolor[sub_out]
 
             full_xfer_in, full_xfer_out = _setup_index_views(total_size, xfer_in, xfer_out)
-
-            # print('xfers_in', full_xfer_in)
-            # print('xfers_out', full_xfer_out)
 
             transfers = {
                 None: PETScTransfer(vectors['input']['nonlinear'],
@@ -519,66 +506,3 @@ def _get_output_inds(group, abs_out, abs_in):
             start = end
 
         return output_inds, orig_src_inds
-
-
-def _rev_xfer_iter(group, abs_out, abs_in):
-    """
-    Yield output ranks where the given input will transfer to the given output (reverse transfer).
-
-    Parameters
-    ----------
-    group : Group
-        The Group where the transfers will be performed.
-    abs_out : str
-        Absolute name of output variable.
-    abs_in : str
-        Absolute name of input variable.
-
-    Yields
-    ------
-    int
-        Output rank to transfer to.
-    """
-    myrank = group.comm.rank
-
-    try:
-        idx_in = group._var_allprocs_abs2idx[abs_in]
-    except KeyError:
-        if abs_in in group._var_allprocs_discrete['input']:
-            return
-        raise KeyError(f"{group.msginfo}: variable '{abs_in}' not found.")
-    sizes_in = group._var_sizes['input'][:, idx_in]
-    if sizes_in[myrank] == 0:
-        return
-
-    try:
-        idx_out = group._var_allprocs_abs2idx[abs_out]
-    except KeyError:
-        if abs_out in group._var_allprocs_discrete['output']:
-            return
-        raise KeyError(f"{group.msginfo}: variable '{abs_out}' not found.")
-    sizes_out = group._var_sizes['output'][:, idx_out]
-
-    dist_out = group._var_allprocs_abs2meta['output']['distributed']
-    dist_in = group._var_allprocs_abs2meta['input']['distributed']
-
-    if dist_in:
-        if dist_out:  # dist <-- dist
-            yield myrank
-        else:  # serial <-- dist
-            for rnk, (osize, isize) in enumerate(zip(sizes_out, sizes_in)):
-                if osize > 0:
-                    if rnk == myrank or isize == 0:
-                        yield rnk  # myrank will transfer to this rank
-    elif dist_out:  # dist <-- serial
-        pass
-    else:  # serial <-- serial
-        iown = myrank == np.nonzero(sizes_in)[0].min()
-        if iown:
-            for rnk, (osize, isize) in enumerate(zip(sizes_out, sizes_in)):
-                if osize > 0:
-                    if rnk == myrank or isize == 0:
-                        yield rnk  # myrank will transfer to this rank
-        else:
-            if sizes_out[myrank] > 0 and sizes_in[myrank] > 0:
-                yield myrank

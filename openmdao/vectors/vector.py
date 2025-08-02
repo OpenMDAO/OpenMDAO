@@ -8,7 +8,6 @@ from openmdao.utils.indexer import Indexer, indexer, _full_slice, _flat_full_ind
 from openmdao.utils.array_utils import shape_to_len
 
 
-
 _type_map = {  # map vector type to iotype
     'input': 'input',
     'output': 'output',

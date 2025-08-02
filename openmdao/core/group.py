@@ -3028,38 +3028,6 @@ class Group(System):
                             all_knowns.add(mnode)
                             progress = True
 
-        # if prop == 'shape':
-        #     # now perform a consistency check on all computed/copied properties
-        #     mismatches = set()
-        #     for u, v, data in graph.edges(data=True):
-        #         if not data['multi']:
-        #             umeta = nodes[u]
-        #             vmeta = nodes[v]
-        #             udist = umeta['distributed']
-        #             vdist = vmeta['distributed']
-        #             if not (udist ^ vdist):
-        #                 ushape = umeta['shape']
-        #                 if ushape is None:
-        #                     continue
-        #                 vshape = vmeta['shape']
-        #                 if vshape is None:
-        #                     continue
-        #                 ucomp = u.rpartition('.')[0]
-        #                 vcomp = v.rpartition('.')[0]
-        #                 if ucomp != vcomp:  # not internal, so check for src_indices
-        #                     if vmeta['io'] == 'input':
-        #                         src_indices = vmeta.get('src_indices')
-        #                         if src_indices is not None:
-        #                             vshape = src_indices.indexed_src_shape
-        #                 if ushape != vshape:
-        #                     mismatches.add(tuple(sorted((u, v))))
-
-        #     if mismatches:
-        #         for u, v in mismatches:
-        #             self._collect_error(f"{self.msginfo}: Shape mismatch, {nodes[u]['shape']} vs. "
-        #                                 f"{nodes[v]['shape']} for variables '{u}' and '{v}' during "
-        #                                 "dynamic shape determination.")
-
         # update variable metadata based on graph shapes
         for node, data in graph.nodes(data=True):
             if node.startswith('#'):  # not a real variable node
@@ -3261,6 +3229,8 @@ class Group(System):
                     try:
                         shp = (out_shape if all_meta_out['distributed'] else
                                all_meta_out['global_shape'])
+                        if shp is None:  # a collected error has already happened, so continue
+                            continue
                         src_indices.set_src_shape(shp, dist_shape=out_shape)
                         src_indices = src_indices.shaped_instance()
                     except Exception:
