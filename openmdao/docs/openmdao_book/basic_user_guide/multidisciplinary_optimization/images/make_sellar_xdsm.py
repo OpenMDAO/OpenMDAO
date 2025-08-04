@@ -7,7 +7,7 @@ def make_xdsm():
 
     x.add_system("dis1", FUNC, [r"\text{Discipline 1}", "y_1 = z_1^2 + z_2 + x - 0.2 y_2"])
     x.add_system("dis2", FUNC, [r"\text{Discipline 2}", r"y_2 = \sqrt{y_1} + z_1 + z_2"])
-    x.add_system("obj", IFUNC, [r"\text{Objective}", r"f = x^2 + z_2 + y_1 - e^{-y_2}"])
+    x.add_system("obj", IFUNC, [r"\text{Objective}", r"f = x^2 + z_2 + y_1 + e^{-y_2}"])
     x.add_system("con1", IFUNC, [r"\text{Constraint 1}", r"g_1 = 3.16 - y_1"])
     x.add_system("con2", IFUNC, [r"\text{Constraint 2}", r"g_2 = y_2 - 24.0"])
 
