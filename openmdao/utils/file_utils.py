@@ -12,10 +12,9 @@ from fnmatch import fnmatch
 from os.path import join, basename, dirname, isfile, split, splitext, abspath
 import pathlib
 import shutil
-import tempfile
 
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.testing_utils import set_env_vars_context, env_truthy
+from openmdao.utils.testing_utils import set_env_vars_context, env_truthy, get_tempdir
 
 
 def get_module_path(fpath):
@@ -439,7 +438,7 @@ def image2html(imagefile, title='', alt=''):
 
 
 if env_truthy('TESTFLO_RUNNING'):
-    TESTFLO_WORKDIR = tempfile.mkdtemp()
+    TESTFLO_WORKDIR = get_tempdir()
 else:
     TESTFLO_WORKDIR = ''
 

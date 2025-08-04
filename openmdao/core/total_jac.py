@@ -1658,9 +1658,12 @@ class _TotalJacInfo(object):
                         zero_rows.append((n, list(zip(*zero_idxs))))
 
             if zero_rows:
-                zero_rows = [f"('{n}', inds={idxs})" for n, idxs in zero_rows]
-                msg = (f"Constraints or objectives [{', '.join(zero_rows)}] cannot be impacted by "
-                       "the design variables of the problem.")
+                # zero_rows = [f"('{n}', inds={idxs})" for n, idxs in zero_rows]
+                msg = ('The following constraints or objectives cannot be impacted by '
+                       'the design variables of the problem at the current design point:\n')
+                for name, idxs in zero_rows:
+                    with np.printoptions(legacy='1.21'):
+                        msg += f'  {name}, inds={idxs}\n'
                 if raise_error:
                     raise RuntimeError(msg)
                 else:
@@ -1684,9 +1687,11 @@ class _TotalJacInfo(object):
                         zero_cols.append((n, list(zip(*zero_idxs))))
 
             if zero_cols:
-                zero_cols = [f"('{n}', inds={idxs})" for n, idxs in zero_cols]
-                msg = (f"Design variables [{', '.join(zero_cols)}] have no impact on the "
-                       "constraints or objective.")
+                msg = ('The following design variables have no impact on the '
+                       'constraints or objective at the current design point:\n')
+                for name, idxs in zero_cols:
+                    with np.printoptions(legacy='1.21'):
+                        msg += f'  {name}, inds={idxs}\n'
                 if raise_error:
                     raise RuntimeError(msg)
                 else:
