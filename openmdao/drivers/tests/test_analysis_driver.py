@@ -12,7 +12,6 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_warning, assert_warnings, assert_near_equal
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
-# from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
 
 
 try:
@@ -219,7 +218,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
         """
         samples = {'x': {'val': [0.0, 0.5, 1.0]},
                    'y': {'val': [0.0, 0.5, 1.0]}}
-        
+
         generator = om.ProductGenerator(samples)
 
         samples_list = [s for s in generator]
@@ -340,7 +339,7 @@ class TestAnalysisDriverParallel(unittest.TestCase):
         prob = om.Problem(FanInGrouped())
 
         # Note the absense of adding design varaibles here, compared to DOEGenerator
-       
+
         # the FanInGrouped model uses 2 processes, so we can run
         # two instances of the model at a time, each using 2 of our 4 procs
         procs_per_model = 2
@@ -460,9 +459,9 @@ class TestAnalysisDriver(unittest.TestCase):
             self.assertEqual(num_recorded_cases, 1)
 
     def test_csv(self):
-        
+
         ### Part 1 - Create a CSV file of the cases we want to run
-        
+
         var_dict = {'x': {'val': [0.0, 0.5, 1.0], 'units': None, 'indices': [0]},
                     'y': {'val': [0.0, 0.5, 1.0], 'units': None, 'indices': [0]}}
 
@@ -484,9 +483,9 @@ class TestAnalysisDriver(unittest.TestCase):
             writer = csv.DictWriter(f, fieldnames=var_dict.keys())
             writer.writeheader()
             writer.writerows(cases_csv_data)
-        
+
         ### Part 2 - Run the CSVGenerator on the file we just created
-        
+
         prob = om.Problem()
         model = prob.model
 
@@ -537,6 +536,19 @@ class TestAnalysisDriver(unittest.TestCase):
                    "{'x': 5, 'y': 4}")
 
         self.assertEqual(expected, str(e.exception))
+
+
+class TestErrors(unittest.TestCase):
+
+    def test_generator_check(self):
+        prob = om.Problem()
+
+        with self.assertRaises(ValueError) as err:
+            prob.driver = om.AnalysisDriver(om.Problem())
+
+        self.assertEqual(str(err.exception),
+                         "samples must be a list, tuple, or derived from AnalysisGenerator "
+                         "but got <class 'openmdao.core.problem.Problem'>")
 
 
 if __name__ == "__main__":

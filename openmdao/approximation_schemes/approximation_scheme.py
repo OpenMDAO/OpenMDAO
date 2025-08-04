@@ -127,14 +127,14 @@ class ApproximationScheme(object):
 
         return self._approx_groups, self._colored_approx_groups
 
-    def add_approximation(self, abs_key, system, kwargs):
+    def add_approximation(self, wrt, system, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
         Parameters
         ----------
-        abs_key : tuple(str,str)
-            Absolute name pairing of (of, wrt) for the derivative.
+        wrt : str
+            Name of wrt variable.
         system : System
             Containing System.
         kwargs : dict
@@ -167,7 +167,7 @@ class ApproximationScheme(object):
 
         if is_total or wrt_matches is not None:
             colored_start = colored_end = 0
-            for abs_wrt, cstart, cend, _, cinds, _ in system._jac_wrt_iter():
+            for abs_wrt, cstart, cend, _, cinds, _ in system._get_jac_wrts():
                 if wrt_matches is None or abs_wrt in wrt_matches:
                     colored_end += cend - cstart
                     if wrt_matches is not None:
@@ -187,7 +187,7 @@ class ApproximationScheme(object):
         abs2prom = system._resolver.abs2prom
 
         if is_total:
-            it = ((of, end - start) for of, start, end, _, _ in system._jac_of_iter())
+            it = ((of, end - start) for of, start, end, _, _ in system._get_jac_ofs())
             rangemapper = RangeMapper.create(wrt_ranges)
         else:
             it = ((n, arr.size) for n, arr in system._outputs._abs_item_iter())
@@ -252,7 +252,7 @@ class ApproximationScheme(object):
             vec_inds_directional = defaultdict(list)
 
         # wrt here is an absolute name (source if total)
-        for wrt, start, end, vec, sinds, _ in system._jac_wrt_iter(wrt_matches):
+        for wrt, start, end, vec, sinds, _ in system._get_jac_wrts(wrt_matches):
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:
@@ -357,7 +357,7 @@ class ApproximationScheme(object):
 
         if total:
             tot_result = np.zeros(sum([end - start for _, start, end, _, _
-                                       in system._jac_of_iter()]))
+                                       in system._get_jac_ofs()]))
             scratch = tot_result.copy()
         else:
             scratch = np.empty(len(system._outputs))
@@ -482,7 +482,7 @@ class ApproximationScheme(object):
         """
         total = system.pathname == ''
         if total:
-            for _, _, end, _, _ in system._jac_of_iter():
+            for _, _, end, _, _ in system._get_jac_ofs():
                 pass
             tot_result = np.zeros(end)
 
@@ -579,7 +579,7 @@ class ApproximationScheme(object):
                     else:
                         yield jinds, res
 
-    def compute_approximations(self, system, jac=None):
+    def compute_approximations(self, system, jac):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -587,17 +587,11 @@ class ApproximationScheme(object):
         ----------
         system : System
             System on which the execution is run.
-        jac : None or dict-like
-            If None, update system with the approximated sub-Jacobians. Otherwise, store the
-            approximations in the given dict-like object.
+        jac : dict-like
+            Store the approximations in the given dict-like object.
         """
         if not self._wrt_meta:
             return
-
-        if system._tot_jac is not None:
-            jac = system._tot_jac
-        elif jac is None:
-            jac = system._jacobian
 
         for ic, col in self.compute_approx_col_iter(system,
                                                     under_cs=system._outputs._under_complex_step):

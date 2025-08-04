@@ -31,7 +31,7 @@ class TestJax(unittest.TestCase):
         sin = np.sin(x)
         cos = np.cos(x)
 
-        smax = smooth_max(sin, cos, mu=1.0E-6)
+        smax = np.asarray(smooth_max(sin, cos, mu=1.0E-6))
 
         idxs_sgt = np.where(sin > cos)
         idxs_cgt = np.where(sin < cos)
@@ -44,7 +44,7 @@ class TestJax(unittest.TestCase):
         sin = np.sin(x)
         cos = np.cos(x)
 
-        smin = smooth_min(sin, cos, mu=1.0E-6)
+        smin = np.asarray(smooth_min(sin, cos, mu=1.0E-6))
 
         idxs_sgt = np.where(sin > cos)
         idxs_cgt = np.where(sin < cos)
@@ -55,7 +55,7 @@ class TestJax(unittest.TestCase):
     def test_smooth_abs(self):
         x = np.linspace(-0.5, 0.5, 1000)
 
-        sabs = smooth_abs(x)
+        sabs = np.asarray(smooth_abs(x))
         abs = np.abs(x)
 
         idxs_compare = np.where(abs > 0.1)
@@ -64,7 +64,7 @@ class TestJax(unittest.TestCase):
     def test_smooth_round(self):
         x = np.linspace(10, -10, 100)
 
-        round_x = smooth_round(x, mu=0.1)
+        round_x = np.asarray(smooth_round(x, mu=0.1))
 
         expected_x = np.array([10.,   9.997,   9.872,   9.107,   9.002,   9.,   8.997,
                                8.848,   8.089,   8.002,   8.,   7.996,   7.82,   7.074,
@@ -87,7 +87,7 @@ class TestJax(unittest.TestCase):
     def test_ks_max(self):
         x = np.random.random(1000)
 
-        ksmax = ks_max(x, rho=1.E6)
+        ksmax = np.asarray(ks_max(x, rho=1.E6))
         npmax = np.max(x)
 
         assert_near_equal(ksmax, npmax, tolerance=1.0E-6)
@@ -95,7 +95,7 @@ class TestJax(unittest.TestCase):
     def test_ks_min(self):
         x = np.random.random(1000)
 
-        ksmin = ks_min(x, rho=1.E6)
+        ksmin = np.asarray(ks_min(x, rho=1.E6))
         npmin = np.min(x)
 
         assert_near_equal(ksmin, npmin, tolerance=2.0E-5)

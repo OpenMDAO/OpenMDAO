@@ -246,8 +246,8 @@ class BroydenSolver(NonlinearSolver):
         Return a generator of linear solvers using assembled jacs.
         """
         if self.linear_solver is not None:
-            for s in self.linear_solver._assembled_jac_solver_iter():
-                yield s
+            for tup in self.linear_solver._assembled_jac_solver_iter():
+                yield tup
 
     def _set_solver_print(self, level=2, type_='all'):
         """
@@ -302,9 +302,9 @@ class BroydenSolver(NonlinearSolver):
             self.xm = self.xm.astype(complex)
             self.fxm = self.fxm.astype(complex)
         elif np.iscomplexobj(self.xm):
-            self.Gm = self.Gm.real
-            self.xm = self.xm.real
-            self.fxm = self.fxm.real
+            self.Gm = np.ascontiguousarray(self.Gm.real)
+            self.xm = np.ascontiguousarray(self.xm.real)
+            self.fxm = np.ascontiguousarray(self.fxm.real)
 
         self._converge_failures = 0
         self._computed_jacobians = 0
@@ -570,10 +570,7 @@ class BroydenSolver(NonlinearSolver):
         try:
             # Linearize model.
             ln_solver = self.linear_solver
-            my_asm_jac = ln_solver._assembled_jac
-            system._linearize(my_asm_jac, sub_do_ln=ln_solver._linearize_children())
-            if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
-                my_asm_jac._update(system)
+            system._linearize(sub_do_ln=ln_solver._linearize_children())
             self._linearize()
 
             for wrt_name in states:
@@ -632,10 +629,7 @@ class BroydenSolver(NonlinearSolver):
             # Linearize model.
             ln_solver = self.linear_solver
             do_sub_ln = ln_solver._linearize_children()
-            my_asm_jac = ln_solver._assembled_jac
-            system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-            if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
-                my_asm_jac._update(system)
+            system._linearize(sub_do_ln=do_sub_ln)
 
             inv_jac = self.linear_solver._inverse()
         finally:

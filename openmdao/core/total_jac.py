@@ -133,6 +133,10 @@ class _TotalJacInfo(object):
             driver = problem.driver
         self.model = model = problem.model
 
+        # reset the of and wrt caches just in case we've previously built a total jac with
+        # linear constraints (which will have different ofs and wrts than the nl total jac).
+        model._clear_jac_caches()
+
         self.comm = model.comm
         self._orig_mode = problem._orig_mode
         self.has_scaling = driver and driver._has_scaling and driver_scaling
@@ -1380,12 +1384,8 @@ class _TotalJacInfo(object):
 
         if self.approx:
             try:
-                return self._compute_totals_approx(progress_out_stream=progress_out_stream)
-            finally:
-                self.model._recording_iter.pop()
-        elif self.model.options['derivs_method'] == 'jax':
-            try:
-                return self._compute_totals_jax(progress_out_stream=progress_out_stream)
+                with self.relevance.all_seeds_active():
+                    return self._compute_totals_approx(progress_out_stream=progress_out_stream)
             finally:
                 self.model._recording_iter.pop()
 
@@ -1411,11 +1411,7 @@ class _TotalJacInfo(object):
                         try:
                             ln_solver = model._linear_solver
                             with model._scaled_context_all():
-                                model._linearize(model._assembled_jac,
-                                                 sub_do_ln=ln_solver._linearize_children())
-                            if ln_solver._assembled_jac is not None and \
-                                    ln_solver._assembled_jac._under_complex_step:
-                                model.linear_solver._assembled_jac._update(model)
+                                model._linearize(sub_do_ln=ln_solver._linearize_children())
                             ln_solver._linearize()
                         finally:
                             model._tot_jac = None
@@ -1558,7 +1554,6 @@ class _TotalJacInfo(object):
                         if progress_out_stream is not None:
                             model._approx_schemes['fd']._progress_out = progress_out_stream
 
-                    model._setup_jacobians(recurse=False)
                     model._setup_approx_derivs()
                     if model._coloring_info.coloring is not None:
                         model._coloring_info._update_wrt_matches(model)
@@ -1574,66 +1569,7 @@ class _TotalJacInfo(object):
                         scheme._totals_directional_mode = None
 
                 # Linearize Model
-                model._linearize(model._assembled_jac,
-                                 sub_do_ln=model._linear_solver._linearize_children())
-
-            finally:
-                model._tot_jac = None
-
-            totals = self.J_dict
-            if debug_print:
-                print(f'Elapsed time to approx totals: {time.perf_counter() - t0} secs\n',
-                      flush=True)
-
-            # Driver scaling.
-            if self.has_scaling:
-                self._do_driver_scaling(totals)
-
-            if return_format == 'array':
-                totals = self.J  # change back to array version
-
-            if debug_print:
-                # Debug outputs scaled derivatives.
-                self._print_derivatives()
-
-        return totals
-
-    def _compute_totals_jax(self, progress_out_stream=None):
-        """
-        Compute derivatives of desired quantities with respect to desired inputs.
-
-        Uses jax to calculate the derivatives.
-
-        Parameters
-        ----------
-        progress_out_stream : None or file-like object
-            Where to send human readable output. None by default which suppresses the output.
-
-        Returns
-        -------
-        derivs : object
-            Derivatives in form requested by 'return_format'.
-        """
-        model = self.model
-        return_format = self.return_format
-        debug_print = self.debug_print
-
-        # Prepare model for calculation by cleaning out the derivatives vectors.
-        model._dinputs.set_val(0.0)
-        model._doutputs.set_val(0.0)
-        model._dresiduals.set_val(0.0)
-
-        # Solve for derivs using jax
-        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
-
-        t0 = time.perf_counter()
-
-        with self._totjac_context():
-            model._tot_jac = self
-            try:
-                # Linearize Model
-                model._linearize(model._assembled_jac,
-                                 sub_do_ln=model._linear_solver._linearize_children())
+                model._linearize(sub_do_ln=model._linear_solver._linearize_children())
 
             finally:
                 model._tot_jac = None
@@ -1722,9 +1658,12 @@ class _TotalJacInfo(object):
                         zero_rows.append((n, list(zip(*zero_idxs))))
 
             if zero_rows:
-                zero_rows = [f"('{n}', inds={idxs})" for n, idxs in zero_rows]
-                msg = (f"Constraints or objectives [{', '.join(zero_rows)}] cannot be impacted by "
-                       "the design variables of the problem.")
+                # zero_rows = [f"('{n}', inds={idxs})" for n, idxs in zero_rows]
+                msg = ('The following constraints or objectives cannot be impacted by '
+                       'the design variables of the problem at the current design point:\n')
+                for name, idxs in zero_rows:
+                    with np.printoptions(legacy='1.21'):
+                        msg += f'  {name}, inds={idxs}\n'
                 if raise_error:
                     raise RuntimeError(msg)
                 else:
@@ -1748,9 +1687,11 @@ class _TotalJacInfo(object):
                         zero_cols.append((n, list(zip(*zero_idxs))))
 
             if zero_cols:
-                zero_cols = [f"('{n}', inds={idxs})" for n, idxs in zero_cols]
-                msg = (f"Design variables [{', '.join(zero_cols)}] have no impact on the "
-                       "constraints or objective.")
+                msg = ('The following design variables have no impact on the '
+                       'constraints or objective at the current design point:\n')
+                for name, idxs in zero_cols:
+                    with np.printoptions(legacy='1.21'):
+                        msg += f'  {name}, inds={idxs}\n'
                 if raise_error:
                     raise RuntimeError(msg)
                 else:
@@ -1875,6 +1816,53 @@ class _TotalJacInfo(object):
 
         finally:
             self.model._recording_iter.pop()
+
+    def _setup(self, system):
+        """
+        Set up the total jacobian.
+
+        Parameters
+        ----------
+        system : System
+            System that is setting up the total jacobian.
+        """
+        # This is called when this is a system ._jacobian.  Eventually, once we unify the
+        # interfaces between partial and total jacobians, this will actually do something.
+        pass
+
+    def todense(self):
+        """
+        Return the total jacobian as a dense array.
+
+        Returns
+        -------
+        ndarray
+            Dense array representation of the total jacobian.
+        """
+        return self.J
+
+    def _update(self, system):
+        """
+        Update the total jacobian.
+        """
+        pass
+
+    def _pre_update(self, dtype):
+        """
+        Pre-update the total jacobian.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The dtype of the jacobian.
+        """
+        pass
+
+    def _post_update(self):
+        """
+        Post-update the total jacobian.
+        """
+        pass
 
     def set_col(self, system, icol, column):
         """

@@ -2107,7 +2107,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).')
+                         'Constraints or objectives [parab.z] cannot be impacted by the design'
+                         ' variables of the problem because no partials were defined for them in their parent component(s).')
 
     def test_singular_jac_error_desvars(self):
         prob = om.Problem()
@@ -2137,12 +2138,12 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with printoptions(legacy='1.21'):
-            with self.assertRaises(RuntimeError) as msg:
-                prob.run_driver()
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
+                         'The following design variables have no impact on the constraints or '
+                         'objective at the current design point:\n  z, inds=[0]\n')
 
     def test_singular_jac_ignore(self):
         prob = om.Problem()
@@ -2194,15 +2195,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        msg = "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design variables of the problem."
+        expected_msg = ('The following constraints or objectives cannot be impacted by'
+                        ' the design variables of the problem at the current design point:\n  parab.z, inds=[0]\n')
 
-        with printoptions(legacy='1.21'):
-            with assert_warning(UserWarning, msg):
-                prob.run_driver()
+        with assert_warning(DerivativesWarning, expected_msg):
+            prob.run_driver()
 
     def test_singular_jac_desvars_multidim_indices_dv(self):
-        expected_msg = "Design variables [('z', inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)])] " \
-                       "have no impact on the constraints or objective."
+        expected_msg = "The following design variables " \
+                       "have no impact on the constraints or objective at the current design point:\n  z, inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)]\n"
 
         for option in ['error', 'warn', 'ignore']:
             with self.subTest(f'singular_jac_behavior = {option}'):
@@ -2275,7 +2276,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                 prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
+                         'The following constraints or objectives cannot be impacted by the design'
+                         ' variables of the problem at the current design point:\n  parab.f_z, inds=[(1, 1, 0)]\n')
 
     @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")
@@ -2450,6 +2452,128 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         with assert_no_warning(DerivativesWarning, "Inefficient choice of derivative mode", contains=True):
             prob.setup(mode='rev')
             prob.run_driver()
+
+
+@unittest.skipUnless(ScipyVersion >= Version("1.14"), "scipy >= 1.14 is required for COBYQA.")
+class TestScipyOptimizeDriverCOBYQA(unittest.TestCase):
+
+    def test_simple_paraboloid_unconstrained_COBYQA(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-9, disp=False)
+
+        # note: want x to have no bounds, but COBYQA won't converge with bounds
+        # of +/- 1e30 due to how the algorithm works. So set big bounds, but still
+        # much smaller than OpenMDAO's default when there are no bounds
+        model.add_design_var('x', lower=-1e6, upper=1e6)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.setup()
+
+        failed = not prob.run_driver().success
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver._scipy_optimize_result))
+
+        assert_near_equal(prob['x'], 6.66666667, 1e-6)
+        assert_near_equal(prob['y'], -7.3333333, 1e-6)
+
+    def test_simple_paraboloid_upper_COBYQA(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.set_input_defaults('x', val=50.)
+        model.set_input_defaults('y', val=50.)
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-9, disp=False)
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup()
+
+        failed = not prob.run_driver().success
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver._scipy_optimize_result))
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_near_equal(prob['x'], 7.16667, 1e-6)
+        assert_near_equal(prob['y'], -7.833334, 1e-6)
+
+    def test_simple_paraboloid_desvar_indices_COBYQA(self):
+        # verify indices are handled properly when creating constraints for
+        # upper and lower bounds on design variables for COBYQA
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('indep', om.IndepVarComp('xy', val=[-1., 50., 50., -1]))
+        model.add_subsystem('comp', Paraboloid())
+        model.add_subsystem('cons', om.ExecComp('c = - x + y'))
+
+        model.connect('indep.xy', ['comp.x', 'cons.x'], src_indices=[1])
+        model.connect('indep.xy', ['comp.y', 'cons.y'], src_indices=[2])
+
+        model.add_design_var('indep.xy', indices=[1,2], lower=[-50.0, -50.0], upper=[50.0, 50.0])
+        model.add_objective('comp.f_xy')
+        model.add_constraint('cons.c', upper=-15.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-9, disp=False)
+        prob.setup()
+
+        failed = not prob.run_driver().success
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver._scipy_optimize_result))
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_near_equal(prob['indep.xy'], [-1, 7.16667, -7.833334, -1], 1e-6)
+
+    def test_sellar_mdf_COBYQA(self):
+
+        prob = om.Problem()
+        model = prob.model = SellarDerivativesGrouped(nonlinear_solver=om.NonlinearBlockGS,
+                                                      linear_solver=om.ScipyKrylov)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-9, disp=False)
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.setup(check=False, mode='rev')
+
+        failed = not prob.run_driver().success
+
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver._scipy_optimize_result))
+
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 1e-3)
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from openmdao.components.func_comp_common import _check_var_name, _copy_with_ign
     jac_forward, jac_reverse, _get_tangents, _ensure_iter
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.jacobians.jacobian import JacobianUpdateContext
 
 try:
     import jax
@@ -141,14 +142,12 @@ class ExplicitFuncComp(ExplicitComponent):
             if isinstance(meta['val'], JaxArray):
                 meta['val'] = np.asarray(meta['val'])
 
-    def _linearize(self, jac=None, sub_do_ln=False):
+    def _linearize(self, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            Ignored.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
@@ -158,9 +157,10 @@ class ExplicitFuncComp(ExplicitComponent):
                 self._first_call_to_linearize = True
                 self._tangents = None
             self._check_first_linearize()
-            self._jax_linearize()
+            with JacobianUpdateContext(self):
+                self._jax_linearize()
         else:
-            super()._linearize(jac, sub_do_ln)
+            super()._linearize(sub_do_ln)
 
     def _jax_linearize(self):
         """
@@ -224,7 +224,7 @@ class ExplicitFuncComp(ExplicitComponent):
                      for a in jac_forward(func, argnums, tangents)(*invals)]
                 j = coloring._expand_jac(np.vstack(j), 'fwd').toarray()
 
-        self._jacobian.set_dense_jac(self, j)
+        self._get_jacobian().set_dense_jac(self, j)
 
     def _get_tangents(self, vals, direction, coloring=None, argnums=None):
         """
