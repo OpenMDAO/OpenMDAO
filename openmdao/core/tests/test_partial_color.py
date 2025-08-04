@@ -582,6 +582,7 @@ class TestColoringImplicitFuncComp(unittest.TestCase):
     def setUp(self):
         np.random.seed(11)
 
+    @unittest.skipIf(sys.version_info > (3, 11), "In newer versions of python, inspect.getsource fails here, causing the test to fail.")
     def test_partials_implicit_funccomp(self):
         for (method, direction), isplit, osplit in itertools.product([('fd', 'fwd'), ('cs', 'fwd'), ('jax', 'fwd'), ('jax', 'rev')] if jax else [('fd', 'fwd'), ('cs', 'fwd')],
         [1,2,7,19],

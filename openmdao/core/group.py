@@ -2958,18 +2958,13 @@ class Group(System):
         nodes = graph.nodes
         do_sort = self.comm.size > 1
 
-        # import pprint
-        # pprint.pprint(sorted(graph.edges()))
-
         # connected_components needs an undirected graph
         for comps in nx.weakly_connected_components(graph):
-            # print("CONNECTED COMPONENTS:", sorted(comps))
 
             # treat all knowns initially as unresolved
             unresolved_knowns = all_knowns.intersection(comps)
             if not unresolved_knowns:
                 # no knowns in this component, so we fail.
-                # print("FAIL!")
                 continue
 
             progress = True
@@ -2983,11 +2978,8 @@ class Group(System):
                 if do_sort:
                     active_single_edges = sorted(active_single_edges)
 
-                # print("ACTIVE EDGES", active_single_edges)
-                # print("COMPUTE NODES:", sorted(computed_nodes))
                 for k, u in active_single_edges:
                     shp = copy_var_property(graph, k, u, dist_shapes, dist_sizes)
-                    # print((k, u), 'GOT SHAPE:', shp)
                     if shp is not None:
                         if is_unresolved(graph, u, prop):
                             unresolved_knowns.add(u)
@@ -2996,11 +2988,9 @@ class Group(System):
                         progress = True
 
                 for mnode in computed_nodes:
-                    # print("COMPUTE NODE", mnode)
                     for k, _, data in graph.in_edges(mnode, data=True):
                         if nodes[k][prop] is None and data['multi']:
                             # if any preds are unknown, we can't compute the property yet
-                            # print("TOO EARLY")
                             break
                     else:
                         # all compute_prop preds are known so compute the property
@@ -3015,13 +3005,8 @@ class Group(System):
                                 for n in graph.predecessors(mnode)
                             }
 
-                        # import pprint
-                        # print("COMPUTING WITH:")
-                        # pprint.pprint(props)
-
                         shp = compute_var_property(mnode, props, nodes[mnode][compute_prop], prop)
                         if shp is not None:
-                            # print("COMPUTED SHAPE", shp)
                             graph.nodes[mnode][prop] = shp
                             if is_unresolved(graph, mnode, prop):
                                 unresolved_knowns.add(mnode)
@@ -3201,10 +3186,6 @@ class Group(System):
                 # get input shape and src_indices from the local meta dict
                 # (input is always local)
                 if meta_in['distributed']:
-                    if self.pathname == '':
-                        exist_procs = self._var_existence['input'][:, abs2idx[abs_in]]
-                    else:
-                        exist_procs = None
                     # if output is non-distributed and input is distributed, make output shape the
                     # full distributed shape, i.e., treat it in this regard as a distributed output
                     out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'], 'output')

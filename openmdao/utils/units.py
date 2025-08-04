@@ -1085,27 +1085,6 @@ def _has_val_mismatch(units1, val1, units2, val2, rtol=1e-10):
         return True
 
     absdiff = np.abs(val2 - val1)
-
-    # Determine the denominator for the relative difference calculation.
-    # To handle cases where neither array is a clear "reference" and to provide
-    # a symmetric check, we use the maximum of the absolute values of the
-    # corresponding elements as the basis for the relative difference.
-    # This means we are checking if |val1[i] - val2[i]| / max(|val1[i]|, |val2[i]|) > tolerance.
-    #
-    # We re-arrange this to: |val1[i] - val2[i]| > tolerance * max(|val1[i]|, |val2[i]|)
-    #
-    # Handling of zeros:
-    # - If both val1[i] and val2[i] are 0:
-    #   max(|0|, |0|) = 0.
-    #   abs_diff[i] = 0.
-    #   The condition (0 > tolerance * 0) simplifies to (0 > 0), which is False. Correct.
-    # - If one is zero and the other is non-zero (e.g., val1[i]=0, val2[i]=X != 0):
-    #   max(|0|, |X|) = |X|.
-    #   abs_diff[i] = |0 - X| = |X|.
-    #   The condition (|X| > tolerance * |X|) simplifies to (1 > tolerance).
-    #   This means a difference from zero is considered significant if tolerance < 1. Correct.
-    # - If both are non-zero:
-    #   The check becomes |val1[i] - val2[i]| / max(|val1[i]|, |val2[i]|) > tolerance. Correct.
     denominator_basis = np.maximum(np.abs(val1), np.abs(val2))
     threshold = rtol * denominator_basis
     return np.any(absdiff > threshold)

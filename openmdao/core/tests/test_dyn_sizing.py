@@ -770,34 +770,6 @@ class TestRemoteDistribDynShapes(unittest.TestCase):
         p.model.connect('par.G2.C2.y1', 'sink.x2', src_indices=om.slicer[:])
         return p
 
-    def test_remote_distrib_fwd(self):
-        # dynamic shapes solved moving fwd (from IVC -->).  Deriv mode = fwd
-        p = self._build_model(solve_dyn_fwd=True)
-        p.setup(mode='fwd')
-        p.run_model()
-        for name, meta in p.model._var_abs2meta['input'].items():
-            print('input', name, meta.get('distributed'), meta.get('shape'), meta.get('src_indices'))
-        for name, meta in p.model._var_abs2meta['output'].items():
-            print('output', name, meta.get('distributed'), meta.get('shape'))
-
-        # np.testing.assert_allclose(np.tile(p.get_val('indep.x1'), 2)*8, p.get_val('sink.y1'))
-        assert_check_partials(p.check_partials(method='fd', show_only_incorrect=True))
-        assert_check_totals(p.check_totals(of=['sink.y1'], wrt=['indep.x1'], rich_print=False))
-
-    def test_remote_distrib_rev(self):
-        # dynamic shapes solved moving fwd (from IVC -->).  Deriv mode = rev
-        p = self._build_model(solve_dyn_fwd=True)
-        p.setup(mode='rev')
-        p.run_model()
-        for name, meta in p.model._var_abs2meta['input'].items():
-            print('input', name, meta.get('distributed'), meta.get('shape'), meta.get('src_indices'))
-        for name, meta in p.model._var_abs2meta['output'].items():
-            print('output', name, meta.get('distributed'), meta.get('shape'))
-
-        # np.testing.assert_allclose(np.tile(p.get_val('indep.x1'), 2)*8, p.get_val('sink.y1'))
-        assert_check_partials(p.check_partials(method='fd', show_only_incorrect=True))
-        assert_check_totals(p.check_totals(of=['sink.y1'], wrt=['indep.x1'], rich_print=False))
-
     def test_remote_distrib_err(self):
         # this test has remote distributed components (distributed comps under parallel groups)
         p = self._build_model(solve_dyn_fwd=False)
@@ -1369,29 +1341,59 @@ class TestDynShapeSrcIndices(unittest.TestCase):
         global_val[4:] *= 4
         assert_near_equal(p.get_val('comp.y1', get_remote=True), global_val)
 
-    # def test_serial_serial_rev(self):
-    #     p = om.Problem()
-    #     model = p.model
+    def test_serial_serial_rev(self):
+        p = om.Problem()
+        model = p.model
 
-    #     self.fail("foo")
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', shape_by_conn=True)
 
-    # def test_serial_dist_rev(self):
-    #     p = om.Problem()
-    #     model = p.model
+        model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                x={'copy_shape': 'y'}, y={'shape_by_conn': True}))
+        model.add_subsystem('sink', om.ExecComp('y = x', shape=(2,3)))
 
-    #     self.fail("foo")
+        model.connect('indep.x', 'comp.x')
+        model.connect('comp.y', 'sink.x')
 
-    # def test_dist_serial_rev(self):
-    #     p = om.Problem()
-    #     model = p.model
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('indep.x'), np.ones((2, 3)))
 
-    #     self.fail("foo")
+    def test_serial_dist_rev(self):
 
-    # def test_dist_dist_rev(self):
-    #     p = om.Problem()
-    #     model = p.model
+        class MyDistComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', distributed=True, shape=(2,3))
+                self.add_output('y', distributed=True, shape=(2,3))
 
-    #     self.fail("foo")
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] * 2.
+
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', shape_by_conn=True)
+
+        model.add_subsystem('comp', MyDistComp())
+
+        model.connect('indep.x', 'comp.x')
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('indep.x'), np.ones((2, 3)))
+
+    def test_dist_serial_rev(self):
+        p = om.Problem()
+        model = p.model
+
+        self.fail("This test is missing")
+
+    def test_dist_dist_rev(self):
+        p = om.Problem()
+        model = p.model
+
+        self.fail("This test is missing")
 
 
 

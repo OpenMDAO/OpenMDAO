@@ -3,7 +3,6 @@ import os
 import re
 import sys
 import textwrap
-import json
 from types import TracebackType
 import unittest
 from contextlib import contextmanager
@@ -1271,146 +1270,15 @@ def get_connection_owner(system, tgt):
     return system, src, tgt
 
 
-def generate_launch_json_file(vscode_dir, base_port, ranks):
+def wing_dbg():
     """
-    Generate a launch.json file for the VSCode debugger.
+    Make import of wingdbstub contingent on value of WING_DBG environment variable.
 
-    Parameters
-    ----------
-    vscode_dir : str
-        The full path of the .vscode directory.
-    base_port : int
-        The base port number for the debugger.
-    ranks : int
-        The specific ranks to debug.
+    Also will import wingdbstub from the WINGHOME directory.
     """
-    # Create a list of configurations for each MPI rank
-    configurations = []
-    compound_configs = []
-    for rank in ranks:
-        config_name = f"rank_{rank}_config"
-        config = {
-            "name": config_name,
-            "type": "python",
-            "request": "attach",
-            "port": base_port + rank,
-            "host": "localhost",
-            "justMyCode": True,
-            "presentation": {
-                "order": rank + 2
-            }
-        }
-        configurations.append(config)
-        compound_configs.append(config_name)
-
-    top = {
-        "version": "0.2.0",
-        "configurations": configurations,
-        "compounds": [
-            {
-                "name": "MPI Debug (Use this instead of rank_?_configs)",
-                "configurations": compound_configs,
-                "presentation": {
-                    "order": 1
-                }
-            }
-        ]
-    }
-    with open(os.path.join(vscode_dir, "launch.json"), "w") as f:
-        json.dump(top, f, indent=2)
-
-
-def vscode_env_error(env_var):
-    """
-    Generate error message.
-
-    Parameters
-    ----------
-    env_var : str
-        Value of VSCODE_DBG environment variable.
-    """
-    print("Invalid VSCODE_DBG environment variable. Expected ':<port>' or "
-          f"'<rank1,rank2,...>:<port>' but got '{env_var}'. Debugging aborted.", flush=True)
-    sys.exit(1)
-
-
-def setup_dbg():
-    """
-    If WING_DBG or VSCODE_DBG is truthy in the environment, set up their debuggers.
-    """
-    # Get the base port from the VSCODE_DBG environment variable if set
-    vscode_dbg = os.environ.get("VSCODE_DBG")
-
-    use_def_ranks = True
-    if vscode_dbg is not None:
-        if MPI is None:
-            myrank = 0
-            ranks = [0]
-        else:
-            myrank = MPI.COMM_WORLD.rank
-            ranks = range(MPI.COMM_WORLD.size)  # by default, debug all ranks
-
-        default_base_port = 51111
-
-        if vscode_dbg == '1':  # use default port and all ranks
-            portstr = str(default_base_port)
-        else:
-            if ':' in vscode_dbg:
-                ranks_str, _, portstr = vscode_dbg.partition(':')
-            else:
-                ranks_str = vscode_dbg
-                portstr = str(default_base_port)
-
-            if ',' in ranks_str:
-                use_def_ranks = False
-                try:
-                    ranks = [int(r) for r in ranks_str.split(',') if r.strip()]
-                except (ValueError, TypeError):
-                    vscode_env_error(vscode_dbg)
-            elif ranks_str.strip() == '':
-                use_def_ranks = True
-            else:  # single rank
-                use_def_ranks = False
-                try:
-                    ranks = [int(ranks_str)]
-                except (ValueError, TypeError):
-                    vscode_env_error(vscode_dbg)
-
-        try:
-            base_port = int(portstr)
-        except (ValueError, TypeError):
-            vscode_env_error(vscode_dbg)
-
-        # verify ranks are valid
-        if MPI is not None and not use_def_ranks:
-            badranks = []
-            for r in ranks:
-                if not 0 <= r < MPI.COMM_WORLD.size:
-                    badranks.append(r)
-            if badranks:
-                print("The following ranks are outside of the valid range of "
-                      f"(0-{MPI.COMM_WORLD.size - 1}): {badranks}. Debugging aborted.", flush=True)
-                sys.exit(1)
-
-        debug_port = base_port + myrank
-
-        if myrank == min(ranks):
-            omdir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            vscode_dir = os.path.join(omdir, ".vscode")
-            if not os.path.exists(vscode_dir):
-                os.makedirs(vscode_dir)
-            generate_launch_json_file(vscode_dir, base_port, ranks)
-
-        if MPI is not None:
-            MPI.COMM_WORLD.barrier()
-
-        if myrank in ranks:
-            import debugpy
-            debugpy.listen(('0.0.0.0', debug_port))
-            debugpy.wait_for_client()  # This will block until a debugger connects
-            print(f"Rank {myrank}: Debugger listening on port {debug_port}", flush=True)
-
-    elif env_truthy('WING_DBG'):
+    if env_truthy('WING_DBG'):
+        import sys
+        import os
         save = sys.path
         new = sys.path[:] + [os.environ['WINGHOME']]
         sys.path = new

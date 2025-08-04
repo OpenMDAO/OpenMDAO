@@ -1110,7 +1110,6 @@ class Component(System):
         # src is outside of this component, so we need to use the all_sizes dict to get the sizes
         # of the output variables
         sizes_out = all_sizes['output']
-        exist_ins = all_exist['input']
         added_src_inds = []
         # loop over continuous local inputs
         for iname, meta_in in abs2meta_in.items():
@@ -1123,19 +1122,9 @@ class Component(System):
                     gsize_out = all_abs2meta_out[src]['global_size']
                     gsize_in = all_abs2meta_in[iname]['global_size']
                     vout_sizes = sizes_out[:, all_abs2idx[src]]
-                    sizes_ok = False
-                    if gsize_out == gsize_in:
-                        sizes_ok = True
-                    else:
-                        if dist_in and not dist_out:  # serial output --> distrib input
-                            exins = exist_ins[:, all_abs2idx[iname]]
-                            # only compare to the total size of the src across the procs where
-                            # this distributed input variable exists.
-                            if np.sum(vout_sizes[exins]) == gsize_in:
-                                sizes_ok = True
 
                     offset = None
-                    if gsize_out == gsize_in or sizes_ok:
+                    if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes) == gsize_in):
                         # This assumes one of:
                         # 1) a distributed output with total size matching the total size of a
                         #    distributed input
