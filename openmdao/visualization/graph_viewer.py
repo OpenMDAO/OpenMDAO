@@ -899,7 +899,7 @@ def _graph_cmd(options, user_args):
         # _setup_dynamic_properties.  inst_id is None here because no system's pathname will
         # have been set at the time this hook is triggered.
         hooks._register_hook('_setup_part2', class_name='Group', inst_id=None,
-                             pre=_view_graph, exit=True)
+                             post=_view_graph, exit=True)
         hooks._setup_hooks(prob.model)
 
     # register the hooks
