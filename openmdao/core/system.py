@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from collections import defaultdict
 from itertools import chain
 from enum import IntEnum
+import warnings
 
 from fnmatch import fnmatchcase
 from numbers import Integral
@@ -156,6 +157,11 @@ def collect_errors(method):
             self._collect_error(str(exc), exc_type=type_exc, tback=tb)
 
     return wrapper
+
+
+class ValidationError(ValueError):
+    def __init__(self, message="Errors / Warnings during validation"):
+        super().__init__(message)
 
 
 class System(object, metaclass=SystemMetaclass):
@@ -7096,8 +7102,37 @@ class System(object, metaclass=SystemMetaclass):
                 self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP):
             raise RuntimeError("Either 'run_model' or 'final_setup' must be "
                                "called before 'run_validation' can be called.")
+        validation_string = ''
+        validation_errors = False
+        validation_warnings = False
         for system in self.system_iter(include_self=True, recurse=True):
-            system._validate_wrapper()
+            with warnings.catch_warnings():
+                warnings.filterwarnings('error')
+                try:
+                    system._validate_wrapper()
+                except Warning as e:
+                    validation_string += f'\n{type(e).__name__}: {e}\n'
+                    validation_warnings = True
+                    msg_type = 'warnings' if not validation_errors else 'errors / warnings'
+                except Exception as e:
+                    validation_string += f'\n{type(e).__name__}: {e}\n'
+                    validation_errors = True
+                    msg_type = 'errors' if not validation_warnings else 'errors / warnings'
+
+        if validation_string:
+            msg_text = (
+                f'\nThe following {msg_type} were collected during validation:'
+                '\n-----------------------------------------------------------------\n'
+                f'{validation_string}'
+                '\n-----------------------------------------------------------------'
+            )
+            if validation_errors:
+                raise ValidationError(msg_text)
+            else:
+                print(msg_text)
+        else:
+            print('\nNo errors / warnings were collected during validation.')
+
 
     def _validate_wrapper(self):
         """
@@ -7117,7 +7152,9 @@ class System(object, metaclass=SystemMetaclass):
         Check any final input / output values after a run.
 
         The model is assumed to be in an unscaled state. An inherited component
-        may choose to either override this function or ignore it.
+        may choose to either override this function or ignore it. Any errors or
+        warnings raised in this method will be collected and all printed / raised
+        together.
 
         Parameters
         ----------
