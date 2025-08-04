@@ -161,7 +161,12 @@ def collect_errors(method):
 
 class ValidationError(ValueError):
     """
-    Custom error class for when validation checking fails
+    Custom error class for when validation checking fails.
+
+    Parameters
+    ----------
+    message : str
+        Message displayed when this error is raised.
     """
     def __init__(self, message="Errors / Warnings during validation"):
         """
