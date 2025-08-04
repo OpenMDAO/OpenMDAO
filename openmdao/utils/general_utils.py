@@ -455,7 +455,7 @@ def _find_dict_meta(dct, key):
         True if non-None metadata at the given key was found.
     """
     for meta in dct.values():
-        if key in meta and meta[key] is not None:
+        if key in meta:
             return True
     return False
 

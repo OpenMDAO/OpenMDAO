@@ -1852,9 +1852,10 @@ class Problem(object, metaclass=ProblemMetaclass):
         header = "Design Variables"
         if desvar_opts is None:
             desvar_opts = ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler',
-                           'parallel_deriv_color','cache_linear_solution', 'units', 'min', 'max']
+                           'parallel_deriv_color', 'cache_linear_solution', 'units', 'min', 'max']
         def_desvar_opts = [opt for opt in ('indices',) if opt not in desvar_opts and
                            _find_dict_meta(desvars, opt)]
+        desvar_opts = [opt for opt in desvar_opts if _find_dict_meta(desvars, opt)]
         col_names = default_col_names + def_desvar_opts + desvar_opts
         if out_stream:
             self._write_var_info_table(header, col_names, desvars, vals,
@@ -1883,11 +1884,12 @@ class Problem(object, metaclass=ProblemMetaclass):
         header = "Constraints"
         if cons_opts is None:
             cons_opts = ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'adder', 'scaler',
-                        'linear', 'parallel_deriv_color', 'cache_linear_solution', 'units', 'min',
-                        'max']
+                         'linear', 'parallel_deriv_color', 'cache_linear_solution', 'units', 'min',
+                         'max']
         # detect any cons that use aliases
         def_cons_opts = [opt for opt in ('indices', 'alias') if opt not in cons_opts and
                          _find_dict_meta(cons, opt)]
+        cons_opts = [opt for opt in cons_opts if _find_dict_meta(cons, opt)]
         col_names = default_col_names + def_cons_opts + cons_opts
         if out_stream:
             self._write_var_info_table(header, col_names, cons, vals,
