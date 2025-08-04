@@ -125,7 +125,6 @@ def _rtplot_cmd(options, user_args):
     else:
         script_path = None
 
-
     def _view_realtime_plot_hook(problem):
         driver = problem.driver
         if not driver:
@@ -331,7 +330,7 @@ class _CaseRecorderTracker:
     def _get_shape(self, name):
         item = self._initial_case[name]
         return item.shape
-    
+
     def _get_size(self, name):
         item = self._initial_case[name]
         return item.size
