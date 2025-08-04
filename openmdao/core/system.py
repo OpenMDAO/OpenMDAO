@@ -160,7 +160,13 @@ def collect_errors(method):
 
 
 class ValidationError(ValueError):
+    """
+    Custom error class for when validation checking fails
+    """
     def __init__(self, message="Errors / Warnings during validation"):
+        """
+        Initialize all attributes.
+        """
         super().__init__(message)
 
 
@@ -7132,7 +7138,6 @@ class System(object, metaclass=SystemMetaclass):
                 print(msg_text)
         else:
             print('\nNo errors / warnings were collected during validation.')
-
 
     def _validate_wrapper(self):
         """
