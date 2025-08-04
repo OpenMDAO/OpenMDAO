@@ -168,6 +168,7 @@ class ValidationError(ValueError):
     message : str
         Message displayed when this error is raised.
     """
+
     def __init__(self, message="Errors / Warnings during validation"):
         """
         Initialize all attributes.
