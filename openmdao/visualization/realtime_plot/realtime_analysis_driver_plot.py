@@ -5,8 +5,6 @@ from itertools import product
 import time
 from datetime import datetime, timedelta
 
-from tornado.ioloop import IOLoop
-
 from openmdao.visualization.realtime_plot.realtime_plot_class import _RealTimePlot
 
 try:
@@ -203,14 +201,6 @@ class _RealTimeAnalysisDriverPlot(_RealTimePlot):
 
         doc.add_periodic_callback(self._update_wrapped_in_try, callback_period)
         doc.title = "OpenMDAO Analysis Driver Progress Plot"
-
-    def _update_wrapped_in_try(self):
-        try:
-            self._update()
-        except Exception as e:
-            print(f"Fatal error in periodic callback: {e}")
-            IOLoop.current().stop()
-            return
 
     def _update(self):
         # this is the main method of the class. It gets called periodically by Bokeh
