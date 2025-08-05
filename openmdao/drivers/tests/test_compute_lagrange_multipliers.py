@@ -51,7 +51,8 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
         drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
                    'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
                    'pos_SNOPT': om.pyOptSparseDriver(optimizer=snopt_opt, print_results=False),
-                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)}
+                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
+                   'scipy_COBYLA': om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)}
 
         prob = self._make_problem(driver=drivers['pos_IPOPT'])
         result = prob.run_driver()
@@ -78,7 +79,8 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
         drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
                    'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
                    'pos_SNOPT': om.pyOptSparseDriver(optimizer=snopt_opt, print_results=False),
-                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),}
+                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
+                   'scipy_COBYLA': om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)}
 
         prob = self._make_problem(driver=drivers['pos_IPOPT'], f_xy_ref=0.1, c_ref=15, x_ref=10, y_ref=10)
         result = prob.run_driver()
@@ -110,7 +112,8 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
         drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
                    'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
                    'pos_SNOPT': om.pyOptSparseDriver(optimizer=snopt_opt, print_results=False),
-                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),}
+                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
+                   'scipy_COBYLA': om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)}
 
         prob = self._make_problem(driver=drivers['pos_IPOPT'], y_lower=-7.0)
         result = prob.run_driver()
@@ -153,7 +156,8 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
         drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
                    'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
                    'pos_SNOPT': om.pyOptSparseDriver(optimizer=snopt_opt, print_results=False),
-                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),}
+                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
+                   'scipy_COBYLA': om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)}
 
         prob = self._make_problem(driver=drivers['pos_IPOPT'], y_lower=-7.0, f_xy_ref=0.1,
                                   c_ref=15, x_ref=10, y_ref=10)

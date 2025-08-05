@@ -1129,8 +1129,8 @@ class Group(System):
         return sarr, tarr, tsize, has_dist_data
 
     def _setup_dynamic_properties(self):
-        self._setup_dynamic_property('units')
         self._setup_dynamic_property('shape')
+        self._setup_dynamic_property('units')
 
     def _setup_part2(self):
         """
@@ -2619,15 +2619,21 @@ class Group(System):
         def serial2distrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
                            is_full_slice):
             # serial_out <-- dist_in
-            to_io = graph.nodes[to_var]['io']
-            from_io = graph.nodes[from_var]['io']
-            if not np.all(dist_sizes[from_var] == dist_sizes[from_var][0]):
-                self._collect_error(
-                    f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
-                    f"from distributed {from_io} '{from_var}' is not supported because not "
-                    f"all {from_var} ranks are the same size "
-                    f"(sizes={dist_sizes[from_var]}).", ident=(from_var, to_var))
-                return
+            dshapes = dist_shapes[from_var]
+            if len(dshapes) >= 1:
+                shape0 = dshapes[0]
+                for ds in dshapes:
+                    if ds != shape0:
+                        to_io = graph.nodes[to_var]['io']
+                        from_io = graph.nodes[from_var]['io']
+                        self._collect_error(
+                            f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
+                            f"from distributed {from_io} '{from_var}' is not supported because not "
+                            f"all {from_var} ranks are the same shape "
+                            f"(shapes={dshapes}).", ident=(from_var, to_var))
+                        return
+
+                return shape0
 
         def dist2serialfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
                            is_full_slice):

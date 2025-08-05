@@ -2822,11 +2822,11 @@ class TestSqliteRecorder(unittest.TestCase):
         con = case.get_constraints()
         obj = case.get_objectives()
 
-        assert_near_equal(obj, {'f_xy': -27.33333333}, tolerance=1e-6)
-        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-6, tol_type='abs')
+        assert_near_equal(obj, {'f_xy': -27.33333333}, tolerance=1e-8)
+        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=8.1e-8, tol_type='abs')
 
         if Version(scipy_version) < Version("1.11"):
-            assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=1e-6, tol_type='abs')
+            assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=8.1e-8, tol_type='abs')
         else:
             self.assertEqual(con, {})
 

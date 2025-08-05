@@ -1,16 +1,10 @@
 import unittest
 
-from packaging.version import Version
-
 import numpy as np
-from scipy import __version__ as scipy_version
 
 from openmdao.api import MultiFiCoKrigingSurrogate
 from openmdao.surrogate_models.multifi_cokriging import MultiFiCoKriging
 from openmdao.utils.assert_utils import assert_near_equal
-
-
-ScipyVersion = Version(scipy_version)
 
 
 class CoKrigingSurrogateTest(unittest.TestCase):
@@ -130,8 +124,6 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         assert_near_equal(mu, [[22]], 1)
         assert_near_equal(sigma, [[13]], 1)
 
-    @unittest.skipIf(ScipyVersion >= Version("1.16.0"),
-                        "COBYLA in Scipy >= 1.16.0 fails in this example.")
     def test_2d_2fi_cokriging(self):
 
         def branin(x):
@@ -176,7 +168,7 @@ class CoKrigingSurrogateTest(unittest.TestCase):
               [ 0.40806563,  0.91465314]]]
         y = [[branin(case) for case in x[0]],
              [branin_low_fidelity(case) for case in x[1]]]
-        cokrig = MultiFiCoKrigingSurrogate(normalize=False, tolerance=1.0E-12)
+        cokrig = MultiFiCoKrigingSurrogate(normalize=False)
         cokrig.train_multifi(x, y)
 
         mu, sigma = cokrig.predict([2./3., 1/3.])
@@ -184,7 +176,7 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         assert_near_equal(sigma, [[0.3]], 0.2)
 
         # Test with theta setting instead of theta estimation
-        cokrig2 = MultiFiCoKrigingSurrogate(theta=0.1, normalize=False, tolerance=1.0E-12)
+        cokrig2 = MultiFiCoKrigingSurrogate(theta=0.1, normalize=False)
         cokrig2.train_multifi(x, y)
 
         mu, sigma = cokrig2.predict([2./3., 1/3.])
@@ -192,7 +184,7 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         assert_near_equal(sigma, [[2.29]], 0.1)
 
         # Test with theta setting instead of theta estimation
-        cokrig2 = MultiFiCoKrigingSurrogate(theta=[0.1, 10], normalize=False, tolerance=1.0E-12)
+        cokrig2 = MultiFiCoKrigingSurrogate(theta=[0.1, 10], normalize=False)
         cokrig2.train_multifi(x, y)
 
         mu, sigma = cokrig2.predict([2./3., 1/3.])

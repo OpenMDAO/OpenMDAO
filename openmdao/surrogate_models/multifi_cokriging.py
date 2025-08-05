@@ -28,7 +28,7 @@ MACHINE_EPSILON = np.finfo(np.double).eps  # machine precision
 NUGGET = 10. * MACHINE_EPSILON  # nugget for robustness
 
 INITIAL_RANGE_DEFAULT = 0.3  # initial range for optimizer
-TOLERANCE_DEFAULT = 1e-8    # stopping criterion for MLE optimization
+TOLERANCE_DEFAULT = 1e-6    # stopping criterion for MLE optimization
 
 THETA0_DEFAULT = 0.5
 THETAL_DEFAULT = 1e-5
@@ -615,18 +615,16 @@ class MultiFiCoKriging(object):
 
         constraints = []
         for i in range(theta0.size):
-            constraints.append({'type': 'ineq', 'fun': lambda log10t:
+            constraints.append({'type': 'ineq', 'fun': lambda log10t, i=i:
                                 log10t[i] - np.log10(thetaL[0][i])})
-            constraints.append({'type': 'ineq', 'fun': lambda log10t:
+            constraints.append({'type': 'ineq', 'fun': lambda log10t, i=i:
                                 np.log10(thetaU[0][i]) - log10t[i]})
 
         constraints = tuple(constraints)
         sol = minimize(rlf_transform, x0, method='COBYLA',
                        constraints=constraints,
-                       options={'disp': False,
-                                'rhobeg': initial_range,
-                                'rhoend': tol,
-                                'tol': tol})
+                       options={'rhobeg': initial_range,
+                                'tol': tol, 'disp': 0})
 
         log10_optimal_x = sol['x']
         optimal_rlf_value = sol['fun']

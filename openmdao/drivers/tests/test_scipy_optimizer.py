@@ -415,8 +415,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], 6.66666667, 1e-6)
         assert_near_equal(prob['y'], -7.3333333, 1e-6)
 
-    @unittest.skipIf(ScipyVersion >= Version("1.16.0"),
-                        "COBYLA in Scipy >= 1.16.0 fails in this example.")
     def test_simple_paraboloid_unconstrained_COBYLA(self):
         prob = om.Problem()
         model = prob.model
@@ -561,19 +559,14 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        if ScipyVersion >= Version('1.16.0'):
+        with self.assertRaises(Exception) as raises_cm:
             prob.run_driver()
-            assert_near_equal(prob['x'], 7.16667, 1e-4)
-            assert_near_equal(prob['y'], -7.833334, 1e-4)
-        else:
-            with self.assertRaises(Exception) as raises_cm:
-                prob.run_driver()
 
-            exception = raises_cm.exception
+        exception = raises_cm.exception
 
-            msg = "Constraints of type 'eq' not handled by COBYLA."
+        msg = "Constraints of type 'eq' not handled by COBYLA."
 
-            self.assertEqual(exception.args[0], msg)
+        self.assertEqual(exception.args[0], msg)
 
     def test_scipy_missing_objective(self):
 
