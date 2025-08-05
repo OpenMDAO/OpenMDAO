@@ -1371,7 +1371,7 @@ def generate_launch_json_file(vscode_dir, base_port, ranks):
         atexit.register(functools.partial(_remove_old_configs, vscode_dir))
 
 
-def vscode_env_error(env_var):
+def _vscode_env_error(env_var):
     print("Invalid VSCODE_DBG environment variable. Expected ':<port>' or "
           f"'<rank1,rank2,...>:<port>' but got '{env_var}'. Debugging aborted.", flush=True)
     sys.exit(1)
@@ -1409,7 +1409,7 @@ def setup_dbg():
                 try:
                     ranks = [int(r) for r in ranks_str.split(',') if r.strip()]
                 except (ValueError, TypeError):
-                    vscode_env_error(vscode_dbg)
+                    _vscode_env_error(vscode_dbg)
             elif ranks_str.strip() == '':
                 use_def_ranks = True
             else:  # single rank
@@ -1417,12 +1417,12 @@ def setup_dbg():
                 try:
                     ranks = [int(ranks_str)]
                 except (ValueError, TypeError):
-                    vscode_env_error(vscode_dbg)
+                    _vscode_env_error(vscode_dbg)
 
         try:
             base_port = int(portstr)
         except (ValueError, TypeError):
-            vscode_env_error(vscode_dbg)
+            _vscode_env_error(vscode_dbg)
 
         # verify ranks are valid
         if MPI is not None and not use_def_ranks:
@@ -1453,7 +1453,7 @@ def setup_dbg():
             import debugpy
             print(f"Rank {myrank}: Debugger listening on port {debug_port}", flush=True)
             debugpy.listen(('0.0.0.0', debug_port))
-            debugpy.wait_for_client() # This will block until a debugger connects
+            debugpy.wait_for_client()  # This will block until a debugger connects
 
     elif env_truthy('WING_DBG'):
         save = sys.path
