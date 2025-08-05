@@ -81,7 +81,7 @@ jobs:
             OS: ubuntu-24.04
             PY: '3.13'
             NUMPY: '2.2'
-            SCIPY: '1.16'
+            SCIPY: '1.15'
             PETSc: '3.21'
             PYOPTSPARSE_FROM: 'conda-forge'
             PYOPTSPARSE: '2.13.1'
