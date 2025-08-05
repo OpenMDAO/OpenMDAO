@@ -1432,7 +1432,7 @@ def setup_dbg():
                     badranks.append(r)
             if badranks:
                 print("The following ranks are outside of the valid range of "
-                      f"(0-{MPI.COMM_WORLD.size-1}): {badranks}. Debugging aborted.", flush=True)
+                      f"(0-{MPI.COMM_WORLD.size - 1}): {badranks}. Debugging aborted.", flush=True)
                 sys.exit(1)
 
         debug_port = base_port + myrank
