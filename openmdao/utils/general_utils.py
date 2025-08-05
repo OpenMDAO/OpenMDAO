@@ -4,6 +4,8 @@ import re
 import sys
 import textwrap
 import json
+import functools
+import atexit
 from types import TracebackType
 import unittest
 from contextlib import contextmanager
@@ -1271,6 +1273,36 @@ def get_connection_owner(system, tgt):
     return system, src, tgt
 
 
+def _remove_old_configs(vscode_dir):
+    launch_path = os.path.join(vscode_dir, 'launch.json')
+
+    # Read existing launch.json if it exists
+    if os.path.exists(launch_path):
+        with open(launch_path, 'r') as f:
+            config_top = json.load(f)
+        configs = config_top.get('configurations', [])
+        compounds = config_top.get('compounds', [])
+
+        # remove any old auto-added configs from configurations and compounds
+        configs = [c for c in configs
+                   if not (c['name'].startswith('_rank_') and c['name'].endswith('_config'))]
+
+        compounds = [c for c in compounds if c['name'] != 'MPI Debug']
+
+        if configs:
+            config_top['configurations'] = configs
+        elif 'configurations' in config_top:
+            del config_top['configurations']
+
+        if compounds:
+            config_top['compounds'] = compounds
+        elif 'compounds' in config_top:
+            del config_top['compounds']
+
+        with open(os.path.join(vscode_dir, "launch.json"), "w") as f:
+            json.dump(config_top, f, indent=2)
+
+
 def generate_launch_json_file(vscode_dir, base_port, ranks):
     """
     Generate a launch.json file for the VSCode debugger.
@@ -1284,11 +1316,26 @@ def generate_launch_json_file(vscode_dir, base_port, ranks):
     ranks : int
         The specific ranks to debug.
     """
-    # Create a list of configurations for each MPI rank
-    configurations = []
-    compound_configs = []
+    _remove_old_configs(vscode_dir)
+
+    launch_path = os.path.join(vscode_dir, 'launch.json')
+
+    # Read existing launch.json if it exists
+    if os.path.exists(launch_path):
+        with open(launch_path, 'r') as f:
+            config_top = json.load(f)
+    else:
+        config_top = {"version": "0.2.0", "configurations": [], "compounds": []}
+
+    configs = config_top.get('configurations', [])
+    compounds = config_top.get('compounds', [])
+
+    new_configs = []
+    new_compound_configs = []
+
+    # Add a configuration for each MPI rank
     for rank in ranks:
-        config_name = f"rank_{rank}_config"
+        config_name = f"_rank_{rank}_config"
         config = {
             "name": config_name,
             "type": "python",
@@ -1300,24 +1347,28 @@ def generate_launch_json_file(vscode_dir, base_port, ranks):
                 "order": rank + 2
             }
         }
-        configurations.append(config)
-        compound_configs.append(config_name)
+        new_configs.append(config)
+        new_compound_configs.append(config_name)
 
-    top = {
-        "version": "0.2.0",
-        "configurations": configurations,
-        "compounds": [
-            {
-                "name": "MPI Debug (Use this instead of rank_?_configs)",
-                "configurations": compound_configs,
-                "presentation": {
-                    "order": 1
-                }
+    configs.extend(new_configs)
+    compounds.append(
+        {
+            "name": "MPI Debug",
+            "configurations": new_compound_configs,
+            "presentation": {
+                "order": 1
             }
-        ]
-    }
+        }
+    )
+
+    config_top['configurations'] = configs
+    config_top['compounds'] = compounds
+
     with open(os.path.join(vscode_dir, "launch.json"), "w") as f:
-        json.dump(top, f, indent=2)
+        json.dump(config_top, f, indent=2)
+
+    if MPI is None or MPI.COMM_WORLD.rank == 0:
+        atexit.register(functools.partial(_remove_old_configs, vscode_dir))
 
 
 def vscode_env_error(env_var):
@@ -1397,10 +1448,12 @@ def setup_dbg():
             MPI.COMM_WORLD.barrier()
 
         if myrank in ranks:
+            # disable annoying debugger warning message
+            os.environ['PYDEVD_DISABLE_FILE_VALIDATION'] = '1'
             import debugpy
+            print(f"Rank {myrank}: Debugger listening on port {debug_port}", flush=True)
             debugpy.listen(('0.0.0.0', debug_port))
             debugpy.wait_for_client() # This will block until a debugger connects
-            print(f"Rank {myrank}: Debugger listening on port {debug_port}", flush=True)
 
     elif env_truthy('WING_DBG'):
         save = sys.path
