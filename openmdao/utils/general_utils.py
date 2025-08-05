@@ -1452,7 +1452,8 @@ def setup_dbg():
             os.environ['PYDEVD_DISABLE_FILE_VALIDATION'] = '1'
             import debugpy
             print(f"Rank {myrank}: Debugger listening on port {debug_port}", flush=True)
-            debugpy.listen(('0.0.0.0', debug_port))
+            # only listen for connections from localhost for security reasons
+            debugpy.listen(('127.0.0.1', debug_port))
             debugpy.wait_for_client()  # This will block until a debugger connects
 
     elif env_truthy('WING_DBG'):
