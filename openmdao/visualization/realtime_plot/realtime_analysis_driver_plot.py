@@ -5,9 +5,9 @@ from itertools import product
 import time
 from datetime import datetime, timedelta
 
-from openmdao.visualization.realtime_plot.realtime_plot_class import _RealTimePlot
 
 try:
+    from openmdao.visualization.realtime_plot.realtime_plot_class import _RealTimePlot
     from bokeh.models import (
         ColumnDataSource,
         CheckboxGroup,
@@ -26,9 +26,9 @@ try:
     from bokeh.transform import transform
     from bokeh.plotting import figure
     from bokeh.palettes import Viridis256
-    bokeh_available = True
+    bokeh_and_dependencies_available = True
 except ImportError:
-    bokeh_available = False
+    bokeh_and_dependencies_available = False
 
 import numpy as np
 
@@ -38,7 +38,7 @@ _left_side_column_width = 500
 # how big the individual plots should be in the grid
 _grid_plot_height_and_width = 240
 _color_bar_title_font_size = "20px"
-if bokeh_available:
+if bokeh_and_dependencies_available:
     _page_styles = InlineStyleSheet(
         css="""
     :host(.div_header) {
@@ -106,7 +106,7 @@ _elide_string = "..."
 
 # color bar constants
 # palette for the color bar
-if bokeh_available:
+if bokeh_and_dependencies_available:
     _color_palette = Viridis256
 # the color bar showing response needs an initial value before new data comes in
 _initial_response_range_for_plots = (0, 100)

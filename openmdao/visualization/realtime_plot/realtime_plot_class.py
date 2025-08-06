@@ -37,4 +37,5 @@ try:
                 IOLoop.current().stop()
                 return
 except ImportError:
-    pass
+    class _RealTimePlot(object):
+        pass

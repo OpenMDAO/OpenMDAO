@@ -83,7 +83,7 @@ def _realtime_plot_cmd(options, user_args):
         )
     else:
         print(
-            "The bokeh library is not installed so the realtime "
+            "The bokeh library and dependencies are not installed so the realtime "
             "plot is not available. "
         )
         return
@@ -114,7 +114,7 @@ def _rtplot_cmd(options, user_args):
     """
     if not bokeh_and_dependencies_available:
         print(
-            "The bokeh library is not installed so the rtplot "
+            "The bokeh library and dependencies are not installed so the rtplot "
             "command is not available. "
         )
         return

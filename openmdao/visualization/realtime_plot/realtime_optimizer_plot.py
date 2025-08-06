@@ -3,9 +3,9 @@
 from collections import defaultdict
 
 from openmdao.utils.shell_proc import _is_process_running
-from openmdao.visualization.realtime_plot.realtime_plot_class import _RealTimePlot
 
 try:
+    from openmdao.visualization.realtime_plot.realtime_plot_class import _RealTimePlot
     from bokeh.models import (
         ColumnDataSource,
         LinearAxis,
@@ -32,9 +32,9 @@ try:
     )
     from bokeh.plotting import figure
     from bokeh.palettes import Category20, Colorblind
-    bokeh_available = True
+    bokeh_and_dependencies_available = True
 except ImportError:
-    bokeh_available = False
+    bokeh_and_dependencies_available = False
 
 import numpy as np
 
@@ -58,7 +58,7 @@ _toggle_styles = """
 """
 # colors used for the plot lines and associated buttons and axes labels
 # start with color-blind friendly colors and then use others if needed
-if bokeh_available:
+if bokeh_and_dependencies_available:
     _colorPalette = Colorblind[8] + Category20[20]
 
 # This is the JavaScript code that gets run when a user clicks on
