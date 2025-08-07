@@ -931,12 +931,13 @@ class TestDistribDynShapeComboNoSrcIndsErrs(unittest.TestCase):
         indeps.add_output('x', shape_by_conn=True)
         p.model.add_subsystem('comp', DistCompDiffSizeKnownInput())
         p.model.connect('indeps.x', 'comp.x')
+        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.setup()
             p.final_setup()
+
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'serial_dist_rev_err':"
-           "\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same size (sizes=[3 6 9])."
+           "\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same shape (shapes=[(3,), (6,), (9,)])."
            "\n   <model> <class Group>: Failed to resolve shapes for ['indeps.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
            "\n   'comp' <class DistCompDiffSizeKnownInput>: Can't determine src_indices automatically for input 'comp.x'. They must be supplied manually."
            "\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indeps.x' to 'comp.x'. The source shape is (0,) but the target shape is (18,).")
@@ -1383,20 +1384,60 @@ class TestDynShapeSrcIndices(unittest.TestCase):
         p.run_model()
         assert_near_equal(p.get_val('indep.x'), np.ones((2, 3)))
 
-    def test_dist_serial_rev(self):
-        p = om.Problem()
+    def test_dist_serial_rev_err(self):
+
+        p = om.Problem(name='dist_serial')
         model = p.model
 
-        self.fail("This test is missing")
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', shape_by_conn=True, distributed=True)
 
-    def test_dist_dist_rev(self):
-        p = om.Problem()
+        model.add_subsystem('comp', om.ExecComp('y=2*x', shape=(2,3)))
+
+        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:], flat_src_indices=False)
+
+        p.setup()
+
+        with self.assertRaises(Exception) as cm:
+            p.final_setup()
+
+        # just make sure we still get a clear error msg
+
+        self.assertEqual(cm.exception.args[0],
+           "\nCollected errors for problem 'dist_serial':"
+           "\n   <model> <class Group>: Input 'comp.x' has src_indices so the shape of connected output 'indep.x' cannot be determined."
+           "\n   <model> <class Group>: Failed to resolve shapes for ['indep.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
+
+    def test_dist_dist_rev_err(self):
+        class MyDistComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', distributed=True, shape=(2,3))
+                self.add_output('y', distributed=True, shape=(2,3))
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] * 2.
+
+        p = om.Problem(name='dist_dist')
         model = p.model
 
-        self.fail("This test is missing")
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', shape_by_conn=True, distributed=True)
 
+        model.add_subsystem('comp', MyDistComp())
+        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:, [0,2]])
 
+        p.setup()
 
+        with self.assertRaises(Exception) as cm:
+            p.final_setup()
+
+        # just make sure we still get a clear error msg
+
+        self.assertEqual(cm.exception.args[0],
+           "\nCollected errors for problem 'dist_dist':"
+           "\n   <model> <class Group>: Input 'comp.x' has src_indices so the shape of connected output 'indep.x' cannot be determined."
+           "\n   <model> <class Group>: Failed to resolve shapes for ['indep.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+           "\n   <model> <class Group>: When connecting 'indep.x' to 'comp.x': Can't set source shape to (0,) because indexer (slice(None, None, None), [0, 2]) expects 2 dimensions.")
 
 
 @unittest.skipUnless(MPI and  PETScVector and sys.version_info >= (3, 9), "MPI, PETSc, and python 3.9+ are required.")

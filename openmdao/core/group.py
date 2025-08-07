@@ -2032,18 +2032,15 @@ class Group(System):
 
         iproc = self.comm.rank
         for io, existence in self._var_existence.items():
-            existence = np.asarray(existence, dtype=int)
             abs2meta = self._var_abs2meta[io]
             for i, name in enumerate(self._var_allprocs_abs2meta[io]):
                 abs2idx[name] = i
                 if name in abs2meta:
-                    existence[iproc, i] = 1
+                    existence[iproc, i] = True
 
             if self.comm.size > 1:
-                scratch = existence.copy()
-                self.comm.Allreduce(scratch, existence, MPI.SUM)
-                # convert back to bool
-                self._var_existence[io] = existence.astype(bool)
+                row = existence[iproc, :].copy()
+                self.comm.Allgather(row, existence)
 
     @collect_errors
     def _setup_var_sizes(self):
@@ -2633,6 +2630,7 @@ class Group(System):
                             f"(shapes={dshapes}).", ident=(from_var, to_var))
                         return
 
+                graph.nodes[to_var]['shape'] = shape0
                 return shape0
 
         def dist2serialfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
