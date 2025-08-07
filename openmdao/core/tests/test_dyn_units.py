@@ -21,7 +21,6 @@ class DynUnitsComp(om.ExplicitComponent):
         for i in range(self.n_inputs):
             outputs[f"y{i+1}"] = 2*inputs[f"x{i+1}"]
 
-
 class DynUnitsGroupSeries(om.Group):
     # strings together some number of components in series.
     # component type is determined by comp_class
@@ -76,25 +75,33 @@ class TestDynUnits(unittest.TestCase):
         self.assertEqual(sink._var_abs2meta['output']['sink.y2']['units'], 'ft')
 
     def test_simple_compute_units(self):
+        class DynUnitsCompDiv(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x1', units_by_conn=True)
+                self.add_input('x2', units_by_conn=True)
+                self.add_output('y', compute_units=lambda dct: dct['x1'] / dct['x2'])
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x1'] / inputs['x2']
+
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', units='m'))
-        indep.add_output('x2', units='ft')
-        p.model.add_subsystem('C1', DynUnitsComp(2))
-        sink = p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
-                                                  x1={'units_by_conn': True, 'compute_units': lambda u: u['y1']},
-                                                  x2={'units_by_conn': True, 'compute_units': lambda u: u['y2']},
-                                                  y1={'units_by_conn': True, 'compute_units': lambda u: u['x1']},
-                                                  y2={'units_by_conn': True, 'compute_units': lambda u: u['x2']}))
-        p.model.connect('C1.y1', 'sink.x1')
-        p.model.connect('C1.y2', 'sink.x2')
+        indep.add_output('x2', units='s')
+        C1 = p.model.add_subsystem('C1', DynUnitsCompDiv())  # this uses compute_units
+        sink = p.model.add_subsystem('sink', om.ExecComp('y = x * 2.',
+                                                  x={'units_by_conn': True, 'copy_units': 'y'},
+                                                  y={'units_by_conn': True, 'copy_units': 'x'},))
         p.model.connect('indep.x1', 'C1.x1')
         p.model.connect('indep.x2', 'C1.x2')
+        p.model.connect('C1.y', 'sink.x')
+
         p.setup()
         p.run_model()
-        self.assertEqual(sink._var_abs2meta['input']['sink.x1']['units'], 'm')
-        self.assertEqual(sink._var_abs2meta['input']['sink.x2']['units'], 'ft')
-        self.assertEqual(sink._var_abs2meta['output']['sink.y1']['units'], 'm')
-        self.assertEqual(sink._var_abs2meta['output']['sink.y2']['units'], 'ft')
+
+        self.assertEqual(C1._var_abs2meta['input']['C1.x1']['units'], 'm')
+        self.assertEqual(C1._var_abs2meta['input']['C1.x2']['units'], 's')
+        self.assertEqual(C1._var_abs2meta['output']['C1.y']['units'], 'm/s')
+        self.assertEqual(sink._var_abs2meta['output']['sink.y']['units'], 'm/s')
 
     def test_baseline_series(self):
         p = om.Problem()
@@ -335,12 +342,12 @@ class TestDynUnits(unittest.TestCase):
                                                   y1={'units_by_conn': True, 'copy_units': 'x11'}))
         p.model.connect('indep.x1', 'sink.x1')
         p.setup()
-        
+
         expected_warnings = (
             (om.OpenMDAOWarning, "<model> <class Group>: 'units_by_conn' was set for unconnected variable 'sink.y1'."),
             (om.OpenMDAOWarning, "<model> <class Group>: Can't copy units of variable 'sink.x11'. Variable doesn't exist or is not continuous.")
         )
-        
+
         with assert_warnings(expected_warnings):
             p.model._setup_dynamic_properties()
 
@@ -359,14 +366,14 @@ class TestDynUnits(unittest.TestCase):
                                                   y1={'units_by_conn': True}))
         p.model.connect('indep.x1', 'sink.x1')
         p.setup()
-      
+
         expected_warnings = (
             (om.OpenMDAOWarning, "<model> <class Group>: 'units_by_conn' was set for unconnected variable 'sink.y1'."),
         )
-        
+
         with assert_warnings(expected_warnings):
             p.model._setup_dynamic_properties()
-        
+
         with self.assertRaises(Exception) as cm:
             p.final_setup()
 
