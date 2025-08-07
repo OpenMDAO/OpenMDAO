@@ -2982,7 +2982,6 @@ class Group(System):
             while progress:
                 progress = False
                 unresolved_knowns = get_unresolved_knowns(graph, prop, unresolved_knowns)
-                # print("UNRESOLVED KNOWNS:", unresolved_knowns)
 
                 active_single_edges, computed_nodes = get_active_edges(graph, unresolved_knowns,
                                                                        prop)
