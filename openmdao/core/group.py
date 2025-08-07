@@ -262,6 +262,7 @@ class Group(System):
         self._bad_conn_vars = None
         self._sys_graph_cache = None
         self._key_owner = None
+        self._var_existence = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -839,7 +840,6 @@ class Group(System):
         self._configure_check()
 
         self._setup_var_data()
-        self._setup_var_existence()
 
         # have to do this again because we are passed the point in _setup_var_data when this happens
         self._has_output_scaling = False
@@ -864,6 +864,11 @@ class Group(System):
         # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
         # the connections.
         self._setup_global_connections()
+
+    def _get_var_existence(self):
+        if self._var_existence is None:
+            self._setup_var_existence()
+        return self._var_existence
 
     def _check_required_connections(self):
         conns = self._conn_global_abs_in2out
@@ -1473,13 +1478,12 @@ class Group(System):
             dcomp_names = set(d.rpartition('.')[0] for d in dist_ins)
             if dcomp_names:
                 added_src_inds = []
-                exists = self._var_existence
 
                 for comp in self.system_iter(recurse=True, typ=Component):
                     if comp.pathname in dcomp_names:
                         added_src_inds.extend(
                             comp._update_dist_src_indices(conns, all_abs2meta, abs2idx,
-                                                          self._var_sizes, exists, self.comm.rank))
+                                                          self._var_sizes))
 
                 updated = set()
                 for alist in self.comm.allgather(added_src_inds):
@@ -1671,6 +1675,8 @@ class Group(System):
             old_proms = set()
         else:
             old_proms = set(self._resolver.prom_iter('input'))
+
+        self._var_existence = None
 
         super()._setup_var_data()
 
@@ -2584,8 +2590,9 @@ class Group(System):
         def serial2distfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
                            is_full_slice):
             from_shape = graph.nodes[from_var]['shape']
-            exist_outs = self._var_existence['output'][:, self._var_allprocs_abs2idx[from_var]]
-            exist_ins = self._var_existence['input'][:, self._var_allprocs_abs2idx[to_var]]
+            existence = self._get_var_existence()
+            exist_outs = existence['output'][:, self._var_allprocs_abs2idx[from_var]]
+            exist_ins = existence['input'][:, self._var_allprocs_abs2idx[to_var]]
             if src_indices is None:
                 shape = from_shape
             else:
@@ -2671,7 +2678,7 @@ class Group(System):
 
                 # dist input may not exist on all procs, so distribute the serial
                 # entries across only the procs where the dist output exists.
-                exist_procs = self._var_existence['output'][:, abs2idx[to_var]]
+                exist_procs = self._get_var_existence()['output'][:, abs2idx[to_var]]
                 split_num = np.count_nonzero(exist_procs)
 
                 from_shape = graph.nodes[from_var]['shape']

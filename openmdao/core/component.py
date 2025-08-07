@@ -1074,8 +1074,7 @@ class Component(System):
         if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
             self._problem_meta['config_info']._var_added(self.pathname, name)
 
-    def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes, all_exist,
-                                 top_rank):
+    def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes):
         """
         Set default src_indices for any distributed inputs where they aren't set.
 
@@ -1090,10 +1089,6 @@ class Component(System):
             whole model.
         all_sizes : dict
             Mapping of types to sizes of each variable in all procs for the whole model.
-        all_exist : ndarray
-            Array of booleans indicating which variables are present in which procs in the model.
-        top_rank : int
-            Our rank in the model level communicator.
 
         Returns
         -------
