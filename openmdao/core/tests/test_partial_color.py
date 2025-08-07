@@ -887,7 +887,7 @@ class TestColoring(unittest.TestCase):
             jac = comp._jacobian._subjacs_info
             _check_partial_matrix(comp, jac, sparsity, 'cs')
 
-    @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
+    @require_pyoptsparse(optimizer='SLSQP')
     def test_simple_totals(self):
         for method in ['fd', 'cs']:
             with self.subTest(msg=f'{method=}'):
@@ -1038,7 +1038,7 @@ class TestColoring(unittest.TestCase):
                 rows = [1,3,4]
                 _check_total_matrix(model, derivs, sparsity[rows, :], method)
 
-    @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
+    @require_pyoptsparse(optimizer='SLSQP')
     @parameterized.expand(itertools.product(['fd', 'cs'],[True, False]), name_func=parameterized_name)
     def test_totals_of_wrt_indices(self, method, sparse_partials):
         prob = Problem(name=f'test_totals_of_wrt_indices_{method}_{sparse_partials}')

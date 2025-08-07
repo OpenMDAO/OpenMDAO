@@ -228,6 +228,8 @@ class Group(System):
         Cache for the system graph.
     _key_owner : dict
         The owning rank keyed by absolute jacobian key.
+    _var_existence : dict or None
+        Keeps track of which ranks each variable exists on.
     """
 
     def __init__(self, **kwargs):
