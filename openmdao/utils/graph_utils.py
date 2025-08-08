@@ -268,8 +268,8 @@ def get_active_edges(graph, knowns, meta_name):
     and on the other end to a variable with 'unknown' metadata.  Active nodes are those that
     have 'unknown' metadata but are connected to a variable with 'known' metadata.
 
-    Single edges correspond to '???_by_conn' and 'copy_???' connections.
-    Multi nodes are variables that have 'compute_???' set to True so they
+    Single edges correspond to 'x_by_conn' and 'copy_x' connections.
+    Multi nodes are variables that have 'compute_x' set to True so they
     connect to multiple nodes of the opposite io type in a component. For example
     a 'compute_shape' output variable will connect to all inputs in the component and
     each of those edges will be labeled as 'multi'. So a multi node is a node that
@@ -287,9 +287,9 @@ def get_active_edges(graph, knowns, meta_name):
     Returns
     -------
     active_single_edges : set of (str, str)
-        Set of active 'single' edges (for copy_??? and ???_by_conn).
+        Set of active 'single' edges (for copy_x and x_by_conn).
     computed_nodes : set of str
-        Set of active nodes with 'multi' edges (for compute_???).
+        Set of active nodes with 'multi' edges (for compute_x).
     """
     nodes = graph.nodes
     edges = graph.edges
@@ -303,12 +303,14 @@ def get_active_edges(graph, knowns, meta_name):
                     computed_nodes.add(succ)
                 else:
                     active_single_edges.add((known, succ))
-        # for pred in graph.predecessors(known):
-        #     if nodes[pred][meta_name] is None:
-        #         if edges[pred, known]['multi']:
-        #             computed_nodes.add(pred)
-        #         else:
-        #             active_single_edges.add((pred, known))
+
+        # We don't need to loop over predecessors here because this graph is not a dataflow
+        # graph where data always flows from outputs to inputs.  In this case, the direction of
+        # each edge is determined by the presence of shape_by_conn, etc., so for example, if an
+        # output has shape_by_conn, then this graph has an edge from the connected input to
+        # that output, which is the opposite direction of the edge between the same two variables
+        # in our typical dataflow graph.  Since in this function we always start at 'known'
+        # nodes, we only need to check their successors.
 
     return active_single_edges, computed_nodes
 
