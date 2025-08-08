@@ -1038,8 +1038,8 @@ class TestColoring(unittest.TestCase):
                 rows = [1,3,4]
                 _check_total_matrix(model, derivs, sparsity[rows, :], method)
 
-    @require_pyoptsparse(optimizer='SLSQP')
     @parameterized.expand(itertools.product(['fd', 'cs'],[True, False]), name_func=parameterized_name)
+    @require_pyoptsparse(optimizer='SLSQP')
     def test_totals_of_wrt_indices(self, method, sparse_partials):
         prob = Problem(name=f'test_totals_of_wrt_indices_{method}_{sparse_partials}')
         model = prob.model = CounterGroup()
