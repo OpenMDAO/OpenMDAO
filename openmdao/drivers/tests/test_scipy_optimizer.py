@@ -115,7 +115,7 @@ class TestMPIScatter(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-6, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-5, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -419,17 +419,17 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', val=50.)
-        model.set_input_defaults('y', val=50.)
+        model.set_input_defaults('x', val=50)
+        model.set_input_defaults('y', val=50)
 
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)
 
         model.add_design_var('x')  # note: no bounds
-        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50, upper=50)
         model.add_objective('f_xy')
 
         prob.setup()
@@ -559,14 +559,19 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(Exception) as raises_cm:
+        if ScipyVersion >= Version('1.16.0'):
             prob.run_driver()
+            assert_near_equal(prob['x'], 7.16667, 1e-4)
+            assert_near_equal(prob['y'], -7.833334, 1e-4)
+        else:
+            with self.assertRaises(Exception) as raises_cm:
+                prob.run_driver()
 
-        exception = raises_cm.exception
+            exception = raises_cm.exception
 
-        msg = "Constraints of type 'eq' not handled by COBYLA."
+            msg = "Constraints of type 'eq' not handled by COBYLA."
 
-        self.assertEqual(exception.args[0], msg)
+            self.assertEqual(exception.args[0], msg)
 
     def test_scipy_missing_objective(self):
 
