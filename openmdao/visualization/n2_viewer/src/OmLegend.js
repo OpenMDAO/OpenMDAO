@@ -44,11 +44,13 @@ class OmLegend extends Legend {
             { 'name': "Collapsed", 'color': OmStyle.color.collapsed },
             { 'name': "Declared Partial", 'color': OmStyle.color.declaredPartial }
         ];
-                
+
         const rootLinearSolver =
-            OmStyle.solverStyleObject.find(x => x.ln === modelData.tree.linear_solver);
+            OmStyle.solverStyleObject.find(x => x.ln === modelData.tree.linear_solver)
+            || OmStyle.solverStyleObject.find(x => x.ln === "other");
         const rootNonLinearSolver =
-            OmStyle.solverStyleObject.find(x => x.nl === modelData.tree.nonlinear_solver);
+            OmStyle.solverStyleObject.find(x => x.nl === modelData.tree.nonlinear_solver)
+            || OmStyle.solverStyleObject.find(x => x.nl === "other");
         this.linearSolvers = [
             { 'name': modelData.tree.linear_solver, 'color': rootLinearSolver.color }
         ];
