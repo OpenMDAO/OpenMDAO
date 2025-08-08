@@ -4,8 +4,7 @@ import sys
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warnings, assert_check_totals, \
-    assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
 
 from openmdao.utils.mpi import MPI
 if MPI:
@@ -727,18 +726,6 @@ class TestDynShapes(unittest.TestCase):
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'unconnected_var_dyn_shape':"
            "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
-
-
-class DistParModel(om.Group):
-    def setup(self):
-        par = p.model.add_subsystem('par', om.ParallelGroup())
-        par.add_subsystem('G1', SeriesGroup(2,1, DistribDynShapeComp))
-        par.add_subsystem('G2', SeriesGroup(2,1, DistribDynShapeComp))
-
-        # 'sink' has a defined shape and dyn shapes propagate in reverse from there.
-        p.model.add_subsystem('sink', om.ExecComp(['y1=x1+x2'], shape=(8,)))
-        p.model.connect('par.G1.C2.y1', 'sink.x1', src_indices=om.slicer[:])
-        p.model.connect('par.G2.C2.y1', 'sink.x2', src_indices=om.slicer[:])
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
