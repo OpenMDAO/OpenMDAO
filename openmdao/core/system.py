@@ -7111,8 +7111,9 @@ class System(object, metaclass=SystemMetaclass):
         input / output values after a run.
         """
         if (self._problem_meta is None or
-                self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP):
-            raise RuntimeError("Either 'run_model' or 'final_setup' must be "
+                self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP or
+                self._problem_meta['model_ref']().iter_count == 0):
+            raise RuntimeError("Either 'run_model' or 'run_driver' must be "
                                "called before 'run_validation' can be called.")
         validation_string = ''
         validation_errors = False

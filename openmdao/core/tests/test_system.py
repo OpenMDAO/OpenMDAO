@@ -798,8 +798,10 @@ class TestSystem(unittest.TestCase):
         prob = Problem(name='test_prob_name')
         model = prob.model
         model.add_subsystem('comp', Paraboloid())
+        prob.setup()
+        prob.final_setup()
 
-        msg = ("Either 'run_model' or 'final_setup' must be called before "
+        msg = ("Either 'run_model' or 'run_driver' must be called before "
                "'run_validation' can be called.")
         with self.assertRaises(RuntimeError, msg=msg):
             prob.model.run_validation()
