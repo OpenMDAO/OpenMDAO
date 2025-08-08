@@ -3099,7 +3099,6 @@ class Group(System):
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
         abs2meta_out = self._var_abs2meta['output']
-        abs2idx = self._var_allprocs_abs2idx
 
         nproc = self.comm.size
 
@@ -3587,8 +3586,6 @@ class Group(System):
            isinstance(promotes_outputs, str):
             raise RuntimeError(f"{self.msginfo}: promotes must be an iterator of strings and/or "
                                "tuples.")
-
-        prominfo = None
 
         # Note, the declared order in any of these promotes arguments shouldn't matter. However,
         # the order does matter when using system.promotes during configure. There, you are

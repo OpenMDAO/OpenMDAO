@@ -1,10 +1,9 @@
 import unittest
-import sys
 
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
+from openmdao.utils.assert_utils import assert_warnings
 
 
 class DynUnitsComp(om.ExplicitComponent):
@@ -159,7 +158,7 @@ class TestDynUnits(unittest.TestCase):
                                                   x2={'copy_units': 'x1'},
                                                   y1={'units_by_conn': True},
                                                   y2={'units_by_conn': True}))
-        sink = p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'units': 'm'},
                                                   x2={'units': 'ft'},
                                                   y1={'units': 'm'},
@@ -259,7 +258,7 @@ class TestDynUnits(unittest.TestCase):
         # now put the DynUnitsGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Units are known
         # at the sink
         p = om.Problem()
-        Gdyn = p.model.add_subsystem('Gdyn', DynUnitsGroupSeries(3,2, DynUnitsComp))
+        p.model.add_subsystem('Gdyn', DynUnitsGroupSeries(3,2, DynUnitsComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'units': 'm',},
                                                   x2={'units': 'ft',},
