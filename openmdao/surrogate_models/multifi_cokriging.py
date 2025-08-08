@@ -621,12 +621,13 @@ class MultiFiCoKriging(object):
                                 np.log10(thetaU[0][i]) - log10t[i]})
 
         constraints = tuple(constraints)
+
         sol = minimize(rlf_transform, x0, method='COBYLA',
                        constraints=constraints,
-                       options={'disp': False,
-                                'rhobeg': initial_range,
-                                'rhoend': tol,
-                                'tol': tol})
+                       options={'tol': tol,
+                                'disp': False,
+                                'rhobeg': 1.0,
+                                'rhoend': 1.0E-8})
 
         log10_optimal_x = sol['x']
         optimal_rlf_value = sol['fun']

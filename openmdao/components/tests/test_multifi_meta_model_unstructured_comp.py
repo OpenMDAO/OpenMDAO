@@ -260,8 +260,6 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         np.testing.assert_array_equal(surr_y2.ytrain[0], expected_y2train[0])
         np.testing.assert_array_equal(surr_y2.ytrain[1], expected_y2train[1])
 
-    @unittest.skipIf(ScipyVersion >= Version("1.16.0"),
-                     "COBYLA in Scipy >= 1.16.0 fails in this example.")
     def test_array_multi_vectorize(self):
         def branin(x):
             x1 = 15*x[0]-5

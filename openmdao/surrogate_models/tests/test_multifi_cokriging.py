@@ -130,8 +130,6 @@ class CoKrigingSurrogateTest(unittest.TestCase):
         assert_near_equal(mu, [[22]], 1)
         assert_near_equal(sigma, [[13]], 1)
 
-    @unittest.skipIf(ScipyVersion >= Version("1.16.0"),
-                        "COBYLA in Scipy >= 1.16.0 fails in this example.")
     def test_2d_2fi_cokriging(self):
 
         def branin(x):

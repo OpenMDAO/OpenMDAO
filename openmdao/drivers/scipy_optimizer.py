@@ -186,8 +186,9 @@ class ScipyOptimizeDriver(Driver):
                              'control, use solver-specific options.')
         self.options.declare('maxiter', 200, lower=0,
                              desc='Maximum number of iterations.')
-        self.options.declare('disp', True, types=bool,
-                             desc='Set to False to prevent printing of Scipy convergence messages')
+        self.options.declare('disp', default=True, types= (int, bool),
+                             desc='Value of "disp" argument provided to scipy.optimize.minimize '
+                             'which controls the verbosity of the optimization.')
         self.options.declare('singular_jac_behavior', default='warn',
                              values=['error', 'warn', 'ignore'],
                              desc='Defines behavior of a zero row/col check after first call to'
@@ -320,6 +321,12 @@ class ScipyOptimizeDriver(Driver):
                         p_high = meta_high[j]
                     else:
                         p_high = meta_high
+
+                    # Use 1.E16 here in case we've scaled the bounds and they're not quite at +/- INF_BOUND
+                    if p_low <= -1.0E16:
+                        p_low = None
+                    if p_high >= 1.0E16:
+                        p_high = None
 
                     bounds.append((p_low, p_high))
 

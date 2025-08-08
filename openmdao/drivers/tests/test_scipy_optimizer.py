@@ -415,23 +415,21 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], 6.66666667, 1e-6)
         assert_near_equal(prob['y'], -7.3333333, 1e-6)
 
-    @unittest.skipIf(ScipyVersion >= Version("1.16.0"),
-                        "COBYLA in Scipy >= 1.16.0 fails in this example.")
     def test_simple_paraboloid_unconstrained_COBYLA(self):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', val=50.)
-        model.set_input_defaults('y', val=50.)
+        model.set_input_defaults('x', val=50)
+        model.set_input_defaults('y', val=50)
 
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)
 
         model.add_design_var('x')  # note: no bounds
-        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50, upper=50)
         model.add_objective('f_xy')
 
         prob.setup()
