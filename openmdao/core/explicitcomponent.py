@@ -178,10 +178,7 @@ class ExplicitComponent(Component):
 
         return self._jacobian
 
-    def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
-                   lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
-                   shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None,
-                   primal_name=None):
+    def add_output(self, name, val=1.0, ref=1.0, res_ref=None, **kwargs):
         """
         Add an output variable to the component.
 
@@ -193,53 +190,15 @@ class ExplicitComponent(Component):
             Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        shape : int or tuple or list or None
-            Shape of this variable, only required if val is not an array.
-            Default is None.
-        units : str or None
-            Units in which the output variables will be provided to the component during execution.
-            Default is None, which means it has no units.
-        res_units : str or None
-            Units in which the residuals of this output will be given to the user when requested.
-            Default is None, which means it has no units.
-        desc : str
-            Description of the variable.
-        lower : float or list or tuple or ndarray or None
-            Lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
-            consistent with the shape arg (if given), or (3) an array_like matching the shape of
-            val, if val is array_like. A value of None means this output has no lower bound.
-            Default is None.
-        upper : float or list or tuple or ndarray or None
-            Upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
-            consistent with the shape arg (if given), or (3) an array_like matching the shape of
-            val, if val is array_like. A value of None means this output has no upper bound.
-            Default is None.
         ref : float
             Scaling parameter. The value in the user-defined units of this output variable when
             the scaled value is 1. Default is 1.
-        ref0 : float
-            Scaling parameter. The value in the user-defined units of this output variable when
-            the scaled value is 0. Default is 0.
         res_ref : float
             Scaling parameter. The value in the user-defined res_units of this output's residual
             when the scaled value is 1. Default is None, which means residual scaling matches
             output scaling.
-        tags : str or list of strs
-            User defined tags that can be used to filter what gets listed when calling
-            list_inputs and list_outputs and also when listing results from case recorders.
-        shape_by_conn : bool
-            If True, shape this output to match its connected input(s).
-        copy_shape : str or None
-            If a str, that str is the name of a variable. Shape this output to match that of
-            the named variable.
-        compute_shape : function or None
-            If a function, that function is called to determine the shape of this output.
-        distributed : bool
-            If True, this variable is a distributed variable, so it can have different sizes/values
-            across MPI processes.
-        primal_name : str or None
-            Valid python name to represent the variable in compute_primal if 'name' is not a valid
-            python name.
+        **kwargs : dict
+            Additional named arguments passed to the add_output method of Component.
 
         Returns
         -------
@@ -249,13 +208,7 @@ class ExplicitComponent(Component):
         if res_ref is None:
             res_ref = ref
 
-        return super().add_output(name, val=val, shape=shape, units=units,
-                                  res_units=res_units, desc=desc,
-                                  lower=lower, upper=upper,
-                                  ref=ref, ref0=ref0, res_ref=res_ref,
-                                  tags=tags, shape_by_conn=shape_by_conn,
-                                  copy_shape=copy_shape, compute_shape=compute_shape,
-                                  distributed=distributed, primal_name=primal_name)
+        return super().add_output(name, val=val, ref=ref, res_ref=res_ref, **kwargs)
 
     def _approx_subjac_keys_iter(self):
         is_input = self._inputs._contains_abs

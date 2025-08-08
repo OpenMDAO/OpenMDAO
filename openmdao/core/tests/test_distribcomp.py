@@ -33,6 +33,7 @@ class InOutArrayComp(om.ExplicitComponent):
         self.add_input('invec', np.ones(arr_size, float))
         self.add_output('outvec', np.ones(arr_size, float))
         self.declare_partials('outvec', 'invec', rows=np.arange(arr_size), cols=np.arange(arr_size))
+
     def compute(self, inputs, outputs):
         time.sleep(self.options['delay'])
         outputs['outvec'] = inputs['invec'] * 2.
@@ -855,7 +856,7 @@ class MPITests(unittest.TestCase):
                 "\n   <model> <class Group>: Attempted to connect from 'ivc.x0' to 'adder.x', but "
                 "'ivc.x0' doesn't exist. Perhaps you meant to connect to one of the following outputs: ['ivc.x']."
                 "\n   <model> <class Group>: Failed to resolve shapes for ['adder.x']. To see the "
-                "dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'." in str(err))
+                "dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'." in str(err))
         else:
             self.fail("Exception expected.")
 

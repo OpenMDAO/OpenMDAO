@@ -35,9 +35,7 @@ class InputResidsComp(ImplicitComponent):
         self._refs = {}
         super().__init__(**kwargs)
 
-    def add_input(self, name, val=1.0, shape=None, units=None, desc='', tags=None,
-                  shape_by_conn=False, copy_shape=None, compute_shape=None, distributed=None,
-                  ref=None):
+    def add_input(self, name, ref=None, **kwargs):
         """
         Add an input to be used as a residual.
 
@@ -45,38 +43,14 @@ class InputResidsComp(ImplicitComponent):
         ----------
         name : str
             Name of the variable in this component's namespace.
-        val : float or list or tuple or ndarray or Iterable
-            The initial value of the variable being added in user-defined units.
-            Default is 1.0.
-        shape : int or tuple or list or None
-            Shape of this variable, only required if val is not an array. Default is None.
-        units : str or None
-            Units in which this input variable will be provided to the component
-            during execution. Default is None, which means it is unitless.
-        desc : str
-            Description of the variable.
-        tags : str or list of strs
-            User defined tags that can be used to filter what gets listed when calling
-            list_inputs and list_outputs.
-        shape_by_conn : bool
-            If True, shape this input to match its connected output.
-        copy_shape : str or None
-            If a str, that str is the name of a variable. Shape this input to match that of
-            the named variable.
-        compute_shape : function
-            A function taking a dict arg containing names and shapes of this component's outputs
-            and returning the shape of this input.
-        distributed : bool
-            If True, this variable is a distributed variable, so it can have different sizes/values
-            across MPI processes.
         ref : float or ndarray or None
             Scaling parameter. The value in the user-defined units of this residual
             when the scaled value is 1. Default is 1.
+        **kwargs : dict
+            Additional arguments passed to the add_input method of ImplicitComponent.
         """
         self._refs[name] = ref
-        super().add_input(name, val=val, shape=shape, units=units, desc=desc, tags=tags,
-                          shape_by_conn=shape_by_conn, copy_shape=copy_shape,
-                          compute_shape=compute_shape, distributed=distributed)
+        super().add_input(name, **kwargs)
 
     def setup_residuals(self):
         """

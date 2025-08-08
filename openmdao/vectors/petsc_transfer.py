@@ -223,7 +223,7 @@ else:
 
                     output_inds, src_indices = _get_output_inds(group, abs_out, abs_in)
 
-                    # 2. Compute the input indices
+                    # Compute the input indices
                     input_inds = range(offsets_in[myrank, idx_in],
                                        offsets_in[myrank, idx_in] + sizes_in[myrank, idx_in])
 
@@ -445,27 +445,15 @@ def _merge(inds_list, tot_size):
 
 
 def _get_output_inds(group, abs_out, abs_in):
-    owner = group._owning_rank[abs_out]
     meta_in = group._var_abs2meta['input'][abs_in]
     out_dist = group._var_allprocs_abs2meta['output'][abs_out]['distributed']
-    in_dist = meta_in['distributed']
     src_indices = meta_in['src_indices']
 
-    rank = group.comm.rank if abs_out in group._var_abs2meta['output'] else owner
+    rank = group.comm.rank if abs_out in group._var_abs2meta['output'] else \
+        group._owning_rank[abs_out]
     out_idx = group._var_allprocs_abs2idx[abs_out]
     offsets = group._get_var_offsets()['output'][:, out_idx]
     sizes = group._var_sizes['output'][:, out_idx]
-
-    if src_indices is None:
-        orig_src_inds = src_indices
-    else:
-        src_indices = src_indices.shaped_array()
-        orig_src_inds = src_indices
-        if not out_dist and not in_dist:  # convert from local to distributed src_indices
-            off = np.sum(sizes[:rank])
-            if off > 0.:  # adjust for local offsets
-                # don't do += to avoid modifying stored value
-                src_indices = src_indices + off
 
     # NOTE: src_indices are relative to a single, possibly distributed variable,
     # while the output_inds that we compute are relative to the full distributed
@@ -481,21 +469,40 @@ def _get_output_inds(group, abs_out, abs_in):
         else:
             offset = offsets[rank]
             output_inds = range(offset, offset + sizes[rank])
+
+        return output_inds, None
+
     else:
+
+        src_indices = src_indices.shaped_array()
+        orig_src_inds = src_indices
+
+        if not (out_dist or meta_in['distributed']):  # serial --> serial
+            if offsets[rank] > 0.:
+                return src_indices + offsets[rank], orig_src_inds
+            else:
+                return src_indices, orig_src_inds
+
         output_inds = np.empty(src_indices.size, INT_DTYPE)
+        if output_inds.size == 0:
+            return output_inds, orig_src_inds
+
+        min_sind = src_indices.min()
+        max_sind = src_indices.max()
         start = end = 0
         for iproc in range(group.comm.size):
             end += sizes[iproc]
             if start == end:
                 continue
 
-            # The part of src on iproc
-            on_iproc = np.logical_and(start <= src_indices, src_indices < end)
+            if not (min_sind >= end or max_sind < start):
+                # The part of src on iproc
+                on_iproc = np.logical_and(start <= src_indices, src_indices < end)
 
-            if np.any(on_iproc):
-                # This converts from global to variable specific ordering
-                output_inds[on_iproc] = src_indices[on_iproc] + (offsets[iproc] - start)
+                if np.any(on_iproc):
+                    # This converts from global to variable specific ordering
+                    output_inds[on_iproc] = src_indices[on_iproc] + (offsets[iproc] - start)
 
             start = end
 
-    return output_inds, orig_src_inds
+        return output_inds, orig_src_inds
