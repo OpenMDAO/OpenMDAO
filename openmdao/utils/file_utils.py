@@ -2,7 +2,6 @@
 Utilities for working with files.
 """
 import mimetypes
-import sqlite3
 import sys
 import os
 import importlib
