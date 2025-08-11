@@ -1,20 +1,31 @@
 """ Unit tests for the system interface."""
 
 import unittest
-
+import pathlib
+import io
+from contextlib import redirect_stdout
 import numpy as np
+import warnings
 
+import openmdao.api as om
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.file_utils import _get_work_dir
+from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
+from openmdao.test_suite.scripts.circuit_analysis import Circuit
+from openmdao.test_suite.components.sellar_feature import SellarMDA
+from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
+from openmdao.test_suite.components.sellar import SellarProblem
+from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
+from openmdao.test_suite.components.sellar import SellarNoDerivatives
 
 
 @use_tempdirs
 class TestSystem(unittest.TestCase):
 
     def test_get_val(self):
-        import openmdao.api as om
 
         class TestComp(om.ExplicitComponent):
             def setup(self):
@@ -253,7 +264,6 @@ class TestSystem(unittest.TestCase):
             residuals['C2.y'] = bad_val.tolist()
 
     def test_list_inputs_outputs_invalid_return_format(self):
-        from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
         prob = ParaboloidProblem()
         prob.setup()
         prob.final_setup()
@@ -275,8 +285,6 @@ class TestSystem(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
     def test_list_inputs_output_with_includes_excludes(self):
-        from openmdao.test_suite.scripts.circuit_analysis import Circuit
-
         p = Problem()
         model = p.model
 
@@ -328,8 +336,6 @@ class TestSystem(unittest.TestCase):
         self.assertEqual(len(outputs), 2)
 
     def test_list_inputs_outputs_is_indep_is_des_var(self):
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
         model = SellarMDA()
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
@@ -380,8 +386,6 @@ class TestSystem(unittest.TestCase):
                          ['_auto_ivc.v1'])
 
     def test_list_options(self):
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
         model = SellarMDA()
 
         prob = Problem(model)
@@ -495,8 +499,6 @@ class TestSystem(unittest.TestCase):
             prob.model.list_inputs(units=True, prom_name=True, out_stream=None)
 
     def test_get_io_metadata(self):
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
         prob = Problem()
         prob.model = SellarMDA()
 
@@ -539,7 +541,6 @@ class TestSystem(unittest.TestCase):
                             })
 
     def test_model_options_set_all(self):
-        import openmdao.api as om
 
         def declare_options(system):
             system.options.declare('foo', types=(int,))
@@ -572,7 +573,6 @@ class TestSystem(unittest.TestCase):
             self.assertEqual(system.options['baz'], 'fizz')
 
     def test_model_options_with_filter(self):
-        import openmdao.api as om
 
         def declare_options(system):
             system.options.declare('foo', types=(int,))
@@ -611,7 +611,6 @@ class TestSystem(unittest.TestCase):
                 self.assertEqual(system.options['baz'], 'im_a_component')
 
     def test_model_options_override(self):
-        import openmdao.api as om
 
         def declare_options(system):
             system.options.declare('foo', types=(int,), default=0)
@@ -658,8 +657,6 @@ class TestSystem(unittest.TestCase):
                     self.assertEqual(system.options['baz'], 'im_C1_or_C2')
 
     def test_group_modifies_model_options(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
 
         class MyGroup(om.Group):
 
@@ -689,7 +686,6 @@ class TestSystem(unittest.TestCase):
 
     @use_tempdirs
     def test_recording_options_includes_excludes(self):
-        import openmdao.api as om
 
         prob = om.Problem()
 
@@ -725,9 +721,6 @@ class TestSystem(unittest.TestCase):
 
     @use_tempdirs
     def test_record_residuals_includes_excludes(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarProblem
-
         prob = SellarProblem()
 
         model = prob.model
@@ -753,10 +746,6 @@ class TestSystem(unittest.TestCase):
             prob.final_setup()
 
     def test_get_outputs_dir(self):
-        import pathlib
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
         prob = om.Problem(name='test_prob_name')
         model = prob.model
 
@@ -777,7 +766,6 @@ class TestSystem(unittest.TestCase):
         self.assertEqual(str(pathlib.Path(_get_work_dir(), 'test_prob_name_out', 'subdir')), str(d))
 
     def test_validate_protected(self):
-        from openmdao.test_suite.components.sellar import SellarDis1
 
         class MySellar1(SellarDis1):
             def validate(self, inputs, outputs):
@@ -793,8 +781,6 @@ class TestSystem(unittest.TestCase):
             prob.model.run_validation()
 
     def test_premature_validate(self):
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
         prob = Problem(name='test_prob_name')
         model = prob.model
         model.add_subsystem('comp', Paraboloid())
@@ -831,10 +817,6 @@ class TestSystem(unittest.TestCase):
         prob.model.my_comp_2._validate_wrapper()
 
     def test_run_validation_empty(self):
-        from openmdao.test_suite.components.sellar import SellarNoDerivatives
-        import io
-        from contextlib import redirect_stdout
-
         prob = Problem(model=Group())
         prob.model.add_subsystem('cycle', SellarNoDerivatives())
         prob.setup()
@@ -850,11 +832,6 @@ class TestSystem(unittest.TestCase):
         self.assertEqual(validation_print, expected_validation_print)
 
     def test_run_validation_all_warnings(self):
-        from openmdao.api import NonlinearBlockGS
-        from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
-        import warnings
-        import io
-        from contextlib import redirect_stdout
 
         class MySellar1(SellarDis1):
             def validate(self, inputs, outputs):
@@ -878,7 +855,7 @@ class TestSystem(unittest.TestCase):
                 cycle.set_input_defaults('z', np.array([5.0, 2.0]))
 
                 # Nonlinear Block Gauss Seidel is a gradient free solver
-                cycle.nonlinear_solver = NonlinearBlockGS()
+                cycle.nonlinear_solver = om.NonlinearBlockGS()
 
             def validate(self, inputs, outputs):
                 if outputs['y1'] > 10.0:
@@ -903,9 +880,6 @@ class TestSystem(unittest.TestCase):
         self.assertEqual(validation_print, expected_validation_print)
 
     def test_run_validation_mixed(self):
-        from openmdao.api import NonlinearBlockGS, ValidationError
-        from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
-        import warnings
 
         class MySellar1(SellarDis1):
             def validate(self, inputs, outputs):
@@ -929,7 +903,7 @@ class TestSystem(unittest.TestCase):
                 cycle.set_input_defaults('z', np.array([5.0, 2.0]))
 
                 # Nonlinear Block Gauss Seidel is a gradient free solver
-                cycle.nonlinear_solver = NonlinearBlockGS()
+                cycle.nonlinear_solver = om.NonlinearBlockGS()
 
             def validate(self, inputs, outputs):
                 if outputs['y1'] > 10.0:
@@ -951,7 +925,7 @@ class TestSystem(unittest.TestCase):
 
             -----------------------------------------------------------------
         """
-        with self.assertRaises(ValidationError, msg=expected_validation_print):
+        with self.assertRaises(om.ValidationError, msg=expected_validation_print):
             prob.model.run_validation()
 
 
