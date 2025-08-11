@@ -1,0 +1,51 @@
+name: Archive OpenMDAO Docs
+
+on:
+  # Trigger only via workflow_dispatch event
+  workflow_dispatch:
+
+
+run-name:  ${{ inputs.run_name }}
+
+permissions: {}
+
+jobs:
+
+  tests:
+
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+
+          # build docs (baseline versions)
+          - NAME: Build Docs
+            OS: ubuntu-24.04
+            PY: '3.12'
+            NUMPY: '1.26'
+            SCIPY: '1.15'
+            PETSc: '3.20'
+            PYOPTSPARSE: 'v2.13.1'
+            SNOPT: '7.7'
+            OPTIONAL: '[all]'
+            PUBLISH: true
+
+    runs-on: ${{ matrix.OS }}
+
+    name: ${{ matrix.NAME }}
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Archive built docs
+        id: archive_docs
+        if: steps.build_docs.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-docs-artifact
+          path: openmdao/docs/openmdao_book/_build/html
+          retention-days: 1
