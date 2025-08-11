@@ -230,6 +230,14 @@ jobs:
             cat $f
           done
 
+      - name: Archive built docs
+        if: steps.build_docs.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-docs-artifact
+          path: openmdao/docs/openmdao_book/_build/html
+          retention-days: 0.04
+
       - name: Publish docs
         if: github.event_name != 'pull_request' && matrix.PUBLISH
         env:
