@@ -2,7 +2,9 @@
 
 import ctypes
 import errno
+import importlib
 import os
+import pathlib
 import sys
 from collections import defaultdict
 import sqlite3
@@ -19,7 +21,7 @@ try:
         CustomJS,
         Div,
         ScrollBox,
-        SingleIntervalTicker
+        BasicTicker
     )
 
     from bokeh.models.tools import (
@@ -52,6 +54,14 @@ except ImportError:
     # If _get_free_port is unavailable, the default port will be used
     def _get_free_port():
         return 5000
+
+
+# _images_dir = pathlib.Path(importlib.util.find_spec("openmdao").origin).parent.joinpath(
+#     "visualization/realtime_opt_plot/images/"
+# )
+
+_images_dir = pathlib.Path("images")
+
 
 # Constants
 # the time between calls to the udpate method
@@ -424,7 +434,14 @@ class _CaseRecorderTracker:
 
     def _get_cons_names(self):
         cons = self._initial_case.get_constraints()
+        
+        # cons._var_info['const.g']['lower']
         return cons.keys()
+    
+    def _get_constraint_bounds(self, name):
+        cons = self._initial_case.get_constraints()
+        var_info = cons._var_info[name]
+        return (var_info['lower'], var_info['upper'])
 
     def _get_units(self, name):
         try:
@@ -468,6 +485,32 @@ class _RealTimeOptPlot(object):
         self._pid_of_calling_script = pid_of_calling_script
 
         self._source = None
+        self._lower_bounds_cons_source = None
+        self._upper_bounds_cons_source = None
+        
+       
+        # self._up_arrow_image_path = str(_images_dir / "up_arrow.png")
+        # self._down_arrow_image_path = str(_images_dir / "down_arrow.png")
+        
+        
+        # import os 
+        # print(f"{os.getcwd()=}") 
+        
+        # print(os.path.abspath("./openmdao/visualization/realtime_opt_plot/up_arrow.png"))
+        
+        # image_path = "./openmdao/visualization/realtime_opt_plot/images/up_arrow.png"
+        # image_path = "./static/up_arrow.png"
+        # absolute_path = os.path.abspath(image_path)
+        
+        
+        # print(f"{absolute_path=}")
+        # file_url = f"file://{absolute_path}"
+
+        
+        self._up_arrow_image_path = "./static/up_arrow_small.png"
+        self._down_arrow_image_path = "./static/down_arrow_small.png"
+        
+        self._constraint_bounds = {}
         self._lines = []
         self._toggles = []
         self._column_items = []
@@ -501,6 +544,8 @@ class _RealTimeOptPlot(object):
                     #   lines will not change color because of the set_value hack done to get
                     #   get around the bug in setting the line color from JavaScript
                     self._source.stream(self._source_stream_dict)
+                    self._lower_bounds_cons_source.stream(self._lower_bounds_cons_source_stream_dict)
+                    self._upper_bounds_cons_source.stream(self._upper_bounds_cons_source_stream_dict)
                 return
 
             new_data = self._case_tracker._get_data_from_case(new_case)
@@ -604,6 +649,9 @@ class _RealTimeOptPlot(object):
                     value = new_data["cons"][cons_name]
                     float_value = _get_value_for_plotting(value, "cons")
                     self._make_axis("cons", cons_name, float_value, units)
+                    
+                    
+                    self._constraint_bounds[cons_name] = self._case_tracker._get_constraint_bounds(cons_name)
 
                 # Create a Column of the variable buttons and headers inside a scrolling window
                 toggle_column = Column(
@@ -660,7 +708,17 @@ class _RealTimeOptPlot(object):
             counter = new_data["counter"]
 
             self._source_stream_dict = {"iteration": [counter]}
-
+            # self._lower_bounds_cons_source_stream_dict = {"iteration": [counter]}
+            # self._upper_bounds_cons_source_stream_dict = {"iteration": [counter]}
+            self._lower_bounds_cons_source_stream_dict = {
+                "iteration": [counter],
+                "urls": [self._up_arrow_image_path],
+                }
+            self._upper_bounds_cons_source_stream_dict = {
+                "iteration": [counter],
+                "urls": [self._down_arrow_image_path],
+                }
+            
             iline = 0
             for obj_name, obj_value in new_data["objs"].items():
                 float_obj_value = _get_value_for_plotting(obj_value, "objs")
@@ -698,6 +756,16 @@ class _RealTimeOptPlot(object):
                     units = self._case_tracker._get_units(cons_name)
                     self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
                 self._source_stream_dict[cons_name] = [float_cons_value]
+                
+                lower_bound, upper_bound = self._constraint_bounds[cons_name]
+                if float_cons_value < lower_bound :
+                    self._lower_bounds_cons_source_stream_dict[cons_name] = [float_cons_value]
+                else:
+                    self._lower_bounds_cons_source_stream_dict[cons_name] = [np.nan]
+                if float_cons_value > upper_bound :
+                    self._upper_bounds_cons_source_stream_dict[cons_name] = [float_cons_value]
+                else:
+                    self._upper_bounds_cons_source_stream_dict[cons_name] = [np.nan]
                 min_max_changed = _update_y_min_max(
                     cons_name, float_cons_value, self._y_min, self._y_max)
                 if min_max_changed:
@@ -707,6 +775,13 @@ class _RealTimeOptPlot(object):
                     self.plot_figure.extra_y_ranges[f"extra_y_{cons_name}"] = range
                 iline += 1
             self._source.stream(self._source_stream_dict)
+            
+            
+          
+            
+            self._lower_bounds_cons_source.stream(self._lower_bounds_cons_source_stream_dict)
+            self._upper_bounds_cons_source.stream(self._upper_bounds_cons_source_stream_dict)
+            
             self._labels_updated_with_units = True
             # end of _update method
 
@@ -733,6 +808,30 @@ class _RealTimeOptPlot(object):
             self._source_dict[con_name] = []
 
         self._source = ColumnDataSource(self._source_dict)
+        
+        # self._lower_bounds_cons_source_dict = {"iteration": []}
+        self._lower_bounds_cons_source_dict = {
+            "iteration": [],
+            "urls": [],
+            }
+        # Cons
+        con_names = self._case_tracker._get_cons_names()
+        for con_name in con_names:
+            self._lower_bounds_cons_source_dict[con_name] = []
+        self._lower_bounds_cons_source = ColumnDataSource(self._lower_bounds_cons_source_dict)
+        
+      
+        # self._upper_bounds_cons_source_dict = {"iteration": []}
+        self._upper_bounds_cons_source_dict = {
+            "iteration": [],
+            "urls": [],
+            }
+        # Cons
+        for con_name in con_names:
+            self._upper_bounds_cons_source_dict[con_name] = []
+        self._upper_bounds_cons_source = ColumnDataSource(self._upper_bounds_cons_source_dict)
+
+
 
     def _make_variable_button(self, varname, color, active, callback):
         toggle = Toggle(
@@ -783,11 +882,43 @@ class _RealTimeOptPlot(object):
                 color=color,
                 visible=visible,
             )
+            if var_type == "cons":
+                # triangle_lower_bound = self.plot_figure.scatter(marker='triangle',
+                #     x="iteration",
+                #     y=y_name,
+                #     source=self._lower_bounds_cons_source,
+                #     size=15,
+                #     color='red',
+                #     # visible=True,
+                # )
+                # triangle_upper_bound = self.plot_figure.scatter(marker='inverted_triangle',
+                #     x="iteration",
+                #     y=y_name,
+                #     source=self._upper_bounds_cons_source,
+                #     size=15,
+                #     color='red',
+                #     # visible=True,
+                # )
+                
+                
+                arrow_lower_bound = self.plot_figure.image_url(url='urls', x='iteration', y=y_name, 
+                                                               w=None, h=None, 
+                                                               anchor="center", source=self._lower_bounds_cons_source)
+                arrow_upper_bound = self.plot_figure.image_url(url='urls', x='iteration', y=y_name, 
+                                                               w=None, h=None, 
+                                                               anchor="center", source=self._upper_bounds_cons_source)
+
+                # self._lines.append(triangle)
+
 
         if var_type == "desvars":
             line.y_range_name = f"extra_y_{varname}_min"
         elif var_type == "cons":
             line.y_range_name = f"extra_y_{varname}"
+            # triangle_lower_bound.y_range_name = f"extra_y_{varname}"
+            # triangle_upper_bound.y_range_name = f"extra_y_{varname}"
+            arrow_lower_bound.y_range_name = f"extra_y_{varname}"
+            arrow_upper_bound.y_range_name = f"extra_y_{varname}"
         self._lines.append(line)
         if not use_varea:  # hover tool does not work with Varea
             hover = HoverTool(
@@ -840,6 +971,7 @@ class _RealTimeOptPlot(object):
             active_tap=None,
             output_backend="webgl",
         )
+        self.plot_figure.x_range.start = 1
         self.plot_figure.x_range.follow = "start"
         self.plot_figure.title.text_font_size = "14px"
         self.plot_figure.title.text_color = "black"
@@ -849,7 +981,7 @@ class _RealTimeOptPlot(object):
 
         self.plot_figure.xaxis.axis_label = "Driver iterations"
         self.plot_figure.xaxis.minor_tick_line_color = None
-        self.plot_figure.xaxis.ticker = SingleIntervalTicker(interval=1)
+        self.plot_figure.xaxis.ticker = BasicTicker(desired_num_ticks = 10, min_interval=1)
 
         self.plot_figure.axis.axis_label_text_font_style = "bold"
         self.plot_figure.axis.axis_label_text_font_size = "20pt"
@@ -882,12 +1014,49 @@ def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_sc
     _port_number = _get_free_port()
 
     try:
+ 
+        from tornado.web import StaticFileHandler
+        
+ 
         server = Server(
             {"/": Application(FunctionHandler(_make_realtime_opt_plot_doc))},
             port=_port_number,
             unused_session_lifetime_milliseconds=_unused_session_lifetime_milliseconds,
+            
+            
+                    extra_patterns=[
+            ('/static/(.*)', StaticFileHandler, {'path': os.path.normpath(os.path.dirname(__file__) + '/static/')}),
+        ],
+
+            
+            
         )
+        
+        # print(os.path.normpath(os.path.dirname(os.path.dirname(__file__)) + '/static/'))
+        print(os.path.normpath(os.path.dirname(__file__) + '/static/'))
+        
         server.start()
+        
+        
+        import bokeh
+        print(f"{os.path.dirname(__file__)=}")
+        #######. os.path.dirname(__file__)='/Users/hschilli/Documents/OpenMDAO/dev/I3568-rtplot-ui-fixes/openmdao/visualization/realtime_opt_plot'
+        
+        
+                #         handlers = [
+                #     (
+                #         self.prefix + r"/statics/(.*)",
+                #         web.StaticFileHandler,
+                #         {"path": os.path.join(os.path.dirname(__file__), "static")},
+                #     )
+                # ]
+
+                # self.server._tornado.add_handlers(r".*", handlers)
+
+
+        
+        
+        
         if show:
             server.io_loop.add_callback(server.show, "/")
 
