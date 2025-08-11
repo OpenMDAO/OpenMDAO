@@ -236,7 +236,7 @@ jobs:
         with:
           name: built-docs-artifact
           path: openmdao/docs/openmdao_book/_build/html
-          retention-days: 0.04
+          retention-days: 1
 
       - name: Publish docs
         if: github.event_name != 'pull_request' && matrix.PUBLISH
