@@ -138,6 +138,15 @@ const index = toggles.indexOf(toggle);
 // Set line visibility
 lines[index].visible = toggle.active;
 
+// Set cons_violation_indicators visibility
+const index_cons = index - num_desvars - 1;
+console.log(index_cons);
+console.log(lower_bound_violation_indicators);
+console.log(upper_bound_violation_indicators);
+lower_bound_violation_indicators[index_cons].visible = toggle.active;
+upper_bound_violation_indicators[index_cons].visible = toggle.active;
+
+
 // Set axis visibility if it exists (all except first line)
 if (index > 0 && index-1 < axes.length) {{
     axes[index-1].visible = toggle.active;
@@ -425,10 +434,8 @@ class _CaseRecorderTracker:
 
     def _get_cons_names(self):
         cons = self._initial_case.get_constraints()
-        
-        # cons._var_info['const.g']['lower']
         return cons.keys()
-    
+
     def _get_constraint_bounds(self, name):
         cons = self._initial_case.get_constraints()
         var_info = cons._var_info[name]
@@ -478,12 +485,15 @@ class _RealTimeOptPlot(object):
         self._source = None
         self._lower_bounds_cons_source = None
         self._upper_bounds_cons_source = None
-        
+
         self._up_arrow_image_path = "./images/up_arrow_small.png"
         self._down_arrow_image_path = "./images/down_arrow_small.png"
-        
+
         self._constraint_bounds = {}
         self._lines = []
+        self._lower_bound_violation_indicators = []
+        self._upper_bound_violation_indicators = []
+        self._num_desvars = 0
         self._toggles = []
         self._column_items = []
         self._axes = []
@@ -516,8 +526,12 @@ class _RealTimeOptPlot(object):
                     #   lines will not change color because of the set_value hack done to get
                     #   get around the bug in setting the line color from JavaScript
                     self._source.stream(self._source_stream_dict)
-                    self._lower_bounds_cons_source.stream(self._lower_bounds_cons_source_stream_dict)
-                    self._upper_bounds_cons_source.stream(self._upper_bounds_cons_source_stream_dict)
+                    self._lower_bounds_cons_source.stream(
+                        self._lower_bounds_cons_source_stream_dict
+                    )
+                    self._upper_bounds_cons_source.stream(
+                        self._upper_bounds_cons_source_stream_dict
+                    )
                 return
 
             new_data = self._case_tracker._get_data_from_case(new_case)
@@ -543,6 +557,9 @@ class _RealTimeOptPlot(object):
                     args=dict(
                         lines=self._lines,
                         axes=self._axes,
+                        lower_bound_violation_indicators=self._lower_bound_violation_indicators,
+                        upper_bound_violation_indicators=self._upper_bound_violation_indicators,
+                        num_desvars=self._num_desvars,
                         toggles=self._toggles,
                         colorPalette=_colorPalette,
                         plot=self.plot_figure,
@@ -621,9 +638,10 @@ class _RealTimeOptPlot(object):
                     value = new_data["cons"][cons_name]
                     float_value = _get_value_for_plotting(value, "cons")
                     self._make_axis("cons", cons_name, float_value, units)
-                    
-                    
-                    self._constraint_bounds[cons_name] = self._case_tracker._get_constraint_bounds(cons_name)
+
+                    self._constraint_bounds[cons_name] = (
+                        self._case_tracker._get_constraint_bounds(cons_name)
+                    )
 
                 # Create a Column of the variable buttons and headers inside a scrolling window
                 toggle_column = Column(
@@ -635,7 +653,7 @@ class _RealTimeOptPlot(object):
                         "border": "1px solid #ddd",
                         "padding": "8px",
                         "background-color": "#dddddd",
-                        'max-height': '100vh'  # Ensures it doesn't exceed viewport
+                        "max-height": "100vh",  # Ensures it doesn't exceed viewport
                     },
                 )
 
@@ -683,12 +701,12 @@ class _RealTimeOptPlot(object):
             self._lower_bounds_cons_source_stream_dict = {
                 "iteration": [counter],
                 "urls": [self._up_arrow_image_path],
-                }
+            }
             self._upper_bounds_cons_source_stream_dict = {
                 "iteration": [counter],
                 "urls": [self._down_arrow_image_path],
-                }
-            
+            }
+
             iline = 0
             for obj_name, obj_value in new_data["objs"].items():
                 float_obj_value = _get_value_for_plotting(obj_value, "objs")
@@ -726,13 +744,13 @@ class _RealTimeOptPlot(object):
                     units = self._case_tracker._get_units(cons_name)
                     self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
                 self._source_stream_dict[cons_name] = [float_cons_value]
-                
+
                 lower_bound, upper_bound = self._constraint_bounds[cons_name]
-                if float_cons_value < lower_bound :
+                if float_cons_value < lower_bound:
                     self._lower_bounds_cons_source_stream_dict[cons_name] = [float_cons_value]
                 else:
                     self._lower_bounds_cons_source_stream_dict[cons_name] = [np.nan]
-                if float_cons_value > upper_bound :
+                if float_cons_value > upper_bound:
                     self._upper_bounds_cons_source_stream_dict[cons_name] = [float_cons_value]
                 else:
                     self._upper_bounds_cons_source_stream_dict[cons_name] = [np.nan]
@@ -745,10 +763,10 @@ class _RealTimeOptPlot(object):
                     self.plot_figure.extra_y_ranges[f"extra_y_{cons_name}"] = range
                 iline += 1
             self._source.stream(self._source_stream_dict)
-            
+
             self._lower_bounds_cons_source.stream(self._lower_bounds_cons_source_stream_dict)
             self._upper_bounds_cons_source.stream(self._upper_bounds_cons_source_stream_dict)
-            
+
             self._labels_updated_with_units = True
             # end of _update method
 
@@ -768,6 +786,7 @@ class _RealTimeOptPlot(object):
         for desvar_name in desvar_names:
             self._source_dict[f"{desvar_name}_min"] = []
             self._source_dict[f"{desvar_name}_max"] = []
+            self._num_desvars += 1
 
         # Cons
         con_names = self._case_tracker._get_cons_names()
@@ -775,24 +794,21 @@ class _RealTimeOptPlot(object):
             self._source_dict[con_name] = []
 
         self._source = ColumnDataSource(self._source_dict)
-        
-        # self._lower_bounds_cons_source_dict = {"iteration": []}
+
         self._lower_bounds_cons_source_dict = {
             "iteration": [],
             "urls": [],
-            }
+        }
         # Cons
         con_names = self._case_tracker._get_cons_names()
         for con_name in con_names:
             self._lower_bounds_cons_source_dict[con_name] = []
         self._lower_bounds_cons_source = ColumnDataSource(self._lower_bounds_cons_source_dict)
-        
-      
-        # self._upper_bounds_cons_source_dict = {"iteration": []}
+
         self._upper_bounds_cons_source_dict = {
             "iteration": [],
             "urls": [],
-            }
+        }
         # Cons
         for con_name in con_names:
             self._upper_bounds_cons_source_dict[con_name] = []
@@ -848,18 +864,32 @@ class _RealTimeOptPlot(object):
                 visible=visible,
             )
             if var_type == "cons":
-                arrow_lower_bound = self.plot_figure.image_url(url='urls', x='iteration', y=y_name, anchor="center", source=self._lower_bounds_cons_source)
-                arrow_upper_bound = self.plot_figure.image_url(url='urls', x='iteration', y=y_name, anchor="center", source=self._upper_bounds_cons_source)
+                lower_bound_violation_indicator = self.plot_figure.image_url(
+                    url="urls",
+                    x="iteration",
+                    y=y_name,
+                    anchor="center",
+                    source=self._lower_bounds_cons_source,
+                    visible=visible,
+                )
+                upper_bound_violation_indicator = self.plot_figure.image_url(
+                    url="urls",
+                    x="iteration",
+                    y=y_name,
+                    anchor="center",
+                    source=self._upper_bounds_cons_source,
+                    visible=visible,
+                )
 
-                # self._lines.append(triangle)
-
+                self._lower_bound_violation_indicators.append(lower_bound_violation_indicator)
+                self._upper_bound_violation_indicators.append(upper_bound_violation_indicator)
 
         if var_type == "desvars":
             line.y_range_name = f"extra_y_{varname}_min"
         elif var_type == "cons":
             line.y_range_name = f"extra_y_{varname}"
-            arrow_lower_bound.y_range_name = f"extra_y_{varname}"
-            arrow_upper_bound.y_range_name = f"extra_y_{varname}"
+            lower_bound_violation_indicator.y_range_name = f"extra_y_{varname}"
+            upper_bound_violation_indicator.y_range_name = f"extra_y_{varname}"
         self._lines.append(line)
         if not use_varea:  # hover tool does not work with Varea
             hover = HoverTool(
@@ -914,6 +944,7 @@ class _RealTimeOptPlot(object):
         )
         self.plot_figure.x_range.start = 1
         self.plot_figure.x_range.follow = "start"
+
         self.plot_figure.title.text_font_size = "14px"
         self.plot_figure.title.text_color = "black"
         self.plot_figure.title.text_font = "arial"
@@ -922,8 +953,7 @@ class _RealTimeOptPlot(object):
 
         self.plot_figure.xaxis.axis_label = "Driver iterations"
         self.plot_figure.xaxis.minor_tick_line_color = None
-        self.plot_figure.xaxis.ticker = BasicTicker(desired_num_ticks = 10, min_interval=1)
-
+        self.plot_figure.xaxis.ticker = BasicTicker(desired_num_ticks=10, min_interval=1)
         self.plot_figure.axis.axis_label_text_font_style = "bold"
         self.plot_figure.axis.axis_label_text_font_size = "20pt"
 
@@ -961,12 +991,16 @@ def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_sc
             {"/": Application(FunctionHandler(_make_realtime_opt_plot_doc))},
             port=_port_number,
             unused_session_lifetime_milliseconds=_unused_session_lifetime_milliseconds,
-                    extra_patterns=[
-            ('/images/(.*)', StaticFileHandler, {'path': os.path.normpath(os.path.dirname(__file__) + '/images/')}),
-        ],
+            extra_patterns=[
+                (
+                    "/images/(.*)",
+                    StaticFileHandler,
+                    {"path": os.path.normpath(os.path.dirname(__file__) + "/images/")},
+                ),
+            ],
         )
         server.start()
-        
+
         if show:
             server.io_loop.add_callback(server.show, "/")
 
