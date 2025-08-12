@@ -1,4 +1,5 @@
 """Define a base class for all Drivers in OpenMDAO."""
+from fnmatch import fnmatch
 import functools
 from itertools import chain
 import pprint
@@ -260,6 +261,8 @@ class Driver(object, metaclass=DriverMetaclass):
         If True, scaling has been set for this driver.
     _filtered_vars_to_record : dict or None
         Variables to record based on recording options.
+    _in_find_feasible : bool
+        True if the driver is currently executing find_feasible.
     """
 
     def __init__(self, **kwargs):
@@ -276,6 +279,7 @@ class Driver(object, metaclass=DriverMetaclass):
         self._responses = None
         self._lin_dvs = None
         self._nl_dvs = None
+        self._in_find_feasible = False
 
         # Driver options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
@@ -1083,7 +1087,8 @@ class Driver(object, metaclass=DriverMetaclass):
                                      driver_scaling=driver_scaling)
                 for n, obj in self._objs.items()}
 
-    def get_constraint_values(self, ctype='all', lintype='all', driver_scaling=True):
+    def get_constraint_values(self, ctype='all', lintype='all', driver_scaling=True,
+                              viol=False):
         """
         Return constraint values.
 
@@ -1099,6 +1104,13 @@ class Driver(object, metaclass=DriverMetaclass):
             When True, return values that are scaled according to either the adder and scaler or
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
+        viol : bool
+            If True, return the constraint violation rather than the actual value. This
+            is used when minimizing the constraint violation. For equality constraints
+            this is the (optionally scaled) absolute value of deviation for the desired
+            value. For inequality constraints, this is the (optionally scaled) absolute
+            value of deviation beyond the upper or lower bounds, or zero if it is within
+            bounds.
 
         Returns
         -------
@@ -1117,8 +1129,28 @@ class Driver(object, metaclass=DriverMetaclass):
             it = filter_by_meta(it, 'equals', chk_none=True, exclude=True)
 
         for name, meta in it:
-            con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
-                                               driver_scaling=driver_scaling)
+            if viol:
+                con_val = self._get_voi_val(name, meta, self._remote_cons,
+                                            driver_scaling=False)
+                size = con_val.size
+                con_dict[name] = np.zeros(size)
+                if meta['equals'] is not None:
+                    con_dict[name][...] = con_val - meta['equals']
+                else:
+                    lower_viol_idxs = np.where(con_val < meta['lower'])[0]
+                    upper_viol_idxs = np.where(con_val > meta['upper'])[0]
+                    con_dict[name][lower_viol_idxs] = con_val - meta['lower']
+                    con_dict[name][upper_viol_idxs] = con_val - meta['upper']
+
+                # We didn't get the VOI with scaling, so do it now.
+                if driver_scaling:
+                    scaler = meta['total_scaler']
+                    if scaler is not None:
+                        con_dict[name] *= scaler
+
+            else:
+                con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
+                                                driver_scaling=driver_scaling)
 
         return con_dict
 
@@ -2000,6 +2032,287 @@ class Driver(object, metaclass=DriverMetaclass):
             active_cons[key]['multipliers'] = val
 
         return active_dvs, active_cons
+
+    def _scipy_update_design_vars(self, x_new, desvar_names=None):
+        """
+        Update the design variables in the model.
+
+        This interface is used
+        by scipy minimize and least_squares.
+
+        Parameters
+        ----------
+        x_new : ndarray
+            Array containing input values at new design point.
+        desvar_names : Sequence[str] or None
+            If given, the names of the design variables represented in x_new.
+            For the Driver.find_feasible excludes feature, one or more design
+            variables my be excluded from the feasibility search. If None,
+            assume all design variables are present in x_new.
+        """
+        if desvar_names is None:
+            desvar_names = list(self._designvars.keys())
+
+        i = 0
+        for name in desvar_names:
+            meta = self._designvars[name]
+            size = meta['size']
+            self.set_design_var(name, x_new[i:i + size])
+            i += size
+
+    def _compute_con_viol(self, x_new, desvar_names, driver_scaling=True):
+        """
+        Computes the constraint violations for use in minimizing the
+        constraint violation via least squares.
+
+        Parameters
+        ----------
+        x_new : array
+            The design variable vector.
+        desvar_names : Sequence[str]
+            The names of the design variables contained in x_new. This omits
+            the ones excluded in find_feasible.
+        driver_scaling : bool
+            If True, compute the constraint violation in driver-scaled units.
+
+        Returns
+        -------
+        array
+            A flat vector of constraint violations, ordered with the linear constraints first.
+        """
+        model = self._problem().model
+
+        try:
+            # Pass in new inputs
+            if MPI:
+                model.comm.Bcast(x_new, root=0)
+
+            self._scipy_update_design_vars(x_new, desvar_names)
+
+            with RecordingDebugging(self._get_name(), self.iter_count, self):
+                self.iter_count += 1
+                with model._relevance.nonlinear_active('iter'):
+                    self._run_solve_nonlinear()
+
+            # Sort the constraints with the linear contributions first to make it easier to
+            # apply the cached linear constraint gradient.
+            lin_con_viol_dict = self.get_constraint_values(lintype='linear', driver_scaling=driver_scaling, viol=True)
+            nl_con_viol_dict = self.get_constraint_values(lintype='nonlinear', driver_scaling=driver_scaling, viol=True)
+
+            return np.concatenate([v.ravel() for v in list(lin_con_viol_dict.values()) + list(nl_con_viol_dict.values())])
+
+        except Exception as e:
+            raise ValueError('foo') from e
+            if self._exc_info is None:  # only record the first one
+                self._exc_info = sys.exc_info()
+            return np.zeros(np.sum([c['size'] for c in self._cons.values()]))
+
+    def _compute_con_viol_grad(self, x_new, desvar_names, con_row_map, driver_scaling=True, lin_con_grad=None):
+        """
+        Compute the jacobian of the constraint violations wrt the design variables.
+
+        Parameters
+        ----------
+        x_new : array
+            The design variable vector.
+
+        Returns
+        -------
+        jac : array-like
+            A 2D array of the sensitivities of the constraints wrt the design variables.
+        """
+        _lin_con_grad = np.empty((0, x_new.size)) if lin_con_grad is None else lin_con_grad
+
+        nlcons = [name for name, meta in self._cons.items() if not meta.get('linear')]
+
+        # only need the gradient of the active constraints
+        active_cons, _ = self._get_active_cons_and_dvs(feas_atol=1.0E-8, feas_rtol=1.0E-8)
+
+        if nlcons:
+            nl_con_grad = self._compute_totals(of=nlcons, wrt=desvar_names,
+                                               return_format='array',
+                                               driver_scaling=driver_scaling)
+        else:
+            nl_con_grad = np.empty((0, x_new.size))
+
+        g = np.vstack((_lin_con_grad, nl_con_grad))
+
+        # Inactive constraints contribute nothing to the gradient.
+        for con_name, idxs in con_row_map.items():
+            if con_name not in active_cons:
+                g[idxs] = 0.0
+
+        return g
+
+    def find_feasible(self, driver_scaling=True, excludes=None,
+                      method='trf', ftol=1e-08, xtol=1e-08, gtol=1e-08,
+                      x_scale=None, loss='linear', f_scale=1.0, diff_step=None,
+                      tr_solver=None, tr_options=None, iprint=2):
+        """
+        Attempt to find design variable values which minimize the constraint violation.
+
+        If the problem is feasible, this method should find the solution for which the
+        violation of each constraint is zero.
+
+        This approach uses a least-squares minimization of the constraint violation.  If
+        the problem has a feasible solution, this should find the feasible solution
+        closes to the current design variable values.
+
+        Arguments method, ftol, xtol, gtol, x_scale, loss, f_scale, diff_step,
+        tr_solver, tr_options, and verbose are passed to `scipy.optimize.least_squares`, see
+        the documentaiton of that function for more information:
+        https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.least_squares.html
+
+        Parameters
+        ----------
+        driver_scaling : bool
+            If True, consider the constraint violation in driver-scaled units. Otherwise, it
+            will be computed in the model's units.
+        excludes : str or Sequence[str] or None
+            If given, a pattern of one or more design variables to be excluded from
+            the least-squares search.  The allows for finding a feasible (or least infeasible)
+            solution when holding one or more design variables to their current values.
+        method : {'trf', 'dogbox', or 'lm'}
+            The method used by scipy.optimize.least_squares. One or 'trf', 'dogbox', or 'lm'.
+        ftol : float or None
+            The change in the cost function from one iteration to the next which triggers
+            a termination of the minimization.
+        xtol : float or None
+            The change in the design variable vector norm from one iteration to the next which triggers
+            a termination of the minimization.
+        gtol : float or None
+            The change in the gradient norm from one iteration to the next which triggers a termination
+            of the minimization.
+        x_scale : {float, array-like, or 'jac'}
+            Additional scaling applied by the least-squares algorithm. Behavior is method-dependent.
+            For additional details, see the scipy documentation.
+        loss : {'linear', 'soft_l1', 'huber', 'cauchy', or 'arctan'}
+            The loss aggregation method. Options of interst are:
+            - 'linear' gives the standard "sum-of-squares".
+            - 'soft_l1' gives a smooth approximation for the L1-norm of constraint violation.
+            For other options, see the scipy documentation.
+        tr_solver : {None, 'exact', or 'lsmr'}
+            The solver used by trust region (trf) method.
+            For more details, see the scipy documentation.
+        tr_options : dict
+            Additional options for the trust region (trf) method.
+            For more details, see the scipy documentation.
+        iprint : int
+            Verbosity of the output. Use 2 for iteration-by-iteration results.
+            Use 1 for a convergence summary, and 0 to suppress output.
+        """
+        from scipy.optimize import Bounds, least_squares
+        from scipy.optimize._constraints import old_bound_to_new
+
+        self._in_find_feasible = True
+
+        problem = self._problem()
+        model = problem.model
+
+        excludes = [excludes] if isinstance(excludes, str) else excludes or []
+
+        status = -1 if problem is None else problem._metadata['setup_status']
+        if status < _SetupStatus.POST_FINAL_SETUP:
+            problem.final_setup()
+
+        desvar_vals = {dv: val for dv, val in self.get_design_var_values().items()
+                       if not any(fnmatch(dv, pat) for pat in excludes)}
+
+        # Size Problem
+        ndesvar = 0
+        for name in desvar_vals.keys():
+            meta = self._designvars[name]
+            size = meta['global_size'] if meta['distributed'] else meta['size']
+            ndesvar += size
+        x_init = np.empty(ndesvar)
+
+        # Initial Design Vars
+        i = 0
+        bounds = []
+
+        for name, val in desvar_vals.items():
+            meta = self._designvars[name]
+            size = meta['global_size'] if meta['distributed'] else meta['size']
+            x_init[i:i + size] = val
+            i += size
+
+            meta_low = meta['lower']
+            meta_high = meta['upper']
+            for j in range(size):
+
+                if isinstance(meta_low, np.ndarray):
+                    p_low = meta_low[j]
+                else:
+                    p_low = meta_low
+
+                if isinstance(meta_high, np.ndarray):
+                    p_high = meta_high[j]
+                else:
+                    p_high = meta_high
+
+                p_low = -np.inf if p_low < 1.0E16 else p_low
+                p_high = np.inf if p_high > 1.0E16 else p_high
+
+                bounds.append((p_low, p_high))
+
+        # Convert "old-style" bounds to "new_style" bounds
+        lower, upper = old_bound_to_new(bounds)  # tuple, tuple
+        bounds = Bounds(lb=lower, ub=upper, keep_feasible=True)
+
+        lincons = {name: meta for name, meta in self._cons.items() if meta.get('linear')}
+        nl_cons = {name: meta for name, meta in self._cons.items() if not meta.get('linear')}
+
+        # Save the rows in the constraint vector that apply to each constrained output
+        con_row_map = {}
+        i = 0
+        for name, meta in chain(lincons.items(), nl_cons.items()):
+            size = meta['global_size'] if meta['distributed'] else meta['size']
+            con_row_map[name] = slice(i, i+size)
+            i += size
+
+        # Compute and save the gradient of the linear constraints
+        lincongrad_cache = self._compute_totals(of=list(lincons.keys()), wrt=desvar_vals.keys(), return_format='array') if lincons else None
+
+        # Provide the jac function with cached linear gradients and mapping of constraint names to rows.
+        jacfun = functools.partial(self._compute_con_viol_grad, desvar_names=desvar_vals.keys(),
+                                   driver_scaling=driver_scaling, lin_con_grad=lincongrad_cache,
+                                   con_row_map=con_row_map)
+
+        # Wrap the actual least squares call so that we don't need to duplicate calls below'
+        if problem.comm.rank != 0:
+            iprint = 0
+
+        f_lsq = functools.partial(least_squares, self._compute_con_viol,
+                                  kwargs={'driver_scaling': driver_scaling,
+                                          'desvar_names': list(desvar_vals.keys())},
+                                  x0=x_init, bounds=bounds, verbose=iprint,
+                                  method=method, ftol=ftol, xtol=xtol, gtol=gtol,
+                                  x_scale=x_scale, loss=loss, f_scale=f_scale,
+                                  tr_solver=None, tr_options=None, jac=jacfun)
+
+        self.result.reset()
+        if problem.options['group_by_pre_opt_post']:
+            if model._pre_components:
+                with model._relevance.nonlinear_active('pre'):
+                    self._run_solve_nonlinear()
+
+            with SaveOptResult(self):
+                with model._relevance.nonlinear_active('iter'):
+                    res = f_lsq()
+                    self.result.success = res.success
+
+            if model._post_components:
+                with model._relevance.nonlinear_active('post'):
+                    self._run_solve_nonlinear()
+
+        else:
+            with SaveOptResult(self):
+                res = f_lsq()
+                self.result.success = res.success
+
+        self._in_find_feasible = False
+
+        return self.result
 
 
 class SaveOptResult(object):

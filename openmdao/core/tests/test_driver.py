@@ -870,6 +870,35 @@ class TestDriver(unittest.TestCase):
         with assert_warnings(expected_warnings):
             prob.final_setup()
 
+    def test_find_feasible(self):
+        # Define a simple model
+        prob = om.Problem()
+        model = prob.model
+
+        # Design Vars
+        model.add_design_var('x', lower=0.0, upper=10.0)
+
+        # Constraints
+        con = model.add_subsystem('comp', om.ExecComp('y = (x)**2'), promotes=['*'])
+        con.add_constraint('y', lower=1.25, upper=4.0)
+
+        con2 = model.add_subsystem('comp2', om.ExecComp('y2 = x+0.5'), promotes=['*'])
+        con2.add_constraint('y2', equals=2)
+
+        # Objective
+        model.add_subsystem('obj_comp', om.ExecComp('obj = (x-1)**2'), promotes=['*'])
+        model.add_objective('obj')
+
+        # Setup the problem and run the optimization
+        prob.setup()
+
+        model.set_val('x', 5.0)
+
+        res = prob.driver.find_feasible(iprint=2)
+
+        self.assertTrue(res.success)
+        assert_near_equal(prob.get_val('x'), 1.5, tolerance=1.0E-8)
+
 @use_tempdirs
 class TestCheckRelevance(unittest.TestCase):
     def setup_problem(self, driver=None):

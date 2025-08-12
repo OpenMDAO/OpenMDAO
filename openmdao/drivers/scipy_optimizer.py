@@ -588,21 +588,6 @@ class ScipyOptimizeDriver(Driver):
 
         return self.fail
 
-    def _update_design_vars(self, x_new):
-        """
-        Update the design variables in the model.
-
-        Parameters
-        ----------
-        x_new : ndarray
-            Array containing input values at new design point.
-        """
-        i = 0
-        for name, meta in self._designvars.items():
-            size = meta['size']
-            self.set_design_var(name, x_new[i:i + size])
-            i += size
-
     def _objfunc(self, x_new):
         """
         Evaluate and return the objective function.
@@ -632,7 +617,7 @@ class ScipyOptimizeDriver(Driver):
 
             self._desvar_array_cache[:] = x_new
 
-            self._update_design_vars(x_new)
+            self._scipy_update_design_vars(x_new)
 
             with RecordingDebugging(self._get_name(), self.iter_count, self):
                 self.iter_count += 1
