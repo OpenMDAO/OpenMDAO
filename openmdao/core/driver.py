@@ -2046,12 +2046,12 @@ class Driver(object, metaclass=DriverMetaclass):
             Array containing input values at new design point.
         desvar_names : Sequence[str] or None
             If given, the names of the design variables represented in x_new.
-            For the Driver.find_feasible excludes feature, one or more design
-            variables my be excluded from the feasibility search. If None,
+            For the Driver.find_feasible excludes argument, one or more design
+            variables may be excluded from the feasibility search. If None,
             assume all design variables are present in x_new.
         """
         if desvar_names is None:
-            desvar_names = list(self._designvars.keys())
+            desvar_names = self._designvars.keys()
 
         i = 0
         for name in desvar_names:
@@ -2085,7 +2085,7 @@ class Driver(object, metaclass=DriverMetaclass):
 
         try:
             # Pass in new inputs
-            if MPI:
+            if MPI and model.comm.size > 1:
                 model.comm.Bcast(x_new, root=0)
 
             self._scipy_update_design_vars(x_new, desvar_names)
