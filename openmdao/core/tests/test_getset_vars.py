@@ -373,7 +373,7 @@ class TestGetSetVariables(unittest.TestCase):
            "\nCollected errors for problem 'serial_multi_src_inds_units_promoted_no_src':"
            "\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x', 'C3.x'], promoted "
            "to 'x', are connected but their metadata entries ['units'] differ. Call "
-           "<group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+           "model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_serial_multi_src_inds_units_setval_promoted(self):
         p = Problem()
