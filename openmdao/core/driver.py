@@ -1150,7 +1150,7 @@ class Driver(object, metaclass=DriverMetaclass):
 
             else:
                 con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
-                                                driver_scaling=driver_scaling)
+                                                   driver_scaling=driver_scaling)
 
         return con_dict
 
@@ -2062,8 +2062,9 @@ class Driver(object, metaclass=DriverMetaclass):
 
     def _compute_con_viol(self, x_new, desvar_names, driver_scaling=True):
         """
-        Computes the constraint violations for use in minimizing the
-        constraint violation via least squares.
+        Compute the constraint violations.
+
+        Used in minimizing the constraint violation via least squares.
 
         Parameters
         ----------
@@ -2096,10 +2097,17 @@ class Driver(object, metaclass=DriverMetaclass):
 
             # Sort the constraints with the linear contributions first to make it easier to
             # apply the cached linear constraint gradient.
-            lin_con_viol_dict = self.get_constraint_values(lintype='linear', driver_scaling=driver_scaling, viol=True)
-            nl_con_viol_dict = self.get_constraint_values(lintype='nonlinear', driver_scaling=driver_scaling, viol=True)
+            lin_con_viol_dict = self.get_constraint_values(lintype='linear',
+                                                           driver_scaling=driver_scaling,
+                                                           viol=True)
 
-            return np.concatenate([v.ravel() for v in list(lin_con_viol_dict.values()) + list(nl_con_viol_dict.values())])
+            nl_con_viol_dict = self.get_constraint_values(lintype='nonlinear',
+                                                          driver_scaling=driver_scaling,
+                                                          viol=True)
+
+            return np.concatenate([v.ravel() for v in
+                                   list(lin_con_viol_dict.values()) +
+                                   list(nl_con_viol_dict.values())])
 
         except Exception as e:
             raise ValueError('foo') from e
@@ -2107,7 +2115,8 @@ class Driver(object, metaclass=DriverMetaclass):
                 self._exc_info = sys.exc_info()
             return np.zeros(np.sum([c['size'] for c in self._cons.values()]))
 
-    def _compute_con_viol_grad(self, x_new, desvar_names, con_row_map, driver_scaling=True, lin_con_grad=None):
+    def _compute_con_viol_grad(self, x_new, desvar_names, con_row_map,
+                               driver_scaling=True, lin_con_grad=None):
         """
         Compute the jacobian of the constraint violations wrt the design variables.
 
@@ -2115,14 +2124,22 @@ class Driver(object, metaclass=DriverMetaclass):
         ----------
         x_new : array
             The design variable vector.
+        desvar_names : Sequence[str]
+            The names of the design variables not excluded in find_feasible.
+        con_row_map : dict[str: slice]
+            A dict which maps a constraint name to its corresponding rows in
+            the jacobian matrix.
+        driver_scaling : bool
+            If True, assume driver-scaling when computing the gradients,
+            otherwise assume model scaling.
+        lin_con_grad : array or None
+            The cached value of the linear portion of the constraint gradient.
 
         Returns
         -------
         jac : array-like
             A 2D array of the sensitivities of the constraints wrt the design variables.
         """
-        _lin_con_grad = np.empty((0, x_new.size)) if lin_con_grad is None else lin_con_grad
-
         nlcons = [name for name, meta in self._cons.items() if not meta.get('linear')]
 
         # only need the gradient of the active constraints
@@ -2135,7 +2152,7 @@ class Driver(object, metaclass=DriverMetaclass):
         else:
             nl_con_grad = np.empty((0, x_new.size))
 
-        g = np.vstack((_lin_con_grad, nl_con_grad))
+        g = np.vstack((lin_con_grad, nl_con_grad))
 
         # Inactive constraints contribute nothing to the gradient.
         for con_name, idxs in con_row_map.items():
@@ -2146,7 +2163,7 @@ class Driver(object, metaclass=DriverMetaclass):
 
     def find_feasible(self, driver_scaling=True, excludes=None,
                       method='trf', ftol=1e-08, xtol=1e-08, gtol=1e-08,
-                      x_scale=None, loss='linear', f_scale=1.0, diff_step=None,
+                      x_scale=1., loss='linear', f_scale=1.0,
                       tr_solver=None, tr_options=None, iprint=2):
         """
         Attempt to find design variable values which minimize the constraint violation.
@@ -2178,11 +2195,11 @@ class Driver(object, metaclass=DriverMetaclass):
             The change in the cost function from one iteration to the next which triggers
             a termination of the minimization.
         xtol : float or None
-            The change in the design variable vector norm from one iteration to the next which triggers
-            a termination of the minimization.
+            The change in the design variable vector norm from one iteration to the next
+            which triggers a termination of the minimization.
         gtol : float or None
-            The change in the gradient norm from one iteration to the next which triggers a termination
-            of the minimization.
+            The change in the gradient norm from one iteration to the next which triggers
+            a termination of the minimization.
         x_scale : {float, array-like, or 'jac'}
             Additional scaling applied by the least-squares algorithm. Behavior is method-dependent.
             For additional details, see the scipy documentation.
@@ -2191,6 +2208,9 @@ class Driver(object, metaclass=DriverMetaclass):
             - 'linear' gives the standard "sum-of-squares".
             - 'soft_l1' gives a smooth approximation for the L1-norm of constraint violation.
             For other options, see the scipy documentation.
+        f_scale : float or None
+            Value of margin between inlier and outlier residuals when loss is not 'linear'.
+            For more information, see the scipy documentation.
         tr_solver : {None, 'exact', or 'lsmr'}
             The solver used by trust region (trf) method.
             For more details, see the scipy documentation.
@@ -2200,6 +2220,11 @@ class Driver(object, metaclass=DriverMetaclass):
         iprint : int
             Verbosity of the output. Use 2 for iteration-by-iteration results.
             Use 1 for a convergence summary, and 0 to suppress output.
+
+        Returns
+        -------
+        DriverResult
+            A DriverResult object summarizing statistics of the feasibility search.
         """
         from scipy.optimize import Bounds, least_squares
         from scipy.optimize._constraints import old_bound_to_new
@@ -2250,14 +2275,14 @@ class Driver(object, metaclass=DriverMetaclass):
                 else:
                     p_high = meta_high
 
-                p_low = -np.inf if p_low < 1.0E16 else p_low
+                p_low = -np.inf if p_low < -1.0E16 else p_low
                 p_high = np.inf if p_high > 1.0E16 else p_high
 
                 bounds.append((p_low, p_high))
 
         # Convert "old-style" bounds to "new_style" bounds
         lower, upper = old_bound_to_new(bounds)  # tuple, tuple
-        bounds = Bounds(lb=lower, ub=upper, keep_feasible=True)
+        bounds = Bounds(lb=lower, ub=upper, keep_feasible=[True] * x_init.size)
 
         lincons = {name: meta for name, meta in self._cons.items() if meta.get('linear')}
         nl_cons = {name: meta for name, meta in self._cons.items() if not meta.get('linear')}
@@ -2267,13 +2292,18 @@ class Driver(object, metaclass=DriverMetaclass):
         i = 0
         for name, meta in chain(lincons.items(), nl_cons.items()):
             size = meta['global_size'] if meta['distributed'] else meta['size']
-            con_row_map[name] = slice(i, i+size)
+            con_row_map[name] = slice(i, i + size)
             i += size
 
         # Compute and save the gradient of the linear constraints
-        lincongrad_cache = self._compute_totals(of=list(lincons.keys()), wrt=desvar_vals.keys(), return_format='array') if lincons else None
+        if lincons:
+            lincongrad_cache = self._compute_totals(of=list(lincons.keys()),
+                                                    wrt=desvar_vals.keys(),
+                                                    return_format='array')
+        else:
+            lincongrad_cache = np.empty((0, x_init.size))
 
-        # Provide the jac function with cached linear gradients and mapping of constraint names to rows.
+        # Provide the jac with cached linear grad and mapping of constraint names to rows.
         jacfun = functools.partial(self._compute_con_viol_grad, desvar_names=desvar_vals.keys(),
                                    driver_scaling=driver_scaling, lin_con_grad=lincongrad_cache,
                                    con_row_map=con_row_map)
