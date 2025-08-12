@@ -1139,8 +1139,8 @@ class Driver(object, metaclass=DriverMetaclass):
                 else:
                     lower_viol_idxs = np.where(con_val < meta['lower'])[0]
                     upper_viol_idxs = np.where(con_val > meta['upper'])[0]
-                    con_dict[name][lower_viol_idxs] = con_val - meta['lower']
-                    con_dict[name][upper_viol_idxs] = con_val - meta['upper']
+                    con_dict[name][lower_viol_idxs] = con_val[lower_viol_idxs] - meta['lower']
+                    con_dict[name][upper_viol_idxs] = con_val[upper_viol_idxs] - meta['upper']
 
                 # We didn't get the VOI with scaling, so do it now.
                 if driver_scaling:
