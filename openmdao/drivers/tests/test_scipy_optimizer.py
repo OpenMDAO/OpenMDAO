@@ -115,7 +115,7 @@ class TestMPIScatter(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-6, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-5, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -419,17 +419,17 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.set_input_defaults('x', val=50.)
-        model.set_input_defaults('y', val=50.)
+        model.set_input_defaults('x', val=50)
+        model.set_input_defaults('y', val=50)
 
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', tol=1e-9, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)
 
         model.add_design_var('x')  # note: no bounds
-        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50, upper=50)
         model.add_objective('f_xy')
 
         prob.setup()
@@ -559,14 +559,19 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(Exception) as raises_cm:
+        if ScipyVersion >= Version('1.16.0'):
             prob.run_driver()
+            assert_near_equal(prob['x'], 7.16667, 1e-4)
+            assert_near_equal(prob['y'], -7.833334, 1e-4)
+        else:
+            with self.assertRaises(Exception) as raises_cm:
+                prob.run_driver()
 
-        exception = raises_cm.exception
+            exception = raises_cm.exception
 
-        msg = "Constraints of type 'eq' not handled by COBYLA."
+            msg = "Constraints of type 'eq' not handled by COBYLA."
 
-        self.assertEqual(exception.args[0], msg)
+            self.assertEqual(exception.args[0], msg)
 
     def test_scipy_missing_objective(self):
 
@@ -2100,7 +2105,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).')
+                         'Constraints or objectives [parab.z] cannot be impacted by the design'
+                         ' variables of the problem because no partials were defined for them in their parent component(s).')
 
     def test_singular_jac_error_desvars(self):
         prob = om.Problem()
@@ -2130,12 +2136,12 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        with printoptions(legacy='1.21'):
-            with self.assertRaises(RuntimeError) as msg:
-                prob.run_driver()
+        with self.assertRaises(RuntimeError) as msg:
+            prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
+                         'The following design variables have no impact on the constraints or '
+                         'objective at the current design point:\n  z, inds=[0]\n')
 
     def test_singular_jac_ignore(self):
         prob = om.Problem()
@@ -2187,15 +2193,15 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         prob.setup()
 
-        msg = "Constraints or objectives [('parab.z', inds=[0])] cannot be impacted by the design variables of the problem."
+        expected_msg = ('The following constraints or objectives cannot be impacted by'
+                        ' the design variables of the problem at the current design point:\n  parab.z, inds=[0]\n')
 
-        with printoptions(legacy='1.21'):
-            with assert_warning(UserWarning, msg):
-                prob.run_driver()
+        with assert_warning(DerivativesWarning, expected_msg):
+            prob.run_driver()
 
     def test_singular_jac_desvars_multidim_indices_dv(self):
-        expected_msg = "Design variables [('z', inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)])] " \
-                       "have no impact on the constraints or objective."
+        expected_msg = "The following design variables " \
+                       "have no impact on the constraints or objective at the current design point:\n  z, inds=[(0, 1, 0), (1, 0, 1), (1, 1, 0)]\n"
 
         for option in ['error', 'warn', 'ignore']:
             with self.subTest(f'singular_jac_behavior = {option}'):
@@ -2268,7 +2274,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                 prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Constraints or objectives [('parab.f_z', inds=[(1, 1, 0)])] cannot be impacted by the design variables of the problem.")
+                         'The following constraints or objectives cannot be impacted by the design'
+                         ' variables of the problem at the current design point:\n  parab.f_z, inds=[(1, 1, 0)]\n')
 
     @unittest.skipUnless(ScipyVersion >= Version("1.2"),
                          "scipy >= 1.2 is required.")

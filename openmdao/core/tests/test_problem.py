@@ -1800,6 +1800,23 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(output[17], r'Objectives')
         self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
+        # General make sure that the default settings print all columns.
+        self.assertTrue('parallel_deriv_color' in output[3])
+        self.assertTrue('units' in output[3])
+        self.assertTrue('upper' in output[3])
+        self.assertTrue('lower' in output[3])
+        self.assertTrue('ref0' in output[3])
+        self.assertTrue('parallel_deriv_color' in output[11])
+        self.assertTrue('units' in output[11])
+        self.assertTrue('upper' in output[11])
+        self.assertTrue('lower' in output[11])
+        self.assertTrue('ref0' in output[11])
+        self.assertTrue('units' in output[19])
+        self.assertTrue('ref' in output[19])
+        self.assertTrue('adder' in output[19])
+        self.assertTrue('parallel_deriv_color' in output[19])
+        self.assertTrue('cache_linear_solution' in output[19])
+
         # With show_promoted_name=False
         stdout = sys.stdout
         strout = StringIO()
