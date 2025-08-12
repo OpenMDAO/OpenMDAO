@@ -2,7 +2,6 @@
 
 import ctypes
 import errno
-import importlib
 import os
 import pathlib
 import sys
@@ -54,14 +53,6 @@ except ImportError:
     # If _get_free_port is unavailable, the default port will be used
     def _get_free_port():
         return 5000
-
-
-# _images_dir = pathlib.Path(importlib.util.find_spec("openmdao").origin).parent.joinpath(
-#     "visualization/realtime_opt_plot/images/"
-# )
-
-_images_dir = pathlib.Path("images")
-
 
 # Constants
 # the time between calls to the udpate method
@@ -488,27 +479,8 @@ class _RealTimeOptPlot(object):
         self._lower_bounds_cons_source = None
         self._upper_bounds_cons_source = None
         
-       
-        # self._up_arrow_image_path = str(_images_dir / "up_arrow.png")
-        # self._down_arrow_image_path = str(_images_dir / "down_arrow.png")
-        
-        
-        # import os 
-        # print(f"{os.getcwd()=}") 
-        
-        # print(os.path.abspath("./openmdao/visualization/realtime_opt_plot/up_arrow.png"))
-        
-        # image_path = "./openmdao/visualization/realtime_opt_plot/images/up_arrow.png"
-        # image_path = "./static/up_arrow.png"
-        # absolute_path = os.path.abspath(image_path)
-        
-        
-        # print(f"{absolute_path=}")
-        # file_url = f"file://{absolute_path}"
-
-        
-        self._up_arrow_image_path = "./static/up_arrow_small.png"
-        self._down_arrow_image_path = "./static/down_arrow_small.png"
+        self._up_arrow_image_path = "./images/up_arrow_small.png"
+        self._down_arrow_image_path = "./images/down_arrow_small.png"
         
         self._constraint_bounds = {}
         self._lines = []
@@ -708,8 +680,6 @@ class _RealTimeOptPlot(object):
             counter = new_data["counter"]
 
             self._source_stream_dict = {"iteration": [counter]}
-            # self._lower_bounds_cons_source_stream_dict = {"iteration": [counter]}
-            # self._upper_bounds_cons_source_stream_dict = {"iteration": [counter]}
             self._lower_bounds_cons_source_stream_dict = {
                 "iteration": [counter],
                 "urls": [self._up_arrow_image_path],
@@ -776,9 +746,6 @@ class _RealTimeOptPlot(object):
                 iline += 1
             self._source.stream(self._source_stream_dict)
             
-            
-          
-            
             self._lower_bounds_cons_source.stream(self._lower_bounds_cons_source_stream_dict)
             self._upper_bounds_cons_source.stream(self._upper_bounds_cons_source_stream_dict)
             
@@ -831,8 +798,6 @@ class _RealTimeOptPlot(object):
             self._upper_bounds_cons_source_dict[con_name] = []
         self._upper_bounds_cons_source = ColumnDataSource(self._upper_bounds_cons_source_dict)
 
-
-
     def _make_variable_button(self, varname, color, active, callback):
         toggle = Toggle(
             label=varname,
@@ -883,30 +848,8 @@ class _RealTimeOptPlot(object):
                 visible=visible,
             )
             if var_type == "cons":
-                # triangle_lower_bound = self.plot_figure.scatter(marker='triangle',
-                #     x="iteration",
-                #     y=y_name,
-                #     source=self._lower_bounds_cons_source,
-                #     size=15,
-                #     color='red',
-                #     # visible=True,
-                # )
-                # triangle_upper_bound = self.plot_figure.scatter(marker='inverted_triangle',
-                #     x="iteration",
-                #     y=y_name,
-                #     source=self._upper_bounds_cons_source,
-                #     size=15,
-                #     color='red',
-                #     # visible=True,
-                # )
-                
-                
-                arrow_lower_bound = self.plot_figure.image_url(url='urls', x='iteration', y=y_name, 
-                                                               w=None, h=None, 
-                                                               anchor="center", source=self._lower_bounds_cons_source)
-                arrow_upper_bound = self.plot_figure.image_url(url='urls', x='iteration', y=y_name, 
-                                                               w=None, h=None, 
-                                                               anchor="center", source=self._upper_bounds_cons_source)
+                arrow_lower_bound = self.plot_figure.image_url(url='urls', x='iteration', y=y_name, anchor="center", source=self._lower_bounds_cons_source)
+                arrow_upper_bound = self.plot_figure.image_url(url='urls', x='iteration', y=y_name, anchor="center", source=self._upper_bounds_cons_source)
 
                 # self._lines.append(triangle)
 
@@ -915,8 +858,6 @@ class _RealTimeOptPlot(object):
             line.y_range_name = f"extra_y_{varname}_min"
         elif var_type == "cons":
             line.y_range_name = f"extra_y_{varname}"
-            # triangle_lower_bound.y_range_name = f"extra_y_{varname}"
-            # triangle_upper_bound.y_range_name = f"extra_y_{varname}"
             arrow_lower_bound.y_range_name = f"extra_y_{varname}"
             arrow_upper_bound.y_range_name = f"extra_y_{varname}"
         self._lines.append(line)
@@ -1014,48 +955,17 @@ def realtime_opt_plot(case_recorder_filename, callback_period, pid_of_calling_sc
     _port_number = _get_free_port()
 
     try:
- 
         from tornado.web import StaticFileHandler
-        
- 
+
         server = Server(
             {"/": Application(FunctionHandler(_make_realtime_opt_plot_doc))},
             port=_port_number,
             unused_session_lifetime_milliseconds=_unused_session_lifetime_milliseconds,
-            
-            
                     extra_patterns=[
-            ('/static/(.*)', StaticFileHandler, {'path': os.path.normpath(os.path.dirname(__file__) + '/static/')}),
+            ('/images/(.*)', StaticFileHandler, {'path': os.path.normpath(os.path.dirname(__file__) + '/images/')}),
         ],
-
-            
-            
         )
-        
-        # print(os.path.normpath(os.path.dirname(os.path.dirname(__file__)) + '/static/'))
-        print(os.path.normpath(os.path.dirname(__file__) + '/static/'))
-        
         server.start()
-        
-        
-        import bokeh
-        print(f"{os.path.dirname(__file__)=}")
-        #######. os.path.dirname(__file__)='/Users/hschilli/Documents/OpenMDAO/dev/I3568-rtplot-ui-fixes/openmdao/visualization/realtime_opt_plot'
-        
-        
-                #         handlers = [
-                #     (
-                #         self.prefix + r"/statics/(.*)",
-                #         web.StaticFileHandler,
-                #         {"path": os.path.join(os.path.dirname(__file__), "static")},
-                #     )
-                # ]
-
-                # self.server._tornado.add_handlers(r".*", handlers)
-
-
-        
-        
         
         if show:
             server.io_loop.add_callback(server.show, "/")
