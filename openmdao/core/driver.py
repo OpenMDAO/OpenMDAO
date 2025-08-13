@@ -271,6 +271,7 @@ class Driver(object, metaclass=DriverMetaclass):
         """
         self._rec_mgr = RecordingManager()
 
+        self._exc_info = None
         self._problem = None
         self._designvars = None
         self._designvars_discrete = []
@@ -1131,7 +1132,7 @@ class Driver(object, metaclass=DriverMetaclass):
         for name, meta in it:
             if viol:
                 con_val = self._get_voi_val(name, meta, self._remote_cons,
-                                            driver_scaling=False)
+                                            driver_scaling=True)
                 size = con_val.size
                 con_dict[name] = np.zeros(size)
                 if meta['equals'] is not None:
@@ -1142,11 +1143,12 @@ class Driver(object, metaclass=DriverMetaclass):
                     con_dict[name][lower_viol_idxs] = con_val[lower_viol_idxs] - meta['lower']
                     con_dict[name][upper_viol_idxs] = con_val[upper_viol_idxs] - meta['upper']
 
-                # We didn't get the VOI with scaling, so do it now.
-                if driver_scaling:
+                # We got the voi value in driver-scaled units.
+                # Unscale if necessary.
+                if not driver_scaling:
                     scaler = meta['total_scaler']
                     if scaler is not None:
-                        con_dict[name] *= scaler
+                        con_dict[name] /= scaler
 
             else:
                 con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
@@ -2033,6 +2035,14 @@ class Driver(object, metaclass=DriverMetaclass):
 
         return active_dvs, active_cons
 
+    def _reraise(self):
+        """
+        Reraise any exception encountered when scipy calls back into our methods.
+        """
+        exc_info = self._exc_info
+        self._exc_info = None  # clear since we're done with it
+        raise exc_info[1].with_traceback(exc_info[2])
+
     def _scipy_update_design_vars(self, x_new, desvar_names=None):
         """
         Update the design variables in the model.
@@ -2109,8 +2119,7 @@ class Driver(object, metaclass=DriverMetaclass):
                                    list(lin_con_viol_dict.values()) +
                                    list(nl_con_viol_dict.values())])
 
-        except Exception as e:
-            raise ValueError('foo') from e
+        except Exception:
             if self._exc_info is None:  # only record the first one
                 self._exc_info = sys.exc_info()
             return np.zeros(np.sum([c['size'] for c in self._cons.values()]))
@@ -2319,6 +2328,7 @@ class Driver(object, metaclass=DriverMetaclass):
         if lincons:
             lincongrad_cache = self._compute_totals(of=list(lincons.keys()),
                                                     wrt=desvar_vals.keys(),
+                                                    driver_scaling=driver_scaling,
                                                     return_format='array')
         else:
             lincongrad_cache = np.empty((0, x_init.size))
@@ -2338,8 +2348,11 @@ class Driver(object, metaclass=DriverMetaclass):
                                   x0=x_init, bounds=bounds, verbose=2 if iprint == 2 else 0,
                                   method=method, ftol=ftol, xtol=xtol, gtol=gtol,
                                   x_scale=x_scale, loss=loss, max_nfev=max_nfev,
-                                  f_scale=f_scale, tr_solver=None, tr_options=None,
+                                  f_scale=f_scale, tr_solver=tr_solver, tr_options=tr_options,
                                   jac=jacfun)
+
+        if self._exc_info is not None:
+            self._reraise()
 
         if iprint == 2:
             print()

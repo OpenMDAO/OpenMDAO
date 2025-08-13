@@ -876,14 +876,14 @@ class TestDriver(unittest.TestCase):
         model = prob.model
 
         # Design Vars
-        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_design_var('x', lower=0.0, upper=10.0, ref=10)
 
         # Constraints
         con = model.add_subsystem('comp', om.ExecComp('y = (x)**2'), promotes=['*'])
-        con.add_constraint('y', lower=1.25, upper=4.0)
+        con.add_constraint('y', lower=1.25, upper=4.0, ref=10.)
 
         con2 = model.add_subsystem('comp2', om.ExecComp('y2 = x+0.5'), promotes=['*'])
-        con2.add_constraint('y2', equals=2)
+        con2.add_constraint('y2', equals=2, ref=0.2)
 
         # Objective
         model.add_subsystem('obj_comp', om.ExecComp('obj = (x-1)**2'), promotes=['*'])
@@ -896,36 +896,39 @@ class TestDriver(unittest.TestCase):
             for loss in ['linear', 'soft_l1', 'huber', 'cauchy', 'arctan']:
                 for term_tol in [{}, {'xtol': 1.0}, {'ftol': 1.0}, {'gtol': 1.0}]:
                     for max_nfev in [None, 1]:
-                        # Combinations to ignore
-                        if method == 'lm':
-                            if loss != 'linear':
-                                continue
-                            if max_nfev == 1:
-                                continue
-                        if max_nfev == 1 and 'gtol' in term_tol:
-                            # With gtol at 1.0 termination is triggered before max_nfev is hit.
-                            continue
-                        with self.subTest(f'{method=} {loss=} {term_tol=} {max_nfev=}'):
-                            model.set_val('x', 5.0)
+                        for driver_scaling in [True, False]:
+                            # Combinations to ignore
                             if method == 'lm':
-                                with assert_warning(OpenMDAOWarning, "find_feasible method is 'lm' which "
-                                                    "ignores bounds but one or more design variables have bounds."):
+                                if loss != 'linear':
+                                    continue
+                                if max_nfev == 1:
+                                    continue
+                                if term_tol:
+                                    continue
+                            if max_nfev == 1 and 'gtol' in term_tol:
+                                # With gtol at 1.0 termination is triggered before max_nfev is hit.
+                                continue
+                            with self.subTest(f'{method=} {loss=} {term_tol=} {max_nfev=} {driver_scaling=}'):
+                                model.set_val('x', 5.0)
+                                if method == 'lm':
+                                    with assert_warning(OpenMDAOWarning, "find_feasible method is 'lm' which "
+                                                        "ignores bounds but one or more design variables have bounds."):
+                                        failed = prob.run_driver(find_feasible=True, method=method, loss=loss,
+                                                                iprint=0, max_nfev=max_nfev, **term_tol)
+                                else:
                                     failed = prob.run_driver(find_feasible=True, method=method, loss=loss,
-                                                             iprint=0, max_nfev=max_nfev, **term_tol)
-                            else:
-                                failed = prob.run_driver(find_feasible=True, method=method, loss=loss,
-                                                         iprint=0, max_nfev=max_nfev, **term_tol)
-                            if max_nfev == 1:
-                                self.assertTrue(failed)
-                                expected = 'The maximum number of function evaluations is exceeded.'
-                                self.assertEqual(prob.driver.result.exit_status, expected)
-                            elif term_tol and method != 'lm':
-                                # Skip use of term_tol options with lm
-                                self.assertIn(list(term_tol.keys())[0], prob.driver.result.exit_status)
-                            else:
-                                self.assertFalse(failed)
-                                self.assertTrue(prob.driver.result.success)
-                                assert_near_equal(prob.get_val('x'), 1.5, tolerance=1.0E-8)
+                                                            iprint=0, max_nfev=max_nfev, **term_tol)
+                                if max_nfev == 1:
+                                    self.assertTrue(failed)
+                                    expected = 'The maximum number of function evaluations is exceeded.'
+                                    self.assertEqual(prob.driver.result.exit_status, expected)
+                                elif term_tol and method != 'lm':
+                                    # Skip use of term_tol options with lm
+                                    self.assertIn(list(term_tol.keys())[0], prob.driver.result.exit_status)
+                                else:
+                                    self.assertFalse(failed)
+                                    self.assertTrue(prob.driver.result.success)
+                                    assert_near_equal(prob.get_val('x'), 1.5, tolerance=1.0E-8)
 
     def test_no_desvars(self):
         import openmdao.api as om

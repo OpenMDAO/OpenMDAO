@@ -837,14 +837,6 @@ class ScipyOptimizeDriver(Driver):
         else:
             return grad[grad_idx, :]
 
-    def _reraise(self):
-        """
-        Reraise any exception encountered when scipy calls back into our method.
-        """
-        exc_info = self._exc_info
-        self._exc_info = None  # clear since we're done with it
-        raise exc_info[1].with_traceback(exc_info[2])
-
 
 def signature_extender(fcn, extra_args):
     """
