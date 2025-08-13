@@ -670,7 +670,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         finally:
             self._recording_iter.prefix = old_prefix
 
-    def run_driver(self, case_prefix=None, reset_iter_counts=True):
+    def run_driver(self, case_prefix=None, reset_iter_counts=True, find_feasible=False, **kwargs):
         """
         Run the driver on the model.
 
@@ -679,9 +679,59 @@ class Problem(object, metaclass=ProblemMetaclass):
         case_prefix : str or None
             Prefix to prepend to coordinates when recording.  None means keep the preexisting
             prefix.
-
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
+        find_feasible : bool
+            If True, iterate on the design variables to find a point which satisfies all
+            constraints or minimizes the constraint violation.
+        **kwargs : dict
+            Additional keyword arguments for use when find_feasible=True.
+
+            For more details about arguments passed to scipy.optimize.least_squares see
+            https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.least_squares.html.
+
+            * driver_scaling : bool
+                If True, consider the constraint violation in driver-scaled units. Otherwise, it
+                will be computed in the model's units.
+            * exclude_desvars : str or Sequence[str] or None
+                If given, a pattern of one or more design variables to be excluded from
+                the least-squares search.  The allows for finding a feasible (or least infeasible)
+                solution when holding one or more design variables to their current values.
+            * method : {'trf', 'dogbox', or 'lm'}
+                The method used by scipy.optimize.least_squares. One or 'trf', 'dogbox', or 'lm'.
+            * ftol : float or None
+                The change in the cost function from one iteration to the next which triggers
+                a termination of the minimization.
+            * xtol : float or None
+                The change in the design variable vector norm from one iteration to the next
+                which triggers a termination of the minimization.
+            * gtol : float or None
+                The change in the gradient norm from one iteration to the next which triggers
+                a termination of the minimization.
+            * x_scale : {float, array-like, or 'jac'}
+                Additional scaling applied by the least-squares algorithm.
+                Behavior is method-dependent.
+                For additional details, see the scipy documentation.
+            * loss : {'linear', 'soft_l1', 'huber', 'cauchy', or 'arctan'}
+                The loss aggregation method. Options of interst are:
+                - 'linear' gives the standard "sum-of-squares".
+                - 'soft_l1' gives a smooth approximation for the L1-norm of constraint violation.
+                For other options, see the scipy documentation.
+            * f_scale : float or None
+                Value of margin between inlier and outlier residuals when loss is not 'linear'.
+                For more information, see the scipy documentation.
+            * max_nfev : int or None
+                The maximum allowable number of model evaluations.  If not provided scipy will
+                determine it automatically based on the size of the design variable vector.
+            * tr_solver : {None, 'exact', or 'lsmr'}
+                The solver used by trust region (trf) method.
+                For more details, see the scipy documentation.
+            * tr_options : dict
+                Additional options for the trust region (trf) method.
+                For more details, see the scipy documentation.
+            * iprint : int
+                Verbosity of the output. Use 2 for iteration-by-iteration results.
+                Use 1 for a convergence summary, and 0 to suppress output.
 
         Returns
         -------
@@ -726,7 +776,10 @@ class Problem(object, metaclass=ProblemMetaclass):
 
             model._clear_iprint()
 
-            return driver._run()
+            if find_feasible:
+                return driver._find_feasible(**kwargs)
+            else:
+                return driver._run()
         finally:
             self._recording_iter.prefix = old_prefix
 

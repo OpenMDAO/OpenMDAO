@@ -293,6 +293,9 @@ class ScipyOptimizeDriver(Driver):
             ndesvar += size
         x_init = np.empty(ndesvar)
 
+        if ndesvar == 0:
+            raise RuntimeError('Problem has no design variables.')
+
         # Initial Design Vars
         i = 0
         use_bounds = (opt in _bounds_optimizers)

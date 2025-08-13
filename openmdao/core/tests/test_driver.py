@@ -11,7 +11,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.core.driver import Driver
 from openmdao.utils.units import convert_units
-from openmdao.utils.assert_utils import assert_near_equal, assert_warnings, assert_check_totals, assert_no_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings, assert_check_totals, assert_no_warning
 from openmdao.utils.general_utils import printoptions, set_pyoptsparse_opt
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -892,12 +892,137 @@ class TestDriver(unittest.TestCase):
         # Setup the problem and run the optimization
         prob.setup()
 
-        model.set_val('x', 5.0)
+        for method in ['trf', 'dogbox', 'lm']:
+            for loss in ['linear', 'soft_l1', 'huber', 'cauchy', 'arctan']:
+                for term_tol in [{}, {'xtol': 1.0}, {'ftol': 1.0}, {'gtol': 1.0}]:
+                    for max_nfev in [None, 1]:
+                        # Combinations to ignore
+                        if method == 'lm':
+                            if loss != 'linear':
+                                continue
+                            if max_nfev == 1:
+                                continue
+                        if max_nfev == 1 and 'gtol' in term_tol:
+                            # With gtol at 1.0 termination is triggered before max_nfev is hit.
+                            continue
+                        with self.subTest(f'{method=} {loss=} {term_tol=} {max_nfev=}'):
+                            model.set_val('x', 5.0)
+                            if method == 'lm':
+                                with assert_warning(OpenMDAOWarning, "find_feasible method is 'lm' which "
+                                                    "ignores bounds but one or more design variables have bounds."):
+                                    failed = prob.run_driver(find_feasible=True, method=method, loss=loss,
+                                                             iprint=0, max_nfev=max_nfev, **term_tol)
+                            else:
+                                failed = prob.run_driver(find_feasible=True, method=method, loss=loss,
+                                                         iprint=0, max_nfev=max_nfev, **term_tol)
+                            if max_nfev == 1:
+                                self.assertTrue(failed)
+                                expected = 'The maximum number of function evaluations is exceeded.'
+                                self.assertEqual(prob.driver.result.exit_status, expected)
+                            elif term_tol and method != 'lm':
+                                # Skip use of term_tol options with lm
+                                self.assertIn(list(term_tol.keys())[0], prob.driver.result.exit_status)
+                            else:
+                                self.assertFalse(failed)
+                                self.assertTrue(prob.driver.result.success)
+                                assert_near_equal(prob.get_val('x'), 1.5, tolerance=1.0E-8)
 
-        res = prob.driver.find_feasible(iprint=2)
+    def test_no_desvars(self):
+        import openmdao.api as om
 
-        self.assertTrue(res.success)
-        assert_near_equal(prob.get_val('x'), 1.5, tolerance=1.0E-8)
+        prob = om.Problem()
+
+        c1 = om.ExecComp()
+        c1.add_expr('y = x1**2 - x2**2')
+        c1.add_expr('g1 = 2 * x1 + 5')
+        c1.add_expr('g2 = -2 * x1 - 5')
+        c1.add_expr('g3 = x2 - 5')
+
+        c1.add_objective('y')
+        c1.add_constraint('g1', lower=0)
+        c1.add_constraint('g2', lower=0)
+        c1.add_constraint('g3', lower=0)
+
+        prob.model.add_subsystem('c1', c1, promotes=['*'])
+        prob.setup()
+        prob.driver = om.ScipyOptimizeDriver()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_driver()
+
+        self.assertEqual(str(cm.exception), 'Problem has no design variables.')
+
+    def test_find_feasible_no_feasible_solution(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+
+        c1 = om.ExecComp()
+        c1.add_expr('y = x[0]**2 - x[1]**2', x={'shape': (2,)})
+        c1.add_expr('g1 = 2 * x[0] - 5')
+        c1.add_expr('g2 = -2 * x[0] - 5')
+        c1.add_expr('g3 = x[1] - 5')
+
+        c1.add_design_var('x')
+        c1.add_objective('y')
+        c1.add_constraint('g1', lower=0)
+        c1.add_constraint('g2', lower=0)
+        c1.add_constraint('g3', lower=0)
+
+        prob.model.add_subsystem('c1', c1, promotes=['*'])
+        prob.setup()
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            failed = prob.run_driver(find_feasible=True, iprint=1)
+        finally:
+            sys.stdout = stdout
+
+        output = strout.getvalue()
+        lines = [line for line in output.split('\n') if len(line) > 0]
+        self.assertIn('loss(linear)', lines[-6])
+        self.assertIn('Infeasibilities minimized', output)
+        self.assertIn('max violation: g1[0]', lines[-1])
+        self.assertTrue(failed)
+
+    def test_find_feasible_exclude_desvars(self):
+        import openmdao.api as om
+
+        prob = om.Problem()
+
+        c1 = om.ExecComp()
+        c1.add_expr('y = x0**2 - x1**2')
+        c1.add_expr('g1 = 2 * x0 - 5')
+        c1.add_expr('g2 = -2 * x0 - 5')
+        c1.add_expr('g3 = x1 - 5')
+
+        c1.add_design_var('x0')
+        c1.add_design_var('x1')
+        c1.add_objective('y')
+        c1.add_constraint('g1', lower=0)
+        c1.add_constraint('g2', lower=0)
+        c1.add_constraint('g3', lower=0)
+
+        prob.model.add_subsystem('c1', c1, promotes=['*'])
+        prob.setup()
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            failed = prob.run_driver(find_feasible=True, exclude_desvars='x1', iprint=1)
+        finally:
+            sys.stdout = stdout
+
+        output = strout.getvalue()
+        lines = [line for line in output.split('\n') if len(line) > 0]
+        assert_near_equal(prob.get_val('x1'), 1.0)
+        self.assertIn('loss(linear)', lines[-6])
+        self.assertIn('Infeasibilities minimized', output)
+        self.assertIn('max violation: g1[0]', lines[-1])
+        self.assertTrue(failed)
 
 @use_tempdirs
 class TestCheckRelevance(unittest.TestCase):

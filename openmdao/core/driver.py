@@ -2161,10 +2161,10 @@ class Driver(object, metaclass=DriverMetaclass):
 
         return g
 
-    def find_feasible(self, driver_scaling=True, excludes=None,
-                      method='trf', ftol=1e-08, xtol=1e-08, gtol=1e-08,
-                      x_scale=1., loss='linear', f_scale=1.0,
-                      tr_solver=None, tr_options=None, iprint=2):
+    def _find_feasible(self, driver_scaling=True, exclude_desvars=None,
+                       method='trf', ftol=1e-08, xtol=1e-08, gtol=1e-08,
+                       x_scale=1., loss='linear', loss_tol=1.0E-8, f_scale=1.0,
+                       max_nfev=None, tr_solver=None, tr_options=None, iprint=1):
         """
         Attempt to find design variable values which minimize the constraint violation.
 
@@ -2185,7 +2185,7 @@ class Driver(object, metaclass=DriverMetaclass):
         driver_scaling : bool
             If True, consider the constraint violation in driver-scaled units. Otherwise, it
             will be computed in the model's units.
-        excludes : str or Sequence[str] or None
+        exclude_desvars : str or Sequence[str] or None
             If given, a pattern of one or more design variables to be excluded from
             the least-squares search.  The allows for finding a feasible (or least infeasible)
             solution when holding one or more design variables to their current values.
@@ -2208,9 +2208,16 @@ class Driver(object, metaclass=DriverMetaclass):
             - 'linear' gives the standard "sum-of-squares".
             - 'soft_l1' gives a smooth approximation for the L1-norm of constraint violation.
             For other options, see the scipy documentation.
+        loss_tol : float
+            The tolerance on the loss value above which the algorithm is considered to have
+            failed to find a feasible solution. This will result in the `DriverResult.success`
+            attribute being False, and this method will return as _failed_.
         f_scale : float or None
             Value of margin between inlier and outlier residuals when loss is not 'linear'.
             For more information, see the scipy documentation.
+        max_nfev : int or None
+            The maximum allowable number of model evaluations.  If not provided scipy will
+            determine it automatically based on the size of the design variable vector.
         tr_solver : {None, 'exact', or 'lsmr'}
             The solver used by trust region (trf) method.
             For more details, see the scipy documentation.
@@ -2218,13 +2225,13 @@ class Driver(object, metaclass=DriverMetaclass):
             Additional options for the trust region (trf) method.
             For more details, see the scipy documentation.
         iprint : int
-            Verbosity of the output. Use 2 for iteration-by-iteration results.
+            Verbosity of the output. Use 2 for the full verbose least_squares output.
             Use 1 for a convergence summary, and 0 to suppress output.
 
         Returns
         -------
-        DriverResult
-            A DriverResult object summarizing statistics of the feasibility search.
+        bool
+            Failure flag; True if the infeasibility minimization failed to converge.
         """
         from scipy.optimize import Bounds, least_squares
         from scipy.optimize._constraints import old_bound_to_new
@@ -2234,14 +2241,15 @@ class Driver(object, metaclass=DriverMetaclass):
         problem = self._problem()
         model = problem.model
 
-        excludes = [excludes] if isinstance(excludes, str) else excludes or []
+        exclude_desvars = [exclude_desvars] if isinstance(exclude_desvars, str) \
+            else exclude_desvars or []
 
         status = -1 if problem is None else problem._metadata['setup_status']
         if status < _SetupStatus.POST_FINAL_SETUP:
             problem.final_setup()
 
         desvar_vals = {dv: val for dv, val in self.get_design_var_values().items()
-                       if not any(fnmatch(dv, pat) for pat in excludes)}
+                       if not any(fnmatch(dv, pat) for pat in exclude_desvars)}
 
         # Size Problem
         ndesvar = 0
@@ -2251,38 +2259,50 @@ class Driver(object, metaclass=DriverMetaclass):
             ndesvar += size
         x_init = np.empty(ndesvar)
 
-        # Initial Design Vars
-        i = 0
-        bounds = []
+        if ndesvar == 0:
+            raise RuntimeError('Problem has no design variables or '
+                               'all design variables are excluded.')
 
-        for name, val in desvar_vals.items():
-            meta = self._designvars[name]
-            size = meta['global_size'] if meta['distributed'] else meta['size']
-            x_init[i:i + size] = val
-            i += size
+        # Initial Design Vars bounds
+        if method == 'lm':
+            bounds = (-np.inf, np.inf)
 
-            meta_low = meta['lower']
-            meta_high = meta['upper']
-            for j in range(size):
+            if any(meta['lower'] > -1.0E16 or
+                   meta['upper'] < 1.0E16 for meta in self._designvars.values()):
+                issue_warning("find_feasible method is 'lm' which ignores bounds "
+                              "but one or more design variables have bounds.")
+        else:
+            i = 0
+            bounds = []
 
-                if isinstance(meta_low, np.ndarray):
-                    p_low = meta_low[j]
-                else:
-                    p_low = meta_low
+            for name, val in desvar_vals.items():
+                meta = self._designvars[name]
+                size = meta['global_size'] if meta['distributed'] else meta['size']
+                x_init[i:i + size] = val
+                i += size
 
-                if isinstance(meta_high, np.ndarray):
-                    p_high = meta_high[j]
-                else:
-                    p_high = meta_high
+                meta_low = meta['lower']
+                meta_high = meta['upper']
+                for j in range(size):
 
-                p_low = -np.inf if p_low < -1.0E16 else p_low
-                p_high = np.inf if p_high > 1.0E16 else p_high
+                    if isinstance(meta_low, np.ndarray):
+                        p_low = meta_low[j]
+                    else:
+                        p_low = meta_low
 
-                bounds.append((p_low, p_high))
+                    if isinstance(meta_high, np.ndarray):
+                        p_high = meta_high[j]
+                    else:
+                        p_high = meta_high
 
-        # Convert "old-style" bounds to "new_style" bounds
-        lower, upper = old_bound_to_new(bounds)  # tuple, tuple
-        bounds = Bounds(lb=lower, ub=upper, keep_feasible=[True] * x_init.size)
+                    p_low = -np.inf if p_low < -1.0E16 else p_low
+                    p_high = np.inf if p_high > 1.0E16 else p_high
+
+                    bounds.append((p_low, p_high))
+
+            # Convert "old-style" bounds to "new_style" bounds
+            lower, upper = old_bound_to_new(bounds)  # tuple, tuple
+            bounds = Bounds(lb=lower, ub=upper, keep_feasible=[True] * x_init.size)
 
         lincons = {name: meta for name, meta in self._cons.items() if meta.get('linear')}
         nl_cons = {name: meta for name, meta in self._cons.items() if not meta.get('linear')}
@@ -2309,16 +2329,22 @@ class Driver(object, metaclass=DriverMetaclass):
                                    con_row_map=con_row_map)
 
         # Wrap the actual least squares call so that we don't need to duplicate calls below'
-        if problem.comm.rank != 0:
+        if MPI and problem.comm.rank != 0:
             iprint = 0
 
         f_lsq = functools.partial(least_squares, self._compute_con_viol,
                                   kwargs={'driver_scaling': driver_scaling,
                                           'desvar_names': list(desvar_vals.keys())},
-                                  x0=x_init, bounds=bounds, verbose=iprint,
+                                  x0=x_init, bounds=bounds, verbose=2 if iprint == 2 else 0,
                                   method=method, ftol=ftol, xtol=xtol, gtol=gtol,
-                                  x_scale=x_scale, loss=loss, f_scale=f_scale,
-                                  tr_solver=None, tr_options=None, jac=jacfun)
+                                  x_scale=x_scale, loss=loss, max_nfev=max_nfev,
+                                  f_scale=f_scale, tr_solver=None, tr_options=None,
+                                  jac=jacfun)
+
+        if iprint == 2:
+            print()
+            print('-------------------------')
+            print('Finding feasible point...')
 
         self.result.reset()
         if problem.options['group_by_pre_opt_post']:
@@ -2329,7 +2355,7 @@ class Driver(object, metaclass=DriverMetaclass):
             with SaveOptResult(self):
                 with model._relevance.nonlinear_active('iter'):
                     res = f_lsq()
-                    self.result.success = res.success
+                    self.result.success = res.success and res.cost <= loss_tol
 
             if model._post_components:
                 with model._relevance.nonlinear_active('post'):
@@ -2338,11 +2364,52 @@ class Driver(object, metaclass=DriverMetaclass):
         else:
             with SaveOptResult(self):
                 res = f_lsq()
-                self.result.success = res.success
+                self.result.success = res.success and res.cost <= loss_tol
 
+        if iprint >= 1:
+            if res.success:
+                if res.cost <= loss_tol:
+                    print('--------------------')
+                    print('Feasible point found')
+                    print('--------------------')
+                else:
+                    print('-------------------------')
+                    print('Infeasibilities minimized')
+                    print('-------------------------')
+            else:
+                print('----------------------------------')
+                print('Failed to minimize infeasibilities')
+                print('----------------------------------')
+
+            print(f'    loss({loss}): {res.cost:.8f}')
+            print(f'    iterations: {self.result.iter_count}')
+            print(f'    model evals: {res.nfev}')
+            print(f'    gradient evals: {res.njev}')
+            print(f'    elapsed_time: {self.result.model_time + self.result.deriv_time:.8f} s')
+            if not res.success or res.cost >= loss_tol:
+                max_idx = np.argmax(np.abs(res.fun))
+                max_viol = res.fun[max_idx]
+                for con_name, sl in con_row_map.items():
+                    if sl.start <= max_idx < sl.stop:
+                        max_viol_con = con_name
+                        max_viol_idx_in_con = max_idx - sl.start
+                        break
+                else:
+                    max_viol_con = con_name
+                    max_viol_idx_in_con = -1
+                max_viol_str = f'{max_viol_con}[{max_viol_idx_in_con}] = {max_viol:.8f}'
+            else:
+                max_viol_str = 'N/A'
+
+            print(f'    max violation: {max_viol_str}')
+            if not res.success:
+                print(f'    message: {res.message}')
+            print()
+
+        self.result.exit_status = res.message
         self._in_find_feasible = False
 
-        return self.result
+        return not self.result.success
 
 
 class SaveOptResult(object):
