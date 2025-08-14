@@ -1059,8 +1059,7 @@ class TestProblem(unittest.TestCase):
                "\nCollected errors for problem 'get_set_with_units_diff_err':"
                "\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to "
                "'x', are connected but their metadata entries ['units', 'val'] differ. "
-               "Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model "
-               "to remove the ambiguity.")
+               "Call model.set_input_defaults('x', units=?, val=?) to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -1173,7 +1172,7 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob['G1.x']
 
-        msg = "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
+        msg = "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call model.set_input_defaults('G1.x', units=?) to remove the ambiguity."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_get_set_with_units_error_messages(self):
