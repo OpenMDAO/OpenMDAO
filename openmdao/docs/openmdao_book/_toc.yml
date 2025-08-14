@@ -50,7 +50,16 @@ parts:
     - file: features/building_blocks/building_blocks
     - file: features/recording/main.md
     - file: features/model_visualization/main.md
-    - file: features/debugging/debugging.md
+    - file: features/debugging/debugging
+      sections:
+      - file: features/debugging/mpi_debugging
+      - file: features/debugging/listing_variables
+      - file: features/debugging/debugging_solvers
+      - file: features/debugging/debugging_your_optimizations
+      - file: features/debugging/newton_solver_not_converging
+      - file: features/debugging/controlling_mpi
+      - file: features/debugging/debugging_drivers
+      - file: features/debugging/profiling/index
     - file: features/warning_control/warnings
     - file: features/units
     - file: features/experimental/main.md
