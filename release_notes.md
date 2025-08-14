@@ -1,4 +1,57 @@
 ***********************************
+# Release Notes for OpenMDAO 3.40.0
+
+August 15, 2025
+
+OpenMDAO 3.40.0 adds several significant features
+
+- We've added a real time visualization tool for both optimization and analysis driver results via `python -m openmdao rtplot <script.py>`.
+- OpenMDAO systems now support a validation method which can be used to detect invalid results via `model.run_validation`. [POEM 105](https://github.com/OpenMDAO/POEMs/blob/master/POEM_105.md)
+- Dynamic shaping of inputs now works in the presence of `src_indices` in connections (though only when tracing from outputs to inputs). Units of inputs and outputs may also be dynamically shaped. See [POEM 102](https://github.com/OpenMDAO/POEMs/blob/master/POEM_102.md) for more information.
+- Problem now has a `find_feasible` method which uses a least-squares solver to minimize constraint violations. This was originally suggested in [POEM 096](https://github.com/OpenMDAO/POEMs/blob/master/POEM_096.md), though the implementation is somewhat changed. If a feasible solution is possible, this should drive the L2 norm (by default) of the constraint violation to zero. This feature also allows users to optionally exclude design variables from the feasibility search.
+- Users with the PETSc suite installed can use PETSc's implementation of direct solver (`openmdao.api.PETScDirectSolver`) as a linear solver in their systems. In some use cases this has demonstrated to be significantly faster than the SuperLU implementation in scipy used by `openmdao.api.DirectSolver`. See [POEM 105](https://github.com/OpenMDAO/POEMs/blob/master/POEM_105.md) for more information.
+- The DOE analysis generators for DOEDriver now work with AnalysisDriver.
+
+## New Features
+- Added print_mean to variable list methods [#3546](https://github.com/OpenMDAO/OpenMDAO/pull/3546)
+- Added PETScDirectSolver to available linear solver classes [#3549](https://github.com/OpenMDAO/OpenMDAO/pull/3549)
+- BalanceComp now allows all keyword arguments for add_input and add_output to be provided. [#3559](https://github.com/OpenMDAO/OpenMDAO/pull/3559)
+- Added a `--format` option to the `openmdao find_repos` command [#3563](https://github.com/OpenMDAO/OpenMDAO/pull/3563)
+- Added COBYQA as an option to the ScipyOptimizeDriver [#3570](https://github.com/OpenMDAO/OpenMDAO/pull/3570)
+- Allow MetaModelSemiStructuredComp to accept "val" as argument to "add_output" [#3569](https://github.com/OpenMDAO/OpenMDAO/pull/3569)
+- Added DOE analysis generators for use with AnalysisDriver [#3575](https://github.com/OpenMDAO/OpenMDAO/pull/3575)
+- Add drag count as a valid unit [#3577](https://github.com/OpenMDAO/OpenMDAO/pull/3577)
+- Changed default behavior of `list_driver_vars` to be verbose  [#3583](https://github.com/OpenMDAO/OpenMDAO/pull/3583)
+- Add a "validate" method and "run_validation" method to System [#3582](https://github.com/OpenMDAO/OpenMDAO/pull/3582)
+- Added real time plot for analysis driver runs [#3553](https://github.com/OpenMDAO/OpenMDAO/pull/3553)
+- Added automated MPI debugging for VS Code / Cursor [#3586](https://github.com/OpenMDAO/OpenMDAO/pull/3586)
+- Added  dynamic units and allow src_indices with dynamic shapes #3587](https://github.com/OpenMDAO/OpenMDAO/pull/3587
+- Added implementation of `find_feasible` for POEM 096 [#3593](https://github.com/OpenMDAO/OpenMDAO/pull/3593)
+
+## Bug Fixes
+- Restored the get_source method on System. [#3541](https://github.com/OpenMDAO/OpenMDAO/pull/3541)
+- Fixed a bug where connections within the same group were being flagged as invalid if issued from above. [#3543](https://github.com/OpenMDAO/OpenMDAO/pull/3543)
+- Fixed issue with set_val when setting an input where the source is local but the input isn't. [#3547](https://github.com/OpenMDAO/OpenMDAO/pull/3547)
+- Fixed a bug in scaling if total_adder was not None but total_scaler was None. [#3556](https://github.com/OpenMDAO/OpenMDAO/pull/3556)
+- added check to prevent 'val' from being returned if shape is None in get_io_metadata [#3561](https://github.com/OpenMDAO/OpenMDAO/pull/3561)
+- fix for bug in check_totals for directional derivs - Issue #3565 [#3566](https://github.com/OpenMDAO/OpenMDAO/pull/3566)
+- Fix for a performance regression in jacobians [#3572](https://github.com/OpenMDAO/OpenMDAO/pull/3572)
+- Fixed N2 Diagram HTML Failing for Custom Solvers [#3581](https://github.com/OpenMDAO/OpenMDAO/pull/3581)
+
+## Miscellaneous
+
+- Update minimum required python and scipy versions (and test workflow) [#3538](https://github.com/OpenMDAO/OpenMDAO/pull/3538)
+- Updated GitHub workflows [#3550](https://github.com/OpenMDAO/OpenMDAO/pull/3550)
+- Updated test workflow to use newer PETSc for oldest job [#3557](https://github.com/OpenMDAO/OpenMDAO/pull/3557)
+- Added require_pyoptsparse to MPISetvalBug test case [#3554](https://github.com/OpenMDAO/OpenMDAO/pull/3554)
+- Refactor of Jacobian class internals [#3552](https://github.com/OpenMDAO/OpenMDAO/pull/3552)
+- Removed numpy type information from output of singular jac check. [#3580](https://github.com/OpenMDAO/OpenMDAO/pull/3580)
+- Fixed a minor typo in the documentation of the Sellar example. [#3585](https://github.com/OpenMDAO/OpenMDAO/pull/3585)
+- Addressed compatibility issues with Scipy 1.16.0 [#3567](https://github.com/OpenMDAO/OpenMDAO/pull/3567)
+- Archive Built Docs on CI Job [#3589](https://github.com/OpenMDAO/OpenMDAO/pull/3589)
+- Made auto_ivc connection ambiguity message simpler. [#3591](https://github.com/OpenMDAO/OpenMDAO/pull/3591)
+
+***********************************
 # Release Notes for OpenMDAO 3.39.0
 
 May 23, 2025
