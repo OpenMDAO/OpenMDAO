@@ -802,6 +802,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             Verbosity of the output. Use 2 for the full verbose least_squares output.
             Use 1 for a convergence summary, and 0 to suppress output.
 
+        Returns
+        -------
+        bool
+            Failure flag; True if failed to converge, False is successful.
         """
         model = self.model
         driver = self.driver
