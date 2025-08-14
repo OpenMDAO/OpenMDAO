@@ -222,6 +222,8 @@ class Driver(object, metaclass=DriverMetaclass):
     _dist_driver_vars : dict
         Dict of constraints that are distributed outputs. Key is a 'user' variable name,
         typically promoted name or an alias. Values are (local indices, local sizes).
+    _exc_info : 3 item tuple
+        Storage for exception and traceback information.
     _cons : dict
         Contains all constraint info.
     _objs : dict
