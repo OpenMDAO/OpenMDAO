@@ -2232,7 +2232,7 @@ class Driver(object, metaclass=DriverMetaclass):
         tr_solver : {None, 'exact', or 'lsmr'}
             The solver used by trust region (trf) method.
             For more details, see the scipy documentation.
-        tr_options : dict
+        tr_options : dict or None
             Additional options for the trust region (trf) method.
             For more details, see the scipy documentation.
         iprint : int
@@ -2350,7 +2350,8 @@ class Driver(object, metaclass=DriverMetaclass):
                                   x0=x_init, bounds=bounds, verbose=2 if iprint == 2 else 0,
                                   method=method, ftol=ftol, xtol=xtol, gtol=gtol,
                                   x_scale=x_scale, loss=loss, max_nfev=max_nfev,
-                                  f_scale=f_scale, tr_solver=tr_solver, tr_options=tr_options,
+                                  f_scale=f_scale, tr_solver=tr_solver,
+                                  tr_options=tr_options or {},
                                   jac=jacfun)
 
         if self._exc_info is not None:

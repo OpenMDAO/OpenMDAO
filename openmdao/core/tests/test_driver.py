@@ -7,6 +7,7 @@ import sys
 import unittest
 
 import numpy as np
+from scipy import __version__ as scipy_version
 
 import openmdao.api as om
 from openmdao.core.driver import Driver
@@ -900,10 +901,16 @@ class TestDriver(unittest.TestCase):
                             # Combinations to ignore
                             if method == 'lm':
                                 if loss != 'linear':
+                                    # 'lm' only supports linear.
                                     continue
                                 if max_nfev == 1:
+                                    # 'lm' doesn't fail with max func eval message
                                     continue
                                 if term_tol:
+                                    # 'lm' doesn't fail with expected tolerance trigger
+                                    continue
+                                if Version(scipy_version) < Version('1.16'):
+                                    # 'lm' is not reliable in older version of scipy
                                     continue
                             if max_nfev == 1 and 'gtol' in term_tol:
                                 # With gtol at 1.0 termination is triggered before max_nfev is hit.
