@@ -318,6 +318,9 @@ class _AutoIndepVarComp(IndepVarComp):
             'shape_by_conn': False,
             'compute_shape': None,
             'copy_shape': None,
+            'units_by_conn': False,
+            'compute_units': None,
+            'copy_units': None,
         }
 
         self._static_var_rel2meta[name] = metadata

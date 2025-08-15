@@ -1648,3 +1648,8 @@ class Slicer(object):
 
 # instance of the Slicer class to be used by users
 slicer = Slicer()
+
+
+_full_slice = slice(None)
+_flat_full_indexer = indexer(_full_slice, flat_src=True)
+_full_indexer = indexer(_full_slice, flat_src=False)

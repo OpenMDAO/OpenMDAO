@@ -3,12 +3,9 @@ import hashlib
 
 import numpy as np
 
-from openmdao.utils.indexer import Indexer, indexer, combine_ranges
+from openmdao.utils.indexer import Indexer, indexer, _full_slice, _flat_full_indexer, \
+    _full_indexer, combine_ranges
 
-
-_full_slice = slice(None)
-_flat_full_indexer = indexer(_full_slice, flat_src=True)
-_full_indexer = indexer(_full_slice, flat_src=False)
 
 _type_map = {  # map vector type to iotype
     'input': 'input',

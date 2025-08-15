@@ -1911,6 +1911,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                          'parallel_deriv_color', 'cache_linear_solution']
         def_obj_opts = [opt for opt in ('indices',) if opt not in objs_opts and
                         _find_dict_meta(objs, opt)]
+        objs_opts = [opt for opt in objs_opts if _find_dict_meta(objs, opt)]
         col_names = default_col_names + def_obj_opts + objs_opts
         if out_stream:
             self._write_var_info_table(header, col_names, objs, vals,
