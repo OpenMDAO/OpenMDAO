@@ -400,7 +400,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
                                    return_format=driver._total_jac_format)
             totals = driver._total_jac.J  # .J is always an array even if return format != 'array'
-            driver._total_jac = None
+            # driver._total_jac = None
         else:
             totals = driver._total_jac.J  # .J is always an array even if return format != 'array'
             data['oflabels'] = list(driver._total_jac.output_meta['fwd'])
@@ -514,9 +514,10 @@ def _exitfunc(probname):
 
 
 def _check_nl_totals(driver, **kwargs):
-    # prevent hook from triggering until we have computed the total jacobian for the nonlinear
-    # constraints and objectives
-    return driver._total_jac is not None
+    # Prevent hook from triggering until we have computed the total jacobian for the nonlinear
+    # constraints and objectives. Find feasible doesn't necessarily use the entire jacobian
+    # and so we disable this report when running find_feasible.
+    return driver._total_jac is not None and not driver._in_find_feasible
 
 
 def _scaling_cmd(options, user_args):
