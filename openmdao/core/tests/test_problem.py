@@ -2498,6 +2498,39 @@ class TestProblem(unittest.TestCase):
             self.assertIn('max violation: g1[0]', lines[-1])
             self.assertTrue(failed)
 
+    def test_find_feasible_pinched_bounds(self):
+            import openmdao.api as om
+
+            prob = om.Problem()
+
+            c1 = om.ExecComp()
+            c1.add_expr('y = x[0]**2 - x[1]**2', x={'shape': (2,)})
+            c1.add_expr('g1 = 2 * x[0] - 5')
+            c1.add_expr('g2 = x[1] - 5')
+
+            c1.add_design_var('x', lower=(-10, 0), upper=(10, 0))
+            c1.add_objective('y')
+            c1.add_constraint('g1', lower=0)
+            c1.add_constraint('g2', lower=0)
+
+            prob.model.add_subsystem('c1', c1, promotes=['*'])
+            prob.setup()
+
+            prob.set_val('x', [0.0, 0.0])
+
+            stdout = sys.stdout
+            strout = StringIO()
+            sys.stdout = strout
+            try:
+                failed = prob.find_feasible(iprint=2)
+            finally:
+                sys.stdout = stdout
+
+            output = strout.getvalue()
+            self.assertIn('Infeasibilities minimized', output)
+            self.assertIn('max violation: g2[0]', output)
+            self.assertTrue(failed)
+
     def test_find_feasible_exclude_desvars(self):
         import openmdao.api as om
 

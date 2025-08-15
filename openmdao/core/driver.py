@@ -2252,6 +2252,8 @@ class Driver(object, metaclass=DriverMetaclass):
         problem = self._problem()
         model = problem.model
 
+        self._check_for_invalid_desvar_values()
+
         exclude_desvars = [exclude_desvars] if isinstance(exclude_desvars, str) \
             else exclude_desvars or []
 
@@ -2308,6 +2310,16 @@ class Driver(object, metaclass=DriverMetaclass):
 
                     p_low = -np.inf if p_low < -1.0E16 else p_low
                     p_high = np.inf if p_high > 1.0E16 else p_high
+
+                    # If lower and upper are equal at any indices, add some slack
+                    equal_idxs = np.where(np.atleast_1d(np.abs(p_high - p_low)) < 1.0E-16)[0]
+
+                    # Releive bounds if they are pinched
+                    # TODO: Handle this more generically in all drivers
+                    if np.isscalar(p_high):
+                        p_high += 1.0E-16
+                    else:
+                        p_high[equal_idxs] += 1.0E-16
 
                     bounds.append((p_low, p_high))
 
