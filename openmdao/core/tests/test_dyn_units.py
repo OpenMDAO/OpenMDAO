@@ -514,7 +514,7 @@ class TestDynUnitsWithInputConns(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'units_from_conn_input_mismatch_group_inputs':"
-           "\n   <model> <class Group>: The following inputs, ['sub.comp1.x', 'sub.comp2.x'], promoted to 'sub.x', are connected but their metadata entries ['val'] differ. Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'sub' to remove the ambiguity.")
+           "\n   <model> <class Group>: The following inputs, ['sub.comp1.x', 'sub.comp2.x'], promoted to 'sub.x', are connected but their metadata entries ['val'] differ. Call model.set_input_defaults('sub.x', val=?) to remove the ambiguity.")
 
 
 if __name__ == "__main__":

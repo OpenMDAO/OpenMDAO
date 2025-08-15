@@ -1503,8 +1503,7 @@ class TestGroup(unittest.TestCase):
                          "\nCollected errors for problem 'promote_units_and_none':\n   "
                          "<model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', "
                          "are connected but their metadata entries ['units'] differ. "
-                         "Call <group>.set_input_defaults('x', units=?), "
-                         "where <group> is the model to remove the ambiguity.")
+                         "Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_double_set_input_defaults(self):
         problem = om.Problem()
