@@ -209,8 +209,7 @@ class SerialTests(unittest.TestCase):
               "\nCollected errors for problem 'discrete_fan_out2':"
               "\n   <model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted "
               "to 'x', are connected but their metadata entries ['val'] differ. Call "
-              "<group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to "
-              "remove the ambiguity." in str(err))
+              "model.set_input_defaults('x', val=?) to remove the ambiguity." in str(err))
         else:
             self.fail("Exception expected.")
 

@@ -25,9 +25,8 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len, ValueRepeater, evenly_distrib_idxs
-from openmdao.utils.general_utils import common_subpath, \
-    convert_src_inds, shape2tuple, get_connection_owner, ensure_compatible, \
-    meta2src_iter, get_rev_conns, is_undefined
+from openmdao.utils.general_utils import convert_src_inds, shape2tuple, get_connection_owner, \
+    ensure_compatible, meta2src_iter, get_rev_conns, is_undefined
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
     _is_unitless, simplify_unit, PhysicalUnit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
@@ -1921,23 +1920,13 @@ class Group(System):
                                         prm = f"('{origin_prom}' / '{submeta['prom']}')"
                                     else:
                                         prm = f"'{origin_prom}'"
-                                    common = common_subpath((origin, submeta['path']))
-                                    if common:
-                                        sub = self._get_subsystem(common)
-                                        if sub is not None:
-                                            for a in resolver.absnames(prom, 'input'):
-                                                if sub._resolver.is_local(a, 'input'):
-                                                    prom = sub._resolver.abs2prom(a, 'input')
-                                                    break
-
-                                    gname = f"Group named '{common}'" if common else 'model'
                                     self._collect_error(f"{self.msginfo}: The subsystems {origin} "
                                                         f"and {submeta['path']} called "
                                                         f"set_input_defaults for promoted input "
                                                         f"{prm} with conflicting values for "
-                                                        f"'{key}'. Call <group>.set_input_defaults("
-                                                        f"'{prom}', {key}=?), where <group> is the "
-                                                        f"{gname} to remove the ambiguity.")
+                                                        f"'{key}'. Call model.set_input_defaults("
+                                                        f"'{prom}', {key}=?) to remove the "
+                                                        "ambiguity.")
 
             # update all metadata dicts with any missing metadata that was filled in elsewhere
             # and update src_shape and use_tgt in abs_in2prom_info
@@ -4646,6 +4635,7 @@ class Group(System):
         found_dup = False
         abs2meta_in = self._var_abs2meta['input']
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
+        abs2prom = self._resolver.abs2prom
         start_val = val = None
         val_shape = None
         chosen_tgt = None
@@ -4791,11 +4781,13 @@ class Group(System):
             info = (tgt, val, False)
 
         if src_idx_found:  # auto_ivc connected to local vars with src_indices
+            prom = abs2prom(src_idx_found[0], 'input')
             self._collect_error("Attaching src_indices to inputs requires that the shape of the "
-                                "source variable is known, but the source shape for inputs "
-                                f"{src_idx_found} is unknown. You can specify the src shape for "
-                                "these inputs by setting 'val' or 'src_shape' in a call to "
-                                "set_input_defaults, or by adding an IndepVarComp as the source.",
+                                "source variable is known, but the source shape for input "
+                                f"{prom} is unknown. You can specify the src shape "
+                                "for this input by setting 'val' or 'src_shape' in a call to "
+                                "set_input_defaults. For example: model.set_input_defaults"
+                                f"('{prom}', src_shape=?)",
                                 ident=(self.pathname, tuple(src_idx_found)))
             return None
 
@@ -5054,35 +5046,15 @@ class Group(System):
         else:
             meta = sorted(metadata)
         inputs = sorted(tgts)
-        gpath = common_subpath(tgts)
-        if gpath == self.pathname:
-            g = self
-        else:
-            g = self._get_subsystem(gpath)
-        gprom = None
 
-        # get promoted name relative to g
-        if MPI and self.comm.size > 1:
-            if g is not None and not g._is_local:
-                g = None
-            if self.comm.allreduce(int(g is not None)) < self.comm.size:
-                # some procs have remote g
-                if g is not None:
-                    gprom = g._resolver.abs2prom(inputs[0], 'input')
-                proms = self.comm.allgather(gprom)
-                for p in proms:
-                    if p is not None:
-                        gprom = p
-                        break
-        if gprom is None:
-            gprom = g._resolver.abs2prom(inputs[0], 'input')
+        model = self._problem_meta['model_ref']()
+        gprom = model._resolver.abs2prom(tgts[0], 'input')
 
-        gname = f"Group named '{gpath}'" if gpath else 'model'
         args = ', '.join([f'{n}=?' for n in errs])
         self._collect_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
-                            f"to '{prom}', are connected but their metadata entries {meta}"
-                            f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
-                            f"where <group> is the {gname} to remove the ambiguity.")
+                            f"to '{gprom}', are connected but their metadata entries {meta}"
+                            f" differ. Call model.set_input_defaults('{gprom}', {args}) "
+                            "to remove the ambiguity.")
 
     def _ordered_comp_name_iter(self):
         """

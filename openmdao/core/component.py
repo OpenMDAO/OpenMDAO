@@ -562,10 +562,10 @@ class Component(System):
             A function taking a dict arg containing names and shapes of this component's outputs
             and returning the shape of this input.
         units_by_conn : bool
-            If True, units this input to match its connected output.
+            If True, set units of this input to match its connected output.
         copy_units : str or None
-            If a str, that str is the name of a variable. Units this input to match that of
-            the named variable.
+            If a str, that str is the name of a variable. Set the units of this input to match those
+            of the named variable.
         compute_units : function
             A function taking a dict arg containing names and PhysicalUnits of this component's
             outputs and returning the PhysicalUnits of this input.
@@ -816,10 +816,10 @@ class Component(System):
             A function taking a dict arg containing names and shapes of this component's inputs
             and returning the shape of this output.
         units_by_conn : bool
-            If True, units this output to match its connected input(s).
+            If True, set the units of this output to match its connected input(s).
         copy_units : str or None
-            If a str, that str is the name of a variable. Units this output to match that of
-            the named variable.
+            If a str, that str is the name of a variable. Set the units of this output to match
+            those of the named variable.
         compute_units : function
             A function taking a dict arg containing names and PhysicalUnits of this component's
             inputs and returning the PhysicalUnits of this output.

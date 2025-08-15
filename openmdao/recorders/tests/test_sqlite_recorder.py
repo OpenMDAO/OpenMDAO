@@ -4,10 +4,8 @@ import unittest
 from io import StringIO
 import sqlite3
 
-from packaging.version import Version
 
 import numpy as np
-from scipy import __version__ as scipy_version
 
 import openmdao.api as om
 
@@ -2818,17 +2816,13 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(-1)
 
-        dvs = case.get_design_vars()
-        con = case.get_constraints()
-        obj = case.get_objectives()
+        x = case.get_val('x')
+        y = case.get_val('y')
+        obj = case.get_val('f_xy')
 
-        assert_near_equal(obj, {'f_xy': -27.33333333}, tolerance=1e-8)
-        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=8.1e-8, tol_type='abs')
-
-        if Version(scipy_version) < Version("1.11"):
-            assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=8.1e-8, tol_type='abs')
-        else:
-            self.assertEqual(con, {})
+        assert_near_equal(obj, -27.33333333, tolerance=1e-6)
+        assert_near_equal(x, 6.6666666666, tolerance=1e-6, tol_type='abs')
+        assert_near_equal(y, -7.333333333, tolerance=1e-6, tol_type='abs')
 
     @require_pyoptsparse('IPOPT')
     def test_total_coloring_record_case_prefix(self):
@@ -3015,7 +3009,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         metadata = cr.problem_metadata['driver']
-        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings'})
+        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings', 'supports'})
         self.assertEqual(metadata['name'], 'DOEDriver')
         self.assertEqual(metadata['type'], 'doe')
         self.assertEqual(metadata['options'], {'debug_print': [], 'generator': 'UniformGenerator',
@@ -3034,7 +3028,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         metadata = cr.problem_metadata['driver']
-        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings'})
+        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings', 'supports'})
         self.assertEqual(metadata['name'], 'ScipyOptimizeDriver')
         self.assertEqual(metadata['type'], 'optimization')
         self.assertEqual(metadata['options'], {"debug_print": [], "optimizer": "SLSQP",

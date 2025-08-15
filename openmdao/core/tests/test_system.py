@@ -1,20 +1,31 @@
 """ Unit tests for the system interface."""
 
 import unittest
-
+import pathlib
+import io
+from contextlib import redirect_stdout
 import numpy as np
+import warnings
 
+import openmdao.api as om
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.file_utils import _get_work_dir
+from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
+from openmdao.test_suite.scripts.circuit_analysis import Circuit
+from openmdao.test_suite.components.sellar_feature import SellarMDA
+from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
+from openmdao.test_suite.components.sellar import SellarProblem
+from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
+from openmdao.test_suite.components.sellar import SellarNoDerivatives
 
 
 @use_tempdirs
 class TestSystem(unittest.TestCase):
 
     def test_get_val(self):
-        import openmdao.api as om
 
         class TestComp(om.ExplicitComponent):
             def setup(self):
@@ -253,7 +264,6 @@ class TestSystem(unittest.TestCase):
             residuals['C2.y'] = bad_val.tolist()
 
     def test_list_inputs_outputs_invalid_return_format(self):
-        from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
         prob = ParaboloidProblem()
         prob.setup()
         prob.final_setup()
@@ -275,8 +285,6 @@ class TestSystem(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
     def test_list_inputs_output_with_includes_excludes(self):
-        from openmdao.test_suite.scripts.circuit_analysis import Circuit
-
         p = Problem()
         model = p.model
 
@@ -328,8 +336,6 @@ class TestSystem(unittest.TestCase):
         self.assertEqual(len(outputs), 2)
 
     def test_list_inputs_outputs_is_indep_is_des_var(self):
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
         model = SellarMDA()
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
@@ -380,8 +386,6 @@ class TestSystem(unittest.TestCase):
                          ['_auto_ivc.v1'])
 
     def test_list_options(self):
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
         model = SellarMDA()
 
         prob = Problem(model)
@@ -495,8 +499,6 @@ class TestSystem(unittest.TestCase):
             prob.model.list_inputs(units=True, prom_name=True, out_stream=None)
 
     def test_get_io_metadata(self):
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
         prob = Problem()
         prob.model = SellarMDA()
 
@@ -545,7 +547,6 @@ class TestSystem(unittest.TestCase):
         })
 
     def test_model_options_set_all(self):
-        import openmdao.api as om
 
         def declare_options(system):
             system.options.declare('foo', types=(int,))
@@ -578,7 +579,6 @@ class TestSystem(unittest.TestCase):
             self.assertEqual(system.options['baz'], 'fizz')
 
     def test_model_options_with_filter(self):
-        import openmdao.api as om
 
         def declare_options(system):
             system.options.declare('foo', types=(int,))
@@ -617,7 +617,6 @@ class TestSystem(unittest.TestCase):
                 self.assertEqual(system.options['baz'], 'im_a_component')
 
     def test_model_options_override(self):
-        import openmdao.api as om
 
         def declare_options(system):
             system.options.declare('foo', types=(int,), default=0)
@@ -664,8 +663,6 @@ class TestSystem(unittest.TestCase):
                     self.assertEqual(system.options['baz'], 'im_C1_or_C2')
 
     def test_group_modifies_model_options(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
 
         class MyGroup(om.Group):
 
@@ -695,7 +692,6 @@ class TestSystem(unittest.TestCase):
 
     @use_tempdirs
     def test_recording_options_includes_excludes(self):
-        import openmdao.api as om
 
         prob = om.Problem()
 
@@ -731,9 +727,6 @@ class TestSystem(unittest.TestCase):
 
     @use_tempdirs
     def test_record_residuals_includes_excludes(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarProblem
-
         prob = SellarProblem()
 
         model = prob.model
@@ -759,10 +752,6 @@ class TestSystem(unittest.TestCase):
             prob.final_setup()
 
     def test_get_outputs_dir(self):
-        import pathlib
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
         prob = om.Problem(name='test_prob_name')
         model = prob.model
 
@@ -781,6 +770,169 @@ class TestSystem(unittest.TestCase):
 
         d = prob.get_outputs_dir('subdir')
         self.assertEqual(str(pathlib.Path(_get_work_dir(), 'test_prob_name_out', 'subdir')), str(d))
+
+    def test_validate_protected(self):
+
+        class MySellar1(SellarDis1):
+            def validate(self, inputs, outputs):
+                outputs['y1'] = 20.0
+
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('sellar', MySellar1())
+        prob.setup()
+        prob.run_model()
+
+        msg = "Attempt to set value of 'y1' in output vector when it is read only."
+        with self.assertRaises(ValueError, msg=msg):
+            prob.model.run_validation()
+
+    def test_premature_validate(self):
+        prob = Problem(name='test_prob_name')
+        model = prob.model
+        model.add_subsystem('comp', Paraboloid())
+        prob.setup()
+        prob.final_setup()
+
+        msg = ("Either 'run_model' or 'run_driver' must be called before "
+               "'run_validation' can be called.")
+        with self.assertRaises(RuntimeError, msg=msg):
+            prob.model.run_validation()
+
+    def test_validate_wrapper(self):
+        class MyComp1(ExplicitComponent):
+            def setup(self):
+                self.add_discrete_input('my_input', val=1)
+
+            def validate(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                pass
+
+        class MyComp2(ExplicitComponent):
+            def setup(self):
+                self.add_input('my_input', val=1.0)
+                self.add_output('my_output', val=1.0)
+
+            def validate(self, inputs, outputs):
+                pass
+
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('my_comp_1', MyComp1())
+        prob.model.add_subsystem('my_comp_2', MyComp2())
+        prob.setup()
+        prob.run_model()
+        prob.model.my_comp_1._validate_wrapper()
+        prob.model.my_comp_2._validate_wrapper()
+
+    def test_run_validation_empty(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('cycle', SellarNoDerivatives())
+        prob.setup()
+        prob.run_model()
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            prob.model.run_validation()
+        validation_print = buffer.getvalue()
+        expected_validation_print = (
+            '\nNo errors / warnings were collected during validation.\n'
+        )
+        self.assertEqual(validation_print, expected_validation_print)
+
+    def test_run_validation_all_warnings(self):
+
+        class MySellar1(SellarDis1):
+            def validate(self, inputs, outputs):
+                if outputs['y1'] > 20.0:
+                    warnings.warn('warning message 1')
+
+        class MySellar2(SellarDis2):
+            def validate(self, inputs, outputs):
+                if inputs['y1'] < 25.0:
+                    warnings.warn('warning message 2')
+
+        class SellarMDA(Group):
+            def setup(self):
+                cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
+                cycle.add_subsystem('d1', MySellar1(), promotes_inputs=['x', 'z', 'y2'],
+                                    promotes_outputs=['y1'])
+                cycle.add_subsystem('d2', MySellar2(), promotes_inputs=['z', 'y1'],
+                                    promotes_outputs=['y2'])
+
+                cycle.set_input_defaults('x', 1.0)
+                cycle.set_input_defaults('z', np.array([5.0, 2.0]))
+
+                # Nonlinear Block Gauss Seidel is a gradient free solver
+                cycle.nonlinear_solver = om.NonlinearBlockGS()
+
+            def validate(self, inputs, outputs):
+                if outputs['y1'] > 10.0:
+                    warnings.warn('warning message 3')
+
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('cycle', SellarMDA())
+        prob.setup()
+        prob.run_model()
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            prob.model.run_validation()
+        validation_print = buffer.getvalue()
+        expected_validation_print =(
+            "\nThe following warnings were collected during validation:"
+            "\n-----------------------------------------------------------------\n"
+            "\nUserWarning: 'cycle' <class SellarMDA>: Error calling validate(), warning message 3\n"
+            "\nUserWarning: 'cycle.cycle.d1' <class MySellar1>: Error calling validate(), warning message 1\n"
+            "\n-----------------------------------------------------------------\n"
+        )
+        self.assertEqual(validation_print, expected_validation_print)
+
+    def test_run_validation_mixed(self):
+
+        class MySellar1(SellarDis1):
+            def validate(self, inputs, outputs):
+                if outputs['y1'] > 20.0:
+                    raise ValueError('error message')
+
+        class MySellar2(SellarDis2):
+            def validate(self, inputs, outputs):
+                if inputs['y1'] < 25.0:
+                    warnings.warn('warning_message')
+
+        class SellarMDA(Group):
+            def setup(self):
+                cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
+                cycle.add_subsystem('d1', MySellar1(), promotes_inputs=['x', 'z', 'y2'],
+                                    promotes_outputs=['y1'])
+                cycle.add_subsystem('d2', MySellar2(), promotes_inputs=['z', 'y1'],
+                                    promotes_outputs=['y2'])
+
+                cycle.set_input_defaults('x', 1.0)
+                cycle.set_input_defaults('z', np.array([5.0, 2.0]))
+
+                # Nonlinear Block Gauss Seidel is a gradient free solver
+                cycle.nonlinear_solver = om.NonlinearBlockGS()
+
+            def validate(self, inputs, outputs):
+                if outputs['y1'] > 10.0:
+                    warnings.warn('warning_message')
+
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('cycle', SellarMDA())
+        prob.setup()
+        prob.run_model()
+
+        expected_validation_print = """
+
+            The following errors / warnings were collected during validation:
+            -----------------------------------------------------------------
+
+            ValueError: 'cycle' <class SellarMDA>: Error calling validate(), warning message
+
+            UserWarning: 'cycle.cycle.d1' <class MySellar1>: Error calling validate(), error message
+
+            -----------------------------------------------------------------
+        """
+        with self.assertRaises(om.ValidationError, msg=expected_validation_print):
+            prob.model.run_validation()
 
 
 if __name__ == "__main__":
