@@ -2184,11 +2184,11 @@ class Driver(object, metaclass=DriverMetaclass):
 
         This approach uses a least-squares minimization of the constraint violation.  If
         the problem has a feasible solution, this should find the feasible solution
-        closes to the current design variable values.
+        closest to the current design variable values.
 
         Arguments method, ftol, xtol, gtol, x_scale, loss, f_scale, diff_step,
         tr_solver, tr_options, and verbose are passed to `scipy.optimize.least_squares`, see
-        the documentaiton of that function for more information:
+        the documentation of that function for more information:
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.least_squares.html
 
         Parameters
@@ -2215,7 +2215,7 @@ class Driver(object, metaclass=DriverMetaclass):
             Additional scaling applied by the least-squares algorithm. Behavior is method-dependent.
             For additional details, see the scipy documentation.
         loss : {'linear', 'soft_l1', 'huber', 'cauchy', or 'arctan'}
-            The loss aggregation method. Options of interst are:
+            The loss aggregation method. Options of interest are:
             - 'linear' gives the standard "sum-of-squares".
             - 'soft_l1' gives a smooth approximation for the L1-norm of constraint violation.
             For other options, see the scipy documentation.
@@ -2276,6 +2276,13 @@ class Driver(object, metaclass=DriverMetaclass):
             raise RuntimeError('Problem has no design variables or '
                                'all design variables are excluded.')
 
+        i = 0
+        for name, val in desvar_vals.items():
+            meta = self._designvars[name]
+            size = meta['global_size'] if meta['distributed'] else meta['size']
+            x_init[i:i + size] = val
+            i += size
+
         # Initial Design Vars bounds
         if method == 'lm':
             bounds = (-np.inf, np.inf)
@@ -2291,8 +2298,6 @@ class Driver(object, metaclass=DriverMetaclass):
             for name, val in desvar_vals.items():
                 meta = self._designvars[name]
                 size = meta['global_size'] if meta['distributed'] else meta['size']
-                x_init[i:i + size] = val
-                i += size
 
                 meta_low = meta['lower']
                 meta_high = meta['upper']
@@ -2413,7 +2418,7 @@ class Driver(object, metaclass=DriverMetaclass):
             print(f'    iterations: {self.result.iter_count}')
             print(f'    model evals: {res.nfev}')
             print(f'    gradient evals: {res.njev}')
-            print(f'    elapsed_time: {self.result.model_time + self.result.deriv_time:.8f} s')
+            print(f'    elapsed time: {self.result.model_time + self.result.deriv_time:.8f} s')
             if not res.success or res.cost >= loss_tol:
                 max_idx = np.argmax(np.abs(res.fun))
                 max_viol = res.fun[max_idx]

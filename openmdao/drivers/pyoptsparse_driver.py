@@ -229,7 +229,6 @@ class pyOptSparseDriver(Driver):
         self._user_termination_flag = False
         self._in_user_function = False
         self._check_jac = False
-        self._exc_info = None
         self._total_jac_format = 'dict'
         self._total_jac_sparsity = None
         self._model_ran = False

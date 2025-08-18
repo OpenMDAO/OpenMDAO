@@ -168,7 +168,6 @@ class ScipyOptimizeDriver(Driver):
         self.fail = False
         self.iter_count = 0
         self._check_jac = False
-        self._exc_info = None
         self._total_jac_format = 'array'
 
         self.cite = CITATIONS

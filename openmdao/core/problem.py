@@ -742,11 +742,11 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         This approach uses a least-squares minimization of the constraint violation.  If
         the problem has a feasible solution, this should find the feasible solution
-        closes to the current design variable values.
+        closest to the current design variable values.
 
         Arguments method, ftol, xtol, gtol, x_scale, loss, f_scale, diff_step,
         tr_solver, tr_options, and verbose are passed to `scipy.optimize.least_squares`, see
-        the documentaiton of that function for more information:
+        the documentation of that function for more information:
         https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.least_squares.html
 
         Parameters
@@ -778,7 +778,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             Additional scaling applied by the least-squares algorithm. Behavior is method-dependent.
             For additional details, see the scipy documentation.
         loss : {'linear', 'soft_l1', 'huber', 'cauchy', or 'arctan'}
-            The loss aggregation method. Options of interst are:
+            The loss aggregation method. Options of interest are:
             - 'linear' gives the standard "sum-of-squares".
             - 'soft_l1' gives a smooth approximation for the L1-norm of constraint violation.
             For other options, see the scipy documentation.
