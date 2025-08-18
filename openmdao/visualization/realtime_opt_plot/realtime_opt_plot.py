@@ -3,7 +3,6 @@
 import ctypes
 import errno
 import os
-import pathlib
 import sys
 from collections import defaultdict
 import sqlite3
@@ -56,7 +55,7 @@ except ImportError:
 
 # Constants
 # the time between calls to the udpate method
-_time_between_callbacks_in_ms = 1000
+_time_between_callbacks_in_ms = 100
 # Number of milliseconds for unused session lifetime
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10
 # color of the plot line for the objective function
