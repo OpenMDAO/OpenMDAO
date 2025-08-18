@@ -1502,9 +1502,8 @@ class TestGroup(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
                          "\nCollected errors for problem 'promote_units_and_none':\n   "
                          "<model> <class Group>: The following inputs, ['c1.x', 'c2.x'], promoted to 'x', "
-                         "are connected but their metadata entries ['units', 'val'] differ. "
-                         "Call <group>.set_input_defaults('x', units=?, val=?), "
-                         "where <group> is the model to remove the ambiguity.")
+                         "are connected but their metadata entries ['units'] differ. "
+                         "Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_double_set_input_defaults(self):
         problem = om.Problem()
@@ -1885,7 +1884,7 @@ class TestGroupPromotes(unittest.TestCase):
         with assert_no_warning(PromotionWarning):
             top.setup()
 
-    def test_promotes_alias_from_parent(self):
+    def test_promotes_alias_from_parent_err(self):
         class SubGroup(om.Group):
             def setup(self):
                 self.add_subsystem('comp1', om.ExecComp('x=2.0*a+3.0*b+c', a=3.0, b=4.0))
@@ -1978,7 +1977,7 @@ class TestGroupPromotes(unittest.TestCase):
         # Runs without exception.
         p.setup()
 
-    def test_multiple_promotes(self):
+    def test_multiple_promotes_missing_var(self):
 
         class BranchGroup(om.Group):
             def setup(self):
@@ -2971,8 +2970,7 @@ class TestGroupAddInput(unittest.TestCase):
             "\nCollected errors for problem 'missing_diff_units':"
             "\n   <model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted "
             "to 'x', are connected but their metadata entries ['units', 'val'] differ. "
-            "Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group named "
-            "'par' to remove the ambiguity.")
+            "Call model.set_input_defaults('x', units=?, val=?) to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem(name="missing_diff_vals")
@@ -2990,8 +2988,7 @@ class TestGroupAddInput(unittest.TestCase):
             "\nCollected errors for problem 'missing_diff_vals':"
             "\n   <model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted "
             "to 'x', are connected but their metadata entries ['val'] differ. "
-            "Call <group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' "
-            "to remove the ambiguity.")
+            "Call model.set_input_defaults('x', val=?) to remove the ambiguity.")
 
     def test_conflicting_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args
@@ -3017,8 +3014,7 @@ class TestGroupAddInput(unittest.TestCase):
             "\nCollected errors for problem 'conflicting_units':"
             "\n   <model> <class Group>: The subsystems G1.G2 and par.G4 called set_input_defaults "
             "for promoted input 'x' with conflicting values for 'units'. "
-            "Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove "
-            "the ambiguity.")
+            "Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_conflicting_units_multi_level(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -3047,14 +3043,14 @@ class TestGroupAddInput(unittest.TestCase):
            "\nCollected errors for problem 'conflicting_units_multi_level':"
            "\n   <model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults "
            "for promoted input 'x' with conflicting values for 'units'. "
-           "Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity."
+           "Call model.set_input_defaults('x', units=?) to remove the ambiguity."
            "\n   <model> <class Group>: The subsystems G1 and par.G5 called set_input_defaults for "
            "promoted input 'x' with conflicting values for 'units'. "
-           "Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity."
+           "Call model.set_input_defaults('x', units=?) to remove the ambiguity."
            "\n   <model> <class Group>: The following inputs, ['G1.G2.C1.x', 'G1.G2.C2.x', "
            "'G1.G3.C3.x', 'G1.G3.C4.x', 'par.G4.C5.x', 'par.G4.C6.x', 'par.G5.C7.x', 'par.G5.C8.x'], "
            "promoted to 'x', are connected but their metadata entries ['val'] differ. "
-           "Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the ambiguity.")
+           "Call model.set_input_defaults('x', val=?) to remove the ambiguity.")
 
     def test_override_units(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -3177,12 +3173,12 @@ class TestGroupAddInput(unittest.TestCase):
             "\nCollected errors for problem 'conflicting_units_multi_level_par':"
             "\n   <model> <class Group>: The subsystems G1.G2 and par called set_input_defaults "
             "for promoted input 'x' with conflicting values for 'units'. "
-            "Call <group>.set_input_defaults('x', units=?), where <group> is the model to remove "
+            "Call model.set_input_defaults('x', units=?) to remove "
             "the ambiguity."
             "\n   <model> <class Group>: The following inputs, ['G1.G2.C1.x', 'G1.G2.C2.x', "
             "'G1.G3.C3.x', 'G1.G3.C4.x', 'par.G4.C5.x', 'par.G4.C6.x', 'par.G5.C7.x', 'par.G5.C8.x'], "
             "promoted to 'x', are connected but their metadata entries ['val'] differ. "
-            "Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the "
+            "Call model.set_input_defaults('x', val=?) to remove the "
             "ambiguity.")
 
     def test_group_input_not_found(self):
@@ -3214,7 +3210,7 @@ class TestGroupAddInput(unittest.TestCase):
            "\n   <model> <class Group>: The following inputs, ['G1.G2.C1.x', 'G1.G2.C2.x', "
            "'G1.G3.C3.x', 'G1.G3.C4.x', 'par.G4.C5.x', 'par.G4.C6.x', 'par.G5.C7.x', 'par.G5.C8.x'],"
            " promoted to 'x', are connected but their metadata entries ['val'] differ. "
-           "Call <group>.set_input_defaults('x', val=?), where <group> is the model to remove the "
+           "Call model.set_input_defaults('x', val=?) to remove the "
            "ambiguity.")
 
     def test_conflicting_val(self):
@@ -3243,10 +3239,9 @@ class TestGroupAddInput(unittest.TestCase):
            "\nCollected errors for problem 'conflicting_val':"
            "\n   <model> <class Group>: The subsystems G1 and par.G4 called set_input_defaults for "
            "promoted input 'x' with conflicting values for 'val'. Call "
-           "<group>.set_input_defaults('x', val=?), where <group> is the model to remove the ambiguity."
+           "model.set_input_defaults('x', val=?) to remove the ambiguity."
            "\n   <model> <class Group>: The subsystems G1 and par.G5 called set_input_defaults for "
-           "promoted input 'x' with conflicting values for 'val'. Call <group>.set_input_defaults('x', val=?), "
-           "where <group> is the model to remove the ambiguity.")
+           "promoted input 'x' with conflicting values for 'val'. Call model.set_input_defaults('x', val=?) to remove the ambiguity.")
 
     def test_set_input_defaults_discrete(self):
         import math

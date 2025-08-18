@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from collections import defaultdict
 from itertools import chain
 from enum import IntEnum
+import warnings
 
 from fnmatch import fnmatchcase
 from numbers import Integral
@@ -72,10 +73,12 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
     'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc',
-              'shape_by_conn', 'compute_shape', 'copy_shape', 'require_connection'),
+              'shape_by_conn', 'compute_shape', 'copy_shape',
+              'units_by_conn', 'copy_units', 'compute_units', 'require_connection'),
     'output': ('units', 'shape', 'size', 'desc',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags',
-               'shape_by_conn', 'compute_shape', 'copy_shape'),
+               'shape_by_conn', 'compute_shape', 'copy_shape',
+               'units_by_conn', 'copy_units', 'compute_units'),
 }
 
 allowed_meta_names = {
@@ -156,6 +159,23 @@ def collect_errors(method):
             self._collect_error(str(exc), exc_type=type_exc, tback=tb)
 
     return wrapper
+
+
+class ValidationError(ValueError):
+    """
+    Custom error class for when validation checking fails.
+
+    Parameters
+    ----------
+    message : str
+        Message displayed when this error is raised.
+    """
+
+    def __init__(self, message="Errors / Warnings during validation"):
+        """
+        Initialize all attributes.
+        """
+        super().__init__(message)
 
 
 class System(object, metaclass=SystemMetaclass):
@@ -2357,7 +2377,7 @@ class System(object, metaclass=SystemMetaclass):
 
                     # assume that all but the first dimension of the shape of a
                     # distributed variable is the same on all procs
-                    mymeta['global_shape'] = self._get_full_dist_shape(abs_name, local_shape)
+                    mymeta['global_shape'] = self._get_full_dist_shape(abs_name, local_shape, io)
                 else:
                     # not distributed, just use local shape and size
                     mymeta['global_size'] = mymeta['size']
@@ -6205,7 +6225,7 @@ class System(object, metaclass=SystemMetaclass):
                 val = np.reshape(val, abs2meta_all_ins[abs_name]['global_shape'])
             elif not flat and val.size > 0 and vshape is not None:
                 val = np.reshape(val, vshape)
-        elif vshape is not None:
+        elif vshape is not None and vshape != ():
             val = val.reshape(vshape)
 
         if indices is not None:
@@ -6547,7 +6567,7 @@ class System(object, metaclass=SystemMetaclass):
 
         return hash
 
-    def _get_full_dist_shape(self, abs_name, local_shape):
+    def _get_full_dist_shape(self, abs_name, local_shape, io):
         """
         Get the full 'distributed' shape for a variable.
 
@@ -6557,26 +6577,24 @@ class System(object, metaclass=SystemMetaclass):
         ----------
         abs_name : str
             Absolute name of the variable.
-
         local_shape : tuple
             Local shape of the variable, used in error reporting.
+        io : str
+            'input' or 'output'.
 
         Returns
         -------
         tuple
             The distributed shape for the given variable.
         """
-        if abs_name in self._var_allprocs_abs2meta['output']:
-            io = 'output'
+        abs2meta = self._var_allprocs_abs2meta[io]
+        if abs_name in abs2meta:
             scope = self
-        elif abs_name in self._problem_meta['model_ref']()._var_allprocs_abs2meta['output']:
-            io = 'output'
-            scope = self._problem_meta['model_ref']()
         else:
-            io = 'input'
-            scope = self
+            scope = self._problem_meta['model_ref']()
+            abs2meta = scope._var_allprocs_abs2meta[io]
 
-        meta = scope._var_allprocs_abs2meta[io][abs_name]
+        meta = abs2meta[abs_name]
         var_idx = scope._var_allprocs_abs2idx[abs_name]
         global_size = np.sum(scope._var_sizes[io][:, var_idx])
 
@@ -7084,6 +7102,84 @@ class System(object, metaclass=SystemMetaclass):
 
     def _get_subjac_owners(self):
         return {}
+
+    def run_validation(self):
+        """
+        Run validate method on all systems below this system.
+
+        The validate method on each system can be used to check any final
+        input / output values after a run.
+        """
+        if (self._problem_meta is None or
+                self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP or
+                self._problem_meta['model_ref']().iter_count == 0):
+            raise RuntimeError("Either 'run_model' or 'run_driver' must be "
+                               "called before 'run_validation' can be called.")
+        validation_string = ''
+        validation_errors = False
+        validation_warnings = False
+        for system in self.system_iter(include_self=True, recurse=True):
+            with warnings.catch_warnings():
+                warnings.filterwarnings('error')
+                try:
+                    system._validate_wrapper()
+                except Warning as e:
+                    validation_string += f'\n{type(e).__name__}: {e}\n'
+                    validation_warnings = True
+                    msg_type = 'warnings' if not validation_errors else 'errors / warnings'
+                except Exception as e:
+                    validation_string += f'\n{type(e).__name__}: {e}\n'
+                    validation_errors = True
+                    msg_type = 'errors' if not validation_warnings else 'errors / warnings'
+
+        if validation_string:
+            msg_text = (
+                f'\nThe following {msg_type} were collected during validation:'
+                '\n-----------------------------------------------------------------\n'
+                f'{validation_string}'
+                '\n-----------------------------------------------------------------'
+            )
+            if validation_errors:
+                raise ValidationError(msg_text)
+            else:
+                print(msg_text)
+        else:
+            print('\nNo errors / warnings were collected during validation.')
+
+    def _validate_wrapper(self):
+        """
+        Call validate based on whether there are discrete inputs / outputs or not.
+        """
+        # Protect both the inputs and outputs, just want the user to be able
+        # to check values, not change them.
+        with self._call_user_function('validate', protect_outputs=True):
+            if self._discrete_inputs or self._discrete_outputs:
+                self.validate(self._inputs, self._outputs,
+                              self._discrete_inputs, self._discrete_outputs)
+            else:
+                self.validate(self._inputs, self._outputs)
+
+    def validate(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+        """
+        Check any final input / output values after a run.
+
+        The model is assumed to be in an unscaled state. An inherited component
+        may choose to either override this function or ignore it. Any errors or
+        warnings raised in this method will be collected and all printed / raised
+        together.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables read via inputs[key].
+        outputs : Vector
+            Unscaled, dimensional output variables read via outputs[key].
+        discrete_inputs : dict-like or None
+            If not None, dict-like object containing discrete input values.
+        discrete_outputs : dict-like or None
+            If not None, dict-like object containing discrete output values.
+        """
+        pass
 
 
 class _ErrorData(object):

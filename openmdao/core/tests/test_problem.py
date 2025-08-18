@@ -1059,8 +1059,7 @@ class TestProblem(unittest.TestCase):
                "\nCollected errors for problem 'get_set_with_units_diff_err':"
                "\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to "
                "'x', are connected but their metadata entries ['units', 'val'] differ. "
-               "Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model "
-               "to remove the ambiguity.")
+               "Call model.set_input_defaults('x', units=?, val=?) to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -1173,7 +1172,7 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob['G1.x']
 
-        msg = "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
+        msg = "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call model.set_input_defaults('G1.x', units=?) to remove the ambiguity."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_get_set_with_units_error_messages(self):
@@ -1799,6 +1798,23 @@ class TestProblem(unittest.TestCase):
         self.assertRegex(output[14], r'^con2 +\[[0-9. e+-]+\] +1')
         self.assertEqual(output[17], r'Objectives')
         self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
+
+        # General make sure that the default settings print all columns.
+        self.assertTrue('parallel_deriv_color' in output[3])
+        self.assertTrue('units' in output[3])
+        self.assertTrue('upper' in output[3])
+        self.assertTrue('lower' in output[3])
+        self.assertTrue('ref0' in output[3])
+        self.assertTrue('parallel_deriv_color' in output[11])
+        self.assertTrue('units' in output[11])
+        self.assertTrue('upper' in output[11])
+        self.assertTrue('lower' in output[11])
+        self.assertTrue('ref0' in output[11])
+        self.assertTrue('units' in output[19])
+        self.assertTrue('ref' in output[19])
+        self.assertTrue('adder' in output[19])
+        self.assertTrue('parallel_deriv_color' in output[19])
+        self.assertTrue('cache_linear_solution' in output[19])
 
         # With show_promoted_name=False
         stdout = sys.stdout
