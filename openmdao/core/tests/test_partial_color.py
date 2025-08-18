@@ -582,6 +582,7 @@ class TestColoringImplicitFuncComp(unittest.TestCase):
     def setUp(self):
         np.random.seed(11)
 
+    @unittest.skipIf(sys.version_info > (3, 11), "In newer versions of python, inspect.getsource fails here, causing the test to fail.")
     def test_partials_implicit_funccomp(self):
         for (method, direction), isplit, osplit in itertools.product([('fd', 'fwd'), ('cs', 'fwd'), ('jax', 'fwd'), ('jax', 'rev')] if jax else [('fd', 'fwd'), ('cs', 'fwd')],
         [1,2,7,19],
@@ -886,7 +887,7 @@ class TestColoring(unittest.TestCase):
             jac = comp._jacobian._subjacs_info
             _check_partial_matrix(comp, jac, sparsity, 'cs')
 
-    @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
+    @require_pyoptsparse(optimizer='SLSQP')
     def test_simple_totals(self):
         for method in ['fd', 'cs']:
             with self.subTest(msg=f'{method=}'):
@@ -1038,7 +1039,7 @@ class TestColoring(unittest.TestCase):
                 _check_total_matrix(model, derivs, sparsity[rows, :], method)
 
     @parameterized.expand(itertools.product(['fd', 'cs'],[True, False]), name_func=parameterized_name)
-    @unittest.skipUnless(OPTIMIZER, 'requires pyoptsparse SLSQP.')
+    @require_pyoptsparse(optimizer='SLSQP')
     def test_totals_of_wrt_indices(self, method, sparse_partials):
         prob = Problem(name=f'test_totals_of_wrt_indices_{method}_{sparse_partials}')
         model = prob.model = CounterGroup()

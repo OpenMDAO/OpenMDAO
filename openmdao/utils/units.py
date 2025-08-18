@@ -1053,7 +1053,7 @@ def convert_units(val, old_units, new_units=None):
     return (val + offset) * factor
 
 
-def _has_val_mismatch(units1, val1, units2, val2):
+def _has_val_mismatch(units1, val1, units2, val2, rtol=1e-10):
     """
     Return True if values differ after unit conversion or if values differ when units are None.
 
@@ -1067,26 +1067,27 @@ def _has_val_mismatch(units1, val1, units2, val2):
         Units for second value.
     val2 : float or ndarray
         Second value.
+    rtol : float
+        Tolerance for relative difference.
     """
     if units1 != units2:
-        if units1 is None or units2 is None:
-            return True
+        if units1 is not None and units2 is not None:
+            # convert units
+            try:
+                val1 = convert_units(val1, units1, new_units=units2)
+            except TypeError:
+                return True  # units are not compatible
 
-        # convert units
-        try:
-            val1 = convert_units(val1, units1, new_units=units2)
-        except TypeError:
-            return True  # units are not compatible
-
-    rtol = 1e-10
     val1 = np.asarray(val1)
     val2 = np.asarray(val2)
 
-    norm1 = np.linalg.norm(val1)
-    if norm1 == 0.:
-        return np.linalg.norm(val2) > rtol
-    else:
-        return np.linalg.norm(val2 - val1) / norm1 > rtol
+    if val1.shape != val2.shape:
+        return True
+
+    absdiff = np.abs(val2 - val1)
+    denominator_basis = np.maximum(np.abs(val1), np.abs(val2))
+    threshold = rtol * denominator_basis
+    return np.any(absdiff > threshold)
 
 
 def simplify_unit(old_unit_str, msginfo=''):

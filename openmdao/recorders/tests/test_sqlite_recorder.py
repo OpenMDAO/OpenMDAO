@@ -3009,7 +3009,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         metadata = cr.problem_metadata['driver']
-        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings'})
+        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings', 'supports'})
         self.assertEqual(metadata['name'], 'DOEDriver')
         self.assertEqual(metadata['type'], 'doe')
         self.assertEqual(metadata['options'], {'debug_print': [], 'generator': 'UniformGenerator',
@@ -3028,7 +3028,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         metadata = cr.problem_metadata['driver']
-        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings'})
+        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings', 'supports'})
         self.assertEqual(metadata['name'], 'ScipyOptimizeDriver')
         self.assertEqual(metadata['type'], 'optimization')
         self.assertEqual(metadata['options'], {"debug_print": [], "optimizer": "SLSQP",

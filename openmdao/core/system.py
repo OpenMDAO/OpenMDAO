@@ -73,10 +73,12 @@ _recordable_funcs = frozenset(['_apply_linear', '_apply_nonlinear', '_solve_line
 # the following are local metadata that will also be accessible for vars on all procs
 global_meta_names = {
     'input': ('units', 'shape', 'size', 'distributed', 'tags', 'desc',
-              'shape_by_conn', 'compute_shape', 'copy_shape', 'require_connection'),
+              'shape_by_conn', 'compute_shape', 'copy_shape',
+              'units_by_conn', 'copy_units', 'compute_units', 'require_connection'),
     'output': ('units', 'shape', 'size', 'desc',
                'ref', 'ref0', 'res_ref', 'distributed', 'lower', 'upper', 'tags',
-               'shape_by_conn', 'compute_shape', 'copy_shape'),
+               'shape_by_conn', 'compute_shape', 'copy_shape',
+               'units_by_conn', 'copy_units', 'compute_units'),
 }
 
 allowed_meta_names = {
@@ -2375,7 +2377,7 @@ class System(object, metaclass=SystemMetaclass):
 
                     # assume that all but the first dimension of the shape of a
                     # distributed variable is the same on all procs
-                    mymeta['global_shape'] = self._get_full_dist_shape(abs_name, local_shape)
+                    mymeta['global_shape'] = self._get_full_dist_shape(abs_name, local_shape, io)
                 else:
                     # not distributed, just use local shape and size
                     mymeta['global_size'] = mymeta['size']
@@ -6223,7 +6225,7 @@ class System(object, metaclass=SystemMetaclass):
                 val = np.reshape(val, abs2meta_all_ins[abs_name]['global_shape'])
             elif not flat and val.size > 0 and vshape is not None:
                 val = np.reshape(val, vshape)
-        elif vshape is not None:
+        elif vshape is not None and vshape != ():
             val = val.reshape(vshape)
 
         if indices is not None:
@@ -6565,7 +6567,7 @@ class System(object, metaclass=SystemMetaclass):
 
         return hash
 
-    def _get_full_dist_shape(self, abs_name, local_shape):
+    def _get_full_dist_shape(self, abs_name, local_shape, io):
         """
         Get the full 'distributed' shape for a variable.
 
@@ -6575,26 +6577,24 @@ class System(object, metaclass=SystemMetaclass):
         ----------
         abs_name : str
             Absolute name of the variable.
-
         local_shape : tuple
             Local shape of the variable, used in error reporting.
+        io : str
+            'input' or 'output'.
 
         Returns
         -------
         tuple
             The distributed shape for the given variable.
         """
-        if abs_name in self._var_allprocs_abs2meta['output']:
-            io = 'output'
+        abs2meta = self._var_allprocs_abs2meta[io]
+        if abs_name in abs2meta:
             scope = self
-        elif abs_name in self._problem_meta['model_ref']()._var_allprocs_abs2meta['output']:
-            io = 'output'
-            scope = self._problem_meta['model_ref']()
         else:
-            io = 'input'
-            scope = self
+            scope = self._problem_meta['model_ref']()
+            abs2meta = scope._var_allprocs_abs2meta[io]
 
-        meta = scope._var_allprocs_abs2meta[io][abs_name]
+        meta = abs2meta[abs_name]
         var_idx = scope._var_allprocs_abs2idx[abs_name]
         global_size = np.sum(scope._var_sizes[io][:, var_idx])
 

@@ -167,9 +167,7 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
                 else:
                     self._input_sizes[fi] += input_size
 
-    def add_output(self, name, val=1.0, surrogate=None, shape=None, units=None, res_units=None,
-                   desc='', lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=1.0, tags=None,
-                   shape_by_conn=False, copy_shape=None, distributed=None):
+    def add_output(self, name, val=1.0, **kwargs):
         """
         Add an output variable to the component.
 
@@ -179,59 +177,10 @@ class MultiFiMetaModelUnStructuredComp(MetaModelUnStructuredComp):
             Name of the variable in this component's namespace.
         val : float or list or tuple or ndarray
             The initial value of the variable being added in user-defined units. Default is 1.0.
-        surrogate : SurrogateModel
-            Surrogate model to use.
-        shape : int or tuple or list or None
-            Shape of this variable, only required if val is not an array.
-            Default is None.
-        units : str or None
-            Units in which the output variables will be provided to the component during execution.
-            Default is None, which means it has no units.
-        res_units : str or None
-            Units in which the residuals of this output will be given to the user when requested.
-            Default is None, which means it has no units.
-        desc : str
-            Description of the variable.
-        lower : float or list or tuple or ndarray or Iterable or None
-            Lower bound(s) in user-defined units. It can be (1) a float, (2) an array_like
-            consistent with the shape arg (if given), or (3) an array_like matching the shape of
-            val, if val is array_like. A value of None means this output has no lower bound.
-            Default is None.
-        upper : float or list or tuple or ndarray or or Iterable None
-            Upper bound(s) in user-defined units. It can be (1) a float, (2) an array_like
-            consistent with the shape arg (if given), or (3) an array_like matching the shape of
-            val, if val is array_like. A value of None means this output has no upper bound.
-            Default is None.
-        ref : float
-            Scaling parameter. The value in the user-defined units of this output variable when
-            the scaled value is 1. Default is 1.
-        ref0 : float
-            Scaling parameter. The value in the user-defined units of this output variable when
-            the scaled value is 0. Default is 0.
-        res_ref : float
-            Scaling parameter. The value in the user-defined res_units of this output's residual
-            when the scaled value is 1. Default is 1.
-        tags : str or list of strs or set of strs
-            User defined tags that can be used to filter what gets listed when calling
-            list_inputs and list_outputs.
-        shape_by_conn : bool
-            If True, shape this output to match its connected input(s).
-        copy_shape : str or None
-            If a str, that str is the name of a variable. Shape this output to match that of
-            the named variable.
-        distributed : bool
-            If True, this variable is a distributed variable, so it can have different sizes/values
-            across MPI processes.
+        **kwargs : dict
+            Additional arguments to be passed to the add_output method of the base class.
         """
-        super().add_output(name, val, shape=shape,
-                           units=units, res_units=res_units,
-                           desc=desc, lower=lower,
-                           upper=upper, ref=ref,
-                           ref0=ref0, res_ref=res_ref,
-                           surrogate=surrogate, tags=tags,
-                           shape_by_conn=shape_by_conn,
-                           copy_shape=copy_shape,
-                           distributed=distributed)
+        super().add_output(name, val, **kwargs)
         self._training_output[name] = self._nfi * [np.empty(0)]
 
         # Add train_<outvar>_fi<n>

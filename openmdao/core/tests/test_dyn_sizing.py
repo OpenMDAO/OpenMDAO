@@ -4,7 +4,7 @@ import sys
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
 
 from openmdao.utils.mpi import MPI
 if MPI:
@@ -12,6 +12,8 @@ if MPI:
         from openmdao.vectors.petsc_vector import PETScVector
     except ImportError:
         PETScVector = None
+else:
+    PETScVector = None
 
 
 class L2(om.ExplicitComponent):
@@ -190,7 +192,7 @@ class TestPassSize(unittest.TestCase):
         self.assertEqual(exception.args[0],
             "\nCollected errors for problem 'unresolved_err':"
             "\n   <model> <class Group>: Failed to resolve shapes for "
-            "['B.in', 'B.out', 'C.in', 'C.out']. To see the dynamic shape dependency graph, do "
+            "['B.in', 'B.out', 'C.in', 'C.out']. To see the dynamic shapes dependency graph, do "
             "'openmdao view_dyn_shapes <your_py_file>'.")
 
 
@@ -199,10 +201,10 @@ class TestPassSizeDistributed(unittest.TestCase):
 
     N_PROCS = 3
 
-    def test_serial_start(self):
+    def test_serial_start_err(self):
         """the size information starts in the duplicated component C"""
 
-        prob = om.Problem(name='serial_start')
+        prob = om.Problem(name='serial_start_err')
         prob.model = om.Group()
 
         indeps = prob.model.add_subsystem('A', om.IndepVarComp())
@@ -225,16 +227,16 @@ class TestPassSizeDistributed(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(cm.exception),
-            "\nCollected errors for problem 'serial_start':"
-            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported."
-            "\n   <model> <class Group>: Failed to resolve shapes for ['E.in', 'E.out']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-            "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices."
-            "\n   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'B.out' to 'C.in'. The target shape is (4,) but indices are shape (12,).")
+            "\nCollected errors for problem 'serial_start_err':"
+            "\n   <model> <class Group>: Input 'C.in' has src_indices so the shape of connected output 'B.out' cannot be determined."
+            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' without src_indices is not supported."
+            "\n   <model> <class Group>: Failed to resolve shapes for ['A.out', 'B.in', 'B.out', 'E.in', 'E.out']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+            "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices.")
 
-    def test_distributed_start(self):
+    def test_distributed_start_err(self):
         """the size information starts in the distributed component C"""
 
-        prob = om.Problem(name='distributed_start')
+        prob = om.Problem(name='distributed_start_err')
         prob.model = om.Group()
 
         indeps = prob.model.add_subsystem('A', om.IndepVarComp())
@@ -244,9 +246,9 @@ class TestPassSizeDistributed(unittest.TestCase):
         prob.model.connect('A.out', ['B.in'])
 
         prob.model.add_subsystem('C', C_distrib())
-        if self.comm.rank == 0:
+        if prob.comm.rank == 0:
             prob.model.connect('B.out', ['C.in'], src_indices=np.arange(0,1, dtype=int))
-        elif self.comm.rank == 1:
+        elif prob.comm.rank == 1:
             prob.model.connect('B.out', ['C.in'], src_indices=np.arange(1,3, dtype=int))
         else:
             prob.model.connect('B.out', ['C.in'], src_indices=np.arange(3,3, dtype=int))
@@ -261,13 +263,14 @@ class TestPassSizeDistributed(unittest.TestCase):
             prob.setup()
             prob.final_setup()
 
-        self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'distributed_start':"
-           "\n   <model> <class Group>: dynamic sizing of non-distributed output 'A.out' from distributed input 'B.in' is not supported because not all B.in ranks are the same size (sizes=[1 2 0])."
-           "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' is not supported."
-           "\n   <model> <class Group>: Failed to resolve shapes for ['A.out', 'E.in', 'E.out']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-           "\n   'B' <class B_distrib>: Can't determine src_indices automatically for input 'B.in'. They must be supplied manually."
-           "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices.")
+        self.assertEqual(cm.exception.args[0],
+            "\nCollected errors for problem 'distributed_start_err':"
+            "\n   <model> <class Group>: Input 'C.in' has src_indices so the shape of connected output 'B.out' cannot be determined."
+            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' without src_indices is not supported."
+            "\n   <model> <class Group>: Failed to resolve shapes for ['A.out', 'B.in', 'B.out', 'E.in', 'E.out']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+            "\n   <model> <class Group>: When connecting 'B.out' to 'C.in': index 0 is out of bounds for source dimension of size 0."
+            "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices.")
+
 
 class ResizableComp(om.ExplicitComponent):
     # this is just a component that allows us to resize between setups
@@ -289,13 +292,14 @@ class ResizableComp(om.ExplicitComponent):
 
 class DynShapeComp(om.ExplicitComponent):
     # component whose inputs and outputs are dynamically shaped
-    def __init__(self, n_inputs=1):
+    def __init__(self, n_inputs=1, src_indices=None):
         super().__init__()
         self.n_inputs = n_inputs
+        self.src_indices = src_indices
 
         for i in range(self.n_inputs):
             self.add_input(f"x{i+1}", shape_by_conn=True, copy_shape=f"y{i+1}")
-            self.add_output(f"y{i+1}", shape_by_conn=True, copy_shape=f"x{i+1}")
+            self.add_output(f"y{i+1}", shape_by_conn=self.src_indices is None, copy_shape=f"x{i+1}")
 
     def compute(self, inputs, outputs):
         for i in range(self.n_inputs):
@@ -312,27 +316,47 @@ class DistribDynShapeComp(om.ExplicitComponent):
         for i in range(self.n_inputs):
             self.add_input(f"x{i+1}", shape_by_conn=True, copy_shape=f"y{i+1}", distributed=True)
             self.add_output(f"y{i+1}", shape_by_conn=True, copy_shape=f"x{i+1}", distributed=True)
+            self.declare_partials(of=f"y{i+1}", wrt=f"x{i+1}")
 
     def compute(self, inputs, outputs):
         for i in range(self.n_inputs):
             outputs[f"y{i+1}"] = 2*inputs[f"x{i+1}"]
 
+    def compute_partials(self, inputs, partials):
+        for i in range(self.n_inputs):
+            size = self._var_sizes['input'][self.comm.rank][self._var_allprocs_abs2idx[f"{self.pathname}.x{i+1}"]]
+            partials[f"y{i+1}", f"x{i+1}"] = 2*np.eye(size)
 
-class DynShapeGroupSeries(om.Group):
+
+class SeriesGroup(om.Group):
     # strings together some number of components in series.
     # component type is determined by comp_class
-    def __init__(self, n_comps, n_inputs, comp_class):
+    def __init__(self, n_comps, n_inputs, comp_class, src_indices=None, flat_src_indices=None):
         super().__init__()
         self.n_comps = n_comps
         self.n_inputs = n_inputs
         self.comp_class = comp_class
+        self.src_indices = src_indices
+        self.flat_src_indices = flat_src_indices
+        assert(src_indices is None or len(src_indices) == n_inputs)
 
+    def setup(self):
+        kwargs = {
+            'n_inputs': self.n_inputs,
+        }
+        if self.src_indices is not None:
+            kwargs['src_indices'] = self.src_indices
         for icmp in range(1, self.n_comps + 1):
-            self.add_subsystem(f"C{icmp}", self.comp_class(n_inputs=self.n_inputs))
+            self.add_subsystem(f"C{icmp}", self.comp_class(**kwargs))
 
         for icmp in range(1, self.n_comps):
             for i in range(1, self.n_inputs + 1):
-                self.connect(f"C{icmp}.y{i}", f"C{icmp+1}.x{i}")
+                if self.src_indices is None or self.src_indices[i-1] is None:
+                    src_indices = None
+                else:
+                    src_indices = self.src_indices[i-1]
+                self.connect(f"C{icmp}.y{i}", f"C{icmp+1}.x{i}", src_indices=src_indices,
+                             flat_src_indices=self.flat_src_indices)
 
 
 class DynShapeGroupConnectedInputs(om.Group):
@@ -344,9 +368,26 @@ class DynShapeGroupConnectedInputs(om.Group):
         self.n_inputs = n_inputs
         self.comp_class = comp_class
 
+    def setup(self):
         for icmp in range(1, self.n_comps + 1):
             self.add_subsystem(f"C{icmp}", self.comp_class(n_inputs=self.n_inputs),
                                promotes_inputs=['*'])
+
+
+class DynPartialsComp(om.ExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape_by_conn=True, copy_shape='y')
+        self.add_output('y', shape_by_conn=True, copy_shape='x')
+
+    def setup_partials(self):
+        size = self._get_var_meta('x', 'size')
+        self.mat = np.eye(size) * 3.
+        rng = np.arange(size)
+        self.declare_partials('y', 'x', rows=rng, cols=rng, val=3.0)
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.mat.dot(inputs['x'])
+
 
 
 class TestDynShapes(unittest.TestCase):
@@ -389,11 +430,11 @@ class TestDynShapes(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*4)
 
     def test_baseline_series(self):
-        # this is just a sized source and unsized sink, and we put a DynShapeGroupSeries in between them
+        # this is just a sized source and unsized sink, and we put a SeriesGroup in between them
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         indep.add_output('x2', val=np.ones((4,2)))
-        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
+        p.model.add_subsystem('Gdyn', SeriesGroup(3, 2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   x2={'shape_by_conn': True, 'copy_shape': 'y2'},
@@ -408,12 +449,33 @@ class TestDynShapes(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y1'], np.ones((2,3))*16)
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*16)
 
+    def test_baseline_series_src_indices(self):
+        # this is just a sized source and unsized sink, and we put a SeriesGroup in between them
+        p = om.Problem()
+        indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones(6)))
+        indep.add_output('x2', val=np.ones(8))
+        p.model.add_subsystem('Gdyn', SeriesGroup(2, 2, DynShapeComp,
+                                                          src_indices=[om.slicer[:-2], om.slicer[2:]]))
+        p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
+                                                  x1={'shape_by_conn': True, 'copy_shape': 'y1'},
+                                                  x2={'shape_by_conn': True, 'copy_shape': 'y2'},
+                                                  y1={'shape_by_conn': True, 'copy_shape': 'x1'},
+                                                  y2={'shape_by_conn': True, 'copy_shape': 'x2'}))
+        p.model.connect('Gdyn.C2.y1', 'sink.x1')
+        p.model.connect('Gdyn.C2.y2', 'sink.x2')
+        p.model.connect('indep.x1', 'Gdyn.C1.x1')
+        p.model.connect('indep.x2', 'Gdyn.C1.x2')
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p['sink.y1'], np.ones(4)*8)
+        np.testing.assert_allclose(p['sink.y2'], np.ones(6)*8)
+
     def test_copy_shape_out_out(self):
         # test copy_shape from output to output
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         indep.add_output('x2', val=np.ones((2,3)))
-        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
+        p.model.add_subsystem('Gdyn', SeriesGroup(3, 2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   x2={'shape_by_conn': True, 'copy_shape': 'y2'},
@@ -433,7 +495,7 @@ class TestDynShapes(unittest.TestCase):
         p = om.Problem()
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         indep.add_output('x2', val=np.ones((2,3)))
-        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
+        p.model.add_subsystem('Gdyn', SeriesGroup(3, 2, DynShapeComp))
         p.model.add_subsystem('comp', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'copy_shape': 'x2'},
                                                   x2={'copy_shape': 'x1', 'shape_by_conn': True,},
@@ -478,15 +540,15 @@ class TestDynShapes(unittest.TestCase):
             p.setup()
             p.final_setup()
 
-        msg = "\nCollected errors for problem 'copy_shape_in_in_unresolvable':\n   <model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'comp.x1'. The source shape is (2, 3) but the target shape is None.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x2' to 'comp.x2'. The source shape is (2, 3) but the target shape is None."
+        msg = "\nCollected errors for problem 'copy_shape_in_in_unresolvable':\n   <model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'comp.x1'. The source shape is (2, 3) but the target shape is None.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x2' to 'comp.x2'. The source shape is (2, 3) but the target shape is None."
         self.assertEqual(cm.exception.args[0], msg)
 
-    def test_mismatched_dyn_shapes(self):
+    def test_mismatched_dyn_shapes_err(self):
         # this is a sized source and sink, but their sizes are incompatible
-        p = om.Problem(name='mismatched_dyn_shapes')
+        p = om.Problem(name='mismatched_dyn_shapes_err')
         indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
         indep.add_output('x2', val=np.ones((4,2)))
-        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3, 2, DynShapeComp))
+        p.model.add_subsystem('Gdyn', SeriesGroup(3, 2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1=np.ones((2,3)),
                                                   x2=np.ones((3,2)),
@@ -496,13 +558,13 @@ class TestDynShapes(unittest.TestCase):
         p.model.connect('Gdyn.C3.y2', 'sink.x2')
         p.model.connect('indep.x1', 'Gdyn.C1.x1')
         p.model.connect('indep.x2', 'Gdyn.C1.x2')
+        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.setup()
-            p.final_setup()
+            p.run_model()
 
-        self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'mismatched_dyn_shapes':"
-           "\n   <model> <class Group>: Shape mismatch, (4, 2) vs. (3, 2) for variables 'Gdyn.C2.x2' and 'Gdyn.C2.y2' during dynamic shape determination.")
+        msg = ("'Gdyn.C2' <class DynShapeComp>: Failed to set value of 'y2': could not broadcast input array from shape (4,2) into shape (3,2).")
+
+        self.assertEqual(cm.exception.args[0], msg)
 
     def test_baseline_conn_inputs(self):
         # this is a sized source and unsized sink, with a DynShapeGroupConnectedInputs between them
@@ -531,7 +593,7 @@ class TestDynShapes(unittest.TestCase):
         # test that the dynamic sizing reflects any changes that occur prior to 2nd call to setup.
         p = om.Problem()
         ninputs = 1
-        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(2, ninputs, DynShapeComp))
+        p.model.add_subsystem('Gdyn', SeriesGroup(2, ninputs, DynShapeComp))
         comp = p.model.add_subsystem('sink', ResizableComp(ninputs, 10, 3.))
         p.model.connect('Gdyn.C2.y1', 'sink.x1')
         p.setup()
@@ -545,11 +607,11 @@ class TestDynShapes(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y1'], np.ones(5)*12)
 
     def test_cycle_fwd_rev(self):
-        # now put the DynShapeGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
+        # now put the SeriesGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2). Sizes are known
         # at both ends of the model (the IVC and at the sink)
         p = om.Problem()
         # p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
-        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3,2, DynShapeComp))
+        p.model.add_subsystem('Gdyn', SeriesGroup(3,2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1=np.ones((2,3)),
                                                   x2=np.ones((4,2)),
@@ -571,10 +633,10 @@ class TestDynShapes(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*256)
 
     def test_cycle_rev(self):
-        # now put the DynShapeGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
+        # now put the SeriesGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
         # only the sink outputs are known and inputs are coming from auto_ivcs.
         p = om.Problem()
-        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3,2, DynShapeComp))
+        p.model.add_subsystem('Gdyn', SeriesGroup(3,2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1=np.ones((2,3)),
                                                   x2=np.ones((4,2)),
@@ -594,11 +656,11 @@ class TestDynShapes(unittest.TestCase):
         np.testing.assert_allclose(p['sink.y2'], np.ones((4,2))*256)
 
     def test_cycle_unresolved(self):
-        # now put the DynShapeGroupSeries in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
+        # now put the SeriesGroup in a cycle (sink.y2 feeds back into Gdyn.C1.x2), but here,
         # sink.y2 is unsized, so no var in the '2' loop can get resolved.
         p = om.Problem(name='cycle_unresolved')
         p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
-        p.model.add_subsystem('Gdyn', DynShapeGroupSeries(3,2, DynShapeComp))
+        p.model.add_subsystem('Gdyn', SeriesGroup(3,2, DynShapeComp))
         p.model.add_subsystem('sink', om.ExecComp('y1, y2 = x1*2, x2*2',
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   x2={'shape_by_conn': True, 'copy_shape': 'y2'},
@@ -616,7 +678,7 @@ class TestDynShapes(unittest.TestCase):
            "\nCollected errors for problem 'cycle_unresolved':"
            "\n   <model> <class Group>: Failed to resolve shapes for "
            "['Gdyn.C1.x2', 'Gdyn.C1.y2', 'Gdyn.C2.x2', 'Gdyn.C2.y2', 'Gdyn.C3.x2', 'Gdyn.C3.y2', "
-           "'sink.x2', 'sink.y2']. To see the dynamic shape dependency graph, do "
+           "'sink.x2', 'sink.y2']. To see the dynamic shapes dependency graph, do "
            "'openmdao view_dyn_shapes <your_py_file>'.")
 
     def test_bad_copy_shape_name(self):
@@ -626,14 +688,21 @@ class TestDynShapes(unittest.TestCase):
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   y1={'shape_by_conn': True, 'copy_shape': 'x11'}))
         p.model.connect('indep.x1', 'sink.x1')
+        p.setup()
+        expected_warnings = (
+            (om.OpenMDAOWarning, "<model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'."),
+            (om.OpenMDAOWarning, "<model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist or is not continuous.")
+        )
+
+        with assert_warnings(expected_warnings):
+            p.model._setup_dynamic_properties()
+
         with self.assertRaises(Exception) as cm:
-            p.setup()
             p.final_setup()
 
-        self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'bad_copy_shape_name':"
-           "\n   <model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist or is not continuous."
-           "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
+        self.assertEqual(cm.exception.args[0],
+                         "\nCollected errors for problem 'bad_copy_shape_name':"
+                         "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
 
     def test_unconnected_var_dyn_shape(self):
         p = om.Problem(name='unconnected_var_dyn_shape')
@@ -642,64 +711,69 @@ class TestDynShapes(unittest.TestCase):
                                                   x1={'shape_by_conn': True, 'copy_shape': 'y1'},
                                                   y1={'shape_by_conn': True}))
         p.model.connect('indep.x1', 'sink.x1')
+        p.setup()
+
+        expected_warnings = (
+            (om.OpenMDAOWarning, "<model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'."),
+        )
+
+        with assert_warnings(expected_warnings):
+            p.model._setup_dynamic_properties()
+
         with self.assertRaises(Exception) as cm:
-            p.setup()
             p.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'unconnected_var_dyn_shape':"
-           "\n   <model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'."
-           "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
+           "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestDistribDynShapes(unittest.TestCase):
+class TestRemoteDistribDynShapes(unittest.TestCase):
     N_PROCS = 4
 
-    def test_remote_distrib(self):
+    def _build_model(self, solve_dyn_fwd):
         # this test has remote distributed components (distributed comps under parallel groups)
-        p = om.Problem(name='remote_distrib')
+        p = om.Problem(name='remote_distrib_err')
         indep = p.model.add_subsystem('indep', om.IndepVarComp())
-        indep.add_output('x1', shape_by_conn=True)
+        if solve_dyn_fwd:
+            indep.add_output('x1', val=np.random.random(4))
+        else:
+            indep.add_output('x1', shape_by_conn=True)
 
         par = p.model.add_subsystem('par', om.ParallelGroup())
-        par.add_subsystem('G1', DynShapeGroupSeries(2,1, DistribDynShapeComp))
-        par.add_subsystem('G2', DynShapeGroupSeries(2,1, DistribDynShapeComp))
+        par.add_subsystem('G1', SeriesGroup(2,1, DistribDynShapeComp))
+        par.add_subsystem('G2', SeriesGroup(2,1, DistribDynShapeComp))
 
-        # 'sink' has a defined shape and dyn shapes propagate in reverse from there.
-        p.model.add_subsystem('sink', om.ExecComp(['y1=x1+x2'], shape=(8,)))
+        if solve_dyn_fwd:
+            p.model.add_subsystem('sink', om.ExecComp(['y1=x1+x2'], x1={'shape_by_conn': True},
+                                                      x2={'shape_by_conn': True},
+                                                      y1={'copy_shape': 'x1'}))
+        else:
+            p.model.add_subsystem('sink', om.ExecComp(['y1=x1+x2'], shape=(8,)))
+
         p.model.connect('indep.x1', ['par.G1.C1.x1', 'par.G2.C1.x1'])
         p.model.connect('par.G1.C2.y1', 'sink.x1', src_indices=om.slicer[:])
         p.model.connect('par.G2.C2.y1', 'sink.x2', src_indices=om.slicer[:])
+        return p
+
+    def test_remote_distrib_err(self):
+        # this test has remote distributed components (distributed comps under parallel groups)
+        p = self._build_model(solve_dyn_fwd=False)
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
             p.final_setup()
 
+        print(cm.exception.args[0])
+
         self.assertTrue(
-            "Collected errors for problem 'remote_distrib':\n"
-            "   'par.G1.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.G1.C1.x1'. They must be supplied manually.\n"
-            "   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'par.G1.C1.x1'. The source shape is (32,) but the target shape is (8,).\n"
-            "   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'par.G1.C2.y1' to 'sink.x1'. The target shape is (8,) but indices are shape (16,).\n"
-            "   <model> <class Group>: The source indices slice(None, None, 1) do not specify a valid shape for the connection 'par.G2.C2.y1' to 'sink.x2'. The target shape is (8,) but indices are shape (16,).\n"
-            "   'par.G2.C1' <class DistribDynShapeComp>: Can't determine src_indices automatically for input 'par.G2.C1.x1'. They must be supplied manually.\n"
-            "   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'par.G2.C1.x1'. The source shape is (32,) but the target shape is (8,)."
-           in str(cm.exception))
-
-
-class DynPartialsComp(om.ExplicitComponent):
-    def setup(self):
-        self.add_input('x', shape_by_conn=True, copy_shape='y')
-        self.add_output('y', shape_by_conn=True, copy_shape='x')
-
-    def setup_partials(self):
-        size = self._get_var_meta('x', 'size')
-        self.mat = np.eye(size) * 3.
-        rng = np.arange(size)
-        self.declare_partials('y', 'x', rows=rng, cols=rng, val=3.0)
-
-    def compute(self, inputs, outputs):
-        outputs['y'] = self.mat.dot(inputs['x'])
+            "Collected errors for problem 'remote_distrib_err':\n"
+            "   <model> <class Group>: Input 'sink.x1' has src_indices so the shape of connected output 'par.G1.C2.y1' cannot be determined.\n"
+            "   <model> <class Group>: Input 'sink.x2' has src_indices so the shape of connected output 'par.G2.C2.y1' cannot be determined.\n"
+            "   <model> <class Group>: Failed to resolve shapes for ['indep.x1', 'par.G1.C1.x1', 'par.G1.C1.y1', 'par.G1.C2.x1', 'par.G1.C2.y1', "
+            "'par.G2.C1.x1', 'par.G2.C1.y1', 'par.G2.C2.x1', 'par.G2.C2.y1']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+           in cm.exception.args[0])
 
 
 class TestDynShapeFeature(unittest.TestCase):
@@ -710,7 +784,7 @@ class TestDynShapeFeature(unittest.TestCase):
         p.model.add_subsystem('comp', DynPartialsComp())
         p.model.add_subsystem('sink', om.ExecComp('y=x',
                                                   x={'shape_by_conn': True, 'copy_shape': 'y'},
-                                                  y={'shape_by_conn': True, 'copy_shape': 'x'}))
+                                                  y={'copy_shape': 'x'}))
         p.model.connect('indeps.x', 'comp.x')
         p.model.connect('comp.y', 'sink.x')
         p.setup()
@@ -748,7 +822,7 @@ class TestDynShapeFeature(unittest.TestCase):
         p.model.add_subsystem('comp', PartialsComp())
         p.model.add_subsystem('sink', om.ExecComp('y=x',
                                                   x={'shape_by_conn': True, 'copy_shape': 'y'},
-                                                  y={'shape_by_conn': True, 'copy_shape': 'x'}))
+                                                  y={'copy_shape': 'x'}))
         p.model.connect('comp.y', 'sink.x')
         p.setup()
         p.run_model()
@@ -760,42 +834,32 @@ class DistCompDiffSizeKnownInput(om.ExplicitComponent):
     def setup(self):
         size = (self.comm.rank + 1) * 3
         self.add_input('x', val=np.random.random(size), distributed=True)
-
-
-class DistCompKnownInput(om.ExplicitComponent):
-    def setup(self):
-        size = 3
-        self.add_input('x', val=np.random.random(size), distributed=True)
+        self.add_output('y', val=np.zeros(size), distributed=True)
 
     def compute(self, inputs, outputs):
-        pass
+        outputs['y'] = inputs['x'] * 5
 
 
 class DistCompUnknownInput(om.ExplicitComponent):
     def setup(self):
         self.add_input('x', shape_by_conn=True, distributed=True)
+        self.add_output('y', copy_shape='x', distributed=True)
 
     def compute(self, inputs, outputs):
-        pass
+        outputs['y'] = inputs['x'] * 5
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-class TestDistribDynShapeCombos(unittest.TestCase):
+class TestDistribDynShapeCombosNoSrcInds(unittest.TestCase):
     """
     This will test the dynamic shaping on parallel runs with all of the possible
-    combinations of connections and dynamic shaping directions.
-
-    Here is a list of possible connections:
-
-    duplicated => duplicated
-    duplicated => distributed
-    distributed => duplicated
-    distributed => distributed
+    combinations of serial and distributed connections and dynamic shaping directions
+    without src_indices.
     """
 
     N_PROCS = 3
 
-    def test_ser_known_ser_unknown(self):
+    def test_serial_serial_fwd(self):
         p = om.Problem()
         indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', val=np.random.random(2))
@@ -805,9 +869,9 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.model.connect('indeps.x', 'comp.x')
         p.setup()
         p.run_model()
-        np.testing.assert_allclose(p.get_val('indeps.x'), p.get_val('comp.x'))
+        np.testing.assert_allclose(p.get_val('indeps.x')*2, p.get_val('comp.y'))
 
-    def test_ser_unknown_ser_known(self):
+    def test_serial_serial_rev(self):
         p = om.Problem()
         indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', shape_by_conn=True)
@@ -817,25 +881,56 @@ class TestDistribDynShapeCombos(unittest.TestCase):
         p.model.connect('indeps.x', 'comp.x')
         p.setup()
         p.run_model()
-        np.testing.assert_allclose(p.get_val('indeps.x'), p.get_val('comp.x'))
+        np.testing.assert_allclose(p.get_val('indeps.x')*2, p.get_val('comp.y'))
 
-    def test_ser_unknown_dist_known_err(self):
-        p = om.Problem(name='ser_unknown_dist_known_err')
+    def test_dist_dist_fwd(self):
+        p = om.Problem()
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
+        sizes = [3,0,5]
+        indeps.add_output('x', np.random.random(sizes[p.comm.rank]), distributed=True)
+        p.model.add_subsystem('comp', DistCompUnknownInput())
+        p.model.connect('indeps.x', 'comp.x')
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p.get_val('indeps.x')*5, p.get_val('comp.y'))
+        np.testing.assert_allclose(p.get_val('indeps.x', get_remote=True)*5, p.get_val('comp.y', get_remote=True))
+
+    def test_dist_dist_rev(self):
+        p = om.Problem()
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
+        indeps.add_output('x', shape_by_conn=True, distributed=True)
+        p.model.add_subsystem('comp', DistCompDiffSizeKnownInput())
+        p.model.connect('indeps.x', 'comp.x')
+        p.setup()
+        p.run_model()
+        np.testing.assert_allclose(p.get_val('indeps.x')*5, p.get_val('comp.y'))
+        np.testing.assert_allclose(p.get_val('indeps.x', get_remote=True)*5, p.get_val('comp.y', get_remote=True))
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestDistribDynShapeComboNoSrcIndsErrs(unittest.TestCase):
+
+    N_PROCS = 3
+
+    def test_serial_dist_rev_err(self):
+        p = om.Problem(name='serial_dist_rev_err')
         indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', shape_by_conn=True)
         p.model.add_subsystem('comp', DistCompDiffSizeKnownInput())
         p.model.connect('indeps.x', 'comp.x')
+        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.setup()
             p.final_setup()
-        self.assertEqual(cm.exception.args[0],
-           "\nCollected errors for problem 'ser_unknown_dist_known_err':"
-           "\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same size (sizes=[3 6 9])."
-           "\n   <model> <class Group>: Failed to resolve shapes for ['indeps.x']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-           "\n   'comp' <class DistCompDiffSizeKnownInput>: Can't determine src_indices automatically for input 'comp.x'. They must be supplied manually.")
 
-    def test_dist_known_ser_unknown(self):
-        p = om.Problem(name='dist_known_ser_unknown')
+        self.assertEqual(cm.exception.args[0],
+           "\nCollected errors for problem 'serial_dist_rev_err':"
+           "\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same shape (shapes=[(3,), (6,), (9,)])."
+           "\n   <model> <class Group>: Failed to resolve shapes for ['indeps.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+           "\n   'comp' <class DistCompDiffSizeKnownInput>: Can't determine src_indices automatically for input 'comp.x'. They must be supplied manually."
+           "\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indeps.x' to 'comp.x'. The source shape is (0,) but the target shape is (18,).")
+
+    def test_dist_serial_fwd_err(self):
+        p = om.Problem(name='dist_serial_fwd_err')
         indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', np.ones(3), distributed=True)
         p.model.add_subsystem('comp', om.ExecComp('y = x * 2',
@@ -846,13 +941,13 @@ class TestDistribDynShapeCombos(unittest.TestCase):
             p.setup()
             p.final_setup()
         self.assertEqual(cm.exception.args[0],
-            "\nCollected errors for problem 'dist_known_ser_unknown':"
-            "\n   <model> <class Group>: dynamic sizing of non-distributed input 'comp.x' from distributed output 'indeps.x' is not supported."
-            "\n   <model> <class Group>: Failed to resolve shapes for ['comp.x', 'comp.y']. To see the dynamic shape dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-            "\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to non-distributed input 'comp.x' without specifying src_indices.")
+            "\nCollected errors for problem 'dist_serial_fwd_err':\n"
+            "   <model> <class Group>: dynamic sizing of non-distributed input 'comp.x' from distributed output 'indeps.x' without src_indices is not supported.\n"
+            "   <model> <class Group>: Failed to resolve shapes for ['comp.x', 'comp.y']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n"
+            "   <model> <class Group>: Can't connect distributed output 'indeps.x' to non-distributed input 'comp.x' without specifying src_indices.")
 
-    def test_dist_unknown_ser_known(self):
-        p = om.Problem(name='dist_unknown_ser_known')
+    def test_dist_serial_rev_err(self):
+        p = om.Problem(name='dist_serial_rev_err')
         indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', distributed=True, shape_by_conn=True)
         p.model.add_subsystem('comp', om.ExecComp('y = x * 2', shape=3))
@@ -861,30 +956,10 @@ class TestDistribDynShapeCombos(unittest.TestCase):
             p.setup()
             p.final_setup()
         self.assertTrue(
-            "\nCollected errors for problem 'dist_unknown_ser_known':"
-            "\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to "
-            "non-distributed input 'comp.x' without specifying src_indices." in cm.exception.args[0])
-
-    def test_dist_known_dist_unknown(self):
-        p = om.Problem()
-        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
-        sizes = [3,0,5]
-        indeps.add_output('x', np.random.random(sizes[p.comm.rank]), distributed=True)
-        p.model.add_subsystem('comp', DistCompUnknownInput())
-        p.model.connect('indeps.x', 'comp.x')
-        p.setup()
-        p.run_model()
-        np.testing.assert_allclose(p.get_val('indeps.x'), p.get_val('comp.x'))
-
-    def test_dist_unknown_dist_known(self):
-        p = om.Problem()
-        indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
-        indeps.add_output('x', shape_by_conn=True, distributed=True)
-        p.model.add_subsystem('comp', DistCompDiffSizeKnownInput())
-        p.model.connect('indeps.x', 'comp.x')
-        p.setup()
-        p.run_model()
-        np.testing.assert_allclose(p.get_val('indeps.x'), p.get_val('comp.x'))
+            "\nCollected errors for problem 'dist_serial_rev_err':"
+            "\n   <model> <class Group>: Input 'comp.x' has src_indices so the shape of connected output 'indeps.x' cannot be determined."
+            "\n   <model> <class Group>: Failed to resolve shapes for ['indeps.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+            "\n   <model> <class Group>: Can't connect distributed output 'indeps.x' to non-distributed input 'comp.x' without specifying src_indices." in cm.exception.args[0])
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -1069,9 +1144,8 @@ class TestDynShapesWithInputConns(unittest.TestCase):
            "\n   <model> <class Group>: Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,).")
 
 
-
-
-class MMP(om.ExplicitComponent):
+class MatMatProd(om.ExplicitComponent):
+    # matrix matrix product comp with computed output shape
     def setup(self):
         self.add_input('M', shape_by_conn=True)
         self.add_input('N', shape_by_conn=True)
@@ -1093,9 +1167,9 @@ class TestComputeShape(unittest.TestCase):
         indep.add_output('P', val=np.random.random((5, 7)))
 
 
-        model.add_subsystem('C1', MMP())
-        model.add_subsystem('C2', MMP())
-        model.add_subsystem('C3', MMP())
+        model.add_subsystem('C1', MatMatProd())
+        model.add_subsystem('C2', MatMatProd())
+        model.add_subsystem('C3', MatMatProd())
 
         model.connect('indep.M', 'C1.M')
         model.connect('indep.N', 'C1.N')
@@ -1109,6 +1183,248 @@ class TestComputeShape(unittest.TestCase):
 
         self.assertEqual(model.C3._outputs['out'].shape, (3, 7))
 
+
+@unittest.skipIf(PETScVector is None, 'test requires PETSc')
+class TestDynShapeSrcIndices(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_serial_serial_fwd(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', val=np.ones((2, 3)))
+
+        model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                x={'shape_by_conn': True}, y={'copy_shape': 'x'}))
+
+        model.connect('indep.x', 'comp.x')
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.y'), np.ones((2, 3)) * 2)
+
+    def test_serial_serial_fwd_src_inds(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', val=np.ones((2, 3)))
+
+        model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                x={'shape_by_conn': True}, y={'copy_shape': 'x'}))
+
+        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:, [0,2]], flat_src_indices=False)
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.y'), np.ones((2, 2)) * 2)
+
+    def test_serial_dist_fwd(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', val=np.ones((2, 3)))
+
+        model.add_subsystem('comp', DistribDynShapeComp(n_inputs=1))
+
+        model.connect('indep.x', 'comp.x1')
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.y1', get_remote=False), np.ones((2, 3)) * 2)
+
+        # serial --> dist results in dist value in each proc being equivalent to the serial value,
+        # so the full dist value across 2 procs is (4, 3)
+        assert_near_equal(p.get_val('comp.y1', get_remote=True), np.ones((4, 3)) * 2)
+
+    def test_dist_serial_fwd_flat(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', val=np.ones((2, 3)), distributed=True)
+
+        model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                x={'shape_by_conn': True}, y={'copy_shape': 'x'}))
+
+        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:-3], flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.y'), np.ones((9,)) * 2)
+
+    def test_dist_serial_fwd_nonflat(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', val=np.ones((2, 3)), distributed=True)
+
+        model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                x={'shape_by_conn': True}, y={'copy_shape': 'x'}))
+
+        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:, [0,2]], flat_src_indices=False)
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.y'), np.ones((4,2)) * 2)
+
+    def test_dist_dist_fwd_nonflat(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        val = np.array([[2, 3, 2, 3],
+                        [2, 3, 2, 3]], dtype=float)
+        indep.add_output('x', val=val, distributed=True)
+
+        model.add_subsystem('comp', DistribDynShapeComp(n_inputs=1))  # comp multiplies by 2
+
+        if p.comm.rank == 0:
+            model.connect('indep.x', 'comp.x1', src_indices=om.slicer[:, [0,2]], flat_src_indices=False)
+        else:
+            model.connect('indep.x', 'comp.x1', src_indices=om.slicer[:, [1,3]], flat_src_indices=False)
+
+        p.setup()
+        p.run_model()
+        if p.comm.rank == 0:
+            assert_near_equal(p.get_val('comp.y1', get_remote=False), np.ones((4, 2)) * 4)
+        else:
+            assert_near_equal(p.get_val('comp.y1', get_remote=False), np.ones((4, 2)) * 6)
+
+        global_val = np.ones((8, 2))
+        global_val[:4] *= 4
+        global_val[4:] *= 6
+        assert_near_equal(p.get_val('comp.y1', get_remote=True), global_val)
+
+    def test_dist_dist_fwd_flat(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        if p.comm.rank == 0:
+            val = np.array([2,2,2,2], dtype=float)
+        else:
+            val = np.array([3,3,3,3], dtype=float)
+        indep.add_output('x', val=val, distributed=True)
+
+        model.add_subsystem('comp', DistribDynShapeComp(n_inputs=1))  # comp multiplies by 2
+
+        if p.comm.rank == 0:
+            model.connect('indep.x', 'comp.x1', src_indices=om.slicer[4:], flat_src_indices=True)
+        else:
+            model.connect('indep.x', 'comp.x1', src_indices=om.slicer[:4], flat_src_indices=True)
+
+        p.setup()
+        p.run_model()
+        if p.comm.rank == 0:
+            assert_near_equal(p.get_val('comp.y1', get_remote=False), np.ones(4) * 6)
+        else:
+            assert_near_equal(p.get_val('comp.y1', get_remote=False), np.ones(4) * 4)
+
+        global_val = np.ones((8,))
+        global_val[:4] *= 6
+        global_val[4:] *= 4
+        assert_near_equal(p.get_val('comp.y1', get_remote=True), global_val)
+
+    def test_serial_serial_rev(self):
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', shape_by_conn=True)
+
+        model.add_subsystem('comp', om.ExecComp('y = x * 2',
+                                                x={'copy_shape': 'y'}, y={'shape_by_conn': True}))
+        model.add_subsystem('sink', om.ExecComp('y = x', shape=(2,3)))
+
+        model.connect('indep.x', 'comp.x')
+        model.connect('comp.y', 'sink.x')
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('indep.x'), np.ones((2, 3)))
+
+    def test_serial_dist_rev(self):
+
+        class MyDistComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', distributed=True, shape=(2,3))
+                self.add_output('y', distributed=True, shape=(2,3))
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] * 2.
+
+        p = om.Problem()
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', shape_by_conn=True)
+
+        model.add_subsystem('comp', MyDistComp())
+
+        model.connect('indep.x', 'comp.x')
+
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('indep.x'), np.ones((2, 3)))
+
+    def test_dist_serial_rev_err(self):
+
+        p = om.Problem(name='dist_serial')
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', shape_by_conn=True, distributed=True)
+
+        model.add_subsystem('comp', om.ExecComp('y=2*x', shape=(2,3)))
+
+        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:], flat_src_indices=False)
+
+        p.setup()
+
+        with self.assertRaises(Exception) as cm:
+            p.final_setup()
+
+        # just make sure we still get a clear error msg
+
+        self.assertEqual(cm.exception.args[0],
+           "\nCollected errors for problem 'dist_serial':"
+           "\n   <model> <class Group>: Input 'comp.x' has src_indices so the shape of connected output 'indep.x' cannot be determined."
+           "\n   <model> <class Group>: Failed to resolve shapes for ['indep.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
+
+    def test_dist_dist_rev_err(self):
+        class MyDistComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', distributed=True, shape=(2,3))
+                self.add_output('y', distributed=True, shape=(2,3))
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = inputs['x'] * 2.
+
+        p = om.Problem(name='dist_dist')
+        model = p.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp())
+        indep.add_output('x', shape_by_conn=True, distributed=True)
+
+        model.add_subsystem('comp', MyDistComp())
+        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:, [0,2]])
+
+        p.setup()
+
+        with self.assertRaises(Exception) as cm:
+            p.final_setup()
+
+        # just make sure we still get a clear error msg
+
+        self.assertEqual(cm.exception.args[0],
+           "\nCollected errors for problem 'dist_dist':"
+           "\n   <model> <class Group>: Input 'comp.x' has src_indices so the shape of connected output 'indep.x' cannot be determined."
+           "\n   <model> <class Group>: Failed to resolve shapes for ['indep.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
+           "\n   <model> <class Group>: When connecting 'indep.x' to 'comp.x': Can't set source shape to (0,) because indexer (slice(None, None, None), [0, 2]) expects 2 dimensions.")
 
 
 @unittest.skipUnless(MPI and  PETScVector and sys.version_info >= (3, 9), "MPI, PETSc, and python 3.9+ are required.")
