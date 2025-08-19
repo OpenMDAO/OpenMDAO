@@ -43,6 +43,27 @@ _base_display_map = {
 }
 
 
+def escape_dot_label(label_string):
+    """
+    Escapes special characters in a string to be used as a label in a DOT graph.
+
+    Graphviz/DOT requires certain characters to be escaped when they appear
+    within string literals (labels, node names, etc.) to avoid syntax errors.
+
+    Parameters
+    ----------
+    label_string : str
+        The string to escape.
+
+    Returns
+    -------
+    str
+        The escaped string suitable for a DOT label.
+    """
+    escaped_string = label_string.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    return escaped_string.replace("\r", "\\r").replace("<", "\\<").replace(">", "\\>")
+
+
 class GraphViewer(object):
     """
     A class for viewing the model hierarchy and connections in a group.
@@ -860,8 +881,8 @@ def _graph_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    def _view_graph(problem):
-        group = problem.model._get_subsystem(options.group) if options.group else problem.model
+    def _view_graph(model):
+        group = model._get_subsystem(options.group) if options.group else model
         if not options.auto_ivc:
             exclude = {'_auto_ivc'}
         else:
@@ -872,5 +893,11 @@ def _graph_cmd(options, user_args):
                                        outfile=options.outfile)
 
     # register the hooks
-    hooks._register_hook('final_setup', 'Problem', post=_view_graph, exit=True)
+    def _set_dyn_hook(prob):
+        hooks._register_hook('_setup_part2', class_name='Group', inst_id=None,
+                             post=_view_graph, exit=True)
+        hooks._setup_hooks(prob.model)
+
+    # register the hooks
+    hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook, ncalls=1)
     _load_and_exec(options.file[0], user_args)

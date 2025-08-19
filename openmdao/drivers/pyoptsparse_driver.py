@@ -166,9 +166,6 @@ class pyOptSparseDriver(Driver):
         Used internally to control when to return NANs for a bad evaluation.
     _check_jac : bool
         Used internally to control when to perform singular checks on computed total derivs.
-    _exc_info : 3 item tuple
-        Storage for exception and traceback information for exception that was raised in the
-        _objfunc or _gradfunc callbacks.
     _in_user_function :bool
         This is set to True at the start of a pyoptsparse callback to _objfunc and _gradfunc, and
         restored to False at the finish of each callback.
@@ -232,7 +229,6 @@ class pyOptSparseDriver(Driver):
         self._user_termination_flag = False
         self._in_user_function = False
         self._check_jac = False
-        self._exc_info = None
         self._total_jac_format = 'dict'
         self._total_jac_sparsity = None
         self._model_ran = False
