@@ -17,7 +17,7 @@ try:
         CustomJS,
         Div,
         ScrollBox,
-        SingleIntervalTicker,
+        BasicTicker,
     )
 
     from bokeh.models.tools import (
@@ -110,6 +110,12 @@ if (typeof window.ColorManager === 'undefined') {{
 // Get the toggle that triggered the callback
 const toggle = cb_obj;
 const index = toggles.indexOf(toggle);
+
+
+console.log("toggle", toggle);
+console.log("index", index);
+
+
 // index value of 0 is for the objective variable whose axis
 // is on the left. The index variable really refers to the list of toggle buttons.
 // The axes list variable only is for desvars and cons, whose axes are on the right.
@@ -118,6 +124,19 @@ const index = toggles.indexOf(toggle);
 // Set line visibility
 lines[index].visible = toggle.active;
 
+// Set cons_violation_indicators visibility
+var index_cons;
+if (index > num_desvars) {{
+    const index_cons = index - num_desvars - 1;
+    console.log(index_cons);
+    console.log(lower_bound_violation_indicators);
+    console.log(upper_bound_violation_indicators);
+
+    lower_bound_violation_indicators[index_cons].visible = toggle.active;
+    upper_bound_violation_indicators[index_cons].visible = toggle.active;
+   
+}}
+
 // Set axis visibility if it exists (all except first line)
 if (index > 0 && index-1 < axes.length) {{
     axes[index-1].visible = toggle.active;
@@ -125,8 +144,14 @@ if (index > 0 && index-1 < axes.length) {{
 
 let variable_name = cb_obj.label;
 // if turning on, get a color and set the line, axis label, and toggle button to that color
+
+console.log("calling if");
+
+console.log("toggle.active", toggle.active);
 if (toggle.active) {{
     let color = window.colorManager.getColor(variable_name);
+    
+    console.log("color", color);
 
     if (index > 0) {{
         axes[index-1].axis_label_text_color = color
@@ -272,14 +297,22 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             case_tracker, callback_period, doc, pid_of_calling_script, script
         )
 
-        # self._source = None
         self._lines = []
-        self._toggles = []
-        self._column_items = []
+        self._toggles = []  # includes only the toggle buttons
+        self._column_items = [] # includes all items in the Column, including headers and toggles
         self._axes = []
         # flag to prevent updating label with units each time we get new data
         self._labels_updated_with_units = False
-        # self._source_stream_dict = None
+
+        # user for showing which constraint points are out of bounds
+        self._lower_bounds_cons_source = None
+        self._upper_bounds_cons_source = None
+        self._constraint_bounds = {}
+        self._lower_bound_violation_indicators = []
+        self._upper_bound_violation_indicators = []
+        self._num_desvars = 0
+        self._up_arrow_image_path = "./images/up_arrow_small.png"
+        self._down_arrow_image_path = "./images/down_arrow_small.png"
 
         self._setup_figure()
 
@@ -309,6 +342,12 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 #   lines will not change color because of the set_value hack done to get
                 #   get around the bug in setting the line color from JavaScript
                 self._source.stream(self._source_stream_dict)
+                self._lower_bounds_cons_source.stream(
+                    self._lower_bounds_cons_source_stream_dict
+                )
+                self._upper_bounds_cons_source.stream(
+                    self._upper_bounds_cons_source_stream_dict
+                )
             return
 
         new_data = self._case_tracker._get_data_from_case(new_case)
@@ -334,6 +373,9 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 args=dict(
                     lines=self._lines,
                     axes=self._axes,
+                    lower_bound_violation_indicators=self._lower_bound_violation_indicators,
+                    upper_bound_violation_indicators=self._upper_bound_violation_indicators,
+                    num_desvars=self._num_desvars,
                     toggles=self._toggles,
                     colorPalette=_colorPalette,
                     plot=self.plot_figure,
@@ -414,6 +456,9 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 value = new_data["cons"][cons_name]
                 float_value = _get_value_for_plotting(value, "cons")
                 self._make_axis("cons", cons_name, float_value, units)
+                self._constraint_bounds[cons_name] = (
+                    self._case_tracker._get_constraint_bounds(cons_name)
+                )
 
             # Create a Column of the variable buttons and headers inside a scrolling window
             toggle_column = Column(
@@ -468,6 +513,17 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         counter = new_data["counter"]
 
         self._source_stream_dict = {"iteration": [counter]}
+        
+        # need separate sources to be able to plot the icons indicating the cons
+        # are out of bounds
+        self._lower_bounds_cons_source_stream_dict = {
+            "iteration": [counter],
+            "urls": [self._up_arrow_image_path],
+        }
+        self._upper_bounds_cons_source_stream_dict = {
+            "iteration": [counter],
+            "urls": [self._down_arrow_image_path],
+        }
 
         iline = 0
         for obj_name, obj_value in new_data["objs"].items():
@@ -507,6 +563,19 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 units = self._case_tracker._get_units(cons_name)
                 self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
             self._source_stream_dict[cons_name] = [float_cons_value]
+
+            lower_bound, upper_bound = self._constraint_bounds[cons_name]
+            if float_cons_value < lower_bound:
+                self._lower_bounds_cons_source_stream_dict[cons_name] = [float_cons_value]
+            else:
+                self._lower_bounds_cons_source_stream_dict[cons_name] = [np.nan]
+            if float_cons_value > upper_bound:
+                self._upper_bounds_cons_source_stream_dict[cons_name] = [float_cons_value]
+            else:
+                self._upper_bounds_cons_source_stream_dict[cons_name] = [np.nan]
+            min_max_changed = _update_y_min_max(
+                cons_name, float_cons_value, self._y_min, self._y_max)
+
             min_max_changed = _update_y_min_max(
                 cons_name, float_cons_value, self._y_min, self._y_max
             )
@@ -515,6 +584,9 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 self.plot_figure.extra_y_ranges[f"extra_y_{cons_name}"] = range
             iline += 1
         self._source.stream(self._source_stream_dict)
+        self._lower_bounds_cons_source.stream(self._lower_bounds_cons_source_stream_dict)
+        self._upper_bounds_cons_source.stream(self._upper_bounds_cons_source_stream_dict)
+
         self._labels_updated_with_units = True
         # end of _update method
 
@@ -531,13 +603,32 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         for desvar_name in desvar_names:
             self._source_dict[f"{desvar_name}_min"] = []
             self._source_dict[f"{desvar_name}_max"] = []
+            self._num_desvars += 1
 
         # Cons
         con_names = self._case_tracker._get_cons_names()
+
         for con_name in con_names:
             self._source_dict[con_name] = []
-
         self._source = ColumnDataSource(self._source_dict)
+
+        # Cons - lower bound
+        self._lower_bounds_cons_source_dict = {
+            "iteration": [],
+            "urls": [],
+        }
+        for con_name in con_names:
+            self._lower_bounds_cons_source_dict[con_name] = []
+        self._lower_bounds_cons_source = ColumnDataSource(self._lower_bounds_cons_source_dict)
+
+        # Cons - upper bound
+        self._upper_bounds_cons_source_dict = {
+            "iteration": [],
+            "urls": [],
+        }
+        for con_name in con_names:
+            self._upper_bounds_cons_source_dict[con_name] = []
+        self._upper_bounds_cons_source = ColumnDataSource(self._upper_bounds_cons_source_dict)
 
     def _make_variable_button(self, varname, color, active, callback):
         toggle = Toggle(
@@ -546,7 +637,19 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             margin=(0, 0, 8, 0),
         )
         toggle.js_on_change("active", callback)
+        
+        
+        
+        
+        
         self._toggles.append(toggle)
+
+
+        print(f"{varname=} {len(self._toggles)=}")
+
+
+
+
         self._column_items.append(toggle)
 
         # Add custom CSS styles for both active and inactive states
@@ -590,11 +693,33 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 color=color,
                 visible=visible,
             )
+            if var_type == "cons":
+                lower_bound_violation_indicator = self.plot_figure.image_url(
+                    url="urls",
+                    x="iteration",
+                    y=y_name,
+                    anchor="center",
+                    source=self._lower_bounds_cons_source,
+                    visible=visible,
+                )
+                upper_bound_violation_indicator = self.plot_figure.image_url(
+                    url="urls",
+                    x="iteration",
+                    y=y_name,
+                    anchor="center",
+                    source=self._upper_bounds_cons_source,
+                    visible=visible,
+                )
+
+                self._lower_bound_violation_indicators.append(lower_bound_violation_indicator)
+                self._upper_bound_violation_indicators.append(upper_bound_violation_indicator)
 
         if var_type == "desvars":
             line.y_range_name = f"extra_y_{varname}_min"
         elif var_type == "cons":
             line.y_range_name = f"extra_y_{varname}"
+            lower_bound_violation_indicator.y_range_name = f"extra_y_{varname}"
+            upper_bound_violation_indicator.y_range_name = f"extra_y_{varname}"
         self._lines.append(line)
         if not use_varea:  # hover tool does not work with Varea
             hover = HoverTool(
@@ -652,7 +777,9 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             active_tap=None,
             output_backend="webgl",
         )
+        self.plot_figure.x_range.start = 1
         self.plot_figure.x_range.follow = "start"
+
         self.plot_figure.title.text_font_size = "14px"
         self.plot_figure.title.text_color = "black"
         self.plot_figure.title.text_font = "arial"
@@ -661,7 +788,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
 
         self.plot_figure.xaxis.axis_label = "Driver iterations"
         self.plot_figure.xaxis.minor_tick_line_color = None
-        self.plot_figure.xaxis.ticker = SingleIntervalTicker(interval=1)
+        self.plot_figure.xaxis.ticker = BasicTicker(desired_num_ticks=10, min_interval=1)
 
         self.plot_figure.axis.axis_label_text_font_style = "bold"
         self.plot_figure.axis.axis_label_text_font_size = "20pt"
