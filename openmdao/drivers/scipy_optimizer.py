@@ -122,8 +122,6 @@ class ScipyOptimizeDriver(Driver):
     _grad_cache : {}
         Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
         function.
-    _exc_info : 3 item tuple
-        Storage for exception and traceback information.
     _obj_and_nlcons : list
         List of objective + nonlinear constraints. Used to compute total derivatives
         for all except linear constraints.
@@ -170,7 +168,6 @@ class ScipyOptimizeDriver(Driver):
         self.fail = False
         self.iter_count = 0
         self._check_jac = False
-        self._exc_info = None
         self._total_jac_format = 'array'
 
         self.cite = CITATIONS
@@ -292,6 +289,9 @@ class ScipyOptimizeDriver(Driver):
             size = desvar['global_size'] if desvar['distributed'] else desvar['size']
             ndesvar += size
         x_init = np.empty(ndesvar)
+
+        if ndesvar == 0:
+            raise RuntimeError('Problem has no design variables.')
 
         # Initial Design Vars
         i = 0
@@ -595,21 +595,6 @@ class ScipyOptimizeDriver(Driver):
 
         return self.fail
 
-    def _update_design_vars(self, x_new):
-        """
-        Update the design variables in the model.
-
-        Parameters
-        ----------
-        x_new : ndarray
-            Array containing input values at new design point.
-        """
-        i = 0
-        for name, meta in self._designvars.items():
-            size = meta['size']
-            self.set_design_var(name, x_new[i:i + size])
-            i += size
-
     def _objfunc(self, x_new):
         """
         Evaluate and return the objective function.
@@ -639,7 +624,7 @@ class ScipyOptimizeDriver(Driver):
 
             self._desvar_array_cache[:] = x_new
 
-            self._update_design_vars(x_new)
+            self._scipy_update_design_vars(x_new)
 
             with RecordingDebugging(self._get_name(), self.iter_count, self):
                 self.iter_count += 1
@@ -848,14 +833,6 @@ class ScipyOptimizeDriver(Driver):
             return -grad[grad_idx, :]
         else:
             return grad[grad_idx, :]
-
-    def _reraise(self):
-        """
-        Reraise any exception encountered when scipy calls back into our method.
-        """
-        exc_info = self._exc_info
-        self._exc_info = None  # clear since we're done with it
-        raise exc_info[1].with_traceback(exc_info[2])
 
 
 def signature_extender(fcn, extra_args):
