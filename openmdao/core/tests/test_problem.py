@@ -2499,8 +2499,6 @@ class TestProblem(unittest.TestCase):
             self.assertTrue(failed)
 
     def test_find_feasible_pinched_bounds(self):
-            import openmdao.api as om
-
             prob = om.Problem()
 
             c1 = om.ExecComp()
