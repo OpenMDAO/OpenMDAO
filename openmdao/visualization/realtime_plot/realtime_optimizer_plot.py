@@ -544,8 +544,18 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             if min_max_changed:
                 range = Range1d(self._y_min[desvar_name], self._y_max[desvar_name])
                 self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
-            self._source_stream_dict[f"{desvar_name}_min"] = [np.min(desvar_value)]
-            self._source_stream_dict[f"{desvar_name}_max"] = [np.max(desvar_value)]
+            # deal with when min and max are the same. 
+            # Otherwise the varea plot shows nothing, not even a line
+            if np.min(desvar_value) == np.max(desvar_value):
+                range = self._y_max[desvar_name] - self._y_min[desvar_name]
+                min_thickness = range * .001
+                y1 = np.min(desvar_value) - min_thickness
+                y2 = np.min(desvar_value) + min_thickness
+            else:
+                y1 = np.min(desvar_value)
+                y2 = np.max(desvar_value)
+            self._source_stream_dict[f"{desvar_name}_min"] = [y1]
+            self._source_stream_dict[f"{desvar_name}_max"] = [y2]
             iline += 1
 
         for cons_name, cons_value in new_data["cons"].items():
