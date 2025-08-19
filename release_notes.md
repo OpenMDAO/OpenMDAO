@@ -1,7 +1,7 @@
 ***********************************
 # Release Notes for OpenMDAO 3.40.0
 
-August 18, 2025
+August 19, 2025
 
 OpenMDAO 3.40.0 adds several significant features
 
