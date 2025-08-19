@@ -1,5 +1,5 @@
 """Define a base class for all Drivers in OpenMDAO."""
-from fnmatch import fnmatch
+from fnmatch import fnmatchcase
 import functools
 from itertools import chain
 import pprint
@@ -2262,7 +2262,7 @@ class Driver(object, metaclass=DriverMetaclass):
             problem.final_setup()
 
         desvar_vals = {dv: val for dv, val in self.get_design_var_values().items()
-                       if not any(fnmatch(dv, pat) for pat in exclude_desvars)}
+                       if not any(fnmatchcase(dv, pat) for pat in exclude_desvars)}
 
         # Size Problem
         ndesvar = 0
