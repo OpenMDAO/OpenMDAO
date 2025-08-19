@@ -125,7 +125,7 @@ if (index > num_desvars) {{
     const index_cons = index - num_desvars - 1;
     lower_bound_violation_indicators[index_cons].visible = toggle.active;
     upper_bound_violation_indicators[index_cons].visible = toggle.active;
-   
+
 }}
 
 // Set axis visibility if it exists (all except first line)
@@ -289,7 +289,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
 
         self._lines = []
         self._toggles = []  # includes only the toggle buttons
-        self._column_items = [] # includes all items in the Column, including headers and toggles
+        self._column_items = []  # includes all items in the Column, including headers and toggles
         self._axes = []
         # flag to prevent updating label with units each time we get new data
         self._labels_updated_with_units = False
@@ -503,7 +503,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         counter = new_data["counter"]
 
         self._source_stream_dict = {"iteration": [counter]}
-        
+
         # need separate sources to be able to plot the icons indicating the cons
         # are out of bounds
         self._lower_bounds_cons_source_stream_dict = {
@@ -560,8 +560,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             lower_value = float_cons_value if float_cons_value < lower_bound else np.nan
             upper_value = float_cons_value if float_cons_value > upper_bound else np.nan
             self._lower_bounds_cons_source_stream_dict[cons_name] = [lower_value]
-            self._upper_bounds_cons_source_stream_dict[cons_name] = [upper_value]                
-                
+            self._upper_bounds_cons_source_stream_dict[cons_name] = [upper_value]
+
             # handle non-scalar desvars
             min_max_changed = False
             min_max_changed = min_max_changed or _update_y_min_max(
