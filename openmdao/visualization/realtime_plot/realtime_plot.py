@@ -31,7 +31,7 @@ except ImportError:
 # the time between calls to the udpate method
 # if this is too small, the GUI interactions get delayed because
 # code is busy trying to keep up with the periodic callbacks
-_time_between_callbacks_in_ms = 1000
+_time_between_callbacks_in_ms = 100
 
 # Number of milliseconds for unused session lifetime
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10
