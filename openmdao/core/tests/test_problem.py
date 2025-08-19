@@ -2464,8 +2464,6 @@ class TestProblem(unittest.TestCase):
                                     assert_near_equal(prob.get_val('x'), 1.5, tolerance=1.0E-8)
 
     def test_find_feasible_no_feasible_solution(self):
-            import openmdao.api as om
-
             prob = om.Problem()
 
             c1 = om.ExecComp()
@@ -2530,8 +2528,6 @@ class TestProblem(unittest.TestCase):
             self.assertTrue(failed)
 
     def test_find_feasible_exclude_desvars(self):
-        import openmdao.api as om
-
         prob = om.Problem()
 
         c1 = om.ExecComp()

@@ -871,8 +871,6 @@ class TestDriver(unittest.TestCase):
             prob.final_setup()
 
     def test_no_desvars(self):
-        import openmdao.api as om
-
         prob = om.Problem()
 
         c1 = om.ExecComp()
