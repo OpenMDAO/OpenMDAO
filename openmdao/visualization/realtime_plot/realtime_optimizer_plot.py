@@ -111,11 +111,6 @@ if (typeof window.ColorManager === 'undefined') {{
 const toggle = cb_obj;
 const index = toggles.indexOf(toggle);
 
-
-console.log("toggle", toggle);
-console.log("index", index);
-
-
 // index value of 0 is for the objective variable whose axis
 // is on the left. The index variable really refers to the list of toggle buttons.
 // The axes list variable only is for desvars and cons, whose axes are on the right.
@@ -128,10 +123,6 @@ lines[index].visible = toggle.active;
 var index_cons;
 if (index > num_desvars) {{
     const index_cons = index - num_desvars - 1;
-    console.log(index_cons);
-    console.log(lower_bound_violation_indicators);
-    console.log(upper_bound_violation_indicators);
-
     lower_bound_violation_indicators[index_cons].visible = toggle.active;
     upper_bound_violation_indicators[index_cons].visible = toggle.active;
    
@@ -144,15 +135,8 @@ if (index > 0 && index-1 < axes.length) {{
 
 let variable_name = cb_obj.label;
 // if turning on, get a color and set the line, axis label, and toggle button to that color
-
-console.log("calling if");
-
-console.log("toggle.active", toggle.active);
 if (toggle.active) {{
     let color = window.colorManager.getColor(variable_name);
-    
-    console.log("color", color);
-
     if (index > 0) {{
         axes[index-1].axis_label_text_color = color
     }}
@@ -238,11 +222,17 @@ def _get_value_for_plotting(value_from_recorder, var_type):
         return 0.0
     if var_type == "cons":
         # plot the worst case value
-        return np.linalg.norm(value_from_recorder, ord=np.inf)
+        if value_from_recorder.size == 1:
+            return value_from_recorder.item()
+        else:
+            return np.linalg.norm(value_from_recorder, ord=np.inf)
     elif var_type == "objs":
         return value_from_recorder.item()  # get as scalar
     else:  # for desvars, use L2 norm
-        return np.linalg.norm(value_from_recorder)
+        if value_from_recorder.size == 1:
+            return value_from_recorder.item()
+        else:
+            return np.linalg.norm(value_from_recorder)
 
 
 def _make_header_text_for_variable_chooser(header_text):
@@ -543,6 +533,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 self._toggles[iline].label = (
                     f"{desvar_name} ({units}) {desvar_value.shape}"
                 )
+            # handle non-scalar desvars
             min_max_changed = False
             min_max_changed = min_max_changed or _update_y_min_max(
                 desvar_name, np.min(desvar_value), self._y_min, self._y_max
@@ -565,24 +556,25 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             self._source_stream_dict[cons_name] = [float_cons_value]
 
             lower_bound, upper_bound = self._constraint_bounds[cons_name]
-            if float_cons_value < lower_bound:
-                self._lower_bounds_cons_source_stream_dict[cons_name] = [float_cons_value]
-            else:
-                self._lower_bounds_cons_source_stream_dict[cons_name] = [np.nan]
-            if float_cons_value > upper_bound:
-                self._upper_bounds_cons_source_stream_dict[cons_name] = [float_cons_value]
-            else:
-                self._upper_bounds_cons_source_stream_dict[cons_name] = [np.nan]
-            min_max_changed = _update_y_min_max(
-                cons_name, float_cons_value, self._y_min, self._y_max)
-
-            min_max_changed = _update_y_min_max(
-                cons_name, float_cons_value, self._y_min, self._y_max
+            # if given np.nan, nothing will be plotted. Only plot arrows when out of bounds
+            lower_value = float_cons_value if float_cons_value < lower_bound else np.nan
+            upper_value = float_cons_value if float_cons_value > upper_bound else np.nan
+            self._lower_bounds_cons_source_stream_dict[cons_name] = [lower_value]
+            self._upper_bounds_cons_source_stream_dict[cons_name] = [upper_value]                
+                
+            # handle non-scalar desvars
+            min_max_changed = False
+            min_max_changed = min_max_changed or _update_y_min_max(
+                cons_name, np.min(cons_value), self._y_min, self._y_max
+            )
+            min_max_changed = min_max_changed or _update_y_min_max(
+                cons_name, np.max(cons_value), self._y_min, self._y_max
             )
             if min_max_changed:
                 range = Range1d(self._y_min[cons_name], self._y_max[cons_name])
                 self.plot_figure.extra_y_ranges[f"extra_y_{cons_name}"] = range
             iline += 1
+
         self._source.stream(self._source_stream_dict)
         self._lower_bounds_cons_source.stream(self._lower_bounds_cons_source_stream_dict)
         self._upper_bounds_cons_source.stream(self._upper_bounds_cons_source_stream_dict)
@@ -637,19 +629,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             margin=(0, 0, 8, 0),
         )
         toggle.js_on_change("active", callback)
-        
-        
-        
-        
-        
         self._toggles.append(toggle)
-
-
-        print(f"{varname=} {len(self._toggles)=}")
-
-
-
-
         self._column_items.append(toggle)
 
         # Add custom CSS styles for both active and inactive states
