@@ -21,6 +21,7 @@ try:
     from bokeh.application.application import Application
     from bokeh.application.handlers import FunctionHandler
     from tornado.ioloop import PeriodicCallback
+    from tornado.web import StaticFileHandler
 
     bokeh_and_dependencies_available = True
 except ImportError:
@@ -313,6 +314,11 @@ class _CaseRecorderTracker:
         cons = self._initial_case.get_constraints()
         return cons.keys()
 
+    def _get_constraint_bounds(self, name):
+        cons = self._initial_case.get_constraints()
+        var_info = cons._var_info[name]
+        return (var_info['lower'], var_info['upper'])
+
     def _get_units(self, name):
         try:
             units = self._initial_case._get_units(name)
@@ -378,6 +384,13 @@ def realtime_plot(case_recorder_filename, callback_period,
             {"/": Application(FunctionHandler(_make_realtime_plot_doc))},
             port=_port_number,
             unused_session_lifetime_milliseconds=_unused_session_lifetime_milliseconds,
+            extra_patterns=[
+                (
+                    "/images/(.*)",
+                    StaticFileHandler,
+                    {"path": os.path.normpath(os.path.dirname(__file__) + "/images/")},
+                ),
+            ],
         )
         server.start()
 
