@@ -870,6 +870,30 @@ class TestDriver(unittest.TestCase):
         with assert_warnings(expected_warnings):
             prob.final_setup()
 
+    def test_no_desvars(self):
+        prob = om.Problem()
+
+        c1 = om.ExecComp()
+        c1.add_expr('y = x1**2 - x2**2')
+        c1.add_expr('g1 = 2 * x1 + 5')
+        c1.add_expr('g2 = -2 * x1 - 5')
+        c1.add_expr('g3 = x2 - 5')
+
+        c1.add_objective('y')
+        c1.add_constraint('g1', lower=0)
+        c1.add_constraint('g2', lower=0)
+        c1.add_constraint('g3', lower=0)
+
+        prob.model.add_subsystem('c1', c1, promotes=['*'])
+        prob.setup()
+        prob.driver = om.ScipyOptimizeDriver()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_driver()
+
+        self.assertEqual(str(cm.exception), 'Problem has no design variables.')
+
+
 @use_tempdirs
 class TestCheckRelevance(unittest.TestCase):
     def setup_problem(self, driver=None):
