@@ -544,7 +544,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             if min_max_changed:
                 range = Range1d(self._y_min[desvar_name], self._y_max[desvar_name])
                 self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
-            # deal with when min and max are the same. 
+            # deal with when min and max are the same.
             # Otherwise the varea plot shows nothing, not even a line
             if np.min(desvar_value) == np.max(desvar_value):
                 range = self._y_max[desvar_name] - self._y_min[desvar_name]
