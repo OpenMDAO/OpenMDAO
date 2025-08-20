@@ -548,6 +548,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             # Otherwise the varea plot shows nothing, not even a line
             if np.min(desvar_value) == np.max(desvar_value):
                 range = self._y_max[desvar_name] - self._y_min[desvar_name]
+                # 0.001 seems to be a good fraction, not too thick but still visible
                 min_thickness = range * .001
                 y1 = np.min(desvar_value) - min_thickness
                 y2 = np.min(desvar_value) + min_thickness
