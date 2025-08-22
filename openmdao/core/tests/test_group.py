@@ -2369,6 +2369,30 @@ class TestGroupPromotes(unittest.TestCase):
         p.run_model()
         # If working correctly, no exception raised.
 
+    def test_connect_input_to_input(self):
+
+        # Create the problem
+        prob = om.Problem()
+
+        # Add the component
+        prob.model.add_subsystem('c1', om.ExecComp('y1 = a * x + b'))
+        prob.model.add_subsystem('c2', om.ExecComp('y2 = a * x ** 2 - b'))
+        prob.model.add_subsystem('c3', om.ExecComp('y3 = a * x ** 3 - b'))
+
+        prob.model.connect('c1.x', ['c2.x', 'c3.x'])
+        prob.model.connect('c1.a', ['c2.a', 'c3.a'])
+        prob.model.connect('c1.b', ['c2.b', 'c3.b'])
+
+        # Setup the problem
+        prob.setup()
+
+
+        # Run the optimization
+        prob.run_model()
+
+        prob.model.list_vars(list_autoivcs=True)
+
+
 
 class MyComp(om.ExplicitComponent):
     def __init__(self, input_shape, src_indices=None, flat_src_indices=False):

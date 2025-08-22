@@ -2202,15 +2202,18 @@ class Group(System):
         self._bad_conn_vars = set()
 
         # Add explicit connections (only ones declared by this group)
+        input_input_conns = {}
         for prom_in, (prom_out, src_indices, flat) in self._manual_connections.items():
-
+            msg = ''
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
             if not (is_prom(prom_out, 'output') or prom_out in allprocs_discrete_out):
                 if (is_prom(prom_out, 'input') or prom_out in allprocs_discrete_in):
-                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_out}' is an input. " + \
-                          "All connections must be from an output to an input."
+                    # msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
+                    #       f"'{prom_in}', but '{prom_out}' is an input. " + \
+                    #       "All connections must be from an output to an input."
+                    input_input_conns[prom_in] = (prom_out, src_indices, flat)
+                    continue
                 else:
                     guesses = get_close_matches(prom_out, list(resolver.prom_iter('output')) +
                                                 list(allprocs_discrete_out.keys()))
@@ -2218,9 +2221,10 @@ class Group(System):
                           f"'{prom_in}', but '{prom_out}' doesn't exist. Perhaps you meant " + \
                           f"to connect to one of the following outputs: {guesses}."
 
-                self._bad_conn_vars.update((prom_in, prom_out))
-                self._collect_error(msg)
-                continue
+                if msg:
+                    self._bad_conn_vars.update((prom_in, prom_out))
+                    self._collect_error(msg)
+                    continue
 
             if not (is_prom(prom_in, 'input') or prom_in in allprocs_discrete_in):
                 if (is_prom(prom_in, 'output') or prom_in in allprocs_discrete_out):
@@ -2335,6 +2339,12 @@ class Group(System):
 
         self._conn_global_abs_in2out = {name: srcs.pop()
                                         for name, srcs in global_abs_in2out.items()}
+
+        if input_input_conns:
+            print('found the following input-input connections')
+            print(input_input_conns)
+            print('the global connections are')
+            print(self._conn_global_abs_in2out)
 
     def get_indep_vars(self, local, include_discrete=False):
         """
