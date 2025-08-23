@@ -2141,6 +2141,7 @@ class Group(System):
             Dictionary of connections passed down from parent group.
         """
         global_abs_in2out = defaultdict(set)
+        global_abs_in2in = defaultdict(set)
 
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
@@ -2152,12 +2153,15 @@ class Group(System):
 
         pathname = self.pathname
 
+        abs_in2in = {}
         abs_in2out = {}
         new_conns = {}
 
         prefix = pathname + '.' if pathname else ''
         path_len = len(prefix)
 
+        # Any connections defined in a parent system but effectively within
+        # this system should be bookkept here.
         if parent_conns is not None:
             for abs_in, abs_out in parent_conns.items():
                 if abs_in.startswith(prefix) and abs_out.startswith(prefix):
@@ -2201,108 +2205,158 @@ class Group(System):
 
         self._bad_conn_vars = set()
 
+        # Now we do the manual connections in this group.
+        # First check for manual input-input connections and resolve them to an output
+        # if possible.
+        g = nx.DiGraph()
+        # Add all the connections from inputs to a graph.
+        input_srcs = set()
+        for prom_tgt, (prom_src, src_indices, flat) in self._manual_connections.items():
+            if (is_prom(prom_src, 'input') or prom_src in allprocs_discrete_in):
+                input_srcs.add(prom_src)
+                src_iotype = 'input'
+            else:
+                src_iotype = 'output'
+            g.add_edge(prom_src, prom_tgt)
+            g.nodes[prom_src]['iotype'] = src_iotype
+            g.nodes[prom_tgt]['iotype'] = 'input'
+
+        # Keep any chains of nodes that contain and input_to_input connection
+        sinks = [n for n in g.nodes() if g.out_degree(n) == 0]
+        inputs = {n for n, d in g.nodes(data=True) if d.get('iotype') == 'input'}
+        keep_nodes = set()
+        for sink in sinks:
+            predecessors = nx.ancestors(g, sink)
+            if predecessors.intersection(inputs):
+                keep_nodes.update(predecessors | {sink})
+        g = g.subgraph(keep_nodes).copy()
+
+        # pos = nx.shell_layout(g)
+        # color_map = {'input': 'lightgreen', 'output': 'lightcoral'}
+        # node_colors = [color_map[g.nodes[node]['iotype']] for node in g.nodes()]
+
+        # nx.draw(g, pos, with_labels=True, node_color=node_colors)
+        # import matplotlib.pyplot as plt
+        # plt.show()
+
+        # Detect cycles in input-to-input connections
+        if not nx.is_directed_acyclic_graph(g):
+            cycle_edges = nx.find_cycle(g, orientation='original')
+            errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}' for edge in cycle_edges])
+            self._collect_error(f'Cycle detected in input-to-input connections. This is not allowed.\n{errmsg}')
+
+        # Find the root node in each input-to-input connection chain
+        source_nodes = [node for node in g.nodes() if g.in_degree(node) == 0]
+        for src in source_nodes:
+            # Each descendent has its input set to the source node
+            for tgt in nx.descendants(g, src):
+                self._manual_connections[tgt] = (src, None, None)
+
         # Add explicit connections (only ones declared by this group)
-        input_input_conns = {}
-        for prom_in, (prom_out, src_indices, flat) in self._manual_connections.items():
+        for prom_tgt, (prom_src, src_indices, flat) in self._manual_connections.items():
             msg = ''
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
-            if not (is_prom(prom_out, 'output') or prom_out in allprocs_discrete_out):
-                if (is_prom(prom_out, 'input') or prom_out in allprocs_discrete_in):
-                    # msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                    #       f"'{prom_in}', but '{prom_out}' is an input. " + \
+            if not (is_prom(prom_src, 'output') or prom_src in allprocs_discrete_out):
+                if (is_prom(prom_src, 'input') or prom_src in allprocs_discrete_in):
+                    # msg = f"{self.msginfo}: Attempted to connect from '{prom_src}' to " + \
+                    #       f"'{prom_tgt}', but '{prom_src}' is an input. " + \
                     #       "All connections must be from an output to an input."
-                    input_input_conns[prom_in] = (prom_out, src_indices, flat)
-                    continue
+                    pass
                 else:
-                    guesses = get_close_matches(prom_out, list(resolver.prom_iter('output')) +
+                    guesses = get_close_matches(prom_src, list(resolver.prom_iter('output')) +
                                                 list(allprocs_discrete_out.keys()))
-                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_out}' doesn't exist. Perhaps you meant " + \
+                    msg = f"{self.msginfo}: Attempted to connect from '{prom_src}' to " + \
+                          f"'{prom_tgt}', but '{prom_src}' doesn't exist. Perhaps you meant " + \
                           f"to connect to one of the following outputs: {guesses}."
 
-                if msg:
-                    self._bad_conn_vars.update((prom_in, prom_out))
+                    self._bad_conn_vars.update((prom_tgt, prom_src))
                     self._collect_error(msg)
                     continue
 
-            if not (is_prom(prom_in, 'input') or prom_in in allprocs_discrete_in):
-                if (is_prom(prom_in, 'output') or prom_in in allprocs_discrete_out):
-                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_in}' is an output. " + \
-                          "All connections must be from an output to an input."
+            if not (is_prom(prom_tgt, 'input') or prom_tgt in allprocs_discrete_in):
+                if (is_prom(prom_tgt, 'output') or prom_tgt in allprocs_discrete_out):
+                    msg = f"{self.msginfo}: Attempted to connect from '{prom_src}' to " + \
+                          f"'{prom_tgt}', but '{prom_tgt}' is an output. " + \
+                          "The target of connections must be an input."
                 else:
-                    guesses = get_close_matches(prom_in, list(resolver.prom_iter('input')) +
+                    guesses = get_close_matches(prom_tgt, list(resolver.prom_iter('input')) +
                                                 list(allprocs_discrete_in.keys()))
-                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you meant " + \
+                    msg = f"{self.msginfo}: Attempted to connect from '{prom_src}' to " + \
+                          f"'{prom_tgt}', but '{prom_tgt}' doesn't exist. Perhaps you meant " + \
                           f"to connect to one of the following inputs: {guesses}."
 
-                self._bad_conn_vars.update((prom_in, prom_out))
+                self._bad_conn_vars.update((prom_tgt, prom_src))
                 self._collect_error(msg)
                 continue
 
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
             # and check if src_indices is defined in both connect and add_input.
-            abs_out = resolver.prom2abs(prom_out, 'output')
-            out_comp, _, _ = abs_out.rpartition('.')
-            out_subsys, _, _ = abs_out[path_len:].partition('.')
+            abs_src = resolver.prom2abs(prom_src)
+            src_comp, _, _ = abs_src.rpartition('.')
+            src_subsys, _, _ = abs_src[path_len:].partition('.')
 
-            for abs_in in resolver.absnames(prom_in, 'input'):
-                in_comp, _, _ = abs_in.rpartition('.')
-                if out_comp == in_comp:
+            for abs_tgt in resolver.absnames(prom_tgt, 'input'):
+                in_comp, _, _ = abs_tgt.rpartition('.')
+                if src_comp == in_comp:
                     self._collect_error(
                         f"{self.msginfo}: Output and input are in the same System for connection "
-                        f"from '{prom_out}' to '{prom_in}'.")
-                    self._bad_conn_vars.update((prom_in, prom_out))
+                        f"from '{prom_src}' to '{prom_tgt}'.")
+                    self._bad_conn_vars.update((prom_tgt, prom_src))
                     continue
 
                 if src_indices is not None:
-                    if abs_in in abs2meta:
-                        if abs_in not in abs_in2prom_info:
-                            abs_in2prom_info[abs_in] = [None] * (abs_in.count('.') + 1)
+                    if abs_tgt in abs2meta:
+                        if abs_tgt not in abs_in2prom_info:
+                            abs_in2prom_info[abs_tgt] = [None] * (abs_tgt.count('.') + 1)
                         # place a _PromotesInfo at the top level to handle the src_indices
-                        if abs_in2prom_info[abs_in][0] is None:
+                        if abs_in2prom_info[abs_tgt][0] is None:
                             try:
-                                abs_in2prom_info[abs_in][0] = _PromotesInfo(src_indices=src_indices,
-                                                                            flat=flat, prom=abs_in)
+                                abs_in2prom_info[abs_tgt][0] = _PromotesInfo(src_indices=src_indices,
+                                                                             flat=flat, prom=abs_tgt)
                             except Exception:
                                 type_exc, exc, tb = sys.exc_info()
                                 self._collect_error(
-                                    f"When connecting from '{prom_out}' to '{prom_in}': {exc}",
-                                    exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
-                                self._bad_conn_vars.update((prom_in, prom_out))
+                                    f"When connecting from '{prom_src}' to '{prom_tgt}': {exc}",
+                                    exc_type=type_exc, tback=tb, ident=(abs_src, abs_tgt))
+                                self._bad_conn_vars.update((prom_tgt, prom_src))
                                 continue
 
-                        meta = abs2meta[abs_in]
+                        meta = abs2meta[abs_tgt]
                         meta['manual_connection'] = True
                         meta['src_indices'] = src_indices
                         meta['flat_src_indices'] = flat
 
-                    src_ind_inputs.add(abs_in)
+                    src_ind_inputs.add(abs_tgt)
 
-                if abs_in in abs_in2out:
+                if abs_tgt in abs_in2out:
                     self._collect_error(
-                        f"{self.msginfo}: Input '{abs_in}' cannot be connected to '{abs_out}' "
-                        f"because it's already connected to '{abs_in2out[abs_in]}'.",
-                        ident=(abs_out, abs_in))
-                    self._bad_conn_vars.update((prom_in, prom_out))
+                        f"{self.msginfo}: Input '{abs_tgt}' cannot be connected to '{abs_src}' "
+                        f"because it's already connected to '{abs_in2out[abs_tgt]}'.",
+                        ident=(abs_src, abs_tgt))
+                    self._bad_conn_vars.update((prom_tgt, prom_src))
                     continue
 
-                abs_in2out[abs_in] = abs_out
+                if (is_prom(prom_src, 'input') or prom_src in allprocs_discrete_in):
+                    abs_in2in[abs_tgt] = abs_src
+                else:
+                    abs_in2out[abs_tgt] = abs_src
 
                 # if connection is contained in a subgroup, add to conns to pass down to subsystems.
-                if abs_in[path_len:].partition('.')[0] == out_subsys:
-                    if out_subsys not in new_conns:
-                        new_conns[out_subsys] = {abs_in: abs_out}
+                if abs_tgt[path_len:].partition('.')[0] == src_subsys:
+                    if src_subsys not in new_conns:
+                        new_conns[src_subsys] = {abs_tgt: abs_src}
                     else:
-                        new_conns[out_subsys][abs_in] = abs_out
+                        new_conns[src_subsys][abs_tgt] = abs_src
 
         # Compute global_abs_in2out by first adding this group's contributions,
         # then adding contributions from systems above/below, then allgathering.
         for tgt, src in abs_in2out.items():
             global_abs_in2out[tgt].add(src)
+
+        for tgt, src in abs_in2in.items():
+            global_abs_in2in[tgt].add(src)
 
         for subgroup in self._subgroups_myproc:
             if subgroup.name in new_conns:
@@ -2322,16 +2376,18 @@ class Group(System):
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
             # If running in parallel, allgather
             if self._gather_full_data():
-                raw = (global_abs_in2out, src_ind_inputs)
+                raw = (global_abs_in2out, src_ind_inputs, global_abs_in2in)
             else:
                 raw = ({}, ())
             gathered = self.comm.allgather(raw)
 
             all_src_ind_ins = set()
-            for myproc_global_abs_in2out, src_ind_ins in gathered:
+            for myproc_global_abs_in2out, src_ind_ins, myproc_global_abs_in2in in gathered:
                 for tgt, srcs in myproc_global_abs_in2out.items():
                     global_abs_in2out[tgt].update(srcs)
                 all_src_ind_ins.update(src_ind_ins)
+                for tgt, srcs in myproc_global_abs_in2in.items():
+                    global_abs_in2in[tgt].update(srcs)
             src_ind_inputs = all_src_ind_ins
 
         for inp in src_ind_inputs:
@@ -2339,12 +2395,8 @@ class Group(System):
 
         self._conn_global_abs_in2out = {name: srcs.pop()
                                         for name, srcs in global_abs_in2out.items()}
-
-        if input_input_conns:
-            print('found the following input-input connections')
-            print(input_input_conns)
-            print('the global connections are')
-            print(self._conn_global_abs_in2out)
+        self._conn_global_abs_in2in = {name: srcs.pop()
+                                       for name, srcs in global_abs_in2in.items()}
 
     def get_indep_vars(self, local, include_discrete=False):
         """
@@ -4818,8 +4870,9 @@ class Group(System):
         prom2auto = {}
         count = 0
         auto2tgt = {}
-        all_abs2meta = self._var_allprocs_abs2meta['input']
+        all_abs2meta = self._var_allprocs_abs2meta['input'] # all inputs in model
         conns = self._conn_global_abs_in2out
+        input_input_conns = self._conn_global_abs_in2in
         auto_conns = {}
         resolver = self._resolver
 
@@ -4837,15 +4890,21 @@ class Group(System):
                     raise RuntimeError(f'Distributed component input "{tgt}"'
                                        f'{promoted_as} is not connected.')
 
-            prom = resolver.abs2prom(tgt, 'input')
-            if prom in prom2auto:
+            prom_tgt = resolver.abs2prom(tgt, 'input')
+            # If the target is the target of an input-input connection
+            # treat change prom to refer to the source
+            if prom_tgt in input_input_conns:
+                prom_tgt = input_input_conns[prom_tgt]
+
+            if prom_tgt in prom2auto:
+                # we've already encountered this promoted name.
                 # multiple connected inputs w/o a src. Connect them to the same IVC
-                src = prom2auto[prom][0]
+                src = prom2auto[prom_tgt][0]
                 auto_conns[tgt] = src
             else:
                 src = f"_auto_ivc.v{count}"
                 count += 1
-                prom2auto[prom] = (src, tgt)
+                prom2auto[prom_tgt] = (src, tgt)
                 auto_conns[tgt] = src
 
             if src in auto2tgt:

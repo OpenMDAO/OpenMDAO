@@ -2369,28 +2369,55 @@ class TestGroupPromotes(unittest.TestCase):
         p.run_model()
         # If working correctly, no exception raised.
 
-    def test_connect_input_to_input(self):
+    def test_connect_input_to_input_chain(self):
+        """
+        Test the ability to connect an input to another input and use
+        auto_ivc as the source.
+        """
 
         # Create the problem
         prob = om.Problem()
 
         # Add the component
-        prob.model.add_subsystem('c1', om.ExecComp('y1 = a * x + b'))
+        prob.model.add_subsystem('c1', om.ExecComp('b = a * x'))
         prob.model.add_subsystem('c2', om.ExecComp('y2 = a * x ** 2 - b'))
         prob.model.add_subsystem('c3', om.ExecComp('y3 = a * x ** 3 - b'))
+        prob.model.add_subsystem('c4', om.ExecComp('y4 = y3 * a'))
+        prob.model.add_subsystem('c5', om.ExecComp('y5 = y4 * y2'))
 
-        prob.model.connect('c1.x', ['c2.x', 'c3.x'])
-        prob.model.connect('c1.a', ['c2.a', 'c3.a'])
-        prob.model.connect('c1.b', ['c2.b', 'c3.b'])
+        # Chain some connections from c1.x -> c2.x -> c3.x
+        prob.model.connect('c1.x', 'c2.x')
+        prob.model.connect('c2.x', 'c3.x')
+        # prob.model.connect('c3.x', 'c1.x')
+        prob.model.connect('c1.a', ['c2.a', 'c3.a', 'c4.a'])
+        prob.model.connect('c1.b', 'c2.b')
+        prob.model.connect('c2.b', 'c3.b')
+        prob.model.connect('c3.y3', 'c4.y3')
+        prob.model.connect('c4.y4', 'c5.y4')
+        prob.model.connect('c2.y2', 'c5.y2')
+
+        # There should be three outputs in the auto_ivc: x, a, an b.
 
         # Setup the problem
         prob.setup()
 
+        prob.set_val('c1.a', 5.)
+        prob.set_val('c1.x', 3.)
 
         # Run the optimization
         prob.run_model()
 
         prob.model.list_vars(list_autoivcs=True)
+
+        om.n2(prob)
+
+        assert_near_equal(prob.get_val('c1.b'), 5 * 3)
+        assert_near_equal(prob.get_val('c2.y2'), 5 * 3 ** 2 - 15)
+        assert_near_equal(prob.get_val('c3.y3'), 5 * 3 ** 3 - 15)
+
+        # om.n2(prob)
+
+    # Test input-input circular and input-input-input circular
 
 
 

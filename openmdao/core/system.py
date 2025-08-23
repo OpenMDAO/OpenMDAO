@@ -274,6 +274,10 @@ class System(object, metaclass=SystemMetaclass):
         across multiple processes.
     _vars_to_gather : dict
         Contains names of non-distributed variables that are remote on at least one proc in the comm
+    _conn_global_abs_in2in : {'abs_in': 'abs_in'}
+        Dictionary containing all explicit input-to-input connections (continuous and discrete)
+        owned by this system or any descendant system. The data is the same across all processors.
+        This is generated after we've resolved any chains that ultimately source an input to some output.
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections (continuous and discrete)
         owned by this system or any descendant system. The data is the same across all processors.
@@ -504,6 +508,7 @@ class System(object, metaclass=SystemMetaclass):
         self._responses = {}
         self._rec_mgr = RecordingManager()
 
+        self._conn_global_abs_in2in = {}
         self._conn_global_abs_in2out = {}
 
         self._static_subsystems_allprocs = {}
