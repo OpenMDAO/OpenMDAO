@@ -2131,6 +2131,63 @@ class Group(System):
         """
         return self._owned_output_sizes[self.comm.rank, self._var_allprocs_abs2idx[abs_name]]
 
+    def _update_manual_connections_for_input_to_input(self):
+        """
+        Handle any input-to-input manual connections.
+
+        Modify _manual_connections in-place so that input-to-input
+        connections have their source passed to the ultimate source
+        in their connection chain. This ultimate source will either
+        be an output in the model, or an unconnected input which will
+        ultimately become an autoivc output.
+        """
+        is_prom = self._resolver.is_prom
+        allprocs_discrete_in = self._var_allprocs_discrete['input']
+
+        g = nx.DiGraph()
+        # Add all the connections from inputs to a graph.
+        input_srcs = set()
+        for prom_tgt, (prom_src, src_indices, flat) in self._manual_connections.items():
+            if (is_prom(prom_src, 'input') or prom_src in allprocs_discrete_in):
+                input_srcs.add(prom_src)
+                src_iotype = 'input'
+            else:
+                src_iotype = 'output'
+            g.add_edge(prom_src, prom_tgt)
+            g.nodes[prom_src]['iotype'] = src_iotype
+            g.nodes[prom_tgt]['iotype'] = 'input'
+
+        # Keep any chains of nodes that contain and input_to_input connection
+        sinks = [n for n in g.nodes() if g.out_degree(n) == 0]
+        inputs = {n for n, d in g.nodes(data=True) if d.get('iotype') == 'input'}
+        keep_nodes = set()
+        for sink in sinks:
+            predecessors = nx.ancestors(g, sink)
+            if predecessors.intersection(inputs):
+                keep_nodes.update(predecessors | {sink})
+        g = g.subgraph(keep_nodes).copy()
+
+        # pos = nx.shell_layout(g)
+        # color_map = {'input': 'lightgreen', 'output': 'lightcoral'}
+        # node_colors = [color_map[g.nodes[node]['iotype']] for node in g.nodes()]
+
+        # nx.draw(g, pos, with_labels=True, node_color=node_colors)
+        # import matplotlib.pyplot as plt
+        # plt.show()
+
+        # Detect cycles in input-to-input connections
+        if not nx.is_directed_acyclic_graph(g):
+            cycle_edges = nx.find_cycle(g, orientation='original')
+            errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}' for edge in cycle_edges])
+            self._collect_error(f'Cycle detected in input-to-input connections. This is not allowed.\n{errmsg}')
+
+        # Find the root node in each input-to-input connection chain
+        source_nodes = [node for node in g.nodes() if g.in_degree(node) == 0]
+        for src in source_nodes:
+            # Each descendent has its input set to the source node
+            for tgt in nx.descendants(g, src):
+                self._manual_connections[tgt] = (src, None, None)
+
     def _setup_global_connections(self, parent_conns=None):
         """
         Compute dict of all connections between this system's inputs and outputs.
@@ -2207,50 +2264,10 @@ class Group(System):
 
         # Now we do the manual connections in this group.
         # First check for manual input-input connections and resolve them to an output
-        # if possible.
-        g = nx.DiGraph()
-        # Add all the connections from inputs to a graph.
-        input_srcs = set()
-        for prom_tgt, (prom_src, src_indices, flat) in self._manual_connections.items():
-            if (is_prom(prom_src, 'input') or prom_src in allprocs_discrete_in):
-                input_srcs.add(prom_src)
-                src_iotype = 'input'
-            else:
-                src_iotype = 'output'
-            g.add_edge(prom_src, prom_tgt)
-            g.nodes[prom_src]['iotype'] = src_iotype
-            g.nodes[prom_tgt]['iotype'] = 'input'
-
-        # Keep any chains of nodes that contain and input_to_input connection
-        sinks = [n for n in g.nodes() if g.out_degree(n) == 0]
-        inputs = {n for n, d in g.nodes(data=True) if d.get('iotype') == 'input'}
-        keep_nodes = set()
-        for sink in sinks:
-            predecessors = nx.ancestors(g, sink)
-            if predecessors.intersection(inputs):
-                keep_nodes.update(predecessors | {sink})
-        g = g.subgraph(keep_nodes).copy()
-
-        # pos = nx.shell_layout(g)
-        # color_map = {'input': 'lightgreen', 'output': 'lightcoral'}
-        # node_colors = [color_map[g.nodes[node]['iotype']] for node in g.nodes()]
-
-        # nx.draw(g, pos, with_labels=True, node_color=node_colors)
-        # import matplotlib.pyplot as plt
-        # plt.show()
-
-        # Detect cycles in input-to-input connections
-        if not nx.is_directed_acyclic_graph(g):
-            cycle_edges = nx.find_cycle(g, orientation='original')
-            errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}' for edge in cycle_edges])
-            self._collect_error(f'Cycle detected in input-to-input connections. This is not allowed.\n{errmsg}')
-
-        # Find the root node in each input-to-input connection chain
-        source_nodes = [node for node in g.nodes() if g.in_degree(node) == 0]
-        for src in source_nodes:
-            # Each descendent has its input set to the source node
-            for tgt in nx.descendants(g, src):
-                self._manual_connections[tgt] = (src, None, None)
+        # if possible. Only do this if we have at least one input-input connection.
+        if any([is_prom(prom_src, 'input') or prom_src in allprocs_discrete_in
+                for prom_src, _, _ in self._manual_connections.values()]):
+            self._update_manual_connections_for_input_to_input()
 
         # Add explicit connections (only ones declared by this group)
         for prom_tgt, (prom_src, src_indices, flat) in self._manual_connections.items():
