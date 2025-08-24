@@ -2165,7 +2165,7 @@ class Group(System):
             predecessors = nx.ancestors(g, sink)
             if predecessors.intersection(inputs):
                 keep_nodes.update(predecessors | {sink})
-        g = g.subgraph(keep_nodes).copy()
+        g = g.subgraph(keep_nodes)
 
         # pos = nx.shell_layout(g)
         # color_map = {'input': 'lightgreen', 'output': 'lightcoral'}
@@ -2395,7 +2395,7 @@ class Group(System):
             if self._gather_full_data():
                 raw = (global_abs_in2out, src_ind_inputs, global_abs_in2in)
             else:
-                raw = ({}, ())
+                raw = ({}, (), {})
             gathered = self.comm.allgather(raw)
 
             all_src_ind_ins = set()
