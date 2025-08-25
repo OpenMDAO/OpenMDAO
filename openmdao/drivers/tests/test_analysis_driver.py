@@ -579,6 +579,47 @@ class TestAnalysisDriver(unittest.TestCase):
                 num_recorded_cases += len(cr.list_cases(out_stream=None))
             self.assertEqual(num_recorded_cases, 9)
 
+    def test_record_derivs_glob(self):
+        """
+        Test that AnalysisDriver.record_derivatives(of, wrt) works.
+        """
+        paraboloid = om.ExecComp(['f_xy = (x - 3)**2 + x * y + (y + 4)**2 - 3',
+                                  'g = 2 * x + 2 * y'])
+
+        prob = om.Problem(reports=None)
+
+        prob.model.add_subsystem('comp', paraboloid, promotes=['*'])
+
+        prob.driver = om.AnalysisDriver(samples=fullfact3, run_parallel=True)
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+        prob.driver.recording_options.set(record_derivatives=True)
+
+        prob.driver.add_responses(['f_xy', 'g'])
+        prob.driver.record_derivatives(of='*', wrt=['*'])
+
+        prob.setup()
+        prob.run_driver()
+        prob.cleanup()
+
+        if prob.comm.rank == 0:
+            num_recorded_cases = 0
+            for file in glob.glob(str(prob.get_outputs_dir() / "cases.sql*")):
+                if file.endswith('meta'):
+                    continue
+                cr = om.CaseReader(file)
+                for case in cr.get_cases(source='driver'):
+                    case_number = int(case.name.split('|')[-1])
+                    assert_near_equal(case.get_val('f_xy'),
+                                      expected_fullfact3[case_number]['f_xy'])
+                    for wrt in ['x', 'y']:
+                        expected_deriv = expected_fullfact3_derivs[case_number]['f_xy', wrt]
+                        assert_near_equal(case.derivatives['f_xy', wrt],
+                                          np.atleast_2d(expected_deriv))
+                        assert_near_equal(case.derivatives['g', wrt],
+                                          np.atleast_2d([2.]))
+                num_recorded_cases += len(cr.list_cases(out_stream=None))
+            self.assertEqual(num_recorded_cases, 9)
+
 
 class TestErrors(unittest.TestCase):
 
