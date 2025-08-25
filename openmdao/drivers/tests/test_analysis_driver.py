@@ -596,6 +596,7 @@ class TestAnalysisDriver(unittest.TestCase):
 
         prob.driver.add_responses(['f_xy', 'g'])
         prob.driver.record_derivatives(of='*', wrt=['*'])
+        prob.driver.declare_coloring()
 
         prob.setup()
         prob.run_driver()
