@@ -1356,11 +1356,11 @@ class Driver(object, metaclass=DriverMetaclass):
         totals = total_jac.compute_totals()
 
         if self.recording_options['record_derivatives']:
-            self.record_derivatives()
+            self._record_derivatives()
 
         return totals
 
-    def record_derivatives(self):
+    def _record_derivatives(self):
         """
         Record the current total jacobian.
         """
