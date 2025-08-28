@@ -181,7 +181,7 @@ class ExplicitComponent(Component):
     def add_output(self, name, val=1.0, shape=None, units=None, res_units=None, desc='',
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
                    shape_by_conn=False, copy_shape=None, compute_shape=None,
-                   units_by_conn=None, compute_units=None, copy_units=None,
+                   units_by_conn=False, compute_units=None, copy_units=None,
                    distributed=None, primal_name=None):
         """
         Add an output variable to the component.
