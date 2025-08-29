@@ -12,6 +12,7 @@ from openmdao.core.analysis_error import AnalysisError
 from openmdao.drivers.analysis_generator import AnalysisGenerator, SequenceGenerator
 from openmdao.utils.mpi import MPI
 from openmdao.utils.om_warnings import issue_warning, DriverWarning
+from openmdao.utils.general_utils import pattern_filter
 
 
 class AnalysisDriver(Driver):
@@ -81,6 +82,7 @@ class AnalysisDriver(Driver):
         self._num_colors = 1
         self._prev_sample_vars = set()
         self._total_jac_format = 'dict'
+        self._derivs_to_record = {'of': set(), 'wrt': set()}
 
     def _declare_options(self):
         """
@@ -95,6 +97,23 @@ class AnalysisDriver(Driver):
                              'large.')
         self.options.declare('procs_per_model', types=int, default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
+
+    def record_derivatives(self, of, wrt):
+        """
+        Add the
+
+        Parameters
+        ----------
+        of : str or Sequence[str]
+            Outputs of which derivatives are desired. May be a glob
+            pattern to match one or more outputs in the model.
+        wrt : str or Sequence[str]
+            Variables with respect to which derivatives are desired.
+            May be a glob pattern to match one or more outputs in the model.
+        """
+        self.recording_options['record_derivatives'] = True
+        self._derivs_to_record['of'] |= {of} if isinstance(of, str) else set(of)
+        self._derivs_to_record['wrt'] |= {wrt} if isinstance(wrt, str) else set(wrt)
 
     def add_response(self, name, indices=None, units=None,
                      linear=False, parallel_deriv_color=None,
@@ -360,10 +379,14 @@ class AnalysisDriver(Driver):
             self._metadata = metadata
 
         if self.recording_options['record_derivatives']:
-            self._compute_totals(of=list(self._responses.keys()),
-                                 wrt=list(self._get_sampled_vars()),
-                                 return_format=self._total_jac_format,
-                                 driver_scaling=False)
+            ofs = self._derivs_to_record['of']
+            wrts = self._derivs_to_record['wrt']
+            if ofs and wrts:
+                # Default derivatives to record.
+                self._compute_totals(of=ofs,
+                                    wrt=wrts,
+                                    return_format=self._total_jac_format,
+                                    driver_scaling=False)
 
     def _get_sampled_vars(self):
         """
@@ -398,6 +421,17 @@ class AnalysisDriver(Driver):
                 self.recording_options['includes'].append(prom_name)
             elif resolver.is_prom(prom_name, 'input'):
                 self.recording_options['includes'].append(prom_name)
+
+        # Resolve the derivatives to be recorded
+        ofs = set(pattern_filter(self._derivs_to_record['of'], resolver.prom_iter('output')))
+        ofs |= set(self._responses)
+        wrts = set(pattern_filter(self._derivs_to_record['wrt'], resolver.prom_iter('output')))
+        wrts |= set(self._get_sampled_vars())
+        ofs = {o for o in ofs if not o.startswith('_auto_ivc.')}
+        wrts = {o for o in wrts if not o.startswith('_auto_ivc.')}
+        wrts = {w for w in wrts if w not in ofs}
+        self._derivs_to_record['of'] = set(ofs)
+        self._derivs_to_record['wrt'] = set(wrts)
 
         if MPI:
             run_parallel = self.options['run_parallel']
