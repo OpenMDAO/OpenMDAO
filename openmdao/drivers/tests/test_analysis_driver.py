@@ -542,7 +542,7 @@ class TestAnalysisDriver(unittest.TestCase):
         Test that AnalysisDriver.record_derivatives(of, wrt) works.
         """
         paraboloid = om.ExecComp(['f_xy = (x - 3)**2 + x * y + (y + 4)**2 - 3',
-                                  'g = 2 * x + 2 * y'])
+                                  'g = 2 * x + 2 * y + w'])
 
         prob = om.Problem(reports=None)
 
@@ -550,13 +550,13 @@ class TestAnalysisDriver(unittest.TestCase):
 
         prob.driver = om.AnalysisDriver(samples=fullfact3, run_parallel=True)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-        prob.driver.recording_options.set(record_derivatives=True)
 
         prob.driver.add_response('f_xy')
         prob.driver.record_derivatives(of='f_xy', wrt=['x', 'y'])
-        prob.driver.record_derivatives(of='g', wrt=['x', 'y'])
+        prob.driver.record_derivatives(of='g', wrt=['x', 'y', 'w'])
 
         prob.setup()
+        prob.set_val('w', 5.0)
         prob.run_driver()
         prob.cleanup()
 
@@ -570,12 +570,67 @@ class TestAnalysisDriver(unittest.TestCase):
                     case_number = int(case.name.split('|')[-1])
                     assert_near_equal(case.get_val('f_xy'),
                                       expected_fullfact3[case_number]['f_xy'])
-                    for wrt in ['x', 'y']:
+                    for wrt in ['x', 'y', 'w']:
+                        if wrt == 'w':
+                            with self.assertRaises(KeyError):
+                                expected_deriv = expected_fullfact3_derivs[case_number]['f_xy', wrt]
+                            assert_near_equal(case.derivatives['g', wrt],
+                                              np.atleast_2d([1.]))
+                        else:
+                            expected_deriv = expected_fullfact3_derivs[case_number]['f_xy', wrt]
+                            assert_near_equal(case.derivatives['f_xy', wrt],
+                                            np.atleast_2d(expected_deriv))
+                            assert_near_equal(case.derivatives['g', wrt],
+                                            np.atleast_2d([2.]))
+                num_recorded_cases += len(cr.list_cases(out_stream=None))
+            self.assertEqual(num_recorded_cases, 9)
+
+    def test_record_derivs_opt_vars(self):
+        """
+        Test that AnalysisDriver.record_derivatives(of, wrt) works.
+        """
+        paraboloid = om.ExecComp(['f_xy = (x - 3)**2 + x * y + (y + 4)**2 - 3',
+                                  'g = 2 * x + 2 * y + w'])
+
+        prob = om.Problem(reports=None)
+
+        prob.model.add_subsystem('comp', paraboloid, promotes=['*'])
+
+        prob.model.add_design_var('x')
+        prob.model.add_objective('f_xy', alias='obj')
+        prob.model.add_constraint('g', lower=0.0)
+
+        prob.driver = om.AnalysisDriver(samples=fullfact3, run_parallel=True)
+        prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
+
+        prob.driver.record_derivatives(include_opt_vars=True)
+
+        prob.setup()
+        prob.set_val('w', 5.0)
+        prob.run_driver()
+        prob.cleanup()
+
+        if prob.comm.rank == 0:
+            num_recorded_cases = 0
+            for file in glob.glob(str(prob.get_outputs_dir() / "cases.sql*")):
+                if file.endswith('meta'):
+                    continue
+                cr = om.CaseReader(file)
+                for case in cr.get_cases(source='driver'):
+                    case_number = int(case.name.split('|')[-1])
+                    assert_near_equal(case.get_val('f_xy'),
+                                      expected_fullfact3[case_number]['f_xy'])
+                    # The only derivatives present should be df/dx and dg/dx
+                    derivs = case.derivatives
+                    self.assertEqual(len(derivs), 2)
+                    self.assertIn(('obj', 'x'), derivs)
+                    self.assertIn(('g', 'x'), derivs)
+                    for wrt in ['x']:
                         expected_deriv = expected_fullfact3_derivs[case_number]['f_xy', wrt]
-                        assert_near_equal(case.derivatives['f_xy', wrt],
-                                          np.atleast_2d(expected_deriv))
+                        assert_near_equal(case.derivatives['obj', wrt],
+                                        np.atleast_2d(expected_deriv))
                         assert_near_equal(case.derivatives['g', wrt],
-                                          np.atleast_2d([2.]))
+                                        np.atleast_2d([2.]))
                 num_recorded_cases += len(cr.list_cases(out_stream=None))
             self.assertEqual(num_recorded_cases, 9)
 
@@ -584,7 +639,7 @@ class TestAnalysisDriver(unittest.TestCase):
         Test that AnalysisDriver.record_derivatives(of, wrt) works.
         """
         paraboloid = om.ExecComp(['f_xy = (x - 3)**2 + x * y + (y + 4)**2 - 3',
-                                  'g = 2 * x + 2 * y'])
+                                  'g = 2 * x + 2 * y + w'])
 
         prob = om.Problem(reports=None)
 
@@ -592,7 +647,6 @@ class TestAnalysisDriver(unittest.TestCase):
 
         prob.driver = om.AnalysisDriver(samples=fullfact3, run_parallel=True)
         prob.driver.add_recorder(om.SqliteRecorder("cases.sql"))
-        prob.driver.recording_options.set(record_derivatives=True)
 
         prob.driver.add_responses(['f_xy', 'g'])
         prob.driver.record_derivatives(of='*', wrt=['*'])

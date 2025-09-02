@@ -52,6 +52,8 @@ class AnalysisDriver(Driver):
         The set of variables seen in the previous iteration of the driver on this rank.
     _generator : AnalysisGenerator
         The internal AnalysisGenerator providing samples.
+    _derivs_to_record : dict {'of': set(), 'wrt': set(), 'include_opt_vars': bool}
+        Used to store derivatives to record, as requested by `record_derivatives`.
     """
 
     def __init__(self, samples=None, **kwargs):
@@ -82,7 +84,7 @@ class AnalysisDriver(Driver):
         self._num_colors = 1
         self._prev_sample_vars = set()
         self._total_jac_format = 'dict'
-        self._derivs_to_record = {'of': set(), 'wrt': set()}
+        self._derivs_to_record = {'of': set(), 'wrt': set(), 'include_opt_vars': False}
 
     def _declare_options(self):
         """
@@ -98,22 +100,30 @@ class AnalysisDriver(Driver):
         self.options.declare('procs_per_model', types=int, default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
 
-    def record_derivatives(self, of, wrt):
+    def record_derivatives(self, of=None, wrt=None, include_opt_vars=None):
         """
-        Add the
+        Specify which derivatives in the model are to be recorded.
 
         Parameters
         ----------
-        of : str or Sequence[str]
+        of : str or Sequence[str], Optional
             Outputs of which derivatives are desired. May be a glob
             pattern to match one or more outputs in the model.
-        wrt : str or Sequence[str]
+        wrt : str or Sequence[str], Optional
             Variables with respect to which derivatives are desired.
             May be a glob pattern to match one or more outputs in the model.
+        include_opt_vars : bool or None
+            If True, include the responses and design variables as
+            part of the variables to be recorded. If False, disables
+            the recording of these variables. If None, leave the value
+            unchanged (its default is False).
         """
-        self.recording_options['record_derivatives'] = True
-        self._derivs_to_record['of'] |= {of} if isinstance(of, str) else set(of)
-        self._derivs_to_record['wrt'] |= {wrt} if isinstance(wrt, str) else set(wrt)
+        if of is not None:
+            self._derivs_to_record['of'] |= {of} if isinstance(of, str) else set(of)
+        if wrt is not None:
+            self._derivs_to_record['wrt'] |= {wrt} if isinstance(wrt, str) else set(wrt)
+        if include_opt_vars is not None:
+            self._derivs_to_record['include_opt_vars'] = include_opt_vars
 
     def add_response(self, name, indices=None, units=None,
                      linear=False, parallel_deriv_color=None,
@@ -382,11 +392,10 @@ class AnalysisDriver(Driver):
             ofs = self._derivs_to_record['of']
             wrts = self._derivs_to_record['wrt']
             if ofs and wrts:
-                # Default derivatives to record.
                 self._compute_totals(of=ofs,
-                                    wrt=wrts,
-                                    return_format=self._total_jac_format,
-                                    driver_scaling=False)
+                                     wrt=wrts,
+                                     return_format=self._total_jac_format,
+                                     driver_scaling=False)
 
     def _get_sampled_vars(self):
         """
@@ -423,15 +432,24 @@ class AnalysisDriver(Driver):
                 self.recording_options['includes'].append(prom_name)
 
         # Resolve the derivatives to be recorded
-        ofs = set(pattern_filter(self._derivs_to_record['of'], resolver.prom_iter('output')))
-        ofs |= set(self._responses)
-        wrts = set(pattern_filter(self._derivs_to_record['wrt'], resolver.prom_iter('output')))
-        wrts |= set(self._get_sampled_vars())
-        ofs = {o for o in ofs if not o.startswith('_auto_ivc.')}
-        wrts = {o for o in wrts if not o.startswith('_auto_ivc.')}
-        wrts = {w for w in wrts if w not in ofs}
-        self._derivs_to_record['of'] = set(ofs)
-        self._derivs_to_record['wrt'] = set(wrts)
+        all_vars = {var for var in resolver.prom_iter() if not var.startswith('_auto_ivc')}
+        indep_vars = {meta['prom_name'] for meta in
+                      model.get_io_metadata(is_indep_var=True).values()}
+        # Don't pick up outputs from the auto_ivc
+        ofs = set(pattern_filter(self._derivs_to_record['of'], all_vars))
+        wrts = set(pattern_filter(self._derivs_to_record['wrt'], all_vars))
+        # ofs cannot be indep vars
+        ofs -= indep_vars
+        # Include the nominal optimization variables if requested.
+        if self._derivs_to_record['include_opt_vars']:
+            ofs |= set(self._responses.keys())
+            wrts |= set(self._designvars)
+
+        self._derivs_to_record['of'] = ofs
+        self._derivs_to_record['wrt'] = wrts
+
+        if self._derivs_to_record['of'] and self._derivs_to_record['wrt']:
+            self.recording_options['record_derivatives'] = True
 
         if MPI:
             run_parallel = self.options['run_parallel']
