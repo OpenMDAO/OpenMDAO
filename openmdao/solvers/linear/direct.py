@@ -223,6 +223,26 @@ class DirectSolver(LinearSolver):
 
         self.supports['implicit_components'] = True
 
+    def check_config(self, logger):
+        """
+        Perform optional error checks.
+
+        Parameters
+        ----------
+        logger : object
+            The object that manages logging output.
+        """
+        if self.options['rhs_checking'] is False:
+            system = self._system()
+            redundant_adj = system.pathname in system._relevance.get_redundant_adjoint_systems()
+            if redundant_adj:
+                logger.info(
+                    f"\n'rhs_checking' is disabled for '{system.linear_solver.msginfo}'"
+                    ", but that solver has redundant adjoint solves. If it is "
+                    "expensive to compute derivatives for this solver, turning on "
+                    "'rhs_checking' may improve performance.\n"
+                )
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.
@@ -236,8 +256,7 @@ class DirectSolver(LinearSolver):
         """
         super()._setup_solvers(system, depth)
         self._disallow_distrib_solve()
-        self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
-                                                        self.options['rhs_checking'])
+        self._lin_rhs_checker = LinearRHSChecker.create(system, self.options['rhs_checking'])
 
     def _linearize_children(self):
         """
