@@ -10,6 +10,7 @@ from openmdao.solvers.linear.direct import format_singular_error
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
+from openmdao.utils.mpi import FakeComm
 
 try:
     from petsc4py import PETSc
@@ -19,7 +20,7 @@ try:
     from mpi4py import MPI
     DEFAULT_COMM = MPI.COMM_WORLD
 except ImportError:
-    DEFAULT_COMM = None
+    DEFAULT_COMM = FakeComm()
 
 PC_SERIAL_TYPES = [
     "superlu",
