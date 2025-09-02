@@ -16,7 +16,6 @@ from openmdao.utils.file_utils import _get_work_dir
 from openmdao.recorders.tests.sqlite_recorder_test_utils import \
     assertDriverIterDataRecorded, assertProblemDataRecorded
 from openmdao.recorders.tests.recorder_test_utils import run_driver
-from openmdao.utils.assert_utils import assert_warnings
 
 if MPI:
     from openmdao.api import PETScVector
@@ -357,7 +356,7 @@ class DistributedRecorderTest(unittest.TestCase):
 
         prob.setup()
 
-        outputs_dir = prob.get_outputs_dir()
+        prob.get_outputs_dir()
 
         prob.run_driver()
 
