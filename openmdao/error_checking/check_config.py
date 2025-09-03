@@ -437,6 +437,13 @@ def _check_solvers(problem, logger):
         final.extend(lines)
         logger.warning('\n'.join(final))
 
+    # Report any additional solver warnings.
+    for system in problem.model.system_iter(include_self=True, recurse=True):
+        if system._nonlinear_solver is not None:
+            system._nonlinear_solver.check_config(logger)
+        if system._linear_solver is not None:
+            system._linear_solver.check_config(logger)
+
 
 def _check_missing_recorders(problem, logger):
     """

@@ -123,7 +123,7 @@ class SqliteRecorder(CaseRecorder):
     filepath : str or Path
         Path to the recorder file.
     append : bool, optional
-        Optional. If True, append to an existing case recorder file.
+        Optional. If True, append to an existing case recorder file. Default is False.
     pickle_version : int, optional
         The pickle protocol version to use when pickling metadata.
     record_viewer_data : bool, optional
@@ -210,9 +210,6 @@ class SqliteRecorder(CaseRecorder):
                               f"{metadata_filepath}.")
                         try:
                             os.remove(metadata_filepath)
-                            issue_warning("The existing case recorder metadata file, "
-                                          f"{metadata_filepath}, is being overwritten.",
-                                          category=UserWarning)
                         except OSError:
                             pass
                         self.metadata_connection = sqlite3.connect(metadata_filepath)
@@ -228,8 +225,6 @@ class SqliteRecorder(CaseRecorder):
         if filepath:
             try:
                 os.remove(filepath)
-                issue_warning(f'The existing case recorder file, {filepath},'
-                              ' is being overwritten.', category=UserWarning)
             except OSError:
                 pass
 
