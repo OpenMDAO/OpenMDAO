@@ -96,6 +96,82 @@ class AnalysisDriver(Driver):
         self.options.declare('procs_per_model', types=int, default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
 
+    def add_design_var(self, name, lower=None, upper=None, ref=None, ref0=None, indices=None,
+                       adder=None, scaler=None, units=None, parallel_deriv_color=None,
+                       cache_linear_solution=False, flat_indices=False):
+        """
+        Add a design variable to the model.
+
+        For the purposes of AnalysisDriver, this is done in order to specify those variables with respect
+        to which the derivatives should be computed.
+
+        Parameters
+        ----------
+        name : str
+            Promoted name of the design variable in the system.
+        lower : float or ndarray, optional
+            Lower boundary for the input.
+        upper : upper or ndarray, optional
+            Upper boundary for the input.
+        ref : float or ndarray, optional
+            Value of design var that scales to 1.0 in the driver.
+        ref0 : float or ndarray, optional
+            Value of design var that scales to 0.0 in the driver.
+        indices : iter of int, optional
+            If an input is an array, these indicate which entries are of
+            interest for this particular design variable.  These may be
+            positive or negative integers.
+        adder : float or ndarray, optional
+            Value to add to the model value to get the scaled value for the driver. adder
+            is first in precedence.  adder and scaler are an alterantive to using ref
+            and ref0.
+        scaler : float or ndarray, optional
+            Value to multiply the model value to get the scaled value for the driver. scaler
+            is second in precedence. adder and scaler are an alterantive to using ref
+            and ref0.
+        units : str, optional
+            Units to convert to before applying scaling.
+        parallel_deriv_color : str
+            If specified, this design var will be grouped for parallel derivative
+            calculations with other variables sharing the same parallel_deriv_color.
+        cache_linear_solution : bool
+            If True, store the linear solution vectors for this variable so they can
+            be used to start the next linear solution with an initial guess equal to the
+            solution from the previous linear solve.
+        flat_indices : bool
+            If True, interpret specified indices as being indices into a flat source array.
+        """
+        model = self._problem().model
+        model.add_design_var(name=name, lower=lower, upper=upper,
+                           ref=ref, ref0=ref0, adder=adder, scaler=scaler,
+                           indices=indices, units=units,
+                           parallel_deriv_color=parallel_deriv_color,
+                           cache_linear_solution=cache_linear_solution,
+                           flat_indices=flat_indices,)
+
+    def add_design_vars(self, responses):
+        """
+        Add multiple design variables for recording derivatives with AnalysisDriver.
+
+        Parameters
+        ----------
+        responses : Sequence or dict or str
+            A sequence of design variable names to be recorded.  If more
+            metadata needs to be specified, reponses can be provided
+            as a dictionary whose keys are the variables to be recorded,
+            and whose associated values are dictionaries of metadata to
+            be passed on as keyword arguments to add_response.
+        """
+        if isinstance(responses, str):
+            self.add_design_var(responses)
+        elif isinstance(responses, dict):
+            for var, meta in responses.items():
+                self.add_design_var(var, **meta)
+        elif isinstance(responses, Iterable):
+            for res in responses:
+                if isinstance(res, str):
+                    self.add_design_var(res)
+
     def add_response(self, name, indices=None, units=None,
                      linear=False, parallel_deriv_color=None,
                      cache_linear_solution=False, flat_indices=None, alias=None):
@@ -360,8 +436,9 @@ class AnalysisDriver(Driver):
             self._metadata = metadata
 
         if self.recording_options['record_derivatives']:
+            wrt_vars = set(self._designvars.keys()) | set(self._get_sampled_vars())
             self._compute_totals(of=list(self._responses.keys()),
-                                 wrt=list(self._get_sampled_vars()),
+                                 wrt=wrt_vars,
                                  return_format=self._total_jac_format,
                                  driver_scaling=False)
 
