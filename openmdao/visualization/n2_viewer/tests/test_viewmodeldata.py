@@ -650,8 +650,8 @@ class TestN2(unittest.TestCase):
         p = om.Problem(BadConnectionModel(), name='n2_connection_error')
 
         msg = "\nCollected errors for problem 'n2_connection_error':" \
-              "\n   'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but " \
-              "'tgt.x' is an input. All connections must be from an output to an input."
+              "\n   'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.z', but " \
+              "'cmp.z' is an output. The target of connections must be an input."
 
         with self.assertRaises(Exception) as cm:
             p.setup()

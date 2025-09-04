@@ -277,7 +277,8 @@ class System(object, metaclass=SystemMetaclass):
     _conn_global_abs_in2in : {'abs_in': 'abs_in'}
         Dictionary containing all explicit input-to-input connections (continuous and discrete)
         owned by this system or any descendant system. The data is the same across all processors.
-        This is generated after we've resolved any chains that ultimately source an input to some output.
+        This is generated after we've resolved any chains that ultimately source an input
+        to some output.
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections (continuous and discrete)
         owned by this system or any descendant system. The data is the same across all processors.

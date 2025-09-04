@@ -680,7 +680,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         msg = ("\nCollected errors for problem 'connection_to_output':"
                "\n   <model> <class Group>: Attempted to connect from 'C1.y' to 'C2.y', "
-               "but 'C2.y' is an output. All connections must be from an output to an input.")
+               "but 'C2.y' is an output. The target of connections must be an input.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_connection_from_input(self):
@@ -692,14 +692,16 @@ class DiscreteTestCase(unittest.TestCase):
 
         model.connect('C1.x', 'C2.x')
 
-        with self.assertRaises(Exception) as cm:
-            prob.setup()
-            prob.final_setup()
+        prob.setup()
 
-        msg = ("\nCollected errors for problem 'connection_from_input':"
-               "\n   <model> <class Group>: Attempted to connect from 'C1.x' to 'C2.x', "
-               "but 'C1.x' is an input. All connections must be from an output to an input.")
-        self.assertEqual(str(cm.exception), msg)
+        prob.set_val('C1.x', 42)
+
+        prob.run_model()
+
+        om.n2(prob)
+
+        self.assertEqual(prob.get_val('C1.x'), 42)
+        self.assertEqual(prob.get_val('C2.x'), 42)
 
     def test_forgotten_args_error(self):
 

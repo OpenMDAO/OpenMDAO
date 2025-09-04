@@ -2179,7 +2179,8 @@ class Group(System):
         if not nx.is_directed_acyclic_graph(g):
             cycle_edges = nx.find_cycle(g, orientation='original')
             errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}' for edge in cycle_edges])
-            self._collect_error(f'Cycle detected in input-to-input connections. This is not allowed.\n{errmsg}')
+            self._collect_error('Cycle detected in input-to-input connections. '
+                                f'This is not allowed.\n{errmsg}')
 
         # Find the root node in each input-to-input connection chain
         source_nodes = [node for node in g.nodes() if g.in_degree(node) == 0]
@@ -2330,8 +2331,9 @@ class Group(System):
                         # place a _PromotesInfo at the top level to handle the src_indices
                         if abs_in2prom_info[abs_tgt][0] is None:
                             try:
-                                abs_in2prom_info[abs_tgt][0] = _PromotesInfo(src_indices=src_indices,
-                                                                             flat=flat, prom=abs_tgt)
+                                abs_in2prom_info[abs_tgt][0] = \
+                                    _PromotesInfo(src_indices=src_indices,
+                                                  flat=flat, prom=abs_tgt)
                             except Exception:
                                 type_exc, exc, tb = sys.exc_info()
                                 self._collect_error(
@@ -4887,7 +4889,7 @@ class Group(System):
         prom2auto = {}
         count = 0
         auto2tgt = {}
-        all_abs2meta = self._var_allprocs_abs2meta['input'] # all inputs in model
+        all_abs2meta = self._var_allprocs_abs2meta['input']  # all inputs in model
         conns = self._conn_global_abs_in2out
         input_input_conns = self._conn_global_abs_in2in
         auto_conns = {}
@@ -4909,7 +4911,7 @@ class Group(System):
 
             prom_tgt = resolver.abs2prom(tgt, 'input')
             # If the target is the target of an input-input connection
-            # treat change prom to refer to the source
+            # change prom to refer to the source
             if prom_tgt in input_input_conns:
                 prom_tgt = input_input_conns[prom_tgt]
 
@@ -4935,18 +4937,19 @@ class Group(System):
         vars_to_gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
-            prom = resolver.abs2prom(tgts[0], 'input')
+            prom_tgt = resolver.abs2prom(tgts[0], 'input')
             ret = self._get_auto_ivc_out_val(tgts, vars_to_gather)
             if ret is None:  # setup error occurred. Try to continue
                 continue
             tgt, val, remote = ret
-            prom = resolver.abs2prom(tgt, 'input')
-            if prom not in self._group_inputs:
-                self._group_inputs[prom] = [{'use_tgt': tgt, 'auto': True, 'path': self.pathname,
-                                             'prom': prom}]
+            prom_tgt = resolver.abs2prom(tgt, 'input')
+            if prom_tgt not in self._group_inputs:
+                self._group_inputs[prom_tgt] = [{'use_tgt': tgt, 'auto': True,
+                                                 'path': self.pathname,
+                                                 'prom': prom_tgt}]
             else:
-                self._group_inputs[prom][0]['use_tgt'] = tgt
-            gmeta = self._group_inputs[prom][0]
+                self._group_inputs[prom_tgt][0]['use_tgt'] = tgt
+            gmeta = self._group_inputs[prom_tgt][0]
 
             if 'units' in gmeta:
                 units = gmeta['units']
@@ -4983,39 +4986,44 @@ class Group(System):
                 auto_ivc._add_remote(relsrc)
 
         # have to sort to keep vars in sync because we may be doing bcasts
-        for abs_in in sorted(self._var_allprocs_discrete['input']):
-            if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
-                prom = resolver.abs2prom(abs_in, 'input')
+        for abs_tgt in sorted(self._var_allprocs_discrete['input']):
+            if abs_tgt not in conns:  # unconnected, so connect the input to an _auto_ivc output
+                prom_tgt = resolver.abs2prom(abs_tgt, 'input')
                 val = _UNDEFINED
 
-                if prom in prom2auto:
+                # If the target is the target of an input-input connection
+                # change prom to refer to the source
+                if prom_tgt in input_input_conns:
+                    prom_tgt = input_input_conns[prom_tgt]
+
+                if prom_tgt in prom2auto:
                     # multiple connected inputs w/o a src. Connect them to the same IVC
                     # check if they have different metadata, and if they do, there must be
                     # a group input defined that sets the default, else it's an error
-                    conns[abs_in] = prom2auto[prom][0]
+                    conns[abs_tgt] = prom2auto[prom_tgt][0]
                 else:
                     ivc_name = f"_auto_ivc.v{count}"
                     loc_out_name = ivc_name.rsplit('.', 1)[-1]
                     count += 1
-                    prom2auto[prom] = (ivc_name, abs_in)
-                    conns[abs_in] = ivc_name
+                    prom2auto[prom_tgt] = (ivc_name, abs_tgt)
+                    conns[abs_tgt] = ivc_name
 
-                    if resolver.is_local(abs_in, 'input'):  # var is local
-                        val = self._var_discrete['input'][abs_in]['val']
+                    if resolver.is_local(abs_tgt, 'input'):  # var is local
+                        val = self._var_discrete['input'][abs_tgt]['val']
                     else:
                         val = None
-                    if abs_in in vars_to_gather:
-                        if vars_to_gather[abs_in] == self.comm.rank:
-                            self.comm.bcast(val, root=vars_to_gather[abs_in])
+                    if abs_tgt in vars_to_gather:
+                        if vars_to_gather[abs_tgt] == self.comm.rank:
+                            self.comm.bcast(val, root=vars_to_gather[abs_tgt])
                         else:
-                            val = self.comm.bcast(None, root=vars_to_gather[abs_in])
+                            val = self.comm.bcast(None, root=vars_to_gather[abs_tgt])
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
-                src = conns[abs_in]
+                src = conns[abs_tgt]
                 if src in auto2tgt:
-                    auto2tgt[src].append(abs_in)
+                    auto2tgt[src].append(abs_tgt)
                 else:
-                    auto2tgt[src] = [abs_in]
+                    auto2tgt[src] = [abs_tgt]
 
         if not prom2auto:
             return auto_ivc

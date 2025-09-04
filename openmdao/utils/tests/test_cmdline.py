@@ -204,7 +204,7 @@ class CmdlineTestCase(unittest.TestCase):
         for i, line in enumerate(lines):
             if b"Collected errors for problem" in line:
                 self.assertEqual(lines[i+1],
-                    b"   'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but 'tgt.x' is an input. All connections must be from an output to an input.")
+                    b"   'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.z', but 'cmp.z' is an output. The target of connections must be an input.")
                 break
         else:
             self.fail("Didn't find expected err msg in output.")

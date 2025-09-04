@@ -15,7 +15,7 @@ class BadConnectionModel(om.Group):
         sub.add_subsystem('cmp', om.ExecComp('z = x'))
         sub.add_subsystem('arr', om.ExecComp('a = x', x=np.zeros(2)))
 
-        self.sub.connect('tgt.x', 'cmp.x')
+        self.sub.connect('tgt.x', 'cmp.z')
 
 if __name__ == '__main__':
     p = om.Problem(model=BadConnectionModel())
