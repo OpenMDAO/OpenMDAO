@@ -143,32 +143,32 @@ class AnalysisDriver(Driver):
         """
         model = self._problem().model
         model.add_design_var(name=name, lower=lower, upper=upper,
-                           ref=ref, ref0=ref0, adder=adder, scaler=scaler,
-                           indices=indices, units=units,
-                           parallel_deriv_color=parallel_deriv_color,
-                           cache_linear_solution=cache_linear_solution,
-                           flat_indices=flat_indices,)
+                             ref=ref, ref0=ref0, adder=adder, scaler=scaler,
+                             indices=indices, units=units,
+                             parallel_deriv_color=parallel_deriv_color,
+                             cache_linear_solution=cache_linear_solution,
+                             flat_indices=flat_indices,)
 
-    def add_design_vars(self, responses):
+    def add_design_vars(self, design_vars):
         """
         Add multiple design variables for recording derivatives with AnalysisDriver.
 
         Parameters
         ----------
-        responses : Sequence or dict or str
+        design_vars : Sequence or dict or str
             A sequence of design variable names to be recorded.  If more
             metadata needs to be specified, reponses can be provided
             as a dictionary whose keys are the variables to be recorded,
             and whose associated values are dictionaries of metadata to
-            be passed on as keyword arguments to add_response.
+            be passed on as keyword arguments to add_design_var.
         """
-        if isinstance(responses, str):
-            self.add_design_var(responses)
-        elif isinstance(responses, dict):
-            for var, meta in responses.items():
+        if isinstance(design_vars, str):
+            self.add_design_var(design_vars)
+        elif isinstance(design_vars, dict):
+            for var, meta in design_vars.items():
                 self.add_design_var(var, **meta)
-        elif isinstance(responses, Iterable):
-            for res in responses:
+        elif isinstance(design_vars, Iterable):
+            for res in design_vars:
                 if isinstance(res, str):
                     self.add_design_var(res)
 
