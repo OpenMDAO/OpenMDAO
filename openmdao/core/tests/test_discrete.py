@@ -698,8 +698,6 @@ class DiscreteTestCase(unittest.TestCase):
 
         prob.run_model()
 
-        om.n2(prob)
-
         self.assertEqual(prob.get_val('C1.x'), 42)
         self.assertEqual(prob.get_val('C2.x'), 42)
 
