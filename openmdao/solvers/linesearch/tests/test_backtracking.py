@@ -720,6 +720,9 @@ class TestArmijoGoldsteinLSArrayBounds(unittest.TestCase):
         for ind in range(3):
             self.assertTrue(2.4 <= top['comp.z'][ind] <= self.ub[ind])
 
+
+class TestLSWithSubsolves(unittest.TestCase):
+
     def test_with_subsolves(self):
 
         prob = om.Problem()
@@ -861,13 +864,13 @@ class TestFeatureLineSearch(unittest.TestCase):
                             resid_y = {'shape': (3, 1)})
                 ec.add_expr('resid_z = x * z + z - 4.0',
                             resid_z = {'shape': (3, 1)})
-                
+
                 ic.add_input('resid_y', shape=(3, 1))
                 ic.add_input('resid_z', shape=(3, 1))
                 ic.add_output('z', shape=(3, 1), lower=1.5,
                               upper=np.array([2.6, 2.5, 2.65]).reshape((3,1)))
                 ic.add_output('y', shape=(3, 1))
-        
+
         p = om.Problem()
         G_outer = p.model.add_subsystem('G_outer', om.Group())
         G_outer.add_subsystem('G_inner', _TestGroup())

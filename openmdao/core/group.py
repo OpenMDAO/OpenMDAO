@@ -2355,7 +2355,7 @@ class Group(System):
                     self._bad_conn_vars.update((prom_tgt, prom_src))
                     continue
 
-                if (is_prom(prom_src, 'input') or prom_src in allprocs_discrete_in):
+                if (not is_prom(prom_src, 'output') or prom_src in allprocs_discrete_in):
                     abs_in2in[abs_tgt] = abs_src
                 else:
                     abs_in2out[abs_tgt] = abs_src
