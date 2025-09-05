@@ -120,7 +120,6 @@ const index = toggles.indexOf(toggle);
 lines[index].visible = toggle.active;
 
 // Set cons_violation_indicators visibility
-var index_cons;
 if (index > num_desvars) {{
     const index_cons = index - num_desvars - 1;
     lower_bound_violation_indicators[index_cons].visible = toggle.active;
@@ -303,6 +302,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         self._num_desvars = 0
         self._up_arrow_image_path = "./images/up_arrow_small.png"
         self._down_arrow_image_path = "./images/down_arrow_small.png"
+        
+        
+        
+        self._upper_bounds_region_source = None
+
 
         self._setup_figure()
 
@@ -332,12 +336,14 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 #   lines will not change color because of the set_value hack done to get
                 #   get around the bug in setting the line color from JavaScript
                 self._source.stream(self._source_stream_dict)
-                self._lower_bounds_cons_source.stream(
-                    self._lower_bounds_cons_source_stream_dict
-                )
-                self._upper_bounds_cons_source.stream(
-                    self._upper_bounds_cons_source_stream_dict
-                )
+                # self._lower_bounds_cons_source.stream(
+                #     self._lower_bounds_cons_source_stream_dict
+                # )
+                # self._upper_bounds_cons_source.stream(
+                #     self._upper_bounds_cons_source_stream_dict
+                # )
+                
+                self._upper_bounds_region_source.stream(self._upper_bounds_region_source_stream_dict)
             return
 
         new_data = self._case_tracker._get_data_from_case(new_case)
@@ -403,8 +409,14 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             desvar_names = self._case_tracker._get_desvar_names()
             for i, desvar_name in enumerate(desvar_names):
                 units = self._case_tracker._get_units(desvar_name)
+
+                desvar_name_with_type = desvar_name
+                if desvar_name in self._both_desvars_and_cons:
+                    desvar_name_with_type += " [dv]"
+
+                desvar_button_label = f"{desvar_name_with_type} ({units})"
                 self._make_variable_button(
-                    f"{desvar_name} ({units})",
+                    desvar_button_label,
                     _non_active_plot_color,
                     False,
                     legend_item_callback,
@@ -414,14 +426,16 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 use_varea = value.size > 1
                 self._make_line_and_hover_tool(
                     "desvars",
-                    desvar_name,
+                    # desvar_name,
+                    desvar_name_with_type,
                     use_varea,
                     _non_active_plot_color,
                     "solid",
                     False,
                 )
                 float_value = _get_value_for_plotting(value, "desvars")
-                self._make_axis("desvars", desvar_name, float_value, units)
+                # self._make_axis("desvars", desvar_name, float_value, units)
+                self._make_axis("desvars", desvar_name_with_type, float_value, units)
 
             # cons
             cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
@@ -429,15 +443,21 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             cons_names = self._case_tracker._get_cons_names()
             for i, cons_name in enumerate(cons_names):
                 units = self._case_tracker._get_units(cons_name)
+                con_name_with_type = cons_name
+                if cons_name in self._both_desvars_and_cons:
+                    con_name_with_type += " [cons]"
+
+                cons_button_label = f"{con_name_with_type} ({units})"
                 self._make_variable_button(
-                    f"{cons_name} ({units})",
+                    cons_button_label,
                     _non_active_plot_color,
                     False,
                     legend_item_callback,
                 )
                 self._make_line_and_hover_tool(
                     "cons",
-                    cons_name,
+                    # cons_name,
+                    con_name_with_type,
                     False,
                     _non_active_plot_color,
                     "dashed",
@@ -445,7 +465,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 )
                 value = new_data["cons"][cons_name]
                 float_value = _get_value_for_plotting(value, "cons")
-                self._make_axis("cons", cons_name, float_value, units)
+                self._make_axis("cons", con_name_with_type, float_value, units)
                 self._constraint_bounds[cons_name] = (
                     self._case_tracker._get_constraint_bounds(cons_name)
                 )
@@ -503,6 +523,15 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         counter = new_data["counter"]
 
         self._source_stream_dict = {"iteration": [counter]}
+        
+        
+        
+        
+        self.plot_figure.x_range = Range1d(1, counter)
+
+        
+        
+        
 
         # need separate sources to be able to plot the icons indicating the cons
         # are out of bounds
@@ -515,6 +544,16 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             "urls": [self._down_arrow_image_path],
         }
 
+
+        self._upper_bounds_region_source_stream_dict = {
+            "left": [1],
+            "right": [counter],
+            "top": [1e6],
+            "bottom": [0.0]  # TODO need to have a separate entry for each cons upper bound
+        }
+        
+        
+        
         iline = 0
         for obj_name, obj_value in new_data["objs"].items():
             float_obj_value = _get_value_for_plotting(obj_value, "objs")
@@ -528,11 +567,19 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             iline += 1
 
         for desvar_name, desvar_value in new_data["desvars"].items():
+            desvar_name_with_type = desvar_name
+            if desvar_name in self._both_desvars_and_cons:
+                desvar_name_with_type += ' [dv]'
             if not self._labels_updated_with_units and desvar_value.size > 1:
                 units = self._case_tracker._get_units(desvar_name)
-                self._toggles[iline].label = (
-                    f"{desvar_name} ({units}) {desvar_value.shape}"
-                )
+                desvar_button_label = desvar_name_with_type + f' ({units}) {desvar_value.shape}'
+                # if desvar_name in self._both_desvars_and_cons:
+                #     varname = f"{desvar_name} [dv] ({units}) {desvar_value.shape}"
+                # else:
+                #     varname = f"{desvar_name} ({units}) {desvar_value.shape}"
+                # self._toggles[iline].label = varname
+                self._toggles[iline].label = desvar_button_label
+
             # handle non-scalar desvars
             min_max_changed = False
             min_max_changed = min_max_changed or _update_y_min_max(
@@ -543,7 +590,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             )
             if min_max_changed:
                 range = Range1d(self._y_min[desvar_name], self._y_max[desvar_name])
-                self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
+                # self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
+                self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name_with_type}_min"] = range
             # deal with when min and max are the same.
             # Otherwise the varea plot shows nothing, not even a line
             if np.min(desvar_value) == np.max(desvar_value):
@@ -555,40 +603,58 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             else:
                 y1 = np.min(desvar_value)
                 y2 = np.max(desvar_value)
-            self._source_stream_dict[f"{desvar_name}_min"] = [y1]
-            self._source_stream_dict[f"{desvar_name}_max"] = [y2]
+
+            # self._source_stream_dict[f"{desvar_name}_min"] = [y1]
+            # self._source_stream_dict[f"{desvar_name}_max"] = [y2]
+            self._source_stream_dict[f"{desvar_name_with_type}_min"] = [y1]
+            self._source_stream_dict[f"{desvar_name_with_type}_max"] = [y2]
             iline += 1
 
         for cons_name, cons_value in new_data["cons"].items():
             float_cons_value = _get_value_for_plotting(cons_value, "cons")
+            con_name_with_type = cons_name
+            if cons_name in self._both_desvars_and_cons:
+                con_name_with_type += ' [cons]'
             if not self._labels_updated_with_units and cons_value.size > 1:
                 units = self._case_tracker._get_units(cons_name)
-                self._toggles[iline].label = f"{cons_name} ({units}) {cons_value.shape}"
-            self._source_stream_dict[cons_name] = [float_cons_value]
+                cons_button_label = con_name_with_type + f' ({units}) {cons_value.shape}'
+                # if cons_name in self._both_desvars_and_cons:
+                #     varname = f"{cons_name} [cons] ({units}) {cons_value.shape}"
+                # else:
+                #     varname = f"{cons_name} ({units}) {cons_value.shape}"
+                self._toggles[iline].label = cons_button_label
+                # self._toggles[iline].label = varname
+            # self._source_stream_dict[cons_name] = [float_cons_value]
+            self._source_stream_dict[con_name_with_type] = [float_cons_value]
 
             lower_bound, upper_bound = self._constraint_bounds[cons_name]
             # if given np.nan, nothing will be plotted. Only plot arrows when out of bounds
-            lower_value = float_cons_value if float_cons_value < lower_bound else np.nan
-            upper_value = float_cons_value if float_cons_value > upper_bound else np.nan
-            self._lower_bounds_cons_source_stream_dict[cons_name] = [lower_value]
-            self._upper_bounds_cons_source_stream_dict[cons_name] = [upper_value]
+            # lower_value = float_cons_value if float_cons_value < lower_bound else np.nan
+            # upper_value = float_cons_value if float_cons_value > upper_bound else np.nan
+            # self._lower_bounds_cons_source_stream_dict[con_name_with_type] = [lower_value]
+            # self._upper_bounds_cons_source_stream_dict[con_name_with_type] = [upper_value]
+            # self._lower_bounds_cons_source_stream_dict[cons_name] = [lower_value]
+            # self._upper_bounds_cons_source_stream_dict[cons_name] = [upper_value]
 
-            # handle non-scalar desvars
+            # handle non-scalar cons
             min_max_changed = False
             min_max_changed = min_max_changed or _update_y_min_max(
-                cons_name, np.min(cons_value), self._y_min, self._y_max
+                con_name_with_type, np.min(cons_value), self._y_min, self._y_max
             )
             min_max_changed = min_max_changed or _update_y_min_max(
-                cons_name, np.max(cons_value), self._y_min, self._y_max
+                con_name_with_type, np.max(cons_value), self._y_min, self._y_max
             )
             if min_max_changed:
-                range = Range1d(self._y_min[cons_name], self._y_max[cons_name])
-                self.plot_figure.extra_y_ranges[f"extra_y_{cons_name}"] = range
+                range = Range1d(self._y_min[con_name_with_type], self._y_max[con_name_with_type])
+                # self.plot_figure.extra_y_ranges[f"extra_y_{cons_name}"] = range
+                self.plot_figure.extra_y_ranges[f"extra_y_{con_name_with_type}"] = range
             iline += 1
 
         self._source.stream(self._source_stream_dict)
-        self._lower_bounds_cons_source.stream(self._lower_bounds_cons_source_stream_dict)
-        self._upper_bounds_cons_source.stream(self._upper_bounds_cons_source_stream_dict)
+        # self._lower_bounds_cons_source.stream(self._lower_bounds_cons_source_stream_dict)
+        # self._upper_bounds_cons_source.stream(self._upper_bounds_cons_source_stream_dict)
+        
+        self._upper_bounds_region_source.stream(self._upper_bounds_region_source_stream_dict)
 
         self._labels_updated_with_units = True
         # end of _update method
@@ -596,23 +662,34 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
     def _setup_data_source(self):
         self._source_dict = {"iteration": []}
 
-        # Obj
         obj_names = self._case_tracker._get_obj_names()
+        desvar_names = self._case_tracker._get_desvar_names()
+        con_names = self._case_tracker._get_cons_names()
+        self._both_desvars_and_cons = list(set(desvar_names).intersection(set(con_names)))
+
+        # Obj
         for obj_name in obj_names:
             self._source_dict[obj_name] = []
 
         # Desvars
-        desvar_names = self._case_tracker._get_desvar_names()
         for desvar_name in desvar_names:
-            self._source_dict[f"{desvar_name}_min"] = []
-            self._source_dict[f"{desvar_name}_max"] = []
+            desvar_name_with_type = desvar_name
+            if desvar_name in self._both_desvars_and_cons:
+                desvar_name_with_type += ' [dv]'
+            self._source_dict[f"{desvar_name_with_type}_min"] = []
+            self._source_dict[f"{desvar_name_with_type}_max"] = []
+            # self._source_dict[f"{desvar_name}_min"] = []
+            # self._source_dict[f"{desvar_name}_max"] = []
             self._num_desvars += 1
 
         # Cons
-        con_names = self._case_tracker._get_cons_names()
 
         for con_name in con_names:
-            self._source_dict[con_name] = []
+            con_name_with_type = con_name
+            if con_name in self._both_desvars_and_cons:
+                con_name_with_type += ' [cons]'
+            # self._source_dict[con_name] = []
+            self._source_dict[con_name_with_type] = []
         self._source = ColumnDataSource(self._source_dict)
 
         # Cons - lower bound
@@ -621,7 +698,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             "urls": [],
         }
         for con_name in con_names:
-            self._lower_bounds_cons_source_dict[con_name] = []
+            con_name_with_type = con_name
+            if con_name in self._both_desvars_and_cons:
+                con_name_with_type += ' [cons]'
+            self._lower_bounds_cons_source_dict[con_name_with_type] = []
+            # self._lower_bounds_cons_source_dict[con_name] = []
         self._lower_bounds_cons_source = ColumnDataSource(self._lower_bounds_cons_source_dict)
 
         # Cons - upper bound
@@ -630,8 +711,21 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             "urls": [],
         }
         for con_name in con_names:
-            self._upper_bounds_cons_source_dict[con_name] = []
+            con_name_with_type = con_name
+            if con_name in self._both_desvars_and_cons:
+                con_name_with_type += ' [cons]'
+            self._upper_bounds_cons_source_dict[con_name_with_type] = []
+            # self._upper_bounds_cons_source_dict[con_name] = []
         self._upper_bounds_cons_source = ColumnDataSource(self._upper_bounds_cons_source_dict)
+        
+        
+        self._upper_bounds_region_source_stream_dict = {
+            "left": [],
+            "right": [],
+            "top": [],
+            "bottom": [],
+        }
+        self._upper_bounds_region_source = ColumnDataSource(self._upper_bounds_region_source_stream_dict)
 
     def _make_variable_button(self, varname, color, active, callback):
         toggle = Toggle(
@@ -685,6 +779,87 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 visible=visible,
             )
             if var_type == "cons":
+
+                # top = 207.728561113109458
+                # bottom = 0
+                # left = 0
+                # right = 49
+
+                if 'x' in y_name:
+                    color = 'red'
+                elif 'g2' in y_name:
+                    color = 'blue'
+                else:
+                    color = 'green'
+
+
+                import re
+                # Match optional whitespace followed by [anything] at the end of string
+                varname_minus_type = re.sub(r'\s*\[.*?\]$', '', varname)
+
+                lower_bound, upper_bound = self._case_tracker._get_constraint_bounds(varname_minus_type)
+                
+                
+                upper_bound_region = self.plot_figure.quad(
+                            top=1e8,
+                            bottom=upper_bound,
+                            left=-1,
+                            right=1e8,
+                            color=color,
+                            alpha=0.2,    
+                            visible=True,
+                            hatch_alpha=0.05,
+                            hatch_pattern='diagonal_cross',
+                        )
+
+                lower_bound_region = self.plot_figure.quad(
+                            top=lower_bound,
+                            bottom=-1e8,
+                            left=-1,
+                            right=1e8,
+                            color=color,
+                            alpha=0.2,    
+                            visible=True,
+                            hatch_alpha=0.05,
+                            hatch_pattern='diagonal_cross',
+                        )
+
+                
+                
+                
+                
+                
+                
+                # upper_bound_region = self.plot_figure.quad(
+                #             # top=top,
+                #             # bottom=bottom,
+                #             # top=1e6,
+                #             bottom="bottom",
+                #             top="top",
+                #             # top=sys.float_info.max,
+                #             # bottom=y_name,
+                #             # bottom=300,
+                #             # left=left,
+                #             left="left",
+                #             # left=1,
+                #             # right="iteration",
+                #             right="right",
+                #             # color="red",
+                #             color=color,
+                #             alpha=0.2,    
+                #             source=self._upper_bounds_region_source,
+                #             # legend_label=f"Upper Bound Violation {y_name}",
+                #             visible=True,
+                #         )
+
+                # flow_axis = LinearAxis(y_range_name=y_name, axis_label="Flow Rate (L/s)")
+
+                # self.plot_figure.add_layout(flow_axis, 'right')
+
+
+
+
+
                 lower_bound_violation_indicator = self.plot_figure.image_url(
                     url="urls",
                     x="iteration",
@@ -709,8 +884,15 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             line.y_range_name = f"extra_y_{varname}_min"
         elif var_type == "cons":
             line.y_range_name = f"extra_y_{varname}"
+            
             lower_bound_violation_indicator.y_range_name = f"extra_y_{varname}"
             upper_bound_violation_indicator.y_range_name = f"extra_y_{varname}"
+            
+            
+            upper_bound_region.y_range_name = f"extra_y_{varname}"
+            lower_bound_region.y_range_name = f"extra_y_{varname}"
+            
+            
         self._lines.append(line)
         if not use_varea:  # hover tool does not work with Varea
             hover = HoverTool(
@@ -726,6 +908,9 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
 
     def _make_axis(self, var_type, varname, plot_value, units):
         # Make axis for this variable on the right of the plot
+        
+        
+        # print(f"make axis for {varname=}")
         if var_type == "desvars":
             y_range_name = f"extra_y_{varname}_min"
         else:
@@ -735,9 +920,14 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             axis_label=f"{varname} ({units})",
             axis_label_text_font_size="20px",
             visible=False,
+            # visible=True,
         )
         self._axes.append(extra_y_axis)
         self.plot_figure.add_layout(extra_y_axis, "right")
+        
+        print(f"make extra_y_ranges for {y_range_name}")
+        
+        
         self.plot_figure.extra_y_ranges[y_range_name] = Range1d(
             plot_value - 1, plot_value + 1
         )
@@ -752,7 +942,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         self.plot_figure = figure(
             tools=[
                 PanTool(),
-                WheelZoomTool(),
+                WheelZoomTool(dimensions='width'),
                 ZoomInTool(),
                 ZoomOutTool(),
                 BoxZoomTool(),
@@ -768,8 +958,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             active_tap=None,
             output_backend="webgl",
         )
-        self.plot_figure.x_range.start = 1
-        self.plot_figure.x_range.follow = "start"
+        # self.plot_figure.x_range.start = 1
+        # self.plot_figure.x_range.follow = "start"
 
         self.plot_figure.title.text_font_size = "14px"
         self.plot_figure.title.text_color = "black"
@@ -783,3 +973,5 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
 
         self.plot_figure.axis.axis_label_text_font_style = "bold"
         self.plot_figure.axis.axis_label_text_font_size = "20pt"
+        
+

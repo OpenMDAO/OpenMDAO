@@ -140,8 +140,6 @@ def _rtplot_cmd(options, user_args):
         case_recorder_file = str(problem.driver._rec_mgr._recorders[0]._filepath)
 
         cmd = ['openmdao', 'realtime_plot', '--pid', str(os.getpid()), case_recorder_file]
-        # if not options.show:
-        #     cmd.insert(-1, '--no-display')
         if script_path:
             cmd.insert(-1, '--script')
             cmd.insert(-1, script_path)
@@ -260,6 +258,7 @@ class _CaseRecorderTracker:
         else:
             return None
 
+
     def _get_data_from_case(self, driver_case):
         objs = driver_case.get_objectives(scaled=False)
         design_vars = driver_case.get_design_vars(scaled=False)
@@ -315,9 +314,19 @@ class _CaseRecorderTracker:
         return cons.keys()
 
     def _get_constraint_bounds(self, name):
+
         cons = self._initial_case.get_constraints()
         var_info = cons._var_info[name]
         return (var_info['lower'], var_info['upper'])
+
+
+    def _get_desvar_bounds(self, name):
+        # self._cr.problem_metadata['variables']. # has dict of actual promoted var names and includes lower and upper for the constraint
+        # self._cr.problem_metadata['design_vars']. # keys a auto ivcs but have the correct name as element. It has the desvars bounds
+        # # can also try get_io_metadata(includes='varname')
+
+        pass
+
 
     def _get_units(self, name):
         try:
@@ -349,8 +358,7 @@ def realtime_plot(case_recorder_filename, callback_period,
 
     Parameters
     ----------
-    case_recorder_filename : MetaModelStructuredComp or MetaModelUnStructuredComp
-        The metamodel component.
+    case_recorder_filename : str
     callback_period : float
         The time period between when the application calls the update method.
     pid_of_calling_script : int
