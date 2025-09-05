@@ -266,6 +266,9 @@ class Solver(object, metaclass=SolverMetaclass):
         if iprint > -1 and print_flag:
             print(self._solver_info.prefix + self.SOLVER + msg)
 
+        if self.options['debug_print']:
+            self._print_exc_debug_info()
+
         # Raise AnalysisError if requested.
         if self.options['err_on_non_converge']:
             raise AnalysisError(msg)
@@ -384,14 +387,16 @@ class Solver(object, metaclass=SolverMetaclass):
 
         Parameters
         ----------
-        level : int
+        level : int or None
             iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
+            A level of None will leave solver printing unchanged.
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        self.options['iprint'] = level
+        if level is not None:
+            self.options['iprint'] = level
 
     def _mpi_print(self, iteration, abs_res, rel_res):
         """
@@ -691,6 +696,26 @@ class NonlinearSolver(Solver):
                               category=SolverWarning)
                 # reset to False so we won't waste memory allocating a cache array
                 self.options['restart_from_successful'] = False
+
+    def _set_solver_print(self, level=2, type_='all', debug_print=None):
+        """
+        Control printing for solvers and subsolvers in the model.
+
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        debug_print : bool or None
+            If None, leave solver debug printing unchanged, otherwise turn if on or off
+            depending on whether debug_print is True or False.
+        """
+        super()._set_solver_print(level=level, type_=type)
+        if debug_print is not None:
+            self.options['debug_print'] = debug_print
 
     def solve(self):
         """
