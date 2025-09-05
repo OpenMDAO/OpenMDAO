@@ -266,13 +266,12 @@ class Solver(object, metaclass=SolverMetaclass):
         if iprint > -1 and print_flag:
             print(self._solver_info.prefix + self.SOLVER + msg)
 
-        # Linear solvers dont have debug_print
-        if 'debug_print' in self.options and self.options['debug_print']:
-            self._print_exc_debug_info()
-
         # Raise AnalysisError if requested.
         if self.options['err_on_non_converge']:
             raise AnalysisError(msg)
+        elif 'debug_print' in self.options and self.options['debug_print']:
+            # Do a debug print even if we're not raising an exception.
+            self._print_exc_debug_info()
 
     @property
     def _recording_iter(self):
@@ -722,7 +721,12 @@ class NonlinearSolver(Solver):
         """
         Run the solver.
         """
-        self._solve()
+        try:
+            self._solve()
+        except Exception as err:
+            if self.options['debug_print']:
+                self._print_exc_debug_info()
+            raise err
 
     def _iter_initialize(self):
         """

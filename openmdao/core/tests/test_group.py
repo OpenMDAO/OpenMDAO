@@ -363,8 +363,11 @@ class TestGroup(unittest.TestCase):
         p = om.Problem()
         p.model = Sellar()
 
-        p.setup()
-
+        with self.assertRaises(Exception) as err:
+            p.setup()
+        self.assertEqual(str(err.exception),
+                         "'d1' <class SellarDis2>: 'promotes_outputs' failed to find any matches for "
+                         "the following names or patterns: ['foo'].")
 
     def test_group_promotes_modified_systems(self):
         # before the fix, this test raised an exception saying multiple outputs were promoted
