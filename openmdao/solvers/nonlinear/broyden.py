@@ -268,7 +268,7 @@ class BroydenSolver(NonlinearSolver):
         super()._set_solver_print(level=level, type_=type_, debug_print=debug_print)
 
         if self.linear_solver is not None and type_ != 'NL':
-            self.linear_solver._set_solver_print(level=level, type_=type_, debug_print=debug_print)
+            self.linear_solver._set_solver_print(level=level, type_=type_)
 
         if self.linesearch is not None:
             self.linesearch._set_solver_print(level=level, type_=type_, debug_print=debug_print)

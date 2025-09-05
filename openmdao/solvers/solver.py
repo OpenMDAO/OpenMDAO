@@ -266,7 +266,8 @@ class Solver(object, metaclass=SolverMetaclass):
         if iprint > -1 and print_flag:
             print(self._solver_info.prefix + self.SOLVER + msg)
 
-        if self.options['debug_print']:
+        # Linear solvers dont have debug_print
+        if 'debug_print' in self.options and self.options['debug_print']:
             self._print_exc_debug_info()
 
         # Raise AnalysisError if requested.
@@ -721,12 +722,7 @@ class NonlinearSolver(Solver):
         """
         Run the solver.
         """
-        try:
-            self._solve()
-        except Exception as err:
-            if self.options['debug_print']:
-                self._print_exc_debug_info()
-            raise err
+        self._solve()
 
     def _iter_initialize(self):
         """
