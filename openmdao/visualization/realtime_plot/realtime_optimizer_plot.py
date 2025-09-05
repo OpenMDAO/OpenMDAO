@@ -800,26 +800,26 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 lower_bound, upper_bound = self._case_tracker._get_constraint_bounds(varname_minus_type)
                 
                 
-                upper_bound_region = self.plot_figure.quad(
+                upper_bound_violation_indicator = self.plot_figure.quad(
                             top=1e8,
                             bottom=upper_bound,
                             left=-1,
                             right=1e8,
                             color=color,
                             alpha=0.2,    
-                            visible=True,
+                            visible=False,
                             hatch_alpha=0.05,
                             hatch_pattern='diagonal_cross',
                         )
 
-                lower_bound_region = self.plot_figure.quad(
+                lower_bound_violation_indicator = self.plot_figure.quad(
                             top=lower_bound,
                             bottom=-1e8,
                             left=-1,
                             right=1e8,
                             color=color,
                             alpha=0.2,    
-                            visible=True,
+                            visible=False,
                             hatch_alpha=0.05,
                             hatch_pattern='diagonal_cross',
                         )
@@ -827,55 +827,26 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 
                 
                 
-                
-                
-                
-                # upper_bound_region = self.plot_figure.quad(
-                #             # top=top,
-                #             # bottom=bottom,
-                #             # top=1e6,
-                #             bottom="bottom",
-                #             top="top",
-                #             # top=sys.float_info.max,
-                #             # bottom=y_name,
-                #             # bottom=300,
-                #             # left=left,
-                #             left="left",
-                #             # left=1,
-                #             # right="iteration",
-                #             right="right",
-                #             # color="red",
-                #             color=color,
-                #             alpha=0.2,    
-                #             source=self._upper_bounds_region_source,
-                #             # legend_label=f"Upper Bound Violation {y_name}",
-                #             visible=True,
-                #         )
-
-                # flow_axis = LinearAxis(y_range_name=y_name, axis_label="Flow Rate (L/s)")
-
-                # self.plot_figure.add_layout(flow_axis, 'right')
 
 
 
 
-
-                lower_bound_violation_indicator = self.plot_figure.image_url(
-                    url="urls",
-                    x="iteration",
-                    y=y_name,
-                    anchor="center",
-                    source=self._lower_bounds_cons_source,
-                    visible=visible,
-                )
-                upper_bound_violation_indicator = self.plot_figure.image_url(
-                    url="urls",
-                    x="iteration",
-                    y=y_name,
-                    anchor="center",
-                    source=self._upper_bounds_cons_source,
-                    visible=visible,
-                )
+                # lower_bound_violation_indicator = self.plot_figure.image_url(
+                #     url="urls",
+                #     x="iteration",
+                #     y=y_name,
+                #     anchor="center",
+                #     source=self._lower_bounds_cons_source,
+                #     visible=visible,
+                # )
+                # upper_bound_violation_indicator = self.plot_figure.image_url(
+                #     url="urls",
+                #     x="iteration",
+                #     y=y_name,
+                #     anchor="center",
+                #     source=self._upper_bounds_cons_source,
+                #     visible=visible,
+                # )
 
                 self._lower_bound_violation_indicators.append(lower_bound_violation_indicator)
                 self._upper_bound_violation_indicators.append(upper_bound_violation_indicator)
