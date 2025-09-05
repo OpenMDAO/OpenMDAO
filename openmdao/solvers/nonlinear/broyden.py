@@ -249,7 +249,7 @@ class BroydenSolver(NonlinearSolver):
             for tup in self.linear_solver._assembled_jac_solver_iter():
                 yield tup
 
-    def _set_solver_print(self, level=2, type_='all'):
+    def _set_solver_print(self, level=2, type_='all', debug_print=None):
         """
         Control printing for solvers and subsolvers in the model.
 
@@ -261,14 +261,17 @@ class BroydenSolver(NonlinearSolver):
             except for failures, and set to -1 to disable all printing including failures.
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        debug_print : bool or None
+            If None, leave solver debug printing unchanged, otherwise turn if on or off
+            depending on whether debug_print is True or False.
         """
-        super()._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_, debug_print=debug_print)
 
         if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
 
         if self.linesearch is not None:
-            self.linesearch._set_solver_print(level=level, type_=type_)
+            self.linesearch._set_solver_print(level=level, type_=type_, debug_print=debug_print)
 
     def _linearize(self):
         """

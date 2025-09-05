@@ -1816,24 +1816,30 @@ class Problem(object, metaclass=ProblemMetaclass):
                                    debug_print=debug_print, coloring_info=coloring_info)
         return total_info.compute_totals()
 
-    def set_solver_print(self, level=2, depth=1e99, type_='all'):
+    def set_solver_print(self, level=2, depth=1e99, type_='all', debug_print=None):
         """
         Control printing for solvers and subsolvers in the model.
 
         Parameters
         ----------
-        level : int
+        level : int or None
             Iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
+            A value of None will leave solving printing unchanged, which is useful
+            when using this method to enable or disable debug printing only.
         depth : int
             How deep to recurse. For example, you can set this to 0 if you only want
             to print the top level linear and nonlinear solver messages. Default
             prints everything.
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        debug_print : bool or None
+            If None, leave solver debug printing unchanged, otherwise turn if on or off
+            depending on whether debug_print is True or False. Note debug_print only
+            affects nonlinear solvers.
         """
-        self.model.set_solver_print(level=level, depth=depth, type_=type_)
+        self.model.set_solver_print(level=level, depth=depth, type_=type_, debug_print=debug_print)
 
     def list_problem_vars(self,
                           show_promoted_name=True,

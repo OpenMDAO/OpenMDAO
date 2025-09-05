@@ -1,5 +1,7 @@
 """Test the Newton nonlinear solver. """
 
+from io import StringIO
+from contextlib import redirect_stdout
 import unittest
 
 import numpy as np
@@ -765,6 +767,39 @@ class TestNewton(unittest.TestCase):
 
         msg = "Solver 'NL: Newton' on system '': residuals contain 'inf' or 'NaN' after 0 iterations."
         self.assertEqual(str(context.exception), msg)
+
+    def test_err_message_inf_nan_debug_print(self):
+
+        prob = om.Problem()
+        nlsolver = om.NewtonSolver(solve_subsystems=False)
+        prob.model = SellarDerivatives(nonlinear_solver=nlsolver,
+                                       linear_solver=om.LinearBlockGS())
+
+        nlsolver.options['maxiter'] = 1
+
+        prob.setup()
+        prob.set_solver_print(level=1)
+        prob.set_solver_print(level=None, debug_print=True)
+
+        prob['x'] = np.nan
+
+        # Create an in-memory string buffer
+        output_capture = StringIO()
+
+        # Use redirect_stdout as a context manager
+        with redirect_stdout(output_capture):
+            prob.run_model()
+
+        # Retrieve the captured output
+        captured_string = output_capture.getvalue()
+
+        expected = "Solver 'NL: Newton' on system '': residuals contain 'inf' or 'NaN' after 0 iterations."
+        expected2 = "# Inputs and outputs at start of iteration 'rank0:root._solve_nonlinear|0'"
+        self.assertIn(expected, captured_string)
+        self.assertIn(expected2, captured_string)
+
+        # Make sure that the second set_solver_print call did not override iprint
+        self.assertEqual(prob.model.nonlinear_solver.options['iprint'], 1)
 
     def test_relevancy_for_newton(self):
 

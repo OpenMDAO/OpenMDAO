@@ -409,7 +409,7 @@ class TestSubmodelComp(unittest.TestCase):
 
         p.model.add_subsystem('submodel', submodel, promotes=['*'])
 
-        self.assertTrue((3, 20, 'NL') in p.model.submodel._subprob.model._solver_print_cache)
+        self.assertTrue((3, 20, 'NL', None) in p.model.submodel._subprob.model._solver_print_cache)
 
     def test_complex_step_across_submodel(self):
         p = om.Problem()

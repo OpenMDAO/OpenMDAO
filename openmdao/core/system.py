@@ -3123,7 +3123,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         return self._problem_meta['orig_mode']
 
-    def _set_solver_print(self, level=2, depth=1e99, type_='all'):
+    def _set_solver_print(self, level=2, depth=1e99, type_='all', debug_print=None):
         """
         Apply the given print settings to the internal solvers, recursively.
 
@@ -3139,22 +3139,29 @@ class System(object, metaclass=SystemMetaclass):
             prints everything.
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        debug_print : bool or None
+            If None, leave solver debug printing unchanged, otherwise turn if on or off
+            depending on whether debug_print is True or False. Note debug_print is only
+            applied to nonlinear solvers.
         """
         if self._linear_solver is not None and type_ != 'NL':
             self._linear_solver._set_solver_print(level=level, type_=type_)
         if self.nonlinear_solver is not None and type_ != 'LN':
-            self.nonlinear_solver._set_solver_print(level=level, type_=type_)
+            self.nonlinear_solver._set_solver_print(level=level, type_=type_,
+                                                    debug_print=debug_print)
 
         if self.pathname.count('.') + 1 >= depth:
             return
 
         for subsys, _ in self._subsystems_allprocs.values():
-            subsys._set_solver_print(level=level, depth=depth, type_=type_)
+            subsys._set_solver_print(level=level, depth=depth, type_=type_,
+                                     debug_print=debug_print)
 
             if subsys._linear_solver is not None and type_ != 'NL':
                 subsys._linear_solver._set_solver_print(level=level, type_=type_)
             if subsys.nonlinear_solver is not None and type_ != 'LN':
-                subsys.nonlinear_solver._set_solver_print(level=level, type_=type_)
+                subsys.nonlinear_solver._set_solver_print(level=level, type_=type_,
+                                                          debug_print=debug_print)
 
     def _setup_solver_print(self, recurse=True):
         """
@@ -3165,32 +3172,38 @@ class System(object, metaclass=SystemMetaclass):
         recurse : bool
             Whether to call this method in subsystems.
         """
-        for level, depth, type_ in self._solver_print_cache:
-            self._set_solver_print(level, depth, type_)
+        for level, depth, type_, debug_print in self._solver_print_cache:
+            self._set_solver_print(level, depth, type_, debug_print)
 
         if recurse:
             for subsys in self._subsystems_myproc:
                 subsys._setup_solver_print(recurse=recurse)
 
-    def set_solver_print(self, level=2, depth=1e99, type_='all'):
+    def set_solver_print(self, level=2, depth=1e99, type_='all', debug_print=None):
         """
         Control printing for solvers and subsolvers in the model.
 
         Parameters
         ----------
-        level : int
+        level : int or None
             Iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
+            A value of None will leave solving printing unchanged, which is useful
+            when using this method to enable or disable debug printing only.
         depth : int
             How deep to recurse. For example, you can set this to 0 if you only want
             to print the top level linear and nonlinear solver messages. Default
             prints everything.
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        debug_print : bool or None
+            If None, leave solver debug printing unchanged, otherwise turn if on or off
+            depending on whether debug_print is True or False. Note debug_print is only
+            applied to nonlinear solvers.
         """
-        if (level, depth, type_) not in self._solver_print_cache:
-            self._solver_print_cache.append((level, depth, type_))
+        if (level, depth, type_, debug_print) not in self._solver_print_cache:
+            self._solver_print_cache.append((level, depth, type_, debug_print))
 
     def _get_static_wrt_matches(self):
         """

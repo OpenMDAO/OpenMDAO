@@ -26,6 +26,7 @@ nonlinear_solvers = [
     om.BroydenSolver
 ]
 
+
 @use_tempdirs
 class TestNonlinearSolvers(unittest.TestCase):
     def setUp(self):
@@ -171,7 +172,7 @@ class TestNonlinearSolvers(unittest.TestCase):
         nl = model.circuit.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
 
         nl.options['iprint'] = 2
-        nl.options['debug_print'] = True
+        nl.options['debug_print'] = False
         nl.options['err_on_non_converge'] = False
 
         # set some poor initial guesses so that we don't converge
@@ -185,6 +186,7 @@ class TestNonlinearSolvers(unittest.TestCase):
         output = run_model(p)
 
         # Should be empty since solver debugging printing was turned off
+        self.maxDiff = 10000
         self.assertEqual(output, '')
 
 @use_tempdirs
