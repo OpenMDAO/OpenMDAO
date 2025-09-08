@@ -102,8 +102,8 @@ class AnalysisDriver(Driver):
         """
         Add a design variable to the model.
 
-        For the purposes of AnalysisDriver, this is done in order to specify those variables with respect
-        to which the derivatives should be computed.
+        For the purposes of AnalysisDriver, this is done in order to specify those
+        variables with respect to which the derivatives should be computed.
 
         Parameters
         ----------
