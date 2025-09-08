@@ -2157,16 +2157,14 @@ class Group(System):
             g.nodes[prom_src]['iotype'] = src_iotype
             g.nodes[prom_tgt]['iotype'] = 'input'
 
-        # Keep any chains of nodes that contain and input_to_input connection
-        sinks = [n for n in g.nodes() if g.out_degree(n) == 0]
-        inputs = {n for n, d in g.nodes(data=True) if d.get('iotype') == 'input'}
-        keep_nodes = set()
-        for sink in sinks:
-            predecessors = nx.ancestors(g, sink)
-            if predecessors.intersection(inputs):
-                keep_nodes.update(predecessors | {sink})
-        g = g.subgraph(keep_nodes)
+         # Detect cycles in input-to-input connections
+        if not nx.is_directed_acyclic_graph(g):
+            cycle_edges = nx.find_cycle(g, orientation='original')
+            errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}' for edge in cycle_edges])
+            self._collect_error('Cycle detected in input-to-input connections. '
+                                f'This is not allowed.\n{errmsg}')
 
+        # This code is useful for visualizing chains of input-input connections in the model.
         # pos = nx.shell_layout(g)
         # color_map = {'input': 'lightgreen', 'output': 'lightcoral'}
         # node_colors = [color_map[g.nodes[node]['iotype']] for node in g.nodes()]
@@ -2175,12 +2173,18 @@ class Group(System):
         # import matplotlib.pyplot as plt
         # plt.show()
 
-        # Detect cycles in input-to-input connections
-        if not nx.is_directed_acyclic_graph(g):
-            cycle_edges = nx.find_cycle(g, orientation='original')
-            errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}' for edge in cycle_edges])
-            self._collect_error('Cycle detected in input-to-input connections. '
-                                f'This is not allowed.\n{errmsg}')
+        # Keep any chains of nodes that contain and input_to_input connection
+        # These are the only ones for which we want to potentially create new
+        # manual connections.
+        sinks = [n for n in g.nodes() if g.out_degree(n) == 0]
+        inputs = {n for n, d in g.nodes(data=True) if d.get('iotype') == 'input'}
+        keep_nodes = set()
+        for sink in sinks:
+            predecessors = nx.ancestors(g, sink)
+            if predecessors.intersection(inputs):
+                keep_nodes.update(predecessors | {sink})
+
+        g = g.subgraph(keep_nodes)
 
         # Find the root node in each input-to-input connection chain
         source_nodes = [node for node in g.nodes() if g.in_degree(node) == 0]
