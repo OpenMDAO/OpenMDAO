@@ -2157,7 +2157,7 @@ class Group(System):
             g.nodes[prom_src]['iotype'] = src_iotype
             g.nodes[prom_tgt]['iotype'] = 'input'
 
-         # Detect cycles in input-to-input connections
+        # Detect cycles in input-to-input connections
         if not nx.is_directed_acyclic_graph(g):
             cycle_edges = nx.find_cycle(g, orientation='original')
             errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}' for edge in cycle_edges])
