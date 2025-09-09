@@ -1187,7 +1187,7 @@ class Case(object):
                 if isinstance(val, np.ndarray):
                     val = val.copy()
                 if use_indices and meta['indices'] is not None:
-                    val = val[meta['indices']]
+                    val = val.ravel()[meta['indices']]
                 if scaled:
                     if meta['total_adder'] is not None:
                         val += meta['total_adder']
