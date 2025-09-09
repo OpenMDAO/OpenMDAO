@@ -599,6 +599,17 @@ class Solver(object, metaclass=SolverMetaclass):
         """
         return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
 
+    def check_config(self, logger):
+        """
+        Perform optional error checks.
+
+        Parameters
+        ----------
+        logger : object
+            The object that manages logging output.
+        """
+        pass
+
 
 class NonlinearSolver(Solver):
     """

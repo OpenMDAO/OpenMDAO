@@ -147,6 +147,10 @@ class LinearRHSChecker(object):
         LinearRHSChecker or None
             A LinearRHSChecker instance if it was created, None otherwise.
         """
+        if opts is False:
+            # User did not request RHS checking.
+            return None
+
         redundant_adj = system.pathname in system._relevance.get_redundant_adjoint_systems()
         if isinstance(opts, dict):
             LinearRHSChecker.check_options(system, opts)
@@ -159,13 +163,6 @@ class LinearRHSChecker(object):
                           "'rhs_checking' options.")
                 else:
                     return None
-        elif not opts:
-            if redundant_adj:
-                print(f"\n'rhs_checking' is disabled for '{system.linear_solver.msginfo}'"
-                      " but that solver has redundant adjoint solves. If it is "
-                      "expensive to compute derivatives for this solver, turning on "
-                      "'rhs_checking' may improve performance.\n")
-            return None
         else:
             opts = dict(max_cache_entries=3, check_zero=False, rtol=3e-16, atol=3e-16,
                         collect_stats=False, verbose=False)
