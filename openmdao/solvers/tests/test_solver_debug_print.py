@@ -186,7 +186,6 @@ class TestNonlinearSolvers(unittest.TestCase):
         output = run_model(p)
 
         # Should be empty since solver debugging printing was turned off
-        self.maxDiff = 10000
         self.assertEqual(output, '')
 
 @use_tempdirs
