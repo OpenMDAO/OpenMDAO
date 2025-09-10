@@ -647,9 +647,10 @@ class NonlinearSolver(Solver):
         Declare options before kwargs are processed in the init method.
         """
         self.options.declare('debug_print', types=bool, default=False,
-                             desc='If true, the values of input and output variables at '
+                             desc='If True, the values of input and output variables at '
                                   'the start of iteration are printed and written to a file '
-                                  'after a failure to converge.')
+                                  'after a failure to converge or when encountering an' \
+                                  'invalid value in the residual.')
         self.options.declare('stall_limit', default=0,
                              desc='Number of iterations after which, if the residual norms are '
                                   'identical within the stall_tol, then terminate as if max '

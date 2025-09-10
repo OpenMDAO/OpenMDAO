@@ -3198,7 +3198,7 @@ class System(object, metaclass=SystemMetaclass):
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         debug_print : bool or None
-            If None, leave solver debug printing unchanged, otherwise turn if on or off
+            If None, leave solver debug printing unchanged, otherwise turn it on or off
             depending on whether debug_print is True or False. Note debug_print is only
             applied to nonlinear solvers.
         """
