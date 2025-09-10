@@ -271,11 +271,15 @@ class ExplicitDictionaryJacobian(Jacobian):
                 raise RuntimeError(f"{msginfo}: ExplicitDictionaryJacobian is only intended to be "
                                    "used with ExplicitComponents.")
 
+            rel_subjacs, irrelevant_subjacs = self._get_relevant_subjacs_info(system)
             self._subjacs = {}
-            for key, meta, dtype in self._subjacs_info_iter(system):
+            self._irrelevant_subjacs = {}
+            for key, meta, dtype in rel_subjacs:
                 # only keep dr/di subjacs.  dr/do matrix is always -I
                 if key[1] in self._input_slices:
                     self._subjacs[key] = self.create_subjac(key, meta, dtype)
+            for key, meta, dtype in irrelevant_subjacs:
+                self._irrelevant_subjacs[key] = self.create_subjac(key, meta, dtype)
 
             self._initialized = True
 

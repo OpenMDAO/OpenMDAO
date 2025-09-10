@@ -44,7 +44,9 @@ class Jacobian(object):
     _subjacs_info : dict
         Dictionary of the sub-Jacobian metadata keyed by absolute names.
     _subjacs : dict
-        Dictionary of the sub-Jacobian objects keyed by absolute names.
+        Dictionary of the relevant sub-Jacobian objects keyed by absolute names.
+    _irrelevant_subjacs : dict
+        Dictionary of the irrelevant sub-Jacobian objects keyed by absolute names.
     _under_complex_step : bool
         When True, this Jacobian is under complex step, using a complex jacobian.
     _abs_keys : dict
@@ -79,6 +81,7 @@ class Jacobian(object):
         """
         self._subjacs_info = system._subjacs_info
         self._subjacs = None
+        self._irrelevant_subjacs = {}
         self._under_complex_step = False
         self._abs_keys = {}
         self._col_mapper = None
@@ -185,15 +188,18 @@ class Jacobian(object):
             Dictionary of subjacs keyed by absolute names.
         """
         if not self._initialized:
+            rel_subjacs, irrelevant_subjacs = self._get_relevant_subjacs_info(system)
             self._subjacs = {}
-            for key, meta, dtype in self._subjacs_info_iter(system):
+            for key, meta, dtype in rel_subjacs:
                 self._subjacs[key] = self.create_subjac(key, meta, dtype)
+            for key, meta, dtype in irrelevant_subjacs:
+                self._irrelevant_subjacs[key] = self.create_subjac(key, meta, dtype)
 
             self._initialized = True
 
         return self._subjacs
 
-    def _subjacs_info_iter(self, system=None):
+    def _get_relevant_subjacs_info(self, system=None):
         """
         Iterate over subjacs info for the current system.
 
@@ -204,21 +210,25 @@ class Jacobian(object):
         system : System
             System that is updating this jacobian.
 
-        Yields
-        ------
-        tuple
-            Tuple of (key, meta, dtype) for each subjac.
+        Returns
+        -------
+        list
+            List of (key, meta, dtype) for all relevant subjacs.
         """
         relevance = None
-        if self._has_approx:
-            try:
-                relevance = self._problem_meta['relevance']
-                is_relevant = relevance.is_relevant
-                active = system.linear_solver is None or system.linear_solver.use_relevance()
-            except Exception:
-                pass
+        try:
+            relevance = self._problem_meta['relevance']
+            is_relevant = relevance.is_relevant
+            active = system.linear_solver is None or system.linear_solver.use_relevance()
+            if not active or not relevance._active:
+                relevance = None
+        except Exception:
+            pass
 
         dtype = system._outputs.dtype
+
+        relevant_subjacs = []
+        irrelevant_subjacs = []
 
         with relevance.active(active) if relevance else do_nothing_context():
             with relevance.all_seeds_active() if relevance else do_nothing_context():
@@ -227,8 +237,12 @@ class Jacobian(object):
                 for key, meta in self._subjacs_info.items():
                     of, wrt = key
                     if of in out_slices and (wrt in in_slices or wrt in out_slices):
-                        if relevance is None or is_relevant(wrt):
-                            yield key, meta, dtype
+                        if relevance is not None and (not is_relevant(wrt) or not is_relevant(of)):
+                            irrelevant_subjacs.append((key, meta, dtype))
+                        else:
+                            relevant_subjacs.append((key, meta, dtype))
+
+        return relevant_subjacs, irrelevant_subjacs
 
     def _get_abs_key(self, key):
         try:
@@ -272,7 +286,7 @@ class Jacobian(object):
         bool
             return whether sub-Jacobian has been defined.
         """
-        return self._get_abs_key(key) in self._subjacs
+        return self._get_abs_key(key) in self._subjacs_info
 
     def __getitem__(self, key):
         """
@@ -288,10 +302,18 @@ class Jacobian(object):
         ndarray or sparse matrix
             sub-Jacobian as an array or sparse matrix.
         """
-        try:
-            return self._subjacs[self._get_abs_key(key)].info['val']
-        except KeyError:
+        abs_key = self._get_abs_key(key)
+        if abs_key is None:
             raise KeyError(f'Variable name pair {key} not found.')
+
+        try:
+            return self._subjacs[abs_key].info['val']
+        except KeyError:
+            # key might exist in _subjacs_info but not in _subjacs because it's not relevant
+            if abs_key in self._irrelevant_subjacs:
+                return self._irrelevant_subjacs[abs_key].info['val']
+            else:
+                raise KeyError(f'Variable name pair {key} must first be declared.')
 
     def __setitem__(self, key, subjac):
         """
@@ -312,7 +334,11 @@ class Jacobian(object):
         try:
             self._subjacs[abs_key].set_val(subjac)
         except KeyError:
-            raise KeyError(f'Variable name pair {key} must first be declared.')
+            # key might exist in _subjacs_info but not in _subjacs because it's not relevant
+            if abs_key in self._irrelevant_subjacs:
+                self._irrelevant_subjacs[abs_key].set_val(subjac)
+            else:
+                raise KeyError(f'Variable name pair {key} must first be declared.')
         except ValueError as err:
             raise ValueError(f"For subjacobian {key}: {err}")
 
@@ -480,6 +506,7 @@ class Jacobian(object):
         """
         self._initialized = False
         self._subjacs = None
+        self._irrelevant_subjacs = {}
         self._get_subjacs(system)
         self._col_mapper = None  # force recompute of internal index maps on next set_col
 
@@ -499,12 +526,12 @@ class Jacobian(object):
         list
             List of keys matching this jacobian for the current system.
         """
+        relevance = None
         if self._ordered_subjac_keys is None:
-            if self._has_approx:
-                relevance = self._problem_meta['relevance']
-                is_relevant = relevance.is_relevant
-                active = system.linear_solver is None or system.linear_solver.use_relevance()
-            else:
+            relevance = self._problem_meta['relevance']
+            is_relevant = relevance.is_relevant
+            active = system.linear_solver is None or system.linear_solver.use_relevance()
+            if not active or not relevance._active:
                 relevance = None
 
             subjacs_info = self._subjacs_info
@@ -526,8 +553,10 @@ class Jacobian(object):
                             for wrt in wrtnames[type_]:
                                 key = (of, wrt)
                                 if key in subjacs_info:
-                                    if relevance is None or is_relevant(wrt):
-                                        keys.append(key)
+                                    if relevance is not None and (not is_relevant(wrt) or
+                                                                  not is_relevant(of)):
+                                        continue
+                                    keys.append(key)
 
             self._ordered_subjac_keys = keys
 

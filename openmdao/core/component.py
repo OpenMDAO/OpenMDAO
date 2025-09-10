@@ -1583,8 +1583,9 @@ class Component(System):
         matfree = self.matrix_free
         if matfree:
             if 'val' in pattern_meta:
-                issue_warning(f"{self.msginfo}: 'val' was passed to declare_partials for {of} "
-                              f"wrt {wrt} but matrix_free is True, so 'val' will be ignored.")
+                if pattern_meta['val'] is not None:
+                    issue_warning(f"{self.msginfo}: 'val' was passed to declare_partials for {of} "
+                                  f"wrt {wrt} but matrix_free is True, so 'val' will be ignored.")
                 del pattern_meta['val']
             val = None
         elif isinstance(val, list):
