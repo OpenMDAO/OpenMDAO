@@ -172,6 +172,7 @@ class Jacobian(object):
         Get the subjacs for the current system, creating them if necessary based on _subjacs_info.
 
         If approx derivs are being computed, only create subjacs where the wrt variable is relevant.
+        Relevant in this case means required to compute the current set of total derivatives.
 
         Parameters
         ----------
@@ -254,7 +255,6 @@ class Jacobian(object):
         """
         try:
             return self._subjacs_info[self._get_abs_key(key)]
-            # return self._subjacs[self._get_abs_key(key)].info
         except KeyError:
             raise KeyError(f'Variable name pair {key} not found.')
 
@@ -346,6 +346,22 @@ class Jacobian(object):
         """
         for key, subjac in self._subjacs.items():
             yield key, subjac.info['val']
+
+    def is_relevant(self, key):
+        """
+        Return whether there is a relevant subjac for the given promoted or relative name pair.
+
+        Parameters
+        ----------
+        key : (str, str)
+            Promoted or relative name pair of sub-Jacobian.
+
+        Returns
+        -------
+        bool
+            Return whether sub-Jacobian has been defined.
+        """
+        return self._get_abs_key(key) in self._subjacs
 
     @property
     def _randgen(self):
@@ -467,7 +483,7 @@ class Jacobian(object):
         self._get_subjacs(system)
         self._col_mapper = None  # force recompute of internal index maps on next set_col
 
-    def _get_ordered_subjac_keys(self, system, use_relevance=True):
+    def _get_ordered_subjac_keys(self, system):
         """
         Iterate over subjacs keyed by absolute names.
 
@@ -477,8 +493,6 @@ class Jacobian(object):
         ----------
         system : System
             System that is updating this jacobian.
-        use_relevance : bool
-            If True, only include subjacs where the wrt variable is relevant.
 
         Returns
         -------
@@ -486,7 +500,7 @@ class Jacobian(object):
             List of keys matching this jacobian for the current system.
         """
         if self._ordered_subjac_keys is None:
-            if use_relevance and self._has_approx:
+            if self._has_approx:
                 relevance = self._problem_meta['relevance']
                 is_relevant = relevance.is_relevant
                 active = system.linear_solver is None or system.linear_solver.use_relevance()
