@@ -103,7 +103,8 @@
             "expressions": null,
             "nonlinear_solver": "NL: RUNONCE",
             "nonlinear_solver_options": {
-                "iprint": 1
+                "iprint": 1,
+                "debug_print": false
             },
             "linear_solver": "LN: SCIPY",
             "linear_solver_options": {
@@ -128,7 +129,8 @@
                     "expressions": null,
                     "nonlinear_solver": "NL: RUNONCE",
                     "nonlinear_solver_options": {
-                        "iprint": 1
+                        "iprint": 1,
+                        "debug_print": false
                     },
                     "linear_solver": "LN: SCIPY",
                     "linear_solver_options": {
