@@ -59,7 +59,6 @@ class DictionaryJacobian(Jacobian):
         abs_resids = d_residuals._abs_get_val
         abs_outs = d_outputs._abs_get_val
         abs_ins = d_inputs._abs_get_val
-        subjacs_info = self._subjacs_info
         subjacs = self._get_subjacs(system)
         randgen = self._randgen
 
@@ -67,9 +66,6 @@ class DictionaryJacobian(Jacobian):
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._get_ordered_subjac_keys(system):
-                if abs_key not in subjacs_info:
-                    continue
-
                 res_name, other_name = abs_key
 
                 ofvec = abs_resids(res_name) if res_name in d_res_names else None
