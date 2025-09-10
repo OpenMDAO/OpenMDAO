@@ -18,6 +18,7 @@ try:
         Div,
         ScrollBox,
         BasicTicker,
+        Checkbox,
     )
 
     from bokeh.models.tools import (
@@ -148,6 +149,20 @@ if (toggle.active) {{
     if (lines[index].glyph.type == "Line"){{
         lines[index].glyph.properties.line_color.set_value(color);
     }}
+    
+    
+    if (index > num_desvars) {{
+        const index_cons = index - num_desvars - 1;
+        // bound_violation_indicator_source.data["hatch_color"] = color;
+        bound_violation_indicator_source.data[variable_name] = [color];
+        bound_violation_indicator_source.change.emit();
+        //lower_bound_violation_indicators[index_cons].glyph.properties.fill_color=color;
+        //upper_bound_violation_indicators[index_cons].glyph.properties.fill_color=color;
+        //lower_bound_violation_indicators[index_cons].glyph.properties.fill_color.set_value(color);
+        //upper_bound_violation_indicators[index_cons].glyph.properties.fill_color.set_value(color);
+    }}
+
+    
 
     // make the button background color the same as the line, just slightly transparent
     toggle.stylesheets = [`
@@ -302,11 +317,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         self._num_desvars = 0
         self._up_arrow_image_path = "./images/up_arrow_small.png"
         self._down_arrow_image_path = "./images/down_arrow_small.png"
-        
-        
-        
-        self._upper_bounds_region_source = None
 
+        self._upper_bounds_region_source = None
 
         self._setup_figure()
 
@@ -342,7 +354,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 # self._upper_bounds_cons_source.stream(
                 #     self._upper_bounds_cons_source_stream_dict
                 # )
-                
+
                 self._upper_bounds_region_source.stream(self._upper_bounds_region_source_stream_dict)
             return
 
@@ -365,6 +377,22 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             # Create CustomJS callback for toggle buttons.
             # Pass in the data from the Python side that the JavaScript side
             #   needs
+            
+            bound_violation_indicator_source_dict = {}
+            cons_names = self._case_tracker._get_cons_names()
+            for i, cons_name in enumerate(cons_names):
+                units = self._case_tracker._get_units(cons_name)
+                con_name_with_type = cons_name
+                if cons_name in self._both_desvars_and_cons:
+                    con_name_with_type += " [cons]"
+
+                cons_button_label = f"{con_name_with_type} ({units})"
+                bound_violation_indicator_source_dict[cons_button_label] = ["black"]
+
+            self._bound_violation_indicator_source = ColumnDataSource(
+                    data=bound_violation_indicator_source_dict
+                )
+
             legend_item_callback = CustomJS(
                 args=dict(
                     lines=self._lines,
@@ -375,6 +403,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                     toggles=self._toggles,
                     colorPalette=_colorPalette,
                     plot=self.plot_figure,
+                    bound_violation_indicator_source = self._bound_violation_indicator_source,
+                    
                 ),
                 code=callback_code,
             )
@@ -523,15 +553,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         counter = new_data["counter"]
 
         self._source_stream_dict = {"iteration": [counter]}
-        
-        
-        
-        
-        self.plot_figure.x_range = Range1d(1, counter)
 
-        
-        
-        
+        self.plot_figure.x_range = Range1d(1, counter)
 
         # need separate sources to be able to plot the icons indicating the cons
         # are out of bounds
@@ -544,16 +567,13 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             "urls": [self._down_arrow_image_path],
         }
 
-
         self._upper_bounds_region_source_stream_dict = {
             "left": [1],
             "right": [counter],
             "top": [1e6],
             "bottom": [0.0]  # TODO need to have a separate entry for each cons upper bound
         }
-        
-        
-        
+
         iline = 0
         for obj_name, obj_value in new_data["objs"].items():
             float_obj_value = _get_value_for_plotting(obj_value, "objs")
@@ -653,7 +673,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         self._source.stream(self._source_stream_dict)
         # self._lower_bounds_cons_source.stream(self._lower_bounds_cons_source_stream_dict)
         # self._upper_bounds_cons_source.stream(self._upper_bounds_cons_source_stream_dict)
-        
+
         self._upper_bounds_region_source.stream(self._upper_bounds_region_source_stream_dict)
 
         self._labels_updated_with_units = True
@@ -717,8 +737,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             self._upper_bounds_cons_source_dict[con_name_with_type] = []
             # self._upper_bounds_cons_source_dict[con_name] = []
         self._upper_bounds_cons_source = ColumnDataSource(self._upper_bounds_cons_source_dict)
-        
-        
+
         self._upper_bounds_region_source_stream_dict = {
             "left": [],
             "right": [],
@@ -735,7 +754,13 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         )
         toggle.js_on_change("active", callback)
         self._toggles.append(toggle)
-        self._column_items.append(toggle)
+        
+        checkbox = Checkbox(active=False, margin=(12, 0, 8, 4),)
+        
+        self._column_items.append(Row(toggle,checkbox))
+        
+        
+        # self._column_items.append(toggle)
 
         # Add custom CSS styles for both active and inactive states
         toggle.stylesheets = [
@@ -785,31 +810,50 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 # left = 0
                 # right = 49
 
-                if 'x' in y_name:
-                    color = 'red'
-                elif 'g2' in y_name:
-                    color = 'blue'
-                else:
-                    color = 'green'
-
+                # if 'x' in y_name:
+                #     color = 'red'
+                # elif 'g2' in y_name:
+                #     color = 'blue'
+                # else:
+                #     color = 'green'
 
                 import re
                 # Match optional whitespace followed by [anything] at the end of string
                 varname_minus_type = re.sub(r'\s*\[.*?\]$', '', varname)
 
                 lower_bound, upper_bound = self._case_tracker._get_constraint_bounds(varname_minus_type)
-                
-                
+
+                alpha = 0.2
+                hatch_alpha=0.2
+
+                # varname includes if cons, but not units so need to add it here 
+                units = self._case_tracker._get_units(varname_minus_type)
+                cons_button_label = f"{varname} ({units})"
+
+
+
+                # color ="red"
+                # print(f"{color=}")
                 upper_bound_violation_indicator = self.plot_figure.quad(
                             top=1e8,
                             bottom=upper_bound,
                             left=-1,
                             right=1e8,
-                            color=color,
-                            alpha=0.2,    
+                            # color=color,
+                            source = self._bound_violation_indicator_source,
+                            # fill_color=color,
+                            # fill_alpha=alpha,
+    fill_color='lightblue',      # Background fill color
+    fill_alpha=0.0,              # Make background semi-transparent
+    hatch_pattern='cross',           # Diagonal hatch pattern
+    hatch_color=cons_button_label,   # Use color from data source
+    hatch_alpha=0.0,             # Hatch opacity
+    hatch_weight=1,              # Hatch line thickness
+    line_color='black',          # Quad outline
+    line_width=10,
                             visible=False,
-                            hatch_alpha=0.05,
-                            hatch_pattern='diagonal_cross',
+                            # hatch_alpha=hatch_alpha,
+                            # hatch_pattern='diagonal_cross',
                         )
 
                 lower_bound_violation_indicator = self.plot_figure.quad(
@@ -817,19 +861,23 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                             bottom=-1e8,
                             left=-1,
                             right=1e8,
-                            color=color,
-                            alpha=0.2,    
+                            # fill_color=color,
+                            # fill_alpha=alpha,
+                            # color=color,
+                            source=self._bound_violation_indicator_source,
+    fill_color='lightblue',      # Background fill color
+    fill_alpha=0.2,              # Make background semi-transparent
+    hatch_pattern='cross',           # Diagonal hatch pattern
+    hatch_color=cons_button_label,   # Use color from data source
+    hatch_alpha=0.0,             # Hatch opacity
+    hatch_weight=1,              # Hatch line thickness
+    line_color='black',          # Quad outline
+    line_width=10,
+                            alpha=alpha,    
                             visible=False,
-                            hatch_alpha=0.05,
-                            hatch_pattern='diagonal_cross',
+                            # hatch_alpha=hatch_alpha,
+                            # hatch_pattern='diagonal_cross',
                         )
-
-                
-                
-                
-
-
-
 
                 # lower_bound_violation_indicator = self.plot_figure.image_url(
                 #     url="urls",
@@ -855,15 +903,10 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             line.y_range_name = f"extra_y_{varname}_min"
         elif var_type == "cons":
             line.y_range_name = f"extra_y_{varname}"
-            
+
             lower_bound_violation_indicator.y_range_name = f"extra_y_{varname}"
             upper_bound_violation_indicator.y_range_name = f"extra_y_{varname}"
-            
-            
-            upper_bound_region.y_range_name = f"extra_y_{varname}"
-            lower_bound_region.y_range_name = f"extra_y_{varname}"
-            
-            
+
         self._lines.append(line)
         if not use_varea:  # hover tool does not work with Varea
             hover = HoverTool(
@@ -879,8 +922,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
 
     def _make_axis(self, var_type, varname, plot_value, units):
         # Make axis for this variable on the right of the plot
-        
-        
+
         # print(f"make axis for {varname=}")
         if var_type == "desvars":
             y_range_name = f"extra_y_{varname}_min"
@@ -894,11 +936,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             # visible=True,
         )
         self._axes.append(extra_y_axis)
-        self.plot_figure.add_layout(extra_y_axis, "right")
-        
-        print(f"make extra_y_ranges for {y_range_name}")
-        
-        
+        self.plot_figure.add_layout(extra_y_axis, "right")        
+
         self.plot_figure.extra_y_ranges[y_range_name] = Range1d(
             plot_value - 1, plot_value + 1
         )
@@ -944,5 +983,3 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
 
         self.plot_figure.axis.axis_label_text_font_style = "bold"
         self.plot_figure.axis.axis_label_text_font_size = "20pt"
-        
-
