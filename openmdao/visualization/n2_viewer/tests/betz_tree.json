@@ -5,7 +5,8 @@
     "expressions": null,
     "nonlinear_solver": "NL: RUNONCE",
     "nonlinear_solver_options": {
-        "iprint": 1
+        "iprint": 1,
+        "debug_print": false
     },
     "linear_solver": "LN: RUNONCE",
     "linear_solver_options": {
