@@ -2370,6 +2370,56 @@ class TestGroupPromotes(unittest.TestCase):
         # If working correctly, no exception raised.
 
 
+class TestInputInputConnections(unittest.TestCase):
+    def test_connect_input_to_input_chain(self):
+        """
+        Test the ability to connect an input to another input and use
+        auto_ivc as the source.
+        """
+        # Create the problem
+        prob = om.Problem()
+
+        # Add the component
+        prob.model.add_subsystem('c1', om.ExecComp('b = a * x'))
+        prob.model.add_subsystem('c2', om.ExecComp('y2 = a * x ** 2 - b'))
+        prob.model.add_subsystem('c3', om.ExecComp('y3 = a * x ** 3 - b'))
+
+        G = prob.model.add_subsystem('G', om.ParallelGroup())
+        G.add_subsystem('c4', om.ExecComp('y4 = y3 * a'))
+        G.add_subsystem('c5', om.ExecComp('y5 = y4 * y2'))
+
+        # Chain some connections from c1.x -> c2.x -> c3.x
+        prob.model.connect('c1.x', 'c2.x')
+        prob.model.connect('c2.x', 'c3.x')
+        prob.model.connect('c1.b', 'c2.b')
+        prob.model.connect('c2.b', 'c3.b')
+        prob.model.connect('c1.a', ['c2.a', 'c3.a', 'G.c4.a'])
+        prob.model.connect('c3.y3', 'G.c4.y3')
+        prob.model.connect('G.c4.y4', 'G.c5.y4')
+        prob.model.connect('c2.y2', 'G.c5.y2')
+
+        # Setup the problem
+        prob.setup()
+
+        # There should be two outputs in the auto_ivc: c1.a and c1.x
+        prob.set_val('c1.a', 5.)
+        prob.set_val('c1.x', 3.)
+
+        # Run the optimization
+        prob.run_model()
+
+        prob.model.list_vars(list_autoivcs=True)
+
+        assert_near_equal(prob.get_val('c1.b'), 5 * 3)
+        assert_near_equal(prob.get_val('c2.y2'), 5 * 3 ** 2 - 15)
+        assert_near_equal(prob.get_val('c3.y3'), 5 * 3 ** 3 - 15)
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestInputInputConnectionsMPI(TestInputInputConnections):
+    N_PROCS = 2
+
+
 class MyComp(om.ExplicitComponent):
     def __init__(self, input_shape, src_indices=None, flat_src_indices=False):
         super().__init__()
@@ -2471,27 +2521,12 @@ class TestConnect(unittest.TestCase):
         p = self.setup_problem('connect_to_output')
         msg = "\nCollected errors for problem 'connect_to_output':\n   'sub' <class Group>: " + \
               "Attempted to connect from 'tgt.y' to 'cmp.z', but 'cmp.z' is an output. " + \
-              "All connections must be from an output to an input."
+              "The target of connections must be an input."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
         p.model.sub.connect('tgt.y', 'cmp.z')
 
-        with self.assertRaises(Exception) as context:
-            p.setup()
-            p.final_setup()
-
-        self.assertEqual(str(context.exception), msg)
-
-    def test_connect_from_input(self):
-        p = self.setup_problem('connect_from_input')
-        msg = "\nCollected errors for problem 'connect_from_input':\n   'sub' <class Group>: " + \
-              "Attempted to connect from 'tgt.x' to 'cmp.x', but 'tgt.x' is an input. " + \
-              "All connections must be from an output to an input."
-
-        # source and target names can't be checked until setup
-        # because setup is not called until then
-        p.model.sub.connect('tgt.x', 'cmp.x')
         with self.assertRaises(Exception) as context:
             p.setup()
             p.final_setup()
@@ -4477,7 +4512,7 @@ class TestConfigureUpdateMPI(TestConfigureUpdate):
     """
     Runs test in TestConfigureUpdate with 2 procs to make sure the metadata is gathered correctly.
     """
-    N_PROCS = 2
+    N_PROCS = 3
 
 
 if __name__ == "__main__":
