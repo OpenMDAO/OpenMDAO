@@ -424,6 +424,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 #     self._upper_bounds_cons_source_stream_dict
                 # )
 
+
+                # TODO need to do the same for the bounds source 
+                # self._bound_violation_indicator_source
+                
+                # TODO - do I even use this source?
                 self._upper_bounds_region_source.stream(self._upper_bounds_region_source_stream_dict)
             return
 
