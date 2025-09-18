@@ -157,8 +157,8 @@ if (toggle.active) {{
     
     if (var_type == "cons" && checkbox.active) {{
         const index_cons = index - num_desvars - 1;
-        lower_bound_violation_indicators[index_cons].active = true;
-        upper_bound_violation_indicators[index_cons].active = true;
+        lower_bound_violation_indicators[index_cons].visible = true;
+        upper_bound_violation_indicators[index_cons].visible = true;
         bound_violation_indicator_source.data[variable_name] = [color];
         bound_violation_indicator_source.change.emit();
         // bound_violation_indicator_source.data["hatch_color"] = color;
@@ -179,10 +179,11 @@ if (toggle.active) {{
 // if turning off a variable, return the color to the pool
 }} else {{
     window.colorManager.releaseColor(variable_name);
+    debugger;
     if (var_type == "cons") {{
         const index_cons = index - num_desvars - 1;
-        lower_bound_violation_indicators[index_cons].active = false;
-        upper_bound_violation_indicators[index_cons].active = false;
+        lower_bound_violation_indicators[index_cons].visible = false;
+        upper_bound_violation_indicators[index_cons].visible = false;
     }}
     checkbox.disabled = true;
     toggle.stylesheets = [`
