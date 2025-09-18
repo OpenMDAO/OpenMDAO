@@ -57,6 +57,14 @@ _toggle_styles = """
         0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
         inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
+_bounds_hatch_alpha = 0.3
+_bounds_hatch_pattern = 'cross'
+_bounds_hatch_weight = 1
+_bounds_line_width = 1
+_bounds_alpha = 0.0
+_bounds_infinity = 1e8
+_bounds_left = -1
+
 # colors used for the plot lines and associated buttons and axes labels
 # start with color-blind friendly colors and then use others if needed
 if bokeh_and_dependencies_available:
@@ -110,7 +118,10 @@ if (typeof window.ColorManager === 'undefined') {{
 
 // Get the toggle that triggered the callback
 const toggle = cb_obj;
-const index = toggles.indexOf(toggle);
+const var_type = toggle.tags[0].var_type;
+const index = toggle.tags[0].index;
+const checkbox = bounds_off_on_checkboxes[index - 1];
+const variable_name = cb_obj.label;
 
 // index value of 0 is for the objective variable whose axis
 // is on the left. The index variable really refers to the list of toggle buttons.
@@ -120,24 +131,15 @@ const index = toggles.indexOf(toggle);
 // Set line visibility
 lines[index].visible = toggle.active;
 
-// Set cons_violation_indicators visibility
-if (index > num_desvars) {{
-    const index_cons = index - num_desvars - 1;
-    lower_bound_violation_indicators[index_cons].visible = toggle.active;
-    upper_bound_violation_indicators[index_cons].visible = toggle.active;
-
-}}
-
 // Set axis visibility if it exists (all except first line)
-if (index > 0 && index-1 < axes.length) {{
+if (var_type == "desvars" || var_type == "cons") {{
     axes[index-1].visible = toggle.active;
 }}
 
-let variable_name = cb_obj.label;
 // if turning on, get a color and set the line, axis label, and toggle button to that color
 if (toggle.active) {{
     let color = window.colorManager.getColor(variable_name);
-    if (index > 0) {{
+    if (var_type == "desvars" || var_type == "cons") {{
         axes[index-1].axis_label_text_color = color
     }}
 
@@ -150,19 +152,22 @@ if (toggle.active) {{
         lines[index].glyph.properties.line_color.set_value(color);
     }}
     
+    // enable bounds checkbox
+    checkbox.disabled = false;
     
-    if (index > num_desvars) {{
+    if (var_type == "cons" && checkbox.active) {{
         const index_cons = index - num_desvars - 1;
-        // bound_violation_indicator_source.data["hatch_color"] = color;
+        lower_bound_violation_indicators[index_cons].active = true;
+        upper_bound_violation_indicators[index_cons].active = true;
         bound_violation_indicator_source.data[variable_name] = [color];
         bound_violation_indicator_source.change.emit();
+        // bound_violation_indicator_source.data["hatch_color"] = color;
         //lower_bound_violation_indicators[index_cons].glyph.properties.fill_color=color;
         //upper_bound_violation_indicators[index_cons].glyph.properties.fill_color=color;
         //lower_bound_violation_indicators[index_cons].glyph.properties.fill_color.set_value(color);
         //upper_bound_violation_indicators[index_cons].glyph.properties.fill_color.set_value(color);
-    }}
-
-    
+    }} 
+  
 
     // make the button background color the same as the line, just slightly transparent
     toggle.stylesheets = [`
@@ -174,6 +179,12 @@ if (toggle.active) {{
 // if turning off a variable, return the color to the pool
 }} else {{
     window.colorManager.releaseColor(variable_name);
+    if (var_type == "cons") {{
+        const index_cons = index - num_desvars - 1;
+        lower_bound_violation_indicators[index_cons].active = false;
+        upper_bound_violation_indicators[index_cons].active = false;
+    }}
+    checkbox.disabled = true;
     toggle.stylesheets = [`
         .bk-btn {{
             {_toggle_styles}
@@ -181,6 +192,59 @@ if (toggle.active) {{
     `];
 
 }}
+"""
+bounds_off_on_callback_code = f"""
+// Get the toggle that triggered the callback
+const checkbox = cb_obj;
+// the checkbox was created with the name set to the index of 
+//  the checkbox in the list of checkboxes, so we can 
+//  determine which checkbox was checked in this callback and 
+//  use that index to know which bounds graphics to turn off and on
+const var_type = checkbox.tags[0].var_type;
+const index = checkbox.tags[0].index;
+const variable_name = checkbox.tags[0].variable_name;
+
+// index value of 0 is for the objective variable whose axis
+// is on the left. The index variable really refers to the list of toggle buttons.
+// The axes list variable only is for desvars and cons, whose axes are on the right.
+// The lines list variables includes all vars
+ 
+// Set cons_violation_indicators visibility
+if (var_type == "cons") {{
+    debugger;
+    const index_cons = index - num_desvars;
+    
+    console.log("lower_bound_violation_indicators = " + lower_bound_violation_indicators);
+    console.log("index_cons = " + index_cons);
+    lower_bound_violation_indicators[index_cons].properties.visible.set_value(checkbox.active);
+    upper_bound_violation_indicators[index_cons].properties.visible.set_value(checkbox.active);
+
+    if (checkbox.active){{
+        // set bounds indicator color to plot line color
+        const line_index = index + 1 ; // the objective line is the first line
+        
+        // need to handle this here since it has fill color, not line_color
+//  if (lines[index].glyph.type == "VArea"){{
+
+        const plot_line_color = lines[line_index].glyph.properties.line_color.get_value().value;
+    
+    
+        // TODO problem is here!
+        bound_violation_indicator_source.data[variable_name] = [plot_line_color];
+        bound_violation_indicator_source.change.emit();
+        //lower_bound_violation_indicators[index_cons].glyph.properties.fill_color=plot_line_color;
+        //upper_bound_violation_indicators[index_cons].glyph.properties.fill_color=plot_line_color;
+        //lower_bound_violation_indicators[index_cons].glyph.properties.fill_color.set_value(plot_line_color);
+        //upper_bound_violation_indicators[index_cons].glyph.properties.fill_color.set_value(plot_line_color);
+
+    }}
+
+
+
+}}
+
+
+ 
 """
 
 
@@ -303,6 +367,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
 
         self._lines = []
         self._toggles = []  # includes only the toggle buttons
+        self._bounds_off_on_checkboxes = []  # includes only the checkboxes for bounds on/off
+        
+        
+        
+        
         self._column_items = []  # includes all items in the Column, including headers and toggles
         self._axes = []
         # flag to prevent updating label with units each time we get new data
@@ -377,7 +446,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             # Create CustomJS callback for toggle buttons.
             # Pass in the data from the Python side that the JavaScript side
             #   needs
-            
+
             bound_violation_indicator_source_dict = {}
             cons_names = self._case_tracker._get_cons_names()
             for i, cons_name in enumerate(cons_names):
@@ -393,6 +462,30 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                     data=bound_violation_indicator_source_dict
                 )
 
+            import copy
+
+            gleep = self._bounds_off_on_checkboxes.copy() # TODO figure out why I need to do this
+            
+            gleep = copy.deepcopy(self._bounds_off_on_checkboxes)
+            
+            print("before customjs")
+            print(f"{self._toggles=}")
+            print(f"{self._bounds_off_on_checkboxes=}")
+
+            bounds_off_on_callback = CustomJS(
+                args=dict(
+                    lines=self._lines,
+                    lower_bound_violation_indicators=self._lower_bound_violation_indicators,
+                    upper_bound_violation_indicators=self._upper_bound_violation_indicators,
+                    num_desvars=self._num_desvars,
+                    # bounds_off_on_checkboxes=self._bounds_off_on_checkboxes,
+                    # bounds_off_on_checkboxes=gleep,
+                    plot=self.plot_figure,
+                    bound_violation_indicator_source = self._bound_violation_indicator_source,
+                ),
+                code=bounds_off_on_callback_code,
+            )
+            
             legend_item_callback = CustomJS(
                 args=dict(
                     lines=self._lines,
@@ -400,14 +493,18 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                     lower_bound_violation_indicators=self._lower_bound_violation_indicators,
                     upper_bound_violation_indicators=self._upper_bound_violation_indicators,
                     num_desvars=self._num_desvars,
-                    toggles=self._toggles,
+                    # toggles=self._toggles,
+
+                    bounds_off_on_checkboxes=self._bounds_off_on_checkboxes,
+                    # bounds_off_on_checkboxes=gleep,
                     colorPalette=_colorPalette,
                     plot=self.plot_figure,
                     bound_violation_indicator_source = self._bound_violation_indicator_source,
-                    
                 ),
                 code=callback_code,
             )
+
+
 
             # For the variables, make lines, axes, and the buttons to turn on and
             #   off the variable plot.
@@ -423,7 +520,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 units = self._case_tracker._get_units(obj_name)
                 self.plot_figure.yaxis.axis_label = f"{obj_name} ({units})"
                 self._make_variable_button(
-                    f"{obj_name} ({units})", _obj_color, True, legend_item_callback
+                    f"{obj_name} ({units})", 'objs', _obj_color, True, legend_item_callback,
+                    bounds_off_on_callback
                 )
                 self._make_line_and_hover_tool(
                     "objs", obj_name, False, _obj_color, "solid", True
@@ -447,9 +545,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 desvar_button_label = f"{desvar_name_with_type} ({units})"
                 self._make_variable_button(
                     desvar_button_label,
+                    'desvars',  # TODO should make this and the other types a const
                     _non_active_plot_color,
                     False,
                     legend_item_callback,
+                    bounds_off_on_callback
                 )
                 value = new_data["desvars"][desvar_name]
                 # for desvars, if value is a vector, use Bokeh Varea glyph
@@ -480,9 +580,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 cons_button_label = f"{con_name_with_type} ({units})"
                 self._make_variable_button(
                     cons_button_label,
+                    "cons",
                     _non_active_plot_color,
                     False,
                     legend_item_callback,
+                    bounds_off_on_callback
                 )
                 self._make_line_and_hover_tool(
                     "cons",
@@ -499,6 +601,14 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 self._constraint_bounds[cons_name] = (
                     self._case_tracker._get_constraint_bounds(cons_name)
                 )
+
+            # for toggle in self._toggles:
+            #     toggle.js_on_change("active", legend_item_callback)
+
+            # for checkbox in self._bounds_off_on_checkboxes:
+            #     checkbox.js_on_change("active", bounds_off_on_callback)
+
+
 
             # Create a Column of the variable buttons and headers inside a scrolling window
             toggle_column = Column(
@@ -746,20 +856,28 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         }
         self._upper_bounds_region_source = ColumnDataSource(self._upper_bounds_region_source_stream_dict)
 
-    def _make_variable_button(self, varname, color, active, callback):
+    def _make_variable_button(self, varname, var_type, color, active, callback, bounds_off_on_callback):
+        index = len(self._toggles)
         toggle = Toggle(
             label=varname,
             active=active,
             margin=(0, 0, 8, 0),
-        )
+            tags=[{'var_type': var_type, 'index': index}])
         toggle.js_on_change("active", callback)
         self._toggles.append(toggle)
-        
-        checkbox = Checkbox(active=False, margin=(12, 0, 8, 4),)
-        
-        self._column_items.append(Row(toggle,checkbox))
-        
-        
+
+        if var_type != 'objs':
+            index = len(self._bounds_off_on_checkboxes)
+            checkbox = Checkbox(active=False, disabled=True, margin=(12, 0, 8, 4),
+                                tags=[{'var_type': var_type, 'index': index, 'variable_name':varname}])
+            # TODO consistently use varname, cons,...
+            # can be accessed on the javascript side using checkbox.tags[0].name
+            checkbox.js_on_change("active", bounds_off_on_callback)
+            self._bounds_off_on_checkboxes.append(checkbox)
+            self._column_items.append(Row(toggle,checkbox))
+        else:
+            self._column_items.append(toggle)
+            
         # self._column_items.append(toggle)
 
         # Add custom CSS styles for both active and inactive states
@@ -805,96 +923,49 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             )
             if var_type == "cons":
 
-                # top = 207.728561113109458
-                # bottom = 0
-                # left = 0
-                # right = 49
-
-                # if 'x' in y_name:
-                #     color = 'red'
-                # elif 'g2' in y_name:
-                #     color = 'blue'
-                # else:
-                #     color = 'green'
-
                 import re
                 # Match optional whitespace followed by [anything] at the end of string
                 varname_minus_type = re.sub(r'\s*\[.*?\]$', '', varname)
 
                 lower_bound, upper_bound = self._case_tracker._get_constraint_bounds(varname_minus_type)
 
-                alpha = 0.2
-                hatch_alpha=0.2
-
-                # varname includes if cons, but not units so need to add it here 
+                # varname includes if cons, but not units so need to add it here
                 units = self._case_tracker._get_units(varname_minus_type)
                 cons_button_label = f"{varname} ({units})"
 
-
-
-                # color ="red"
-                # print(f"{color=}")
                 upper_bound_violation_indicator = self.plot_figure.quad(
-                            top=1e8,
-                            bottom=upper_bound,
-                            left=-1,
-                            right=1e8,
-                            # color=color,
-                            source = self._bound_violation_indicator_source,
-                            # fill_color=color,
-                            # fill_alpha=alpha,
-    fill_color='lightblue',      # Background fill color
-    fill_alpha=0.0,              # Make background semi-transparent
-    hatch_pattern='cross',           # Diagonal hatch pattern
-    hatch_color=cons_button_label,   # Use color from data source
-    hatch_alpha=0.0,             # Hatch opacity
-    hatch_weight=1,              # Hatch line thickness
-    line_color='black',          # Quad outline
-    line_width=10,
-                            visible=False,
-                            # hatch_alpha=hatch_alpha,
-                            # hatch_pattern='diagonal_cross',
-                        )
+                    top=_bounds_infinity,
+                    bottom=upper_bound,
+                    left=_bounds_left,
+                    right=_bounds_infinity,
+                    source=self._bound_violation_indicator_source,
+                    hatch_pattern=_bounds_hatch_pattern,  # Diagonal hatch pattern
+                    hatch_color=cons_button_label,  # Use color from data source
+                    hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
+                    hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
+                    line_color=cons_button_label,  # Quad outline
+                    line_width=_bounds_line_width,
+                    alpha=_bounds_alpha,
+                    color=cons_button_label,
+                    visible=False,
+                )
 
                 lower_bound_violation_indicator = self.plot_figure.quad(
-                            top=lower_bound,
-                            bottom=-1e8,
-                            left=-1,
-                            right=1e8,
-                            # fill_color=color,
-                            # fill_alpha=alpha,
-                            # color=color,
-                            source=self._bound_violation_indicator_source,
-    fill_color='lightblue',      # Background fill color
-    fill_alpha=0.2,              # Make background semi-transparent
-    hatch_pattern='cross',           # Diagonal hatch pattern
-    hatch_color=cons_button_label,   # Use color from data source
-    hatch_alpha=0.0,             # Hatch opacity
-    hatch_weight=1,              # Hatch line thickness
-    line_color='black',          # Quad outline
-    line_width=10,
-                            alpha=alpha,    
-                            visible=False,
-                            # hatch_alpha=hatch_alpha,
-                            # hatch_pattern='diagonal_cross',
-                        )
-
-                # lower_bound_violation_indicator = self.plot_figure.image_url(
-                #     url="urls",
-                #     x="iteration",
-                #     y=y_name,
-                #     anchor="center",
-                #     source=self._lower_bounds_cons_source,
-                #     visible=visible,
-                # )
-                # upper_bound_violation_indicator = self.plot_figure.image_url(
-                #     url="urls",
-                #     x="iteration",
-                #     y=y_name,
-                #     anchor="center",
-                #     source=self._upper_bounds_cons_source,
-                #     visible=visible,
-                # )
+                    top=lower_bound,
+                    bottom=-_bounds_infinity,
+                    left=_bounds_left,
+                    right=_bounds_infinity,
+                    source=self._bound_violation_indicator_source,
+                    hatch_pattern=_bounds_hatch_pattern,  # Diagonal hatch pattern
+                    hatch_color=cons_button_label,  # Use color from data source
+                    hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
+                    hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
+                    line_color=cons_button_label,  # Quad outline
+                    line_width=_bounds_line_width,
+                    alpha=_bounds_alpha,
+                    color=cons_button_label,
+                    visible=False,
+                )
 
                 self._lower_bound_violation_indicators.append(lower_bound_violation_indicator)
                 self._upper_bound_violation_indicators.append(upper_bound_violation_indicator)
