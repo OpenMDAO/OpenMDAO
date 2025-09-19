@@ -1,7 +1,11 @@
 import unittest
 
 import numpy as np
-import jax.numpy as jnp
+
+try:
+    import jax.numpy as jnp
+except ImportError:
+    jnp = None
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
@@ -203,6 +207,7 @@ class TestPComputeJacvecProd(unittest.TestCase):
         np.testing.assert_allclose(J2, J)
 
 
+@unittest.skipIf(jnp is None, "jax is not installed")
 class TestProbComputeJacvecProdPromoted(unittest.TestCase):
 
     def test_promoted_names(self):
