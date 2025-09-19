@@ -48,6 +48,11 @@ _non_active_plot_color = "black"
 _plot_line_width = 3
 # how transparent is the area part of the plot for desvars that are vectors
 _varea_alpha = 0.3
+# for variables that are vectors, we use bokeh's varea plotting element
+#   which is invisible if the min and max of the varea is the same. 
+#   Use this width to keep it from disappearing.
+#   0.001 seems to be a good fraction, not too thick but still visible
+_varea_min_width = 0.001
 # the CSS for the toggle buttons to let user choose what variables to plot
 _variable_list_header_font_size = "14"
 _toggle_styles = """
@@ -72,7 +77,7 @@ if bokeh_and_dependencies_available:
 
 # This is the JavaScript code that gets run when a user clicks on
 #   one of the toggle buttons that change what variables are plotted
-callback_code = f"""
+variable_button_callback_code = f"""
 // The ColorManager provides color from a palette. When the
 //   user turns off the plotting of a variable, the color is returned to the ColorManager
 //   for later use with a different variable plot
@@ -120,11 +125,12 @@ if (typeof window.ColorManager === 'undefined') {{
 const toggle = cb_obj;
 const var_type = toggle.tags[0].var_type;
 const index = toggle.tags[0].index;
-const checkbox = bounds_off_on_checkboxes[index - 1];
-const variable_name = cb_obj.label;
+const index_checkbox = index - 1; // objective does not have checkbox
+const checkbox = bounds_off_on_checkboxes[index_checkbox];
+const varname = cb_obj.label;
 
 // index value of 0 is for the objective variable whose axis
-// is on the left. The index variable really refers to the list of toggle buttons.
+// is on the left. The index variable refers to the list of toggle buttons.
 // The axes list variable only is for desvars and cons, whose axes are on the right.
 // The lines list variables includes all vars
 
@@ -138,7 +144,7 @@ if (var_type == "desvars" || var_type == "cons") {{
 
 // if turning on, get a color and set the line, axis label, and toggle button to that color
 if (toggle.active) {{
-    let color = window.colorManager.getColor(variable_name);
+    let color = window.colorManager.getColor(varname);
     if (var_type == "desvars" || var_type == "cons") {{
         axes[index-1].axis_label_text_color = color
     }}
@@ -152,20 +158,16 @@ if (toggle.active) {{
         lines[index].glyph.properties.line_color.set_value(color);
     }}
     
-    // enable bounds checkbox
+    // enable bounds_off_on_checkbox
     checkbox.disabled = false;
     
+    // turn on bounds display bounds checkbox is on and var is a cons
     if (var_type == "cons" && checkbox.active) {{
         const index_cons = index - num_desvars - 1;
         lower_bound_violation_indicators[index_cons].visible = true;
         upper_bound_violation_indicators[index_cons].visible = true;
-        bound_violation_indicator_source.data[variable_name] = [color];
+        bound_violation_indicator_source.data[varname] = [color];
         bound_violation_indicator_source.change.emit();
-        // bound_violation_indicator_source.data["hatch_color"] = color;
-        //lower_bound_violation_indicators[index_cons].glyph.properties.fill_color=color;
-        //upper_bound_violation_indicators[index_cons].glyph.properties.fill_color=color;
-        //lower_bound_violation_indicators[index_cons].glyph.properties.fill_color.set_value(color);
-        //upper_bound_violation_indicators[index_cons].glyph.properties.fill_color.set_value(color);
     }} 
   
 
@@ -176,15 +178,15 @@ if (toggle.active) {{
             {_toggle_styles}
         }}
     `];
-// if turning off a variable, return the color to the pool
 }} else {{
-    window.colorManager.releaseColor(variable_name);
-    debugger;
+    // if turning off a variable, return the color to the pool
+    window.colorManager.releaseColor(varname);
     if (var_type == "cons") {{
         const index_cons = index - num_desvars - 1;
         lower_bound_violation_indicators[index_cons].visible = false;
         upper_bound_violation_indicators[index_cons].visible = false;
     }}
+    // if the variable is not being displayed, do not let the user turn on bounds display
     checkbox.disabled = true;
     toggle.stylesheets = [`
         .bk-btn {{
@@ -195,28 +197,18 @@ if (toggle.active) {{
 }}
 """
 bounds_off_on_callback_code = f"""
-// Get the toggle that triggered the callback
+// Get the checkbox that triggered the callback
 const checkbox = cb_obj;
-// the checkbox was created with the name set to the index of 
-//  the checkbox in the list of checkboxes, so we can 
-//  determine which checkbox was checked in this callback and 
-//  use that index to know which bounds graphics to turn off and on
+// the checkbox was created with the tags set to a list
+//  with the single item of a dict with some key values in it
 const var_type = checkbox.tags[0].var_type;
 const index = checkbox.tags[0].index;
-const variable_name = checkbox.tags[0].variable_name;
+const varname = checkbox.tags[0].varname;
+let plot_line_color;
 
-// index value of 0 is for the objective variable whose axis
-// is on the left. The index variable really refers to the list of toggle buttons.
-// The axes list variable only is for desvars and cons, whose axes are on the right.
-// The lines list variables includes all vars
- 
-// Set cons_violation_indicators visibility
+// Set bounds violation indicators visibility
 if (var_type == "cons") {{
-    debugger;
     const index_cons = index - num_desvars;
-    
-    console.log("lower_bound_violation_indicators = " + lower_bound_violation_indicators);
-    console.log("index_cons = " + index_cons);
     lower_bound_violation_indicators[index_cons].properties.visible.set_value(checkbox.active);
     upper_bound_violation_indicators[index_cons].properties.visible.set_value(checkbox.active);
 
@@ -224,30 +216,17 @@ if (var_type == "cons") {{
         // set bounds indicator color to plot line color
         const line_index = index + 1 ; // the objective line is the first line
         
-        // need to handle this here since it has fill color, not line_color
-//  if (lines[index].glyph.type == "VArea"){{
-
-        const plot_line_color = lines[line_index].glyph.properties.line_color.get_value().value;
+        if (lines[line_index].glyph.type == "VArea"){{
+            plot_line_color = lines[line_index].glyph.properties.fill_color.get_value().value;
+        }} else {{
+            plot_line_color = lines[line_index].glyph.properties.line_color.get_value().value;           
+        }}
     
-    
-        // TODO problem is here!
-        bound_violation_indicator_source.data[variable_name] = [plot_line_color];
+        bound_violation_indicator_source.data[varname] = [plot_line_color];
         bound_violation_indicator_source.change.emit();
-        //lower_bound_violation_indicators[index_cons].glyph.properties.fill_color=plot_line_color;
-        //upper_bound_violation_indicators[index_cons].glyph.properties.fill_color=plot_line_color;
-        //lower_bound_violation_indicators[index_cons].glyph.properties.fill_color.set_value(plot_line_color);
-        //upper_bound_violation_indicators[index_cons].glyph.properties.fill_color.set_value(plot_line_color);
-
     }}
-
-
-
 }}
-
-
- 
 """
-
 
 def _update_y_min_max(name, y, y_min, y_max):
     """
@@ -369,10 +348,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         self._lines = []
         self._toggles = []  # includes only the toggle buttons
         self._bounds_off_on_checkboxes = []  # includes only the checkboxes for bounds on/off
-        
-        
-        
-        
         self._column_items = []  # includes all items in the Column, including headers and toggles
         self._axes = []
         # flag to prevent updating label with units each time we get new data
@@ -381,14 +356,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         # user for showing which constraint points are out of bounds
         self._lower_bounds_cons_source = None
         self._upper_bounds_cons_source = None
-        self._constraint_bounds = {}
         self._lower_bound_violation_indicators = []
         self._upper_bound_violation_indicators = []
         self._num_desvars = 0
         self._up_arrow_image_path = "./images/up_arrow_small.png"
         self._down_arrow_image_path = "./images/down_arrow_small.png"
-
-        self._upper_bounds_region_source = None
 
         self._setup_figure()
 
@@ -418,19 +390,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 #   lines will not change color because of the set_value hack done to get
                 #   get around the bug in setting the line color from JavaScript
                 self._source.stream(self._source_stream_dict)
-                # self._lower_bounds_cons_source.stream(
-                #     self._lower_bounds_cons_source_stream_dict
-                # )
-                # self._upper_bounds_cons_source.stream(
-                #     self._upper_bounds_cons_source_stream_dict
-                # )
 
 
                 # TODO need to do the same for the bounds source 
                 # self._bound_violation_indicator_source
                 
-                # TODO - do I even use this source?
-                self._upper_bounds_region_source.stream(self._upper_bounds_region_source_stream_dict)
             return
 
         new_data = self._case_tracker._get_data_from_case(new_case)
@@ -449,10 +413,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                         but {len(obj_names)} objectives found"
                 )
 
-            # Create CustomJS callback for toggle buttons.
-            # Pass in the data from the Python side that the JavaScript side
-            #   needs
-
             bound_violation_indicator_source_dict = {}
             cons_names = self._case_tracker._get_cons_names()
             for i, cons_name in enumerate(cons_names):
@@ -468,49 +428,33 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                     data=bound_violation_indicator_source_dict
                 )
 
-            import copy
-
-            gleep = self._bounds_off_on_checkboxes.copy() # TODO figure out why I need to do this
-            
-            gleep = copy.deepcopy(self._bounds_off_on_checkboxes)
-            
-            print("before customjs")
-            print(f"{self._toggles=}")
-            print(f"{self._bounds_off_on_checkboxes=}")
-
+            # Create CustomJS callback for toggle buttons.
+            # Pass in the data from the Python side that the JavaScript side
+            #   needs
             bounds_off_on_callback = CustomJS(
                 args=dict(
+                    num_desvars=self._num_desvars,
                     lines=self._lines,
+                    bound_violation_indicator_source = self._bound_violation_indicator_source,
                     lower_bound_violation_indicators=self._lower_bound_violation_indicators,
                     upper_bound_violation_indicators=self._upper_bound_violation_indicators,
-                    num_desvars=self._num_desvars,
-                    # bounds_off_on_checkboxes=self._bounds_off_on_checkboxes,
-                    # bounds_off_on_checkboxes=gleep,
-                    plot=self.plot_figure,
-                    bound_violation_indicator_source = self._bound_violation_indicator_source,
                 ),
                 code=bounds_off_on_callback_code,
             )
             
-            legend_item_callback = CustomJS(
+            variable_button_callback = CustomJS(
                 args=dict(
+                    num_desvars=self._num_desvars,
                     lines=self._lines,
                     axes=self._axes,
+                    bounds_off_on_checkboxes=self._bounds_off_on_checkboxes,
+                    bound_violation_indicator_source = self._bound_violation_indicator_source,
                     lower_bound_violation_indicators=self._lower_bound_violation_indicators,
                     upper_bound_violation_indicators=self._upper_bound_violation_indicators,
-                    num_desvars=self._num_desvars,
-                    # toggles=self._toggles,
-
-                    bounds_off_on_checkboxes=self._bounds_off_on_checkboxes,
-                    # bounds_off_on_checkboxes=gleep,
                     colorPalette=_colorPalette,
-                    plot=self.plot_figure,
-                    bound_violation_indicator_source = self._bound_violation_indicator_source,
                 ),
-                code=callback_code,
+                code=variable_button_callback_code,
             )
-
-
 
             # For the variables, make lines, axes, and the buttons to turn on and
             #   off the variable plot.
@@ -526,7 +470,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 units = self._case_tracker._get_units(obj_name)
                 self.plot_figure.yaxis.axis_label = f"{obj_name} ({units})"
                 self._make_variable_button(
-                    f"{obj_name} ({units})", 'objs', _obj_color, True, legend_item_callback,
+                    f"{obj_name} ({units})", 'objs', _obj_color, True, variable_button_callback,
                     bounds_off_on_callback
                 )
                 self._make_line_and_hover_tool(
@@ -538,7 +482,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 self.plot_figure.y_range = Range1d(float_value - 1, float_value + 1)
 
             # desvars
-            desvars_label = _make_header_text_for_variable_chooser("DESIGN VARS")
+            desvars_label = _make_header_text_for_variable_chooser("DESIGN VARIABLES")
             self._column_items.append(desvars_label)
             desvar_names = self._case_tracker._get_desvar_names()
             for i, desvar_name in enumerate(desvar_names):
@@ -554,7 +498,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                     'desvars',  # TODO should make this and the other types a const
                     _non_active_plot_color,
                     False,
-                    legend_item_callback,
+                    variable_button_callback,
                     bounds_off_on_callback
                 )
                 value = new_data["desvars"][desvar_name]
@@ -562,7 +506,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 use_varea = value.size > 1
                 self._make_line_and_hover_tool(
                     "desvars",
-                    # desvar_name,
                     desvar_name_with_type,
                     use_varea,
                     _non_active_plot_color,
@@ -570,8 +513,13 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                     False,
                 )
                 float_value = _get_value_for_plotting(value, "desvars")
-                # self._make_axis("desvars", desvar_name, float_value, units)
                 self._make_axis("desvars", desvar_name_with_type, float_value, units)
+
+            # TODO create a variable object that includes name, units, shape,...
+            
+            # TODO include desvar driver constraints
+            
+            # TODO make a function for the source None part of the code
 
             # cons
             cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
@@ -589,7 +537,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                     "cons",
                     _non_active_plot_color,
                     False,
-                    legend_item_callback,
+                    variable_button_callback,
                     bounds_off_on_callback
                 )
                 self._make_line_and_hover_tool(
@@ -604,17 +552,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 value = new_data["cons"][cons_name]
                 float_value = _get_value_for_plotting(value, "cons")
                 self._make_axis("cons", con_name_with_type, float_value, units)
-                self._constraint_bounds[cons_name] = (
-                    self._case_tracker._get_constraint_bounds(cons_name)
-                )
-
-            # for toggle in self._toggles:
-            #     toggle.js_on_change("active", legend_item_callback)
-
-            # for checkbox in self._bounds_off_on_checkboxes:
-            #     checkbox.js_on_change("active", bounds_off_on_callback)
-
-
 
             # Create a Column of the variable buttons and headers inside a scrolling window
             toggle_column = Column(
@@ -667,28 +604,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         # Do the actual update of the plot including updating the plot range and adding the new
         # data to the Bokeh plot stream
         counter = new_data["counter"]
-
         self._source_stream_dict = {"iteration": [counter]}
-
         self.plot_figure.x_range = Range1d(1, counter)
-
-        # need separate sources to be able to plot the icons indicating the cons
-        # are out of bounds
-        self._lower_bounds_cons_source_stream_dict = {
-            "iteration": [counter],
-            "urls": [self._up_arrow_image_path],
-        }
-        self._upper_bounds_cons_source_stream_dict = {
-            "iteration": [counter],
-            "urls": [self._down_arrow_image_path],
-        }
-
-        self._upper_bounds_region_source_stream_dict = {
-            "left": [1],
-            "right": [counter],
-            "top": [1e6],
-            "bottom": [0.0]  # TODO need to have a separate entry for each cons upper bound
-        }
 
         iline = 0
         for obj_name, obj_value in new_data["objs"].items():
@@ -709,11 +626,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             if not self._labels_updated_with_units and desvar_value.size > 1:
                 units = self._case_tracker._get_units(desvar_name)
                 desvar_button_label = desvar_name_with_type + f' ({units}) {desvar_value.shape}'
-                # if desvar_name in self._both_desvars_and_cons:
-                #     varname = f"{desvar_name} [dv] ({units}) {desvar_value.shape}"
-                # else:
-                #     varname = f"{desvar_name} ({units}) {desvar_value.shape}"
-                # self._toggles[iline].label = varname
                 self._toggles[iline].label = desvar_button_label
 
             # handle non-scalar desvars
@@ -726,22 +638,18 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             )
             if min_max_changed:
                 range = Range1d(self._y_min[desvar_name], self._y_max[desvar_name])
-                # self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name}_min"] = range
                 self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name_with_type}_min"] = range
             # deal with when min and max are the same.
             # Otherwise the varea plot shows nothing, not even a line
             if np.min(desvar_value) == np.max(desvar_value):
                 range = self._y_max[desvar_name] - self._y_min[desvar_name]
-                # 0.001 seems to be a good fraction, not too thick but still visible
-                min_thickness = range * .001
+                min_thickness = range * _varea_min_width
                 y1 = np.min(desvar_value) - min_thickness
                 y2 = np.min(desvar_value) + min_thickness
             else:
                 y1 = np.min(desvar_value)
                 y2 = np.max(desvar_value)
 
-            # self._source_stream_dict[f"{desvar_name}_min"] = [y1]
-            # self._source_stream_dict[f"{desvar_name}_max"] = [y2]
             self._source_stream_dict[f"{desvar_name_with_type}_min"] = [y1]
             self._source_stream_dict[f"{desvar_name_with_type}_max"] = [y2]
             iline += 1
@@ -754,23 +662,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             if not self._labels_updated_with_units and cons_value.size > 1:
                 units = self._case_tracker._get_units(cons_name)
                 cons_button_label = con_name_with_type + f' ({units}) {cons_value.shape}'
-                # if cons_name in self._both_desvars_and_cons:
-                #     varname = f"{cons_name} [cons] ({units}) {cons_value.shape}"
-                # else:
-                #     varname = f"{cons_name} ({units}) {cons_value.shape}"
                 self._toggles[iline].label = cons_button_label
-                # self._toggles[iline].label = varname
-            # self._source_stream_dict[cons_name] = [float_cons_value]
             self._source_stream_dict[con_name_with_type] = [float_cons_value]
-
-            lower_bound, upper_bound = self._constraint_bounds[cons_name]
-            # if given np.nan, nothing will be plotted. Only plot arrows when out of bounds
-            # lower_value = float_cons_value if float_cons_value < lower_bound else np.nan
-            # upper_value = float_cons_value if float_cons_value > upper_bound else np.nan
-            # self._lower_bounds_cons_source_stream_dict[con_name_with_type] = [lower_value]
-            # self._upper_bounds_cons_source_stream_dict[con_name_with_type] = [upper_value]
-            # self._lower_bounds_cons_source_stream_dict[cons_name] = [lower_value]
-            # self._upper_bounds_cons_source_stream_dict[cons_name] = [upper_value]
 
             # handle non-scalar cons
             min_max_changed = False
@@ -782,15 +675,10 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             )
             if min_max_changed:
                 range = Range1d(self._y_min[con_name_with_type], self._y_max[con_name_with_type])
-                # self.plot_figure.extra_y_ranges[f"extra_y_{cons_name}"] = range
                 self.plot_figure.extra_y_ranges[f"extra_y_{con_name_with_type}"] = range
             iline += 1
 
         self._source.stream(self._source_stream_dict)
-        # self._lower_bounds_cons_source.stream(self._lower_bounds_cons_source_stream_dict)
-        # self._upper_bounds_cons_source.stream(self._upper_bounds_cons_source_stream_dict)
-
-        self._upper_bounds_region_source.stream(self._upper_bounds_region_source_stream_dict)
 
         self._labels_updated_with_units = True
         # end of _update method
@@ -814,8 +702,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 desvar_name_with_type += ' [dv]'
             self._source_dict[f"{desvar_name_with_type}_min"] = []
             self._source_dict[f"{desvar_name_with_type}_max"] = []
-            # self._source_dict[f"{desvar_name}_min"] = []
-            # self._source_dict[f"{desvar_name}_max"] = []
             self._num_desvars += 1
 
         # Cons
@@ -838,7 +724,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             if con_name in self._both_desvars_and_cons:
                 con_name_with_type += ' [cons]'
             self._lower_bounds_cons_source_dict[con_name_with_type] = []
-            # self._lower_bounds_cons_source_dict[con_name] = []
         self._lower_bounds_cons_source = ColumnDataSource(self._lower_bounds_cons_source_dict)
 
         # Cons - upper bound
@@ -851,16 +736,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             if con_name in self._both_desvars_and_cons:
                 con_name_with_type += ' [cons]'
             self._upper_bounds_cons_source_dict[con_name_with_type] = []
-            # self._upper_bounds_cons_source_dict[con_name] = []
         self._upper_bounds_cons_source = ColumnDataSource(self._upper_bounds_cons_source_dict)
 
-        self._upper_bounds_region_source_stream_dict = {
-            "left": [],
-            "right": [],
-            "top": [],
-            "bottom": [],
-        }
-        self._upper_bounds_region_source = ColumnDataSource(self._upper_bounds_region_source_stream_dict)
 
     def _make_variable_button(self, varname, var_type, color, active, callback, bounds_off_on_callback):
         index = len(self._toggles)
@@ -875,17 +752,13 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         if var_type != 'objs':
             index = len(self._bounds_off_on_checkboxes)
             checkbox = Checkbox(active=False, disabled=True, margin=(12, 0, 8, 4),
-                                tags=[{'var_type': var_type, 'index': index, 'variable_name':varname}])
-            # TODO consistently use varname, cons,...
-            # can be accessed on the javascript side using checkbox.tags[0].name
+                                tags=[{'var_type': var_type, 'index': index, 'varname':varname}])
             checkbox.js_on_change("active", bounds_off_on_callback)
             self._bounds_off_on_checkboxes.append(checkbox)
             self._column_items.append(Row(toggle,checkbox))
         else:
             self._column_items.append(toggle)
             
-        # self._column_items.append(toggle)
-
         # Add custom CSS styles for both active and inactive states
         toggle.stylesheets = [
             f"""
@@ -1045,8 +918,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             active_tap=None,
             output_backend="webgl",
         )
-        # self.plot_figure.x_range.start = 1
-        # self.plot_figure.x_range.follow = "start"
 
         self.plot_figure.title.text_font_size = "14px"
         self.plot_figure.title.text_color = "black"
