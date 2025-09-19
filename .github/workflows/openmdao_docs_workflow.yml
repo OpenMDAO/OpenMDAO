@@ -133,15 +133,41 @@ jobs:
           echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
           echo "TMPDIR=/tmp" >> $GITHUB_ENV
 
-      - name: Install pyOptSparse
-        if: matrix.PYOPTSPARSE
+      - name: Install pyOptSparse from GitHub
+        if: matrix.PYOPTSPARSE && matrix.PYOPTSPARSE_FROM == 'github'
         run: |
-          echo "============================================================="
-          echo "Install pyoptsparse"
-          echo "============================================================="
+          echo "Installing pyOptSparse from GitHub, IPOPT will not be available"
+          pip install git+https://github.com/mdolab/pyoptsparse@v${{ matrix.PYOPTSPARSE }}
+
+      - name: Install pyOptSparse from conda-forge
+        if: matrix.PYOPTSPARSE && matrix.PYOPTSPARSE_FROM == 'conda-forge'
+        run: |
+          echo "Installing pyOptSparse from conda-forge, IPOPT will be available"
+          conda install -c conda-forge pyoptsparse=${{ matrix.PYOPTSPARSE }} -q -y
+
+      - name: Install pyOptSparse using build_pyoptsparse
+        if: matrix.PYOPTSPARSE && matrix.PYOPTSPARSE_FROM == 'build_pyoptsparse'
+        continue-on-error: false
+        run: |
+          conda install -c conda-forge swig -q -y
+
           python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
 
-          BRANCH="-b ${{ matrix.PYOPTSPARSE }}"
+          if [[ "${{ matrix.PYOPTSPARSE }}" == "latest" ]]; then
+            function latest_version() {
+              local REPO_URL=$1/releases/latest
+              local LATEST_URL=`curl -fsSLI -o /dev/null -w %{url_effective} $REPO_URL`
+              local LATEST_VER=`echo $LATEST_URL | awk '{split($0,a,"/tag/"); print a[2]}'`
+              echo $LATEST_VER
+            }
+            BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
+          else
+            BRANCH="-b v${{ matrix.PYOPTSPARSE }}"
+          fi
+
+          if [[ "${{ matrix.PAROPT }}" ]]; then
+            PAROPT="-a"
+          fi
 
           if [[ "${{ matrix.SNOPT }}" == "7.7" && "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
             echo "  > Secure copying SNOPT 7.7 over SSH"
@@ -152,12 +178,13 @@ jobs:
             echo "  > Secure copying SNOPT 7.2 over SSH"
             mkdir SNOPT
             scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT
+            ls -lR SNOPT
             SNOPT="-s SNOPT/source"
           elif [[ "${{ matrix.SNOPT }}" ]]; then
             echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
           fi
 
-          build_pyoptsparse -v $BRANCH $SNOPT
+          build_pyoptsparse -v $BRANCH $PAROPT $SNOPT
 
       - name: Display environment info
         id: env_info
