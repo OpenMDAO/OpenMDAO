@@ -33,12 +33,12 @@ jobs:
           # build docs (baseline versions)
           - NAME: Build Docs
             OS: ubuntu-24.04
-            PY: '3.12'
-            NUMPY: '1.26'
-            SCIPY: '1.15'
-            PETSc: '3.20'
-            PYOPTSPARSE: 'v2.13.1'
-            SNOPT: '7.7'
+            PY: '3.13'
+            NUMPY: '2.2'
+            SCIPY: '1.16'
+            PETSc: '3.21'
+            PYOPTSPARSE_FROM: 'conda-forge'
+            PYOPTSPARSE: '2.13.1'
             OPTIONAL: '[all]'
             PUBLISH: true
 
