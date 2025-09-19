@@ -1,9 +1,10 @@
-
 import unittest
 
 import numpy as np
+import jax.numpy as jnp
 
 import openmdao.api as om
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 def get_comp(size):
@@ -201,3 +202,75 @@ class TestPComputeJacvecProd(unittest.TestCase):
 
         np.testing.assert_allclose(J2, J)
 
+
+class TestProbComputeJacvecProdPromoted(unittest.TestCase):
+
+    def test_promoted_names(self):
+        class ObjComp(om.JaxExplicitComponent):
+
+            def setup(self):
+                self.add_input('Θ', shape_by_conn=True)
+                self.add_input('p', shape_by_conn=True)
+                self.add_output('f', shape=(1,))
+
+            def compute_primal(self, Θ, p):
+                f = (Θ[0] - p[0])**2 + Θ[0] * Θ[1] + (Θ[1] + p[1])**2 - p[2]
+                return jnp.array([f])
+
+        class ConComp(om.JaxExplicitComponent):
+
+            def setup(self):
+                self.add_input('Θ', shape_by_conn=True)
+                self.add_input('p', shape_by_conn=True)
+                self.add_output('g', shape=(1,))
+
+            def compute_primal(self, Θ, p):
+                g = 2*Θ[0] + Θ[1]
+                return jnp.array([g])
+
+        prob = om.Problem()
+        prob.model.add_subsystem('f_comp', ObjComp(), promotes_inputs=['*'], promotes_outputs=['*'])
+        prob.model.add_subsystem('g_comp', ConComp(), promotes_inputs=['*'], promotes_outputs=['*'])
+
+        prob.model.add_design_var('Θ', upper=[6., None])
+        prob.model.add_constraint('g', equals=0.)
+        prob.model.add_objective('f')
+
+        prob.driver = om.ScipyOptimizeDriver()
+
+        prob.setup()
+
+        # Set parameter values
+        prob.set_val('p', np.array([3.0, 4.0, 3.0]))
+
+        # Initial guess
+        prob.set_val('Θ', np.array([1.0, 1.0]))
+
+        prob.run_model()
+
+        dg_dΘ = prob.compute_totals(of='g', wrt='Θ', return_format='array')
+
+        # The constraint jac should be [2, 1]
+        jvp0 = prob.compute_jacvec_product(of=['g'],
+                                           wrt=['Θ'],
+                                           mode='fwd',
+                                           seed={'Θ': np.array([1.0, 0.0])},
+                                           linearize=True)
+
+        jvp1 = prob.compute_jacvec_product(of=['g'],
+                                           wrt=['Θ'],
+                                           mode='fwd',
+                                           seed={'Θ': np.array([0.0, 1.0])},
+                                           linearize=False)
+
+        assert_near_equal(jvp0['g'], dg_dΘ @ np.array([1.0, 0.0]))
+        assert_near_equal(jvp1['g'], dg_dΘ @ np.array([0.0, 1.0]))
+
+        # Reverse mode
+        jvp0 = prob.compute_jacvec_product(of=['g'],
+                                           wrt=['Θ'],
+                                           mode='rev',
+                                           seed={'g': np.array([1.0])},
+                                           linearize=True)
+        # Should yield a row of dg_dΘ (the entire jacobian in this case)
+        assert_near_equal(jvp0['Θ'], dg_dΘ.ravel())

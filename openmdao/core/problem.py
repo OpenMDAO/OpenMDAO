@@ -855,7 +855,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         finally:
             self._recording_iter.prefix = old_prefix
 
-    def compute_jacvec_product(self, of, wrt, mode, seed):
+    def compute_jacvec_product(self, of, wrt, mode, seed, linearize=False):
         """
         Given a seed and 'of' and 'wrt' variables, compute the total jacobian vector product.
 
@@ -871,6 +871,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             Either a dict keyed by 'wrt' varnames (fwd) or 'of' varnames (rev), containing
             dresidual (fwd) or doutput (rev) values, OR a list of dresidual or doutput
             values that matches the corresponding 'wrt' (fwd) or 'of' (rev) varname list.
+        linearize : bool
+            If False, assume the model is already in a linearized state, which it must be
+            in order to produce correct results for the jvp/vjp. If True, this method
+            will linearize the model before computing the jvp/vjp.
 
         Returns
         -------
@@ -890,29 +894,28 @@ class Problem(object, metaclass=ProblemMetaclass):
             lnames, rnames = wrt, of
             lkind, rkind = 'residual', 'output'
 
+        if linearize:
+            self.model.run_linearize()
+
+        resolver = self.model._resolver
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
 
         rvec.set_val(0.)
-
-        conns = self.model._conn_global_abs_in2out
 
         # set seed values into dresids (fwd) or doutputs (rev)
         # seed may have keys that are inputs and must be converted into auto_ivcs
         try:
             seed[rnames[0]]
         except (IndexError, TypeError):
+            # Seeds are given as a Sequence
             for i, name in enumerate(rnames):
-                if name in conns:
-                    rvec[conns[name]] = seed[i]
-                else:
-                    rvec[name] = seed[i]
+                rvec[resolver.source(name)] = seed[i]
         else:
+            # Seeds are given as a map
             for name in rnames:
-                if name in conns:
-                    rvec[conns[name]] = seed[name]
-                else:
-                    rvec[name] = seed[name]
+                # rnames are abs_path
+                rvec[resolver.source(name)] = seed[name]
 
         # We apply a -1 here because the derivative of the output is minus the derivative of
         # the residual in openmdao.
@@ -921,11 +924,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         self.model.run_solve_linear(mode)
 
-        if mode == 'fwd':
-            return {n: lvec[n].copy() for n in lnames}
-        else:
-            # may need to convert some lnames to auto_ivc names
-            return {n: lvec[conns[n] if n in conns else n].copy() for n in lnames}
+        return {n: lvec[resolver.source(n)].copy() for n in lnames}
 
     def _setup_recording(self):
         """
