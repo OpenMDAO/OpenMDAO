@@ -372,6 +372,206 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         doc.add_periodic_callback(self._update_wrapped_in_try, callback_period)
         doc.title = "OpenMDAO Optimization Progress Plot"
 
+    def _setup_plotting(self, new_data):
+        # when we first get some data, we can start building the 
+        # plot since we know about the variables and their metadata.
+        self._setup_data_source()
+
+        # Check to make sure we have one and only one objective before going farther
+        obj_names = self._case_tracker._get_obj_names()
+        if len(obj_names) != 1:
+            raise ValueError(
+                f"Plot requires there to be one and only one objective \
+                    but {len(obj_names)} objectives found"
+            )
+
+        bound_violation_indicator_source_dict = {}
+        cons_names = self._case_tracker._get_cons_names()
+        for i, cons_name in enumerate(cons_names):
+            units = self._case_tracker._get_units(cons_name)
+            con_name_with_type = cons_name
+            if cons_name in self._both_desvars_and_cons:
+                con_name_with_type += " [cons]"
+
+            cons_button_label = f"{con_name_with_type} ({units})"
+            bound_violation_indicator_source_dict[cons_button_label] = ["black"]
+
+        self._bound_violation_indicator_source = ColumnDataSource(
+                data=bound_violation_indicator_source_dict
+            )
+
+        # Create CustomJS callback for toggle buttons.
+        # Pass in the data from the Python side that the JavaScript side
+        #   needs
+        bounds_off_on_callback = CustomJS(
+            args=dict(
+                num_desvars=self._num_desvars,
+                lines=self._lines,
+                bound_violation_indicator_source = self._bound_violation_indicator_source,
+                lower_bound_violation_indicators=self._lower_bound_violation_indicators,
+                upper_bound_violation_indicators=self._upper_bound_violation_indicators,
+            ),
+            code=bounds_off_on_callback_code,
+        )
+        
+        variable_button_callback = CustomJS(
+            args=dict(
+                num_desvars=self._num_desvars,
+                lines=self._lines,
+                axes=self._axes,
+                bounds_off_on_checkboxes=self._bounds_off_on_checkboxes,
+                bound_violation_indicator_source = self._bound_violation_indicator_source,
+                lower_bound_violation_indicators=self._lower_bound_violation_indicators,
+                upper_bound_violation_indicators=self._upper_bound_violation_indicators,
+                colorPalette=_colorPalette,
+            ),
+            code=variable_button_callback_code,
+        )
+
+        # For the variables, make lines, axes, and the buttons to turn on and
+        #   off the variable plot.
+        # All the lines and axes for the desvars and cons are created in
+        #   Python but initially are not visible. They are turned on and
+        #   off on the JavaScript side.
+
+        # objs
+        obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
+        self._column_items.append(obj_label)
+
+        for i, obj_name in enumerate(obj_names):
+            units = self._case_tracker._get_units(obj_name)
+            self.plot_figure.yaxis.axis_label = f"{obj_name} ({units})"
+            self._make_variable_button(
+                f"{obj_name} ({units})", 'objs', _obj_color, True, variable_button_callback,
+                bounds_off_on_callback
+            )
+            self._make_line_and_hover_tool(
+                "objs", obj_name, False, _obj_color, "solid", True
+            )
+            value = new_data["objs"][obj_name]
+            float_value = _get_value_for_plotting(value, "objs")
+            # just give it some non-zero initial range since we only have one point
+            self.plot_figure.y_range = Range1d(float_value - 1, float_value + 1)
+
+        # desvars
+        desvars_label = _make_header_text_for_variable_chooser("DESIGN VARIABLES")
+        self._column_items.append(desvars_label)
+        desvar_names = self._case_tracker._get_desvar_names()
+        for i, desvar_name in enumerate(desvar_names):
+            units = self._case_tracker._get_units(desvar_name)
+
+            desvar_name_with_type = desvar_name
+            if desvar_name in self._both_desvars_and_cons:
+                desvar_name_with_type += " [dv]"
+
+            desvar_button_label = f"{desvar_name_with_type} ({units})"
+            self._make_variable_button(
+                desvar_button_label,
+                'desvars',  # TODO should make this and the other types a const
+                _non_active_plot_color,
+                False,
+                variable_button_callback,
+                bounds_off_on_callback
+            )
+            value = new_data["desvars"][desvar_name]
+            # for desvars, if value is a vector, use Bokeh Varea glyph
+            use_varea = value.size > 1
+            self._make_line_and_hover_tool(
+                "desvars",
+                desvar_name_with_type,
+                use_varea,
+                _non_active_plot_color,
+                "solid",
+                False,
+            )
+            float_value = _get_value_for_plotting(value, "desvars")
+            self._make_axis("desvars", desvar_name_with_type, float_value, units)
+
+        # TODO create a variable object that includes name, units, shape,...
+        
+        # TODO include desvar driver constraints
+        
+        # TODO make a function for the source None part of the code
+
+        # cons
+        cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
+        self._column_items.append(cons_label)
+        cons_names = self._case_tracker._get_cons_names()
+        for i, cons_name in enumerate(cons_names):
+            units = self._case_tracker._get_units(cons_name)
+            con_name_with_type = cons_name
+            if cons_name in self._both_desvars_and_cons:
+                con_name_with_type += " [cons]"
+
+            cons_button_label = f"{con_name_with_type} ({units})"
+            self._make_variable_button(
+                cons_button_label,
+                "cons",
+                _non_active_plot_color,
+                False,
+                variable_button_callback,
+                bounds_off_on_callback
+            )
+            self._make_line_and_hover_tool(
+                "cons",
+                # cons_name,
+                con_name_with_type,
+                False,
+                _non_active_plot_color,
+                "dashed",
+                False,
+            )
+            value = new_data["cons"][cons_name]
+            float_value = _get_value_for_plotting(value, "cons")
+            self._make_axis("cons", con_name_with_type, float_value, units)
+
+        # Create a Column of the variable buttons and headers inside a scrolling window
+        toggle_column = Column(
+            children=self._column_items,
+            sizing_mode="stretch_both",
+            height_policy="fit",
+            styles={
+                "overflow-y": "auto",
+                "border": "1px solid #ddd",
+                "padding": "8px",
+                "background-color": "#dddddd",
+                "max-height": "100vh",  # Ensures it doesn't exceed viewport
+            },
+        )
+
+        quit_button = Button(label="Quit Application", button_type="danger")
+
+        # Define callback function for the quit button
+        def quit_app():
+            raise KeyboardInterrupt("Quit button pressed")
+
+        # Attach the callback to the button
+        quit_button.on_click(quit_app)
+
+        # header for the variable list
+        label = Div(
+            text="Variables",
+            width=200,
+            styles={"font-size": "20px", "font-weight": "bold"},
+        )
+        label_and_toggle_column = Column(
+            quit_button,
+            label,
+            toggle_column,
+            sizing_mode="stretch_height",
+            height_policy="fit",
+            styles={"max-height": "100vh"},  # Ensures it doesn't exceed viewport
+        )
+
+        scroll_box = ScrollBox(
+            child=label_and_toggle_column,
+            sizing_mode="stretch_height",
+            height_policy="max",
+        )
+
+        graph = Row(self.plot_figure, scroll_box, sizing_mode="stretch_both")
+        self._doc.add_root(graph)
+
     def _update(self):
         # this is the main method of the class. It gets called periodically by Bokeh
         # It looks for new data and if found, updates the plot with the new data
@@ -391,7 +591,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 #   get around the bug in setting the line color from JavaScript
                 self._source.stream(self._source_stream_dict)
 
-
                 # TODO need to do the same for the bounds source 
                 # self._bound_violation_indicator_source
                 
@@ -403,202 +602,206 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         # since now we have data from the case recorder with info about the
         # variables to be plotted.
         if self._source is None:
-            self._setup_data_source()
-
-            # Check to make sure we have one and only one objective before going farther
-            obj_names = self._case_tracker._get_obj_names()
-            if len(obj_names) != 1:
-                raise ValueError(
-                    f"Plot requires there to be one and only one objective \
-                        but {len(obj_names)} objectives found"
-                )
-
-            bound_violation_indicator_source_dict = {}
-            cons_names = self._case_tracker._get_cons_names()
-            for i, cons_name in enumerate(cons_names):
-                units = self._case_tracker._get_units(cons_name)
-                con_name_with_type = cons_name
-                if cons_name in self._both_desvars_and_cons:
-                    con_name_with_type += " [cons]"
-
-                cons_button_label = f"{con_name_with_type} ({units})"
-                bound_violation_indicator_source_dict[cons_button_label] = ["black"]
-
-            self._bound_violation_indicator_source = ColumnDataSource(
-                    data=bound_violation_indicator_source_dict
-                )
-
-            # Create CustomJS callback for toggle buttons.
-            # Pass in the data from the Python side that the JavaScript side
-            #   needs
-            bounds_off_on_callback = CustomJS(
-                args=dict(
-                    num_desvars=self._num_desvars,
-                    lines=self._lines,
-                    bound_violation_indicator_source = self._bound_violation_indicator_source,
-                    lower_bound_violation_indicators=self._lower_bound_violation_indicators,
-                    upper_bound_violation_indicators=self._upper_bound_violation_indicators,
-                ),
-                code=bounds_off_on_callback_code,
-            )
+            self._setup_plotting(new_data)
             
-            variable_button_callback = CustomJS(
-                args=dict(
-                    num_desvars=self._num_desvars,
-                    lines=self._lines,
-                    axes=self._axes,
-                    bounds_off_on_checkboxes=self._bounds_off_on_checkboxes,
-                    bound_violation_indicator_source = self._bound_violation_indicator_source,
-                    lower_bound_violation_indicators=self._lower_bound_violation_indicators,
-                    upper_bound_violation_indicators=self._upper_bound_violation_indicators,
-                    colorPalette=_colorPalette,
-                ),
-                code=variable_button_callback_code,
-            )
-
-            # For the variables, make lines, axes, and the buttons to turn on and
-            #   off the variable plot.
-            # All the lines and axes for the desvars and cons are created in
-            #   Python but initially are not visible. They are turned on and
-            #   off on the JavaScript side.
-
-            # objs
-            obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
-            self._column_items.append(obj_label)
-
-            for i, obj_name in enumerate(obj_names):
-                units = self._case_tracker._get_units(obj_name)
-                self.plot_figure.yaxis.axis_label = f"{obj_name} ({units})"
-                self._make_variable_button(
-                    f"{obj_name} ({units})", 'objs', _obj_color, True, variable_button_callback,
-                    bounds_off_on_callback
-                )
-                self._make_line_and_hover_tool(
-                    "objs", obj_name, False, _obj_color, "solid", True
-                )
-                value = new_data["objs"][obj_name]
-                float_value = _get_value_for_plotting(value, "objs")
-                # just give it some non-zero initial range since we only have one point
-                self.plot_figure.y_range = Range1d(float_value - 1, float_value + 1)
-
-            # desvars
-            desvars_label = _make_header_text_for_variable_chooser("DESIGN VARIABLES")
-            self._column_items.append(desvars_label)
-            desvar_names = self._case_tracker._get_desvar_names()
-            for i, desvar_name in enumerate(desvar_names):
-                units = self._case_tracker._get_units(desvar_name)
-
-                desvar_name_with_type = desvar_name
-                if desvar_name in self._both_desvars_and_cons:
-                    desvar_name_with_type += " [dv]"
-
-                desvar_button_label = f"{desvar_name_with_type} ({units})"
-                self._make_variable_button(
-                    desvar_button_label,
-                    'desvars',  # TODO should make this and the other types a const
-                    _non_active_plot_color,
-                    False,
-                    variable_button_callback,
-                    bounds_off_on_callback
-                )
-                value = new_data["desvars"][desvar_name]
-                # for desvars, if value is a vector, use Bokeh Varea glyph
-                use_varea = value.size > 1
-                self._make_line_and_hover_tool(
-                    "desvars",
-                    desvar_name_with_type,
-                    use_varea,
-                    _non_active_plot_color,
-                    "solid",
-                    False,
-                )
-                float_value = _get_value_for_plotting(value, "desvars")
-                self._make_axis("desvars", desvar_name_with_type, float_value, units)
-
-            # TODO create a variable object that includes name, units, shape,...
             
-            # TODO include desvar driver constraints
             
-            # TODO make a function for the source None part of the code
+            # self._setup_data_source()
 
-            # cons
-            cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
-            self._column_items.append(cons_label)
-            cons_names = self._case_tracker._get_cons_names()
-            for i, cons_name in enumerate(cons_names):
-                units = self._case_tracker._get_units(cons_name)
-                con_name_with_type = cons_name
-                if cons_name in self._both_desvars_and_cons:
-                    con_name_with_type += " [cons]"
+            # # Check to make sure we have one and only one objective before going farther
+            # obj_names = self._case_tracker._get_obj_names()
+            # if len(obj_names) != 1:
+            #     raise ValueError(
+            #         f"Plot requires there to be one and only one objective \
+            #             but {len(obj_names)} objectives found"
+            #     )
 
-                cons_button_label = f"{con_name_with_type} ({units})"
-                self._make_variable_button(
-                    cons_button_label,
-                    "cons",
-                    _non_active_plot_color,
-                    False,
-                    variable_button_callback,
-                    bounds_off_on_callback
-                )
-                self._make_line_and_hover_tool(
-                    "cons",
-                    # cons_name,
-                    con_name_with_type,
-                    False,
-                    _non_active_plot_color,
-                    "dashed",
-                    False,
-                )
-                value = new_data["cons"][cons_name]
-                float_value = _get_value_for_plotting(value, "cons")
-                self._make_axis("cons", con_name_with_type, float_value, units)
+            # bound_violation_indicator_source_dict = {}
+            # cons_names = self._case_tracker._get_cons_names()
+            # for i, cons_name in enumerate(cons_names):
+            #     units = self._case_tracker._get_units(cons_name)
+            #     con_name_with_type = cons_name
+            #     if cons_name in self._both_desvars_and_cons:
+            #         con_name_with_type += " [cons]"
 
-            # Create a Column of the variable buttons and headers inside a scrolling window
-            toggle_column = Column(
-                children=self._column_items,
-                sizing_mode="stretch_both",
-                height_policy="fit",
-                styles={
-                    "overflow-y": "auto",
-                    "border": "1px solid #ddd",
-                    "padding": "8px",
-                    "background-color": "#dddddd",
-                    "max-height": "100vh",  # Ensures it doesn't exceed viewport
-                },
-            )
+            #     cons_button_label = f"{con_name_with_type} ({units})"
+            #     bound_violation_indicator_source_dict[cons_button_label] = ["black"]
 
-            quit_button = Button(label="Quit Application", button_type="danger")
+            # self._bound_violation_indicator_source = ColumnDataSource(
+            #         data=bound_violation_indicator_source_dict
+            #     )
 
-            # Define callback function for the quit button
-            def quit_app():
-                raise KeyboardInterrupt("Quit button pressed")
+            # # Create CustomJS callback for toggle buttons.
+            # # Pass in the data from the Python side that the JavaScript side
+            # #   needs
+            # bounds_off_on_callback = CustomJS(
+            #     args=dict(
+            #         num_desvars=self._num_desvars,
+            #         lines=self._lines,
+            #         bound_violation_indicator_source = self._bound_violation_indicator_source,
+            #         lower_bound_violation_indicators=self._lower_bound_violation_indicators,
+            #         upper_bound_violation_indicators=self._upper_bound_violation_indicators,
+            #     ),
+            #     code=bounds_off_on_callback_code,
+            # )
+            
+            # variable_button_callback = CustomJS(
+            #     args=dict(
+            #         num_desvars=self._num_desvars,
+            #         lines=self._lines,
+            #         axes=self._axes,
+            #         bounds_off_on_checkboxes=self._bounds_off_on_checkboxes,
+            #         bound_violation_indicator_source = self._bound_violation_indicator_source,
+            #         lower_bound_violation_indicators=self._lower_bound_violation_indicators,
+            #         upper_bound_violation_indicators=self._upper_bound_violation_indicators,
+            #         colorPalette=_colorPalette,
+            #     ),
+            #     code=variable_button_callback_code,
+            # )
 
-            # Attach the callback to the button
-            quit_button.on_click(quit_app)
+            # # For the variables, make lines, axes, and the buttons to turn on and
+            # #   off the variable plot.
+            # # All the lines and axes for the desvars and cons are created in
+            # #   Python but initially are not visible. They are turned on and
+            # #   off on the JavaScript side.
 
-            # header for the variable list
-            label = Div(
-                text="Variables",
-                width=200,
-                styles={"font-size": "20px", "font-weight": "bold"},
-            )
-            label_and_toggle_column = Column(
-                quit_button,
-                label,
-                toggle_column,
-                sizing_mode="stretch_height",
-                height_policy="fit",
-                styles={"max-height": "100vh"},  # Ensures it doesn't exceed viewport
-            )
+            # # objs
+            # obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
+            # self._column_items.append(obj_label)
 
-            scroll_box = ScrollBox(
-                child=label_and_toggle_column,
-                sizing_mode="stretch_height",
-                height_policy="max",
-            )
+            # for i, obj_name in enumerate(obj_names):
+            #     units = self._case_tracker._get_units(obj_name)
+            #     self.plot_figure.yaxis.axis_label = f"{obj_name} ({units})"
+            #     self._make_variable_button(
+            #         f"{obj_name} ({units})", 'objs', _obj_color, True, variable_button_callback,
+            #         bounds_off_on_callback
+            #     )
+            #     self._make_line_and_hover_tool(
+            #         "objs", obj_name, False, _obj_color, "solid", True
+            #     )
+            #     value = new_data["objs"][obj_name]
+            #     float_value = _get_value_for_plotting(value, "objs")
+            #     # just give it some non-zero initial range since we only have one point
+            #     self.plot_figure.y_range = Range1d(float_value - 1, float_value + 1)
 
-            graph = Row(self.plot_figure, scroll_box, sizing_mode="stretch_both")
-            self._doc.add_root(graph)
+            # # desvars
+            # desvars_label = _make_header_text_for_variable_chooser("DESIGN VARIABLES")
+            # self._column_items.append(desvars_label)
+            # desvar_names = self._case_tracker._get_desvar_names()
+            # for i, desvar_name in enumerate(desvar_names):
+            #     units = self._case_tracker._get_units(desvar_name)
+
+            #     desvar_name_with_type = desvar_name
+            #     if desvar_name in self._both_desvars_and_cons:
+            #         desvar_name_with_type += " [dv]"
+
+            #     desvar_button_label = f"{desvar_name_with_type} ({units})"
+            #     self._make_variable_button(
+            #         desvar_button_label,
+            #         'desvars',  # TODO should make this and the other types a const
+            #         _non_active_plot_color,
+            #         False,
+            #         variable_button_callback,
+            #         bounds_off_on_callback
+            #     )
+            #     value = new_data["desvars"][desvar_name]
+            #     # for desvars, if value is a vector, use Bokeh Varea glyph
+            #     use_varea = value.size > 1
+            #     self._make_line_and_hover_tool(
+            #         "desvars",
+            #         desvar_name_with_type,
+            #         use_varea,
+            #         _non_active_plot_color,
+            #         "solid",
+            #         False,
+            #     )
+            #     float_value = _get_value_for_plotting(value, "desvars")
+            #     self._make_axis("desvars", desvar_name_with_type, float_value, units)
+
+            # # TODO create a variable object that includes name, units, shape,...
+            
+            # # TODO include desvar driver constraints
+            
+            # # TODO make a function for the source None part of the code
+
+            # # cons
+            # cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
+            # self._column_items.append(cons_label)
+            # cons_names = self._case_tracker._get_cons_names()
+            # for i, cons_name in enumerate(cons_names):
+            #     units = self._case_tracker._get_units(cons_name)
+            #     con_name_with_type = cons_name
+            #     if cons_name in self._both_desvars_and_cons:
+            #         con_name_with_type += " [cons]"
+
+            #     cons_button_label = f"{con_name_with_type} ({units})"
+            #     self._make_variable_button(
+            #         cons_button_label,
+            #         "cons",
+            #         _non_active_plot_color,
+            #         False,
+            #         variable_button_callback,
+            #         bounds_off_on_callback
+            #     )
+            #     self._make_line_and_hover_tool(
+            #         "cons",
+            #         # cons_name,
+            #         con_name_with_type,
+            #         False,
+            #         _non_active_plot_color,
+            #         "dashed",
+            #         False,
+            #     )
+            #     value = new_data["cons"][cons_name]
+            #     float_value = _get_value_for_plotting(value, "cons")
+            #     self._make_axis("cons", con_name_with_type, float_value, units)
+
+            # # Create a Column of the variable buttons and headers inside a scrolling window
+            # toggle_column = Column(
+            #     children=self._column_items,
+            #     sizing_mode="stretch_both",
+            #     height_policy="fit",
+            #     styles={
+            #         "overflow-y": "auto",
+            #         "border": "1px solid #ddd",
+            #         "padding": "8px",
+            #         "background-color": "#dddddd",
+            #         "max-height": "100vh",  # Ensures it doesn't exceed viewport
+            #     },
+            # )
+
+            # quit_button = Button(label="Quit Application", button_type="danger")
+
+            # # Define callback function for the quit button
+            # def quit_app():
+            #     raise KeyboardInterrupt("Quit button pressed")
+
+            # # Attach the callback to the button
+            # quit_button.on_click(quit_app)
+
+            # # header for the variable list
+            # label = Div(
+            #     text="Variables",
+            #     width=200,
+            #     styles={"font-size": "20px", "font-weight": "bold"},
+            # )
+            # label_and_toggle_column = Column(
+            #     quit_button,
+            #     label,
+            #     toggle_column,
+            #     sizing_mode="stretch_height",
+            #     height_policy="fit",
+            #     styles={"max-height": "100vh"},  # Ensures it doesn't exceed viewport
+            # )
+
+            # scroll_box = ScrollBox(
+            #     child=label_and_toggle_column,
+            #     sizing_mode="stretch_height",
+            #     height_policy="max",
+            # )
+
+            # graph = Row(self.plot_figure, scroll_box, sizing_mode="stretch_both")
+            # self._doc.add_root(graph)
             # end of self._source is None - plotting is setup
 
         # Do the actual update of the plot including updating the plot range and adding the new
