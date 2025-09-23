@@ -25,6 +25,7 @@ runs:
   using: 'composite'
   steps:
     - name: 'Install OpenMDAO'
+      shell: bash
       run: |
         conda install numpy=${{ inputs.numpy }} scipy=${{ inputs.scipy }} -q -y
 
