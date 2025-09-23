@@ -1,0 +1,50 @@
+name: Install OpenMDAO
+description: 'Install OpenMDAO from the requested source'
+inputs:
+  numpy:
+    description: 'Numpy version'
+    required: true
+  scipy:
+    description: 'scipy version'
+    required: true
+  use_pypi:
+    type: boolean
+    description: 'Install the published PyPi version of OpenMDAO'
+    required: false
+    default: false
+  PEP517:
+    type: boolean
+    description: 'Strictly adhere to PEP517 when building a wheel.'
+    required: false
+    default: false
+  optional:
+    type: string
+    description: 'pip options specification in [name1,name2] syntax. e.g. "pip install openmdao[all,numba]'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: 'Install OpenMDAO'
+      run: |
+        conda install numpy=${{ inputs.numpy }} scipy=${{ inputs.scipy }} -q -y
+
+        python -m pip install --upgrade pip
+
+        echo "============================================================="
+        echo "Install OpenMDAO"
+        echo "============================================================="
+        if [[  "${{ inputs.use_pypi }}" == "true" ]]; then
+          echo "-----------------------------------------------------------"
+          echo "Installing from PyPi"
+          echo "-----------------------------------------------------------"
+          python -m pip install openmdao${{ inputs.optional }}
+        elif [[ "${{ inputs.PEP517 }}" == "true" ]]; then
+          pip wheel --no-deps --use-pep517 .
+          WHEEL=`find openmdao-*.whl`
+          echo "-----------------------------------------------------------"
+          echo "Installing from wheel: $WHEEL"
+          echo "-----------------------------------------------------------"
+          python -m pip install $WHEEL${{ inputs.optional }}
+        else
+          python -m pip install .${{ inputs.optional }}
+        fi

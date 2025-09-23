@@ -29,30 +29,6 @@ on:
         required: false
         default: true
 
-      MacOS_Baseline:
-        type: boolean
-        description: 'Include MacOS Baseline in test matrix'
-        required: false
-        default: true
-
-      Windows_Baseline:
-        type: boolean
-        description: 'Include Windows Baseline in test matrix'
-        required: false
-        default: true
-
-      Ubuntu_Minimal:
-        type: boolean
-        description: 'Include Ubuntu Minimal in test matrix'
-        required: false
-        default: true
-
-      Ubuntu_Oldest:
-        type: boolean
-        description: 'Include Ubuntu Oldest in test matrix'
-        required: false
-        default: true
-
       debug_enabled:
         type: boolean
         description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
@@ -93,7 +69,7 @@ jobs:
             OPTIONAL: '[all,numba]'
             BANDIT: true
             PEP517: true
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Baseline }}
+            # EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Baseline }}
 
           # # test baseline versions on MacOS
           # - NAME: MacOS Baseline
@@ -145,7 +121,7 @@ jobs:
           echo "============================================================="
           echo "Run #${GITHUB_RUN_NUMBER}"
           echo "Run ID: ${GITHUB_RUN_ID}"
-          echo "Testing: ${GITHUB_REPOSITORY}"
+          echo "Building Docs: ${GITHUB_REPOSITORY}"
           echo "Triggered by: ${GITHUB_EVENT_NAME}"
           echo "Initiated by: ${GITHUB_ACTOR}"
           echo "============================================================="
@@ -168,7 +144,7 @@ jobs:
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
@@ -177,30 +153,38 @@ jobs:
           conda-remove-defaults: true
           channels: conda-forge
 
-      - name: Install OpenMDAO
-        run: |
-          conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
+      - id: setup_openmdao
+        uses: ./.github/actions/setup_openmdao_ci
+        with:
+          numpy: ${{matrix.NUMPY}}
+          scipy: ${{matrix.SCIPY}}
+          pep517: ${{matrix.PEP517}}
+          optional: ${{matrix.OPTIONAL}}
 
-          python -m pip install --upgrade pip
+      # - name: Install OpenMDAO
+      #   run: |
+      #     conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
-          echo "============================================================="
-          echo "Install OpenMDAO"
-          echo "============================================================="
-          if [[  "${{ inputs.use_pypi }}" == "true" ]]; then
-            echo "-----------------------------------------------------------"
-            echo "Installing from PyPi"
-            echo "-----------------------------------------------------------"
-            python -m pip install openmdao${{ matrix.OPTIONAL }}
-          elif [[ "${{ matrix.PEP517 }}" == "true" ]]; then
-            pip wheel --no-deps --use-pep517 .
-            WHEEL=`find openmdao-*.whl`
-            echo "-----------------------------------------------------------"
-            echo "Installing from wheel: $WHEEL"
-            echo "-----------------------------------------------------------"
-            python -m pip install $WHEEL${{ matrix.OPTIONAL }}
-          else
-            python -m pip install .${{ matrix.OPTIONAL }}
-          fi
+      #     python -m pip install --upgrade pip
+
+      #     echo "============================================================="
+      #     echo "Install OpenMDAO"
+      #     echo "============================================================="
+      #     if [[  "${{ inputs.use_pypi }}" == "true" ]]; then
+      #       echo "-----------------------------------------------------------"
+      #       echo "Installing from PyPi"
+      #       echo "-----------------------------------------------------------"
+      #       python -m pip install openmdao${{ matrix.OPTIONAL }}
+      #     elif [[ "${{ matrix.PEP517 }}" == "true" ]]; then
+      #       pip wheel --no-deps --use-pep517 .
+      #       WHEEL=`find openmdao-*.whl`
+      #       echo "-----------------------------------------------------------"
+      #       echo "Installing from wheel: $WHEEL"
+      #       echo "-----------------------------------------------------------"
+      #       python -m pip install $WHEEL${{ matrix.OPTIONAL }}
+      #     else
+      #       python -m pip install .${{ matrix.OPTIONAL }}
+      #     fi
 
       - name: Install compilers
         if: matrix.PYOPTSPARSE
