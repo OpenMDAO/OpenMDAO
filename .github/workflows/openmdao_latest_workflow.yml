@@ -81,7 +81,7 @@ jobs:
 
       - name: Exit if this job was not selected
         if: github.event_name == 'workflow_dispatch' &&  inputs.job_name != '' &&  inputs.job_name != matrix.NAME
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: core.setFailed('The ${{ matrix.NAME }} job was not included in the run, exiting...');
 
@@ -97,7 +97,7 @@ jobs:
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
@@ -389,7 +389,7 @@ jobs:
 
       - name: Fail the workflow if tests or doc build failed
         if: steps.run_tests.outcome == 'failure' || steps.build_docs.outcome == 'failure'
-        uses: actions/github-script@v3
+        uses: actions/github-script@v8
         with:
           script: |
               let test_fail = ${{ steps.run_tests.outcome == 'failure' }};

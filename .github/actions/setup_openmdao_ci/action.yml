@@ -1,0 +1,99 @@
+name: Setup and install OpenMDAO
+description: 'Install OpenMDAO from the requested source'
+inputs:
+  matrix_name:
+    description: 'Name of the run matrix entry being used.'
+    required: true
+  os_version:
+    description: 'OS Version'
+    required: true
+  python_version:
+    description: 'Python version'
+    required: true
+  numpy_version:
+    description: 'Numpy version'
+    required: true
+  scipy_version:
+    description: 'scipy version'
+    required: true
+  exclude:
+    description: 'if true, current run matrix entry should not be executed.'
+    required: true
+  use_pypi:
+    description: 'Install the published PyPi version of OpenMDAO'
+    required: false
+  PEP517:
+    description: 'Strictly adhere to PEP517 when building a wheel.'
+    required: false
+  optional:
+    description: 'pip options specification in [name1,name2] syntax. e.g. "pip install openmdao[all,numba]'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+
+    - name: Display run details
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Run #${GITHUB_RUN_NUMBER}"
+        echo "Run ID: ${GITHUB_RUN_ID}"
+        echo "Building Docs: ${GITHUB_REPOSITORY}"
+        echo "Triggered by: ${GITHUB_EVENT_NAME}"
+        echo "Initiated by: ${GITHUB_ACTOR}"
+        echo "============================================================="
+
+    - name: Exit if this job was excluded
+      if: inputs.exclude == 'true'
+      uses: actions/github-script@v8
+      with:
+        script: core.setFailed('The ${{ inputs.matrix_name }} job was excluded from the run, exiting...');
+
+    - name: Log inputs
+      shell: bash -l {0}
+      run: |
+        echo "===== Composite Action Inputs ====="
+        echo "matrix_name: ${{ inputs.matrix_name }}"
+        echo "os_version: ${{ inputs.os_version }}"
+        echo "python_version: ${{ inputs.python_version }}"
+        echo "numpy_version: ${{ inputs.numpy_version }}"
+        echo "scipy_version: ${{ inputs.scipy_version }}"
+        echo "exclude: ${{ inputs.exclude }}"
+        echo "use_pypi: ${{ inputs.use_pypi }}"
+        echo "PEP517: ${{ inputs.PEP517 }}"
+        echo "optional: ${{ inputs.optional }}"
+        echo "=================================="
+
+    - name: Setup conda
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        python-version: ${{ inputs.python_version }}
+        conda-remove-defaults: true
+        channels: conda-forge
+        channel-priority: "strict"
+
+    - name: 'Install OpenMDAO'
+      shell: bash -l {0}
+      run: |
+        conda install numpy=${{ inputs.numpy_version }} scipy=${{ inputs.scipy_version }} -q -y
+
+        python -m pip install --upgrade pip
+
+        echo "============================================================="
+        echo "Install OpenMDAO"
+        echo "============================================================="
+        if [[  "${{ inputs.use_pypi }}" == "true" ]]; then
+          echo "-----------------------------------------------------------"
+          echo "Installing from PyPi"
+          echo "-----------------------------------------------------------"
+          python -m pip install openmdao${{ inputs.optional }}
+        elif [[ "${{ inputs.PEP517 }}" == "true" ]]; then
+          pip wheel --no-deps --use-pep517 .
+          WHEEL=`find openmdao-*.whl`
+          echo "-----------------------------------------------------------"
+          echo "Installing from wheel: $WHEEL"
+          echo "-----------------------------------------------------------"
+          python -m pip install $WHEEL${{ inputs.optional }}
+        else
+          python -m pip install .${{ inputs.optional }}
+        fi

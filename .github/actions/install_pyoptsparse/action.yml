@@ -1,0 +1,209 @@
+name: Install pyOptSparse
+description: 'Install pyOptSparse from the requested source'
+inputs:
+  pyoptsparse_version:
+    description: 'Version of pyoptsparse to be used, or empty string for no pyoptsparse.'
+    required: false
+  pyoptsparse_from:
+    description: 'Location from which to acquire pyoptsparse, either "build_pyoptsparse" or "conda-forge" or "github" or ""'
+    required: false
+  snopt_version:
+    description: 'The version of SNOPT to test against, if avaiable.'
+    required: false
+  SECRET_ssh_private_key:
+    description: 'ssh private key when being run by OpenMDAO org'
+    required: false
+  SECRET_ssh_known_hosts:
+    description: 'ssh known hosts when being run by OpenMDAO org'
+    required: false
+  SECRET_snopt_location:
+    description: 'snopt location when being run by OpenMDAO org'
+    required: false
+  SECRET_snopt_location_77:
+    description: 'snopt 7.7 location when being run by OpenMDAO org'
+    required: false
+  SECRET_snopt_location_72:
+    description: 'snopt 7.2 location when being run by OpenMDAO org'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: Log inputs
+      shell: bash -l {0}
+      run: |
+        echo "===== Composite Action Inputs ====="
+        echo "pyoptsparse_version: ${{ inputs.pyoptsparse_version }}"
+        echo "pyoptsparse_from: ${{ inputs.pyoptsparse_from }}"
+        echo "snopt_version: ${{ inputs.snopt_version }}"
+        echo "=================================="
+
+    - name: Display run details
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Run #${GITHUB_RUN_NUMBER}"
+        echo "Run ID: ${GITHUB_RUN_ID}"
+        echo "Building Docs: ${GITHUB_REPOSITORY}"
+        echo "Triggered by: ${GITHUB_EVENT_NAME}"
+        echo "Initiated by: ${GITHUB_ACTOR}"
+        echo "============================================================="
+
+    - name: Log inputs
+      shell: bash -l {0}
+      run: |
+        echo "===== Composite Action Inputs ====="
+        echo "pyoptsparse_version: ${{ inputs.pyoptsparse_version }}"
+        echo "pyoptsparse_from: ${{ inputs.pyoptsparse_from }}"
+        echo "snopt_version: ${{ inputs.snopt_version }}"
+        echo "=================================="
+
+    - name: Create SSH key
+      if: inputs.snopt_version != ''
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.SECRET_ssh_private_key }}
+        SSH_KNOWN_HOSTS: ${{ inputs.SECRET_ssh_known_hosts }}
+      shell: bash -l {0}
+      run: |
+        mkdir -p ~/.ssh/
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        sudo chmod 600 ~/.ssh/id_rsa
+        echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+    - name: Install compilers
+      if: inputs.pyoptsparse_version != ''
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Install compilers"
+        echo "============================================================="
+        if [[  "${{ inputs.os_version }}" != "macos-15" ]]; then
+          conda install cython swig compilers cmake meson openmp -q -y
+        else
+          conda install cython swig compilers cmake meson -q -y
+        fi
+
+    - name: Build SNOPT
+      if: inputs.pyoptsparse_from != 'build_pyoptsparse' && inputs.snopt_version_version != ''
+      shell: bash -l {0}
+      continue-on-error: false
+      env:
+        SNOPT_LOCATION: ${{ inputs.SECRET_snopt_location }}
+        SNOPT_VERSION: ${{ inputs.snopt_version }}
+      run: |
+        echo "============================================================="
+        echo "Build SNOPT library"
+        echo "============================================================="
+        if [[ -n "$SNOPT_LOCATION" && "$SNOPT_VERSION" == "7.7" ]]; then
+          echo "-------------------------------------------------------------"
+          echo "Getting SNOPT source"
+          echo "-------------------------------------------------------------"
+          scp -qr "$SNOPT_LOCATION" .
+        elif [[ "${{ inputs.snopt_version }}" ]]; then
+          echo "SNOPT version ${{ inputs.snopt_version }} was requested but source is not available"
+        fi
+
+        if [ -d "SNOPT" ] ; then
+          echo "-------------------------------------------------------------"
+          echo "Building SNOPT"
+          echo "-------------------------------------------------------------"
+          cd SNOPT
+          ./configure
+          make
+          make check
+
+          echo "-------------------------------------------------------------"
+          echo "Building Python bindings"
+          echo "-------------------------------------------------------------"
+          echo "  > Copying required files from pySNOPT.."
+
+          git clone https://github.com/mdolab/pyoptsparse $HOME/pyoptsparse
+
+          PYSNOPT_SOURCE=$HOME/pyoptsparse/pyoptsparse/pySNOPT/source/
+          cp -v $PYSNOPT_SOURCE/*.f src/
+          cp -v $PYSNOPT_SOURCE/f2py/snopt.pyf .
+
+          echo "  > Removing problematic files..."
+          rm -f src/snopth.f
+          rm -f src/sn27lu77.f
+          rm -f src/sn27lu90.f
+
+          echo "  > Building Python bindings..."
+          python -m numpy.f2py -m snopt -c snopt.pyf src/*.f -L`pwd`/lib -L/lib -lsnopt7
+
+          echo "-------------------------------------------------------------"
+          echo "Try to import SNOPT"
+          echo "-------------------------------------------------------------"
+          python -c "import snopt; print(snopt)"
+
+          echo "-------------------------------------------------------------"
+          echo "Set PYOPTSPARSE_IMPORT_SNOPT_FROM for subsequent steps"
+          echo "-------------------------------------------------------------"
+          export PYOPTSPARSE_IMPORT_SNOPT_FROM=`pwd`
+          echo "PYOPTSPARSE_IMPORT_SNOPT_FROM=$PYOPTSPARSE_IMPORT_SNOPT_FROM" >> $GITHUB_ENV
+
+          cd ../..
+        fi
+
+    - name: Install pyOptSparse from GitHub
+      if: inputs.pyoptsparse_version != '' && inputs.pyoptsparse_from == 'github'
+      shell: bash -l {0}
+      run: |
+        echo "Installing pyOptSparse from GitHub, IPOPT will not be available"
+        pip install git+https://github.com/mdolab/pyoptsparse@v${{ inputs.pyoptsparse_version }}
+
+    - name: Install pyOptSparse from conda-forge
+      if: inputs.pyoptsparse_version != '' && inputs.pyoptsparse_from == 'conda-forge'
+      shell: bash -l {0}
+      run: |
+        echo "Installing pyOptSparse from conda-forge, IPOPT will be available"
+        conda install -c conda-forge pyoptsparse=${{ inputs.pyoptsparse_version }} -q -y
+
+    - name: Install pyOptSparse using build_pyoptsparse
+      if: inputs.pyoptsparse_version != '' && inputs.pyoptsparse_from == 'build_pyoptsparse'
+      continue-on-error: false
+      shell: bash -l {0}
+      env:
+        SNOPT_LOCATION_72: ${{ inputs.SECRET_snopt_location_72 }}
+        SNOPT_LOCATION_77: ${{ inputs.SECRET_snopt_location_77 }}
+        SNOPT_VERSION: ${{ inputs.snopt_version }}
+      run: |
+        echo "Installing pyOptSparse from build_pyoptsparse"
+        conda install -c conda-forge swig -q -y
+
+        python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
+
+        if [[ "${{ inputs.pyoptsparse_version }}" == "latest" ]]; then
+          function latest_version() {
+            local REPO_URL=$1/releases/latest
+            local LATEST_URL=`curl -fsSLI -o /dev/null -w %{url_effective} $REPO_URL`
+            local LATEST_VER=`echo $LATEST_URL | awk '{split($0,a,"/tag/"); print a[2]}'`
+            echo $LATEST_VER
+          }
+          BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
+        else
+          BRANCH="-b v${{ inputs.pyoptsparse_version }}"
+        fi
+
+        if [[ "$SNOPT_VERSION" == "7.7" && -n "$SNOPT_LOCATION_77" ]]; then
+          echo "  > Secure copying SNOPT 7.7 over SSH"
+          mkdir SNOPT
+          scp -qr "$SNOPT_LOCATION_77" SNOPT
+          SNOPT="-s SNOPT/src"
+        elif [[ "$SNOPT_VERSION" == "7.2" && -n "$SNOPT_LOCATION_72" ]]; then
+          echo "  > Secure copying SNOPT 7.2 over SSH"
+          mkdir SNOPT
+          scp -qr "$SNOPT_LOCATION_72" SNOPT
+          ls -lR SNOPT
+          SNOPT="-s SNOPT/source"
+        elif [[ "$SNOPT_VERSION" ]]; then
+          echo "SNOPT version $SNOPT_VERSION was requested but source is not available"
+        fi
+
+        build_pyoptsparse -v $BRANCH $SNOPT
+
+    - name: Test pyoptsparse installation
+      if: inputs.pyoptsparse_version != ''
+      shell: bash -l {0}
+      run: |
+        python -c "import pyoptsparse; from pyoptsparse import SLSQP; SLSQP()" && echo "pyOptSparse OK" || echo "pyOptSparse FAILED"
+
