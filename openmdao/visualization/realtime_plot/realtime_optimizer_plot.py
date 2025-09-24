@@ -1,8 +1,10 @@
 """A real-time plot monitoring the optimization process as an OpenMDAO script runs."""
-
+ 
 from collections import defaultdict
-
+import re
+ 
 from openmdao.utils.shell_proc import _is_process_running
+from openmdao.core.constants import INF_BOUND
 
 try:
     from openmdao.visualization.realtime_plot.realtime_plot_class import _RealTimePlot
@@ -20,7 +22,7 @@ try:
         BasicTicker,
         Checkbox,
     )
-
+ 
     from bokeh.models.tools import (
         BoxZoomTool,
         ResetTool,
@@ -36,9 +38,9 @@ try:
     bokeh_and_dependencies_available = True
 except ImportError:
     bokeh_and_dependencies_available = False
-
+ 
 import numpy as np
-
+ 
 
 # Constants
 # color of the plot line for the objective function
@@ -49,7 +51,7 @@ _plot_line_width = 3
 # how transparent is the area part of the plot for desvars that are vectors
 _varea_alpha = 0.3
 # for variables that are vectors, we use bokeh's varea plotting element
-#   which is invisible if the min and max of the varea is the same. 
+#   which is invisible if the min and max of the varea is the same.
 #   Use this width to keep it from disappearing.
 #   0.001 seems to be a good fraction, not too thick but still visible
 _varea_min_width = 0.001
@@ -63,18 +65,21 @@ _toggle_styles = """
         inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
 _bounds_hatch_alpha = 0.3
-_bounds_hatch_pattern = 'cross'
+# _desvars_bounds_hatch_pattern = 'dot'
+# _cons_bounds_hatch_pattern = 'cross'
+_desvars_bounds_hatch_pattern = None
+_cons_bounds_hatch_pattern = None
 _bounds_hatch_weight = 1
 _bounds_line_width = 1
 _bounds_alpha = 0.0
 _bounds_infinity = 1e8
 _bounds_left = -1
-
+ 
 # colors used for the plot lines and associated buttons and axes labels
 # start with color-blind friendly colors and then use others if needed
 if bokeh_and_dependencies_available:
     _colorPalette = Colorblind[8] + Category20[20]
-
+ 
 # This is the JavaScript code that gets run when a user clicks on
 #   one of the toggle buttons that change what variables are plotted
 variable_button_callback_code = f"""
@@ -87,27 +92,27 @@ if (typeof window.ColorManager === 'undefined') {{
             if (ColorManager.instance) {{
                 return ColorManager.instance;
             }}
-
+ 
             this.palette = colorPalette;
             this.usedColors = new Set();
             this.variableColorMap = new Map();
             ColorManager.instance = this;
         }} //  end of constructor
-
+ 
         getColor(variableName) {{
             if (this.variableColorMap.has(variableName)) {{
                 return this.variableColorMap.get(variableName);
             }}
-
+ 
             const availableColor = this.palette.find(color => !this.usedColors.has(color));
             const newColor = availableColor ||
                                 this.palette[this.usedColors.size % this.palette.length];
-
+ 
             this.usedColors.add(newColor);
             this.variableColorMap.set(variableName, newColor);
             return newColor;
         }} // end of getColor
-
+ 
         releaseColor(variableName) {{
             const color = this.variableColorMap.get(variableName);
             if (color) {{
@@ -115,12 +120,12 @@ if (typeof window.ColorManager === 'undefined') {{
                 this.variableColorMap.delete(variableName);
             }}
         }} // end of releaseColor
-
+ 
     }}; // end of class definition
-
+ 
     window.colorManager = new window.ColorManager();
 }}
-
+ 
 // Get the toggle that triggered the callback
 const toggle = cb_obj;
 const var_type = toggle.tags[0].var_type;
@@ -128,27 +133,27 @@ const index = toggle.tags[0].index;
 const index_checkbox = index - 1; // objective does not have checkbox
 const checkbox = bounds_off_on_checkboxes[index_checkbox];
 const varname = cb_obj.label;
-
+ 
 // index value of 0 is for the objective variable whose axis
 // is on the left. The index variable refers to the list of toggle buttons.
 // The axes list variable only is for desvars and cons, whose axes are on the right.
 // The lines list variables includes all vars
-
+ 
 // Set line visibility
 lines[index].visible = toggle.active;
-
+ 
 // Set axis visibility if it exists (all except first line)
 if (var_type == "desvars" || var_type == "cons") {{
     axes[index-1].visible = toggle.active;
 }}
-
+ 
 // if turning on, get a color and set the line, axis label, and toggle button to that color
 if (toggle.active) {{
     let color = window.colorManager.getColor(varname);
     if (var_type == "desvars" || var_type == "cons") {{
         axes[index-1].axis_label_text_color = color
     }}
-
+ 
     // using set_value is a workaround because of a bug in Bokeh.
     // see https://github.com/bokeh/bokeh/issues/14364 for more info
     if (lines[index].glyph.type == "VArea"){{
@@ -157,20 +162,31 @@ if (toggle.active) {{
     if (lines[index].glyph.type == "Line"){{
         lines[index].glyph.properties.line_color.set_value(color);
     }}
-    
+   
     // enable bounds_off_on_checkbox
     checkbox.disabled = false;
-    
+   
+    // turn on bounds display if bounds checkbox is on and var is a desvar
+    if (var_type == "desvars" && checkbox.active) {{
+        const index_desvar = index - 1;
+        desvar_lower_bound_violation_indicators[index_desvar].visible = true;
+        desvar_upper_bound_violation_indicators[index_desvar].visible = true;
+        // TODO how to handle vars that are cons and desvars
+        desvar_bound_violation_indicator_source.data[varname] = [color];
+        desvar_bound_violation_indicator_source.change.emit();
+    }}
+  
     // turn on bounds display bounds checkbox is on and var is a cons
     if (var_type == "cons" && checkbox.active) {{
         const index_cons = index - num_desvars - 1;
-        lower_bound_violation_indicators[index_cons].visible = true;
-        upper_bound_violation_indicators[index_cons].visible = true;
-        bound_violation_indicator_source.data[varname] = [color];
-        bound_violation_indicator_source.change.emit();
-    }} 
+        constraint_lower_bound_violation_indicators[index_cons].visible = true;
+        constraint_upper_bound_violation_indicators[index_cons].visible = true;
+        // TODO how to handle vars that are cons and desvars
+        constraint_bound_violation_indicator_source.data[varname] = [color];
+        constraint_bound_violation_indicator_source.change.emit();
+    }}
   
-
+ 
     // make the button background color the same as the line, just slightly transparent
     toggle.stylesheets = [`
         .bk-btn.bk-active {{
@@ -181,10 +197,15 @@ if (toggle.active) {{
 }} else {{
     // if turning off a variable, return the color to the pool
     window.colorManager.releaseColor(varname);
+    if (var_type == "desvars") {{
+        const index_desvar = index - 1;
+        desvar_lower_bound_violation_indicators[index_desvar].visible = false;
+        desvar_upper_bound_violation_indicators[index_desvar].visible = false;
+    }}
     if (var_type == "cons") {{
         const index_cons = index - num_desvars - 1;
-        lower_bound_violation_indicators[index_cons].visible = false;
-        upper_bound_violation_indicators[index_cons].visible = false;
+        constraint_lower_bound_violation_indicators[index_cons].visible = false;
+        constraint_upper_bound_violation_indicators[index_cons].visible = false;
     }}
     // if the variable is not being displayed, do not let the user turn on bounds display
     checkbox.disabled = true;
@@ -193,7 +214,7 @@ if (toggle.active) {{
             {_toggle_styles}
         }}
     `];
-
+ 
 }}
 """
 bounds_off_on_callback_code = f"""
@@ -205,33 +226,53 @@ const var_type = checkbox.tags[0].var_type;
 const index = checkbox.tags[0].index;
 const varname = checkbox.tags[0].varname;
 let plot_line_color;
-
+ 
 // Set bounds violation indicators visibility
-if (var_type == "cons") {{
-    const index_cons = index - num_desvars;
-    lower_bound_violation_indicators[index_cons].properties.visible.set_value(checkbox.active);
-    upper_bound_violation_indicators[index_cons].properties.visible.set_value(checkbox.active);
-
+if (var_type == "desvars") {{
+    const index_desvar = index;
+    desvar_lower_bound_violation_indicators[index_desvar].properties.visible.set_value(checkbox.active);
+    desvar_upper_bound_violation_indicators[index_desvar].properties.visible.set_value(checkbox.active);
+ 
     if (checkbox.active){{
         // set bounds indicator color to plot line color
         const line_index = index + 1 ; // the objective line is the first line
-        
+       
         if (lines[line_index].glyph.type == "VArea"){{
             plot_line_color = lines[line_index].glyph.properties.fill_color.get_value().value;
         }} else {{
-            plot_line_color = lines[line_index].glyph.properties.line_color.get_value().value;           
+            plot_line_color = lines[line_index].glyph.properties.line_color.get_value().value;          
         }}
-    
-        bound_violation_indicator_source.data[varname] = [plot_line_color];
-        bound_violation_indicator_source.change.emit();
+   
+        desvar_bound_violation_indicator_source.data[varname] = [plot_line_color];
+        desvar_bound_violation_indicator_source.change.emit();
+    }}
+}}
+// Set bounds violation indicators visibility
+if (var_type == "cons") {{
+    const index_cons = index - num_desvars;
+    constraint_lower_bound_violation_indicators[index_cons].properties.visible.set_value(checkbox.active);
+    constraint_upper_bound_violation_indicators[index_cons].properties.visible.set_value(checkbox.active);
+ 
+    if (checkbox.active){{
+        // set bounds indicator color to plot line color
+        const line_index = index + 1 ; // the objective line is the first line
+       
+        if (lines[line_index].glyph.type == "VArea"){{
+            plot_line_color = lines[line_index].glyph.properties.fill_color.get_value().value;
+        }} else {{
+            plot_line_color = lines[line_index].glyph.properties.line_color.get_value().value;          
+        }}
+   
+        constraint_bound_violation_indicator_source.data[varname] = [plot_line_color];
+        constraint_bound_violation_indicator_source.change.emit();
     }}
 }}
 """
-
+ 
 def _update_y_min_max(name, y, y_min, y_max):
     """
     Update the y_min and y_max dicts containing the min and max of the variables.
-
+ 
     Parameters
     ----------
     name : str
@@ -242,7 +283,7 @@ def _update_y_min_max(name, y, y_min, y_max):
         Dict of mins of each variable.
     y_max : dict
         Dict of maxs of each variable.
-
+ 
     Returns
     -------
     bool
@@ -256,21 +297,21 @@ def _update_y_min_max(name, y, y_min, y_max):
         y_max[name] = y
         min_max_changed = True
     return min_max_changed
-
+ 
 
 def _get_value_for_plotting(value_from_recorder, var_type):
     """
     Return the double value to be used for plotting the variable.
-
+ 
     Handles variables that are vectors.
-
+ 
     Parameters
     ----------
     value_from_recorder : numpy array
         Value of the variable.
     var_type : str
         String indicating which type of variable it is: 'objs', 'desvars' or 'cons'.
-
+ 
     Returns
     -------
     double
@@ -291,17 +332,17 @@ def _get_value_for_plotting(value_from_recorder, var_type):
             return value_from_recorder.item()
         else:
             return np.linalg.norm(value_from_recorder)
-
+ 
 
 def _make_header_text_for_variable_chooser(header_text):
     """
     Return a Div to be used for the label for the type of variables in the variable list.
-
+ 
     Parameters
     ----------
     header_text : str
         Label string.
-
+ 
     Returns
     -------
     Div
@@ -312,12 +353,12 @@ def _make_header_text_for_variable_chooser(header_text):
         styles={"font-size": _variable_list_header_font_size},
     )
     return header_text_div
-
+ 
 
 class _RealTimeOptimizerPlot(_RealTimePlot):
     """
     A class that handles all of the real-time plotting.
-
+ 
     Parameters
     ----------
     case_recorder_filename : str
@@ -328,12 +369,12 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         The Bokeh document which is a collection of plots, layouts, and widgets.
     pid_of_calling_script : int or None
         The process ID of the process that called the command to start the realtime plot.
-
+ 
         None if the plot was called for directly by the user.
     script : str or None
         The name of the script used to create the case recorder file.
     """
-
+ 
     def __init__(
         self, case_tracker, callback_period, doc, pid_of_calling_script, script
     ):
@@ -344,7 +385,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         super().__init__(
             case_tracker, callback_period, doc, pid_of_calling_script, script
         )
-
+ 
         self._lines = []
         self._toggles = []  # includes only the toggle buttons
         self._bounds_off_on_checkboxes = []  # includes only the checkboxes for bounds on/off
@@ -352,31 +393,37 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         self._axes = []
         # flag to prevent updating label with units each time we get new data
         self._labels_updated_with_units = False
-
-        # user for showing which constraint points are out of bounds
-        self._lower_bounds_cons_source = None
-        self._upper_bounds_cons_source = None
-        self._lower_bound_violation_indicators = []
-        self._upper_bound_violation_indicators = []
+ 
+        self._source = None  # main source for data values for plots
+        
+        # used for showing which constraint points are out of bounds
+        # For constraints
+        self._constraint_bound_violation_indicator_source = None
+        self._constraint_lower_bound_violation_indicators = []
+        self._constraint_upper_bound_violation_indicators = []
+        
+        # for design var/driver bounds
+        self._desvar_bound_violation_indicator_source = None
+        self._desvar_lower_bound_violation_indicators = []
+        self._desvar_upper_bound_violation_indicators = []
+        
         self._num_desvars = 0
-        self._up_arrow_image_path = "./images/up_arrow_small.png"
-        self._down_arrow_image_path = "./images/down_arrow_small.png"
-
+ 
         self._setup_figure()
-
+ 
         # used to keep track of the y min and max of the data so that
         # the axes ranges can be adjusted as data comes in
         self._y_min = defaultdict(lambda: float("inf"))
         self._y_max = defaultdict(lambda: float("-inf"))
-
+ 
         doc.add_periodic_callback(self._update_wrapped_in_try, callback_period)
         doc.title = "OpenMDAO Optimization Progress Plot"
-
+ 
     def _setup_plotting(self, new_data):
-        # when we first get some data, we can start building the 
+        # when we first get some data, we can start building the
         # plot since we know about the variables and their metadata.
         self._setup_data_source()
-
+ 
         # Check to make sure we have one and only one objective before going farther
         obj_names = self._case_tracker._get_obj_names()
         if len(obj_names) != 1:
@@ -384,22 +431,37 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 f"Plot requires there to be one and only one objective \
                     but {len(obj_names)} objectives found"
             )
-
-        bound_violation_indicator_source_dict = {}
+ 
+        # setup sources for the colors of the bounds indicators
+        # Changing values of the quads used to draw the bounds indicators
+        #  is the only way to get this to work when changing via
+        #  javascipt callbacks.
+        desvar_bound_violation_indicator_source_dict = {}
+        desvar_names = self._case_tracker._get_desvar_names()
+        for desvar_name in desvar_names:
+            units = self._case_tracker._get_units(desvar_name)
+            desvar_name_with_type = desvar_name
+            if desvar_name in self._both_desvars_and_cons:
+                desvar_name_with_type += " [dv]"
+            desvar_button_label = f"{desvar_name_with_type} ({units})"
+            desvar_bound_violation_indicator_source_dict[desvar_button_label] = ["black"]
+        self._desvar_bound_violation_indicator_source = ColumnDataSource(
+                data=desvar_bound_violation_indicator_source_dict
+            )
+ 
+        constraint_bound_violation_indicator_source_dict = {}
         cons_names = self._case_tracker._get_cons_names()
-        for i, cons_name in enumerate(cons_names):
+        for cons_name in cons_names:
             units = self._case_tracker._get_units(cons_name)
             con_name_with_type = cons_name
             if cons_name in self._both_desvars_and_cons:
                 con_name_with_type += " [cons]"
-
             cons_button_label = f"{con_name_with_type} ({units})"
-            bound_violation_indicator_source_dict[cons_button_label] = ["black"]
-
-        self._bound_violation_indicator_source = ColumnDataSource(
-                data=bound_violation_indicator_source_dict
+            constraint_bound_violation_indicator_source_dict[cons_button_label] = ["black"]
+        self._constraint_bound_violation_indicator_source = ColumnDataSource(
+                data=constraint_bound_violation_indicator_source_dict
             )
-
+ 
         # Create CustomJS callback for toggle buttons.
         # Pass in the data from the Python side that the JavaScript side
         #   needs
@@ -407,42 +469,48 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             args=dict(
                 num_desvars=self._num_desvars,
                 lines=self._lines,
-                bound_violation_indicator_source = self._bound_violation_indicator_source,
-                lower_bound_violation_indicators=self._lower_bound_violation_indicators,
-                upper_bound_violation_indicators=self._upper_bound_violation_indicators,
+                desvar_bound_violation_indicator_source = self._desvar_bound_violation_indicator_source,
+                desvar_lower_bound_violation_indicators=self._desvar_lower_bound_violation_indicators,
+                desvar_upper_bound_violation_indicators=self._desvar_upper_bound_violation_indicators,
+                constraint_bound_violation_indicator_source = self._constraint_bound_violation_indicator_source,
+                constraint_lower_bound_violation_indicators=self._constraint_lower_bound_violation_indicators,
+                constraint_upper_bound_violation_indicators=self._constraint_upper_bound_violation_indicators,
             ),
             code=bounds_off_on_callback_code,
         )
-        
+       
         variable_button_callback = CustomJS(
             args=dict(
                 num_desvars=self._num_desvars,
                 lines=self._lines,
                 axes=self._axes,
                 bounds_off_on_checkboxes=self._bounds_off_on_checkboxes,
-                bound_violation_indicator_source = self._bound_violation_indicator_source,
-                lower_bound_violation_indicators=self._lower_bound_violation_indicators,
-                upper_bound_violation_indicators=self._upper_bound_violation_indicators,
+                desvar_bound_violation_indicator_source = self._desvar_bound_violation_indicator_source,
+                desvar_lower_bound_violation_indicators=self._desvar_lower_bound_violation_indicators,
+                desvar_upper_bound_violation_indicators=self._desvar_upper_bound_violation_indicators,
+                constraint_bound_violation_indicator_source = self._constraint_bound_violation_indicator_source,
+                constraint_lower_bound_violation_indicators=self._constraint_lower_bound_violation_indicators,
+                constraint_upper_bound_violation_indicators=self._constraint_upper_bound_violation_indicators,
                 colorPalette=_colorPalette,
             ),
             code=variable_button_callback_code,
         )
-
+ 
         # For the variables, make lines, axes, and the buttons to turn on and
         #   off the variable plot.
         # All the lines and axes for the desvars and cons are created in
         #   Python but initially are not visible. They are turned on and
         #   off on the JavaScript side.
-
+ 
         # objs
         obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
         self._column_items.append(obj_label)
-
+ 
         for i, obj_name in enumerate(obj_names):
             units = self._case_tracker._get_units(obj_name)
             self.plot_figure.yaxis.axis_label = f"{obj_name} ({units})"
             self._make_variable_button(
-                f"{obj_name} ({units})", 'objs', _obj_color, True, variable_button_callback,
+                f"{obj_name} ({units})", 'objs', True, variable_button_callback,
                 bounds_off_on_callback
             )
             self._make_line_and_hover_tool(
@@ -452,23 +520,22 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             float_value = _get_value_for_plotting(value, "objs")
             # just give it some non-zero initial range since we only have one point
             self.plot_figure.y_range = Range1d(float_value - 1, float_value + 1)
-
+ 
         # desvars
         desvars_label = _make_header_text_for_variable_chooser("DESIGN VARIABLES")
         self._column_items.append(desvars_label)
         desvar_names = self._case_tracker._get_desvar_names()
         for i, desvar_name in enumerate(desvar_names):
             units = self._case_tracker._get_units(desvar_name)
-
+ 
             desvar_name_with_type = desvar_name
             if desvar_name in self._both_desvars_and_cons:
                 desvar_name_with_type += " [dv]"
-
+ 
             desvar_button_label = f"{desvar_name_with_type} ({units})"
             self._make_variable_button(
                 desvar_button_label,
-                'desvars',  # TODO should make this and the other types a const
-                _non_active_plot_color,
+                'desvars',
                 False,
                 variable_button_callback,
                 bounds_off_on_callback
@@ -486,11 +553,9 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             )
             float_value = _get_value_for_plotting(value, "desvars")
             self._make_axis("desvars", desvar_name_with_type, float_value, units)
-
-        # TODO create a variable object that includes name, units, shape,...
-        
+ 
         # TODO include desvar driver constraints
-        
+       
         # cons
         cons_label = _make_header_text_for_variable_chooser("CONSTRAINTS")
         self._column_items.append(cons_label)
@@ -500,12 +565,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             con_name_with_type = cons_name
             if cons_name in self._both_desvars_and_cons:
                 con_name_with_type += " [cons]"
-
+ 
             cons_button_label = f"{con_name_with_type} ({units})"
             self._make_variable_button(
                 cons_button_label,
                 "cons",
-                _non_active_plot_color,
                 False,
                 variable_button_callback,
                 bounds_off_on_callback
@@ -522,7 +586,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             value = new_data["cons"][cons_name]
             float_value = _get_value_for_plotting(value, "cons")
             self._make_axis("cons", con_name_with_type, float_value, units)
-
+ 
         # Create a Column of the variable buttons and headers inside a scrolling window
         toggle_column = Column(
             children=self._column_items,
@@ -536,16 +600,16 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 "max-height": "100vh",  # Ensures it doesn't exceed viewport
             },
         )
-
+ 
         quit_button = Button(label="Quit Application", button_type="danger")
-
+ 
         # Define callback function for the quit button
         def quit_app():
             raise KeyboardInterrupt("Quit button pressed")
-
+ 
         # Attach the callback to the button
         quit_button.on_click(quit_app)
-
+ 
         # header for the variable list
         label = Div(
             text="Variables",
@@ -560,21 +624,21 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             height_policy="fit",
             styles={"max-height": "100vh"},  # Ensures it doesn't exceed viewport
         )
-
+ 
         scroll_box = ScrollBox(
             child=label_and_toggle_column,
             sizing_mode="stretch_height",
             height_policy="max",
         )
-
+ 
         graph = Row(self.plot_figure, scroll_box, sizing_mode="stretch_both")
         self._doc.add_root(graph)
-
+ 
     def _update(self):
         # this is the main method of the class. It gets called periodically by Bokeh
         # It looks for new data and if found, updates the plot with the new data
         new_case = self._case_tracker._get_new_case()
-
+ 
         if new_case is None:
             if self._pid_of_calling_script is None or not _is_process_running(
                 self._pid_of_calling_script
@@ -588,26 +652,26 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 #   lines will not change color because of the set_value hack done to get
                 #   get around the bug in setting the line color from JavaScript
                 self._source.stream(self._source_stream_dict)
-
-                # TODO need to do the same for the bounds source 
-                # self._bound_violation_indicator_source
-                
+ 
+                # TODO need to do the same for the bounds source
+                # self._constraint_bound_violation_indicator_source
+               
             return
-
+ 
         new_data = self._case_tracker._get_data_from_case(new_case)
-
+ 
         # See if Bokeh source object is defined yet. If not, set it up
         # since now we have data from the case recorder with info about the
         # variables to be plotted.
         if self._source is None:
             self._setup_plotting(new_data)
-
+ 
         # Do the actual update of the plot including updating the plot range and adding the new
         # data to the Bokeh plot stream
         counter = new_data["counter"]
         self._source_stream_dict = {"iteration": [counter]}
         self.plot_figure.x_range = Range1d(1, counter)
-
+ 
         iline = 0
         for obj_name, obj_value in new_data["objs"].items():
             float_obj_value = _get_value_for_plotting(obj_value, "objs")
@@ -619,7 +683,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 self.plot_figure.y_range.start = self._y_min[obj_name]
                 self.plot_figure.y_range.end = self._y_max[obj_name]
             iline += 1
-
+ 
         for desvar_name, desvar_value in new_data["desvars"].items():
             desvar_name_with_type = desvar_name
             if desvar_name in self._both_desvars_and_cons:
@@ -628,7 +692,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 units = self._case_tracker._get_units(desvar_name)
                 desvar_button_label = desvar_name_with_type + f' ({units}) {desvar_value.shape}'
                 self._toggles[iline].label = desvar_button_label
-
+ 
             # handle non-scalar desvars
             min_max_changed = False
             min_max_changed = min_max_changed or _update_y_min_max(
@@ -650,11 +714,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             else:
                 y1 = np.min(desvar_value)
                 y2 = np.max(desvar_value)
-
+ 
             self._source_stream_dict[f"{desvar_name_with_type}_min"] = [y1]
             self._source_stream_dict[f"{desvar_name_with_type}_max"] = [y2]
             iline += 1
-
+ 
         for cons_name, cons_value in new_data["cons"].items():
             float_cons_value = _get_value_for_plotting(cons_value, "cons")
             con_name_with_type = cons_name
@@ -665,7 +729,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 cons_button_label = con_name_with_type + f' ({units}) {cons_value.shape}'
                 self._toggles[iline].label = cons_button_label
             self._source_stream_dict[con_name_with_type] = [float_cons_value]
-
+ 
             # handle non-scalar cons
             min_max_changed = False
             min_max_changed = min_max_changed or _update_y_min_max(
@@ -678,24 +742,24 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 range = Range1d(self._y_min[con_name_with_type], self._y_max[con_name_with_type])
                 self.plot_figure.extra_y_ranges[f"extra_y_{con_name_with_type}"] = range
             iline += 1
-
+ 
         self._source.stream(self._source_stream_dict)
-
+ 
         self._labels_updated_with_units = True
         # end of _update method
-
+ 
     def _setup_data_source(self):
         self._source_dict = {"iteration": []}
-
+ 
         obj_names = self._case_tracker._get_obj_names()
         desvar_names = self._case_tracker._get_desvar_names()
         con_names = self._case_tracker._get_cons_names()
         self._both_desvars_and_cons = list(set(desvar_names).intersection(set(con_names)))
-
+ 
         # Obj
         for obj_name in obj_names:
             self._source_dict[obj_name] = []
-
+ 
         # Desvars
         for desvar_name in desvar_names:
             desvar_name_with_type = desvar_name
@@ -704,43 +768,42 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             self._source_dict[f"{desvar_name_with_type}_min"] = []
             self._source_dict[f"{desvar_name_with_type}_max"] = []
             self._num_desvars += 1
-
+ 
         # Cons
-
+ 
         for con_name in con_names:
             con_name_with_type = con_name
             if con_name in self._both_desvars_and_cons:
                 con_name_with_type += ' [cons]'
-            # self._source_dict[con_name] = []
             self._source_dict[con_name_with_type] = []
         self._source = ColumnDataSource(self._source_dict)
+ 
+        # # Cons - lower bound
+        # self._lower_bounds_cons_source_dict = {
+        #     "iteration": [],
+        #     "urls": [],
+        # }
+        # for con_name in con_names:
+        #     con_name_with_type = con_name
+        #     if con_name in self._both_desvars_and_cons:
+        #         con_name_with_type += ' [cons]'
+        #     self._lower_bounds_cons_source_dict[con_name_with_type] = []
+        # self._constraint_lower_bounds_cons_source = ColumnDataSource(self._lower_bounds_cons_source_dict)
+ 
+        # # Cons - upper bound
+        # self._upper_bounds_cons_source_dict = {
+        #     "iteration": [],
+        #     "urls": [],
+        # }
+        # for con_name in con_names:
+        #     con_name_with_type = con_name
+        #     if con_name in self._both_desvars_and_cons:
+        #         con_name_with_type += ' [cons]'
+        #     self._upper_bounds_cons_source_dict[con_name_with_type] = []
+        # self._constraint_upper_bounds_cons_source = ColumnDataSource(self._upper_bounds_cons_source_dict)
+ 
 
-        # Cons - lower bound
-        self._lower_bounds_cons_source_dict = {
-            "iteration": [],
-            "urls": [],
-        }
-        for con_name in con_names:
-            con_name_with_type = con_name
-            if con_name in self._both_desvars_and_cons:
-                con_name_with_type += ' [cons]'
-            self._lower_bounds_cons_source_dict[con_name_with_type] = []
-        self._lower_bounds_cons_source = ColumnDataSource(self._lower_bounds_cons_source_dict)
-
-        # Cons - upper bound
-        self._upper_bounds_cons_source_dict = {
-            "iteration": [],
-            "urls": [],
-        }
-        for con_name in con_names:
-            con_name_with_type = con_name
-            if con_name in self._both_desvars_and_cons:
-                con_name_with_type += ' [cons]'
-            self._upper_bounds_cons_source_dict[con_name_with_type] = []
-        self._upper_bounds_cons_source = ColumnDataSource(self._upper_bounds_cons_source_dict)
-
-
-    def _make_variable_button(self, varname, var_type, color, active, callback, bounds_off_on_callback):
+    def _make_variable_button(self, varname, var_type, active, callback, bounds_off_on_callback):
         index = len(self._toggles)
         toggle = Toggle(
             label=varname,
@@ -749,7 +812,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             tags=[{'var_type': var_type, 'index': index}])
         toggle.js_on_change("active", callback)
         self._toggles.append(toggle)
-
+ 
         if var_type != 'objs':
             index = len(self._bounds_off_on_checkboxes)
             checkbox = Checkbox(active=False, disabled=True, margin=(12, 0, 8, 4),
@@ -759,7 +822,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             self._column_items.append(Row(toggle,checkbox))
         else:
             self._column_items.append(toggle)
-            
+           
         # Add custom CSS styles for both active and inactive states
         toggle.stylesheets = [
             f"""
@@ -774,6 +837,51 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         ]
         return toggle
 
+    def _make_bounds_display(self, top, bottom, source, varname):
+        bounds_display = self.plot_figure.quad(
+            top=top,
+            bottom=bottom,
+            left=_bounds_left,
+            right=_bounds_infinity,
+            source=source,
+            #                 hatch_pattern=_desvars_bounds_hatch_pattern,  # Diagonal hatch pattern
+            #                 hatch_color=desvars_button_label,  # Use color from data source
+            #                 hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
+            #                 hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
+            # line_color=varname,  # Quad outline
+            # line_width=_bounds_line_width,
+            # alpha=_bounds_alpha,
+            color=varname,
+            fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
+            fill_color=varname,
+            visible=False,
+            syncable = True # try this
+        )
+        
+        return bounds_display
+        
+    
+    
+    #                     top=_bounds_infinity,
+    #                 bottom=upper_bound,
+    #                 left=_bounds_left,
+    #                 right=_bounds_infinity,
+    #                 source=self._desvar_bound_violation_indicator_source,
+    #                 hatch_pattern=_desvars_bounds_hatch_pattern,  # Diagonal hatch pattern
+    #                 hatch_color=desvars_button_label,  # Use color from data source
+    #                 hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
+    #                 hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
+    #                 line_color=desvars_button_label,  # Quad outline
+    #                 line_width=_bounds_line_width,
+    #                 alpha=_bounds_alpha,
+    #                 color=desvars_button_label,
+    #                 fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
+    # fill_color='blue',  # Explicit transparent fill
+    #                 visible=False,
+
+    
+    
+    
     def _make_line_and_hover_tool(
         self, var_type, varname, use_varea, color, line_dash, visible
     ):
@@ -801,63 +909,194 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 color=color,
                 visible=visible,
             )
-            if var_type == "cons":
+        
+                
+        # # Disable padding on both axes
+        # from bokeh.models import DataRange1d
+        # self.plot_figure.y_range = DataRange1d(range_padding=0)
+        # self.plot_figure.x_range = DataRange1d(range_padding=0)
 
-                import re
-                # Match optional whitespace followed by [anything] at the end of string
-                varname_minus_type = re.sub(r'\s*\[.*?\]$', '', varname)
+        
+        
+        
+        # make graphics showing bounds
+        if var_type == "desvars":
+            varname_minus_type = re.sub(r'\s*\[.*?\]$', '', varname)
+            lower_bound, upper_bound = self._case_tracker._get_desvar_bounds(varname_minus_type)
+            
+            
+            print(f"{varname} {(lower_bound, upper_bound)=}")
+            
+            units = self._case_tracker._get_units(varname_minus_type)
+            desvars_button_label = f"{varname} ({units})"
 
-                lower_bound, upper_bound = self._case_tracker._get_constraint_bounds(varname_minus_type)
-
-                # varname includes if cons, but not units so need to add it here
-                units = self._case_tracker._get_units(varname_minus_type)
-                cons_button_label = f"{varname} ({units})"
-
+            print(f"for {varname} upper bound top is {_bounds_infinity} and bottom is {upper_bound}")
+            if upper_bound != INF_BOUND:
                 upper_bound_violation_indicator = self.plot_figure.quad(
                     top=_bounds_infinity,
                     bottom=upper_bound,
                     left=_bounds_left,
                     right=_bounds_infinity,
-                    source=self._bound_violation_indicator_source,
-                    hatch_pattern=_bounds_hatch_pattern,  # Diagonal hatch pattern
-                    hatch_color=cons_button_label,  # Use color from data source
+                    source=self._desvar_bound_violation_indicator_source,
+                    hatch_pattern=_desvars_bounds_hatch_pattern,  # Diagonal hatch pattern
+                    hatch_color=desvars_button_label,  # Use color from data source
                     hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
                     hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
-                    line_color=cons_button_label,  # Quad outline
-                    line_width=_bounds_line_width,
+                    # line_color=desvars_button_label,  # Quad outline
+                    # line_width=_bounds_line_width,
                     alpha=_bounds_alpha,
-                    color=cons_button_label,
+                    color=desvars_button_label,
+                    fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
+    fill_color='blue',  # Explicit transparent fill
                     visible=False,
                 )
+            else:
+                upper_bound_violation_indicator = self.plot_figure.quad(
+                    alpha= 0.0)
 
+
+            print(f"for {varname} lower bound top is {lower_bound} and bottom is {-_bounds_infinity}")
+
+
+            if lower_bound != - INF_BOUND:
                 lower_bound_violation_indicator = self.plot_figure.quad(
                     top=lower_bound,
                     bottom=-_bounds_infinity,
                     left=_bounds_left,
                     right=_bounds_infinity,
-                    source=self._bound_violation_indicator_source,
-                    hatch_pattern=_bounds_hatch_pattern,  # Diagonal hatch pattern
-                    hatch_color=cons_button_label,  # Use color from data source
+                    source=self._desvar_bound_violation_indicator_source,
+                    hatch_pattern=_desvars_bounds_hatch_pattern,  # Diagonal hatch pattern
+                    hatch_color=desvars_button_label,  # Use color from data source
                     hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
                     hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
-                    line_color=cons_button_label,  # Quad outline
-                    line_width=_bounds_line_width,
+                    # line_color=desvars_button_label,  # Quad outline
+                    # line_width=_bounds_line_width,
                     alpha=_bounds_alpha,
-                    color=cons_button_label,
+                    color=desvars_button_label,
+                    fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
+    fill_color='blue',  # Explicit transparent fill
                     visible=False,
                 )
+            else:
+                lower_bound_violation_indicator = self.plot_figure.quad(
+                    alpha= 0.0)
+                
 
-                self._lower_bound_violation_indicators.append(lower_bound_violation_indicator)
-                self._upper_bound_violation_indicators.append(upper_bound_violation_indicator)
+            self._desvar_lower_bound_violation_indicators.append(lower_bound_violation_indicator)
+            self._desvar_upper_bound_violation_indicators.append(upper_bound_violation_indicator)
+
+        if var_type == "cons":
+            # Match optional whitespace followed by [anything] at the end of string
+            varname_minus_type = re.sub(r'\s*\[.*?\]$', '', varname)
+
+            lower_bound, upper_bound = self._case_tracker._get_constraint_bounds(varname_minus_type)
+
+            # varname includes if cons, but not units so need to add it here
+            units = self._case_tracker._get_units(varname_minus_type)
+            cons_button_label = f"{varname} ({units})"
+
+
+            print(f"{varname} {(lower_bound, upper_bound)=}")
+
+            print(f"for {varname} upper bound top is {_bounds_infinity} and bottom is {upper_bound}")
+
+
+            upper_bound_violation_indicator = self.plot_figure.quad(
+                top=_bounds_infinity,
+                bottom=upper_bound,
+                left=_bounds_left,
+                right=_bounds_infinity,
+                source=self._constraint_bound_violation_indicator_source,
+                hatch_pattern=_cons_bounds_hatch_pattern,  # Diagonal hatch pattern
+                hatch_color=cons_button_label,  # Use color from data source
+                hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
+                hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
+                line_color=cons_button_label,  # Quad outline
+                line_width=_bounds_line_width,
+                alpha=_bounds_alpha,
+                color=cons_button_label,
+                fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
+    fill_color='blue',  # Explicit transparent fill
+                visible=False,
+            )
+            
+            
+            
+            # from bokeh.models import Span
+
+            # # This creates a horizontal line that spans the entire plot width
+            # horizontal_line = Span(
+            #     location=upper_bound,           # y-value where line appears
+            #     dimension='width',    # 'width' for horizontal, 'height' for vertical
+            #     line_color='red',
+            #     line_width=2,
+            #     line_alpha=1.0
+            # )
+            # self.plot_figure.add_layout(horizontal_line)
+            # horizontal_line.y_range_name = f"extra_y_{varname}"
+            # # This creates a horizontal line that spans the entire plot width
+            # horizontal_line = Span(
+            #     location=lower_bound,           # y-value where line appears
+            #     dimension='width',    # 'width' for horizontal, 'height' for vertical
+            #     line_color='red',
+            #     line_width=2,
+            #     line_alpha=1.0
+            # )
+            # self.plot_figure.add_layout(horizontal_line)
+            # horizontal_line.y_range_name = f"extra_y_{varname}"
+
+
+            print(f"for {varname} lower bound top is {lower_bound} and bottom is {-_bounds_infinity}")
+
+
+            lower_bound_violation_indicator = self._make_bounds_display(lower_bound, -_bounds_infinity,
+                                                                   self._constraint_bound_violation_indicator_source,
+                                                                   cons_button_label)
+            
+            
+
+
+
+
+    #         lower_bound_violation_indicator = self.plot_figure.quad(
+    #             top=lower_bound,
+    #             bottom=-_bounds_infinity,
+    #             left=_bounds_left,
+    #             right=_bounds_infinity,
+    #             source=self._constraint_bound_violation_indicator_source,
+    #             hatch_pattern=_cons_bounds_hatch_pattern,  # Diagonal hatch pattern
+    #             hatch_color=cons_button_label,  # Use color from data source
+    #             hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
+    #             hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
+    #             line_color=cons_button_label,  # Quad outline
+    #             line_width=_bounds_line_width,
+
+
+    #             # line_join='miter',  # Sharp corners
+    #             # line_cap='butt',    # Sharp edges
+
+
+
+
+    #             alpha=_bounds_alpha,
+    #             color=cons_button_label,
+    #             fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
+    # fill_color='blue',  # Explicit transparent fill
+    #             visible=False,
+    #         )
+
+            self._constraint_lower_bound_violation_indicators.append(lower_bound_violation_indicator)
+            self._constraint_upper_bound_violation_indicators.append(upper_bound_violation_indicator)
 
         if var_type == "desvars":
             line.y_range_name = f"extra_y_{varname}_min"
+            lower_bound_violation_indicator.y_range_name = f"extra_y_{varname}_min"
+            upper_bound_violation_indicator.y_range_name = f"extra_y_{varname}_min"
         elif var_type == "cons":
             line.y_range_name = f"extra_y_{varname}"
-
             lower_bound_violation_indicator.y_range_name = f"extra_y_{varname}"
             upper_bound_violation_indicator.y_range_name = f"extra_y_{varname}"
-
+ 
         self._lines.append(line)
         if not use_varea:  # hover tool does not work with Varea
             hover = HoverTool(
@@ -870,29 +1109,33 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 visible=visible,
             )
             self.plot_figure.add_tools(hover)
-
+ 
     def _make_axis(self, var_type, varname, plot_value, units):
         # Make axis for this variable on the right of the plot
-
+ 
         # print(f"make axis for {varname=}")
         if var_type == "desvars":
             y_range_name = f"extra_y_{varname}_min"
         else:
             y_range_name = f"extra_y_{varname}"
+            
+            
+            
+        print(f"{y_range_name=}")
+            
         extra_y_axis = LinearAxis(
             y_range_name=y_range_name,
             axis_label=f"{varname} ({units})",
             axis_label_text_font_size="20px",
             visible=False,
-            # visible=True,
         )
         self._axes.append(extra_y_axis)
-        self.plot_figure.add_layout(extra_y_axis, "right")        
-
+        self.plot_figure.add_layout(extra_y_axis, "right")       
+ 
         self.plot_figure.extra_y_ranges[y_range_name] = Range1d(
             plot_value - 1, plot_value + 1
         )
-
+ 
     def _setup_figure(self):
         # Make the figure and all the settings for it
         if self._script:
@@ -919,16 +1162,19 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             active_tap=None,
             output_backend="webgl",
         )
-
+ 
         self.plot_figure.title.text_font_size = "14px"
         self.plot_figure.title.text_color = "black"
         self.plot_figure.title.text_font = "arial"
         self.plot_figure.title.align = "left"
         self.plot_figure.title.standoff = 40  # Adds 40 pixels of space below the title
-
+ 
         self.plot_figure.xaxis.axis_label = "Driver iterations"
         self.plot_figure.xaxis.minor_tick_line_color = None
         self.plot_figure.xaxis.ticker = BasicTicker(desired_num_ticks=10, min_interval=1)
-
+ 
         self.plot_figure.axis.axis_label_text_font_style = "bold"
         self.plot_figure.axis.axis_label_text_font_size = "20pt"
+
+ 
+ 

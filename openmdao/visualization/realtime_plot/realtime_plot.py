@@ -314,7 +314,6 @@ class _CaseRecorderTracker:
         return cons.keys()
 
     def _get_constraint_bounds(self, name):
-
         cons = self._initial_case.get_constraints()
         var_info = cons._var_info[name]
         return (var_info['lower'], var_info['upper'])
@@ -324,8 +323,10 @@ class _CaseRecorderTracker:
         # self._cr.problem_metadata['variables']. # has dict of actual promoted var names and includes lower and upper for the constraint
         # self._cr.problem_metadata['design_vars']. # keys a auto ivcs but have the correct name as element. It has the desvars bounds
         # # can also try get_io_metadata(includes='varname')
-
-        pass
+        # # cr.problem_metadata['variables']['y']['upper']
+        lower = self._cr.problem_metadata['variables'][name]['lower']
+        upper = self._cr.problem_metadata['variables'][name]['upper']
+        return lower, upper
 
 
     def _get_units(self, name):
