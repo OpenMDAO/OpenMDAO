@@ -778,30 +778,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             self._source_dict[con_name_with_type] = []
         self._source = ColumnDataSource(self._source_dict)
  
-        # # Cons - lower bound
-        # self._lower_bounds_cons_source_dict = {
-        #     "iteration": [],
-        #     "urls": [],
-        # }
-        # for con_name in con_names:
-        #     con_name_with_type = con_name
-        #     if con_name in self._both_desvars_and_cons:
-        #         con_name_with_type += ' [cons]'
-        #     self._lower_bounds_cons_source_dict[con_name_with_type] = []
-        # self._constraint_lower_bounds_cons_source = ColumnDataSource(self._lower_bounds_cons_source_dict)
- 
-        # # Cons - upper bound
-        # self._upper_bounds_cons_source_dict = {
-        #     "iteration": [],
-        #     "urls": [],
-        # }
-        # for con_name in con_names:
-        #     con_name_with_type = con_name
-        #     if con_name in self._both_desvars_and_cons:
-        #         con_name_with_type += ' [cons]'
-        #     self._upper_bounds_cons_source_dict[con_name_with_type] = []
-        # self._constraint_upper_bounds_cons_source = ColumnDataSource(self._upper_bounds_cons_source_dict)
- 
 
     def _make_variable_button(self, varname, var_type, active, callback, bounds_off_on_callback):
         index = len(self._toggles)
@@ -844,43 +820,15 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             left=_bounds_left,
             right=_bounds_infinity,
             source=source,
-            #                 hatch_pattern=_desvars_bounds_hatch_pattern,  # Diagonal hatch pattern
-            #                 hatch_color=desvars_button_label,  # Use color from data source
-            #                 hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
-            #                 hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
-            # line_color=varname,  # Quad outline
-            # line_width=_bounds_line_width,
-            # alpha=_bounds_alpha,
-            color=varname,
-            fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
+            # color=varname,
+            fill_alpha=0.1,
             fill_color=varname,
             visible=False,
-            syncable = True # try this
+            syncable = False # try this
         )
         
         return bounds_display
         
-    
-    
-    #                     top=_bounds_infinity,
-    #                 bottom=upper_bound,
-    #                 left=_bounds_left,
-    #                 right=_bounds_infinity,
-    #                 source=self._desvar_bound_violation_indicator_source,
-    #                 hatch_pattern=_desvars_bounds_hatch_pattern,  # Diagonal hatch pattern
-    #                 hatch_color=desvars_button_label,  # Use color from data source
-    #                 hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
-    #                 hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
-    #                 line_color=desvars_button_label,  # Quad outline
-    #                 line_width=_bounds_line_width,
-    #                 alpha=_bounds_alpha,
-    #                 color=desvars_button_label,
-    #                 fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
-    # fill_color='blue',  # Explicit transparent fill
-    #                 visible=False,
-
-    
-    
     
     def _make_line_and_hover_tool(
         self, var_type, varname, use_varea, color, line_dash, visible
@@ -910,73 +858,27 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 visible=visible,
             )
         
-                
-        # # Disable padding on both axes
-        # from bokeh.models import DataRange1d
-        # self.plot_figure.y_range = DataRange1d(range_padding=0)
-        # self.plot_figure.x_range = DataRange1d(range_padding=0)
-
-        
-        
-        
         # make graphics showing bounds
         if var_type == "desvars":
             varname_minus_type = re.sub(r'\s*\[.*?\]$', '', varname)
             lower_bound, upper_bound = self._case_tracker._get_desvar_bounds(varname_minus_type)
             
-            
-            print(f"{varname} {(lower_bound, upper_bound)=}")
-            
             units = self._case_tracker._get_units(varname_minus_type)
             desvars_button_label = f"{varname} ({units})"
 
-            print(f"for {varname} upper bound top is {_bounds_infinity} and bottom is {upper_bound}")
             if upper_bound != INF_BOUND:
-                upper_bound_violation_indicator = self.plot_figure.quad(
-                    top=_bounds_infinity,
-                    bottom=upper_bound,
-                    left=_bounds_left,
-                    right=_bounds_infinity,
-                    source=self._desvar_bound_violation_indicator_source,
-                    hatch_pattern=_desvars_bounds_hatch_pattern,  # Diagonal hatch pattern
-                    hatch_color=desvars_button_label,  # Use color from data source
-                    hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
-                    hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
-                    # line_color=desvars_button_label,  # Quad outline
-                    # line_width=_bounds_line_width,
-                    alpha=_bounds_alpha,
-                    color=desvars_button_label,
-                    fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
-    fill_color='blue',  # Explicit transparent fill
-                    visible=False,
-                )
+                upper_bound_violation_indicator = self._make_bounds_display(_bounds_infinity, upper_bound,
+                                                                    self._desvar_bound_violation_indicator_source,
+                                                                    desvars_button_label)
             else:
                 upper_bound_violation_indicator = self.plot_figure.quad(
                     alpha= 0.0)
 
-
-            print(f"for {varname} lower bound top is {lower_bound} and bottom is {-_bounds_infinity}")
-
-
             if lower_bound != - INF_BOUND:
-                lower_bound_violation_indicator = self.plot_figure.quad(
-                    top=lower_bound,
-                    bottom=-_bounds_infinity,
-                    left=_bounds_left,
-                    right=_bounds_infinity,
-                    source=self._desvar_bound_violation_indicator_source,
-                    hatch_pattern=_desvars_bounds_hatch_pattern,  # Diagonal hatch pattern
-                    hatch_color=desvars_button_label,  # Use color from data source
-                    hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
-                    hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
-                    # line_color=desvars_button_label,  # Quad outline
-                    # line_width=_bounds_line_width,
-                    alpha=_bounds_alpha,
-                    color=desvars_button_label,
-                    fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
-    fill_color='blue',  # Explicit transparent fill
-                    visible=False,
-                )
+                lower_bound_violation_indicator = self._make_bounds_display(lower_bound, -_bounds_infinity,
+                                                                    self._desvar_bound_violation_indicator_source,
+                                                                    desvars_button_label)
+
             else:
                 lower_bound_violation_indicator = self.plot_figure.quad(
                     alpha= 0.0)
@@ -995,95 +897,13 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             units = self._case_tracker._get_units(varname_minus_type)
             cons_button_label = f"{varname} ({units})"
 
-
-            print(f"{varname} {(lower_bound, upper_bound)=}")
-
-            print(f"for {varname} upper bound top is {_bounds_infinity} and bottom is {upper_bound}")
-
-
-            upper_bound_violation_indicator = self.plot_figure.quad(
-                top=_bounds_infinity,
-                bottom=upper_bound,
-                left=_bounds_left,
-                right=_bounds_infinity,
-                source=self._constraint_bound_violation_indicator_source,
-                hatch_pattern=_cons_bounds_hatch_pattern,  # Diagonal hatch pattern
-                hatch_color=cons_button_label,  # Use color from data source
-                hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
-                hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
-                line_color=cons_button_label,  # Quad outline
-                line_width=_bounds_line_width,
-                alpha=_bounds_alpha,
-                color=cons_button_label,
-                fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
-    fill_color='blue',  # Explicit transparent fill
-                visible=False,
-            )
-            
-            
-            
-            # from bokeh.models import Span
-
-            # # This creates a horizontal line that spans the entire plot width
-            # horizontal_line = Span(
-            #     location=upper_bound,           # y-value where line appears
-            #     dimension='width',    # 'width' for horizontal, 'height' for vertical
-            #     line_color='red',
-            #     line_width=2,
-            #     line_alpha=1.0
-            # )
-            # self.plot_figure.add_layout(horizontal_line)
-            # horizontal_line.y_range_name = f"extra_y_{varname}"
-            # # This creates a horizontal line that spans the entire plot width
-            # horizontal_line = Span(
-            #     location=lower_bound,           # y-value where line appears
-            #     dimension='width',    # 'width' for horizontal, 'height' for vertical
-            #     line_color='red',
-            #     line_width=2,
-            #     line_alpha=1.0
-            # )
-            # self.plot_figure.add_layout(horizontal_line)
-            # horizontal_line.y_range_name = f"extra_y_{varname}"
-
-
-            print(f"for {varname} lower bound top is {lower_bound} and bottom is {-_bounds_infinity}")
-
+            upper_bound_violation_indicator = self._make_bounds_display(_bounds_infinity, upper_bound,
+                                                                   self._constraint_bound_violation_indicator_source,
+                                                                   cons_button_label)
 
             lower_bound_violation_indicator = self._make_bounds_display(lower_bound, -_bounds_infinity,
                                                                    self._constraint_bound_violation_indicator_source,
                                                                    cons_button_label)
-            
-            
-
-
-
-
-    #         lower_bound_violation_indicator = self.plot_figure.quad(
-    #             top=lower_bound,
-    #             bottom=-_bounds_infinity,
-    #             left=_bounds_left,
-    #             right=_bounds_infinity,
-    #             source=self._constraint_bound_violation_indicator_source,
-    #             hatch_pattern=_cons_bounds_hatch_pattern,  # Diagonal hatch pattern
-    #             hatch_color=cons_button_label,  # Use color from data source
-    #             hatch_alpha=_bounds_hatch_alpha,  # Hatch opacity
-    #             hatch_weight=_bounds_hatch_weight,  # Hatch line thickness
-    #             line_color=cons_button_label,  # Quad outline
-    #             line_width=_bounds_line_width,
-
-
-    #             # line_join='miter',  # Sharp corners
-    #             # line_cap='butt',    # Sharp edges
-
-
-
-
-    #             alpha=_bounds_alpha,
-    #             color=cons_button_label,
-    #             fill_alpha=0.05,    # Make solid fill transparent (only hatch will show)
-    # fill_color='blue',  # Explicit transparent fill
-    #             visible=False,
-    #         )
 
             self._constraint_lower_bound_violation_indicators.append(lower_bound_violation_indicator)
             self._constraint_upper_bound_violation_indicators.append(upper_bound_violation_indicator)
