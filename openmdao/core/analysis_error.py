@@ -30,6 +30,6 @@ class AnalysisError(Exception):
         if location is not None:
             with reset_warning_registry():
                 warnings.formatwarning = _warn_simple_format
-                msg = (f"Analysis Error: {msginfo} Line {location.lineno} of file "
-                       f"{location.filename}")
+                msg = (f"Analysis Error: {msginfo} Line {location.f_lineno} of file "
+                       f"{location.f_code.co_filename}")
                 warnings.warn(msg, UserWarning, 2)
