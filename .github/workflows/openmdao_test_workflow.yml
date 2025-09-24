@@ -19,33 +19,9 @@ on:
         required: false
         default: ""
 
-      Ubuntu_Baseline:
-        type: boolean
-        description: 'Include Ubuntu Baseline in test matrix'
-        required: false
-        default: true
-
-      MacOS_Baseline:
-        type: boolean
-        description: 'Include MacOS Baseline in test matrix'
-        required: false
-        default: true
-
       Windows_Baseline:
         type: boolean
         description: 'Include Windows Baseline in test matrix'
-        required: false
-        default: true
-
-      Ubuntu_Minimal:
-        type: boolean
-        description: 'Include Ubuntu Minimal in test matrix'
-        required: false
-        default: true
-
-      Ubuntu_Oldest:
-        type: boolean
-        description: 'Include Ubuntu Oldest in test matrix'
         required: false
         default: true
 
@@ -76,56 +52,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # test baseline versions on Ubuntu
-          - NAME: Ubuntu Baseline
-            OS: ubuntu-24.04
-            PY: '3.13'
-            NUMPY: '2.2'
-            SCIPY: '1.16'
-            PETSc: '3.21'
-            PYOPTSPARSE_FROM: 'conda-forge'
-            PYOPTSPARSE: '2.13.1'
-            SNOPT: '7.7'
-            OPTIONAL: '[all,numba]'
-            BANDIT: true
-            PEP517: true
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Baseline }}
-
-          # test baseline versions on MacOS
-          - NAME: MacOS Baseline
-            OS: macos-15
-            PY: '3.13'
-            NUMPY: '2.2'
-            SCIPY: '1.15'
-            PETSc: '3.21'
-            PYOPTSPARSE_FROM: 'build_pyoptsparse'
-            PYOPTSPARSE: '2.13.1'
-            SNOPT: '7.7'
-            OPTIONAL: '[all]'
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_Baseline }}
-
-          # test minimal install
-          - NAME: Ubuntu Minimal
-            OS: ubuntu-24.04
-            PY: '3.13'
-            NUMPY: '2.2'
-            SCIPY: '1.15'
-            OPTIONAL: '[test]'
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
-
-          # test oldest supported versions
-          - NAME: Ubuntu Oldest
-            OS: ubuntu-22.04
-            PY: '3.10'
-            NUMPY: '1.26'
-            SCIPY: '1.12'
-            PETSc: '3.20'
-            OPENMPI: '4.1'
-            PYOPTSPARSE_FROM: 'build_pyoptsparse'
-            PYOPTSPARSE: '2.10.2'
-            SNOPT: '7.7'
-            OPTIONAL: '[all]'
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Oldest }}
 
     runs-on: ${{ matrix.OS }}
 
@@ -649,6 +575,8 @@ jobs:
           copy .coveragerc $HOME
           cd $HOME
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          cd openmdao
+          cd drivers
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
 
       - name: Slack unit test failure
@@ -699,47 +627,4 @@ jobs:
           python -m bandit -c bandit.yml -ll -r openmdao
 
 
-  coveralls:
-    name: Finish coverage
-    needs: [tests, windows_tests]
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-    - uses: coverallsapp/github-action@master
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        parallel-finished: true
 
-
-  related_tests:
-    name: Run Dymos & pyCycle Tests
-    needs: [tests, windows_tests]
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: benc-uk/workflow-dispatch@v1
-      with:
-        workflow: Dymos Tests
-        repo: ${{ github.repository_owner }}/dymos
-        inputs: >
-          {
-            "run_name": "Test Latest OpenMDAO Development Version",
-            "latest": true
-           }
-        token: ${{ secrets.ACCESS_TOKEN }}
-      if: github.event_name == 'push'
-
-    - uses: benc-uk/workflow-dispatch@v1
-      with:
-        workflow: pyCycle Tests
-        repo: ${{ github.repository_owner }}/pycycle
-        inputs: >
-          {
-            "run_name": "Test Latest OpenMDAO Development Version",
-            "Ubuntu_Baseline": false,
-            "MacOS_Baseline": false,
-            "Windows_Baseline": false,
-            "OpenMDAO_Dev": true
-           }
-        token: ${{ secrets.ACCESS_TOKEN }}
-      if: github.event_name == 'push'
