@@ -404,8 +404,6 @@ jobs:
           echo "###################################################"
           cp .coveragerc $HOME
           cd $HOME
-          cd openmdao
-          cd drivers
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage --coverpkg openmdao --durations=20
 
       - name: Submit coverage
@@ -615,8 +613,6 @@ jobs:
           copy .coveragerc $HOME
           cd $HOME
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
-          cd openmdao
-          cd drivers
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
 
       - name: Slack unit test failure
