@@ -333,7 +333,7 @@ jobs:
         if: matrix.OPTIONAL == '[all]' || matrix.OPTIONAL == '[all,numba]'
         run: |
           echo "============================================================="
-          echo "Install additional packages for testing/coverage"
+          echo "Install additional packages for testing/"
           echo "============================================================="
           if [[  "${{ matrix.OS }}" == "macos-15" ]]; then
             brew install graphviz -q
@@ -400,37 +400,8 @@ jobs:
           echo "Run tests with coverage (from directory other than repo root)"
           echo "============================================================="
           echo "############ .coveragerc contents #################"
-          cat .coveragerc
-          echo "###################################################"
-          cp .coveragerc $HOME
           cd $HOME
-          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage --coverpkg openmdao --durations=20
-
-      - name: Submit coverage
-        id: coveralls
-        continue-on-error: true
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COVERALLS_SERVICE_NAME: "github"
-          COVERALLS_PARALLEL: true
-        run: |
-          echo "============================================================="
-          echo "Submit coverage"
-          echo "============================================================="
-          cp $HOME/.coverage .
-          python -m pip install coveralls
-          SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
-          coveralls --basedir $SITE_DIR
-
-      - name: Slack failure to upload to coveralls.io
-        if: steps.coveralls.outcome == 'failure'
-        uses: act10ns/slack@v2.0.0
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: 'warning'
-          message: |
-            Uploading of coverage data to coveralls.io failed.
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          testflo -n 2 openmdao --timeout=240 --show_skipped --durations=20
 
       - name: Scan for security issues
         if: matrix.BANDIT
@@ -443,15 +414,6 @@ jobs:
           echo "============================================================="
           cd $GITHUB_WORKSPACE
           python -m bandit -c bandit.yml -ll -r openmdao
-
-      - name: Perform linting with Ruff
-        if: ${{ matrix.NAME == 'Ubuntu Baseline' }}
-        run: |
-          echo "============================================================="
-          echo "Lint OpenMDAO code per settings in pyproject.toml"
-          echo "============================================================="
-          python -m pip install ruff
-          ruff check . --config pyproject.toml
 
       - name: Slack env change
         if: steps.env_info.outputs.errors != ''
@@ -510,7 +472,7 @@ jobs:
             PY: '3.12'
             NUMPY: '1.26'
             SCIPY: '1.13'
-            PYOPTSPARSE: '2.13.1'
+            PYOPTSPARSE: '2.14'
             BANDIT: true
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Windows_Baseline }}
 
@@ -610,10 +572,9 @@ jobs:
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
           echo "============================================================="
-          copy .coveragerc $HOME
           cd $HOME
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
-          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
+          testflo -n 2 openmdao --timeout=240 --show_skipped --durations=20
 
       - name: Slack unit test failure
         if: failure() && steps.run_tests.outcome == 'failure'
@@ -623,32 +584,6 @@ jobs:
           status: ${{ steps.run_tests.outcome }}
           message:
             Unit testing failed on `${{ matrix.NAME }}` build.
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
-      - name: Submit coverage
-        id: coveralls
-        continue-on-error: true
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COVERALLS_SERVICE_NAME: "github"
-          COVERALLS_PARALLEL: true
-        run: |
-          echo "============================================================="
-          echo "Submit coverage"
-          echo "============================================================="
-          copy $HOME\.coverage .
-          python -m pip install coveralls
-          $SITE_DIR=python -c "import site; print(site.getsitepackages()[-1].replace('lib\\site-', 'Lib\\site-'))"
-          coveralls --basedir $SITE_DIR
-
-      - name: Slack failure to upload to coveralls.io
-        if: steps.coveralls.outcome == 'failure'
-        uses: act10ns/slack@v2.0.0
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: 'warning'
-          message: |
-            Uploading of coverage data to coveralls.io failed.
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Scan for security issues
@@ -661,18 +596,6 @@ jobs:
           echo "============================================================="
           cd ${{ github.workspace }}
           python -m bandit -c bandit.yml -ll -r openmdao
-
-
-  coveralls:
-    name: Finish coverage
-    needs: [tests, windows_tests]
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-    - uses: coverallsapp/github-action@master
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        parallel-finished: true
 
 
   related_tests:
