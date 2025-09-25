@@ -613,6 +613,7 @@ jobs:
           echo "Install pyoptsparse from conda-forge"
           echo "============================================================="
           conda install -c conda-forge pyoptsparse=${{ matrix.PYOPTSPARSE }} -q -y
+          conda install cyipopt
 
       - name: Install optional dependencies
         run: |
