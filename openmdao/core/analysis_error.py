@@ -28,8 +28,15 @@ class AnalysisError(Exception):
         """
         super().__init__(error)
         if location is not None:
+            if hasattr(location, 'f_lineno'):
+                # from inspect.currentframe()
+                line_num = location.f_lineno
+                file_name = location.f_code.co_filename
+            else:
+                # from inspect.getframeinfo(inspect.currentframe())
+                line_num = location.lineno
+                file_name = location.filename
             with reset_warning_registry():
                 warnings.formatwarning = _warn_simple_format
-                msg = (f"Analysis Error: {msginfo} Line {location.f_lineno} of file "
-                       f"{location.f_code.co_filename}")
+                msg = (f"Analysis Error: {msginfo} Line {line_num} of file {file_name}")
                 warnings.warn(msg, UserWarning, 2)
