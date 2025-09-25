@@ -4,7 +4,6 @@ import sys
 import unittest
 import subprocess
 import re
-import time
 
 from openmdao.utils.testing_utils import use_tempdirs
 import openmdao.core.tests.test_coloring as coloring_test_mod
@@ -172,6 +171,8 @@ class CmdlineTestCase(unittest.TestCase):
         env_vars["TESTFLO_RUNNING"] = "0"
 
         cmd = f"openmdao {os.path.join(scriptdir, 'circle_opt.py')}"
+        print('Command:', cmd)
+        print('Current working dir:', os.getcwd())
         proc = subprocess.Popen(cmd.split(),  # nosec: trusted input
                                 env=env_vars,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -186,8 +187,7 @@ class CmdlineTestCase(unittest.TestCase):
         except subprocess.TimeoutExpired:
             proc.kill()
             outs, errs = proc.communicate()
-        proc.wait()
-        time.sleep(1.)
+
         self.assertTrue(os.path.exists('circle_opt_out'))
 
     def test_n2_err(self):
