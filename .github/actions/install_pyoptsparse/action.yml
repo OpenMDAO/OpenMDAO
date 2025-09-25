@@ -156,6 +156,7 @@ runs:
       shell: bash -l {0}
       run: |
         echo "Installing pyOptSparse from conda-forge, IPOPT will be available"
+        conda install -c conda-forge cyipopt -q -y
         conda install -c conda-forge pyoptsparse=${{ inputs.pyoptsparse_version }} -q -y
 
     - name: Install pyOptSparse using build_pyoptsparse
