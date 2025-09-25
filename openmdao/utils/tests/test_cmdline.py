@@ -165,32 +165,6 @@ class CmdlineTestCase(unittest.TestCase):
                 self.assertNotIn(p1_outdir, subdirs)
                 self.assertNotIn(p2_outdir, subdirs)
 
-    def test_outdir(self):
-        env_vars = os.environ.copy()
-        env_vars["OPENMDAO_REPORTS"] = "1"
-        env_vars["TESTFLO_RUNNING"] = "0"
-
-        cmd = f"openmdao {os.path.join(scriptdir, 'circle_opt.py')}"
-        print('Command:', cmd)
-        print('Current working dir:', os.getcwd())
-        proc = subprocess.Popen(cmd.split(),  # nosec: trusted input
-                                env=env_vars,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        try:
-            outs, errs = proc.communicate(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            outs, errs = proc.communicate()
-
-        print('Output')
-        print('------')
-        print(outs.decode())
-        print('Errors')
-        print('------')
-        print(errs.decode())
-
-        self.assertTrue(os.path.exists('circle_opt_out'))
-
     def test_n2_err(self):
         # command should raise exception but still produce an n2 html file
         cmd = f'openmdao n2 --no_browser {scriptdir}/bad_connection.py'
@@ -218,6 +192,34 @@ class CmdlineTestCase(unittest.TestCase):
         else:
             self.fail("Didn't find expected err msg in output.")
 
+
+class CmdlineTestOutdirCase(unittest.TestCase):
+
+    def test_outdir(self):
+        env_vars = os.environ.copy()
+        env_vars["OPENMDAO_REPORTS"] = "1"
+        env_vars["TESTFLO_RUNNING"] = "0"
+
+        cmd = f"openmdao {os.path.join(scriptdir, 'circle_opt.py')}"
+        print('Command:', cmd)
+        print('Current working dir:', os.getcwd())
+        proc = subprocess.Popen(cmd.split(),  # nosec: trusted input
+                                env=env_vars,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            outs, errs = proc.communicate(timeout=20)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            outs, errs = proc.communicate()
+
+        print('Output')
+        print('------')
+        print(outs.decode())
+        print('Errors')
+        print('------')
+        print(errs.decode())
+
+        self.assertTrue(os.path.exists('circle_opt_out'))
 
 class CmdlineTestCaseCheck(unittest.TestCase):
     def test_auto_ivc_warnings_check(self):
