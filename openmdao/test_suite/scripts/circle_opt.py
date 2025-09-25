@@ -72,7 +72,4 @@ if __name__ == '__main__':
     p.setup(mode='fwd')
     p.run_driver()
 
-    print('outputs directory:')
-    print(p.get_outputs_dir())
-
     print(p['circle.area'], np.pi)

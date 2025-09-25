@@ -176,16 +176,10 @@ class CmdlineTestCase(unittest.TestCase):
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
             outs, errs = proc.communicate(timeout=10)
-            print('stdout:')
-            print(outs.decode())
-            print('stderr:')
-            print(errs.decode())
         except subprocess.TimeoutExpired:
             proc.kill()
             outs, errs = proc.communicate()
 
-        print('cwd:')
-        print(os.getcwd())
         self.assertTrue(os.path.exists('circle_opt_out'))
 
     def test_n2_err(self):

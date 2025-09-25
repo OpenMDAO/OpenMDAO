@@ -62,6 +62,11 @@ on:
         default: false
 
 
+concurrency:
+  # Cancel any existing CI runs if we push to this branch
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 run-name:  ${{ inputs.run_name }}
 
 permissions: {}
