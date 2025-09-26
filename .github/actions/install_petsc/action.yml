@@ -1,0 +1,81 @@
+name: Install PETSc
+description: 'Optionally install PETSc and associated MPI tools.'
+inputs:
+  petsc_version:
+    description: 'version of PETSc to be used, or "" for no petsc.'
+    required: false
+  mpi4py_version:
+    description: 'version of mpi4py to be used'
+    required: false
+  openmpi_version:
+    description: 'version of openmpi to be used'
+    required: false
+  mpich_version:
+    description: 'version of mpich to be used'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+
+    - name: Log inputs
+      shell: bash -l {0}
+      run: |
+        echo "===== Composite Action Inputs ====="
+        echo "petsc_version: ${{ inputs.petsc_version }}"
+        echo "mpi4py_version: ${{ inputs.mpi4py_version }}"
+        echo "openmpi_version: ${{ inputs.openmpi_version }}"
+        echo "mpich_version: ${{ inputs.mpich_version }}"
+        echo "=================================="
+
+    - name: Install PETSc
+      if: inputs.petsc_version != ''
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Install PETSc"
+        echo "============================================================="
+        if [[ "${{ inputs.mpich_version }}" ]]; then
+          conda install mpich-mpicc=${{ inputs.mpich_version }} -q -y -c conda-forge
+        elif [[ "${{ inputs.openmpi_version }}" ]]; then
+          conda install openmpi=${{ inputs.openmpi_version }} openmpi-mpicc=${{ inputs.openmpi_version }} -q -y -c conda-forge
+        else
+          conda install openmpi openmpi-mpicc -q -y -c conda-forge
+        fi
+
+        if [[ "${{ inputs.mpi4py_version }}" ]]; then
+          conda install mpi4py=${{ inputs.mpi4py_version }} petsc4py=${{ inputs.petsc_version }} -q -y
+        else
+          conda install mpi4py petsc4py=${{ inputs.petsc_version }} -q -y
+        fi
+
+        echo "============================================================="
+        echo "Check MPI and PETSc installation"
+        echo "============================================================="
+
+        # Manually add to PATH if needed
+        export PATH=$CONDA_PREFIX/bin:$PATH
+
+        # Verify
+        which mpirun || echo "mpirun not in PATH"
+        ls -la $CONDA_PREFIX/bin/mpirun
+
+        export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
+        export OMPI_MCA_rmaps_base_oversubscribe=1
+        export OMPI_MCA_btl=^openib
+        echo "-----------------------"
+        echo "Quick test of mpi4py:"
+        mpirun -n 3 python -c "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
+        echo "-----------------------"
+        echo "Quick test of petsc4py:"
+        mpirun -n 3 python -c "import numpy; from mpi4py import MPI; comm = MPI.COMM_WORLD; \
+                                import petsc4py; petsc4py.init(); \
+                                x = petsc4py.PETSc.Vec().createWithArray(numpy.ones(5)*comm.rank, comm=comm);  \
+                                print(x.getArray())"
+        echo "-----------------------"
+
+        echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> $GITHUB_ENV
+        echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
+        echo "OMPI_MCA_btl=^openib" >> $GITHUB_ENV
+
+        echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
+        echo "TMPDIR=/tmp" >> $GITHUB_ENV

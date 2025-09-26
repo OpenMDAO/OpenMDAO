@@ -59,7 +59,6 @@ class DictionaryJacobian(Jacobian):
         abs_resids = d_residuals._abs_get_val
         abs_outs = d_outputs._abs_get_val
         abs_ins = d_inputs._abs_get_val
-        subjacs_info = self._subjacs_info
         subjacs = self._get_subjacs(system)
         randgen = self._randgen
 
@@ -67,9 +66,6 @@ class DictionaryJacobian(Jacobian):
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
             for abs_key in self._get_ordered_subjac_keys(system):
-                if abs_key not in subjacs_info:
-                    continue
-
                 res_name, other_name = abs_key
 
                 ofvec = abs_resids(res_name) if res_name in d_res_names else None
@@ -275,11 +271,15 @@ class ExplicitDictionaryJacobian(Jacobian):
                 raise RuntimeError(f"{msginfo}: ExplicitDictionaryJacobian is only intended to be "
                                    "used with ExplicitComponents.")
 
+            rel_subjacs, irrelevant_subjacs = self._get_relevant_subjacs_info(system)
             self._subjacs = {}
-            for key, meta, dtype in self._subjacs_info_iter(system):
+            self._irrelevant_subjacs = {}
+            for key, meta, dtype in rel_subjacs:
                 # only keep dr/di subjacs.  dr/do matrix is always -I
                 if key[1] in self._input_slices:
                     self._subjacs[key] = self.create_subjac(key, meta, dtype)
+            for key, meta, dtype in irrelevant_subjacs:
+                self._irrelevant_subjacs[key] = self.create_subjac(key, meta, dtype)
 
             self._initialized = True
 
