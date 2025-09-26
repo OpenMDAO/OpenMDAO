@@ -1,0 +1,74 @@
+name: Display Environment Info
+description: 'Display environment information in the job log'
+inputs:
+  matrix_name:
+    description: 'Name of the matrix job'
+    required: true
+  python_version:
+    description: 'Python version'
+    required: true
+  numpy_version:
+    description: 'Numpy version'
+    required: true
+  scipy_version:
+    description: 'Scipy version'
+    required: true
+  SECRET_slack_webhook_url:
+    description: 'URL for posting version change detection to slack'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: Log inputs
+      shell: bash -l {0}
+      run: |
+        echo "===== Composite Action Inputs ====="
+        echo "matrix_name: ${{ inputs.matrix_name }}"
+        echo "python_version: ${{ inputs.python_version }}"
+        echo "numpy_version: ${{ inputs.numpy_version }}"
+        echo "scipy_version: ${{ inputs.scipy_version }}"
+        echo "=================================="
+
+    - name: Display environment info
+      id: env_info
+      continue-on-error: true
+      shell: bash -l {0}
+      run: |
+        conda info
+        conda list
+
+        echo "============================================================="
+        echo "Check installed versions of Python, Numpy and Scipy"
+        echo "============================================================="
+        echo 'errors<<EOF' >> $GITHUB_OUTPUT
+
+        FINAL_VER=`python -c "import platform; print(platform.python_version())"`
+        if [[ ! "$FINAL_VER" == "${{ inputs.python_version }}"* ]]; then
+          echo "Python version was changed from ${{ inputs.python_version }} to $FINAL_VER" >> $GITHUB_OUTPUT
+        fi
+
+        FINAL_VER=`python -c "import numpy; print(numpy.__version__)"`
+        if [[ ! "$FINAL_VER" == "${{ inputs.numpy_version }}"* ]]; then
+          echo "NumPy version was changed from ${{ inputs.numpy_version }} to $FINAL_VER" >> $GITHUB_OUTPUT
+        fi
+
+        FINAL_VER=`python -c "import scipy; print(scipy.__version__)"`
+        if [[ ! "$FINAL_VER" == "${{ inputs.scipy_version }}"* ]]; then
+          echo "SciPy version was changed from ${{ inputs.scipy_version }} to $FINAL_VER" >> $GITHUB_OUTPUT
+        fi
+
+        echo 'EOF' >> $GITHUB_OUTPUT
+
+        grep changed $GITHUB_OUTPUT || echo ""
+
+    - name: Slack env change
+      if: steps.env_info.outputs.errors != ''
+      uses: act10ns/slack@v2.0.0
+      with:
+        webhook-url: ${{ inputs.SECRET_slack_webhook_url }}
+        status: 'warning'
+        message: |
+          Environment change detected on `${{ inputs.matrix_name }}` build.
+          Python, NumPy or SciPy was not the requested version:
+          ```${{steps.env_info.outputs.errors}}```
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
