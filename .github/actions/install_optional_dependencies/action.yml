@@ -1,0 +1,36 @@
+name: Install Optional Dependencies
+description: 'Install optional dependencies for testing/coverage'
+inputs:
+  os_version:
+    description: 'Operating system version'
+    required: false
+  optional:
+    description: 'pip options specification in [name1,name2] syntax. e.g. "pip install openmdao[all,numba]'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+    - name: Log inputs
+      shell: bash -l {0}
+      run: |
+        echo "===== Composite Action Inputs ====="
+        echo "os_version: ${{ inputs.os_version }}"
+        echo "optional: ${{ inputs.optional }}"
+        echo "=================================="
+
+    - name: Install optional dependencies
+      if: inputs.optional == '[all]' || inputs.optional == '[all,numba]'
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Install additional packages for testing/coverage"
+        echo "============================================================="
+        if [[  "${{ inputs.os_version }}" == "macos-15" ]]; then
+          brew install graphviz -q
+        else
+          conda install graphviz -q -y
+        fi
+        python -m pip install pyparsing psutil objgraph pyxdsm pydot
+
+        echo "Pre-install playwright dependencies to avoid 'Playwright Host validation warning'"
+        playwright install --with-deps

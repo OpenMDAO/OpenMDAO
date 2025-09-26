@@ -62,6 +62,11 @@ on:
         default: false
 
 
+concurrency:
+  # Cancel any existing CI runs if we push to this branch
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 run-name:  ${{ inputs.run_name }}
 
 permissions: {}
@@ -546,7 +551,7 @@ jobs:
             PY: '3.12'
             NUMPY: '1.26'
             SCIPY: '1.13'
-            PYOPTSPARSE: '2.13.1'
+            PYOPTSPARSE: '2.14.0'
             BANDIT: true
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Windows_Baseline }}
 
@@ -613,6 +618,7 @@ jobs:
           echo "Install pyoptsparse from conda-forge"
           echo "============================================================="
           conda install -c conda-forge pyoptsparse=${{ matrix.PYOPTSPARSE }} -q -y
+          conda install cyipopt
 
       - name: Install optional dependencies
         run: |
@@ -649,7 +655,7 @@ jobs:
           copy .coveragerc $HOME
           cd $HOME
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
-          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
+          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20 -s
 
       - name: Slack unit test failure
         if: failure() && steps.run_tests.outcome == 'failure'

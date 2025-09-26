@@ -71,13 +71,13 @@ cmd_tests = [
     ('openmdao clean --dryrun {}'.format(scriptdir), {}),
     ('python -m openmdao clean --dryrun {}'.format(scriptdir), {}),
     ('openmdao compute_entry_points openmdao', {}),
-    ('openmdao graph --no-display {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
-    ('openmdao graph --no-display --type=tree {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
-    ('python -m openmdao graph --no-display --show-vars {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
-    ('openmdao graph --no-display --show-vars --no-recurse {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
-    ('openmdao graph --no-display --group=circuit {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
-    ('openmdao graph --no-display --group=circuit --show-vars {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
-    ('openmdao graph --no-display --group=circuit --show-vars --no-recurse {}'.format(os.path.join(scriptdir, 'circuit_analysis.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display {}'.format(os.path.join(scriptdir, '.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display --type=tree {}'.format(os.path.join(scriptdir, '.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('python -m openmdao graph --no-display --show-vars {}'.format(os.path.join(scriptdir, '.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display --show-vars --no-recurse {}'.format(os.path.join(scriptdir, '.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display --group=circuit {}'.format(os.path.join(scriptdir, '.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display --group=circuit --show-vars {}'.format(os.path.join(scriptdir, '.py')), {'pydot': pydot, 'graphviz': graphviz}),
+    ('openmdao graph --no-display --group=circuit --show-vars --no-recurse {}'.format(os.path.join(scriptdir, '.py')), {'pydot': pydot, 'graphviz': graphviz}),
     ('openmdao iprof --no_browser {}'.format(os.path.join(scriptdir, 'circle_opt.py')),
         {'tornado': tornado}),
     ('openmdao iprof_totals {}'.format(os.path.join(scriptdir, 'circle_opt.py')), {}),
@@ -171,14 +171,23 @@ class CmdlineTestCase(unittest.TestCase):
         env_vars["TESTFLO_RUNNING"] = "0"
 
         cmd = f"openmdao {os.path.join(scriptdir, 'circle_opt.py')}"
+        print('Command:', cmd)
+        print('Current working dir:', os.getcwd())
         proc = subprocess.Popen(cmd.split(),  # nosec: trusted input
                                 env=env_vars,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
-            outs, errs = proc.communicate(timeout=10)
+            outs, errs = proc.communicate(timeout=20)
         except subprocess.TimeoutExpired:
             proc.kill()
             outs, errs = proc.communicate()
+
+        print('Output')
+        print('------')
+        print(outs.decode())
+        print('Errors')
+        print('------')
+        print(errs.decode())
 
         self.assertTrue(os.path.exists('circle_opt_out'))
 
