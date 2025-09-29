@@ -64,16 +64,7 @@ _toggle_styles = """
         0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
         inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
-_bounds_hatch_alpha = 0.3
-# _desvars_bounds_hatch_pattern = 'dot'
-# _cons_bounds_hatch_pattern = 'cross'
-_desvars_bounds_hatch_pattern = None
-_cons_bounds_hatch_pattern = None
-_bounds_hatch_weight = 1
-_bounds_line_width = 1
-_bounds_alpha = 0.0
 _bounds_infinity = 1e8
-_bounds_left = -1
  
 # colors used for the plot lines and associated buttons and axes labels
 # start with color-blind friendly colors and then use others if needed
@@ -506,6 +497,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         obj_label = _make_header_text_for_variable_chooser("OBJECTIVE")
         self._column_items.append(obj_label)
  
+        self.plot_figure.x_range = Range1d(1, 2) # just to start
+
         for i, obj_name in enumerate(obj_names):
             units = self._case_tracker._get_units(obj_name)
             self.plot_figure.yaxis.axis_label = f"{obj_name} ({units})"
@@ -576,7 +569,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             )
             self._make_line_and_hover_tool(
                 "cons",
-                # cons_name,
                 con_name_with_type,
                 False,
                 _non_active_plot_color,
@@ -670,7 +662,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         # data to the Bokeh plot stream
         counter = new_data["counter"]
         self._source_stream_dict = {"iteration": [counter]}
-        self.plot_figure.x_range = Range1d(1, counter)
+        self.plot_figure.x_range.end = counter
  
         iline = 0
         for obj_name, obj_value in new_data["objs"].items():
@@ -702,8 +694,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 desvar_name, np.max(desvar_value), self._y_min, self._y_max
             )
             if min_max_changed:
-                range = Range1d(self._y_min[desvar_name], self._y_max[desvar_name])
-                self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name_with_type}_min"] = range
+                self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name_with_type}_min"].start = self._y_min[desvar_name]
+                self.plot_figure.extra_y_ranges[f"extra_y_{desvar_name_with_type}_min"].end = self._y_max[desvar_name]
             # deal with when min and max are the same.
             # Otherwise the varea plot shows nothing, not even a line
             if np.min(desvar_value) == np.max(desvar_value):
@@ -739,8 +731,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 con_name_with_type, np.max(cons_value), self._y_min, self._y_max
             )
             if min_max_changed:
-                range = Range1d(self._y_min[con_name_with_type], self._y_max[con_name_with_type])
-                self.plot_figure.extra_y_ranges[f"extra_y_{con_name_with_type}"] = range
+                self.plot_figure.extra_y_ranges[f"extra_y_{con_name_with_type}"].start = self._y_min[con_name_with_type]
+                self.plot_figure.extra_y_ranges[f"extra_y_{con_name_with_type}"].end = self._y_max[con_name_with_type]
             iline += 1
  
         self._source.stream(self._source_stream_dict)
@@ -791,7 +783,9 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
  
         if var_type != 'objs':
             index = len(self._bounds_off_on_checkboxes)
-            checkbox = Checkbox(active=False, disabled=True, margin=(12, 0, 8, 4),
+            checkbox = Checkbox(active=False, 
+                                visible=False,
+                                disabled=True, margin=(12, 0, 8, 4),
                                 tags=[{'var_type': var_type, 'index': index, 'varname':varname}])
             checkbox.js_on_change("active", bounds_off_on_callback)
             self._bounds_off_on_checkboxes.append(checkbox)
@@ -814,19 +808,14 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         return toggle
 
     def _make_bounds_display(self, top, bottom, source, varname):
-        bounds_display = self.plot_figure.quad(
-            top=top,
-            bottom=bottom,
-            left=_bounds_left,
-            right=_bounds_infinity,
+        bounds_display = self.plot_figure.hstrip(
+            y1=top,
+            y0=bottom,
             source=source,
-            # color=varname,
             fill_alpha=0.1,
             fill_color=varname,
             visible=False,
-            syncable = False # try this
-        )
-        
+        )        
         return bounds_display
         
     
@@ -871,8 +860,16 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                                                                     self._desvar_bound_violation_indicator_source,
                                                                     desvars_button_label)
             else:
+                upper_bound_violation_indicator = self._make_bounds_display(_bounds_infinity, upper_bound,
+                                                                    self._desvar_bound_violation_indicator_source,
+                                                                    desvars_button_label)
                 upper_bound_violation_indicator = self.plot_figure.quad(
-                    alpha= 0.0)
+                    right=0.0,
+                    left=0.0,
+                    top=0.0,
+                    bottom=0.0,
+                    visible=False,
+                    )
 
             if lower_bound != - INF_BOUND:
                 lower_bound_violation_indicator = self._make_bounds_display(lower_bound, -_bounds_infinity,
@@ -881,8 +878,12 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
 
             else:
                 lower_bound_violation_indicator = self.plot_figure.quad(
-                    alpha= 0.0)
-                
+                    right=0.0,
+                    left=0.0,
+                    top=0.0,
+                    bottom=0.0,
+                    visible=False,
+                    )
 
             self._desvar_lower_bound_violation_indicators.append(lower_bound_violation_indicator)
             self._desvar_upper_bound_violation_indicators.append(upper_bound_violation_indicator)
@@ -932,17 +933,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
  
     def _make_axis(self, var_type, varname, plot_value, units):
         # Make axis for this variable on the right of the plot
- 
-        # print(f"make axis for {varname=}")
         if var_type == "desvars":
             y_range_name = f"extra_y_{varname}_min"
         else:
             y_range_name = f"extra_y_{varname}"
-            
-            
-            
-        print(f"{y_range_name=}")
-            
+           
         extra_y_axis = LinearAxis(
             y_range_name=y_range_name,
             axis_label=f"{varname} ({units})",
