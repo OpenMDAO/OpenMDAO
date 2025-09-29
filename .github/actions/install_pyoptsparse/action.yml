@@ -83,7 +83,7 @@ runs:
         fi
 
     - name: Build SNOPT
-      if: inputs.pyoptsparse_from != 'build_pyoptsparse' && inputs.snopt_version_version != ''
+      if: inputs.pyoptsparse_from != 'build_pyoptsparse' && inputs.snopt_version != ''
       shell: bash -l {0}
       continue-on-error: false
       env:
