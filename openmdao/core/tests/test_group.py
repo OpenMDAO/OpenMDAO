@@ -1704,16 +1704,14 @@ class TestGroup(unittest.TestCase):
         p = om.Problem()
 
         p.model.add_subsystem('circle', CircleAreaComp(), promotes_inputs=['r'])
-        p.model.add_subsystem('circle2', CircleAreaComp(), promotes_inputs=[('r', 'r2')])
+        p.model.add_subsystem('circle2', CircleAreaComp(), promotes_inputs=['r'])
 
         p.setup()
 
         p.set_val("r", 1.0)
-        p.set_val("r2", 1.0)
         p.run_model()
         assert_near_equal(p.get_val('circle.area'), np.pi)
         assert_near_equal(p.get_val('circle2.area'), np.pi)
-
 
 
 @unittest.skipUnless(MPI, "MPI is required.")
