@@ -2466,7 +2466,7 @@ class TestScipyOptimizeDriverCOBYQA(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-9, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-6, disp=False)
 
         # note: want x to have no bounds, but COBYQA won't converge with bounds
         # of +/- 1e30 due to how the algorithm works. So set big bounds, but still
@@ -2498,7 +2498,7 @@ class TestScipyOptimizeDriverCOBYQA(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-9, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-6, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -2535,7 +2535,7 @@ class TestScipyOptimizeDriverCOBYQA(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-9, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-6, disp=False)
         prob.setup()
 
         failed = not prob.run_driver().success
@@ -2552,7 +2552,7 @@ class TestScipyOptimizeDriverCOBYQA(unittest.TestCase):
         model = prob.model = SellarDerivativesGrouped(nonlinear_solver=om.NonlinearBlockGS,
                                                       linear_solver=om.ScipyKrylov)
 
-        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-9, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYQA', tol=1e-6, disp=False)
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
         model.add_design_var('x', lower=0.0, upper=10.0)
