@@ -358,7 +358,7 @@ class Case(object):
         Parameters
         ----------
         scaled : bool
-            If True, then return scaled values
+            If True, then return scaled values.
         use_indices : bool
             If True, apply indices.
 

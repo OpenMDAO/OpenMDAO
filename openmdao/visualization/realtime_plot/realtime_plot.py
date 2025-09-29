@@ -258,7 +258,6 @@ class _CaseRecorderTracker:
         else:
             return None
 
-
     def _get_data_from_case(self, driver_case):
         objs = driver_case.get_objectives(scaled=False)
         design_vars = driver_case.get_design_vars(scaled=False)
@@ -318,12 +317,10 @@ class _CaseRecorderTracker:
         var_info = cons._var_info[name]
         return (var_info['lower'], var_info['upper'])
 
-
     def _get_desvar_bounds(self, name):
         lower = self._cr.problem_metadata['variables'][name]['lower']
         upper = self._cr.problem_metadata['variables'][name]['upper']
         return lower, upper
-
 
     def _get_units(self, name):
         try:
@@ -356,6 +353,7 @@ def realtime_plot(case_recorder_filename, callback_period,
     Parameters
     ----------
     case_recorder_filename : str
+        The path to the case recorder file that is the source of the data for the plot.
     callback_period : float
         The time period between when the application calls the update method.
     pid_of_calling_script : int
