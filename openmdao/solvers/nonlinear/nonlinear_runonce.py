@@ -53,6 +53,7 @@ class NonlinearRunOnce(NonlinearSolver):
         """
         # Remove unused options from base options here, so that users
         #  attempting to set them will get KeyErrors.
+        super()._declare_options()
         self.options.undeclare("atol")
         self.options.undeclare("rtol")
 
@@ -60,3 +61,8 @@ class NonlinearRunOnce(NonlinearSolver):
         self.options.undeclare("maxiter")
         self.options.undeclare("err_on_non_converge")
         self.options.undeclare("restart_from_successful")
+
+        # Remove stall behavior
+        self.options.undeclare('stall_limit')
+        self.options.undeclare('stall_tol')
+        self.options.undeclare('stall_tol_type')

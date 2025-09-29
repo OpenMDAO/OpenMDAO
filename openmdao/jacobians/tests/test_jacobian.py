@@ -10,7 +10,7 @@ from openmdao.api import IndepVarComp, Group, Problem, \
                          ExplicitComponent, ImplicitComponent, ExecComp, \
                          NewtonSolver, ScipyKrylov, \
                          LinearBlockGS, DirectSolver
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
 from openmdao.utils.array_utils import rand_sparsity
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.api import ScipyOptimizeDriver
@@ -1262,6 +1262,71 @@ class MaskingTestCase(unittest.TestCase):
         self.run_asjac_type_test('dense', 'direct')
 
 
+class TestIrrelevantPartials(unittest.TestCase):
+    """Test that setting partials for irrelevant subjacobians doesn't raise KeyError."""
+
+    def test_irrelevant_partials_no_keyerror(self):
+        """
+        Test that when a component sets partials in compute_partials for subjacobians
+        that are not relevant to the current total derivative computation, no KeyError
+        is raised.
+        """
+
+        class TestComp(ExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_input('y', val=2.0)
+                self.add_output('f', val=0.0)
+                self.add_output('g', val=0.0)
+
+                # Declare all possible partials
+                self.declare_partials('f', 'x', method='fd')
+                self.declare_partials('f', 'y', method='fd')
+                self.declare_partials('g', 'x')
+                self.declare_partials('g', 'y')
+
+            def compute(self, inputs, outputs):
+                outputs['f'] = inputs['x']**2 + inputs['y']
+                outputs['g'] = inputs['x'] + inputs['y']**2
+
+            def compute_partials(self, inputs, partials):
+                # Set all partials, including ones that might not be relevant
+                # to the current total derivative computation
+                partials['f', 'x'] = 2.0 * inputs['x']
+                partials['f', 'y'] = 1.0
+                partials['g', 'x'] = 1.0
+                partials['g', 'y'] = 2.0 * inputs['y']
+
+        # Create a problem with multiple components
+        prob = Problem()
+        model = prob.model
+
+        # Add independent variables
+        model.add_subsystem('indep_x', IndepVarComp('x', 1.0))
+
+        # Add the test component
+        model.add_subsystem('comp', TestComp())
+
+        # Add another component that uses only 'f' output
+        model.add_subsystem('comp2', ExecComp('h = 3.0 * f', f=0.0, h=0.0))
+
+        # Connect variables
+        model.connect('indep_x.x', 'comp.x')
+        model.connect('comp.f', 'comp2.f')
+
+        # Set up design variables and objectives
+        # Only use 'f' in the optimization, making 'g' irrelevant
+        model.add_design_var('indep_x.x')
+        model.add_objective('comp2.h')
+
+        prob.setup()
+        prob.run_model()
+
+        # Compute totals - this should only require partials for 'f' wrt 'x' and 'y'
+        # The partials for 'g' should not be relevant, but setting them in compute_partials
+        # should not raise a KeyError
+        totals = prob.check_totals(of=['comp2.h'], wrt=['indep_x.x'], show_only_incorrect=True)
+        assert_check_totals(totals)
 
 if __name__ == '__main__':
     unittest.main()

@@ -706,15 +706,16 @@ class Relevance(object):
         if self._active is False:
             yield
         else:
-            save = {'fwd': self._seed_vars['fwd'], 'rev': self._seed_vars['rev']}
+            save_fwd = self._seed_vars['fwd']
+            save_rev = self._seed_vars['rev']
             save_active = self._active
             self._active = True
             self._set_seeds(self._all_seed_vars['fwd'], self._all_seed_vars['rev'])
             try:
                 yield
             finally:
-                self._seed_vars = save
                 self._active = save_active
+                self._set_seeds(save_fwd, save_rev)
 
     @contextmanager
     def seeds_active(self, fwd_seeds=None, rev_seeds=None):
@@ -737,7 +738,8 @@ class Relevance(object):
         if self._active is False:  # if already inactive from higher level, don't change anything
             yield
         else:
-            save = {'fwd': self._seed_vars['fwd'], 'rev': self._seed_vars['rev']}
+            save_fwd = self._seed_vars['fwd']
+            save_rev = self._seed_vars['rev']
             save_active = self._active
             self._active = True
             if fwd_seeds is None:
@@ -748,7 +750,7 @@ class Relevance(object):
             try:
                 yield
             finally:
-                self._seed_vars = save
+                self._set_seeds(save_fwd, save_rev)
                 self._active = save_active
 
     @contextmanager
@@ -771,7 +773,7 @@ class Relevance(object):
             yield
         else:
             save_active = self._active
-            save_relarray = self._current_rel_sarray
+            save_relsarray = self._current_rel_sarray
             self._active = True
             self._current_rel_sarray = self._nonlinear_sets[name]
 
@@ -779,7 +781,7 @@ class Relevance(object):
                 yield
             finally:
                 self._active = save_active
-                self._current_rel_sarray = save_relarray
+                self._current_rel_sarray = save_relsarray
 
     def _set_seeds(self, fwd_seeds, rev_seeds):
         """

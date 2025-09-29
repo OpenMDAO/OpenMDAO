@@ -4683,6 +4683,39 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         assert_model_matches_case(seventh_slsqp_iteration_case, prob.model)
 
 
+class TestCaseReaderConstraints(unittest.TestCase):
+    
+    def test_casereader_nd_array_constraint(self):
+        prob = ParaboloidProblem()
+
+        ivc = prob.model.add_subsystem("ivc", om.IndepVarComp())
+        ivc.add_output("array_output", np.arange(30).reshape((10, 3)))
+        prob.model.add_constraint("ivc.array_output", lower=0.0, indices=om.slicer[:, 1])
+
+        recorder = om.SqliteRecorder("cases.sqlite", record_viewer_data=False)
+
+        prob.add_recorder(recorder)
+        prob.recording_options['includes'] = ['*']
+        prob.recording_options['record_desvars'] = True
+        prob.recording_options['record_constraints'] = True
+        prob.recording_options['record_derivatives'] = True
+        prob.recording_options['record_objectives'] = True
+
+        prob.setup()
+        prob.final_setup()  # Conclude setup but don't run model.
+        prob.run_model()
+        prob.record("case")
+        prob.cleanup()
+
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sqlite")
+        case = cr.get_case(cr.list_cases(out_stream=None)[-1])
+
+        # test that sliced constraints are read correctly
+        cons = case.get_constraints(use_indices=True)
+
+        assert_near_equal(cons['ivc.array_output'], prob.get_val('ivc.array_output')[:, 1])
+
+
 @use_tempdirs
 class TestCaseReaderMPI4(unittest.TestCase):
 

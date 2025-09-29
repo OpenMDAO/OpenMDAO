@@ -1,0 +1,124 @@
+name: Install Optional Dependencies
+description: 'Install optional dependencies for testing/coverage'
+inputs:
+  matrix_name:
+    description: 'Name of the matrix job'
+    required: true
+  use_snopt:
+    description: '"true" or "false" depending on whether SNOPT is being used.'
+    required: false
+  SECRET_docs_location:
+    description: 'Location to which the docs should be published'
+    required: false
+  SECRET_slack_webhook_url:
+    description: 'URL for posting version build failure to slack'
+    required: false
+  publish:
+    description: '"true" if docs should be uploaded.'
+    required: false
+runs:
+  using: 'composite'
+  steps:
+
+    - name: Log inputs
+      shell: bash -l {0}
+      run: |
+        echo "===== Composite Action Inputs ====="
+        echo "matrix_name: ${{ inputs.matrix_name }}"
+        echo "use_snopt: ${{ inputs.use_snopt }}"
+        echo "publish: ${{ inputs.publish }}"
+        echo "=================================="
+
+    - name: Build docs
+      id: build_docs
+      continue-on-error: true
+      shell: bash -l {0}
+      run: |
+        export OPENMDAO_REPORTS=0
+        export PYDEVD_DISABLE_FILE_VALIDATION=1
+
+        cd openmdao/docs
+
+        if [[ "${{ inputs.use_snopt }}" == 'true' ]]; then
+          echo "============================================================="
+          echo "Building docs with SNOPT examples."
+          echo "============================================================="
+        else
+          echo "============================================================="
+          echo "Disabling SNOPT cells in notebooks."
+          echo "============================================================="
+          python openmdao_book/other/disable_snopt_cells.py
+        fi
+
+        # start ipcluster to run MPI under notebooks
+        ./ipcluster_start.sh
+        sleep 12
+
+        echo "============================================================="
+        echo "Build the docs"
+        echo "============================================================="
+        python build_source_docs.py
+        jupyter-book build -W --keep-going openmdao_book
+        python copy_build_artifacts.py
+
+    - name: Display doc build reports
+      if: steps.build_docs.outcome == 'failure'
+      shell: bash -l {0}
+      run: |
+        for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log'); do
+          echo "============================================================="
+          echo $f
+          echo "============================================================="
+          cat $f
+        done
+        exit 1
+
+    - name: Archive built docs
+      if: steps.build_docs.outcome == 'success'
+      uses: actions/upload-artifact@v4
+      with:
+        name: built-docs-artifact
+        path: openmdao/docs/openmdao_book/_build/html
+        retention-days: 1
+
+    - name: Publish docs
+      if: github.event_name != 'pull_request' && inputs.publish == 'true' && inputs.SECRET_docs_location != ''
+      env:
+        DOCS_LOCATION: ${{ inputs.SECRET_docs_location }}
+      shell: bash -l {0}
+      run: |
+        if [[ "${#DOCS_LOCATION}" ]]; then
+          echo "============================================================="
+          echo "Create env with openssl compatible with hosting service"
+          echo "============================================================="
+          conda create -n upload python=3.11 packaging openssl=3
+          conda activate upload
+
+          echo "============================================================="
+          echo "Publish docs"
+          echo "============================================================="
+          cd openmdao/docs
+          python upload_doc_version.py openmdao_book/_build/html/ "$DOCS_LOCATION"
+        else
+          echo "Docs destination not available."
+        fi
+
+    - name: Slack doc build failure
+      if: steps.build_docs.outcome == 'failure'
+      uses: act10ns/slack@v2.0.0
+      with:
+        webhook-url: ${{ inputs.SECRET_slack_webhook_url }}
+        status: ${{ steps.build_docs.outcome }}
+        message: |
+          Doc build failed on `${{ inputs.matrix_name }}` build.
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Fail the workflow if doc build failed
+      if: steps.build_docs.outcome == 'failure'
+      uses: actions/github-script@v8
+      with:
+        script: |
+            let docs_fail = ${{ steps.build_docs.outcome == 'failure' }};
+            if (docs_fail) {
+                core.setFailed('Doc build failed.');
+            }
