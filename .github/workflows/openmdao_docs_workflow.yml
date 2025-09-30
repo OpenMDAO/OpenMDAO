@@ -69,7 +69,6 @@ jobs:
             PETSc: '3.21'
             PYOPTSPARSE: '2.13.1'
             PYOPTSPARSE_FROM: 'build_pyoptsparse'
-            SNOPT: '7.7'
             OPTIONAL: '[all,numba]'
             PEP517: true
             PUBLISH: true
