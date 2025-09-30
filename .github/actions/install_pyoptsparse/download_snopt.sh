@@ -1,4 +1,4 @@
-# this script will create a SNOPT firectory and populate it
+# this script will create a SNOPT directory and populate it
 # with the specified version of the SNOPT source code
 # via secure copy over SSH
 
