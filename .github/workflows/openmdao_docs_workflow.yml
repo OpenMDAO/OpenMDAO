@@ -144,7 +144,7 @@ jobs:
         uses: ./.github/actions/build_docs
         with:
           matrix_name: ${{ matrix.NAME }}
-          use_snopt: ${{ format('{0}', matrix.SNOPT_LOCATION_72 != '' || matrix.SNOPT_LOCATION_77 != '') }}
+          use_snopt: true
           SECRET_docs_location: ${{ secrets.DOCS_LOCATION }}
           SECRET_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           publish: ${{ matrix.PUBLISH }}

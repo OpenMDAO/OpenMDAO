@@ -262,6 +262,9 @@ jobs:
       - name: Build SNOPT
         if: matrix.PYOPTSPARSE_FROM != 'build_pyoptsparse' && matrix.SNOPT
         continue-on-error: false
+        env:
+          SNOPT_LOCATION: ${{ secrets.SNOPT_LOCATION }}
+          SNOPT_VERSION: ${{ matrix.SNOPT }}
         run: |
           echo "============================================================="
           echo "Build SNOPT library"
@@ -270,9 +273,7 @@ jobs:
             echo "-------------------------------------------------------------"
             echo "Getting SNOPT source"
             echo "-------------------------------------------------------------"
-            scp -qr ${{ secrets.SNOPT_LOCATION }} .
-          elif [[ "${{ matrix.SNOPT }}" ]]; then
-            echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
+            .github/actions/install_pyoptsparse/download_snopt.sh
           fi
 
           if [ -d "SNOPT" ] ; then
@@ -332,6 +333,9 @@ jobs:
       - name: Install pyOptSparse using build_pyoptsparse
         if: matrix.PYOPTSPARSE && matrix.PYOPTSPARSE_FROM == 'build_pyoptsparse'
         continue-on-error: false
+        env:
+          SNOPT_LOCATION: ${{ secrets.SNOPT_LOCATION }}
+          SNOPT_VERSION: ${{ matrix.SNOPT }}
         run: |
           conda install -c conda-forge swig -q -y
 
@@ -353,16 +357,13 @@ jobs:
             PAROPT="-a"
           fi
 
-          if [[ "${{ matrix.SNOPT }}" == "7.7" && "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
+          if [[ "${{ matrix.SNOPT }}" == "7.7" ]]; then
             echo "  > Secure copying SNOPT 7.7 over SSH"
-            mkdir SNOPT
-            scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
+            .github/actions/install_pyoptsparse/download_snopt.sh
             SNOPT="-s SNOPT/src"
-          elif [[ "${{ matrix.SNOPT }}" == "7.2" && "${{ secrets.SNOPT_LOCATION_72 }}" ]]; then
+          elif [[ "${{ matrix.SNOPT }}" == "7.2" ]]; then
             echo "  > Secure copying SNOPT 7.2 over SSH"
-            mkdir SNOPT
-            scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT
-            ls -lR SNOPT
+            .github/actions/install_pyoptsparse/download_snopt.sh
             SNOPT="-s SNOPT/source"
           elif [[ "${{ matrix.SNOPT }}" ]]; then
             echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
