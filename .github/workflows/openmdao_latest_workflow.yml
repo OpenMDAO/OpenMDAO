@@ -50,6 +50,7 @@ jobs:
             OS: ubuntu-latest
             PY: 3
             NUMPY: 2
+            SNOPT: 7.7
             PETSc: true
 
           # test latest versions on macos
@@ -57,6 +58,7 @@ jobs:
             OS: macos-latest
             PY: 3
             NUMPY: 2
+            SNOPT: 7.7
             PETSc: true
 
     runs-on: ${{ matrix.OS }}
@@ -162,6 +164,9 @@ jobs:
 
       - name: Install pyOptSparse
         if: ${{ matrix.PYOPTSPARSE }}
+        env:
+          SNOPT_LOCATION: ${{ secrets.SNOPT_LOCATION }}
+          SNOPT_VERSION: ${{ matrix.SNOPT }}
         run: |
           echo "============================================================="
           echo "Define useful functions"
@@ -183,11 +188,10 @@ jobs:
           python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
           BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
           if [[ "${{ matrix.SNOPT }}" ]]; then
-            if [[ "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
-              echo "  > Secure copying SNOPT 7.7 over SSH"
-              mkdir SNOPT
-              scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
-              SNOPT="-s SNOPT/src"
+              .github/actions/install_pyoptsparse/download_snopt.sh
+              if [ -d "SNOPT" ] ; then
+                SNOPT="-s SNOPT/src"
+              fi
             else
               echo "SNOPT source is not available"
             fi
@@ -269,7 +273,7 @@ jobs:
           export PYDEVD_DISABLE_FILE_VALIDATION=1
 
           cd openmdao/docs
-          if [[ "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
+          if [[ "${{ matrix.SNOPT }}" ]]; then
             echo "============================================================="
             echo "Building docs with SNOPT examples."
             echo "============================================================="
