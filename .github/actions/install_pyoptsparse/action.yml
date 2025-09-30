@@ -188,11 +188,15 @@ runs:
         if [[ "$SNOPT_VERSION" == "7.7" ]]; then
           echo "  > Secure copying SNOPT 7.7 over SSH"
           .github/actions/install_pyoptsparse/download_snopt.sh
-          SNOPT="-s SNOPT/src"
+          if [ -d "SNOPT" ] ; then
+            SNOPT="-s SNOPT/src"
+          fi
         elif [[ "$SNOPT_VERSION" == "7.2" ]]; then
           echo "  > Secure copying SNOPT 7.2 over SSH"
           .github/actions/install_pyoptsparse/download_snopt.sh
-          SNOPT="-s SNOPT/source"
+          if [ -d "SNOPT" ] ; then
+            SNOPT="-s SNOPT/source"
+          fi
         elif [[ "$SNOPT_VERSION" ]]; then
           echo "SNOPT version $SNOPT_VERSION was requested but source is not available"
         fi
@@ -204,4 +208,3 @@ runs:
       shell: bash -l {0}
       run: |
         python -c "import pyoptsparse; from pyoptsparse import SLSQP; SLSQP()" && echo "pyOptSparse OK" || echo "pyOptSparse FAILED"
-

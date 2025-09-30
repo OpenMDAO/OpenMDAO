@@ -189,7 +189,9 @@ jobs:
           BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
           if [[ "${{ matrix.SNOPT }}" ]]; then
               .github/actions/install_pyoptsparse/download_snopt.sh
-              SNOPT="-s SNOPT/src"
+              if [ -d "SNOPT" ] ; then
+                SNOPT="-s SNOPT/src"
+              fi
             else
               echo "SNOPT source is not available"
             fi

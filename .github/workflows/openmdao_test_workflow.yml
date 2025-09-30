@@ -360,11 +360,15 @@ jobs:
           if [[ "${{ matrix.SNOPT }}" == "7.7" ]]; then
             echo "  > Secure copying SNOPT 7.7 over SSH"
             .github/actions/install_pyoptsparse/download_snopt.sh
-            SNOPT="-s SNOPT/src"
+            if [ -d "SNOPT" ] ; then
+              SNOPT="-s SNOPT/src"
+            fi
           elif [[ "${{ matrix.SNOPT }}" == "7.2" ]]; then
             echo "  > Secure copying SNOPT 7.2 over SSH"
             .github/actions/install_pyoptsparse/download_snopt.sh
-            SNOPT="-s SNOPT/source"
+            if [ -d "SNOPT" ] ; then
+              SNOPT="-s SNOPT/source"
+            fi
           elif [[ "${{ matrix.SNOPT }}" ]]; then
             echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
           fi
