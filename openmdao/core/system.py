@@ -7,7 +7,7 @@ import time
 import functools
 from copy import deepcopy
 from contextlib import contextmanager
-from collections import defaultdict
+from collections import defaultdict, ChainMap
 from itertools import chain
 from enum import IntEnum
 import warnings
@@ -2318,6 +2318,9 @@ class System(object, metaclass=SystemMetaclass):
         self._jac_ofs_cache = None
         self._jac_wrts_cache = {}
 
+        if self.pathname == '':
+            self._all_conn_graph = None
+
     def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
@@ -2345,9 +2348,13 @@ class System(object, metaclass=SystemMetaclass):
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
         self._var_prom2inds = {}
-        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
+        self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_allprocs_discrete = {'input': {}, 'output': {}}
+        self._allvars_abs2meta = ChainMap(self._var_allprocs_abs2meta['input'],
+                                          self._var_allprocs_abs2meta['output'],
+                                          self._var_allprocs_discrete['input'],
+                                          self._var_allprocs_discrete['output'])
         self._var_allprocs_abs2idx = {}
         self._owning_rank = defaultdict(int)
         self._var_sizes = {}

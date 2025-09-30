@@ -75,8 +75,9 @@ def combine_ranges(ranges):
     if not ranges:
         return rnglist
 
-    cstart, cend = ranges[0]
-    for start, end in ranges[1:]:
+    it = iter(ranges)
+    cstart, cend = next(it)
+    for start, end in it:
         if start == cend:
             cend = end
         else:
@@ -140,6 +141,8 @@ class Indexer(object):
         Distributed shape of the source.
     """
 
+    _copy_attrs = {'_src_shape', '_dist_shape', '_flat_src'}
+
     def __init__(self, flat_src=None):
         """
         Initialize attributes.
@@ -160,16 +163,24 @@ class Indexer(object):
         """
         raise NotImplementedError("No implementation of '__call__' found.")
 
-    def __repr__(self):
+    def indexed_val(self, arr):
         """
-        Return simple string representation.
+        Return the value of the indices in the array.
+
+        Parameters
+        ----------
+        arr : ndarray
+            The array to index into.
 
         Returns
         -------
-        str
-            String representation.
+        ndarray
+            The result of indexing into the array.
         """
-        return f"{self.__class__.__name__}: {str(self)}"
+        if self._flat_src:
+            return arr.ravel()[self.flat()]
+        else:
+            return arr[self()]
 
     def copy(self, *args):
         """
@@ -186,7 +197,8 @@ class Indexer(object):
             A copy of this Indexer.
         """
         inst = self.__class__(*args)
-        inst.__dict__.update(self.__dict__)
+        for attr in self._copy_attrs:
+            setattr(inst, attr, getattr(self, attr))
         return inst
 
     def _set_attrs(self, parent):
@@ -1436,6 +1448,39 @@ class EllipsisIndexer(Indexer):
             A list or int version of self.
         """
         return self.as_array().tolist()
+
+
+class CompoundIndexer(Indexer):
+    """
+    An Indexer that applies multiple indexers in sequence.
+    """
+    def __init__(self, idxers):
+        super().__init__()
+        self._idxers = list(idxers)
+
+    def __call__(self):
+        return tuple(idxer() for idxer in self._idxers)
+
+    def __str__(self):
+        return f"CompoundIndexer: {self._idxers}"
+
+    def indexed_val(self, arr):
+        """
+        Return the value after indices are applied to the array.
+
+        Parameters
+        ----------
+        arr : ndarray
+            The array to index into.
+
+        Returns
+        -------
+        ndarray
+            The result of indexing into the array.
+        """
+        for idxer in self._idxers:
+            arr = idxer.indexed_val(arr)
+        return arr
 
 
 class IndexMaker(object):

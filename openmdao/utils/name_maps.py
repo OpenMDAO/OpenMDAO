@@ -611,6 +611,7 @@ class NameResolver(object):
                     _, flags = a2p[absname]
                     if flags & mask == expected:
                         yield promname  # yield promoted name if any absname matches the flags
+                        break
 
     def abs_iter(self, iotype=None, local=None, continuous=None, distributed=None):
         """
@@ -1105,11 +1106,26 @@ class NameResolver(object):
 
         absnames = other.absnames(promname, iotype, report_error=False)
         if absnames:
-            absname = absnames[0]
-            if absname in self._abs2prom[iotype]:
-                return self._abs2prom[iotype][absname][0]
+            try:
+                return self._abs2prom[iotype][absnames[0]][0]
+            except KeyError:
+                pass
 
         return promname
+
+    def get_implicit_conns(self):
+        """
+        Get the implicit connections.
+
+        Implicit connection are connections that occur when a promoted output name matches
+        one or more promoted input names.
+
+        Returns
+        -------
+        set of str
+            The implicit connections.
+        """
+        return set(self._prom2abs['output']).intersection(self._prom2abs['input'])
 
     def _add_guesses(self, name, msg, n=10, cutoff=0.15, include_prom=True, include_abs=False):
         """

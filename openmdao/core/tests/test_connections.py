@@ -3,7 +3,6 @@
 import unittest
 import numpy as np
 
-from io import StringIO
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
@@ -52,128 +51,6 @@ class TestConnections(unittest.TestCase):
         self.assertEqual(self.C1._inputs['x'], 111.)
         self.assertEqual(self.C3._inputs['x'], 222.)
         self.assertEqual(self.C4._inputs['x'], 333.)
-
-    def test_pull_size_from_source(self):
-        raise unittest.SkipTest("setting input size based on src size not supported yet")
-
-        class Src(om.ExplicitComponent):
-
-            def setup(self):
-
-                self.add_input('x', 2.0)
-                self.add_output('y1', np.zeros((3, )))
-                self.add_output('y2', shape=((3, )))
-
-            def compute(self, inputs, outputs):
-                x = inputs['x']
-
-                outputs['y1'] = x * np.array([1.0, 2.0, 3.0])
-                outputs['y2'] = x * np.array([1.0, 2.0, 3.0])
-
-        class Tgt(om.ExplicitComponent):
-
-            def setup(self):
-
-                self.add_input('x1')
-                self.add_input('x2')
-                self.add_output('y1', 0.0)
-                self.add_output('y2', 0.0)
-
-            def compute(self, inputs, outputs):
-                x1 = inputs['x1']
-                x2 = inputs['x2']
-
-                outputs['y1'] = np.sum(x1)
-                outputs['y2'] = np.sum(x2)
-
-        p = om.Problem()
-        p.model.add_subsystem('src', Src())
-        p.model.add_subsystem('tgt', Tgt())
-
-        p.model.connect('src.y1', 'tgt.x1')
-        p.model.connect('src.y2', 'tgt.x2')
-
-        p.setup()
-        p.run_model()
-
-        self.assertEqual(p['tgt.y1'], 12.0)
-        self.assertEqual(p['tgt.y2'], 12.0)
-
-    def test_pull_size_from_source_with_indices(self):
-        raise unittest.SkipTest("setting input size based on src size not supported yet")
-
-        class Src(om.ExplicitComponent):
-
-            def setup(self):
-
-                self.add_input('x', 2.0)
-                self.add_output('y1', np.zeros((3, )))
-                self.add_output('y2', shape=((3, )))
-                self.add_output('y3', 3.0)
-
-            def compute(self, inputs, outputs):
-                """ counts up. """
-
-                x = inputs['x']
-
-                outputs['y1'] = x * np.array([1.0, 2.0, 3.0])
-                outputs['y2'] = x * np.array([1.0, 2.0, 3.0])
-                outputs['y3'] = x * 4.0
-
-        class Tgt(om.ExplicitComponent):
-
-            def setup(self):
-
-                self.add_input('x1')
-                self.add_input('x2')
-                self.add_input('x3')
-                self.add_output('y1', 0.0)
-                self.add_output('y2', 0.0)
-                self.add_output('y3', 0.0)
-
-            def compute(self, inputs, outputs):
-                """ counts up. """
-
-                x1 = inputs['x1']
-                x2 = inputs['x2']
-                x3 = inputs['x3']
-
-                outputs['y1'] = np.sum(x1)
-                outputs['y2'] = np.sum(x2)
-                outputs['y3'] = np.sum(x3)
-
-        top = om.Problem()
-        top.model.add_subsystem('src', Src())
-        top.model.add_subsystem('tgt', Tgt())
-
-        top.model.connect('src.y1', 'tgt.x1', src_indices=(0, 1))
-        top.model.connect('src.y2', 'tgt.x2', src_indices=(0, 1))
-        top.model.connect('src.y3', 'tgt.x3')
-
-        top.setup()
-        top.run_model()
-
-        self.assertEqual(top['tgt.y1'], 6.0)
-        self.assertEqual(top['tgt.y2'], 6.0)
-        self.assertEqual(top['tgt.y3'], 8.0)
-
-    def test_inp_inp_conn_no_src(self):
-        raise unittest.SkipTest("no setup testing yet")
-        self.p.model.connect('G3.G4.C3.x', 'G3.G4.C4.x')
-
-        stream = StringIO()
-        self.p.setup(out_stream=stream)
-
-        self.p['G3.G4.C3.x'] = 999.
-        self.assertEqual(self.p.model.G3.G4.C3._inputs['x'], 999.)
-        self.assertEqual(self.p.model.G3.G4.C4._inputs['x'], 999.)
-
-        content = stream.getvalue()
-        self.assertTrue("The following parameters have no associated unknowns:\n"
-                        "G1.G2.C1.x\nG3.G4.C3.x\nG3.G4.C4.x" in content)
-        self.assertTrue("The following components have no connections:\n"
-                        "G1.G2.C1\nG1.G2.C2\nG3.G4.C3\nG3.G4.C4\n" in content)
-        self.assertTrue("No recorders have been specified, so no data will be saved." in content)
 
 
 class TestConnectionsPromoted(unittest.TestCase):
@@ -302,9 +179,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # Should not be allowed because the source and target shapes do not match
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
-        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: The source and target shapes do not match or are " + \
-                   "ambiguous for the connection 'idvp.blammo' to 'arraycomp.inp'. " + \
-                   "The source shape is (1,) but the target shape is (2,)."
+        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: When connecting 'idvp.blammo' to 'arraycomp.inp': shape (1,) != (2,)."
         self.prob.setup()
         try:
             self.prob.final_setup()
@@ -319,9 +194,7 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_length')
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 0, 0])
 
-        expected = "\nCollected errors for problem 'bad_length':\n   <model> <class Group>: The source indices [0 0 0] do not specify a valid shape " + \
-                   "for the connection 'idvp.blammo' to 'arraycomp.inp'. The target shape is " + \
-                   "(2,) but indices are shape (3,)."
+        expected = "\nCollected errors for problem 'bad_length':\n   <model> <class Group>: When connecting 'idvp.blammo' to 'arraycomp.inp' after applying src_indices [0 0 0] : shape (3,) != (2,)."
 
         self.prob.setup()
         try:
@@ -449,9 +322,7 @@ class TestShapes(unittest.TestCase):
                                                 y={'val': np.zeros((5, 2))}))
         p.model.connect('indep.x', 'C1.x')
 
-        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: The source and target shapes do not match or are " + \
-                   "ambiguous for the connection 'indep.x' to 'C1.x'. The source shape is " + \
-                   "(1, 10, 1, 1) but the target shape is (5, 2)."
+        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: When connecting 'indep.x' to 'C1.x': shape (1, 10, 1, 1) != (5, 2)."
 
         p.setup()
         with self.assertRaises(Exception) as context:
@@ -487,8 +358,7 @@ class TestMultiConns(unittest.TestCase):
 
         self.assertEqual(str(context.exception),
            "\nCollected errors for problem 'mult_conns':"
-           "\n   <model> <class Group>: The following inputs have multiple connections: "
-                   "sub.c2.y from ['indeps.y', 'sub.c1.y'].")
+           "\n   <model> <class Group>: Target 'sub.y (sub.c2.y)' cannot be connected to 'sub.y (sub.c1.y)' because it's already connected to 'y (indeps.y)'.")
 
     def test_mixed_conns_same_level(self):
 
@@ -512,8 +382,7 @@ class TestMultiConns(unittest.TestCase):
 
         self.assertEqual(str(context.exception),
            "\nCollected errors for problem 'mixed_conns_same_level':"
-           "\n   <model> <class Group>: Input 'c2.y' cannot be connected to 'indeps.x' "
-                   "because it's already connected to 'c1.y'.")
+           "\n   <model> <class Group>: Target 'y (c2.y)' cannot be connected to 'y (c1.y)' because it's already connected to 'indeps.x'.")
 
 
 class TestAutoIVCAllowableShapeMismatch(unittest.TestCase):
@@ -775,6 +644,137 @@ class TestConnectionsMPIBug(unittest.TestCase):
         prob = om.Problem(model=Traj())
         prob.setup()
         prob.run_model()
+
+
+class TestAllConnectionTypes(unittest.TestCase):
+
+    def build_nested_model(self, promote=False, autoivc=False):
+        prob = om.Problem()
+        model = prob.model
+
+        if promote:
+            def get_proms(lst):
+                return lst
+        else:
+            def get_proms(lst):
+                return None
+
+        if not autoivc:
+            model.add_subsystem('indeps', om.IndepVarComp('x', 10.0), promotes=get_proms(['x']))
+        G1 = model.add_subsystem('G1', om.Group(), promotes_inputs=get_proms(['x']))
+        G2 = model.add_subsystem('G2', om.Group())
+
+        G1A = G1.add_subsystem('G1A', om.Group(), promotes_inputs=get_proms(['x']))
+        G1B = G1.add_subsystem('G1B', om.Group(), promotes_inputs=get_proms([('y','x')]))
+        G2A = G2.add_subsystem('G2A', om.Group())
+        G2B = G2.add_subsystem('G2B', om.Group())
+
+        G1A.add_subsystem('C1', om.ExecComp('y = 2.0 * x'), promotes=get_proms(['x', 'y']))
+
+        G1B.add_subsystem('C2', om.ExecComp('z = 3.0 * y'), promotes=get_proms(['z', 'y']))
+        G1B.add_subsystem('C3', om.ExecComp('w = 4.0 * z'), promotes=get_proms(['w', 'z']))
+
+        G2A.add_subsystem('C4', om.ExecComp('b = 2.0 * a'), promotes=get_proms(['a', 'b']))
+
+        G2B.add_subsystem('C5', om.ExecComp('c = 3.0 * b'), promotes=get_proms(['b', 'c']))
+        G2B.add_subsystem('C6', om.ExecComp('d = 4.0 * c'), promotes=get_proms(['c', 'd']))
+
+        model.add_subsystem('C7', om.ExecComp('result = w + d'))
+
+        return prob
+
+    def test_promoted(self):
+        prob = self.build_nested_model(promote=True)
+        model = prob.model
+
+        model.connect('G1.G1A.y', 'G2.G2A.a')
+        model.connect('G2.G2A.b', 'G2.G2B.b')
+
+        model.connect('G1.G1B.w', 'C7.w')
+        model.connect('G2.G2B.d', 'C7.d')
+
+        prob.setup()
+        prob.run_model()
+
+        # prob.model._get_all_conn_graph().display()
+        # prob.model._get_all_conn_graph().dump()
+        print('done')
+
+    def test_promoted_branching_output(self):
+        prob = self.build_nested_model(promote=True)
+        model = prob.model
+
+        # model.connect('G1.G1A.y', 'G2.G2A.a')
+        model.connect('x', 'G2.G2A.a')
+        model.connect('G2.G2A.b', 'G2.G2B.b')
+
+        model.connect('G1.G1B.w', 'C7.w')
+        model.connect('G2.G2B.d', 'C7.d')
+
+        prob.setup()
+        prob.run_model()
+
+        #prob.model._get_all_conn_graph().display()
+        #prob.model._get_all_conn_graph().dump()
+        #print('done')
+
+    def test_promoted_branching_output_autoivc(self):
+        prob = self.build_nested_model(promote=True, autoivc=True)
+        model = prob.model
+
+        # model.connect('G1.G1A.y', 'G2.G2A.a')
+        model.connect('x', 'G2.G2A.a')
+        model.connect('G2.G2A.b', 'G2.G2B.b')
+
+        model.connect('G1.G1B.w', 'C7.w')
+        model.connect('G2.G2B.d', 'C7.d')
+
+        prob.setup()
+        prob.run_model()
+
+        #prob.model._get_all_conn_graph().display()
+        #prob.model._get_all_conn_graph().dump()
+        #print('done')
+
+    def test_promoted_autoivc(self):
+        prob = self.build_nested_model(promote=True)
+
+        prob.setup()
+        prob.run_model()
+
+        # prob.model._get_all_conn_graph().display()
+
+    def test_no_promotion(self):
+        prob = self.build_nested_model(promote=False)
+        model = prob.model
+
+        model.connect('G1.G1A.C1.y', 'G2.G2A.C4.a')
+        model.connect('G2.G2A.C4.b', 'G2.G2B.C5.b')
+
+        model.connect('G1.G1B.C3.w', 'C7.w')
+        model.connect('G2.G2B.C6.d', 'C7.d')
+
+        prob.setup()
+        prob.run_model()
+
+        #prob.model._get_all_conn_graph().display()
+
+    def test_no_promotion_input_to_input(self):
+        prob = self.build_nested_model(promote=False)
+        model = prob.model
+
+        model.connect('G1.G1A.C1.x', 'G2.G2A.C4.a')  # input-input
+        model.connect('G2.G2A.C4.b', 'G2.G2B.C5.b')
+
+        model.connect('G1.G1B.C3.w', 'C7.w')
+        model.connect('G2.G2B.C6.d', 'C7.d')
+
+        prob.setup()
+        prob.run_model()
+
+        #prob.model._get_all_conn_graph().display()
+        #prob.model._get_all_conn_graph().dump()
+        #print('done')
 
 
 if __name__ == "__main__":

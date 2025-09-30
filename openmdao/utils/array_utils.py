@@ -369,33 +369,13 @@ def array_connection_compatible(shape1, shape2):
     bool
         True if the two shapes are compatible for connection, else False.
     """
-    ashape1 = np.asarray(shape1, dtype=INT_DTYPE)
-    ashape2 = np.asarray(shape2, dtype=INT_DTYPE)
+    if shape1 == shape2:
+        return True
 
-    size1 = shape_to_len(ashape1)
-    size2 = shape_to_len(ashape2)
+    sqz1 = [d for d in shape1 if d != 1]
+    sqz2 = [d for d in shape2 if d != 1]
 
-    # Shapes are not connection-compatible if size is different
-    if size1 != size2:
-        return False
-
-    nz1 = np.where(ashape1 > 1)[0]
-    nz2 = np.where(ashape2 > 1)[0]
-
-    if len(nz1) > 0:
-        fundamental_shape1 = ashape1[np.min(nz1): np.max(nz1) + 1]
-    else:
-        fundamental_shape1 = np.ones((1,))
-
-    if len(nz2) > 0:
-        fundamental_shape2 = ashape2[np.min(nz2): np.max(nz2) + 1]
-    else:
-        fundamental_shape2 = np.ones((1,))
-
-    if len(fundamental_shape1) != len(fundamental_shape2):
-        return False
-
-    return np.all(fundamental_shape1 == fundamental_shape2)
+    return sqz1 == sqz2
 
 
 def tile_sparse_jac(data, rows, cols, nrow, ncol, num_nodes):

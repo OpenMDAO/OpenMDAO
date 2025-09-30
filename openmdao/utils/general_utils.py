@@ -381,7 +381,7 @@ def all_ancestors(pathname, delim='.'):
     """
     while pathname:
         yield pathname
-        pathname, _, _ = pathname.rpartition(delim)
+        pathname = pathname.rpartition(delim)[0]
 
 
 def find_matches(pattern, var_list):
@@ -1073,11 +1073,12 @@ def common_subpath(pathnames):
     str
         Common dotted subpath.  Returns '' if no common subpath is found.
     """
-    if len(pathnames) == 1:
-        return pathnames[0]
-
     if pathnames:
         npaths = len(pathnames)
+
+        if npaths == 1:
+            return pathnames[0]
+
         splits = [p.split('.') for p in pathnames]
         for common_loc in range(np.min([len(s) for s in splits])):
             p0 = splits[0][common_loc]

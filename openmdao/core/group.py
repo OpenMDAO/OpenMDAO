@@ -6,7 +6,6 @@ from collections.abc import Iterable
 from itertools import product, chain
 from numbers import Number
 import inspect
-from difflib import get_close_matches
 
 import numpy as np
 import networkx as nx
@@ -25,10 +24,9 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len, ValueRepeater, evenly_distrib_idxs
-from openmdao.utils.general_utils import convert_src_inds, shape2tuple, get_connection_owner, \
-    ensure_compatible, meta2src_iter, get_rev_conns, is_undefined
-from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
-    _is_unitless, simplify_unit, PhysicalUnit
+from openmdao.utils.general_utils import convert_src_inds, shape2tuple, ensure_compatible, meta2src_iter, get_rev_conns, is_undefined, all_ancestors
+from openmdao.utils.units import unit_conversion, _has_val_mismatch, _find_unit, \
+    simplify_unit, PhysicalUnit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
     get_unresolved_knowns, is_unresolved, get_active_edges, add_shape_node, \
     add_units_node, are_connected
@@ -36,7 +34,7 @@ from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_c
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.relevance import get_relevance
-from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOptionWarning, \
+from openmdao.utils.om_warnings import issue_warning, UnusedOptionWarning, \
     PromotionWarning, MPIWarning, DerivativesWarning
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.jax_utils import jax
@@ -45,6 +43,7 @@ from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.subjac import Subjac
 from openmdao.jacobians.jacobian import GroupJacobianUpdateContext
+from openmdao.core.conn_graph import AllConnGraph
 
 
 # regex to check for valid names.
@@ -246,6 +245,8 @@ class Group(System):
         self._pre_config_group_inputs = {}
         self._static_group_inputs = {}
         self._static_manual_connections = {}
+        self._static_conn_graph = AllConnGraph()
+        self._all_conn_graph = None
         self._conn_abs_in2out = {}
         self._conn_discrete_in2out = {}
         self._transfers = {}
@@ -320,6 +321,12 @@ class Group(System):
         """
         pass
 
+    def _get_all_conn_graph(self):
+        if self._all_conn_graph is None:
+            return self._static_conn_graph
+
+        return self._all_conn_graph
+
     def set_input_defaults(self, name, val=_UNDEFINED, units=None, src_shape=None):
         """
         Specify metadata to be assumed when multiple inputs are promoted to the same name.
@@ -335,7 +342,15 @@ class Group(System):
         src_shape : int or tuple
             Assumed shape of any connected source or higher level promoted input.
         """
-        meta = {'prom': name, 'auto': False}
+        graph = self._get_all_conn_graph()
+        node = ('i', name)
+        if node not in graph:
+            node, kwargs = self.get_node_meta(self, name, 'input')
+            graph.add_node(node, **kwargs)
+
+        meta = graph.nodes[node]
+
+        # meta = {'prom': name, 'auto': False}
         if is_undefined(val):
             src_shape = shape2tuple(src_shape)
         else:
@@ -347,6 +362,7 @@ class Group(System):
             elif isinstance(val, Number):
                 src_shape = (1,)
             meta['val'] = val
+            meta['shape'] = val.shape
 
         if units is not None:
             if not isinstance(units, str):
@@ -356,21 +372,21 @@ class Group(System):
         if src_shape is not None:
             meta['src_shape'] = src_shape
 
-        if self._static_mode:
-            dct = self._static_group_inputs
-        else:
-            dct = self._group_inputs
+        # if self._static_mode:
+        #     dct = self._static_group_inputs
+        # else:
+        #     dct = self._group_inputs
 
-        if name in dct:
-            old = dct[name][0]
-            overlap = set(old).intersection(meta)
-            if overlap:
-                issue_warning(f"Setting input defaults for input '{name}' which "
-                              f"override previously set defaults for {sorted(overlap)}.",
-                              prefix=self.msginfo, category=PromotionWarning)
-            old.update(meta)
-        else:
-            dct[name] = [meta]
+        # if name in dct:
+        #     old = dct[name][0]
+        #     overlap = set(old).intersection(meta)
+        #     if overlap:
+        #         issue_warning(f"Setting input defaults for input '{name}' which "
+        #                       f"override previously set defaults for {sorted(overlap)}.",
+        #                       prefix=self.msginfo, category=PromotionWarning)
+        #     old.update(meta)
+        # else:
+        #     dct[name] = [meta]
 
     def _get_matvec_scope(self, excl_sub=None):
         """
@@ -641,6 +657,11 @@ class Group(System):
         for n, lst in self._group_inputs.items():
             self._group_inputs[n] = lst.copy()
 
+        if self.pathname == '':
+            self._all_conn_graph = AllConnGraph()
+
+        self._all_conn_graph.update(self._static_conn_graph)
+
         # Call setup function for this group.
         self.setup()
         self._setup_check()
@@ -698,6 +719,7 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
+            subsys._all_conn_graph = self._all_conn_graph
             subsys._setup_procs(subsys.pathname, sub_comm, prob_meta)
 
         # build a list of local subgroups to speed up later loops
@@ -1716,6 +1738,7 @@ class Group(System):
             sub_prefix = subsys.name + '.'
 
             for io in ['input', 'output']:
+                isinput = io == 'input'
                 abs2meta[io].update(subsys._var_abs2meta[io])
                 allprocs_abs2meta[io].update(subsys._var_allprocs_abs2meta[io])
                 subprom2prom = var_maps[io]
@@ -1725,9 +1748,10 @@ class Group(System):
                                          subsys._var_discrete[io].items()})
 
                 for sub_prom, sub_abs in subsys._resolver.prom2abs_iter(io):
+                    pinfo = None
                     if sub_prom in subprom2prom:
                         prom_name, _, pinfo, _ = subprom2prom[sub_prom]
-                        if pinfo is not None and io == 'input':
+                        if pinfo is not None and isinput:
                             pinfo = pinfo.copy()
                             pinfo.promoted_from = subsys.pathname
                             pinfo.prom = sub_prom
@@ -1738,6 +1762,7 @@ class Group(System):
                                     # add 1 to abs_in.count('.') which includes the var name
                                     abs_in2prom_info[abs_in] = [None] * (abs_in.count('.') + 1)
                                 abs_in2prom_info[abs_in][tree_level] = pinfo
+
                     else:
                         prom_name = sub_prefix + sub_prom
 
@@ -1747,6 +1772,10 @@ class Group(System):
                                              local=flags & LOCAL,
                                              continuous=flags & CONTINUOUS,
                                              distributed=flags & DISTRIBUTED)
+
+                    if sub_prom in subprom2prom:
+                        self._all_conn_graph.add_promotion(io, self, prom_name,
+                                                           subsys, sub_prom, pinfo)
 
             if isinstance(subsys, Group):
                 # propagate any subsystem 'set_input_defaults' info up to this Group
@@ -1763,7 +1792,6 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            proc_resolvers = [None] * self.comm.size
             resolver.reset_prom_maps()  # no use sending prom2abs to other procs
             if self._gather_full_data():
                 raw = (allprocs_discrete, resolver, allprocs_abs2meta,
@@ -1789,6 +1817,7 @@ class Group(System):
             old_abs2meta = allprocs_abs2meta
             allprocs_abs2meta = {'input': {}, 'output': {}}
 
+            proc_resolvers = [None] * self.comm.size
             myrank = self.comm.rank
             for rank, (proc_discrete, proc_resolver, proc_abs2meta,
                        oscale, oadd, rscale, ginputs, has_dist_vars,
@@ -2140,201 +2169,209 @@ class Group(System):
         parent_conns : dict
             Dictionary of connections passed down from parent group.
         """
-        global_abs_in2out = defaultdict(set)
+        # global_abs_in2out = defaultdict(set)
 
-        allprocs_discrete_in = self._var_allprocs_discrete['input']
-        allprocs_discrete_out = self._var_allprocs_discrete['output']
+        # allprocs_discrete_in = self._var_allprocs_discrete['input']
+        # allprocs_discrete_out = self._var_allprocs_discrete['output']
 
-        resolver = self._resolver
-        is_prom = self._resolver.is_prom
+        # resolver = self._resolver
+        # # is_prom = self._resolver.is_prom
 
-        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
+        # abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
-        pathname = self.pathname
+        # abs_in2out = {}
+        # new_conns = {}
 
-        abs_in2out = {}
-        new_conns = {}
+        # prefix = self.pathname + '.' if self.pathname else ''
+        # path_len = len(prefix)
 
-        prefix = pathname + '.' if pathname else ''
-        path_len = len(prefix)
+        # if parent_conns is not None:
+        #     for abs_in, abs_out in parent_conns.items():
+        #         if abs_in.startswith(prefix) and abs_out.startswith(prefix):
+        #             global_abs_in2out[abs_in].add(abs_out)
 
-        if parent_conns is not None:
-            for abs_in, abs_out in parent_conns.items():
-                if abs_in.startswith(prefix) and abs_out.startswith(prefix):
-                    global_abs_in2out[abs_in].add(abs_out)
+        #             in_subsys, _, _ = abs_in[path_len:].partition('.')
+        #             out_subsys, _, _ = abs_out[path_len:].partition('.')
 
-                    in_subsys, _, _ = abs_in[path_len:].partition('.')
-                    out_subsys, _, _ = abs_out[path_len:].partition('.')
+        #             # if connection is contained in a subgroup, add to conns
+        #             # to pass down to subsystems.
+        #             if in_subsys == out_subsys:
+        #                 if in_subsys not in new_conns:
+        #                     new_conns[in_subsys] = {abs_in: abs_out}
+        #                 else:
+        #                     new_conns[in_subsys][abs_in] = abs_out
 
-                    # if connection is contained in a subgroup, add to conns
-                    # to pass down to subsystems.
-                    if in_subsys == out_subsys:
-                        if in_subsys not in new_conns:
-                            new_conns[in_subsys] = {abs_in: abs_out}
-                        else:
-                            new_conns[in_subsys][abs_in] = abs_out
+        #for subgroup in self._subgroups_myproc:
+            #subgroup._setup_global_connections()
+
+        all_conn_graph = self._get_all_conn_graph()
 
         # Add implicit connections (only ones owned by this group)
-        for prom_name, out_list in resolver.prom2abs_iter('output'):
-            if is_prom(prom_name, 'input'):  # names match ==> a connection
-                abs_out = out_list[0]
-                out_subsys, _, _ = abs_out[path_len:].partition('.')
-                for abs_in in resolver.absnames(prom_name, 'input'):
-                    in_subsys, _, _ = abs_in[path_len:].partition('.')
-                    global_abs_in2out[abs_in].add(abs_out)
-                    if out_subsys == in_subsys:
-                        in_subsys, _, _ = abs_in[path_len:].partition('.')
-                        out_subsys, _, _ = abs_out[path_len:].partition('.')
-                        # if connection is contained in a subgroup, add to conns
-                        # to pass down to subsystems.
-                        if in_subsys == out_subsys:
-                            if in_subsys not in new_conns:
-                                new_conns[in_subsys] = {abs_in: abs_out}
-                            else:
-                                new_conns[in_subsys][abs_in] = abs_out
-                    else:  # this group will handle the transfer
-                        abs_in2out[abs_in] = abs_out
+        # for prom_name, out_list in resolver.prom2abs_iter('output'):
+        #     if is_prom(prom_name, 'input'):  # names match ==> a connection
+        #         abs_out = out_list[0]
+        #         out_subsys, _, _ = abs_out[path_len:].partition('.')
+        #         for abs_in in resolver.absnames(prom_name, 'input'):
+        #             in_subsys, _, _ = abs_in[path_len:].partition('.')
+        #             global_abs_in2out[abs_in].add(abs_out)
+        #             if out_subsys == in_subsys:
+        #                 # if connection is contained in a subgroup, add to conns
+        #                 # to pass down to subsystems.
+        #                 if in_subsys not in new_conns:
+        #                     new_conns[in_subsys] = {abs_in: abs_out}
+        #                 else:
+        #                     new_conns[in_subsys][abs_in] = abs_out
+        #             else:  # this group will handle the transfer
+        #                 abs_in2out[abs_in] = abs_out
 
-        src_ind_inputs = set()
-        abs2meta = self._var_abs2meta['input']
-        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+        # src_ind_inputs = set()
+        # abs2meta = self._var_abs2meta['input']
+        # allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
 
         self._bad_conn_vars = set()
 
-        # Add explicit connections (only ones declared by this group)
-        for prom_in, (prom_out, src_indices, flat) in self._manual_connections.items():
+        # all_conn_graph.add_manual_connections(self)
 
-            # throw an exception if either output or input doesn't exist
-            # (not traceable to a connect statement, so provide context)
-            if not (is_prom(prom_out, 'output') or prom_out in allprocs_discrete_out):
-                if (is_prom(prom_out, 'input') or prom_out in allprocs_discrete_in):
-                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_out}' is an input. " + \
-                          "All connections must be from an output to an input."
-                else:
-                    guesses = get_close_matches(prom_out, list(resolver.prom_iter('output')) +
-                                                list(allprocs_discrete_out.keys()))
-                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_out}' doesn't exist. Perhaps you meant " + \
-                          f"to connect to one of the following outputs: {guesses}."
+        if self.pathname == '':
+            groups = list(self.system_iter(include_self=True, recurse=True, typ=Group))
+            for g in groups:
+                all_conn_graph.add_manual_connections(g)
 
-                self._bad_conn_vars.update((prom_in, prom_out))
-                self._collect_error(msg)
-                continue
+            # TODO: gather all manual connections and static info from all procs
 
-            if not (is_prom(prom_in, 'input') or prom_in in allprocs_discrete_in):
-                if (is_prom(prom_in, 'output') or prom_in in allprocs_discrete_out):
-                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_in}' is an output. " + \
-                          "All connections must be from an output to an input."
-                else:
-                    guesses = get_close_matches(prom_in, list(resolver.prom_iter('input')) +
-                                                list(allprocs_discrete_in.keys()))
-                    msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
-                          f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you meant " + \
-                          f"to connect to one of the following inputs: {guesses}."
+            all_conn_graph.add_implicit_connections(self)
 
-                self._bad_conn_vars.update((prom_in, prom_out))
-                self._collect_error(msg)
-                continue
+            # check for cycles
+            if not nx.is_directed_acyclic_graph(all_conn_graph):
+                cycle_edges = nx.find_cycle(all_conn_graph, orientation='original')
+                errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}'
+                                    for edge in cycle_edges])
+                self._collect_error('Cycle detected in input-to-input connections. '
+                                    f'This is not allowed.\n{errmsg}')
 
-            # Throw an exception if output and input are in the same system
-            # (not traceable to a connect statement, so provide context)
-            # and check if src_indices is defined in both connect and add_input.
-            abs_out = resolver.prom2abs(prom_out, 'output')
-            out_comp, _, _ = abs_out.rpartition('.')
-            out_subsys, _, _ = abs_out[path_len:].partition('.')
+            all_conn_graph.add_auto_ivcs(self)
+            all_conn_graph.update_shapes(self)
+            all_conn_graph.transform_input_input_connections(self)
+            # all_conn_graph.display()
 
-            for abs_in in resolver.absnames(prom_in, 'input'):
-                in_comp, _, _ = abs_in.rpartition('.')
-                if out_comp == in_comp:
-                    self._collect_error(
-                        f"{self.msginfo}: Output and input are in the same System for connection "
-                        f"from '{prom_out}' to '{prom_in}'.")
-                    self._bad_conn_vars.update((prom_in, prom_out))
-                    continue
+            conn_dict = all_conn_graph.get_all_conns(self)
+            # import pprint
+            # pprint.pprint(conn_dict)
 
-                if src_indices is not None:
-                    if abs_in in abs2meta:
-                        if abs_in not in abs_in2prom_info:
-                            abs_in2prom_info[abs_in] = [None] * (abs_in.count('.') + 1)
-                        # place a _PromotesInfo at the top level to handle the src_indices
-                        if abs_in2prom_info[abs_in][0] is None:
-                            try:
-                                abs_in2prom_info[abs_in][0] = _PromotesInfo(src_indices=src_indices,
-                                                                            flat=flat, prom=abs_in)
-                            except Exception:
-                                type_exc, exc, tb = sys.exc_info()
-                                self._collect_error(
-                                    f"When connecting from '{prom_out}' to '{prom_in}': {exc}",
-                                    exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
-                                self._bad_conn_vars.update((prom_in, prom_out))
-                                continue
-
-                        meta = abs2meta[abs_in]
-                        meta['manual_connection'] = True
-                        meta['src_indices'] = src_indices
-                        meta['flat_src_indices'] = flat
-
-                    src_ind_inputs.add(abs_in)
-
-                if abs_in in abs_in2out:
-                    self._collect_error(
-                        f"{self.msginfo}: Input '{abs_in}' cannot be connected to '{abs_out}' "
-                        f"because it's already connected to '{abs_in2out[abs_in]}'.",
-                        ident=(abs_out, abs_in))
-                    self._bad_conn_vars.update((prom_in, prom_out))
-                    continue
-
-                abs_in2out[abs_in] = abs_out
-
-                # if connection is contained in a subgroup, add to conns to pass down to subsystems.
-                if abs_in[path_len:].partition('.')[0] == out_subsys:
-                    if out_subsys not in new_conns:
-                        new_conns[out_subsys] = {abs_in: abs_out}
+            global_conn_dict = {'': {}}
+            root_dict = global_conn_dict['']
+            for path, conn_data in conn_dict.items():
+                for name in all_ancestors(path):
+                    if name in global_conn_dict:
+                        global_conn_dict[name].update(conn_data)
                     else:
-                        new_conns[out_subsys][abs_in] = abs_out
+                        global_conn_dict[name] = conn_data.copy()
 
-        # Compute global_abs_in2out by first adding this group's contributions,
-        # then adding contributions from systems above/below, then allgathering.
-        for tgt, src in abs_in2out.items():
-            global_abs_in2out[tgt].add(src)
+                # don't forget the root path!
+                root_dict.update(conn_data)
 
-        for subgroup in self._subgroups_myproc:
-            if subgroup.name in new_conns:
-                subgroup._setup_global_connections(parent_conns=new_conns[subgroup.name])
-            else:
-                subgroup._setup_global_connections()
-            for tgt, src in subgroup._conn_global_abs_in2out.items():
-                global_abs_in2out[tgt].add(src)
+            for g in groups:
+                g._conn_abs_in2out = conn_dict.get(g.pathname, {})
+                g._conn_global_abs_in2out = global_conn_dict.get(g.pathname, {})
 
-        dup_info = [(n, srcs) for n, srcs in global_abs_in2out.items() if len(srcs) > 1]
-        if dup_info:
-            dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
-            dupstr = ', '.join(dup)
-            self._collect_error(f"{self.msginfo}: The following inputs have multiple "
-                                f"connections: {dupstr}.", ident=dupstr)
+        # # Add explicit connections (only ones declared by this group)
+        # for prom_in, (prom_out, src_indices, flat) in self._manual_connections.items():
 
-        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            # If running in parallel, allgather
-            if self._gather_full_data():
-                raw = (global_abs_in2out, src_ind_inputs)
-            else:
-                raw = ({}, ())
-            gathered = self.comm.allgather(raw)
+        #     # Throw an exception if output and input are in the same system
+        #     # (not traceable to a connect statement, so provide context)
+        #     # and check if src_indices is defined in both connect and add_input.
+        #     # abs_out = resolver.prom2abs(prom_out, 'output')
+        #     # out_comp, _, _ = abs_out.rpartition('.')
+        #     # out_subsys, _, _ = abs_out[path_len:].partition('.')
 
-            all_src_ind_ins = set()
-            for myproc_global_abs_in2out, src_ind_ins in gathered:
-                for tgt, srcs in myproc_global_abs_in2out.items():
-                    global_abs_in2out[tgt].update(srcs)
-                all_src_ind_ins.update(src_ind_ins)
-            src_ind_inputs = all_src_ind_ins
+        #     for abs_in in resolver.absnames(prom_in, 'input'):
+        #     #     in_comp, _, _ = abs_in.rpartition('.')
+        #     #     if out_comp == in_comp:
+        #     #         self._collect_error(
+        #     #             f"{self.msginfo}: Output and input are in the same System for connection "
+        #     #             f"from '{prom_out}' to '{prom_in}'.")
+        #     #         self._bad_conn_vars.update((prom_in, prom_out))
+        #     #         continue
 
-        for inp in src_ind_inputs:
-            allprocs_abs2meta_in[inp]['has_src_indices'] = True
+        #         if src_indices is not None:
+        #             if abs_in in abs2meta:
+        #                 if abs_in not in abs_in2prom_info:
+        #                     abs_in2prom_info[abs_in] = [None] * (abs_in.count('.') + 1)
+        #                 # place a _PromotesInfo at the top level to handle the src_indices
+        #                 if abs_in2prom_info[abs_in][0] is None:
+        #                     try:
+        #                         abs_in2prom_info[abs_in][0] = _PromotesInfo(src_indices=src_indices,
+        #                                                                     flat=flat, prom=abs_in)
+        #                     except Exception:
+        #                         type_exc, exc, tb = sys.exc_info()
+        #                         self._collect_error(
+        #                             f"When connecting from '{prom_out}' to '{prom_in}': {exc}",
+        #                             exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
+        #                         self._bad_conn_vars.update((prom_in, prom_out))
+        #                         continue
 
-        self._conn_global_abs_in2out = {name: srcs.pop()
-                                        for name, srcs in global_abs_in2out.items()}
+        #                 meta = abs2meta[abs_in]
+        #                 meta['manual_connection'] = True
+        #                 meta['src_indices'] = src_indices
+        #                 meta['flat_src_indices'] = flat
+
+        #             src_ind_inputs.add(abs_in)
+
+        #         # if abs_in in abs_in2out:
+        #         #     self._collect_error(
+        #         #         f"{self.msginfo}: Input '{abs_in}' cannot be connected to '{abs_out}' "
+        #         #         f"because it's already connected to '{abs_in2out[abs_in]}'.",
+        #         #         ident=(abs_out, abs_in))
+        #         #     self._bad_conn_vars.update((prom_in, prom_out))
+        #         #     continue
+
+        #         abs_in2out[abs_in] = abs_out
+
+        #         # # if connection is contained in a subgroup, add to conns to pass down to subsystems.
+        #         # if abs_in[path_len:].partition('.')[0] == out_subsys:
+        #         #     if out_subsys not in new_conns:
+        #         #         new_conns[out_subsys] = {abs_in: abs_out}
+        #         #     else:
+        #         #         new_conns[out_subsys][abs_in] = abs_out
+
+        # for tgt, src in abs_in2out.items():
+        #     global_abs_in2out[tgt].add(src)
+
+        # for subgroup in self._subgroups_myproc:
+        #     if subgroup.name in new_conns:
+        #         subgroup._setup_global_connections(parent_conns=new_conns[subgroup.name])
+        #     else:
+        #         subgroup._setup_global_connections()
+        #     for tgt, src in subgroup._conn_global_abs_in2out.items():
+        #         global_abs_in2out[tgt].add(src)
+
+        #dup_info = [(n, srcs) for n, srcs in global_abs_in2out.items() if len(srcs) > 1]
+        #if dup_info:
+            #dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
+            #dupstr = ', '.join(dup)
+            #self._collect_error(f"{self.msginfo}: The following inputs have multiple "
+                                #f"connections: {dupstr}.", ident=dupstr)
+
+        # if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+        #     # If running in parallel, allgather
+        #     if self._gather_full_data():
+        #         raw = (global_abs_in2out, src_ind_inputs)
+        #     else:
+        #         raw = ({}, ())
+        #     gathered = self.comm.allgather(raw)
+
+        #     all_src_ind_ins = set()
+        #     for myproc_global_abs_in2out, src_ind_ins in gathered:
+        #         for tgt, srcs in myproc_global_abs_in2out.items():
+        #             global_abs_in2out[tgt].update(srcs)
+        #         all_src_ind_ins.update(src_ind_ins)
+        #     src_ind_inputs = all_src_ind_ins
+
+        # for inp in src_ind_inputs:
+        #     allprocs_abs2meta_in[inp]['has_src_indices'] = True
+
+        # self._conn_global_abs_in2out = {name: srcs.pop()
+        #                                 for name, srcs in global_abs_in2out.items()}
 
     def get_indep_vars(self, local, include_discrete=False):
         """
@@ -3070,189 +3107,190 @@ class Group(System):
 
         Also, check shapes of connected variables.
         """
-        abs_in2out = self._conn_abs_in2out = {}
-        self._conn_discrete_in2out = {}
-        global_abs_in2out = self._conn_global_abs_in2out
-        pathname = self.pathname
-        allprocs_discrete_in = self._var_allprocs_discrete['input']
-        allprocs_discrete_out = self._var_allprocs_discrete['output']
-        self._resolver._conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
+        # abs_in2out = self._conn_abs_in2out = {}
+        # self._conn_discrete_in2out = {}
+        # global_abs_in2out = self._conn_global_abs_in2out
+        # pathname = self.pathname
+        # allprocs_discrete_in = self._var_allprocs_discrete['input']
+        # allprocs_discrete_out = self._var_allprocs_discrete['output']
+        # self._resolver._conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
 
-        for subsys in self._sorted_sys_iter():
-            subsys._setup_connections()
+        # for subsys in self._sorted_sys_iter():
+        #     subsys._setup_connections()
 
-        path_dot = pathname + '.' if pathname else ''
-        path_len = len(path_dot)
+        # path_dot = pathname + '.' if pathname else ''
+        # path_len = len(path_dot)
 
-        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
-        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-        abs2meta_in = self._var_abs2meta['input']
-        abs2meta_out = self._var_abs2meta['output']
+        # allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+        # allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+        # abs2meta_in = self._var_abs2meta['input']
+        # abs2meta_out = self._var_abs2meta['output']
 
-        nproc = self.comm.size
+        # nproc = self.comm.size
 
-        # Check input/output units here, and set _has_input_scaling
-        # to True for this Group if units are defined and different, or if
-        # ref or ref0 are defined for the output.
-        for abs_in, abs_out in global_abs_in2out.items():
-            # Check that they are in different subsystems of this system.
-            out_subsys = abs_out[path_len:].partition('.')[0]
-            in_subsys = abs_in[path_len:].partition('.')[0]
-            if out_subsys != in_subsys:
-                if abs_in in allprocs_discrete_in:
-                    self._conn_discrete_in2out[abs_in] = abs_out
-                elif abs_out in allprocs_discrete_out:
-                    self._collect_error(
-                        f"{self.msginfo}: Can't connect discrete output '{abs_out}' "
-                        f"to continuous input '{abs_in}'.", ident=(abs_out, abs_in))
-                    continue
-                else:
-                    abs_in2out[abs_in] = abs_out
+        # # Check input/output units here, and set _has_input_scaling
+        # # to True for this Group if units are defined and different, or if
+        # # ref or ref0 are defined for the output.
+        # for abs_in, abs_out in global_abs_in2out.items():
+        #     # Check that they are in different subsystems of this system.
+        #     out_subsys = abs_out[path_len:].partition('.')[0]
+        #     in_subsys = abs_in[path_len:].partition('.')[0]
+        #     if out_subsys != in_subsys:
+        #         if abs_in in allprocs_discrete_in:
+        #             self._conn_discrete_in2out[abs_in] = abs_out
+        #         elif abs_out in allprocs_discrete_out:
+        #             self._collect_error(
+        #                 f"{self.msginfo}: Can't connect discrete output '{abs_out}' "
+        #                 f"to continuous input '{abs_in}'.", ident=(abs_out, abs_in))
+        #             continue
+        #         else:
+        #             abs_in2out[abs_in] = abs_out
 
-                if nproc > 1 and self._vector_class is None:
-                    # check for any cross-process data transfer.  If found, use
-                    # self._problem_meta['distributed_vector_class'] as our vector class.
-                    if (abs_in not in abs2meta_in or abs_out not in abs2meta_out or
-                            abs2meta_in[abs_in]['distributed'] or
-                            abs2meta_out[abs_out]['distributed']):
-                        self._vector_class = self._distributed_vector_class
+        #         if nproc > 1 and self._vector_class is None:
+        #             # check for any cross-process data transfer.  If found, use
+        #             # self._problem_meta['distributed_vector_class'] as our vector class.
+        #             if (abs_in not in abs2meta_in or abs_out not in abs2meta_out or
+        #                     abs2meta_in[abs_in]['distributed'] or
+        #                     abs2meta_out[abs_out]['distributed']):
+        #                 self._vector_class = self._distributed_vector_class
 
-            # if connected output has scaling then we need input scaling
-            if not self._has_input_scaling and not (abs_in in allprocs_discrete_in or
-                                                    abs_out in allprocs_discrete_out):
-                out_units = allprocs_abs2meta_out[abs_out]['units']
-                in_units = allprocs_abs2meta_in[abs_in]['units']
+        #     # if connected output has scaling then we need input scaling
+        #     if not self._has_input_scaling and not (abs_in in allprocs_discrete_in or
+        #                                             abs_out in allprocs_discrete_out):
+        #         out_units = allprocs_abs2meta_out[abs_out]['units']
+        #         in_units = allprocs_abs2meta_in[abs_in]['units']
 
-                # if units are defined and different, or if a connected output has any scaling,
-                # we need input scaling.
-                self._has_input_scaling = self._has_output_scaling or \
-                    (in_units and out_units and in_units != out_units)
+        #         # if units are defined and different, or if a connected output has any scaling,
+        #         # we need input scaling.
+        #         self._has_input_scaling = self._has_output_scaling or \
+        #             (in_units and out_units and in_units != out_units)
 
-        # check compatability for any discrete connections
-        for abs_in, abs_out in self._conn_discrete_in2out.items():
-            in_type = self._var_allprocs_discrete['input'][abs_in]['type']
-            try:
-                out_type = self._var_allprocs_discrete['output'][abs_out]['type']
-            except KeyError:
-                self._collect_error(
-                    f"{self.msginfo}: Can't connect continuous output '{abs_out}' "
-                    f"to discrete input '{abs_in}'.", ident=(abs_out, abs_in))
-                continue
+        # # check compatability for any discrete connections
+        # for abs_in, abs_out in self._conn_discrete_in2out.items():
+        #     in_type = self._var_allprocs_discrete['input'][abs_in]['type']
+        #     try:
+        #         out_type = self._var_allprocs_discrete['output'][abs_out]['type']
+        #     except KeyError:
+        #         self._collect_error(
+        #             f"{self.msginfo}: Can't connect continuous output '{abs_out}' "
+        #             f"to discrete input '{abs_in}'.", ident=(abs_out, abs_in))
+        #         continue
 
-            if not issubclass(in_type, out_type):
-                self._collect_error(
-                    f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is "
-                    f"incompatible with type '{in_type.__name__}' of input '{abs_in}'.",
-                    ident=(abs_out, abs_in))
+        #     if not issubclass(in_type, out_type):
+        #         self._collect_error(
+        #             f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is "
+        #             f"incompatible with type '{in_type.__name__}' of input '{abs_in}'.",
+        #             ident=(abs_out, abs_in))
 
-        # check unit/shape compatibility, but only for connections that are
-        # either owned by (implicit) or declared by (explicit) this Group.
-        # This way, we don't repeat the error checking in multiple groups.
+        # # check unit/shape compatibility, but only for connections that are
+        # # either owned by (implicit) or declared by (explicit) this Group.
+        # # This way, we don't repeat the error checking in multiple groups.
 
-        for abs_in, abs_out in abs_in2out.items():
-            all_meta_out = allprocs_abs2meta_out[abs_out]
-            all_meta_in = allprocs_abs2meta_in[abs_in]
+        # for abs_in, abs_out in abs_in2out.items():
+        #     all_meta_out = allprocs_abs2meta_out[abs_out]
+        #     all_meta_in = allprocs_abs2meta_in[abs_in]
 
-            # check unit compatibility
-            out_units = all_meta_out['units']
-            in_units = all_meta_in['units']
+        #     # check unit compatibility
+        #     out_units = all_meta_out['units']
+        #     in_units = all_meta_in['units']
 
-            if out_units:
-                if not in_units:
-                    if not _is_unitless(out_units):
-                        msg = f"Output '{abs_out}' with units of '{out_units}' " + \
-                            f"is connected to input '{abs_in}' which has no units."
-                        issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
-                elif not is_compatible(in_units, out_units):
-                    self._collect_error(
-                        f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' "
-                        f"are incompatible with input units of '{in_units}' for '{abs_in}'.",
-                        ident=(abs_out, abs_in))
-                    continue
-            elif in_units is not None:
-                if not _is_unitless(in_units):
-                    msg = f"Input '{abs_in}' with units of '{in_units}' is " + \
-                        f"connected to output '{abs_out}' which has no units."
-                    issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
+        #     if out_units:
+        #         if not in_units:
+        #             if not _is_unitless(out_units):
+        #                 msg = f"Output '{abs_out}' with units of '{out_units}' " + \
+        #                     f"is connected to input '{abs_in}' which has no units."
+        #                 issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
+        #         elif not is_compatible(in_units, out_units):
+        #             self._collect_error(
+        #                 f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' "
+        #                 f"are incompatible with input units of '{in_units}' for '{abs_in}'.",
+        #                 ident=(abs_out, abs_in))
+        #             continue
+        #     elif in_units is not None:
+        #         if not _is_unitless(in_units):
+        #             msg = f"Input '{abs_in}' with units of '{in_units}' is " + \
+        #                 f"connected to output '{abs_out}' which has no units."
+        #             issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
 
-            # check shape compatibility
-            if abs_in in abs2meta_in:
-                meta_in = abs2meta_in[abs_in]
+        #     # check shape compatibility
+        #     if abs_in in abs2meta_in:
+        #         meta_in = abs2meta_in[abs_in]
 
-                # get output shape from allprocs meta dict, since it may
-                # be distributed (we want global shape)
-                out_shape = all_meta_out['global_shape']
+        #         # get output shape from allprocs meta dict, since it may
+        #         # be distributed (we want global shape)
+        #         out_shape = all_meta_out['global_shape']
 
-                # get input shape and src_indices from the local meta dict
-                # (input is always local)
-                if meta_in['distributed']:
-                    # if output is non-distributed and input is distributed, make output shape the
-                    # full distributed shape, i.e., treat it in this regard as a distributed output
-                    out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'], 'output')
+        #         # get input shape and src_indices from the local meta dict
+        #         # (input is always local)
+        #         if meta_in['distributed']:
+        #             # if output is non-distributed and input is distributed, make output shape the
+        #             # full distributed shape, i.e., treat it in this regard as a distributed output
+        #             out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'], 'output')
 
-                in_shape = meta_in['global_shape']
-                src_indices = meta_in['src_indices']
+        #         in_shape = meta_in['global_shape']
+        #         src_indices = meta_in['src_indices']
 
-                if src_indices is None and out_shape != in_shape:
-                    # out_shape != in_shape is allowed if there's no ambiguity in storage order
-                    if (in_shape is None or out_shape is None or
-                            not array_connection_compatible(in_shape, out_shape)):
-                        with np.printoptions(legacy='1.21'):
-                            self._collect_error(
-                                f"{self.msginfo}: The source and target shapes do not match or "
-                                f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. "
-                                f"The source shape is {out_shape} "
-                                f"but the target shape is {in_shape}.", ident=(abs_out, abs_in))
-                        continue
+        #         if src_indices is None and out_shape != in_shape:
+        #             # out_shape != in_shape is allowed if there's no ambiguity in storage order
+        #             if (in_shape is None or out_shape is None or
+        #                     not array_connection_compatible(in_shape, out_shape)):
+        #                 with np.printoptions(legacy='1.21'):
+        #                     self._collect_error(
+        #                         f"{self.msginfo}: The source and target shapes do not match or "
+        #                         f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. "
+        #                         f"The source shape is {out_shape} "
+        #                         f"but the target shape is {in_shape}.", ident=(abs_out, abs_in))
+        #                 continue
 
-                elif src_indices is not None:
+        #         elif src_indices is not None:
 
-                    try:
-                        shp = (out_shape if all_meta_out['distributed'] else
-                               all_meta_out['global_shape'])
-                        if shp is None:  # a collected error has already happened, so continue
-                            continue
-                        src_indices.set_src_shape(shp, dist_shape=out_shape)
-                        src_indices = src_indices.shaped_instance()
-                    except Exception:
-                        type_exc, exc, tb = sys.exc_info()
-                        s, src, tgt = get_connection_owner(self, abs_in)
-                        abs_out = self._conn_global_abs_in2out[tgt]
-                        self._collect_error(
-                            f"{s.msginfo}: When connecting '{src}' to '{tgt}': {exc}",
-                            exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
-                        continue
+        #             try:
+        #                 shp = (out_shape if all_meta_out['distributed'] else
+        #                        all_meta_out['global_shape'])
+        #                 if shp is None:  # a collected error has already happened, so continue
+        #                     continue
+        #                 src_indices.set_src_shape(shp, dist_shape=out_shape)
+        #                 src_indices = src_indices.shaped_instance()
+        #             except Exception:
+        #                 type_exc, exc, tb = sys.exc_info()
+        #                 s, src, tgt = get_connection_owner(self, abs_in)
+        #                 abs_out = self._conn_global_abs_in2out[tgt]
+        #                 self._collect_error(
+        #                     f"{s.msginfo}: When connecting '{src}' to '{tgt}': {exc}",
+        #                     exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
+        #                 continue
 
-                    if src_indices.indexed_src_size == 0:
-                        continue
+        #             if src_indices.indexed_src_size == 0:
+        #                 continue
 
-                    if src_indices.indexed_src_size != meta_in['size']:
-                        # initial dimensions of indices shape must be same shape as target
-                        for idx_d, inp_d in zip(src_indices.indexed_src_shape, in_shape):
-                            if idx_d != inp_d:
-                                self._collect_error(
-                                    f"{self.msginfo}: The source indices {meta_in['src_indices']} "
-                                    f"do not specify a valid shape for the connection '{abs_out}' "
-                                    f"to '{abs_in}'. The target shape is {in_shape} but indices "
-                                    f"are shape {src_indices.indexed_src_shape}.",
-                                    ident=(abs_out, abs_in))
-                                break
-                        else:
-                            self._collect_error(
-                                f"{self.msginfo}: src_indices shape {src_indices.indexed_src_shape}"
-                                f" does not match {abs_in} shape {in_shape}.",
-                                ident=(abs_out, abs_in))
-                        continue
+        #             if src_indices.indexed_src_size != meta_in['size']:
+        #                 # initial dimensions of indices shape must be same shape as target
+        #                 for idx_d, inp_d in zip(src_indices.indexed_src_shape, in_shape):
+        #                     if idx_d != inp_d:
+        #                         self._collect_error(
+        #                             f"{self.msginfo}: The source indices {meta_in['src_indices']} "
+        #                             f"do not specify a valid shape for the connection '{abs_out}' "
+        #                             f"to '{abs_in}'. The target shape is {in_shape} but indices "
+        #                             f"are shape {src_indices.indexed_src_shape}.",
+        #                             ident=(abs_out, abs_in))
+        #                         break
+        #                 else:
+        #                     self._collect_error(
+        #                         f"{self.msginfo}: src_indices shape {src_indices.indexed_src_shape}"
+        #                         f" does not match {abs_in} shape {in_shape}.",
+        #                         ident=(abs_out, abs_in))
+        #                 continue
 
-                    # any remaining dimension of indices must match shape of source
-                    if not src_indices._flat_src and (len(src_indices.indexed_src_shape) >
-                                                      len(out_shape)):
-                        self._collect_error(
-                            f"{self.msginfo}: The source indices {meta_in['src_indices']} do not "
-                            f"specify a valid shape for the connection '{abs_out}' to '{abs_in}'. "
-                            f"The source has {len(out_shape)} dimensions but the indices expect at "
-                            f"least {len(src_indices.indexed_src_shape)}.",
-                            ident=(abs_out, abs_in))
+        #             # any remaining dimension of indices must match shape of source
+        #             if not src_indices._flat_src and (len(src_indices.indexed_src_shape) >
+        #                                               len(out_shape)):
+        #                 self._collect_error(
+        #                     f"{self.msginfo}: The source indices {meta_in['src_indices']} do not "
+        #                     f"specify a valid shape for the connection '{abs_out}' to '{abs_in}'. "
+        #                     f"The source has {len(out_shape)} dimensions but the indices expect at "
+        #                     f"least {len(src_indices.indexed_src_shape)}.",
+        #                     ident=(abs_out, abs_in))
+        pass
 
     def _transfer(self, vec_name, mode, sub=None):
         """
@@ -4797,9 +4835,6 @@ class Group(System):
         # only happens at top level
         from openmdao.core.indepvarcomp import _AutoIndepVarComp
 
-        if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-            raise RuntimeError("The top level system must not be a ParallelGroup.")
-
         # create the IndepVarComp that will contain all auto-ivc outputs
         self._auto_ivc = auto_ivc = _AutoIndepVarComp()
         auto_ivc.name = '_auto_ivc'
@@ -4812,36 +4847,42 @@ class Group(System):
         conns = self._conn_global_abs_in2out
         auto_conns = {}
         resolver = self._resolver
+        conn_graph = self._all_conn_graph
 
-        for tgt in all_abs2meta:
-            if tgt in conns or tgt in self._bad_conn_vars:
-                continue
+        for srcnode in conn_graph.nodes():
+            io, src = srcnode
+            if src.startswith('_auto_ivc.'):
+                pass
 
-            all_meta = all_abs2meta[tgt]
-            if all_meta['distributed']:
-                # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
-                # distributed components.
-                if tgt not in self._bad_conn_vars:
-                    prom_name = resolver.abs2prom(tgt, 'input')
-                    promoted_as = f', promoted as "{prom_name}",' if prom_name != tgt else ''
-                    raise RuntimeError(f'Distributed component input "{tgt}"'
-                                       f'{promoted_as} is not connected.')
+        # for tgt in all_abs2meta:
+        #     if tgt in conns or tgt in self._bad_conn_vars:
+        #         continue
 
-            prom = resolver.abs2prom(tgt, 'input')
-            if prom in prom2auto:
-                # multiple connected inputs w/o a src. Connect them to the same IVC
-                src = prom2auto[prom][0]
-                auto_conns[tgt] = src
-            else:
-                src = f"_auto_ivc.v{count}"
-                count += 1
-                prom2auto[prom] = (src, tgt)
-                auto_conns[tgt] = src
+        #     all_meta = all_abs2meta[tgt]
+        #     if all_meta['distributed']:
+        #         # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
+        #         # distributed components.
+        #         if tgt not in self._bad_conn_vars:
+        #             prom_name = resolver.abs2prom(tgt, 'input')
+        #             promoted_as = f', promoted as "{prom_name}",' if prom_name != tgt else ''
+        #             raise RuntimeError(f'Distributed component input "{tgt}"'
+        #                                f'{promoted_as} is not connected.')
 
-            if src in auto2tgt:
-                auto2tgt[src].append(tgt)
-            else:
-                auto2tgt[src] = [tgt]
+        #     prom = resolver.abs2prom(tgt, 'input')
+        #     if prom in prom2auto:
+        #         # multiple connected inputs w/o a src. Connect them to the same IVC
+        #         src = prom2auto[prom][0]
+        #         auto_conns[tgt] = src
+        #     else:
+        #         src = f"_auto_ivc.v{count}"
+        #         count += 1
+        #         prom2auto[prom] = (src, tgt)
+        #         auto_conns[tgt] = src
+
+        #     if src in auto2tgt:
+        #         auto2tgt[src].append(tgt)
+        #     else:
+        #         auto2tgt[src] = [tgt]
 
         conns.update(auto_conns)
         auto_ivc.auto2tgt = auto2tgt
