@@ -5022,7 +5022,9 @@ class Group(System):
                             errs.add('units')
 
                     if 'val' not in gmeta:
-                        if tval.shape == sval.shape:
+                        tval_shape = () if np.isscalar(tval) else tval.shape
+                        sval_shape = () if np.isscalar(sval) else sval.shape
+                        if tval_shape == sval_shape:
                             if _has_val_mismatch(tunits, tval, sunits, sval):
                                 errs.add('val')
                         else:

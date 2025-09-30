@@ -1685,6 +1685,34 @@ class TestGroup(unittest.TestCase):
         comp.set_val('x', 3.5, units='m')
         assert_near_equal(comp.get_val('x'), 3.5)
 
+    def test_scalar_vars(self):
+
+        class CircleAreaComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input("r", shape=tuple())
+                self.add_output("area", shape=tuple())
+
+                self.declare_partials("*", "*")
+
+            def compute(self, inputs, outputs):
+                outputs["area"] = np.pi*inputs["r"]**2
+
+            def compute_partials(self, inputs, partials):
+                partials["area", "r"] = 2*np.pi*inputs["r"]
+
+        p = om.Problem()
+
+        p.model.add_subsystem('circle', CircleAreaComp(), promotes_inputs=['r'])
+        p.model.add_subsystem('circle2', CircleAreaComp(), promotes_inputs=['r'])
+
+        p.setup()
+
+        p.set_val("r", 1.0)
+        p.run_model()
+        assert_near_equal(p.get_val('circle.area'), np.pi)
+        assert_near_equal(p.get_val('circle2.area'), np.pi)
+
 
 @unittest.skipUnless(MPI, "MPI is required.")
 class TestGroupMPISlice(unittest.TestCase):
