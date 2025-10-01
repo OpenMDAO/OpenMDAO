@@ -83,8 +83,6 @@ runs:
 
     - name: Publish docs
       if: github.event_name != 'pull_request' && inputs.publish == 'true' && inputs.SECRET_docs_location != ''
-      env:
-        DOCS_LOCATION: ${{ inputs.SECRET_docs_location }}
       shell: bash -l {0}
       run: |
         if [[ "${#DOCS_LOCATION}" ]]; then
@@ -98,7 +96,7 @@ runs:
           echo "Publish docs"
           echo "============================================================="
           cd openmdao/docs
-          python upload_doc_version.py openmdao_book/_build/html/ "$DOCS_LOCATION"
+          python upload_doc_version.py openmdao_book/_build/html/ ${{ inputs.SECRET_docs_location }}
         else
           echo "Docs destination not available."
         fi
