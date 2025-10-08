@@ -931,18 +931,18 @@ class TestProblem(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x-25.',
-                                                     x={'val': 77.0, 'units': 'degF'},
-                                                     y={'val': 0.0, 'units': 'degC'}))
+                                                     x={'val': 77.0, 'units': 'degF', 'shape': (),},
+                                                     y={'val': 0.0, 'units': 'degC', 'shape': (),}))
         prob.model.add_subsystem('prom', om.ExecComp('yy=xx-25.',
-                                                     xx={'val': 77.0, 'units': 'degF'},
-                                                     yy={'val': 0.0, 'units': 'degC'}),
+                                                     xx={'val': 77.0, 'units': 'degF', 'shape': (),},
+                                                     yy={'val': 0.0, 'units': 'degC', 'shape': (),}),
                                  promotes=['xx', 'yy'])
         prob.model.add_subsystem('acomp', om.ExecComp('y=x-25.',
                                                       x={'val': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                      y={'val': 0.0, 'units': 'degC'}))
+                                                      y={'val': 0.0, 'units': 'degC', 'shape': (),}))
         prob.model.add_subsystem('aprom', om.ExecComp('ayy=axx-25.',
                                                       axx={'val': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                      ayy={'val': 0.0, 'units': 'degC'}),
+                                                      ayy={'val': 0.0, 'units': 'degC', 'shape': (),}),
                                  promotes=['axx', 'ayy'])
 
         prob.setup()
@@ -1059,9 +1059,7 @@ class TestProblem(unittest.TestCase):
         except Exception as err:
             self.assertEqual(str(err),
                "\nCollected errors for problem 'get_set_with_units_diff_err':"
-               "\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to "
-               "'x', are connected but their metadata entries ['units', 'val'] differ. "
-               "Call model.set_input_defaults('x', units=?, val=?) to remove the ambiguity.")
+               "\n   <model> <class Group>: No default units have been set for input 'x (['C1.x', 'C2.x'])' so the choice of units between '['ft', 'inch']' is ambiguous. Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -1171,10 +1169,10 @@ class TestProblem(unittest.TestCase):
 
         # using the promoted name of the inputs will raise an exception because the two promoted
         # inputs have different units and set_input_defaults was not called to disambiguate.
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(Exception) as cm:
             prob['G1.x']
 
-        msg = "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call model.set_input_defaults('G1.x', units=?) to remove the ambiguity."
+        msg = "<model> <class Group>: No default units have been set for input 'G1.x (['G1.C1.x', 'G1.C2.x'])' so the choice of units between '['cm', 'mm']' is ambiguous. Call model.set_input_defaults('G1.x', units=?) to remove the ambiguity."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_get_set_with_units_error_messages(self):

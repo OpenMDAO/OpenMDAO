@@ -41,7 +41,6 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
 from openmdao.utils.deriv_display import _print_deriv_table, _deriv_display, _deriv_display_compact
 from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.units import simplify_unit
 from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.hooks import _setup_hooks, _reset_all_hooks
 from openmdao.utils.record_util import create_local_meta
@@ -518,17 +517,17 @@ class Problem(object, metaclass=ProblemMetaclass):
         object
             The value of the requested output/input variable.
         """
-        if self._metadata['setup_status'] <= _SetupStatus.POST_SETUP2:
-            abs_names = self.model._resolver.absnames(name)
-            val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
-            if not is_undefined(val):
-                if indices is not None:
-                    val = val[indices]
-                if units is not None:
-                    val = self.model.convert2units(name, val, simplify_unit(units))
-        else:
-            val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
-                                     from_src=True)
+        #if self._metadata['setup_status'] <= _SetupStatus.POST_SETUP2:
+            #abs_names = self.model._resolver.absnames(name)
+            #val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
+            #if not is_undefined(val):
+                #if indices is not None:
+                    #val = val[indices]
+                #if units is not None:
+                    #val = self.model.convert2units(name, val, simplify_unit(units))
+        #else:
+        val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
+                                 from_src=True, copy=copy)
 
         if is_undefined(val):
             if get_remote:
@@ -538,10 +537,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                                    f"rank {self.comm.rank}. You can retrieve values from "
                                    "other processes using `get_val(<name>, get_remote=True)`.")
 
-        if copy:
-            return deepcopy(val)
-        else:
-            return val
+        return val
 
     def __setitem__(self, name, value):
         """
@@ -582,15 +578,22 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         Set all initial conditions that have been saved in cache after setup.
         """
-        for value, set_units, pathname, name in self.model._initial_condition_cache.values():
+        graph = self.model._get_all_conn_graph()
+
+        # for value, set_units, pathname, name in self.model._initial_condition_cache.values():
+        for node, tup in self.model._initial_condition_cache.items():
+            value, units, indices = tup
+            node_meta = graph.nodes[node]
+            pathname = node_meta['pathname']
+            _, name = node
             if pathname:
                 system = self.model._get_subsystem(pathname)
                 if system is None or not system._is_local:
                     pass
                 else:
-                    system.set_val(name, value, units=set_units)
+                    system.set_val(name, value, units=units, indices=indices)
             else:
-                self.model.set_val(name, value, units=set_units)
+                self.model.set_val(name, value, units=units, indices=indices)
 
         # Clean up cache
         self.model._initial_condition_cache = {}

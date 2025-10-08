@@ -7,7 +7,7 @@ import time
 import functools
 from copy import deepcopy
 from contextlib import contextmanager
-from collections import defaultdict, ChainMap
+from collections import defaultdict
 from itertools import chain
 from enum import IntEnum
 import warnings
@@ -33,12 +33,12 @@ from openmdao.utils.name_maps import NameResolver
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.indexer import indexer
+from openmdao.utils.indexer import indexer, get_subarray
 from openmdao.utils.om_warnings import issue_warning, \
-    PromotionWarning, UnusedOptionWarning, UnitsWarning, warn_deprecation
+    PromotionWarning, UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, is_undefined, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
-    ensure_compatible, env_truthy, make_traceback, _is_slicer_op, _wrap_comm, _unwrap_comm, \
+    ensure_compatible, env_truthy, make_traceback, _wrap_comm, _unwrap_comm, \
     _om_dump, SystemMetaclass
 from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
@@ -2351,10 +2351,6 @@ class System(object, metaclass=SystemMetaclass):
         self._var_abs2meta = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_allprocs_discrete = {'input': {}, 'output': {}}
-        self._allvars_abs2meta = ChainMap(self._var_allprocs_abs2meta['input'],
-                                          self._var_allprocs_abs2meta['output'],
-                                          self._var_allprocs_discrete['input'],
-                                          self._var_allprocs_discrete['output'])
         self._var_allprocs_abs2idx = {}
         self._owning_rank = defaultdict(int)
         self._var_sizes = {}
@@ -5543,18 +5539,19 @@ class System(object, metaclass=SystemMetaclass):
         object or None
             The value of the requested output/input/resid variable.  None if variable is not found.
         """
+        resolver = self._resolver
+        typ = resolver.get_abs_iotype(abs_name)
+
         discrete = distrib = False
         val = _UNDEFINED
         if from_root:
             all_meta = self._problem_meta['model_ref']()._var_allprocs_abs2meta
             my_meta = self._problem_meta['model_ref']()._var_abs2meta
-            io = 'output' if abs_name in all_meta['output'] else 'input'
-            all_meta = all_meta[io]
-            my_meta = my_meta[io]
+            all_meta = all_meta[typ]
+            my_meta = my_meta[typ]
         else:
-            io = 'output' if abs_name in self._var_allprocs_abs2meta['output'] else 'input'
-            all_meta = self._var_allprocs_abs2meta[io]
-            my_meta = self._var_abs2meta[io]
+            all_meta = self._var_allprocs_abs2meta[typ]
+            my_meta = self._var_abs2meta[typ]
 
         vars_to_gather = self._problem_meta['vars_to_gather']
 
@@ -5592,8 +5589,6 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 return _UNDEFINED
 
-        resolver = self._resolver
-        typ = resolver.get_abs_iotype(abs_name)
         if kind is None:
             kind = typ
         if vec_name is None:
@@ -5703,89 +5698,131 @@ class System(object, metaclass=SystemMetaclass):
         object
             The value of the requested output/input variable.
         """
-        abs_names = self._resolver.absnames(name)
-        simp_units = simplify_unit(units)
-
-        if from_src:
-            conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
+        graph = self._get_all_conn_graph()
+        node = graph.find_node(self, name)
+        srcnode = graph.get_root(node)
+        if self._problem_meta is None:
+            has_vectors = False
         else:
-            conns = ()
+            has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
 
-        if from_src and abs_names[0] in conns:  # pull input from source
-            src = conns[abs_names[0]]
-            if self._resolver.is_abs(src, 'output'):
-                caller = self
-            else:
-                # src is outside of this system so get the value from the model
-                caller = self._problem_meta['model_ref']()
-            val = caller._get_input_from_src(name, abs_names, conns, units=simp_units,
-                                             indices=indices, get_remote=get_remote, rank=rank,
-                                             vec_name=vec_name, flat=flat, scope_sys=self)
+        if has_vectors:
+            try:
+                if node[0] == 'o':  # getting an output
+                    val = self._abs_get_val(srcnode[1], get_remote, rank, vec_name, kind, flat)
+                    val = graph.get_val_from_node(val, srcnode, units=units, indices=indices)
+
+                elif from_src:  # getting an input from its source
+                    val = self._abs_get_val(srcnode[1], get_remote, rank, vec_name, kind, flat)
+                    val = graph.get_val_from_node(val, srcnode, node, units=units, indices=indices)
+                else:
+                    # getting a specific input
+                    # (must use absolute name or have only a single leaf node)
+                    leaves = list(graph.leaf_input_iter(node))
+                    if len(leaves) > 1:
+                        raise ValueError(
+                            f"{self.msginfo}: Promoted variable '{name}' refers to multiple "
+                            "input variables so the choice of input is ambiguous.  Either "
+                            "use the absolute name of the input or set 'from_src=True' to "
+                            "retrieve the value from the connected output.")
+                    val = self._abs_get_val(leaves[0][1], get_remote, rank, vec_name, kind, flat)
+                    val = graph.get_val_from_node(val, leaves[0], node, units=units, indices=indices)
+            except Exception as err:
+                raise RuntimeError(f"{self.msginfo}: When getting value of '{name}', {str(err)}.")
         else:
-            val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
+            if node in self._initial_condition_cache:
+                val, cache_units, cache_inds = self._initial_condition_cache[node]
+            else:  # try to retrieve from metadata
+                # model = self._problem_meta['model_ref']()
+                srcmeta = graph.nodes[srcnode]
+                # discrete = srcmeta['discrete']
+                val = srcmeta['val']
+                # srcunits = srcmeta['units']
+                # cache_inds = None
 
-            if indices is not None:
-                val = val[indices]
+        # abs_names = self._resolver.absnames(name)
+        # simp_units = simplify_unit(units)
 
-            if units is not None:
-                val = self.convert2units(abs_names[0], val, simp_units)
+        # if from_src:
+        #     conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
+        # else:
+        #     conns = ()
+
+        # if from_src and abs_names[0] in conns:  # pull input from source
+        #     src = conns[abs_names[0]]
+        #     if self._resolver.is_abs(src, 'output'):
+        #         caller = self
+        #     else:
+        #         # src is outside of this system so get the value from the model
+        #         caller = self._problem_meta['model_ref']()
+        #     val = caller._get_input_from_src(name, abs_names, conns, units=simp_units,
+        #                                      indices=indices, get_remote=get_remote, rank=rank,
+        #                                      vec_name=vec_name, flat=flat, scope_sys=self)
+        # else:
+        #     val = self._abs_get_val(abs_names[0], get_remote, rank, vec_name, kind, flat)
+
+        #     if indices is not None:
+        #         val = val[indices]
+
+        #     if units is not None:
+        #         val = self.convert2units(abs_names[0], val, simp_units)
 
         if copy:
             return deepcopy(val)
         else:
             return val
 
-    def _get_cached_val(self, name, abs_names, get_remote=False):
-        # We have set and cached already
-        for abs_name in abs_names:
-            if abs_name in self._initial_condition_cache:
-                return self._initial_condition_cache[abs_name][0]
+    # def _get_cached_val(self, name, abs_names, get_remote=False):
+    #     # We have set and cached already
+    #     for abs_name in abs_names:
+    #         if abs_name in self._initial_condition_cache:
+    #             return self._initial_condition_cache[abs_name][0]
 
-        # Vector not setup, so we need to pull values from saved metadata request.
-        model = self._problem_meta['model_ref']()
+    #     # Vector not setup, so we need to pull values from saved metadata request.
+    #     model = self._problem_meta['model_ref']()
 
-        try:
-            conns = model._conn_global_abs_in2out
-        except AttributeError:
-            conns = {}
+    #     try:
+    #         conns = model._conn_global_abs_in2out
+    #     except AttributeError:
+    #         conns = {}
 
-        abs_name = abs_names[0]
-        vars_to_gather = self._problem_meta['vars_to_gather']
-        units = None
+    #     abs_name = abs_names[0]
+    #     vars_to_gather = self._problem_meta['vars_to_gather']
+    #     units = None
 
-        meta = model._var_abs2meta
-        io = 'output' if abs_name in meta['output'] else 'input'
-        if abs_name in meta[io]:
-            if abs_name in conns:
-                smeta = meta['output'][conns[abs_name]]
-                val = smeta['val']  # output
-                units = smeta['units']
-            else:
-                vmeta = meta[io][abs_name]
-                val = vmeta['val']
-                units = vmeta['units']
-        else:
-            # not found in real outputs or inputs, try discretes
-            meta = model._var_discrete
-            io = 'output' if abs_name in meta['output'] else 'input'
-            if abs_name in meta[io]:
-                if abs_name in conns:
-                    val = meta['output'][conns[abs_name]]['val']
-                else:
-                    val = meta[io][abs_name]['val']
+    #     meta = model._var_abs2meta
+    #     io = 'output' if abs_name in meta['output'] else 'input'
+    #     if abs_name in meta[io]:
+    #         if abs_name in conns:
+    #             smeta = meta['output'][conns[abs_name]]
+    #             val = smeta['val']  # output
+    #             units = smeta['units']
+    #         else:
+    #             vmeta = meta[io][abs_name]
+    #             val = vmeta['val']
+    #             units = vmeta['units']
+    #     else:
+    #         # not found in real outputs or inputs, try discretes
+    #         meta = model._var_discrete
+    #         io = 'output' if abs_name in meta['output'] else 'input'
+    #         if abs_name in meta[io]:
+    #             if abs_name in conns:
+    #                 val = meta['output'][conns[abs_name]]['val']
+    #             else:
+    #                 val = meta[io][abs_name]['val']
 
-        if get_remote and abs_name in vars_to_gather:
-            owner = vars_to_gather[abs_name]
-            if model.comm.rank == owner:
-                model.comm.bcast(val, root=owner)
-            else:
-                val = model.comm.bcast(None, root=owner)
+    #     if get_remote and abs_name in vars_to_gather:
+    #         owner = vars_to_gather[abs_name]
+    #         if model.comm.rank == owner:
+    #             model.comm.bcast(val, root=owner)
+    #         else:
+    #             val = model.comm.bcast(None, root=owner)
 
-        if val is not _UNDEFINED:
-            # Need to cache the "get" in case the user calls in-place numpy operations.
-            self._initial_condition_cache[abs_name] = (val, units, self.pathname, name)
+    #     if val is not _UNDEFINED:
+    #         # Need to cache the "get" in case the user calls in-place numpy operations.
+    #         self._initial_condition_cache[abs_name] = (val, units, self.pathname, name)
 
-        return val
+    #     return val
 
     def set_val(self, name, val, units=None, indices=None):
         """
@@ -5805,10 +5842,7 @@ class System(object, metaclass=SystemMetaclass):
         post_setup = self._problem_meta is not None and \
             self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP
 
-        if post_setup:
-            if self._is_local:
-                abs_names = self._resolver.absnames(name)
-        else:
+        if not post_setup:
             raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
                                "completes.")
 
@@ -5816,229 +5850,267 @@ class System(object, metaclass=SystemMetaclass):
             # we'll do any necessary transfers later
             return
 
+        graph = self._get_all_conn_graph()
+        node = graph.find_node(self, name)
         has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
         model = self._problem_meta['model_ref']()
-        nprocs = model.comm.size
 
-        try:
-            ginputs = self._group_inputs
-        except AttributeError:
-            ginputs = {}  # could happen if this system is not a Group
-
-        post_setup = self._problem_meta is not None and \
-            self._problem_meta['setup_status'] >= _SetupStatus.POST_SETUP
-
-        if post_setup:
-            abs_names = self._resolver.absnames(name)
-        else:
-            raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
-                               "completes.")
-
-        value = val
-
-        conns = model._conn_global_abs_in2out
-
-        all_meta = model._var_allprocs_abs2meta
-        all_idx = model._var_allprocs_abs2idx
-        all_sizes = model._var_sizes
-        all_meta_in = model._var_allprocs_abs2meta['input']
-        loc_meta_in = model._var_abs2meta['input']
-
-        n_proms = len(abs_names)  # for output this will never be > 1
-        if n_proms > 1 and name in ginputs:
-            abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
-        else:
-            abs_name = abs_names[0]
-
-        set_units = None
-
-        if abs_name in conns:  # we're setting an input
-            src = conns[abs_name]
-
-            if abs_name in all_meta_in:  # input is continuous
-                value = np.asarray(value)
-                tmeta = all_meta_in[abs_name]
-                tunits = tmeta['units']
-                sunits = all_meta['output'][src]['units']
-                if abs_name in loc_meta_in:
-                    tlocmeta = loc_meta_in[abs_name]
-                else:
-                    tlocmeta = None
-
-                gunits = ginputs[name][0].get('units') if name in ginputs else None
-                if n_proms > 1:  # promoted input name was used
-                    if gunits is None:
-                        tunit_list = [all_meta_in[n]['units'] for n in abs_names]
-                        tu0 = tunit_list[0]
-                        for tu in tunit_list:
-                            if tu != tu0:
-                                model._show_ambiguity_msg(name, ('units',), abs_names)
-
-                if units is None:
-                    # avoids double unit conversion
-                    ivalue = value
-                    if sunits is not None:
-                        if gunits is not None and gunits != tunits:
-                            value = model.convert_from_units(src, value, gunits)
-                        elif tunits is not None:
-                            value = model.convert_from_units(src, value, tunits)
-                        else:
-                            msg = "A value with no units has been specified for input " + \
-                                  f"'{name}', but the source ('{src}') has units '{sunits}'. " + \
-                                  "No unit checking can be done."
-                            issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
-                else:
-                    if gunits is None:
-                        ivalue = model.convert_from_units(abs_name, value, units)
-                    else:
-                        ivalue = model.convert_units(name, value, units, gunits)
-                    value = model.convert_from_units(src, value, units)
-                set_units = sunits
-
-        else:  # setting an output
-            src = abs_name
-            if units is not None:
-                value = model.convert_from_units(abs_name, np.asarray(value), units)
-                try:
-                    set_units = all_meta['output'][abs_name]['units']
-                except KeyError:  # this can happen if a component is the top level System
-                    set_units = all_meta_in[abs_name]['units']
-
-        # Caching only needed if vectors aren't allocated yet.
-        if not has_vectors:
+        if has_vectors:
+            try:
+                graph.set_val_from_node(model, node, val, units=units, indices=indices)
+            except Exception as err:
+                raise RuntimeError(f"{self.msginfo}: When setting value of '{name}', {str(err)}.")
+        else:  # cache the value for later
             ic_cache = model._initial_condition_cache
-            if indices is not None:
-                self._get_cached_val(name, abs_names)
-                try:
-                    cval = ic_cache[abs_name][0]
-                    if _is_slicer_op(indices):
-                        try:
-                            ic_cache[abs_name] = (value[indices], set_units, self.pathname, name)
-                        except (IndexError, TypeError):
-                            cval[indices] = value
-                            ic_cache[abs_name] = (cval, set_units, self.pathname, name)
-                    else:
-                        cval[indices] = value
-                        ic_cache[abs_name] = (cval, set_units, self.pathname, name)
-                except Exception as err:
-                    raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
-            else:
-                ic_cache[abs_name] = (value, set_units, self.pathname, name)
-
-            for n in abs_names:
-                if n in all_meta_in:
-                    m = all_meta_in[n]
-                    if 'shape_by_conn' in m and m['shape_by_conn']:
-                        val = ic_cache[abs_name][0]
-                        shape = () if np.isscalar(val) else val.shape
-                        all_meta_in[n]['shape'] = shape
-                        if n in loc_meta_in:
-                            loc_meta_in[n]['shape'] = shape
-        else:
-            if abs_name in conns and nprocs > 1 and abs_name in all_idx:
-                # check if src exists on a proc where tgt doesn't
-                insizes = all_sizes['input'][:, all_idx[abs_name]]
-                outsizes = all_sizes['output'][:, all_idx[src]]
-                if np.any(insizes != outsizes):
-                    # keep track of this for later setting across all procs
-                    model._remote_sets.append((abs_name, src, value))
-
-            myrank = model.comm.rank
+            ic_cache[node] = (val, units, indices)
+            # if indices is not None:
+            #     self._get_cached_val(name, abs_names)
+            #     try:
+            #         cval = ic_cache[abs_name][0]
+            #         if _is_slicer_op(indices):
+            #             try:
+            #                 ic_cache[abs_name] = (value[indices], set_units, self.pathname, name)
+            #             except (IndexError, TypeError):
+            #                 cval[indices] = value
+            #                 ic_cache[abs_name] = (cval, set_units, self.pathname, name)
+            #         else:
+            #             cval[indices] = value
+            #             ic_cache[abs_name] = (cval, set_units, self.pathname, name)
+            #     except Exception as err:
+            #         raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
+            # else:
+            #     ic_cache[abs_name] = (value, set_units, self.pathname, name)
 
             if indices is None:
-                indices = _full_slice
-
-            if model._outputs._contains_abs(abs_name):
-                distrib = all_meta['output'][abs_name]['distributed']
-                if (distrib and indices is _full_slice and
-                        value.size == all_meta['output'][abs_name]['global_size']):
-                    # assume user is setting using full distributed value
-                    sizes = model._var_sizes['output'][:, model._var_allprocs_abs2idx[abs_name]]
-                    start = np.sum(sizes[:myrank])
-                    end = start + sizes[myrank]
-                    model._outputs.set_var(abs_name, value[start:end], indices)
-                else:
-                    model._outputs.set_var(abs_name, value, indices)
-            elif abs_name in conns:  # input name given. Set value into output
-                src_is_auto_ivc = src.startswith('_auto_ivc.')
-                # when setting auto_ivc output, error messages should refer
-                # to the promoted name used in the set_val call
-                var_name = name if src_is_auto_ivc else src
-                if model._outputs._contains_abs(src):  # src is local
-                    if (model._outputs._abs_get_val(src).size == 0 and
-                            src_is_auto_ivc and
-                            all_meta['output'][src]['distributed']):
-                        pass  # special case, auto_ivc dist var with 0 local size
-                    elif tmeta['has_src_indices']:
-                        if tlocmeta:  # target is local
-                            flat = False
-                            if name in model._var_prom2inds:
-                                sshape, inds, flat = model._var_prom2inds[name]
-                                src_indices = inds
-                            elif (tlocmeta.get('manual_connection') or
-                                  model._inputs._contains_abs(name)):
-                                src_indices = tlocmeta['src_indices']
+                all_meta_in = model._var_allprocs_abs2meta['input']
+                loc_meta_in = model._var_abs2meta['input']
+                node_meta = graph.nodes[node]
+                for abs_in_node in graph.leaf_input_iter(node):
+                    abs_in_meta = graph.nodes[abs_in_node]
+                    _, abs_name = abs_in_node
+                    if abs_name in all_meta_in:
+                        meta = all_meta_in[abs_name]
+                        if 'shape_by_conn' in meta and meta['shape_by_conn']:
+                            # get any src_indices applied downstream of the initial target node
+                            src_inds_list = \
+                                abs_in_meta['src_inds_list'][len(node_meta['src_inds_list']):]
+                            if src_inds_list:
+                                # compute final val shape
+                                inval = get_subarray(val, src_inds_list)
                             else:
-                                src_indices = None
+                                inval = val
 
-                            if src_indices is None:
-                                model._outputs.set_var(src, value, _full_slice, flat,
-                                                       var_name=var_name)
-                            else:
-                                flat = src_indices._flat_src
+                            # val = ic_cache[abs_name][0]
+                            shape = () if np.isscalar(inval) else inval.shape
+                            all_meta_in[abs_name]['shape'] = shape
+                            if abs_name in loc_meta_in:
+                                loc_meta_in[abs_name]['shape'] = shape
 
-                                if tmeta['distributed']:
-                                    src_indices = src_indices.shaped_array()
-                                    ssizes = model._var_sizes['output']
-                                    sidx = model._var_allprocs_abs2idx[src]
-                                    ssize = ssizes[myrank, sidx]
-                                    start = np.sum(ssizes[:myrank, sidx])
-                                    end = start + ssize
-                                    if np.any(src_indices < start) or np.any(src_indices >= end):
-                                        raise RuntimeError(f"{model.msginfo}: Can't set {name}: "
-                                                           "src_indices refer "
-                                                           "to out-of-process array entries.")
-                                    if start > 0:
-                                        src_indices = src_indices - start
-                                    src_indices = indexer(src_indices)
-                                if indices is _full_slice:
-                                    model._outputs.set_var(src, value, src_indices, flat,
-                                                           var_name=var_name)
-                                else:
-                                    model._outputs.set_var(src, value, src_indices.apply(indices),
-                                                           True, var_name=var_name)
-                        else:
-                            issue_warning(f"{model.msginfo}: Cannot set the value of '{abs_name}':"
-                                          " Setting the value of a remote connected input with"
-                                          " src_indices is currently not supported, you must call"
-                                          " `run_model()` to have the outputs populate their"
-                                          " corresponding inputs.")
-                    else:
-                        value = np.asarray(value)
-                        if indices is not _full_slice:
-                            indices = indexer(indices)
-                        model._outputs.set_var(src, value, indices, var_name=var_name)
-                elif src in model._discrete_outputs:
-                    model._discrete_outputs[src] = value
-                # also set the input
-                # TODO: maybe remove this if inputs are removed from case recording
-                if n_proms < 2:
-                    if model._inputs._contains_abs(abs_name):
-                        model._inputs.set_var(abs_name, ivalue, indices)
-                    elif abs_name in model._discrete_inputs:
-                        model._discrete_inputs[abs_name] = value
-                    else:
-                        # must be a remote var. so, just do nothing on this proc. We can't get here
-                        # unless abs_name is found in connections, so the variable must exist.
-                        if abs_name in model._var_allprocs_abs2meta:
-                            print(f"Variable '{name}' is remote on rank {self.comm.rank}.  "
-                                  "Local assignment ignored.")
-            elif abs_name in model._discrete_outputs:
-                model._discrete_outputs[abs_name] = value
-            elif model._inputs._contains_abs(abs_name):   # could happen if model is a component
-                model._inputs.set_var(abs_name, value, indices)
-            elif abs_name in model._discrete_inputs:   # could happen if model is a component
-                model._discrete_inputs[abs_name] = value
+
+        # model = self._problem_meta['model_ref']()
+        # conns = model._conn_global_abs_in2out
+        # nprocs = model.comm.size
+
+        # value = val
+
+
+        # all_meta = model._var_allprocs_abs2meta
+        # all_idx = model._var_allprocs_abs2idx
+        # all_sizes = model._var_sizes
+        # all_meta_in = all_meta['input']
+        # loc_meta_in = model._var_abs2meta['input']
+
+        # abs_names = self._resolver.absnames(name)
+        # abs_name = abs_names[0]
+
+        # n_proms = len(abs_names)  # for output this will never be > 1
+        # # if n_proms > 1 and name in ginputs:
+        # #     abs_name = ginputs[name][0].get('use_tgt', abs_names[0])
+        # # else:
+        # #     abs_name = abs_names[0]
+
+        # set_units = None
+
+        # if abs_name in conns:  # we're setting an input
+        #     src = conns[abs_name]
+
+        #     if src.startswith('_auto_ivc.'):
+        #         src_meta = conn_graph.nodes[('o', src)]
+        #     else:
+        #         src_meta = all_meta['output'][src]
+
+        #     if abs_name in all_meta_in:  # input is continuous
+        #         value = np.asarray(value)
+        #         tmeta = all_meta_in[abs_name]
+        #         tunits = tmeta['units']
+        #         sunits = src_meta['units']
+        #         if abs_name in loc_meta_in:
+        #             tlocmeta = loc_meta_in[abs_name]
+        #         else:
+        #             tlocmeta = None
+
+        #         if units is None:
+        #             # avoids double unit conversion
+        #             ivalue = value
+        #             #if sunits is not None:
+        #                 #if False: # gunits is not None and gunits != tunits:
+        #                     #value = model.convert_from_units(src, value, gunits)
+        #                 #elif tunits is not None:
+        #                     #value = model.convert_from_units(src, value, tunits)
+        #                 #else:
+        #                     #msg = "A value with no units has been specified for input " + \
+        #                           #f"'{name}', but the source ('{src}') has units '{sunits}'. " + \
+        #                           #"No unit checking can be done."
+        #                     #issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
+        #         else:
+        #             if True: # gunits is None:
+        #                 ivalue = model.convert_from_units(abs_name, value, units)
+        #             else:
+        #                 ivalue = model.convert_units(name, value, units, gunits)
+        #             value = model.convert_from_units(src, value, units)
+        #         set_units = sunits
+
+        # else:  # setting an output
+        #     src = abs_name
+        #     if units is not None:
+        #         value = model.convert_from_units(abs_name, np.asarray(value), units)
+        #         set_units = all_meta['output'][abs_name]['units']
+
+        # # Caching only needed if vectors aren't allocated yet.
+        # if not has_vectors:
+        #     ic_cache = model._initial_condition_cache
+        #     if indices is not None:
+        #         self._get_cached_val(name, abs_names)
+        #         try:
+        #             cval = ic_cache[abs_name][0]
+        #             if _is_slicer_op(indices):
+        #                 try:
+        #                     ic_cache[abs_name] = (value[indices], set_units, self.pathname, name)
+        #                 except (IndexError, TypeError):
+        #                     cval[indices] = value
+        #                     ic_cache[abs_name] = (cval, set_units, self.pathname, name)
+        #             else:
+        #                 cval[indices] = value
+        #                 ic_cache[abs_name] = (cval, set_units, self.pathname, name)
+        #         except Exception as err:
+        #             raise RuntimeError(f"Failed to set value of '{name}': {str(err)}.")
+        #     else:
+        #         ic_cache[abs_name] = (value, set_units, self.pathname, name)
+
+        #     for n in abs_names:
+        #         if n in all_meta_in:
+        #             m = all_meta_in[n]
+        #             if 'shape_by_conn' in m and m['shape_by_conn']:
+        #                 val = ic_cache[abs_name][0]
+        #                 shape = () if np.isscalar(val) else val.shape
+        #                 all_meta_in[n]['shape'] = shape
+        #                 if n in loc_meta_in:
+        #                     loc_meta_in[n]['shape'] = shape
+        # else:
+        #     if abs_name in conns and nprocs > 1 and abs_name in all_idx:
+        #         # check if src exists on a proc where tgt doesn't
+        #         insizes = all_sizes['input'][:, all_idx[abs_name]]
+        #         outsizes = all_sizes['output'][:, all_idx[src]]
+        #         if np.any(insizes != outsizes):
+        #             # keep track of this for later setting across all procs
+        #             model._remote_sets.append((abs_name, src, value))
+
+        #     myrank = model.comm.rank
+
+        #     if indices is None:
+        #         indices = _full_slice
+
+        #     if model._outputs._contains_abs(abs_name):
+        #         distrib = all_meta['output'][abs_name]['distributed']
+        #         if (distrib and indices is _full_slice and
+        #                 value.size == all_meta['output'][abs_name]['global_size']):
+        #             # assume user is setting using full distributed value
+        #             sizes = model._var_sizes['output'][:, model._var_allprocs_abs2idx[abs_name]]
+        #             start = np.sum(sizes[:myrank])
+        #             end = start + sizes[myrank]
+        #             model._outputs.set_var(abs_name, value[start:end], indices)
+        #         else:
+        #             model._outputs.set_var(abs_name, value, indices)
+        #     elif abs_name in conns:  # input name given. Set value into output
+        #         src_is_auto_ivc = src.startswith('_auto_ivc.')
+        #         # when setting auto_ivc output, error messages should refer
+        #         # to the promoted name used in the set_val call
+        #         var_name = name if src_is_auto_ivc else src
+        #         if model._outputs._contains_abs(src):  # src is local
+        #             if (model._outputs._abs_get_val(src).size == 0 and
+        #                     src_is_auto_ivc and
+        #                     all_meta['output'][src]['distributed']):
+        #                 pass  # special case, auto_ivc dist var with 0 local size
+        #             elif tmeta['has_src_indices']:
+        #                 if tlocmeta:  # target is local
+        #                     flat = False
+        #                     if name in model._var_prom2inds:
+        #                         sshape, inds, flat = model._var_prom2inds[name]
+        #                         src_indices = inds
+        #                     elif (tlocmeta.get('manual_connection') or
+        #                           model._inputs._contains_abs(name)):
+        #                         src_indices = tlocmeta['src_indices']
+        #                     else:
+        #                         src_indices = None
+
+        #                     if src_indices is None:
+        #                         model._outputs.set_var(src, value, _full_slice, flat,
+        #                                                var_name=var_name)
+        #                     else:
+        #                         flat = src_indices._flat_src
+
+        #                         if tmeta['distributed']:
+        #                             src_indices = src_indices.shaped_array()
+        #                             ssizes = model._var_sizes['output']
+        #                             sidx = model._var_allprocs_abs2idx[src]
+        #                             ssize = ssizes[myrank, sidx]
+        #                             start = np.sum(ssizes[:myrank, sidx])
+        #                             end = start + ssize
+        #                             if np.any(src_indices < start) or np.any(src_indices >= end):
+        #                                 raise RuntimeError(f"{model.msginfo}: Can't set {name}: "
+        #                                                    "src_indices refer "
+        #                                                    "to out-of-process array entries.")
+        #                             if start > 0:
+        #                                 src_indices = src_indices - start
+        #                             src_indices = indexer(src_indices)
+        #                         if indices is _full_slice:
+        #                             model._outputs.set_var(src, value, src_indices, flat,
+        #                                                    var_name=var_name)
+        #                         else:
+        #                             model._outputs.set_var(src, value, src_indices.apply(indices),
+        #                                                    True, var_name=var_name)
+        #                 else:
+        #                     issue_warning(f"{model.msginfo}: Cannot set the value of '{abs_name}':"
+        #                                   " Setting the value of a remote connected input with"
+        #                                   " src_indices is currently not supported, you must call"
+        #                                   " `run_model()` to have the outputs populate their"
+        #                                   " corresponding inputs.")
+        #             else:
+        #                 value = np.asarray(value)
+        #                 if indices is not _full_slice:
+        #                     indices = indexer(indices)
+        #                 model._outputs.set_var(src, value, indices, var_name=var_name)
+        #         elif src in model._discrete_outputs:
+        #             model._discrete_outputs[src] = value
+        #         # also set the input
+        #         # TODO: maybe remove this if inputs are removed from case recording
+        #         if n_proms < 2:
+        #             if model._inputs._contains_abs(abs_name):
+        #                 model._inputs.set_var(abs_name, ivalue, indices)
+        #             elif abs_name in model._discrete_inputs:
+        #                 model._discrete_inputs[abs_name] = value
+        #             else:
+        #                 # must be a remote var. so, just do nothing on this proc. We can't get here
+        #                 # unless abs_name is found in connections, so the variable must exist.
+        #                 if abs_name in model._var_allprocs_abs2meta:
+        #                     print(f"Variable '{name}' is remote on rank {self.comm.rank}.  "
+        #                           "Local assignment ignored.")
+        #     elif abs_name in model._discrete_outputs:
+        #         model._discrete_outputs[abs_name] = value
+        #     elif model._inputs._contains_abs(abs_name):   # could happen if model is a component
+        #         model._inputs.set_var(abs_name, value, indices)
+        #     elif abs_name in model._discrete_inputs:   # could happen if model is a component
+        #         model._discrete_inputs[abs_name] = value
 
     def _get_input_from_src(self, name, abs_ins, conns, units=None, indices=None,
                             get_remote=False, rank=None, vec_name='nonlinear', flat=False,
@@ -6093,20 +6165,30 @@ class System(object, metaclass=SystemMetaclass):
             scope_sys = self
 
         abs2meta_all_ins = self._var_allprocs_abs2meta['input']
+        conn_graph = self._get_all_conn_graph()
 
-        # if we have multiple promoted inputs that are explicitly connected to an output and units
-        # have not been specified, look for group input to disambiguate
-        if units is None and len(abs_ins) > 1:
-            if abs_name not in self._var_allprocs_discrete['input']:
-                # can't get here unless Group because len(abs_ins) always == 1 for comp
-                try:
-                    units = scope_sys._group_inputs[name][0]['units']
-                except (KeyError, IndexError):
-                    unit0 = abs2meta_all_ins[abs_ins[0]]['units']
-                    for n in abs_ins[1:]:
-                        if unit0 != abs2meta_all_ins[n]['units']:
-                            self._show_ambiguity_msg(name, ('units',), abs_ins)
-                            break
+        node = conn_graph.get_ancestor_input_node(self, name)
+        node_meta = conn_graph.nodes[node]
+        src_inds_list = node_meta['src_inds_list']
+        has_src_indices = len(src_inds_list) > 0
+
+        if units is None:
+            units = node_meta['units']
+            if units is None and len(abs_ins) > 1:
+                # see if we can rollup units from below
+                conn_graph.rollup_to_node(self, node, include_outputs=False)
+                units = node_meta['units']
+                if units is None:
+                    units_list = [self._var_allprocs_abs2meta['input'][n]['units'] for n in abs_ins]
+                    units_list = [u for u in units_list if u is not None]
+                    if len(units_list) == 1:
+                        units = units_list[0]
+                    elif len(units_list) > 1:
+                        self._collect_error(f"{self.msginfo}: Input '{name}' has no units and no "
+                                            "default units have been set so the choice of units "
+                                            f"between '{sorted(units_list)}' is ambiguous. Call "
+                                            f"model.set_input_defaults('{name}', units=?) to remove"
+                                            " the ambiguity.")
 
         is_local = abs_name in self._var_abs2meta['input']
         src_indices = vshape = None
@@ -6120,39 +6202,39 @@ class System(object, metaclass=SystemMetaclass):
 
         distrib = vmeta['distributed']
         vdynshape = vmeta['shape_by_conn']
-        for n in abs_ins:
-            if abs2meta_all_ins[n]['has_src_indices']:
-                has_src_indices = True
-                break
-        else:
-            has_src_indices = False
+        # for n in abs_ins:
+        #     if abs2meta_all_ins[n]['has_src_indices']:
+        #         has_src_indices = True
+        #         break
+        # else:
+        #     has_src_indices = False
 
-        if is_prom:
-            # see if we have any 'intermediate' level src_indices when using a promoted name
-            n = name
-            scope = scope_sys
-            while n:
-                if n in scope._var_prom2inds:
-                    _, inds, _ = scope._var_prom2inds[n]
-                    if inds is None:
-                        if is_prom:  # using a promoted lookup
-                            src_indices = None
-                            vshape = None
-                            has_src_indices = False
-                    else:
-                        shp = inds.indexed_src_shape
-                        src_indices = inds
-                        has_src_indices = True
-                        if is_prom:
-                            vshape = shp
-                    break
+        # if is_prom:
+        #     # see if we have any 'intermediate' level src_indices when using a promoted name
+        #     n = name
+        #     scope = scope_sys
+        #     while n:
+        #         if n in scope._var_prom2inds:
+        #             _, inds, _ = scope._var_prom2inds[n]
+        #             if inds is None:
+        #                 if is_prom:  # using a promoted lookup
+        #                     src_indices = None
+        #                     vshape = None
+        #                     has_src_indices = False
+        #             else:
+        #                 shp = inds.indexed_src_shape
+        #                 src_indices = inds
+        #                 has_src_indices = True
+        #                 if is_prom:
+        #                     vshape = shp
+        #             break
 
-                parent, _, child = n.partition('.')
-                if child:
-                    s = scope._get_subsystem(parent)
-                    if s is not None:
-                        scope = s
-                n = child
+        #         parent, _, child = n.partition('.')
+        #         if child:
+        #             s = scope._get_subsystem(parent)
+        #             if s is not None:
+        #                 scope = s
+        #         n = child
 
         if self.comm.size > 1 and get_remote:
             if self.comm.rank == self._owning_rank[abs_name]:
@@ -6378,36 +6460,36 @@ class System(object, metaclass=SystemMetaclass):
 
         return (val + offset) * scale
 
-    def convert_from_units(self, name, val, units):
-        """
-        Convert the given value from the specified units to those of the named variable.
+    # def convert_from_units(self, name, val, units):
+    #     """
+    #     Convert the given value from the specified units to those of the named variable.
 
-        Parameters
-        ----------
-        name : str
-            Name of the variable.
-        val : float or ndarray of float
-            The value of the variable.
-        units : str
-            The units to convert to.
+    #     Parameters
+    #     ----------
+    #     name : str
+    #         Name of the variable.
+    #     val : float or ndarray of float
+    #         The value of the variable.
+    #     units : str
+    #         The units to convert to.
 
-        Returns
-        -------
-        float or ndarray of float
-            The value converted to the specified units.
-        """
-        base_units = self._get_var_meta(name, 'units')
+    #     Returns
+    #     -------
+    #     float or ndarray of float
+    #         The value converted to the specified units.
+    #     """
+    #     base_units = self._get_all_conn_graph().get_meta(name)['units']
 
-        if base_units == units:
-            return val
+    #     if base_units == units:
+    #         return val
 
-        try:
-            scale, offset = unit_conversion(units, base_units)
-        except Exception:
-            msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
-            raise TypeError(msg.format(self.msginfo, name, base_units, units))
+    #     try:
+    #         scale, offset = unit_conversion(units, base_units)
+    #     except Exception:
+    #         msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
+    #         raise TypeError(msg.format(self.msginfo, name, base_units, units))
 
-        return (val + offset) * scale
+    #     return (val + offset) * scale
 
     def convert_units(self, name, val, units_from, units_to):
         """

@@ -25,8 +25,7 @@ from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len, ValueRepeater, evenly_distrib_idxs
 from openmdao.utils.general_utils import convert_src_inds, shape2tuple, ensure_compatible, meta2src_iter, get_rev_conns, is_undefined, all_ancestors
-from openmdao.utils.units import unit_conversion, _has_val_mismatch, _find_unit, \
-    simplify_unit, PhysicalUnit
+from openmdao.utils.units import unit_conversion, simplify_unit, PhysicalUnit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
     get_unresolved_knowns, is_unresolved, get_active_edges, add_shape_node, \
     add_units_node, are_connected
@@ -342,17 +341,10 @@ class Group(System):
         src_shape : int or tuple
             Assumed shape of any connected source or higher level promoted input.
         """
-        graph = self._get_all_conn_graph()
-        node = ('i', name)
-        if node not in graph:
-            node, kwargs = self.get_node_meta(self, name, 'input')
-            graph.add_node(node, **kwargs)
-
-        meta = graph.nodes[node]
-
-        # meta = {'prom': name, 'auto': False}
+        meta = {'prom': name, 'auto': False}
         if is_undefined(val):
             src_shape = shape2tuple(src_shape)
+            meta['val'] = None
         else:
             if src_shape is not None:
                 # make sure value and src_shape are compatible
@@ -362,31 +354,31 @@ class Group(System):
             elif isinstance(val, Number):
                 src_shape = (1,)
             meta['val'] = val
-            meta['shape'] = val.shape
 
         if units is not None:
             if not isinstance(units, str):
                 raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
             meta['units'] = simplify_unit(units, msginfo=self.msginfo)
+        else:
+            meta['units'] = None
 
-        if src_shape is not None:
-            meta['src_shape'] = src_shape
+        meta['src_shape'] = src_shape
 
-        # if self._static_mode:
-        #     dct = self._static_group_inputs
-        # else:
-        #     dct = self._group_inputs
+        if self._static_mode:
+            dct = self._static_group_inputs
+        else:
+            dct = self._group_inputs
 
-        # if name in dct:
-        #     old = dct[name][0]
-        #     overlap = set(old).intersection(meta)
-        #     if overlap:
-        #         issue_warning(f"Setting input defaults for input '{name}' which "
-        #                       f"override previously set defaults for {sorted(overlap)}.",
-        #                       prefix=self.msginfo, category=PromotionWarning)
-        #     old.update(meta)
-        # else:
-        #     dct[name] = [meta]
+        if name in dct:
+            old = dct[name]
+            overlap = set(old).intersection(meta)
+            if overlap:
+                issue_warning(f"Setting input defaults for input '{name}' which "
+                              f"override previously set defaults for {sorted(overlap)}.",
+                              prefix=self.msginfo, category=PromotionWarning)
+            old.update(meta)
+        else:
+            dct[name] = meta
 
     def _get_matvec_scope(self, excl_sub=None):
         """
@@ -583,8 +575,6 @@ class Group(System):
         # reset group_inputs back to what it was just after self.setup() in case _configure
         # is called multiple times.
         self._group_inputs = self._pre_config_group_inputs.copy()
-        for n, lst in self._group_inputs.items():
-            self._group_inputs[n] = lst.copy()
 
         self.matrix_free = False
         self._has_guess = overrides_method('guess_nonlinear', self, Group)
@@ -652,10 +642,6 @@ class Group(System):
         self._subsystems_allprocs = self._static_subsystems_allprocs.copy()
         self._manual_connections = self._static_manual_connections.copy()
         self._group_inputs = self._static_group_inputs.copy()
-        # copy doesn't copy the internal list so we have to do it manually (we don't want
-        # a full deepcopy either because we want the internal metadata dicts to be shared)
-        for n, lst in self._group_inputs.items():
-            self._group_inputs[n] = lst.copy()
 
         if self.pathname == '':
             self._all_conn_graph = AllConnGraph()
@@ -670,8 +656,6 @@ class Group(System):
         # during the config process and we don't want to wipe out any group_inputs
         # that were added during self.setup()
         self._pre_config_group_inputs = self._group_inputs.copy()
-        for n, lst in self._pre_config_group_inputs.items():
-            self._pre_config_group_inputs[n] = lst.copy()
 
         if MPI:
 
@@ -1713,9 +1697,8 @@ class Group(System):
 
         allprocs_abs2meta = {'input': {}, 'output': {}}
 
-        for n, lst in self._group_inputs.items():
-            lst[0]['path'] = self.pathname  # used for error reporting
-            self._group_inputs[n] = lst.copy()  # must copy the list manually
+        for meta in self._group_inputs.values():
+            meta['path'] = self.pathname  # used for error reporting
 
         self._has_distrib_vars = False
         self._has_fd_group = self._owns_approx_jac
@@ -1777,18 +1760,18 @@ class Group(System):
                         self._all_conn_graph.add_promotion(io, self, prom_name,
                                                            subsys, sub_prom, pinfo)
 
-            if isinstance(subsys, Group):
-                # propagate any subsystem 'set_input_defaults' info up to this Group
-                subprom2prom = var_maps['input']
-                for sub_prom, metalist in subsys._group_inputs.items():
-                    if sub_prom in subprom2prom:
-                        key = subprom2prom[sub_prom][0]
-                    else:
-                        key = sub_prefix + sub_prom
-                    if key not in self._group_inputs:
-                        self._group_inputs[key] = [{'path': self.pathname, 'prom': key,
-                                                    'auto': True}]
-                    self._group_inputs[key].extend(metalist)
+            # if isinstance(subsys, Group):
+            #     # propagate any subsystem 'set_input_defaults' info up to this Group
+            #     subprom2prom = var_maps['input']
+            #     for sub_prom, metalist in subsys._group_inputs.items():
+            #         if sub_prom in subprom2prom:
+            #             key = subprom2prom[sub_prom][0]
+            #         else:
+            #             key = sub_prefix + sub_prom
+            #         if key not in self._group_inputs:
+            #             self._group_inputs[key] = [{'path': self.pathname, 'prom': key,
+            #                                         'auto': True}]
+            #         self._group_inputs[key].extend(metalist)
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -1829,10 +1812,9 @@ class Group(System):
                 self._has_fd_group |= has_fd_group
 
                 if rank != myrank:
-                    for p, mlist in ginputs.items():
+                    for p, mta in ginputs.items():
                         if p not in self._group_inputs:
-                            self._group_inputs[p] = []
-                        self._group_inputs[p].extend(mlist)
+                            self._group_inputs[p] = mta
 
                 proc_resolvers[rank] = proc_resolver
 
@@ -1887,125 +1869,125 @@ class Group(System):
         show_warnings : bool
             Bool to show or hide the auto_ivc warnings.
         """
-        skip = {'path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'}
-        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-        abs2meta_in = self._var_allprocs_abs2meta['input']
-        resolver = self._resolver
+        # skip = {'path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'}
+        # abs_in2prom_info = self._problem_meta['abs_in2prom_info']
+        # abs2meta_in = self._var_allprocs_abs2meta['input']
+        # resolver = self._resolver
 
         self._auto_ivc_warnings = []
 
-        for prom, metalist in self._group_inputs.items():
-            if not resolver.is_prom(prom, 'input'):
-                # this error was already collected in setup_var_data, so just continue here
-                continue
-            try:
-                paths = [(i, m['path']) for i, m in enumerate(metalist) if not m['auto']]
-                if paths:
-                    top_origin = paths[0][1]
-                    top_prom = metalist[paths[0][0]]['prom']
-            except KeyError:
-                issue_warning("No auto IVCs found", prefix=self.msginfo, category=PromotionWarning)
-            allmeta = set()
-            for meta in metalist:
-                allmeta.update(meta)
-            fullmeta = {n: _UNDEFINED for n in allmeta - skip}
+        # for prom, metalist in self._group_inputs.items():
+        #     if not resolver.is_prom(prom, 'input'):
+        #         # this error was already collected in setup_var_data, so just continue here
+        #         continue
+        #     try:
+        #         paths = [(i, m['path']) for i, m in enumerate(metalist) if not m['auto']]
+        #         if paths:
+        #             top_origin = paths[0][1]
+        #             top_prom = metalist[paths[0][0]]['prom']
+        #     except KeyError:
+        #         issue_warning("No auto IVCs found", prefix=self.msginfo, category=PromotionWarning)
+        #     allmeta = set()
+        #     for meta in metalist:
+        #         allmeta.update(meta)
+        #     fullmeta = {n: _UNDEFINED for n in allmeta - skip}
 
-            for key in sorted(fullmeta):
-                for submeta in metalist:
-                    if submeta['auto']:
-                        continue
-                    if key in submeta:
-                        if is_undefined(fullmeta[key]):
-                            origin = submeta['path']
-                            origin_prom = submeta['prom']
-                            val = fullmeta[key] = submeta[key]
-                            if origin != top_origin:
-                                msg = (f"Group '{top_origin}' did not set a default "
-                                       f"'{key}' for input '{top_prom}', so the value of "
-                                       f"({val}) from group '{origin}' will be used.")
-                                if show_warnings:
-                                    issue_warning(msg, category=PromotionWarning)
-                                else:
-                                    self._auto_ivc_warnings.append(msg)
+        #     for key in sorted(fullmeta):
+        #         for submeta in metalist:
+        #             if submeta['auto']:
+        #                 continue
+        #             if key in submeta:
+        #                 if is_undefined(fullmeta[key]):
+        #                     origin = submeta['path']
+        #                     origin_prom = submeta['prom']
+        #                     val = fullmeta[key] = submeta[key]
+        #                     if origin != top_origin:
+        #                         msg = (f"Group '{top_origin}' did not set a default "
+        #                                f"'{key}' for input '{top_prom}', so the value of "
+        #                                f"({val}) from group '{origin}' will be used.")
+        #                         if show_warnings:
+        #                             issue_warning(msg, category=PromotionWarning)
+        #                         else:
+        #                             self._auto_ivc_warnings.append(msg)
 
-                        else:
-                            eq = submeta[key] == val
-                            if isinstance(eq, np.ndarray):
-                                eq = np.all(eq)
-                            if not eq:
-                                # first, see if origin is an ancestor
-                                if not origin or submeta['path'].startswith(origin + '.'):
-                                    msg = (f"Groups '{origin}' and '{submeta['path']}' "
-                                           f"called set_input_defaults for the input "
-                                           f"'{origin_prom}' with conflicting '{key}'. "
-                                           f"The value ({val}) from '{origin}' will be "
-                                           "used.")
-                                    if show_warnings:
-                                        issue_warning(msg, category=PromotionWarning)
-                                    else:
-                                        self._auto_ivc_warnings.append(msg)
-                                else:  # origin is not an ancestor, so we have an ambiguity
-                                    if origin_prom != submeta['prom']:
-                                        prm = f"('{origin_prom}' / '{submeta['prom']}')"
-                                    else:
-                                        prm = f"'{origin_prom}'"
-                                    self._collect_error(f"{self.msginfo}: The subsystems {origin} "
-                                                        f"and {submeta['path']} called "
-                                                        f"set_input_defaults for promoted input "
-                                                        f"{prm} with conflicting values for "
-                                                        f"'{key}'. Call model.set_input_defaults("
-                                                        f"'{prom}', {key}=?) to remove the "
-                                                        "ambiguity.")
+        #                 else:
+        #                     eq = submeta[key] == val
+        #                     if isinstance(eq, np.ndarray):
+        #                         eq = np.all(eq)
+        #                     if not eq:
+        #                         # first, see if origin is an ancestor
+        #                         if not origin or submeta['path'].startswith(origin + '.'):
+        #                             msg = (f"Groups '{origin}' and '{submeta['path']}' "
+        #                                    f"called set_input_defaults for the input "
+        #                                    f"'{origin_prom}' with conflicting '{key}'. "
+        #                                    f"The value ({val}) from '{origin}' will be "
+        #                                    "used.")
+        #                             if show_warnings:
+        #                                 issue_warning(msg, category=PromotionWarning)
+        #                             else:
+        #                                 self._auto_ivc_warnings.append(msg)
+        #                         else:  # origin is not an ancestor, so we have an ambiguity
+        #                             if origin_prom != submeta['prom']:
+        #                                 prm = f"('{origin_prom}' / '{submeta['prom']}')"
+        #                             else:
+        #                                 prm = f"'{origin_prom}'"
+        #                             self._collect_error(f"{self.msginfo}: The subsystems {origin} "
+        #                                                 f"and {submeta['path']} called "
+        #                                                 f"set_input_defaults for promoted input "
+        #                                                 f"{prm} with conflicting values for "
+        #                                                 f"'{key}'. Call model.set_input_defaults("
+        #                                                 f"'{prom}', {key}=?) to remove the "
+        #                                                 "ambiguity.")
 
-            # update all metadata dicts with any missing metadata that was filled in elsewhere
-            # and update src_shape and use_tgt in abs_in2prom_info
-            for meta in metalist:
-                tree_level = meta['path'].count('.') + 1 if meta['path'] else 0
-                prefix = meta['path'] + '.' if meta['path'] else ''
-                src_shape = None
-                if 'val' in meta:
-                    abs_in = resolver.absnames(prom, 'input')[0]
-                    if abs_in in abs2meta_in:  # it's a continuous variable
-                        src_shape = np.asarray(meta['val']).shape
-                elif 'src_shape' in meta:
-                    src_shape = meta['src_shape']
+        #     # update all metadata dicts with any missing metadata that was filled in elsewhere
+        #     # and update src_shape and use_tgt in abs_in2prom_info
+        #     for meta in metalist:
+        #         tree_level = meta['path'].count('.') + 1 if meta['path'] else 0
+        #         prefix = meta['path'] + '.' if meta['path'] else ''
+        #         src_shape = None
+        #         if 'val' in meta:
+        #             abs_in = resolver.absnames(prom, 'input')[0]
+        #             if abs_in in abs2meta_in:  # it's a continuous variable
+        #                 src_shape = np.asarray(meta['val']).shape
+        #         elif 'src_shape' in meta:
+        #             src_shape = meta['src_shape']
 
-                if src_shape is not None:
-                    # Now update the global promotes info dict
-                    for tgt in resolver.absnames(prom, 'input'):
-                        if tgt in abs_in2prom_info and tgt.startswith(prefix):
-                            pinfo = abs_in2prom_info[tgt][tree_level]
-                            if pinfo is not None:
-                                p2 = abs_in2prom_info[tgt][tree_level + 1]
-                                if p2 is not None:
-                                    # src_shape from a set_input_defaults call actually
-                                    # must match the promoted src_shape from one level
-                                    # deeper in the tree.
-                                    if p2.src_shape is not None and p2.src_shape != src_shape:
-                                        self._collect_error(f"{self.msginfo}: src_shape {src_shape}"
-                                                            f" set by set_input_defaults('{prom}', "
-                                                            f"...) in group '{meta['path']}' "
-                                                            "conflicts with src_shape of "
-                                                            f"{pinfo.src_shape} for promoted input "
-                                                            f"'{pinfo.prom_path()}")
-                                    p2.set_src_shape(src_shape)
-                            else:
-                                abs_in2prom_info[tgt][tree_level] = \
-                                    _PromotesInfo(src_shape=src_shape, prom=prom,
-                                                  promoted_from=self.pathname)
-                else:
-                    # check for discrete targets
-                    for tgt in resolver.absnames(prom, 'input'):
-                        if tgt in self._discrete_inputs:
-                            for key, val in meta.items():
-                                # for discretes we can only set the value (not units/src_shape)
-                                if key == 'val':
-                                    self._discrete_inputs[tgt] = val
-                                elif key in ('units', 'src_shape'):
-                                    self._collect_error(f"{self.msginfo}: Cannot set '{key}={val}'"
-                                                        f" for discrete variable '{tgt}'.")
+        #         if src_shape is not None:
+        #             # Now update the global promotes info dict
+        #             for tgt in resolver.absnames(prom, 'input'):
+        #                 if tgt in abs_in2prom_info and tgt.startswith(prefix):
+        #                     pinfo = abs_in2prom_info[tgt][tree_level]
+        #                     if pinfo is not None:
+        #                         p2 = abs_in2prom_info[tgt][tree_level + 1]
+        #                         if p2 is not None:
+        #                             # src_shape from a set_input_defaults call actually
+        #                             # must match the promoted src_shape from one level
+        #                             # deeper in the tree.
+        #                             if p2.src_shape is not None and p2.src_shape != src_shape:
+        #                                 self._collect_error(f"{self.msginfo}: src_shape {src_shape}"
+        #                                                     f" set by set_input_defaults('{prom}', "
+        #                                                     f"...) in group '{meta['path']}' "
+        #                                                     "conflicts with src_shape of "
+        #                                                     f"{pinfo.src_shape} for promoted input "
+        #                                                     f"'{pinfo.prom_path()}")
+        #                             p2.set_src_shape(src_shape)
+        #                     else:
+        #                         abs_in2prom_info[tgt][tree_level] = \
+        #                             _PromotesInfo(src_shape=src_shape, prom=prom,
+        #                                           promoted_from=self.pathname)
+        #         else:
+        #             # check for discrete targets
+        #             for tgt in resolver.absnames(prom, 'input'):
+        #                 if tgt in self._discrete_inputs:
+        #                     for key, val in meta.items():
+        #                         # for discretes we can only set the value (not units/src_shape)
+        #                         if key == 'val':
+        #                             self._discrete_inputs[tgt] = val
+        #                         elif key in ('units', 'src_shape'):
+        #                             self._collect_error(f"{self.msginfo}: Cannot set '{key}={val}'"
+        #                                                 f" for discrete variable '{tgt}'.")
 
-                meta.update(fullmeta)
+        #         meta.update(fullmeta)
 
     def _find_vars_to_gather(self):
         """
@@ -2169,73 +2151,14 @@ class Group(System):
         parent_conns : dict
             Dictionary of connections passed down from parent group.
         """
-        # global_abs_in2out = defaultdict(set)
-
-        # allprocs_discrete_in = self._var_allprocs_discrete['input']
-        # allprocs_discrete_out = self._var_allprocs_discrete['output']
-
-        # resolver = self._resolver
-        # # is_prom = self._resolver.is_prom
-
-        # abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-
-        # abs_in2out = {}
-        # new_conns = {}
-
-        # prefix = self.pathname + '.' if self.pathname else ''
-        # path_len = len(prefix)
-
-        # if parent_conns is not None:
-        #     for abs_in, abs_out in parent_conns.items():
-        #         if abs_in.startswith(prefix) and abs_out.startswith(prefix):
-        #             global_abs_in2out[abs_in].add(abs_out)
-
-        #             in_subsys, _, _ = abs_in[path_len:].partition('.')
-        #             out_subsys, _, _ = abs_out[path_len:].partition('.')
-
-        #             # if connection is contained in a subgroup, add to conns
-        #             # to pass down to subsystems.
-        #             if in_subsys == out_subsys:
-        #                 if in_subsys not in new_conns:
-        #                     new_conns[in_subsys] = {abs_in: abs_out}
-        #                 else:
-        #                     new_conns[in_subsys][abs_in] = abs_out
-
-        #for subgroup in self._subgroups_myproc:
-            #subgroup._setup_global_connections()
-
         all_conn_graph = self._get_all_conn_graph()
-
-        # Add implicit connections (only ones owned by this group)
-        # for prom_name, out_list in resolver.prom2abs_iter('output'):
-        #     if is_prom(prom_name, 'input'):  # names match ==> a connection
-        #         abs_out = out_list[0]
-        #         out_subsys, _, _ = abs_out[path_len:].partition('.')
-        #         for abs_in in resolver.absnames(prom_name, 'input'):
-        #             in_subsys, _, _ = abs_in[path_len:].partition('.')
-        #             global_abs_in2out[abs_in].add(abs_out)
-        #             if out_subsys == in_subsys:
-        #                 # if connection is contained in a subgroup, add to conns
-        #                 # to pass down to subsystems.
-        #                 if in_subsys not in new_conns:
-        #                     new_conns[in_subsys] = {abs_in: abs_out}
-        #                 else:
-        #                     new_conns[in_subsys][abs_in] = abs_out
-        #             else:  # this group will handle the transfer
-        #                 abs_in2out[abs_in] = abs_out
-
-        # src_ind_inputs = set()
-        # abs2meta = self._var_abs2meta['input']
-        # allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
 
         self._bad_conn_vars = set()
 
-        # all_conn_graph.add_manual_connections(self)
-
         if self.pathname == '':
-            groups = list(self.system_iter(include_self=True, recurse=True, typ=Group))
-            for g in groups:
+            for g in self.system_iter(include_self=True, recurse=True, typ=Group):
                 all_conn_graph.add_manual_connections(g)
+                all_conn_graph.add_group_input_defaults(g)
 
             # TODO: gather all manual connections and static info from all procs
 
@@ -2249,6 +2172,8 @@ class Group(System):
                 self._collect_error('Cycle detected in input-to-input connections. '
                                     f'This is not allowed.\n{errmsg}')
 
+            all_conn_graph.add_abs_variable_meta(self)  # add nodes for all absolute inputs
+            all_conn_graph.rollup_input_meta(self)
             all_conn_graph.add_auto_ivcs(self)
             all_conn_graph.update_shapes(self)
             all_conn_graph.transform_input_input_connections(self)
@@ -2270,108 +2195,11 @@ class Group(System):
                 # don't forget the root path!
                 root_dict.update(conn_data)
 
-            for g in groups:
-                g._conn_abs_in2out = conn_dict.get(g.pathname, {})
-                g._conn_global_abs_in2out = global_conn_dict.get(g.pathname, {})
-
-        # # Add explicit connections (only ones declared by this group)
-        # for prom_in, (prom_out, src_indices, flat) in self._manual_connections.items():
-
-        #     # Throw an exception if output and input are in the same system
-        #     # (not traceable to a connect statement, so provide context)
-        #     # and check if src_indices is defined in both connect and add_input.
-        #     # abs_out = resolver.prom2abs(prom_out, 'output')
-        #     # out_comp, _, _ = abs_out.rpartition('.')
-        #     # out_subsys, _, _ = abs_out[path_len:].partition('.')
-
-        #     for abs_in in resolver.absnames(prom_in, 'input'):
-        #     #     in_comp, _, _ = abs_in.rpartition('.')
-        #     #     if out_comp == in_comp:
-        #     #         self._collect_error(
-        #     #             f"{self.msginfo}: Output and input are in the same System for connection "
-        #     #             f"from '{prom_out}' to '{prom_in}'.")
-        #     #         self._bad_conn_vars.update((prom_in, prom_out))
-        #     #         continue
-
-        #         if src_indices is not None:
-        #             if abs_in in abs2meta:
-        #                 if abs_in not in abs_in2prom_info:
-        #                     abs_in2prom_info[abs_in] = [None] * (abs_in.count('.') + 1)
-        #                 # place a _PromotesInfo at the top level to handle the src_indices
-        #                 if abs_in2prom_info[abs_in][0] is None:
-        #                     try:
-        #                         abs_in2prom_info[abs_in][0] = _PromotesInfo(src_indices=src_indices,
-        #                                                                     flat=flat, prom=abs_in)
-        #                     except Exception:
-        #                         type_exc, exc, tb = sys.exc_info()
-        #                         self._collect_error(
-        #                             f"When connecting from '{prom_out}' to '{prom_in}': {exc}",
-        #                             exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
-        #                         self._bad_conn_vars.update((prom_in, prom_out))
-        #                         continue
-
-        #                 meta = abs2meta[abs_in]
-        #                 meta['manual_connection'] = True
-        #                 meta['src_indices'] = src_indices
-        #                 meta['flat_src_indices'] = flat
-
-        #             src_ind_inputs.add(abs_in)
-
-        #         # if abs_in in abs_in2out:
-        #         #     self._collect_error(
-        #         #         f"{self.msginfo}: Input '{abs_in}' cannot be connected to '{abs_out}' "
-        #         #         f"because it's already connected to '{abs_in2out[abs_in]}'.",
-        #         #         ident=(abs_out, abs_in))
-        #         #     self._bad_conn_vars.update((prom_in, prom_out))
-        #         #     continue
-
-        #         abs_in2out[abs_in] = abs_out
-
-        #         # # if connection is contained in a subgroup, add to conns to pass down to subsystems.
-        #         # if abs_in[path_len:].partition('.')[0] == out_subsys:
-        #         #     if out_subsys not in new_conns:
-        #         #         new_conns[out_subsys] = {abs_in: abs_out}
-        #         #     else:
-        #         #         new_conns[out_subsys][abs_in] = abs_out
-
-        # for tgt, src in abs_in2out.items():
-        #     global_abs_in2out[tgt].add(src)
-
-        # for subgroup in self._subgroups_myproc:
-        #     if subgroup.name in new_conns:
-        #         subgroup._setup_global_connections(parent_conns=new_conns[subgroup.name])
-        #     else:
-        #         subgroup._setup_global_connections()
-        #     for tgt, src in subgroup._conn_global_abs_in2out.items():
-        #         global_abs_in2out[tgt].add(src)
-
-        #dup_info = [(n, srcs) for n, srcs in global_abs_in2out.items() if len(srcs) > 1]
-        #if dup_info:
-            #dup = ["%s from %s" % (tgt, sorted(srcs)) for tgt, srcs in dup_info]
-            #dupstr = ', '.join(dup)
-            #self._collect_error(f"{self.msginfo}: The following inputs have multiple "
-                                #f"connections: {dupstr}.", ident=dupstr)
-
-        # if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
-        #     # If running in parallel, allgather
-        #     if self._gather_full_data():
-        #         raw = (global_abs_in2out, src_ind_inputs)
-        #     else:
-        #         raw = ({}, ())
-        #     gathered = self.comm.allgather(raw)
-
-        #     all_src_ind_ins = set()
-        #     for myproc_global_abs_in2out, src_ind_ins in gathered:
-        #         for tgt, srcs in myproc_global_abs_in2out.items():
-        #             global_abs_in2out[tgt].update(srcs)
-        #         all_src_ind_ins.update(src_ind_ins)
-        #     src_ind_inputs = all_src_ind_ins
-
-        # for inp in src_ind_inputs:
-        #     allprocs_abs2meta_in[inp]['has_src_indices'] = True
-
-        # self._conn_global_abs_in2out = {name: srcs.pop()
-        #                                 for name, srcs in global_abs_in2out.items()}
+            for system in self.system_iter(include_self=True, recurse=True):
+                if isinstance(system, Group):
+                    system._conn_abs_in2out = conn_dict.get(system.pathname, {})
+                    system._conn_global_abs_in2out = global_conn_dict.get(system.pathname, {})
+                system._resolver._conns = self._conn_global_abs_in2out
 
     def get_indep_vars(self, local, include_discrete=False):
         """
@@ -2447,15 +2275,15 @@ class Group(System):
                 return gdict[prom]
 
             if prom in self._group_inputs:
-                for d in self._group_inputs[prom]:
-                    if prop == 'shape':
-                        if 'src_shape' in d:
-                            return d['src_shape']
-                        elif 'val' in d:
-                            return np.asarray(d['val']).shape
-                    elif prop == 'units':
-                        if 'units' in d:
-                            return d['units']
+                d = self._group_inputs[prom]
+                if prop == 'shape':
+                    if 'src_shape' in d:
+                        return d['src_shape']
+                    elif 'val' in d:
+                        return np.asarray(d['val']).shape
+                elif prop == 'units':
+                    if 'units' in d:
+                        return d['units']
 
         def compute_var_property(to_var, prop_dict, func, prop):
             """
@@ -4840,19 +4668,19 @@ class Group(System):
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
-        prom2auto = {}
-        count = 0
-        auto2tgt = {}
-        all_abs2meta = self._var_allprocs_abs2meta['input']
-        conns = self._conn_global_abs_in2out
-        auto_conns = {}
-        resolver = self._resolver
+        # prom2auto = {}
+        # count = 0
+        # all_abs2meta = self._var_allprocs_abs2meta['input']
+        # conns = self._conn_global_abs_in2out
+        # # auto_conns = {}
+        # resolver = self._resolver
         conn_graph = self._all_conn_graph
 
+        auto2tgt = {}
         for srcnode in conn_graph.nodes():
             io, src = srcnode
             if src.startswith('_auto_ivc.'):
-                pass
+                auto2tgt[src] = [n[1] for n in conn_graph.leaf_input_iter(srcnode)]
 
         # for tgt in all_abs2meta:
         #     if tgt in conns or tgt in self._bad_conn_vars:
@@ -4884,95 +4712,110 @@ class Group(System):
         #     else:
         #         auto2tgt[src] = [tgt]
 
-        conns.update(auto_conns)
+        # conns.update(auto_conns)
         auto_ivc.auto2tgt = auto2tgt
 
-        vars_to_gather = self._vars_to_gather
+        # vars_to_gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
-            prom = resolver.abs2prom(tgts[0], 'input')
-            ret = self._get_auto_ivc_out_val(tgts, vars_to_gather)
-            if ret is None:  # setup error occurred. Try to continue
-                continue
-            tgt, val, remote = ret
-            prom = resolver.abs2prom(tgt, 'input')
-            if prom not in self._group_inputs:
-                self._group_inputs[prom] = [{'use_tgt': tgt, 'auto': True, 'path': self.pathname,
-                                             'prom': prom}]
-            else:
-                self._group_inputs[prom][0]['use_tgt'] = tgt
-            gmeta = self._group_inputs[prom][0]
+            node_meta = conn_graph.nodes[('o', src)]
+            units = node_meta['units']
+            # shape = node_meta['_shape']
+            val = node_meta['val']
+            discrete = node_meta['discrete']
+            remote = False  # TODO: fix this
 
-            if 'units' in gmeta:
-                units = gmeta['units']
-            else:
-                units = all_abs2meta[tgt]['units']
+            #prom = resolver.abs2prom(tgts[0], 'input')
+            #ret = self._get_auto_ivc_out_val(tgts, vars_to_gather)
+            #if ret is None:  # setup error occurred. Try to continue
+                #continue
+            #tgt, val, remote = ret
+            #prom = resolver.abs2prom(tgt, 'input')
+            #if prom not in self._group_inputs:
+                #self._group_inputs[prom] = {'use_tgt': tgt, 'auto': True, 'path': self.pathname,
+                                            #'prom': prom}
+            #else:
+                #self._group_inputs[prom]['use_tgt'] = tgt
+            #gmeta = self._group_inputs[prom]
 
-            if not remote and 'val' in gmeta:
-                val = gmeta['val']
+            #if 'units' in gmeta:
+                #units = gmeta['units']
+            #else:
+                #units = all_abs2meta[tgt]['units']
 
-            if self.comm.size > 1:
-                tgt_local_procs = set()
-                for t in tgts:
-                    if t in vars_to_gather:
-                        tgt_local_procs.add(vars_to_gather[t])
-                    else:   # t is duplicated in all procs
-                        break
-                else:
-                    if len(tgt_local_procs) < self.comm.size:  # don't have a local var in each proc
-                        tgt_local_procs = set()
-                        for t in self.comm.allgather(tgt):
-                            if t in vars_to_gather:
-                                tgt_local_procs.add(vars_to_gather[t])
-                        if len(tgt_local_procs) > 1:
-                            # the 'local' val can only exist on 1 proc (distrib auto_ivcs not
-                            # allowed), so must consolidate onto one proc
-                            rank = sorted(tgt_local_procs)[0]
-                            if rank != self.comm.rank:
-                                val = np.zeros(0)
-                                remote = True
+            #if not remote and 'val' in gmeta:
+                #val = gmeta['val']
+
+            #if self.comm.size > 1:
+                #tgt_local_procs = set()
+                #for t in tgts:
+                    #if t in vars_to_gather:
+                        #tgt_local_procs.add(vars_to_gather[t])
+                    #else:   # t is duplicated in all procs
+                        #break
+                #else:
+                    #if len(tgt_local_procs) < self.comm.size:  # don't have a local var in each proc
+                        #tgt_local_procs = set()
+                        #for t in self.comm.allgather(tgt):
+                            #if t in vars_to_gather:
+                                #tgt_local_procs.add(vars_to_gather[t])
+                        #if len(tgt_local_procs) > 1:
+                            ## the 'local' val can only exist on 1 proc (distrib auto_ivcs not
+                            ## allowed), so must consolidate onto one proc
+                            #rank = sorted(tgt_local_procs)[0]
+                            #if rank != self.comm.rank:
+                                #val = np.zeros(0)
+                                #remote = True
 
             relsrc = src.rsplit('.', 1)[-1]
-            auto_ivc.add_output(relsrc, val=np.atleast_1d(val), units=units)
+            if discrete:
+                auto_ivc.add_discrete_output(relsrc, val=val)
+            else:
+                auto_ivc.add_output(relsrc, val=np.atleast_1d(val), units=units)
             if remote:
                 auto_ivc._add_remote(relsrc)
 
-        # have to sort to keep vars in sync because we may be doing bcasts
-        for abs_in in sorted(self._var_allprocs_discrete['input']):
-            if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
-                prom = resolver.abs2prom(abs_in, 'input')
-                val = _UNDEFINED
+        ## have to sort to keep vars in sync because we may be doing bcasts
+        #for abs_in in sorted(self._var_allprocs_discrete['input']):
+            #if abs_in in conns:
+                #src = conns[abs_in]
+                #if not src.startswith('_auto_ivc.'):
+                    #continue
 
-                if prom in prom2auto:
-                    # multiple connected inputs w/o a src. Connect them to the same IVC
-                    # check if they have different metadata, and if they do, there must be
-                    # a group input defined that sets the default, else it's an error
-                    conns[abs_in] = prom2auto[prom][0]
-                else:
-                    ivc_name = f"_auto_ivc.v{count}"
-                    loc_out_name = ivc_name.rsplit('.', 1)[-1]
-                    count += 1
-                    prom2auto[prom] = (ivc_name, abs_in)
-                    conns[abs_in] = ivc_name
+                #loc_out_name = src.rpartition('.')[-1]
 
-                    if resolver.is_local(abs_in, 'input'):  # var is local
-                        val = self._var_discrete['input'][abs_in]['val']
-                    else:
-                        val = None
-                    if abs_in in vars_to_gather:
-                        if vars_to_gather[abs_in] == self.comm.rank:
-                            self.comm.bcast(val, root=vars_to_gather[abs_in])
-                        else:
-                            val = self.comm.bcast(None, root=vars_to_gather[abs_in])
-                    auto_ivc.add_discrete_output(loc_out_name, val=val)
+                #prom = resolver.abs2prom(abs_in, 'input')
+                #val = _UNDEFINED
 
-                src = conns[abs_in]
-                if src in auto2tgt:
-                    auto2tgt[src].append(abs_in)
-                else:
-                    auto2tgt[src] = [abs_in]
+                #if prom in prom2auto:
+                    ## multiple connected inputs w/o a src. Connect them to the same IVC
+                    ## check if they have different metadata, and if they do, there must be
+                    ## a group input defined that sets the default, else it's an error
+                    #conns[abs_in] = prom2auto[prom][0]
+                #else:
+                    #ivc_name = f"_auto_ivc.v{count}"
+                    #loc_out_name = ivc_name.rsplit('.', 1)[-1]
+                    #count += 1
+                    #prom2auto[prom] = (ivc_name, abs_in)
+                    #conns[abs_in] = ivc_name
 
-        if not prom2auto:
+                    #if resolver.is_local(abs_in, 'input'):  # var is local
+                        #val = self._var_discrete['input'][abs_in]['val']
+                    #else:
+                        #val = None
+                    #if abs_in in vars_to_gather:
+                        #if vars_to_gather[abs_in] == self.comm.rank:
+                            #self.comm.bcast(val, root=vars_to_gather[abs_in])
+                        #else:
+                            #val = self.comm.bcast(None, root=vars_to_gather[abs_in])
+                    #auto_ivc.add_discrete_output(loc_out_name, val=val)
+
+                ##if src in auto2tgt:
+                    ##auto2tgt[src].append(abs_in)
+                ##else:
+                    ##auto2tgt[src] = [abs_in]
+
+        if not auto2tgt:
             return auto_ivc
 
         auto_ivc._setup_procs(auto_ivc.pathname, self.comm, self._problem_meta)
@@ -5019,66 +4862,67 @@ class Group(System):
 
         This should only be called on the top level Group.
         """
-        all_abs2meta_in = self._var_allprocs_abs2meta['input']
-        all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        pass
+        #all_abs2meta_in = self._var_allprocs_abs2meta['input']
+        #all_abs2meta_out = self._var_allprocs_abs2meta['output']
 
-        abs2meta_in = self._var_abs2meta['input']
-        all_discrete_outs = self._var_allprocs_discrete['output']
-        all_discrete_ins = self._var_allprocs_discrete['input']
-        resolver = self._resolver
+        #abs2meta_in = self._var_abs2meta['input']
+        #all_discrete_outs = self._var_allprocs_discrete['output']
+        #all_discrete_ins = self._var_allprocs_discrete['input']
+        #resolver = self._resolver
 
-        for src, tgts in self._auto_ivc.auto2tgt.items():
-            if len(tgts) < 2:
-                continue
+        #for src, tgts in self._auto_ivc.auto2tgt.items():
+            #if len(tgts) < 2:
+                #continue
 
-            prom = resolver.abs2prom(tgts[0], 'input')
-            if prom in self._group_inputs:
-                gmeta = self._group_inputs[prom][0]
-            else:
-                gmeta = {'path': self.pathname, 'prom': prom, 'auto': True}
+            #prom = resolver.abs2prom(tgts[0], 'input')
+            #if prom in self._group_inputs:
+                #gmeta = self._group_inputs[prom]
+            #else:
+                #gmeta = {'path': self.pathname, 'prom': prom, 'auto': True}
 
-            if src not in all_discrete_outs:
-                smeta = all_abs2meta_out[src]
-                sunits = smeta['units'] if 'units' in smeta else None
+            #if src not in all_discrete_outs:
+                #smeta = all_abs2meta_out[src]
+                #sunits = smeta['units'] if 'units' in smeta else None
 
-            sval = self.get_val(src, kind='output', get_remote=True, from_src=False)
-            errs = set()
+            #sval = self.get_val(src, kind='output', get_remote=True, from_src=False)
+            #errs = set()
 
-            for tgt in tgts:
-                tval = self.get_val(tgt, kind='input', get_remote=True, from_src=False)
+            #for tgt in tgts:
+                #tval = self.get_val(tgt, kind='input', get_remote=True, from_src=False)
 
-                if tgt in all_discrete_ins:
-                    if 'val' not in gmeta and sval != tval:
-                        errs.add('val')
-                else:
-                    tmeta = all_abs2meta_in[tgt]
-                    tunits = tmeta['units'] if 'units' in tmeta else None
-                    if 'units' not in gmeta and sunits != tunits:
+                #if tgt in all_discrete_ins:
+                    #if 'val' not in gmeta and sval != tval:
+                        #errs.add('val')
+                #else:
+                    #tmeta = all_abs2meta_in[tgt]
+                    #tunits = tmeta['units'] if 'units' in tmeta else None
+                    #if 'units' not in gmeta and sunits != tunits:
 
-                        # Detect if either Source or Targe units are None.
-                        if sunits is None or tunits is None:
-                            errs.add('units')
+                        ## Detect if either Source or Targe units are None.
+                        #if sunits is None or tunits is None:
+                            #errs.add('units')
 
-                        elif _find_unit(sunits) != _find_unit(tunits):
-                            errs.add('units')
+                        #elif _find_unit(sunits) != _find_unit(tunits):
+                            #errs.add('units')
 
-                    if 'val' not in gmeta:
-                        if tval.shape == sval.shape:
-                            if _has_val_mismatch(tunits, tval, sunits, sval):
-                                errs.add('val')
-                        else:
-                            if all_abs2meta_in[tgt]['has_src_indices'] and tgt in abs2meta_in:
-                                if abs2meta_in[tgt]['flat_src_indices']:
-                                    srcpart = sval.ravel()[abs2meta_in[tgt]['src_indices'].flat()]
-                                else:
-                                    srcpart = sval[abs2meta_in[tgt]['src_indices']()]
-                                if _has_val_mismatch(tunits, tval, sunits, srcpart):
-                                    errs.add('val')
+                    #if 'val' not in gmeta:
+                        #if tval.shape == sval.shape:
+                            #if _has_val_mismatch(tunits, tval, sunits, sval):
+                                #errs.add('val')
+                        #else:
+                            #if all_abs2meta_in[tgt]['has_src_indices'] and tgt in abs2meta_in:
+                                #if abs2meta_in[tgt]['flat_src_indices']:
+                                    #srcpart = sval.ravel()[abs2meta_in[tgt]['src_indices'].flat()]
+                                #else:
+                                    #srcpart = sval[abs2meta_in[tgt]['src_indices']()]
+                                #if _has_val_mismatch(tunits, tval, sunits, srcpart):
+                                    #errs.add('val')
 
-            if errs:
-                self._show_ambiguity_msg(prom, errs, tgts)
-            elif src not in all_discrete_outs:
-                gmeta['units'] = sunits
+            #if errs:
+                #self._show_ambiguity_msg(prom, errs, tgts)
+            #elif src not in all_discrete_outs:
+                #gmeta['units'] = sunits
 
     def _show_ambiguity_msg(self, prom, metavars, tgts, metadata=None):
         errs = sorted(metavars)
