@@ -888,8 +888,8 @@ class Group(System):
             v_meta = nodes[v]
             if u_meta['_shape'] is not None and v_meta['_shape'] is not None:
                 if not array_connection_compatible(u_meta['_shape'], v_meta['_shape']):
-                    self._collect_error(f"{self.msginfo}: Input '{u[1]}' shape {u_meta['_shape']} "
-                                        f"and output '{v[1]}' shape {v_meta['_shape']} are "
+                    self._collect_error(f"{self.msginfo}: '{u[1]}' shape {u_meta['_shape']} "
+                                        f"and '{v[1]}' shape {v_meta['_shape']} are "
                                         "incompatible.")
 
         # conns = self._conn_global_abs_in2out
@@ -2167,7 +2167,7 @@ class Group(System):
         self._bad_conn_vars = set()
 
         if self.pathname == '':
-            self.display_conn_graph()
+            # self.display_conn_graph()
             # at this point, the conn graph has no connections, but all promotions are there.
 
             all_conn_graph.add_implicit_connections(self)

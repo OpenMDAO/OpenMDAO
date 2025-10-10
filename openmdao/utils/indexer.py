@@ -49,12 +49,6 @@ def array2slice(arr):
             return slice(0, 0)
 
 
-def _truncate(s):
-    if len(s) > 40:
-        return s[:20] + ' ... ' + s[-20:]
-    return s
-
-
 def combine_ranges(ranges):
     """
     Combine a list of (start, end) tuples into the smallest possible list of contiguous ranges.
@@ -866,7 +860,7 @@ class ShapedArrayIndexer(Indexer):
         str
             String representation.
         """
-        return _truncate(f"{self._arr}".replace('\n', ''))
+        return f"{self._arr}".replace('\n', '')
 
     def apply_offset(self, offset, flat=True):
         """
@@ -1322,7 +1316,14 @@ class EllipsisIndexer(Indexer):
         str
             String representation.
         """
-        return f"{self._tup}"
+        s = []
+        for i in self._tup:
+            if i is ...:
+                s.append('...')
+            else:
+                s.append(str(i))
+
+        return f"({', '.join(s)})"
 
     def apply_offset(self, offset, flat=True):
         """

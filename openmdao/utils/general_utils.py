@@ -1096,6 +1096,35 @@ def common_subpath(pathnames):
     return ''
 
 
+def truncate_str(s, max_len=20):
+    """
+    Truncate a string to a maximum length.
+
+    Truncated strings will look like this:  'first_part ... last_part'.
+
+    Parameters
+    ----------
+    s : str
+        The string to be truncated.
+    max_len : int
+        The maximum length of the truncated string.  Must be greater than 7
+
+    Returns
+    -------
+    str
+        The truncated string.
+    """
+    if max_len < 7:
+        raise ValueError("max_len must be greater than 7.")
+
+    s_len = len(s)
+    if s_len <= max_len:
+        return s
+
+    div, rem = divmod(max_len - 5, 2)
+    return s[:(div + rem)] + ' ... ' + s[-div:]
+
+
 def _is_slicer_op(indices):
     """
     Check if an indexer contains a slice or ellipsis operator.

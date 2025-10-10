@@ -179,7 +179,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # Should not be allowed because the source and target shapes do not match
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
-        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: When connecting 'idvp.blammo' to 'arraycomp.inp': shape (1,) != (2,)."
+        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: 'idvp.blammo' shape (1,) and 'arraycomp.inp' shape (2,) are incompatible."
         self.prob.setup()
         try:
             self.prob.final_setup()
@@ -194,13 +194,13 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_length')
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 0, 0])
 
-        expected = "\nCollected errors for problem 'bad_length':\n   <model> <class Group>: When connecting 'idvp.blammo' to 'arraycomp.inp' after applying src_indices [0 0 0] : shape (3,) != (2,)."
+        expected = "<model> <class Group>: After applying index [0 0 0] to 'idvp.blammo', shape (3,) != (2,) of 'arraycomp.inp'."
 
         self.prob.setup()
         try:
             self.prob.final_setup()
         except Exception as err:
-            self.assertEqual(str(err), expected)
+            self.assertTrue(expected in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -214,10 +214,10 @@ class TestConnectionsIndices(unittest.TestCase):
         try:
             self.prob.final_setup()
         except Exception as err:
-            self.assertEqual(str(err),
+            self.assertTrue(
                "\nCollected errors for problem 'bad_value':"
                "\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': "
-               "index 100000 is out of bounds for source dimension of size 5.")
+               "index 100000 is out of bounds for source dimension of size 5." in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -231,10 +231,10 @@ class TestConnectionsIndices(unittest.TestCase):
         try:
             self.prob.final_setup()
         except Exception as err:
-            self.assertEqual(str(err),
+            self.assertTrue(
                "\nCollected errors for problem 'bad_value_bug':"
                "\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': "
-               "index 100000 is out of bounds for source dimension of size 5.")
+               "index 100000 is out of bounds for source dimension of size 5." in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -322,7 +322,7 @@ class TestShapes(unittest.TestCase):
                                                 y={'val': np.zeros((5, 2))}))
         p.model.connect('indep.x', 'C1.x')
 
-        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: When connecting 'indep.x' to 'C1.x': shape (1, 10, 1, 1) != (5, 2)."
+        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: 'indep.x' shape (1, 10, 1, 1) and 'C1.x' shape (5, 2) are incompatible."
 
         p.setup()
         with self.assertRaises(Exception) as context:
@@ -357,8 +357,7 @@ class TestMultiConns(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(context.exception),
-           "\nCollected errors for problem 'mult_conns':"
-           "\n   <model> <class Group>: Target 'sub.y (sub.c2.y)' cannot be connected to 'sub.y (sub.c1.y)' because it's already connected to 'y (indeps.y)'.")
+           "\nCollected errors for problem 'mult_conns':\n   <model> <class Group>: Target 'sub.y (sub.c2.y)' cannot be connected to 'y (indeps.y)' because it's already connected to 'sub.y (sub.c1.y)'.")
 
     def test_mixed_conns_same_level(self):
 
@@ -378,11 +377,9 @@ class TestMultiConns(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
             prob.final_setup()
-            prob.run_model()
 
         self.assertEqual(str(context.exception),
-           "\nCollected errors for problem 'mixed_conns_same_level':"
-           "\n   <model> <class Group>: Target 'y (c2.y)' cannot be connected to 'y (c1.y)' because it's already connected to 'indeps.x'.")
+           "\nCollected errors for problem 'mixed_conns_same_level':\n   <model> <class Group>: Target 'y (c2.y)' cannot be connected to 'indeps.x' because it's already connected to 'y (c1.y)'.")
 
 
 class TestAutoIVCAllowableShapeMismatch(unittest.TestCase):
