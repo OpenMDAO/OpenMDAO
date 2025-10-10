@@ -7,7 +7,13 @@ import numpy as np
 from numbers import Number
 from collections import deque
 
+import webbrowser
+import threading
+import time
+from http.server import HTTPServer
+
 from openmdao.visualization.graph_viewer import write_graph
+from openmdao.visualization.conn_graph_ui import ConnGraphHandler
 from openmdao.utils.general_utils import common_subpath, is_undefined, shape2tuple, \
     ensure_compatible, truncate_str
 from openmdao.utils.array_utils import array_connection_compatible
@@ -1289,6 +1295,29 @@ class AllConnGraph(nx.DiGraph):
             mnames = ['units', 'discrete', '_shape']
             dismeta = {k: meta[k] for k in mnames if k in meta and meta[k] is not None}
             print(f"{indent}{node[1]}  {dismeta}")
+
+    def serve(self, port=8001, open_browser=True):
+        """Serve connection graph web UI."""
+        def handler(*args, **kwargs):
+            return ConnGraphHandler(self, *args, **kwargs)
+
+        print(f"🌐 Starting Simple AllConnGraph Web UI on port {port}")
+        print(f"📱 Open your browser to: http://localhost:{port}")
+
+        if open_browser:
+            def open_browser():
+                time.sleep(1)
+                webbrowser.open(f'http://localhost:{port}')
+
+            threading.Thread(target=open_browser, daemon=True).start()
+
+        try:
+            with HTTPServer(("", port), handler) as httpd:
+                print(f"✅ Server running on http://localhost:{port}")
+                print("Press Ctrl+C to stop")
+                httpd.serve_forever()
+        except KeyboardInterrupt:
+            print("\n🛑 Server stopped")
 
     def dump(self):
         skip = {'style', 'tooltip', 'fillcolor', 'label'}

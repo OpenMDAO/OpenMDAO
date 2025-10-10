@@ -43,7 +43,7 @@ from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.subjac import Subjac
 from openmdao.jacobians.jacobian import GroupJacobianUpdateContext
-from openmdao.core.conn_graph import AllConnGraph
+from openmdao.visualization.conn_graph import AllConnGraph
 
 
 # regex to check for valid names.
