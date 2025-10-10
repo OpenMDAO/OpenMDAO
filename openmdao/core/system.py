@@ -33,7 +33,7 @@ from openmdao.utils.name_maps import NameResolver
 from openmdao.utils.coloring import _compute_coloring, Coloring, \
     STD_COLORING_FNAME, _DEF_COMP_SPARSITY_ARGS, _ColSparsityJac
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.indexer import indexer, get_subarray
+from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, \
     PromotionWarning, UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, is_undefined, \
@@ -5505,6 +5505,11 @@ class System(object, metaclass=SystemMetaclass):
         return set(s for s in self.system_iter(include_self=True, recurse=True)
                    if s.nonlinear_solver and s.nonlinear_solver.supports['gradients'])
 
+    def _get_all_conn_graph(self):
+        if self._problem_meta is None:
+            return None
+        return self._problem_meta['model_ref']()._get_all_conn_graph()
+
     def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,
                      flat=False, from_root=False):
         """
@@ -5539,19 +5544,31 @@ class System(object, metaclass=SystemMetaclass):
         object or None
             The value of the requested output/input/resid variable.  None if variable is not found.
         """
-        resolver = self._resolver
-        typ = resolver.get_abs_iotype(abs_name)
-
         discrete = distrib = False
         val = _UNDEFINED
         if from_root:
-            all_meta = self._problem_meta['model_ref']()._var_allprocs_abs2meta
-            my_meta = self._problem_meta['model_ref']()._var_abs2meta
-            all_meta = all_meta[typ]
-            my_meta = my_meta[typ]
+            model = self._problem_meta['model_ref']()
+            all_meta = model._var_allprocs_abs2meta
+            my_meta = model._var_abs2meta
+            # resolver = model._resolver
         else:
-            all_meta = self._var_allprocs_abs2meta[typ]
-            my_meta = self._var_abs2meta[typ]
+            # resolver = self._resolver
+            all_meta = self._var_allprocs_abs2meta
+            my_meta = self._var_abs2meta
+
+        graph = self._get_all_conn_graph()
+        node = ('i', abs_name)
+        if node in graph:
+            typ = 'input'
+        else:
+            node = ('o', abs_name)
+            if node in graph:
+                typ = 'output'
+            else:
+                raise KeyError(f"{self.msginfo}: Variable '{abs_name}' not found.")
+
+        all_meta = all_meta[typ]
+        my_meta = my_meta[typ]
 
         vars_to_gather = self._problem_meta['vars_to_gather']
 
@@ -5589,7 +5606,7 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 return _UNDEFINED
 
-        if kind is None:
+        if kind != 'residual':
             kind = typ
         if vec_name is None:
             vec_name = 'nonlinear'
@@ -5606,7 +5623,7 @@ class System(object, metaclass=SystemMetaclass):
                     val = my_meta[abs_name]['val']
             else:
                 if from_root:
-                    vec = self._problem_meta['model_ref']()._vectors[kind][vec_name]
+                    vec = model._vectors[kind][vec_name]
                 if vec._contains_abs(abs_name):
                     val = vec._abs_get_val(abs_name, flat)
 
@@ -5698,47 +5715,48 @@ class System(object, metaclass=SystemMetaclass):
         object
             The value of the requested output/input variable.
         """
-        graph = self._get_all_conn_graph()
-        node = graph.find_node(self, name)
-        srcnode = graph.get_root(node)
-        if self._problem_meta is None:
-            has_vectors = False
-        else:
-            has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
+        val = self._get_all_conn_graph().get_val(self, name, units, indices, get_remote, rank,
+                                                 vec_name, kind, flat, from_src)
+        # node = graph.find_node(self, name)
+        # srcnode = graph.get_root(node)
+        # if self._problem_meta is None:
+        #     has_vectors = False
+        # else:
+        #     has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
 
-        if has_vectors:
-            try:
-                if node[0] == 'o':  # getting an output
-                    val = self._abs_get_val(srcnode[1], get_remote, rank, vec_name, kind, flat)
-                    val = graph.get_val_from_node(val, srcnode, units=units, indices=indices)
+        # if has_vectors:
+        #     try:
+        #         if node[0] == 'o':  # getting an output
+        #             val = self._abs_get_val(srcnode[1], get_remote, rank, vec_name, kind, flat)
+        #             val = graph.get_val_from_node(val, srcnode, units=units, indices=indices)
 
-                elif from_src:  # getting an input from its source
-                    val = self._abs_get_val(srcnode[1], get_remote, rank, vec_name, kind, flat)
-                    val = graph.get_val_from_node(val, srcnode, node, units=units, indices=indices)
-                else:
-                    # getting a specific input
-                    # (must use absolute name or have only a single leaf node)
-                    leaves = list(graph.leaf_input_iter(node))
-                    if len(leaves) > 1:
-                        raise ValueError(
-                            f"{self.msginfo}: Promoted variable '{name}' refers to multiple "
-                            "input variables so the choice of input is ambiguous.  Either "
-                            "use the absolute name of the input or set 'from_src=True' to "
-                            "retrieve the value from the connected output.")
-                    val = self._abs_get_val(leaves[0][1], get_remote, rank, vec_name, kind, flat)
-                    val = graph.get_val_from_node(val, leaves[0], node, units=units, indices=indices)
-            except Exception as err:
-                raise RuntimeError(f"{self.msginfo}: When getting value of '{name}', {str(err)}.")
-        else:
-            if node in self._initial_condition_cache:
-                val, cache_units, cache_inds = self._initial_condition_cache[node]
-            else:  # try to retrieve from metadata
-                # model = self._problem_meta['model_ref']()
-                srcmeta = graph.nodes[srcnode]
-                # discrete = srcmeta['discrete']
-                val = srcmeta['val']
-                # srcunits = srcmeta['units']
-                # cache_inds = None
+        #         elif from_src:  # getting an input from its source
+        #             val = self._abs_get_val(srcnode[1], get_remote, rank, vec_name, kind, flat)
+        #             val = graph.get_val_from_node(val, srcnode, node, units=units, indices=indices)
+        #         else:
+        #             # getting a specific input
+        #             # (must use absolute name or have only a single leaf node)
+        #             leaves = list(graph.leaf_input_iter(node))
+        #             if len(leaves) > 1:
+        #                 raise ValueError(
+        #                     f"{self.msginfo}: Promoted variable '{name}' refers to multiple "
+        #                     "input variables so the choice of input is ambiguous.  Either "
+        #                     "use the absolute name of the input or set 'from_src=True' to "
+        #                     "retrieve the value from the connected output.")
+        #             val = self._abs_get_val(leaves[0][1], get_remote, rank, vec_name, kind, flat)
+        #             val = graph.get_val_from_node(val, leaves[0], node, units=units, indices=indices)
+        #     except Exception as err:
+        #         raise RuntimeError(f"{self.msginfo}: When getting value of '{name}', {str(err)}.")
+        # else:
+        #     if node in self._initial_condition_cache:
+        #         val, cache_units, cache_inds = self._initial_condition_cache[node]
+        #     else:  # try to retrieve from metadata
+        #         # model = self._problem_meta['model_ref']()
+        #         srcmeta = graph.nodes[srcnode]
+        #         # discrete = srcmeta['discrete']
+        #         val = srcmeta['val']
+        #         # srcunits = srcmeta['units']
+        #         # cache_inds = None
 
         # abs_names = self._resolver.absnames(name)
         # simp_units = simplify_unit(units)
@@ -5851,18 +5869,16 @@ class System(object, metaclass=SystemMetaclass):
             return
 
         graph = self._get_all_conn_graph()
-        node = graph.find_node(self, name)
-        has_vectors = self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
-        model = self._problem_meta['model_ref']()
+        graph.set_val(self, name, val, units=units, indices=indices)
 
-        if has_vectors:
-            try:
-                graph.set_val_from_node(model, node, val, units=units, indices=indices)
-            except Exception as err:
-                raise RuntimeError(f"{self.msginfo}: When setting value of '{name}', {str(err)}.")
-        else:  # cache the value for later
-            ic_cache = model._initial_condition_cache
-            ic_cache[node] = (val, units, indices)
+        # if has_vectors:
+        #     try:
+        #         graph.set_val(self, node, val, units=units, indices=indices)
+        #     except Exception as err:
+        #         raise RuntimeError(f"{self.msginfo}: When setting value of '{name}', {str(err)}.")
+        # else:  # cache the value for later
+        #     ic_cache = model._initial_condition_cache
+        #     ic_cache[node] = (val, units, indices)
             # if indices is not None:
             #     self._get_cached_val(name, abs_names)
             #     try:
@@ -5881,30 +5897,30 @@ class System(object, metaclass=SystemMetaclass):
             # else:
             #     ic_cache[abs_name] = (value, set_units, self.pathname, name)
 
-            if indices is None:
-                all_meta_in = model._var_allprocs_abs2meta['input']
-                loc_meta_in = model._var_abs2meta['input']
-                node_meta = graph.nodes[node]
-                for abs_in_node in graph.leaf_input_iter(node):
-                    abs_in_meta = graph.nodes[abs_in_node]
-                    _, abs_name = abs_in_node
-                    if abs_name in all_meta_in:
-                        meta = all_meta_in[abs_name]
-                        if 'shape_by_conn' in meta and meta['shape_by_conn']:
-                            # get any src_indices applied downstream of the initial target node
-                            src_inds_list = \
-                                abs_in_meta['src_inds_list'][len(node_meta['src_inds_list']):]
-                            if src_inds_list:
-                                # compute final val shape
-                                inval = get_subarray(val, src_inds_list)
-                            else:
-                                inval = val
+            # if indices is None:
+            #     all_meta_in = model._var_allprocs_abs2meta['input']
+            #     loc_meta_in = model._var_abs2meta['input']
+            #     node_meta = graph.nodes[node]
+            #     for abs_in_node in graph.leaf_input_iter(node):
+            #         abs_in_meta = graph.nodes[abs_in_node]
+            #         _, abs_name = abs_in_node
+            #         if abs_name in all_meta_in:
+            #             meta = all_meta_in[abs_name]
+            #             if 'shape_by_conn' in meta and meta['shape_by_conn']:
+            #                 # get any src_indices applied downstream of the initial target node
+            #                 src_inds_list = \
+            #                     abs_in_meta['src_inds_list'][len(node_meta['src_inds_list']):]
+            #                 if src_inds_list:
+            #                     # compute final val shape
+            #                     inval = get_subarray(val, src_inds_list)
+            #                 else:
+            #                     inval = val
 
-                            # val = ic_cache[abs_name][0]
-                            shape = () if np.isscalar(inval) else inval.shape
-                            all_meta_in[abs_name]['shape'] = shape
-                            if abs_name in loc_meta_in:
-                                loc_meta_in[abs_name]['shape'] = shape
+            #                 # val = ic_cache[abs_name][0]
+            #                 shape = () if np.isscalar(inval) else inval.shape
+            #                 all_meta_in[abs_name]['shape'] = shape
+            #                 if abs_name in loc_meta_in:
+            #                     loc_meta_in[abs_name]['shape'] = shape
 
 
         # model = self._problem_meta['model_ref']()
@@ -7282,6 +7298,18 @@ class System(object, metaclass=SystemMetaclass):
             If not None, dict-like object containing discrete output values.
         """
         pass
+
+    def has_vectors(self):
+        """
+        Check if the system vectors have been initialized.
+
+        Returns
+        -------
+        bool
+            True if the system has vectors, False otherwise.
+        """
+        return self._problem_meta is not None and \
+            self._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
 
 
 class _ErrorData(object):

@@ -1125,7 +1125,7 @@ class NameResolver(object):
         set of str
             The implicit connections.
         """
-        return set(self._prom2abs['output']).intersection(self._prom2abs['input'])
+        return self._prom2abs['output'].keys() & self._prom2abs['input'].keys()
 
     def _add_guesses(self, name, msg, n=10, cutoff=0.15, include_prom=True, include_abs=False):
         """

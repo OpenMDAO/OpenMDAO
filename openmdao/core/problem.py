@@ -585,15 +585,15 @@ class Problem(object, metaclass=ProblemMetaclass):
             value, units, indices = tup
             node_meta = graph.nodes[node]
             pathname = node_meta['pathname']
-            _, name = node
+            relname = node_meta['rel_name']
             if pathname:
                 system = self.model._get_subsystem(pathname)
                 if system is None or not system._is_local:
                     pass
                 else:
-                    system.set_val(name, value, units=units, indices=indices)
+                    system.set_val(relname, value, units=units, indices=indices)
             else:
-                self.model.set_val(name, value, units=units, indices=indices)
+                self.model.set_val(relname, value, units=units, indices=indices)
 
         # Clean up cache
         self.model._initial_condition_cache = {}

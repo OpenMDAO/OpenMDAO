@@ -308,10 +308,11 @@ class TestProblem(unittest.TestCase):
 
         # check bad scalar value
         bad_val = -10*np.ones((10))
-        prob['indep.num'] = bad_val
-        with self.assertRaisesRegex(ValueError,
-                "<model> <class Group>: Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."):
-            prob.final_setup()
+        with self.assertRaises(ValueError) as cm:
+            prob['indep.num'] = bad_val
+
+        self.assertEqual(cm.exception.args[0],
+                         "Failed to set value of 'indep.num': could not broadcast input array from shape (10,) into shape (1,).")
         prob.model._initial_condition_cache = {}
 
         # check assign scalar to array
@@ -325,7 +326,7 @@ class TestProblem(unittest.TestCase):
         prob['indep.arr'] = new_val
         assert_near_equal(prob['indep.arr'], new_val, 1e-10)
 
-        msg = "<model> <class Group>: Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
+        msg = "Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
         # check bad array value
         bad_val = -10*np.ones((9,1))
         with self.assertRaisesRegex(ValueError, msg):
@@ -931,18 +932,18 @@ class TestProblem(unittest.TestCase):
 
         prob = om.Problem()
         prob.model.add_subsystem('comp', om.ExecComp('y=x-25.',
-                                                     x={'val': 77.0, 'units': 'degF', 'shape': (),},
-                                                     y={'val': 0.0, 'units': 'degC', 'shape': (),}))
+                                                     x={'val': 77.0, 'units': 'degF',},
+                                                     y={'val': 0.0, 'units': 'degC',}))
         prob.model.add_subsystem('prom', om.ExecComp('yy=xx-25.',
-                                                     xx={'val': 77.0, 'units': 'degF', 'shape': (),},
-                                                     yy={'val': 0.0, 'units': 'degC', 'shape': (),}),
+                                                     xx={'val': 77.0, 'units': 'degF',},
+                                                     yy={'val': 0.0, 'units': 'degC',}),
                                  promotes=['xx', 'yy'])
         prob.model.add_subsystem('acomp', om.ExecComp('y=x-25.',
                                                       x={'val': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                      y={'val': 0.0, 'units': 'degC', 'shape': (),}))
+                                                      y={'val': 0.0, 'units': 'degC',}))
         prob.model.add_subsystem('aprom', om.ExecComp('ayy=axx-25.',
                                                       axx={'val': np.array([77.0, 95.0]), 'units': 'degF'},
-                                                      ayy={'val': 0.0, 'units': 'degC', 'shape': (),}),
+                                                      ayy={'val': 0.0, 'units': 'degC',}),
                                  promotes=['axx', 'ayy'])
 
         prob.setup()
@@ -1186,18 +1187,18 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        msg = "<model> <class Group>: Can't express variable 'comp.x' with units of 'cm' in units of 'degK'."
-        with self.assertRaisesRegex(TypeError, msg):
+        msg = "<model> <class Group>: Can't get value of 'comp.x': Can't express value with units of 'cm' in units of 'degK'"
+        with self.assertRaisesRegex(Exception, msg):
             prob.get_val('comp.x', 'degK')
 
-        with self.assertRaisesRegex(TypeError, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.set_val('comp.x', 55.0, 'degK')
 
         msg = "Can't express variable 'no_unit.x' with units of 'None' in units of 'degK'."
-        with self.assertRaisesRegex(TypeError, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.get_val('no_unit.x', 'degK')
 
-        with self.assertRaisesRegex(TypeError, msg):
+        with self.assertRaisesRegex(Exception, msg):
             prob.set_val('no_unit.x', 55.0, 'degK')
 
     def test_feature_get_set_with_units(self):

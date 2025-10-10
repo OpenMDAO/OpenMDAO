@@ -163,6 +163,12 @@ class Indexer(object):
         """
         raise NotImplementedError("No implementation of '__call__' found.")
 
+    def __repr__(self):
+        """
+        Return string representation.
+        """
+        return str(self)
+
     def indexed_val(self, arr):
         """
         Return the value of the indices in the array.
@@ -1698,151 +1704,3 @@ slicer = Slicer()
 _full_slice = slice(None)
 _flat_full_indexer = indexer(_full_slice, flat_src=True)
 _full_indexer = indexer(_full_slice, flat_src=False)
-
-
-def get_subarray(arr, indices_list):
-    """
-    Applies a sequence of indexing operations to the input array.
-
-    Parameters
-    ----------
-    arr : numpy.ndarray
-        The initial array.
-    indices_list : list
-        A list of indexing objects (e.g., slices, integers, arrays for advanced indexing).
-
-    Returns
-    -------
-    subarray : numpy.ndarray
-        The result after applying all indexing operations (may be a view or copy).
-    """
-    current = arr
-    for idx in indices_list:
-        current = current[idx]
-    return current
-
-
-def set_subarray(arr, indices_list, val):
-    """
-    Sets the provided val into the positions of the original array corresponding to the final subarray
-    after applying the sequence of indexing operations.
-
-    This function handles both views and copies by propagating changes back through the chain.
-
-    Parameters
-    ----------
-    arr : numpy.ndarray
-        The original array to modify.
-    indices_list : list
-        A list of indexing objects (e.g., slices, integers, arrays for advanced indexing).
-    val : numpy.ndarray or compatible
-        The val to set (must match the shape of the final subarray).
-
-    Raises
-    ------
-    ValueError
-        If the shape of val does not match the final subarray shape.
-    """
-    chain = [arr]
-    for idx in indices_list:
-        chain.append(chain[-1][idx])
-
-    if np.shape(val) != () and np.squeeze(val).shape != np.squeeze(chain[-1]).shape:
-        raise ValueError(f"Value shape {np.squeeze(val).shape} does not match final subarray "
-                         f"shape {np.squeeze(chain[-1]).shape}.")
-
-    chain[-1][:] = val
-
-    for i in range(len(chain) - 2, -1, -1):
-        sub = chain[i + 1]
-        prev = chain[i]
-        idx = indices_list[i]
-        if sub.base is not prev:
-            prev[idx] = sub
-
-
-# Test function
-def test_set_subarray():
-    # Test 1: Simple slicing (should create views)
-    arr1 = np.arange(12).reshape(3, 4)
-    original1 = arr1.copy()  # For comparison
-    indices1 = [slice(1, 3), slice(1, 3)]
-
-    sub1 = get_subarray(arr1, indices1)
-    assert sub1.shape == (2, 2)
-    assert np.all(sub1 == np.array([[5, 6], [9, 10]]))
-
-    new_value1 = np.array([[100, 101], [102, 103]])
-    set_subarray(arr1, indices1, new_value1)
-
-    new_sub1 = get_subarray(arr1, indices1)
-    assert np.all(new_sub1 == new_value1)
-
-    # Check other parts unchanged
-    assert np.all(arr1[0] == original1[0])
-    assert np.all(arr1[:, 0] == original1[:, 0])  # First column unchanged
-    assert arr1[2, 3] == original1[2, 3]  # Example unchanged element
-
-    print("Test 1 passed: Slicing (views)")
-
-    # Test 2: Advanced indexing (should create copy)
-    arr2 = np.arange(12).reshape(3, 4)
-    original2 = arr2.copy()
-    indices2 = [np.array([0, 2]), np.array([1, 3])]
-
-    sub2 = get_subarray(arr2, indices2)
-    assert sub2.shape == (2,)
-    assert np.all(sub2 == np.array([1, 11]))
-
-    new_value2 = np.array([200, 201])
-    set_subarray(arr2, indices2, new_value2)
-
-    new_sub2 = get_subarray(arr2, indices2)
-    assert np.all(new_sub2 == new_value2)
-
-    # Check specific changes
-    assert arr2[0, 1] == 200
-    assert arr2[2, 3] == 201
-    # Check unchanged
-    assert arr2[1, 2] == original2[1, 2]
-
-    print("Test 2 passed: Advanced indexing (copy)")
-
-    # Test 3: Mixed - slice then advanced
-    arr3 = np.arange(24).reshape(2, 3, 4)
-    original3 = arr3.copy()
-    indices3 = [slice(0, 2), np.array([0, 2]), slice(1, 4, 2)]
-
-    sub3 = get_subarray(arr3, indices3)
-    assert sub3.shape == (2, 2)
-    assert np.all(sub3 == np.array([[1, 3], [17, 19]]))
-
-    new_value3 = np.array([[300, 301], [302, 303]])
-    set_subarray(arr3, indices3, new_value3)
-
-    new_sub3 = get_subarray(arr3, indices3)
-    assert np.all(new_sub3 == new_value3)
-
-    # Check specific changes
-    assert arr3[0, 0, 1] == 300
-    assert arr3[0, 0, 3] == 301
-    assert arr3[1, 0, 1] == 302
-    assert arr3[1, 0, 3] == 303
-    # Unchanged
-    assert arr3[0, 1, 0] == original3[0, 1, 0]
-
-    print("Test 3 passed: Mixed indexing")
-
-    # Test 4: Error on shape mismatch
-    try:
-        set_subarray(arr3, indices3, np.array([[1,2,3],[4,5,6]]))  # Wrong shape
-        assert False, "Should have raised ValueError"
-    except ValueError:
-        pass
-
-    print("Test 4 passed: Shape mismatch error")
-
-
-if __name__ == "__main__":
-    # Run the tests
-    test_set_subarray()

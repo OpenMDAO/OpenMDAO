@@ -1,7 +1,7 @@
 import unittest
 import openmdao.api as om
 import numpy as np
-from openmdao.core.tests.test_allconn_graph import is_equal, are_compatible_values, convert_get, convert_set
+from openmdao.core.conn_graph import is_equal, are_compatible_values
 
 
 class TestAllConnectionTypes(unittest.TestCase):
@@ -56,7 +56,7 @@ class TestAllConnectionTypes(unittest.TestCase):
 
         # prob.model._get_all_conn_graph().display()
         # prob.model._get_all_conn_graph().dump()
-        print('done')
+        #print('done')
 
     def test_promoted_branching_output(self):
         prob = self.build_nested_model(promote=True)
@@ -72,7 +72,8 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        #prob.model._get_all_conn_graph().display()
+        #prob.model.display_conn_graph()
+        #prob.model.G2.display_conn_graph()
         #prob.model._get_all_conn_graph().dump()
         #print('done')
 
@@ -131,7 +132,7 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        #prob.model._get_all_conn_graph().display()
+        #prob.model.display_conn_graph()
         #prob.model._get_all_conn_graph().dump()
         #print('done')
 
@@ -172,32 +173,6 @@ class TestAllConnGraphUtilityFunctions(unittest.TestCase):
 
         # Test with different types
         self.assertFalse(are_compatible_values(5, 5.0))
-
-    def test_convert_get_no_conversion(self):
-        """Test convert_get without unit conversion."""
-        val = np.array([1.0, 2.0, 3.0])
-        result = convert_get(val, None, None)
-        np.testing.assert_array_equal(result, val)
-
-    def test_convert_get_with_units(self):
-        """Test convert_get with unit conversion."""
-        val = np.array([1.0, 2.0, 3.0])  # meters
-        result = convert_get(val, 'm', 'mm')
-        expected = val * 1000.0  # convert to millimeters
-        np.testing.assert_array_equal(result, expected)
-
-    def test_convert_set_no_conversion(self):
-        """Test convert_set without unit conversion."""
-        val = np.array([1.0, 2.0, 3.0])
-        result = convert_set(val, None, None)
-        np.testing.assert_array_equal(result, val)
-
-    def test_convert_set_with_units(self):
-        """Test convert_set with unit conversion."""
-        val = np.array([1000.0, 2000.0, 3000.0])  # millimeters
-        result = convert_set(val, 'm', 'mm')
-        expected = val / 1000.0  # convert from mm to m
-        np.testing.assert_array_almost_equal(result, expected, decimal=6)
 
 
 

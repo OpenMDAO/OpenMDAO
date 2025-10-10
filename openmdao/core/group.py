@@ -1,4 +1,5 @@
 """Define the Group class."""
+import os
 import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable
@@ -877,29 +878,42 @@ class Group(System):
             self._setup_var_existence()
         return self._var_existence
 
-    def _check_required_connections(self):
-        conns = self._conn_global_abs_in2out
-        abs2meta_in = self._var_allprocs_abs2meta['input']
-        discrete_in = self._var_allprocs_discrete['input']
-        desvar = self.get_design_vars()
-        resolver = self._resolver
+    def _check_connections(self):
+        graph = self._get_all_conn_graph()
+        nodes = graph.nodes
 
-        for abs_tgt, src in conns.items():
-            if src.startswith('_auto_ivc.'):
-                if abs_tgt in discrete_in:
-                    continue
+        for u, v in graph.io_conn_iter():
+            # check all connection shapes
+            u_meta = nodes[u]
+            v_meta = nodes[v]
+            if u_meta['_shape'] is not None and v_meta['_shape'] is not None:
+                if not array_connection_compatible(u_meta['_shape'], v_meta['_shape']):
+                    self._collect_error(f"{self.msginfo}: Input '{u[1]}' shape {u_meta['_shape']} "
+                                        f"and output '{v[1]}' shape {v_meta['_shape']} are "
+                                        "incompatible.")
 
-                prom_tgt = resolver.abs2prom(abs_tgt, 'input')
+        # conns = self._conn_global_abs_in2out
+        # abs2meta_in = self._var_allprocs_abs2meta['input']
+        # discrete_in = self._var_allprocs_discrete['input']
+        # desvar = self.get_design_vars()
+        # resolver = self._resolver
 
-                # Ignore inputs that are declared as design vars.
-                if prom_tgt in desvar:
-                    continue
+        # for abs_tgt, src in conns.items():
+        #     if src.startswith('_auto_ivc.'):
+        #         if abs_tgt in discrete_in:
+        #             continue
 
-                if abs2meta_in[abs_tgt]['require_connection']:
-                    promoted_as = f', promoted as "{prom_tgt}",' if prom_tgt != abs_tgt else ''
-                    self._collect_error(f'{self.msginfo}: Input "{abs_tgt}"{promoted_as} '
-                                        'requires a connection but is not connected.',
-                                        ident=(prom_tgt, abs_tgt))
+        #         prom_tgt = resolver.abs2prom(abs_tgt, 'input')
+
+        #         # Ignore inputs that are declared as design vars.
+        #         if prom_tgt in desvar:
+        #             continue
+
+        #         if abs2meta_in[abs_tgt]['require_connection']:
+        #             promoted_as = f', promoted as "{prom_tgt}",' if prom_tgt != abs_tgt else ''
+        #             self._collect_error(f'{self.msginfo}: Input "{abs_tgt}"{promoted_as} '
+        #                                 'requires a connection but is not connected.',
+        #                                 ident=(prom_tgt, abs_tgt))
 
     def _get_dataflow_graph(self):
         """
@@ -1162,10 +1176,7 @@ class Group(System):
 
         self._top_level_post_sizes()
 
-        # determine which connections are managed by which group, and check validity of connections
-        self._setup_connections()
-
-        self._check_required_connections()
+        self._check_connections()
 
         # setup of residuals must occur before setup of vectors and partials
         self._setup_residuals()
@@ -2156,13 +2167,22 @@ class Group(System):
         self._bad_conn_vars = set()
 
         if self.pathname == '':
+            self.display_conn_graph()
+            # at this point, the conn graph has no connections, but all promotions are there.
+
+            all_conn_graph.add_implicit_connections(self)
+
+            # add nodes for all absolute inputs and connected absolute outputs
+            all_conn_graph.add_abs_variable_meta(self)
+
+            for g in self.system_iter(include_self=True, recurse=True, typ=Group):
+                all_conn_graph.add_group_input_defaults(g)
+
             for g in self.system_iter(include_self=True, recurse=True, typ=Group):
                 all_conn_graph.add_manual_connections(g)
-                all_conn_graph.add_group_input_defaults(g)
 
             # TODO: gather all manual connections and static info from all procs
 
-            all_conn_graph.add_implicit_connections(self)
 
             # check for cycles
             if not nx.is_directed_acyclic_graph(all_conn_graph):
@@ -2172,7 +2192,6 @@ class Group(System):
                 self._collect_error('Cycle detected in input-to-input connections. '
                                     f'This is not allowed.\n{errmsg}')
 
-            all_conn_graph.add_abs_variable_meta(self)  # add nodes for all absolute inputs
             all_conn_graph.rollup_input_meta(self)
             all_conn_graph.add_auto_ivcs(self)
             all_conn_graph.update_shapes(self)
@@ -4668,19 +4687,14 @@ class Group(System):
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
-        # prom2auto = {}
-        # count = 0
-        # all_abs2meta = self._var_allprocs_abs2meta['input']
-        # conns = self._conn_global_abs_in2out
-        # # auto_conns = {}
-        # resolver = self._resolver
         conn_graph = self._all_conn_graph
 
         auto2tgt = {}
         for srcnode in conn_graph.nodes():
             io, src = srcnode
-            if src.startswith('_auto_ivc.'):
+            if io == 'o' and src.startswith('_auto_ivc.'):
                 auto2tgt[src] = [n[1] for n in conn_graph.leaf_input_iter(srcnode)]
+        self._auto2tgt = auto2tgt
 
         # for tgt in all_abs2meta:
         #     if tgt in conns or tgt in self._bad_conn_vars:
@@ -4774,46 +4788,6 @@ class Group(System):
                 auto_ivc.add_output(relsrc, val=np.atleast_1d(val), units=units)
             if remote:
                 auto_ivc._add_remote(relsrc)
-
-        ## have to sort to keep vars in sync because we may be doing bcasts
-        #for abs_in in sorted(self._var_allprocs_discrete['input']):
-            #if abs_in in conns:
-                #src = conns[abs_in]
-                #if not src.startswith('_auto_ivc.'):
-                    #continue
-
-                #loc_out_name = src.rpartition('.')[-1]
-
-                #prom = resolver.abs2prom(abs_in, 'input')
-                #val = _UNDEFINED
-
-                #if prom in prom2auto:
-                    ## multiple connected inputs w/o a src. Connect them to the same IVC
-                    ## check if they have different metadata, and if they do, there must be
-                    ## a group input defined that sets the default, else it's an error
-                    #conns[abs_in] = prom2auto[prom][0]
-                #else:
-                    #ivc_name = f"_auto_ivc.v{count}"
-                    #loc_out_name = ivc_name.rsplit('.', 1)[-1]
-                    #count += 1
-                    #prom2auto[prom] = (ivc_name, abs_in)
-                    #conns[abs_in] = ivc_name
-
-                    #if resolver.is_local(abs_in, 'input'):  # var is local
-                        #val = self._var_discrete['input'][abs_in]['val']
-                    #else:
-                        #val = None
-                    #if abs_in in vars_to_gather:
-                        #if vars_to_gather[abs_in] == self.comm.rank:
-                            #self.comm.bcast(val, root=vars_to_gather[abs_in])
-                        #else:
-                            #val = self.comm.bcast(None, root=vars_to_gather[abs_in])
-                    #auto_ivc.add_discrete_output(loc_out_name, val=val)
-
-                ##if src in auto2tgt:
-                    ##auto2tgt[src].append(abs_in)
-                ##else:
-                    ##auto2tgt[src] = [abs_in]
 
         if not auto2tgt:
             return auto_ivc
@@ -5437,6 +5411,37 @@ class Group(System):
         # inside of the group or its children.
         meta['base'] = 'Group'
         return meta
+
+    def write_graph(self, graph_type='dataflow', recurse=True, show_vars=True, display=True,
+                    show_boundary=False, stacked=False, exclude=(), outfile=None):
+        from openmdao.visualization.graph_viewer import GraphViewer
+
+        valid_types = {'tree', 'dataflow', 'cycle'}
+
+        if graph_type not in valid_types:
+            raise ValueError(f"{self.msginfo}: Invalid graph type '{graph_type}'. Valid types are "
+                             f"{sorted(valid_types)}.")
+
+        if stacked:
+            recurse = False
+            groups = self.system_iter(include_self=True, recurse=True, typ=Group)
+        else:
+            groups = [self]
+
+        orig_outfile = outfile
+        for g in groups:
+            if orig_outfile is not None:
+                orig, orig_ext = os.path.splitext(orig_outfile)
+                name = '_' + g.pathname.replace('.', '_') if g.pathname else ''
+                outfile = f"{orig}{name}{orig_ext}"
+
+            GraphViewer(g).write_graph(gtype=graph_type, recurse=recurse,
+                                       show_vars=show_vars, display=display,
+                                       exclude=exclude, show_boundary=show_boundary,
+                                       outfile=outfile)
+
+    def display_conn_graph(self, varname=None):
+        self._get_all_conn_graph().display(self, varname=varname)
 
     def _column_iotypes(self):
         """
