@@ -74,12 +74,14 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             # get help colors from the subgraph (where fillcolor is set)
             incolor = outcolor = None
             for node_id, node_data in subgraph.nodes(data=True):
-                if incolor is None or outcolor is None:
-                    if incolor is None and node_id[0] == 'i':
-                        incolor = node_data.get('fillcolor', None)
-                    elif outcolor is None and node_id[0] == 'o':
-                        outcolor = node_data.get('fillcolor', None)
-                else:
+                # Look for input nodes (starting with 'i')
+                if incolor is None and node_id[0] == 'i':
+                    incolor = node_data.get('fillcolor', None)
+                # Look for output nodes (starting with 'o')
+                elif outcolor is None and node_id[0] == 'o':
+                    outcolor = node_data.get('fillcolor', None)
+                # Stop once we have both colors
+                if incolor is not None and outcolor is not None:
                     break
 
             help_colors = {'i': incolor, 'o': outcolor}
@@ -491,11 +493,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         }
 
         .legend-color.input {
-            background-color: #3498db;
+            /* Color will be set dynamically by JavaScript */
+            background-color: #f0f0f0; /* Default gray */
         }
 
         .legend-color.output {
-            background-color: #e74c3c;
+            /* Color will be set dynamically by JavaScript */
+            background-color: #f0f0f0; /* Default gray */
         }
 
         .modal-body code {
@@ -585,12 +589,12 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 <h3>Node Colors</h3>
                 <div class="legend">
                     <div class="legend-item">
-                        <div class="legend-color input"></div>
-                        <span><strong>Blue/Input Color:</strong> Input variables</span>
+                        <div class="legend-color input" id="input-color-swatch"></div>
+                        <span id="input-color-text"><strong>Input Color:</strong> Input variables</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-color output"></div>
-                        <span><strong>Red/Output Color:</strong> Output variables</span>
+                        <div class="legend-color output" id="output-color-swatch"></div>
+                        <span id="output-color-text"><strong>Output Color:</strong> Output variables</span>
                     </div>
                 </div>
 
@@ -799,10 +803,10 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         }
 
         function showHelp() {
-            console.log('showHelp() called');
+            // Show the modal first
+            document.getElementById('help-modal').style.display = 'flex';
             // Get actual colors from the connection graph
             updateHelpColors();
-            document.getElementById('help-modal').style.display = 'flex';
         }
 
         function updateHelpColors() {
@@ -810,55 +814,88 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             let inputColor = '#3498db';  // Default blue
             let outputColor = '#e74c3c'; // Default red
 
-            console.log('Updating help colors...');
+            // Color mapping function to convert color names to hex values
+            function getColorHex(colorName) {
+                const colorMap = {
+                    'peachpuff3': '#cdaf95',
+                    'skyblue3': '#87ceeb',
+                    'peachpuff': '#ffdab9',
+                    'skyblue': '#87ceeb'
+                };
+                return colorMap[colorName] || colorName;
+            }
 
-            // Try to get colors from the connection graph metadata
-            fetch('/api/subsystem/')
-                .then(response => {
-                    console.log('Help colors response status:', response.status);
-                    return response.json();
-                })
+            // Set default colors immediately while we fetch the real ones
+            const inputColorEl = document.getElementById('input-color-swatch');
+            const outputColorEl = document.getElementById('output-color-swatch');
+            const inputTextEl = document.getElementById('input-color-text');
+            const outputTextEl = document.getElementById('output-color-text');
+
+            if (inputColorEl) {
+                inputColorEl.style.backgroundColor = inputColor;
+            }
+            if (outputColorEl) {
+                outputColorEl.style.backgroundColor = outputColor;
+            }
+            if (inputTextEl) {
+                inputTextEl.innerHTML = `<strong>Input Color (${inputColor}):</strong> Input variables`;
+            }
+            if (outputTextEl) {
+                outputTextEl.innerHTML = `<strong>Output Color (${outputColor}):</strong> Output variables`;
+            }
+
+            // Use the current subsystem to get the correct colors
+            const subsystemPath = currentSubsystem === 'model' ? '' : currentSubsystem;
+
+            fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
+                .then(response => response.json())
                 .then(subsystemData => {
-                    console.log('Subsystem data for colors:', subsystemData);
                     if (subsystemData.success && subsystemData.help_colors) {
-                        console.log('Found help_colors:', subsystemData.help_colors);
                         // Use the help_colors dictionary directly
                         if (subsystemData.help_colors.i) {
-                            inputColor = subsystemData.help_colors.i;
-                            console.log('Found input color:', inputColor);
+                            inputColor = getColorHex(subsystemData.help_colors.i);
                         }
                         if (subsystemData.help_colors.o) {
-                            outputColor = subsystemData.help_colors.o;
-                            console.log('Found output color:', outputColor);
+                            outputColor = getColorHex(subsystemData.help_colors.o);
                         }
-                    } else {
-                        console.log('No help_colors found in response');
                     }
 
-                    // Update the legend colors
-                    const inputColorEl = document.querySelector('.legend-color.input');
-                    const outputColorEl = document.querySelector('.legend-color.output');
-
-                    console.log('Updating legend colors - input:', inputColor, 'output:', outputColor);
-                    console.log('Found input element:', inputColorEl);
-                    console.log('Found output element:', outputColorEl);
-
+                    // Update the legend colors and text with the real colors from the graph
                     if (inputColorEl) {
                         inputColorEl.style.backgroundColor = inputColor;
-                        console.log('Updated input color element to:', inputColor);
-                    } else {
-                        console.log('Input color element not found!');
                     }
                     if (outputColorEl) {
                         outputColorEl.style.backgroundColor = outputColor;
-                        console.log('Updated output color element to:', outputColor);
-                    } else {
-                        console.log('Output color element not found!');
+                    }
+
+                    // Update the text labels to show actual colors
+                    if (inputTextEl && inputColor) {
+                        inputTextEl.innerHTML = `<strong>Input Color (${inputColor}):</strong> Input variables`;
+                    }
+                    if (outputTextEl && outputColor) {
+                        outputTextEl.innerHTML = `<strong>Output Color (${outputColor}):</strong> Output variables`;
                     }
                 })
                 .catch(error => {
-                    console.log('Could not fetch subsystem data for colors, using defaults:', error);
                     // Use default colors if we can't get the metadata
+                    const inputColorEl = document.getElementById('input-color-swatch');
+                    const outputColorEl = document.getElementById('output-color-swatch');
+                    const inputTextEl = document.getElementById('input-color-text');
+                    const outputTextEl = document.getElementById('output-color-text');
+
+                    // Set default colors
+                    if (inputColorEl) {
+                        inputColorEl.style.backgroundColor = '#3498db'; // Default blue
+                    }
+                    if (outputColorEl) {
+                        outputColorEl.style.backgroundColor = '#e74c3c'; // Default red
+                    }
+                    if (inputTextEl) {
+                        inputTextEl.innerHTML = `<strong>Input Color (#3498db):</strong> Input variables`;
+                    }
+                    if (outputTextEl) {
+                        outputTextEl.innerHTML = `<strong>Output Color (#e74c3c):</strong> Output variables`;
+                    }
                 });
         }
 
