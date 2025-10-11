@@ -11,8 +11,8 @@ This creates a web interface that:
 
 import json
 from http.server import SimpleHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
-import pydot
+from urllib.parse import urlparse, parse_qs, unquote
+import networkx as nx
 
 
 class ConnGraphHandler(SimpleHTTPRequestHandler):
@@ -31,10 +31,10 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         elif parsed_path.path == '/api/graph_info':
             self.serve_graph_info()
         elif parsed_path.path.startswith('/api/subsystem/'):
-            subsystem = parsed_path.path.replace('/api/subsystem/', '')
+            subsystem = unquote(parsed_path.path.replace('/api/subsystem/', ''))
             self.serve_subsystem_graph(subsystem)
         elif parsed_path.path.startswith('/api/variable/'):
-            variable = parsed_path.path.replace('/api/variable/', '')
+            variable = unquote(parsed_path.path.replace('/api/variable/', ''))
             self.serve_variable_graph(variable)
         elif parsed_path.path == '/api/search':
             self.serve_search()
@@ -61,36 +61,100 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
     def serve_subsystem_graph(self, subsystem):
         """Serve graph for a specific subsystem."""
         try:
-            subgraph = self.get_subsystem_graph(subsystem)
-            graphviz_svg = self.generate_graphviz_svg(subgraph, f"Subsystem: {subsystem}")
+            print(f"Serving subsystem graph for: '{subsystem}'")
+            subgraph = self.conn_graph.get_drawable_graph(subsystem)
+            print(f"Subgraph has {len(subgraph.nodes())} nodes and {len(subgraph.edges())} edges")
+
+            pydot_graph = nx.drawing.nx_pydot.to_pydot(subgraph)
+            try:
+                graphviz_svg = pydot_graph.create_svg().decode('utf-8')
+            except Exception:
+                graphviz_svg = self.create_text_graph(subgraph, f"Subsystem: {subsystem}")
+
+            # Convert nodes to a format the frontend can use
+            nodes_data = {}
+            for node_id, node_data in subgraph.nodes(data=True):
+                print(f"Raw node {node_id}: {node_data}")
+
+                # Extract the actual variable information from the node metadata
+                # The node_data contains the original rel_name and pathname
+                rel_name = node_data.get('rel_name', '')
+                pathname = node_data.get('pathname', '')
+                io_type = node_data.get('io', '')
+
+                # If io_type is not in node_data, extract from node_id tuple
+                if not io_type and isinstance(node_id, tuple) and len(node_id) == 2:
+                    io_type = node_id[0]  # 'i' or 'o'
+
+                nodes_data[str(node_id)] = {
+                    'rel_name': rel_name,
+                    'pathname': pathname,
+                    'io': io_type
+                }
+                print(f"Processed node {node_id}: rel_name='{rel_name}', pathname='{pathname}', io='{io_type}'")
 
             response = {
                 'success': True,
                 'subsystem': subsystem,
                 'nodes': len(subgraph.nodes()),
                 'edges': len(subgraph.edges()),
+                'nodes_data': nodes_data,
                 'svg': graphviz_svg
             }
+            print(f"Returning {len(nodes_data)} nodes_data entries")
         except Exception as e:
-            response = {'success': False, 'error': str(e)}
+            print(f"Error in serve_subsystem_graph: {e}")
+            # Provide more helpful error message
+            error_msg = str(e)
+            if "not found" in error_msg.lower():
+                error_msg = f"Subsystem '{subsystem}' not found. Try searching for a different subsystem name."
+            response = {'success': False, 'error': error_msg}
 
         self.send_json_response(response)
 
     def serve_variable_graph(self, variable):
         """Serve graph focused on a specific variable."""
         try:
-            subgraph = self.get_variable_graph(variable)
-            graphviz_svg = self.generate_graphviz_svg(subgraph, f"Variable: {variable}")
+            # First try the variable name as-is
+            try:
+                pydot_graph = self.conn_graph.get_pydot_graph(varname=variable)
+            except Exception:
+                # If that fails, try to find the full pathname for this variable
+                full_variable = self.find_full_variable_path(variable)
+                if full_variable:
+                    pydot_graph = self.conn_graph.get_pydot_graph(varname=full_variable)
+                else:
+                    raise ValueError(f"Variable '{variable}' not found in connection graph")
+
+            # pydot_graph is already a pydot.Dot object, so we can use it directly
+            try:
+                graphviz_svg = pydot_graph.create_svg().decode('utf-8')
+            except Exception:
+                # If SVG generation fails, create a text representation
+                # We need to convert the pydot graph to NetworkX for the text fallback
+                try:
+                    nx_graph = nx.drawing.nx_pydot.from_pydot(pydot_graph)
+                    graphviz_svg = self.create_text_graph(nx_graph, f"Variable: {variable}")
+                except Exception:
+                    graphviz_svg = f"<div style='padding: 20px; color: red;'>Error generating graph for variable: {variable}</div>"
+
+            # Count nodes and edges from the pydot graph
+            nodes_count = len(pydot_graph.get_nodes())
+            edges_count = len(pydot_graph.get_edges())
 
             response = {
                 'success': True,
                 'variable': variable,
-                'nodes': len(subgraph.nodes()),
-                'edges': len(subgraph.edges()),
+                'nodes': nodes_count,
+                'edges': edges_count,
                 'svg': graphviz_svg
             }
         except Exception as e:
-            response = {'success': False, 'error': str(e)}
+            # Provide more helpful error message
+            error_msg = str(e)
+            if "not found" in error_msg.lower():
+                error_msg = f"Variable '{variable}' not found. Try searching for a different variable name."
+            response = {'success': False, 'error': error_msg}
 
         self.send_json_response(response)
 
@@ -106,13 +170,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         # Search nodes
         for node_id, node_data in self.conn_graph.nodes(data=True):
             # Try different name fields
-            name = node_data.get('name') or node_data.get('rel_name', '')
+            name = node_data['rel_name']
             if query in name.lower():
                 results.append({
                     'type': 'variable',
                     'name': name,
-                    'path': node_data.get('pathname', ''),
-                    'io_type': node_data.get('io', '')
+                    'path': node_data['pathname'],
+                    'io_type': node_id[0]
                 })
 
         # Search subsystems
@@ -129,86 +193,14 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
     def get_subsystems(self):
         """Get list of unique subsystems."""
-        subsystems = set()
+        subsystems = {'model'}
         for node_id, node_data in self.conn_graph.nodes(data=True):
             pathname = node_data.get('pathname', '')
             if pathname:
-                parts = pathname.split('.')
-                if len(parts) > 1:
-                    subsystem = '.'.join(parts[:-1])
-                    subsystems.add(subsystem)
-        return sorted(list(subsystems))
+                subsystems.add(pathname)
 
-    def get_subsystem_graph(self, subsystem_path):
-        """Get subgraph for a specific subsystem."""
-        subsystem_nodes = []
-        for node_id, node_data in self.conn_graph.nodes(data=True):
-            pathname = node_data.get('pathname', '')
-            if pathname.startswith(subsystem_path + '.') or pathname == subsystem_path:
-                subsystem_nodes.append(node_id)
-
-        return self.conn_graph.subgraph(subsystem_nodes)
-
-    def get_variable_graph(self, variable_name):
-        """Get subgraph focused on a specific variable."""
-        target_node = None
-        for node_id, node_data in self.conn_graph.nodes(data=True):
-            name = node_data.get('name') or node_data.get('rel_name', '')
-            if name == variable_name:
-                target_node = node_id
-                break
-
-        if not target_node:
-            raise ValueError(f"Variable '{variable_name}' not found")
-
-        # Get connected nodes (up to 2 degrees of separation)
-        connected_nodes = {target_node}
-
-        # First degree connections
-        for edge in self.conn_graph.edges():
-            if edge[0] == target_node or edge[1] == target_node:
-                connected_nodes.add(edge[0])
-                connected_nodes.add(edge[1])
-
-        # Second degree connections
-        for edge in self.conn_graph.edges():
-            if edge[0] in connected_nodes or edge[1] in connected_nodes:
-                connected_nodes.add(edge[0])
-                connected_nodes.add(edge[1])
-
-        return self.conn_graph.subgraph(list(connected_nodes))
-
-    def generate_graphviz_svg(self, subgraph, title):
-        """Generate SVG using pydot."""
-        try:
-            # Create a pydot graph
-            graph = pydot.Dot(graph_type='digraph')
-            graph.set_rankdir('TB')
-            graph.set_node_defaults(shape='box', style='filled', fontname='Arial', fontsize='10')
-            graph.set_edge_defaults(color='gray', fontname='Arial', fontsize='8')
-
-            # Add nodes
-            for node_id, node_data in subgraph.nodes(data=True):
-                name = node_data.get('name') or node_data.get('rel_name', str(node_id))
-                io_type = node_data.get('io', '')
-                color = '#ffeb3b' if io_type == 'i' else '#4caf50'
-
-                # Create pydot node
-                node = pydot.Node(str(node_id), label=name, fillcolor=color)
-                graph.add_node(node)
-
-            # Add edges
-            for edge in subgraph.edges():
-                edge_obj = pydot.Edge(str(edge[0]), str(edge[1]))
-                graph.add_edge(edge_obj)
-
-            # Generate SVG
-            svg_content = graph.create_svg().decode('utf-8')
-            return svg_content
-
-        except Exception:
-            # Fallback to text representation
-            return self.create_text_graph(subgraph, title)
+        print(f"Found subsystems: {sorted(subsystems)}")
+        return sorted(subsystems)
 
     def create_text_graph(self, subgraph, title):
         """Create a simple text-based graph representation when Graphviz is not available."""
@@ -219,8 +211,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         # Show nodes
         html += '<h4>Variables:</h4><ul>'
         for node_id, node_data in subgraph.nodes(data=True):
-            name = node_data.get('name') or node_data.get('rel_name', str(node_id))
-            io_type = node_data.get('io', '')
+            name = node_data['rel_name']
+            io_type = node_id[0]
             io_label = 'Input' if io_type == 'i' else 'Output'
             html += f'<li><strong>{name}</strong> ({io_label})</li>'
         html += '</ul>'
@@ -230,8 +222,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         for edge in subgraph.edges():
             source_data = subgraph.nodes[edge[0]]
             target_data = subgraph.nodes[edge[1]]
-            source_name = source_data.get('name') or source_data.get('rel_name', str(edge[0]))
-            target_name = target_data.get('name') or target_data.get('rel_name', str(edge[1]))
+            source_name = source_data['rel_name']
+            target_name = target_data['rel_name']
             html += f'<li>{source_name} → {target_name}</li>'
         html += '</ul>'
 
@@ -263,37 +255,53 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllConnGraph Explorer</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            height: 100%;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            font-family: Arial, sans-serif;
             background-color: #f5f5f5;
         }
         .container {
-            max-width: 1200px;
-            margin: 0 auto;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
             background: white;
-            border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            overflow: hidden;
         }
         .header {
             background: #2c3e50;
             color: white;
-            padding: 20px;
+            padding: 10px 20px;
             text-align: center;
+            flex-shrink: 0;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
         }
         .controls {
-            padding: 20px;
+            padding: 15px 20px;
             border-bottom: 1px solid #eee;
             background: #f8f9fa;
+            flex-shrink: 0;
         }
-        .search-box {
+        .dropdown {
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
             font-size: 16px;
+            background: white;
+            cursor: pointer;
+        }
+        .dropdown:focus {
+            outline: none;
+            border-color: #2c3e50;
+            box-shadow: 0 0 0 2px rgba(44, 62, 80, 0.2);
         }
         .search-results {
             max-height: 200px;
@@ -312,14 +320,22 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             background: #f0f0f0;
         }
         .graph-container {
+            flex: 1;
             padding: 20px;
             text-align: center;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
         }
         .graph-svg {
             max-width: 100%;
+            max-height: 100%;
+            width: auto;
             height: auto;
             border: 1px solid #ddd;
             border-radius: 4px;
+            flex: 1;
+            object-fit: contain;
         }
         .graph-text {
             text-align: left;
@@ -328,11 +344,14 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             border-radius: 4px;
             padding: 20px;
             margin: 10px 0;
+            flex: 1;
+            overflow: auto;
         }
         .info {
-            padding: 20px;
+            padding: 15px 20px;
             background: #f8f9fa;
             border-top: 1px solid #eee;
+            flex-shrink: 0;
         }
         .loading {
             text-align: center;
@@ -344,83 +363,164 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔗 AllConnGraph Explorer</h1>
-            <p>Explore OpenMDAO connection graphs with Graphviz layouts</p>
+            <h1>Connection Graph Explorer</h1>
         </div>
 
         <div class="controls">
-            <input type="text" id="search-box" class="search-box" placeholder="Search for variables or subsystems...">
-            <div id="search-results" class="search-results"></div>
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <div style="flex: 1;">
+                    <label for="subsystem-select" style="display: block; margin-bottom: 5px; font-weight: bold;">System:</label>
+                    <select id="subsystem-select" class="dropdown" onchange="onSubsystemChange()">
+                        <option value="model">Model (Top Level)</option>
+                    </select>
+                </div>
+                <div style="flex: 1;">
+                    <label for="variable-select" style="display: block; margin-bottom: 5px; font-weight: bold;">Variable:</label>
+                    <select id="variable-select" class="dropdown" onchange="onVariableChange()">
+                        <option value="">Select a variable...</option>
+                    </select>
+                </div>
+                <div style="flex: 0;">
+                    <button onclick="showCurrentSubsystem()" style="padding: 10px 20px; background: #2c3e50; color: white; border: none; border-radius: 4px; cursor: pointer;">Show Subsystem</button>
+                </div>
+            </div>
         </div>
 
         <div class="graph-container">
             <div id="graph-content">
                 <div class="loading">
-                    <h3>🔍 Search for a variable or subsystem to get started</h3>
-                    <p>Try searching for:</p>
+                    <h3>🔍 Select a subsystem and variable to explore</h3>
+                    <p>Use the dropdowns above to:</p>
                     <ul style="text-align: left; display: inline-block;">
-                        <li>Variable names (e.g., 'wing_span', 'engine_power')</li>
-                        <li>Subsystem names (e.g., 'aerodynamics', 'propulsion')</li>
-                        <li>Partial matches work too!</li>
+                        <li>Choose a subsystem to see its connection graph</li>
+                        <li>Select a variable to focus on its connections</li>
+                        <li>Navigate through your OpenMDAO model hierarchy</li>
                     </ul>
                 </div>
             </div>
         </div>
 
         <div class="info" id="graph-info">
-            <strong>Ready to explore!</strong> Use the search box above to find variables or subsystems.
+            <strong>Ready to explore!</strong> Use the dropdowns above to navigate your OpenMDAO model.
         </div>
     </div>
 
     <script>
         let currentGraph = null;
+        let currentSubsystem = 'model';
 
-        // Search functionality
-        const searchBox = document.getElementById('search-box');
-        const searchResults = document.getElementById('search-results');
+        // UI elements
+        const subsystemSelect = document.getElementById('subsystem-select');
+        const variableSelect = document.getElementById('variable-select');
         const graphContent = document.getElementById('graph-content');
         const graphInfo = document.getElementById('graph-info');
 
-        searchBox.addEventListener('input', function() {
-            const query = this.value.trim();
-            if (query.length < 2) {
-                searchResults.style.display = 'none';
-                return;
-            }
-
-            fetch(`/api/search?q=${encodeURIComponent(query)}`)
-                .then(response => response.json())
-                .then(data => {
-                    displaySearchResults(data.results);
-                })
-                .catch(error => {
-                    console.error('Search error:', error);
-                });
+        // Initialize the interface
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSubsystems();
+            loadVariablesForSubsystem('model');
         });
 
-        function displaySearchResults(results) {
-            if (results.length === 0) {
-                searchResults.innerHTML = '<div class="search-result">No results found</div>';
-            } else {
-                searchResults.innerHTML = results.map(result =>
-                    `<div class="search-result" onclick="selectResult('${result.type}', '${result.name}')">
-                        <strong>${result.name}</strong> (${result.type})
-                        ${result.path ? `<br><small>${result.path}</small>` : ''}
-                    </div>`
-                ).join('');
-            }
-            searchResults.style.display = 'block';
+        function loadSubsystems() {
+            fetch('/api/graph_info')
+                .then(response => response.json())
+                .then(data => {
+                    // Clear existing options except the first one
+                    subsystemSelect.innerHTML = '<option value="model">Model (Top Level)</option>';
+
+                    // Add subsystem options, filtering out 'model' if it exists
+                    const filteredSubsystems = data.subsystems.filter(s => s !== 'model');
+                    filteredSubsystems.forEach(subsystem => {
+                        const option = document.createElement('option');
+                        option.value = subsystem;
+                        option.textContent = subsystem;
+                        subsystemSelect.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading subsystems:', error);
+                });
         }
 
-        function selectResult(type, name) {
-            searchBox.value = name;
-            searchResults.style.display = 'none';
+        function loadVariablesForSubsystem(subsystem) {
+            const subsystemPath = subsystem === 'model' ? '' : subsystem;
+            console.log('Loading variables for subsystem:', subsystem, 'path:', subsystemPath);
 
-            if (type === 'variable') {
-                loadVariableGraph(name);
-            } else if (type === 'subsystem') {
-                loadSubsystemGraph(name);
+            fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Full API response:', data);
+                    if (data.success) {
+                        // Clear existing options
+                        variableSelect.innerHTML = '<option value="">Select a variable...</option>';
+
+                        // Get all variables in this subsystem
+                        const variables = new Set();
+
+                        console.log('nodes_data:', data.nodes_data);
+                        console.log('nodes_data type:', typeof data.nodes_data);
+                        console.log('nodes_data keys:', data.nodes_data ? Object.keys(data.nodes_data) : 'none');
+
+                        if (data.nodes_data) {
+                            for (const [nodeId, nodeData] of Object.entries(data.nodes_data)) {
+                                console.log('Processing node:', nodeId, nodeData);
+                                if (nodeData && nodeData.rel_name) {
+                                    // Create the combined name: pathname + '.' + rel_name (or just rel_name if no pathname)
+                                    let combinedName = nodeData.rel_name;
+                                    if (nodeData.pathname && nodeData.pathname !== '') {
+                                        combinedName = nodeData.pathname + '.' + nodeData.rel_name;
+                                    }
+
+                                    // Filter out internal OpenMDAO variables
+                                    if (!combinedName.startsWith('_auto_ivc.')) {
+                                        console.log('Adding variable:', combinedName);
+                                        variables.add(combinedName);
+                                    } else {
+                                        console.log('Filtering out internal variable:', combinedName);
+                                    }
+                                }
+                            }
+                        }
+
+                        console.log('Found variables:', Array.from(variables));
+
+                        // Add variable options
+                        Array.from(variables).sort().forEach(variable => {
+                            const option = document.createElement('option');
+                            option.value = variable;
+                            option.textContent = variable;
+                            variableSelect.appendChild(option);
+                        });
+
+                        console.log(`Loaded ${variables.size} variables for subsystem: ${subsystem}`);
+                    } else {
+                        console.error('Failed to load subsystem:', data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading variables:', error);
+                });
+        }
+
+        function onSubsystemChange() {
+            const selectedSubsystem = subsystemSelect.value;
+            currentSubsystem = selectedSubsystem;
+            console.log('Subsystem changed to:', selectedSubsystem);
+            loadVariablesForSubsystem(selectedSubsystem);
+            showCurrentSubsystem();
+        }
+
+        function onVariableChange() {
+            const selectedVariable = variableSelect.value;
+            if (selectedVariable) {
+                loadVariableGraph(selectedVariable);
             }
+        }
+
+        function showCurrentSubsystem() {
+            const subsystemPath = currentSubsystem === 'model' ? '' : currentSubsystem;
+            console.log('Showing subsystem:', subsystemPath);
+            loadSubsystemGraph(subsystemPath);
         }
 
         function loadVariableGraph(variable) {
@@ -442,10 +542,12 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
         function loadSubsystemGraph(subsystem) {
             showLoading('Loading subsystem graph...');
+            console.log('Loading subsystem graph for:', subsystem);
 
             fetch(`/api/subsystem/${encodeURIComponent(subsystem)}`)
                 .then(response => response.json())
                 .then(data => {
+                    console.log('Subsystem response:', data);
                     if (data.success) {
                         displayGraph(data.svg, `Subsystem: ${subsystem}`, data.nodes, data.edges);
                     } else {
@@ -453,6 +555,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                     }
                 })
                 .catch(error => {
+                    console.error('Subsystem load error:', error);
                     showError(`Error: ${error.message}`);
                 });
         }
@@ -461,19 +564,16 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             // Check if content is SVG or HTML
             if (svgContent.trim().startsWith('<svg')) {
                 graphContent.innerHTML = `
-                    <h3>${title}</h3>
-                    <div class="graph-svg">${svgContent}</div>
+                    <div class="graph-svg" style="flex: 1; display: flex; align-items: center; justify-content: center;">${svgContent}</div>
                 `;
             } else {
                 graphContent.innerHTML = `
-                    <h3>${title}</h3>
-                    <div class="graph-text">${svgContent}</div>
+                    <div class="graph-text" style="flex: 1;">${svgContent}</div>
                 `;
             }
 
             graphInfo.innerHTML = `
-                <strong>${title}</strong><br>
-                <strong>Nodes:</strong> ${nodes} | <strong>Edges:</strong> ${edges}
+                <strong>${title}</strong> | <strong>Nodes:</strong> ${nodes} | <strong>Edges:</strong> ${edges}
             `;
         }
 
@@ -484,6 +584,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         function showError(message) {
             graphContent.innerHTML = `<div class="loading" style="color: red;">${message}</div>`;
         }
+
+
 
         // Hide search results when clicking outside
         document.addEventListener('click', function(e) {

@@ -65,7 +65,7 @@ class AllConnGraph(nx.DiGraph):
         self._mult_inconn_nodes = set()
         self._input_input_conns = set()
 
-    def find_node(self, system, varname, io=None):
+    def find_node(self, pathname, varname, io=None):
         """
         Find a node in the graph.
 
@@ -83,7 +83,7 @@ class AllConnGraph(nx.DiGraph):
         tuple of the form (io, name), where io is either 'i' or 'o'.
             The node found.
         """
-        name = system.pathname + '.' + varname if system.pathname else varname
+        name = pathname + '.' + varname if pathname else varname
 
         if io is None:
             node = ('o', name)
@@ -95,7 +95,7 @@ class AllConnGraph(nx.DiGraph):
         if node in self:
             return node
 
-        raise KeyError(f"{system.msginfo}: Variable '{varname}' not found in connection graph.")
+        raise KeyError(f"{pathname}: Variable '{varname}' not found in connection graph.")
 
     def fullname(self, node):
         """
@@ -133,7 +133,7 @@ class AllConnGraph(nx.DiGraph):
     def get_val(self, system, name, units=None, indices=None, get_remote=False, rank=None,
                 vec_name='nonlinear', kind=None, flat=False, from_src=True):
 
-        node = self.find_node(system, name)
+        node = self.find_node(system.pathname, name)
         if node[0] == 'o':
             tgt_units = None
             tgt_inds_list = ()
@@ -182,7 +182,7 @@ class AllConnGraph(nx.DiGraph):
         return val
 
     def set_val(self, system, name, val, units=None, indices=None):
-        node = self.find_node(system, name)
+        node = self.find_node(system.pathname, name)
         if node[0] == 'o':
             tgt_units = None
             tgt_inds_list = ()
@@ -1162,6 +1162,8 @@ class AllConnGraph(nx.DiGraph):
                                   data['_shape'], f"def: {data.get('defaults', '')}")
             newdata['style'] = 'filled'
             newdata['shape'] = 'box'
+            newdata['pathname'] = data['pathname']
+            newdata['rel_name'] = data['rel_name']
             yield node, newdata
 
     def drawable_edge_iter(self, pathname='', show_cross_boundary=True):
@@ -1205,7 +1207,7 @@ class AllConnGraph(nx.DiGraph):
 
             yield u, v, newdata
 
-    def display(self, system=None, varname=None, show_cross_boundary=True):
+    def get_drawable_graph(self, pathname='', varname=None, show_cross_boundary=True):
         """
         Display the connection graph.
 
@@ -1215,8 +1217,8 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        system : System
-            The system to display.
+        pathname : str
+            The pathname of the system to display.
         varname : str or None
             Display the connection tree associated with this variable.  If None, display the entire
             collection graph.
@@ -1224,8 +1226,6 @@ class AllConnGraph(nx.DiGraph):
             Whether to show cross boundary connections.
         """
         G = nx.DiGraph()
-
-        pathname = system.pathname if system else ''
 
         if pathname:
             # special handling for cross boundary connections
@@ -1246,7 +1246,9 @@ class AllConnGraph(nx.DiGraph):
                         'tooltip': (node_meta['io'], node_meta['pathname'], node_meta['rel_name'],
                                     node_meta['units'], node_meta['_shape'],
                                     f"def: {node_meta.get('defaults', '')}"),
-                        'style': 'filled', 'shape': 'box'
+                        'style': 'filled', 'shape': 'box',
+                        'pathname': node_meta['pathname'],
+                        'rel_name': node_meta['rel_name'],
                     }
                     draw_nodes.append((node, meta))
 
@@ -1261,7 +1263,7 @@ class AllConnGraph(nx.DiGraph):
                 G.add_edge(u, v, **data)
 
         if varname:
-            root = self.get_root(self.find_node(system, varname))
+            root = self.get_root(self.find_node(pathname, varname))
             nodes = [root]
             nodes.extend(v for _, v in dfs_edges(G, root))
             G = nx.subgraph(G, nodes)
@@ -1276,7 +1278,14 @@ class AllConnGraph(nx.DiGraph):
         if replace:
             G = nx.relabel_nodes(G, replace)
 
-        write_graph(G)
+        return G
+
+    def get_pydot_graph(self, pathname='', varname=None, show_cross_boundary=True):
+        return nx.drawing.nx_pydot.to_pydot(self.get_drawable_graph(pathname, varname,
+                                                                    show_cross_boundary))
+
+    def display(self, pathname='', varname=None, show_cross_boundary=True):
+        write_graph(self.get_drawable_graph(pathname, varname, show_cross_boundary))
 
     def print_tree(self, name):
         if name in self:
@@ -1301,7 +1310,7 @@ class AllConnGraph(nx.DiGraph):
         def handler(*args, **kwargs):
             return ConnGraphHandler(self, *args, **kwargs)
 
-        print(f"🌐 Starting Simple AllConnGraph Web UI on port {port}")
+        print(f"🌐 Starting Simple Connection Graph Web UI on port {port}")
         print(f"📱 Open your browser to: http://localhost:{port}")
 
         if open_browser:
