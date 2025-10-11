@@ -565,24 +565,23 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             <div class="modal-body">
                 <h3>How to Use</h3>
                 <ol>
-                    <li><strong>Select a System:</strong> Choose a system from the dropdown to view its connection graph</li>
-                    <li><strong>Select a Variable:</strong> Choose a variable to focus on its specific connections</li>
-                    <li><strong>Navigate:</strong> Use the dropdowns to explore different parts of your OpenMDAO model</li>
+                    <li>Choose a system from the dropdown to view all connection trees in that system</li>
+                    <li>Choose a variable from the dropdown to view only the connection tree for that variable</li>
                 </ol>
 
-                <h3>Connection Types Legend</h3>
+                <h3>Connection Types</h3>
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-line solid"></div>
-                        <span><strong>Solid Line:</strong> Manual connection (explicitly defined)</span>
+                        <span><strong>Solid Line:</strong> Manual connection (from a connect() call)</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-line dashed"></div>
-                        <span><strong>Dashed Line:</strong> Promoted variable connection</span>
+                        <span><strong>Dashed Line:</strong> Variable promotion</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-line dotted"></div>
-                        <span><strong>Dotted Line:</strong> Implicit connection (auto-detected)</span>
+                        <span><strong>Dotted Line:</strong> Implicit connection (happens when promoted names match within a group)</span>
                     </div>
                 </div>
 
@@ -590,21 +589,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-color input" id="input-color-swatch"></div>
-                        <span id="input-color-text"><strong>Input Color:</strong> Input variables</span>
+                        <span id="input-color-text"><strong>Input variables:</strong></span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color output" id="output-color-swatch"></div>
-                        <span id="output-color-text"><strong>Output Color:</strong> Output variables</span>
+                        <span id="output-color-text"><strong>Output variables:</strong></span>
                     </div>
                 </div>
-
-                <h3>Tips</h3>
-                <ul>
-                    <li>Start with the top-level "Model" system to see the overall structure</li>
-                    <li>Select specific subsystems to focus on particular components</li>
-                    <li>Use variable selection to trace data flow through your model</li>
-                    <li>Internal variables (starting with <code>_auto_ivc.</code>) are hidden for clarity</li>
-                </ul>
             </div>
         </div>
     </div>
@@ -612,6 +603,19 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
     <script>
         let currentGraph = null;
         let currentSubsystem = 'model';
+        let cachedColors = { input: '#3498db', output: '#e74c3c' }; // Cache the colors
+        let colorsLoaded = false; // Track if colors have been loaded
+
+        // Color mapping function to convert color names to hex values
+        function getColorHex(colorName) {
+            const colorMap = {
+                'peachpuff3': '#cdaf95',
+                'skyblue3': '#87ceeb',
+                'peachpuff': '#ffdab9',
+                'skyblue': '#87ceeb'
+            };
+            return colorMap[colorName] || colorName;
+        }
 
         // UI elements
         const subsystemSelect = document.getElementById('subsystem-select');
@@ -623,6 +627,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         document.addEventListener('DOMContentLoaded', function() {
             loadSubsystems();
             loadVariablesForSubsystem('model');
+            loadHelpColors(); // Load colors once at startup
         });
 
         function loadSubsystems() {
@@ -712,6 +717,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             console.log('Subsystem changed to:', selectedSubsystem);
             loadVariablesForSubsystem(selectedSubsystem);
             loadSubsystemGraph(selectedSubsystem);
+            loadHelpColors(); // Reload colors for the new subsystem
         }
 
         function onVariableChange() {
@@ -802,102 +808,53 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             graphContent.innerHTML = `<div class="loading" style="color: red;">${message}</div>`;
         }
 
-        function showHelp() {
-            // Show the modal first
-            document.getElementById('help-modal').style.display = 'flex';
-            // Get actual colors from the connection graph
-            updateHelpColors();
-        }
-
-        function updateHelpColors() {
-            // Get colors from the connection graph metadata
-            let inputColor = '#3498db';  // Default blue
-            let outputColor = '#e74c3c'; // Default red
-
-            // Color mapping function to convert color names to hex values
-            function getColorHex(colorName) {
-                const colorMap = {
-                    'peachpuff3': '#cdaf95',
-                    'skyblue3': '#87ceeb',
-                    'peachpuff': '#ffdab9',
-                    'skyblue': '#87ceeb'
-                };
-                return colorMap[colorName] || colorName;
-            }
-
-            // Set default colors immediately while we fetch the real ones
-            const inputColorEl = document.getElementById('input-color-swatch');
-            const outputColorEl = document.getElementById('output-color-swatch');
-            const inputTextEl = document.getElementById('input-color-text');
-            const outputTextEl = document.getElementById('output-color-text');
-
-            if (inputColorEl) {
-                inputColorEl.style.backgroundColor = inputColor;
-            }
-            if (outputColorEl) {
-                outputColorEl.style.backgroundColor = outputColor;
-            }
-            if (inputTextEl) {
-                inputTextEl.innerHTML = `<strong>Input Color (${inputColor}):</strong> Input variables`;
-            }
-            if (outputTextEl) {
-                outputTextEl.innerHTML = `<strong>Output Color (${outputColor}):</strong> Output variables`;
-            }
-
-            // Use the current subsystem to get the correct colors
+        function loadHelpColors() {
+            // Load colors once at startup and cache them
             const subsystemPath = currentSubsystem === 'model' ? '' : currentSubsystem;
+            colorsLoaded = false; // Reset flag
 
             fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
                 .then(response => response.json())
                 .then(subsystemData => {
                     if (subsystemData.success && subsystemData.help_colors) {
-                        // Use the help_colors dictionary directly
+                        // Cache the colors
                         if (subsystemData.help_colors.i) {
-                            inputColor = getColorHex(subsystemData.help_colors.i);
+                            cachedColors.input = getColorHex(subsystemData.help_colors.i);
                         }
                         if (subsystemData.help_colors.o) {
-                            outputColor = getColorHex(subsystemData.help_colors.o);
+                            cachedColors.output = getColorHex(subsystemData.help_colors.o);
                         }
                     }
-
-                    // Update the legend colors and text with the real colors from the graph
-                    if (inputColorEl) {
-                        inputColorEl.style.backgroundColor = inputColor;
-                    }
-                    if (outputColorEl) {
-                        outputColorEl.style.backgroundColor = outputColor;
-                    }
-
-                    // Update the text labels to show actual colors
-                    if (inputTextEl && inputColor) {
-                        inputTextEl.innerHTML = `<strong>Input Color (${inputColor}):</strong> Input variables`;
-                    }
-                    if (outputTextEl && outputColor) {
-                        outputTextEl.innerHTML = `<strong>Output Color (${outputColor}):</strong> Output variables`;
-                    }
+                    colorsLoaded = true; // Mark as loaded
                 })
                 .catch(error => {
-                    // Use default colors if we can't get the metadata
-                    const inputColorEl = document.getElementById('input-color-swatch');
-                    const outputColorEl = document.getElementById('output-color-swatch');
-                    const inputTextEl = document.getElementById('input-color-text');
-                    const outputTextEl = document.getElementById('output-color-text');
-
-                    // Set default colors
-                    if (inputColorEl) {
-                        inputColorEl.style.backgroundColor = '#3498db'; // Default blue
-                    }
-                    if (outputColorEl) {
-                        outputColorEl.style.backgroundColor = '#e74c3c'; // Default red
-                    }
-                    if (inputTextEl) {
-                        inputTextEl.innerHTML = `<strong>Input Color (#3498db):</strong> Input variables`;
-                    }
-                    if (outputTextEl) {
-                        outputTextEl.innerHTML = `<strong>Output Color (#e74c3c):</strong> Output variables`;
-                    }
+                    // Keep default colors if fetch fails
+                    colorsLoaded = true; // Still mark as loaded even if failed
                 });
         }
+
+        function showHelp() {
+            // Wait for colors to load if they haven't loaded yet
+            if (!colorsLoaded) {
+                // Wait a bit and try again
+                setTimeout(showHelp, 50);
+                return;
+            }
+
+            // Use cached colors - no delay!
+            const inputColorEl = document.getElementById('input-color-swatch');
+            const outputColorEl = document.getElementById('output-color-swatch');
+
+            if (inputColorEl) {
+                inputColorEl.style.backgroundColor = cachedColors.input;
+            }
+            if (outputColorEl) {
+                outputColorEl.style.backgroundColor = cachedColors.output;
+            }
+
+            document.getElementById('help-modal').style.display = 'flex';
+        }
+
 
         function hideHelp() {
             document.getElementById('help-modal').style.display = 'none';
