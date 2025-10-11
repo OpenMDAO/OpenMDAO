@@ -71,16 +71,29 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             except Exception:
                 graphviz_svg = self.create_text_graph(subgraph, f"Subsystem: {subsystem}")
 
+            # get help colors from the subgraph (where fillcolor is set)
+            incolor = outcolor = None
+            for node_id, node_data in subgraph.nodes(data=True):
+                if incolor is None or outcolor is None:
+                    if incolor is None and node_id[0] == 'i':
+                        incolor = node_data.get('fillcolor', None)
+                    elif outcolor is None and node_id[0] == 'o':
+                        outcolor = node_data.get('fillcolor', None)
+                else:
+                    break
+
+            help_colors = {'i': incolor, 'o': outcolor}
+
             # Convert nodes to a format the frontend can use
             nodes_data = {}
             for node_id, node_data in subgraph.nodes(data=True):
-                print(f"Raw node {node_id}: {node_data}")
+                # print(f"Raw node {node_id}: {node_data}")
 
                 # Extract the actual variable information from the node metadata
                 # The node_data contains the original rel_name and pathname
                 rel_name = node_data.get('rel_name', '')
                 pathname = node_data.get('pathname', '')
-                io_type = node_data.get('io', '')
+                io_type = node_id[0]
 
                 # If io_type is not in node_data, extract from node_id tuple
                 if not io_type and isinstance(node_id, tuple) and len(node_id) == 2:
@@ -89,9 +102,10 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 nodes_data[str(node_id)] = {
                     'rel_name': rel_name,
                     'pathname': pathname,
-                    'io': io_type
+                    'io': io_type,
+                    'fillcolor': node_data.get('fillcolor', '')
                 }
-                print(f"Processed node {node_id}: rel_name='{rel_name}', pathname='{pathname}', io='{io_type}'")
+                #print(f"Processed node {node_id}: rel_name='{rel_name}', pathname='{pathname}', io='{io_type}'")
 
             response = {
                 'success': True,
@@ -99,9 +113,10 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 'nodes': len(subgraph.nodes()),
                 'edges': len(subgraph.edges()),
                 'nodes_data': nodes_data,
+                'help_colors': help_colors,
                 'svg': graphviz_svg
             }
-            print(f"Returning {len(nodes_data)} nodes_data entries")
+            # print(f"Returning {len(nodes_data)} nodes_data entries")
         except Exception as e:
             print(f"Error in serve_subsystem_graph: {e}")
             # Provide more helpful error message
@@ -199,7 +214,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             if pathname:
                 subsystems.add(pathname)
 
-        print(f"Found subsystems: {sorted(subsystems)}")
+        # print(f"Found subsystems: {sorted(subsystems)}")
         return sorted(subsystems)
 
     def create_text_graph(self, subgraph, title):
@@ -352,11 +367,142 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             background: #f8f9fa;
             border-top: 1px solid #eee;
             flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         .loading {
             text-align: center;
             padding: 40px;
             color: #666;
+        }
+
+        /* Modal styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80%;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .close {
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover {
+            opacity: 0.7;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-body h3 {
+            color: #2c3e50;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .modal-body h3:first-child {
+            margin-top: 0;
+        }
+
+        .modal-body ol, .modal-body ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .modal-body li {
+            margin: 5px 0;
+        }
+
+        /* Legend styles */
+        .legend {
+            margin: 15px 0;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .legend-line {
+            width: 40px;
+            height: 3px;
+            margin-right: 15px;
+            background-color: transparent;
+        }
+
+        .legend-line.solid {
+            border-top: 3px solid #333;
+        }
+
+        .legend-line.dashed {
+            border-top: 3px dashed #333;
+        }
+
+        .legend-line.dotted {
+            border-top: 3px dotted #333;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 15px;
+            border-radius: 3px;
+        }
+
+        .legend-color.input {
+            background-color: #3498db;
+        }
+
+        .legend-color.output {
+            background-color: #e74c3c;
+        }
+
+        .modal-body code {
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
         }
     </style>
 </head>
@@ -381,7 +527,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                     </select>
                 </div>
                 <div style="flex: 0;">
-                    <button onclick="showCurrentSubsystem()" style="padding: 10px 20px; background: #2c3e50; color: white; border: none; border-radius: 4px; cursor: pointer;">Show Subsystem</button>
+                    <button onclick="showHelp()" style="padding: 10px 20px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">Help</button>
                 </div>
             </div>
         </div>
@@ -402,6 +548,60 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
         <div class="info" id="graph-info">
             <strong>Ready to explore!</strong> Use the dropdowns above to navigate your OpenMDAO model.
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Connection Graph Explorer - Help</h2>
+                <span class="close" onclick="hideHelp()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <h3>How to Use</h3>
+                <ol>
+                    <li><strong>Select a System:</strong> Choose a system from the dropdown to view its connection graph</li>
+                    <li><strong>Select a Variable:</strong> Choose a variable to focus on its specific connections</li>
+                    <li><strong>Navigate:</strong> Use the dropdowns to explore different parts of your OpenMDAO model</li>
+                </ol>
+
+                <h3>Connection Types Legend</h3>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-line solid"></div>
+                        <span><strong>Solid Line:</strong> Manual connection (explicitly defined)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line dashed"></div>
+                        <span><strong>Dashed Line:</strong> Promoted variable connection</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-line dotted"></div>
+                        <span><strong>Dotted Line:</strong> Implicit connection (auto-detected)</span>
+                    </div>
+                </div>
+
+                <h3>Node Colors</h3>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color input"></div>
+                        <span><strong>Blue/Input Color:</strong> Input variables</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color output"></div>
+                        <span><strong>Red/Output Color:</strong> Output variables</span>
+                    </div>
+                </div>
+
+                <h3>Tips</h3>
+                <ul>
+                    <li>Start with the top-level "Model" system to see the overall structure</li>
+                    <li>Select specific subsystems to focus on particular components</li>
+                    <li>Use variable selection to trace data flow through your model</li>
+                    <li>Internal variables (starting with <code>_auto_ivc.</code>) are hidden for clarity</li>
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -444,12 +644,12 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
         function loadVariablesForSubsystem(subsystem) {
             const subsystemPath = subsystem === 'model' ? '' : subsystem;
-            console.log('Loading variables for subsystem:', subsystem, 'path:', subsystemPath);
+            // console.log('Loading variables for subsystem:', subsystem, 'path:', subsystemPath);
 
             fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Full API response:', data);
+                    // console.log('Full API response:', data);
                     if (data.success) {
                         // Clear existing options
                         variableSelect.innerHTML = '<option value="">Select a variable...</option>';
@@ -457,13 +657,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                         // Get all variables in this subsystem
                         const variables = new Set();
 
-                        console.log('nodes_data:', data.nodes_data);
-                        console.log('nodes_data type:', typeof data.nodes_data);
-                        console.log('nodes_data keys:', data.nodes_data ? Object.keys(data.nodes_data) : 'none');
+                        // console.log('nodes_data:', data.nodes_data);
+                        // console.log('nodes_data type:', typeof data.nodes_data);
+                        // console.log('nodes_data keys:', data.nodes_data ? Object.keys(data.nodes_data) : 'none');
 
                         if (data.nodes_data) {
                             for (const [nodeId, nodeData] of Object.entries(data.nodes_data)) {
-                                console.log('Processing node:', nodeId, nodeData);
+                                // console.log('Processing node:', nodeId, nodeData);
                                 if (nodeData && nodeData.rel_name) {
                                     // Create the combined name: pathname + '.' + rel_name (or just rel_name if no pathname)
                                     let combinedName = nodeData.rel_name;
@@ -473,16 +673,16 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
                                     // Filter out internal OpenMDAO variables
                                     if (!combinedName.startsWith('_auto_ivc.')) {
-                                        console.log('Adding variable:', combinedName);
+                                        // console.log('Adding variable:', combinedName);
                                         variables.add(combinedName);
                                     } else {
-                                        console.log('Filtering out internal variable:', combinedName);
+                                        // console.log('Filtering out internal variable:', combinedName);
                                     }
                                 }
                             }
                         }
 
-                        console.log('Found variables:', Array.from(variables));
+                        // console.log('Found variables:', Array.from(variables));
 
                         // Add variable options
                         Array.from(variables).sort().forEach(variable => {
@@ -492,7 +692,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                             variableSelect.appendChild(option);
                         });
 
-                        console.log(`Loaded ${variables.size} variables for subsystem: ${subsystem}`);
+                        // console.log(`Loaded ${variables.size} variables for subsystem: ${subsystem}`);
                     } else {
                         console.error('Failed to load subsystem:', data.error);
                     }
@@ -507,7 +707,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             currentSubsystem = selectedSubsystem;
             console.log('Subsystem changed to:', selectedSubsystem);
             loadVariablesForSubsystem(selectedSubsystem);
-            showCurrentSubsystem();
+            loadSubsystemGraph(selectedSubsystem);
         }
 
         function onVariableChange() {
@@ -517,11 +717,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             }
         }
 
-        function showCurrentSubsystem() {
-            const subsystemPath = currentSubsystem === 'model' ? '' : currentSubsystem;
-            console.log('Showing subsystem:', subsystemPath);
-            loadSubsystemGraph(subsystemPath);
-        }
 
         function loadVariableGraph(variable) {
             showLoading('Loading variable graph...');
@@ -544,10 +739,14 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             showLoading('Loading subsystem graph...');
             console.log('Loading subsystem graph for:', subsystem);
 
-            fetch(`/api/subsystem/${encodeURIComponent(subsystem)}`)
+            // Convert 'model' to empty string for top-level system
+            const subsystemPath = subsystem === 'model' ? '' : subsystem;
+            console.log('Using subsystem path:', subsystemPath);
+
+            fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
                 .then(response => response.json())
                 .then(data => {
-                    console.log('Subsystem response:', data);
+                    // console.log('Subsystem response:', data);
                     if (data.success) {
                         displayGraph(data.svg, `Subsystem: ${subsystem}`, data.nodes, data.edges);
                     } else {
@@ -572,8 +771,22 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 `;
             }
 
+            // Determine if this is a variable or subsystem view
+            let label, name;
+            if (title.startsWith('Variable:')) {
+                label = 'Variable:';
+                name = title.replace('Variable: ', '');
+            } else if (title.startsWith('Subsystem:')) {
+                label = 'Subsystem:';
+                name = title.replace('Subsystem: ', '');
+            } else {
+                label = 'View:';
+                name = title;
+            }
+
             graphInfo.innerHTML = `
-                <strong>${title}</strong> | <strong>Nodes:</strong> ${nodes} | <strong>Edges:</strong> ${edges}
+                <div><strong>${label}</strong> ${name}</div>
+                <div><strong>Nodes:</strong> ${nodes} | <strong>Edges:</strong> ${edges}</div>
             `;
         }
 
@@ -585,14 +798,82 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             graphContent.innerHTML = `<div class="loading" style="color: red;">${message}</div>`;
         }
 
+        function showHelp() {
+            console.log('showHelp() called');
+            // Get actual colors from the connection graph
+            updateHelpColors();
+            document.getElementById('help-modal').style.display = 'flex';
+        }
 
+        function updateHelpColors() {
+            // Get colors from the connection graph metadata
+            let inputColor = '#3498db';  // Default blue
+            let outputColor = '#e74c3c'; // Default red
 
-        // Hide search results when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!searchBox.contains(e.target) && !searchResults.contains(e.target)) {
-                searchResults.style.display = 'none';
+            console.log('Updating help colors...');
+
+            // Try to get colors from the connection graph metadata
+            fetch('/api/subsystem/')
+                .then(response => {
+                    console.log('Help colors response status:', response.status);
+                    return response.json();
+                })
+                .then(subsystemData => {
+                    console.log('Subsystem data for colors:', subsystemData);
+                    if (subsystemData.success && subsystemData.help_colors) {
+                        console.log('Found help_colors:', subsystemData.help_colors);
+                        // Use the help_colors dictionary directly
+                        if (subsystemData.help_colors.i) {
+                            inputColor = subsystemData.help_colors.i;
+                            console.log('Found input color:', inputColor);
+                        }
+                        if (subsystemData.help_colors.o) {
+                            outputColor = subsystemData.help_colors.o;
+                            console.log('Found output color:', outputColor);
+                        }
+                    } else {
+                        console.log('No help_colors found in response');
+                    }
+
+                    // Update the legend colors
+                    const inputColorEl = document.querySelector('.legend-color.input');
+                    const outputColorEl = document.querySelector('.legend-color.output');
+
+                    console.log('Updating legend colors - input:', inputColor, 'output:', outputColor);
+                    console.log('Found input element:', inputColorEl);
+                    console.log('Found output element:', outputColorEl);
+
+                    if (inputColorEl) {
+                        inputColorEl.style.backgroundColor = inputColor;
+                        console.log('Updated input color element to:', inputColor);
+                    } else {
+                        console.log('Input color element not found!');
+                    }
+                    if (outputColorEl) {
+                        outputColorEl.style.backgroundColor = outputColor;
+                        console.log('Updated output color element to:', outputColor);
+                    } else {
+                        console.log('Output color element not found!');
+                    }
+                })
+                .catch(error => {
+                    console.log('Could not fetch subsystem data for colors, using defaults:', error);
+                    // Use default colors if we can't get the metadata
+                });
+        }
+
+        function hideHelp() {
+            document.getElementById('help-modal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('help-modal');
+            if (event.target === modal) {
+                hideHelp();
             }
-        });
+        }
+
     </script>
 </body>
 </html>
