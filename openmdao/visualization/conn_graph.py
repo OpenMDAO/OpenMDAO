@@ -13,13 +13,22 @@ import time
 from http.server import HTTPServer
 
 from openmdao.visualization.graph_viewer import write_graph
-from openmdao.visualization.conn_graph_ui import ConnGraphHandler
 from openmdao.utils.general_utils import common_subpath, is_undefined, shape2tuple, \
     ensure_compatible, truncate_str
 from openmdao.utils.array_utils import array_connection_compatible
 from openmdao.utils.units import simplify_unit, is_compatible
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.units import unit_conversion
+
+
+# use hex colors here because the using english names was sometimes causing failure to show
+# proper colors in the help dialog.
+GRAPH_COLORS = {
+    'input': 'peachpuff3',
+    'output': 'skyblue3',
+    'highlight': '#66ff00',
+    'boundary': '#D3D3D3',
+}
 
 
 def is_equal(a, b):
@@ -1144,6 +1153,19 @@ class AllConnGraph(nx.DiGraph):
 
         return val
 
+    def create_node_label(self, node):
+        meta = self.nodes[node]
+        units = meta['units']
+        if units is None:
+            units = ''
+        else:
+            units = f"{units}"
+        shape = meta['_shape']
+        if shape is None:
+            shape = ''
+
+        return f"{self.combined_name(node)} {units} {shape}"
+
     def drawable_node_iter(self, pathname=''):
         """
         Yield nodes usable in a pydot graph.
@@ -1166,11 +1188,11 @@ class AllConnGraph(nx.DiGraph):
                 continue
             newdata = {}
             if data['io'] == 'i':
-                newdata['fillcolor'] = 'peachpuff3'
+                newdata['fillcolor'] = GRAPH_COLORS['input']
             else:
-                newdata['fillcolor'] = 'skyblue3'
-            newdata['label'] = \
-                f"({data['pathname']}, {data['rel_name']}, {data['_shape']}, {data['units']})"
+                newdata['fillcolor'] = GRAPH_COLORS['output']
+
+            newdata['label'] = self.create_node_label(node)
             newdata['tooltip'] = (data['io'], data['pathname'], data['rel_name'], data['units'],
                                   data['_shape'], f"def: {data.get('defaults', '')}")
             newdata['style'] = 'filled'
@@ -1253,14 +1275,15 @@ class AllConnGraph(nx.DiGraph):
                 for node in outside_nodes:
                     node_meta = nodes[node]
                     meta = {
-                        'label': f"({node_meta['pathname']}, {node_meta['rel_name']}, "
-                        f"{node_meta['_shape']}, {node_meta['units']})",
+                        'label': self.create_node_label(node),
                         'tooltip': (node_meta['io'], node_meta['pathname'], node_meta['rel_name'],
                                     node_meta['units'], node_meta['_shape'],
                                     f"def: {node_meta.get('defaults', '')}"),
-                        'style': 'filled', 'shape': 'box',
+                        'style': 'filled',
+                        'shape': 'box',
                         'pathname': node_meta['pathname'],
                         'rel_name': node_meta['rel_name'],
+                        'fillcolor': GRAPH_COLORS['boundary'],
                     }
                     draw_nodes.append((node, meta))
 
@@ -1275,7 +1298,10 @@ class AllConnGraph(nx.DiGraph):
                 G.add_edge(u, v, **data)
 
         if varname:
-            root = self.get_root(self.find_node(pathname, varname))
+            varnode = self.find_node(pathname, varname)
+            # change color of the variable node to highlight it
+            G.nodes[varnode]['fillcolor'] = GRAPH_COLORS['highlight']
+            root = self.get_root(varnode)
             nodes = [root]
             nodes.extend(v for _, v in dfs_edges(G, root))
             G = nx.subgraph(G, nodes)
@@ -1319,6 +1345,8 @@ class AllConnGraph(nx.DiGraph):
 
     def serve(self, port=8001, open_browser=True):
         """Serve connection graph web UI."""
+        from openmdao.visualization.conn_graph_ui import ConnGraphHandler
+
         def handler(*args, **kwargs):
             return ConnGraphHandler(self, *args, **kwargs)
 

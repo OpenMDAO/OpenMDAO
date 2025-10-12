@@ -12,6 +12,8 @@ from http.server import SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
 import networkx as nx
 
+from openmdao.visualization.conn_graph import GRAPH_COLORS
+
 
 class ConnGraphHandler(SimpleHTTPRequestHandler):
     """Custom handler for serving the connection graph web interface."""
@@ -70,7 +72,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             'nodes': len(self.conn_graph.nodes()),
             'edges': len(self.conn_graph.edges()),
             'subsystems': self.get_subsystems(),
-            'nodes_data': nodes_data
+            'nodes_data': nodes_data,
+            'graph_colors': GRAPH_COLORS
         }
         self.send_json_response(info)
 
@@ -535,6 +538,16 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             background-color: #f0f0f0; /* Default gray */
         }
 
+        .legend-color.highlight {
+            /* Color will be set dynamically by JavaScript */
+            background-color: #f0f0f0; /* Default gray */
+        }
+
+        .legend-color.boundary {
+            /* Color will be set dynamically by JavaScript */
+            background-color: #f0f0f0; /* Default gray */
+        }
+
         .modal-body code {
             background-color: #f8f9fa;
             padding: 2px 4px;
@@ -725,6 +738,14 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                         <div class="legend-color output" id="output-color-swatch"></div>
                         <span id="output-color-text"><strong>Output variables:</strong></span>
                     </div>
+                    <div class="legend-item">
+                        <div class="legend-color highlight" id="highlight-color-swatch"></div>
+                        <span id="highlight-color-text"><strong>Highlighted variables:</strong></span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color boundary" id="boundary-color-swatch"></div>
+                        <span id="boundary-color-text"><strong>Variables outside of the current system:</strong></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -733,7 +754,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
     <script>
         let currentGraph = null;
         let currentSubsystem = 'model';
-        let cachedColors = { input: '#3498db', output: '#e74c3c' }; // Cache the colors
+        let cachedColors = { input: '#3498db', output: '#e74c3c', highlight: '#ffd700', boundary: '#ff6b6b' }; // Cache the colors
         let colorsLoaded = false; // Track if colors have been loaded
 
         // Color mapping function to convert color names to hex values
@@ -744,6 +765,10 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 'peachpuff': '#ffdab9',
                 'skyblue': '#87ceeb'
             };
+            // If it's already a hex color (starts with #), return it as-is
+            if (colorName && colorName.startsWith('#')) {
+                return colorName;
+            }
             return colorMap[colorName] || colorName;
         }
 
@@ -755,11 +780,11 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         // Tree data structure
         let treeData = {};
         let selectedNode = null;
+        let globalGraphColors = null; // Store graph colors from initial load
 
         // Initialize the interface
         document.addEventListener('DOMContentLoaded', function() {
             loadTreeStructure();
-            loadHelpColors(); // Load colors once at startup
         });
 
         function loadTreeStructure() {
@@ -767,6 +792,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             fetch('/api/graph_info')
                 .then(response => response.json())
                 .then(data => {
+                    // Store graph colors globally
+                    if (data.graph_colors) {
+                        globalGraphColors = data.graph_colors;
+                        loadHelpColors();
+                    } else {
+                        console.error('No graph_colors in API response');
+                    }
                     // Build tree structure from subsystems
                     buildTreeFromSubsystems(data.subsystems);
                 })
@@ -779,8 +811,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         function buildTreeFromSubsystems(subsystems) {
             // Create a hierarchical structure from variable names
             const tree = {};
-
-            console.log('Building tree from subsystems:', subsystems);
 
             // Add model as root
             tree['model'] = {
@@ -797,13 +827,11 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
         function loadVariablesForTree(tree) {
             // Load all variables and build tree structure from variable names
-            console.log('Loading variables for tree...');
 
             fetch('/api/graph_info')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        console.log('Graph info loaded:', data);
                         buildTreeFromVariables(data.nodes_data, tree);
                     } else {
                         console.error('Error loading graph info:', data.error);
@@ -817,8 +845,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         }
 
         function buildTreeFromVariables(nodesData, tree) {
-            console.log('Building tree from variables:', nodesData);
-
             // First, get the list of actual subsystems and their ancestors
             const actualSubsystems = new Set();
             Object.entries(nodesData).forEach(([nodeIdStr, nodeData]) => {
@@ -833,7 +859,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                     }
                 }
             });
-            console.log('Actual subsystems found:', Array.from(actualSubsystems));
 
             // Process each node to extract variable information
             const allVariables = new Map();
@@ -869,11 +894,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 }
             });
 
-            console.log('All variables collected:', allVariables);
-
             // Now build the tree structure from variable names
             allVariables.forEach((variable, key) => {
-                console.log('Processing variable:', key, variable);
 
                 // Use the full variable name to build the tree structure
                 const fullVariableName = variable.fullName;
@@ -892,8 +914,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                         }
                         // Update the variable's path to match the tree hierarchy
                         variable.path = path;
-                        console.log('Adding variable to tree:', variable);
-                        console.log('Variable fullName:', variable.fullName);
                         current.variables.push(variable);
                     } else {
                         // This is an intermediate part - create or find the container
@@ -915,9 +935,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 }
             });
 
-            console.log('Final tree structure:', tree);
-            console.log('Model children:', tree['model'].children);
-            console.log('Model variables:', tree['model'].variables);
             renderTree(tree);
         }
 
@@ -1028,7 +1045,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             if ((node.type === 'system' || node.type === 'container') && (Object.keys(children).length > 0 || variables.length > 0)) {
                 const toggle = document.createElement('div');
                 toggle.className = 'tree-toggle';
-                toggle.innerHTML = '▶';
+                // Show expanded state for first level (depth 0)
+                toggle.innerHTML = depth === 0 ? '▼' : '▶';
                 toggle.onclick = (e) => {
                     e.stopPropagation();
                     toggleNode(nodeDiv, toggle);
@@ -1068,24 +1086,29 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
             // Children container
             const childrenDiv = document.createElement('div');
-            childrenDiv.className = 'tree-children collapsed';
+            // Expand the first level (depth 0) of the model tree at startup
+            childrenDiv.className = depth === 0 ? 'tree-children' : 'tree-children collapsed';
 
-            // Add child systems
-            Object.values(children).forEach(child => {
-                childrenDiv.appendChild(createTreeNode(child, depth + 1));
-            });
+            // Add child systems (sorted alphabetically)
+            Object.values(children)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .forEach(child => {
+                    childrenDiv.appendChild(createTreeNode(child, depth + 1));
+                });
 
-            // Add variables
-            variables.forEach(variable => {
-                const varNode = {
-                    name: variable.name,
-                    fullName: variable.fullName,
-                    path: variable.path,
-                    type: variable.io, // Use io as the type for variables
-                    io: variable.io
-                };
-                childrenDiv.appendChild(createTreeNode(varNode, depth + 1));
-            });
+            // Add variables (sorted alphabetically)
+            variables
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .forEach(variable => {
+                    const varNode = {
+                        name: variable.name,
+                        fullName: variable.fullName,
+                        path: variable.path,
+                        type: variable.io, // Use io as the type for variables
+                        io: variable.io
+                    };
+                    childrenDiv.appendChild(createTreeNode(varNode, depth + 1));
+                });
 
             nodeDiv.appendChild(childrenDiv);
             return nodeDiv;
@@ -1112,19 +1135,12 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             event.currentTarget.classList.add('selected');
             selectedNode = node;
 
-            console.log('Selected node:', node);
-
             // Load the appropriate graph
             if (node.type === 'system' || node.type === 'container') {
-                console.log('Loading system graph for:', node.path);
                 updateCurrentSubsystem(node.path);
                 loadSubsystemGraph(node.path);
             } else if (node.type === 'i' || node.type === 'o' || node.type === 'bidirectional') {
                 // For variables, load the variable-specific graph
-                console.log('Loading variable graph for:', node.fullName);
-                console.log('Variable node data:', node);
-                console.log('Variable keys:', Object.keys(node));
-                console.log('Variable fullName property:', node.fullName);
                 updateCurrentSubsystem(node.path);
                 loadVariableGraph(node.fullName);
             }
@@ -1133,21 +1149,17 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         // Update currentSubsystem when a system is selected
         function updateCurrentSubsystem(systemPath) {
             currentSubsystem = systemPath;
-            loadHelpColors(); // Reload colors for the new subsystem
+            // No need to reload colors since we're using global graph colors
         }
-
 
         function loadVariableGraph(variable) {
             showLoading('Loading variable graph...');
-            console.log('loadVariableGraph called with:', variable);
 
             fetch(`/api/variable/${encodeURIComponent(variable)}`)
                 .then(response => {
-                    console.log('Variable API response:', response);
                     return response.json();
                 })
                 .then(data => {
-                    console.log('Variable API data:', data);
                     if (data.success) {
                         displayGraph(data.svg, `Variable: ${variable}`, data.nodes, data.edges);
                     } else {
@@ -1163,11 +1175,9 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
         function loadSubsystemGraph(subsystem) {
             showLoading('Loading subsystem graph...');
-            console.log('Loading subsystem graph for:', subsystem);
 
             // Convert 'model' to empty string for top-level system
             const subsystemPath = subsystem === 'model' ? '' : subsystem;
-            console.log('Using subsystem path:', subsystemPath);
 
             fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
                 .then(response => response.json())
@@ -1211,7 +1221,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
             graphInfo.innerHTML = `
                 <div><strong>${label}</strong> ${name}</div>
-                <div><strong>Nodes:</strong> ${nodes} | <strong>Edges:</strong> ${edges}</div>
+                <div><strong>Nodes:</strong> ${nodes}</div>
             `;
         }
 
@@ -1224,28 +1234,50 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         }
 
         function loadHelpColors() {
-            // Load colors once at startup and cache them
-            const subsystemPath = currentSubsystem === 'model' ? '' : currentSubsystem;
-            colorsLoaded = false; // Reset flag
+            // Use global graph colors if available
+            if (globalGraphColors) {
+                // Cache the colors from global graph colors
+                if (globalGraphColors.input) {
+                    cachedColors.input = getColorHex(globalGraphColors.input);
+                }
+                if (globalGraphColors.output) {
+                    cachedColors.output = getColorHex(globalGraphColors.output);
+                }
+                if (globalGraphColors.highlight) {
+                    cachedColors.highlight = getColorHex(globalGraphColors.highlight);
+                } else {
+                    console.error('No highlight color in globalGraphColors');
+                }
+                if (globalGraphColors.boundary) {
+                    cachedColors.boundary = getColorHex(globalGraphColors.boundary);
+                } else {
+                    console.error('No boundary color in globalGraphColors');
+                }
+                colorsLoaded = true; // Mark as loaded
+            } else {
+                // Fallback to old method if global colors not available
+                const subsystemPath = currentSubsystem === 'model' ? '' : currentSubsystem;
+                colorsLoaded = false; // Reset flag
 
-            fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
-                .then(response => response.json())
-                .then(subsystemData => {
-                    if (subsystemData.success && subsystemData.help_colors) {
-                        // Cache the colors
-                        if (subsystemData.help_colors.i) {
-                            cachedColors.input = getColorHex(subsystemData.help_colors.i);
+                fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
+                    .then(response => response.json())
+                    .then(subsystemData => {
+                        if (subsystemData.success && subsystemData.help_colors) {
+                            // Cache the colors
+                            if (subsystemData.help_colors.i) {
+                                cachedColors.input = getColorHex(subsystemData.help_colors.i);
+                            }
+                            if (subsystemData.help_colors.o) {
+                                cachedColors.output = getColorHex(subsystemData.help_colors.o);
+                            }
                         }
-                        if (subsystemData.help_colors.o) {
-                            cachedColors.output = getColorHex(subsystemData.help_colors.o);
-                        }
-                    }
-                    colorsLoaded = true; // Mark as loaded
-                })
-                .catch(error => {
-                    // Keep default colors if fetch fails
-                    colorsLoaded = true; // Still mark as loaded even if failed
-                });
+                        colorsLoaded = true; // Mark as loaded
+                    })
+                    .catch(error => {
+                        // Keep default colors if fetch fails
+                        colorsLoaded = true; // Still mark as loaded even if failed
+                    });
+            }
         }
 
         function showHelp() {
@@ -1259,12 +1291,26 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             // Use cached colors - no delay!
             const inputColorEl = document.getElementById('input-color-swatch');
             const outputColorEl = document.getElementById('output-color-swatch');
+            const highlightColorEl = document.getElementById('highlight-color-swatch');
+            const boundaryColorEl = document.getElementById('boundary-color-swatch');
 
             if (inputColorEl) {
                 inputColorEl.style.backgroundColor = cachedColors.input;
             }
             if (outputColorEl) {
                 outputColorEl.style.backgroundColor = cachedColors.output;
+            }
+            if (highlightColorEl && cachedColors.highlight) {
+                highlightColorEl.style.backgroundColor = cachedColors.highlight;
+            } else {
+                console.error('Highlight color element or color not available:', highlightColorEl,
+                              cachedColors.highlight);
+            }
+            if (boundaryColorEl && cachedColors.boundary) {
+                boundaryColorEl.style.backgroundColor = cachedColors.boundary;
+            } else {
+                console.error('Boundary color element or color not available:', boundaryColorEl,
+                              cachedColors.boundary);
             }
 
             document.getElementById('help-modal').style.display = 'flex';
