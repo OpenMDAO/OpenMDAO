@@ -85,7 +85,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             try:
                 graphviz_svg = pydot_graph.create_svg().decode('utf-8')
             except Exception:
-                graphviz_svg = self.create_text_graph(subgraph, f"Subsystem: {subsystem}")
+                graphviz_svg = self.create_text_graph(subgraph, f"System: {subsystem}")
 
             # get help colors from the subgraph (where fillcolor is set)
             incolor = outcolor = None
@@ -672,7 +672,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             </div>
 
             <div class="info" id="graph-info">
-                <strong>Ready to explore!</strong> Select a system or variable from the tree to view its connection graph.
+                <strong></strong> Select a system or variable from the tree to view its connection graph.
             </div>
             </div>
         </div>
@@ -686,17 +686,23 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 <span class="close" onclick="hideHelp()">&times;</span>
             </div>
             <div class="modal-body">
-                <h3>How to Use</h3>
+                <p>A tool for visualizing and understanding how variables are connected and
+                promoted within your OpenMDAO model by examining their connection graphs.
+                </p>
+
                 <ol>
-                    <li>Choose a system from the dropdown to view all connection trees in that system</li>
-                    <li>Choose a variable from the dropdown to view only the connection tree for that variable</li>
+                    <li>Click on any system (📁) to see all connection graphs involving that
+                    system</li>
+                    <li>Click on any variable (⬇️ or ⬆️) to see only the connection graph for that
+                    variable</li>
                 </ol>
 
-                <h3>Connection Types</h3>
+                <h3>Connection Graph Edge Types</h3>
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-line solid"></div>
-                        <span><strong>Solid Line:</strong> Manual connection (from a connect() call)</span>
+                        <span><strong>Solid Line:</strong> Manual connection (from a connect()
+                        call)</span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-line dashed"></div>
@@ -704,11 +710,12 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                     </div>
                     <div class="legend-item">
                         <div class="legend-line dotted"></div>
-                        <span><strong>Dotted Line:</strong> Implicit connection (happens when promoted names match within a group)</span>
+                        <span><strong>Dotted Line:</strong> Automatic connection when promoted
+                        input and output names match</span>
                     </div>
                 </div>
 
-                <h3>Node Colors</h3>
+                <h3>Connection Graph Node Colors</h3>
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-color input" id="input-color-swatch"></div>
@@ -1145,15 +1152,14 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
                 .then(response => response.json())
                 .then(data => {
-                    // console.log('Subsystem response:', data);
                     if (data.success) {
-                        displayGraph(data.svg, `Subsystem: ${subsystem}`, data.nodes, data.edges);
+                        displayGraph(data.svg, `System: ${subsystem}`, data.nodes, data.edges);
                     } else {
                         showError(`Error loading subsystem: ${data.error}`);
                     }
                 })
                 .catch(error => {
-                    console.error('Subsystem load error:', error);
+                    console.error('System load error:', error);
                     showError(`Error: ${error.message}`);
                 });
         }
@@ -1175,9 +1181,9 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             if (title.startsWith('Variable:')) {
                 label = 'Variable:';
                 name = title.replace('Variable: ', '');
-            } else if (title.startsWith('Subsystem:')) {
-                label = 'Subsystem:';
-                name = title.replace('Subsystem: ', '');
+            } else if (title.startsWith('System:')) {
+                label = 'System:';
+                name = title.replace('System: ', '');
             } else {
                 label = 'View:';
                 name = title;
@@ -1262,34 +1268,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 </html>
         '''
 
-
-# def create_simple_conn_graph_ui(conn_graph):
-#     """Create a simple web UI for the connection graph."""
-#     return conn_graph
-
-
-# def serve_simple_conn_graph_ui(conn_graph, port=8001, open_browser=True):
-#     """Serve the simple connection graph web UI."""
-#     def handler(*args, **kwargs):
-#         return ConnGraphHandler(conn_graph, *args, **kwargs)
-
-#     print(f"🌐 Starting Simple AllConnGraph Web UI on port {port}")
-#     print(f"📱 Open your browser to: http://localhost:{port}")
-
-#     if open_browser:
-#         def open_browser():
-#             time.sleep(1)
-#             webbrowser.open(f'http://localhost:{port}')
-
-#         threading.Thread(target=open_browser, daemon=True).start()
-
-#     try:
-#         with HTTPServer(("", port), handler) as httpd:
-#             print(f"✅ Server running on http://localhost:{port}")
-#             print("Press Ctrl+C to stop")
-#             httpd.serve_forever()
-#     except KeyboardInterrupt:
-#         print("\n🛑 Server stopped")
 
 
 if __name__ == "__main__":
