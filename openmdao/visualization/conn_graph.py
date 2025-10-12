@@ -1164,7 +1164,19 @@ class AllConnGraph(nx.DiGraph):
         if shape is None:
             shape = ''
 
-        return f"{self.combined_name(node)} {units} {shape}"
+        # Get the combined name and check for custom formatting first
+        name = self.combined_name(node)
+
+        # Always format the label with HTML: name (normal), units (bold), shape (italic)
+        # Add spacing between elements for better readability and use better typography
+        if units and shape:
+            return f"<{name}&nbsp;&nbsp;<b>{units}</b>&nbsp;&nbsp;<i>{shape}</i>>"
+        elif units:
+            return f"<{name}&nbsp;&nbsp;<b>{units}</b>>"
+        elif shape:
+            return f"<{name}&nbsp;&nbsp;<i>{shape}</i>>"
+        else:
+            return f"<{name}>"
 
     def drawable_node_iter(self, pathname=''):
         """
@@ -1195,8 +1207,11 @@ class AllConnGraph(nx.DiGraph):
             newdata['label'] = self.create_node_label(node)
             newdata['tooltip'] = (data['io'], data['pathname'], data['rel_name'], data['units'],
                                   data['_shape'], f"def: {data.get('defaults', '')}")
-            newdata['style'] = 'filled'
-            newdata['shape'] = 'box'
+            newdata['style'] = 'filled,rounded'
+            newdata['shape'] = 'box'  # Use box shape with rounded corners
+            newdata['margin'] = '0.1,0.1'  # Add some margin around the text
+            newdata['fontname'] = 'Arial'  # Use a clean font
+            newdata['fontsize'] = '10'  # Set a readable font size
             newdata['pathname'] = data['pathname']
             newdata['rel_name'] = data['rel_name']
             yield node, newdata
