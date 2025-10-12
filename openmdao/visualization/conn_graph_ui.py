@@ -51,10 +51,28 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
     def serve_graph_info(self):
         """Serve basic graph information."""
+        # Get all nodes with their data
+        nodes_data = {}
+        for node_id, node_data in self.conn_graph.nodes(data=True):
+            # Convert tuple node_id to JSON-serializable format
+            if isinstance(node_id, tuple) and len(node_id) == 2:
+                node_id_json = [node_id[0], node_id[1]]
+            else:
+                node_id_json = str(node_id)
+
+            nodes_data[json.dumps(node_id_json)] = {
+                'rel_name': node_data.get('rel_name', ''),
+                'pathname': node_data.get('pathname', ''),
+                'io': node_id[0] if isinstance(node_id, tuple) and len(node_id) == 2 else '',
+                'fillcolor': node_data.get('fillcolor', '')
+            }
+
         info = {
+            'success': True,
             'nodes': len(self.conn_graph.nodes()),
             'edges': len(self.conn_graph.edges()),
-            'subsystems': self.get_subsystems()
+            'subsystems': self.get_subsystems(),
+            'nodes_data': nodes_data
         }
         self.send_json_response(info)
 
@@ -136,12 +154,16 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             try:
                 pydot_graph = self.conn_graph.get_pydot_graph(varname=variable)
             except Exception:
-                # If that fails, try to find the full pathname for this variable
-                full_variable = self.find_full_variable_path(variable)
-                if full_variable:
-                    pydot_graph = self.conn_graph.get_pydot_graph(varname=full_variable)
-                else:
-                    raise ValueError(f"Variable '{variable}' not found in connection graph")
+                # If that fails, try to find the variable in the graph
+                try:
+                    # Try to find the variable as an input
+                    pydot_graph = self.conn_graph.get_pydot_graph(varname=variable)
+                except Exception:
+                    try:
+                        # Try to find the variable as an output
+                        pydot_graph = self.conn_graph.get_pydot_graph(varname=variable)
+                    except Exception:
+                        raise ValueError(f"Variable '{variable}' not found in connection graph")
 
             # pydot_graph is already a pydot.Dot object, so we can use it directly
             try:
@@ -285,7 +307,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         .container {
             height: 100vh;
             display: flex;
-            flex-direction: column;
             background: white;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
@@ -343,6 +364,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             overflow: auto;
             display: flex;
             flex-direction: column;
+            min-height: 0; /* Allow flex item to shrink */
         }
         .graph-svg {
             max-width: 100%;
@@ -508,50 +530,138 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             border-radius: 3px;
             font-family: monospace;
         }
+
+        /* Tree structure styles */
+        .sidebar {
+            width: 300px;
+            background: #f8f9fa;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+        }
+
+        .tree-header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .tree-container {
+            padding: 10px;
+        }
+
+        .tree-node {
+            margin: 2px 0;
+        }
+
+        .tree-node-content {
+            display: flex;
+            align-items: center;
+            padding: 5px 8px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+        }
+
+        .tree-node-content:hover {
+            background-color: #e9ecef;
+        }
+
+        .tree-node-content.selected {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .tree-toggle {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .tree-toggle:hover {
+            color: #333;
+        }
+
+        .tree-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .tree-label {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .tree-children {
+            margin-left: 20px;
+            border-left: 1px solid #ddd;
+            padding-left: 10px;
+        }
+
+        .tree-children.collapsed {
+            display: none;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>Connection Graph Explorer</h1>
-        </div>
-
-        <div class="controls">
-            <div style="display: flex; gap: 20px; align-items: center;">
-                <div style="flex: 1;">
-                    <label for="subsystem-select" style="display: block; margin-bottom: 5px; font-weight: bold;">System:</label>
-                    <select id="subsystem-select" class="dropdown" onchange="onSubsystemChange()">
-                        <option value="model">Model (Top Level)</option>
-                    </select>
-                </div>
-                <div style="flex: 1;">
-                    <label for="variable-select" style="display: block; margin-bottom: 5px; font-weight: bold;">Variable:</label>
-                    <select id="variable-select" class="dropdown" onchange="onVariableChange()">
-                        <option value="">Select a variable...</option>
-                    </select>
-                </div>
-                <div style="flex: 0;">
-                    <button onclick="showHelp()" style="padding: 10px 20px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">Help</button>
-                </div>
+        <!-- Sidebar with tree structure -->
+        <div class="sidebar">
+            <div class="tree-header">
+                <h3>Model Hierarchy</h3>
+            </div>
+            <div class="tree-container" id="tree-container">
+                <div class="loading">Loading model structure...</div>
             </div>
         </div>
 
-        <div class="graph-container">
-            <div id="graph-content">
-                <div class="loading">
-                    <h3>🔍 Select a subsystem and variable to explore</h3>
-                    <p>Use the dropdowns above to:</p>
-                    <ul style="text-align: left; display: inline-block;">
-                        <li>Choose a subsystem to see its connection graph</li>
-                        <li>Select a variable to focus on its connections</li>
-                        <li>Navigate through your OpenMDAO model hierarchy</li>
-                    </ul>
+        <!-- Main content area -->
+        <div class="main-content">
+            <div class="header">
+                <h1>Connection Graph Explorer</h1>
+                <button onclick="showHelp()" style="padding: 8px 16px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 20px;">Help</button>
+            </div>
+
+            <div class="graph-container">
+                <div id="graph-content">
+                    <div class="loading">
+                        <h3>🔍 Select a system or variable from the tree to explore</h3>
+                        <p>Use the tree on the left to:</p>
+                        <ul style="text-align: left; display: inline-block;">
+                            <li>Navigate through your OpenMDAO model hierarchy</li>
+                            <li>View connection graphs for specific systems</li>
+                            <li>Focus on individual variables and their connections</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="info" id="graph-info">
-            <strong>Ready to explore!</strong> Use the dropdowns above to navigate your OpenMDAO model.
+            <div class="info" id="graph-info">
+                <strong>Ready to explore!</strong> Select a system or variable from the tree to view its connection graph.
+            </div>
         </div>
     </div>
 
@@ -618,129 +728,381 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         }
 
         // UI elements
-        const subsystemSelect = document.getElementById('subsystem-select');
-        const variableSelect = document.getElementById('variable-select');
+        const treeContainer = document.getElementById('tree-container');
         const graphContent = document.getElementById('graph-content');
         const graphInfo = document.getElementById('graph-info');
 
+        // Tree data structure
+        let treeData = {};
+        let selectedNode = null;
+
         // Initialize the interface
         document.addEventListener('DOMContentLoaded', function() {
-            loadSubsystems();
-            loadVariablesForSubsystem('model');
+            loadTreeStructure();
             loadHelpColors(); // Load colors once at startup
         });
 
-        function loadSubsystems() {
+        function loadTreeStructure() {
+            // First get the basic graph info
             fetch('/api/graph_info')
                 .then(response => response.json())
                 .then(data => {
-                    // Clear existing options except the first one
-                    subsystemSelect.innerHTML = '<option value="model">Model (Top Level)</option>';
-
-                    // Add subsystem options, filtering out 'model' if it exists
-                    const filteredSubsystems = data.subsystems.filter(s => s !== 'model');
-                    filteredSubsystems.forEach(subsystem => {
-                        const option = document.createElement('option');
-                        option.value = subsystem;
-                        option.textContent = subsystem;
-                        subsystemSelect.appendChild(option);
-                    });
+                    // Build tree structure from subsystems
+                    buildTreeFromSubsystems(data.subsystems);
                 })
                 .catch(error => {
-                    console.error('Error loading subsystems:', error);
+                    console.error('Error loading tree structure:', error);
+                    treeContainer.innerHTML = '<div class="loading" style="color: red;">Error loading model structure</div>';
                 });
         }
 
-        function loadVariablesForSubsystem(subsystem) {
-            const subsystemPath = subsystem === 'model' ? '' : subsystem;
-            // console.log('Loading variables for subsystem:', subsystem, 'path:', subsystemPath);
+        function buildTreeFromSubsystems(subsystems) {
+            // Create a hierarchical structure from variable names
+            const tree = {};
 
-            fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
+            console.log('Building tree from subsystems:', subsystems);
+
+            // Add model as root
+            tree['model'] = {
+                name: 'Model',
+                path: 'model',
+                type: 'system',
+                children: {},
+                variables: []
+            };
+
+            // Load variables and build tree from variable names
+            loadVariablesForTree(tree);
+        }
+
+        function loadVariablesForTree(tree) {
+            // Load all variables and build tree structure from variable names
+            console.log('Loading variables for tree...');
+
+            fetch('/api/graph_info')
                 .then(response => response.json())
                 .then(data => {
-                    // console.log('Full API response:', data);
                     if (data.success) {
-                        // Clear existing options
-                        variableSelect.innerHTML = '<option value="">Select a variable...</option>';
+                        console.log('Graph info loaded:', data);
+                        buildTreeFromVariables(data.nodes_data, tree);
+                    } else {
+                        console.error('Error loading graph info:', data.error);
+                        treeContainer.innerHTML = '<div class="loading" style="color: red;">Error loading variables</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading variables:', error);
+                    treeContainer.innerHTML = '<div class="loading" style="color: red;">Error loading variables</div>';
+                });
+        }
 
-                        // Get all variables in this subsystem
-                        const variables = new Set();
+        function buildTreeFromVariables(nodesData, tree) {
+            console.log('Building tree from variables:', nodesData);
 
-                        // console.log('nodes_data:', data.nodes_data);
-                        // console.log('nodes_data type:', typeof data.nodes_data);
-                        // console.log('nodes_data keys:', data.nodes_data ? Object.keys(data.nodes_data) : 'none');
+            // Process each node to extract variable information
+            const allVariables = new Map();
 
-                        if (data.nodes_data) {
+            Object.entries(nodesData).forEach(([nodeIdStr, nodeData]) => {
+                // Parse the node ID string back to tuple format
+                const nodeId = JSON.parse(nodeIdStr);
+                const [io, varName] = nodeId;
+                const pathname = nodeData.pathname || '';
+
+                if (!allVariables.has(varName)) {
+                    // Extract just the final part of the variable name for display
+                    const displayName = varName.split('.').pop();
+                    allVariables.set(varName, {
+                        name: displayName,
+                        fullName: varName,
+                        path: pathname,
+                        type: io,
+                        io: io,
+                        nodeId: nodeId,
+                        nodeData: nodeData
+                    });
+                }
+            });
+
+            console.log('All variables collected:', allVariables);
+
+            // Now build the tree structure
+            allVariables.forEach((variable, key) => {
+                console.log('Processing variable:', key, variable);
+                const nameParts = variable.fullName.split('.');
+                let current = tree['model'];
+
+                // Create hierarchy based on variable name parts
+                for (let i = 0; i < nameParts.length; i++) {
+                    const part = nameParts[i];
+                    const path = nameParts.slice(0, i + 1).join('.');
+
+                    if (i === nameParts.length - 1) {
+                        // This is the final part - add the variable
+                        if (!current.variables) {
+                            current.variables = [];
+                        }
+                        console.log('Adding variable to tree:', variable);
+                        console.log('Variable fullName:', variable.fullName);
+                        current.variables.push(variable);
+                    } else {
+                        // This is an intermediate part - create or find the container
+                        if (!current.children[part]) {
+                            current.children[part] = {
+                                name: part,
+                                path: path,
+                                type: 'container',
+                                children: {},
+                                variables: []
+                            };
+                        }
+                        current = current.children[part];
+                    }
+                }
+            });
+
+            console.log('Final tree structure:', tree);
+            console.log('Model children:', tree['model'].children);
+            console.log('Model variables:', tree['model'].variables);
+            renderTree(tree);
+        }
+
+        function loadVariablesForAllSystems(tree) {
+            // First, collect all variables from all systems
+            const systemPaths = Object.keys(tree);
+            let loadedCount = 0;
+            const allVariables = new Map(); // Map to track variables and their owning systems
+
+            systemPaths.forEach(systemPath => {
+                const pathForAPI = systemPath === 'model' ? '' : systemPath;
+
+                fetch(`/api/subsystem/${encodeURIComponent(pathForAPI)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.nodes_data && tree[systemPath]) {
+                            // Collect variables from this system
                             for (const [nodeId, nodeData] of Object.entries(data.nodes_data)) {
-                                // console.log('Processing node:', nodeId, nodeData);
-                                if (nodeData && nodeData.rel_name) {
-                                    // Create the combined name: pathname + '.' + rel_name (or just rel_name if no pathname)
-                                    let combinedName = nodeData.rel_name;
-                                    if (nodeData.pathname && nodeData.pathname !== '') {
-                                        combinedName = nodeData.pathname + '.' + nodeData.rel_name;
-                                    }
+                                if (nodeData && nodeData.rel_name && !nodeData.rel_name.startsWith('_auto_ivc.')) {
+                                    const variableKey = `${nodeData.rel_name}_${nodeData.io}`;
 
-                                    // Filter out internal OpenMDAO variables
-                                    if (!combinedName.startsWith('_auto_ivc.')) {
-                                        // console.log('Adding variable:', combinedName);
-                                        variables.add(combinedName);
-                                    } else {
-                                        // console.log('Filtering out internal variable:', combinedName);
+                                    // Determine the correct system path from the pathname
+                                    const correctSystemPath = nodeData.pathname || 'model';
+
+                                    // Only add if we haven't seen this variable before
+                                    // or if this is the correct system for this variable
+                                    if (!allVariables.has(variableKey) ||
+                                        allVariables.get(variableKey).systemPath !== correctSystemPath) {
+
+                                        allVariables.set(variableKey, {
+                                            name: nodeData.rel_name,
+                                            path: nodeData.pathname + '.' + nodeData.rel_name,
+                                            type: nodeData.io === 'i' ? 'input' : 'output',
+                                            io: nodeData.io,
+                                            systemPath: correctSystemPath
+                                        });
                                     }
                                 }
                             }
                         }
 
-                        // console.log('Found variables:', Array.from(variables));
-
-                        // Add variable options
-                        Array.from(variables).sort().forEach(variable => {
-                            const option = document.createElement('option');
-                            option.value = variable;
-                            option.textContent = variable;
-                            variableSelect.appendChild(option);
-                        });
-
-                        // console.log(`Loaded ${variables.size} variables for subsystem: ${subsystem}`);
-                    } else {
-                        console.error('Failed to load subsystem:', data.error);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error loading variables:', error);
-                });
+                        loadedCount++;
+                        if (loadedCount === systemPaths.length) {
+                            // Now assign variables to their correct systems
+                            assignVariablesToSystems(tree, allVariables);
+                            renderTree(tree);
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Error loading variables for ${systemPath}:`, error);
+                        loadedCount++;
+                        if (loadedCount === systemPaths.length) {
+                            assignVariablesToSystems(tree, allVariables);
+                            renderTree(tree);
+                        }
+                    });
+            });
         }
 
-        function onSubsystemChange() {
-            const selectedSubsystem = subsystemSelect.value;
-            currentSubsystem = selectedSubsystem;
-            console.log('Subsystem changed to:', selectedSubsystem);
-            loadVariablesForSubsystem(selectedSubsystem);
-            loadSubsystemGraph(selectedSubsystem);
-            loadHelpColors(); // Reload colors for the new subsystem
+        function assignVariablesToSystems(tree, allVariables) {
+            // Clear existing variables
+            Object.keys(tree).forEach(systemPath => {
+                tree[systemPath].variables = [];
+            });
+
+            // Assign each variable to its owning system
+            allVariables.forEach(variable => {
+                const systemPath = variable.systemPath;
+                if (tree[systemPath]) {
+                    tree[systemPath].variables.push({
+                        name: variable.name,
+                        fullName: variable.fullName,
+                        path: variable.path,
+                        type: variable.type,
+                        io: variable.io
+                    });
+                }
+            });
         }
 
-        function onVariableChange() {
-            const selectedVariable = variableSelect.value;
-            if (selectedVariable) {
-                loadVariableGraph(selectedVariable);
+        function renderTree(tree) {
+            treeData = tree;
+            treeContainer.innerHTML = '';
+
+            // Render the model root
+            const modelNode = tree['model'];
+            if (modelNode) {
+                const nodeElement = createTreeNode(modelNode, 0);
+                treeContainer.appendChild(nodeElement);
             }
+        }
+
+        function createTreeNode(node, depth) {
+            const nodeDiv = document.createElement('div');
+            nodeDiv.className = 'tree-node';
+            nodeDiv.setAttribute('data-path', node.path);
+            nodeDiv.setAttribute('data-type', node.type);
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'tree-node-content';
+            contentDiv.onclick = () => selectNode(node);
+
+            // Ensure children and variables exist
+            const children = node.children || {};
+            const variables = node.variables || [];
+
+            // Toggle button for systems/containers with children
+            if ((node.type === 'system' || node.type === 'container') && (Object.keys(children).length > 0 || variables.length > 0)) {
+                const toggle = document.createElement('div');
+                toggle.className = 'tree-toggle';
+                toggle.innerHTML = '▶';
+                toggle.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleNode(nodeDiv, toggle);
+                };
+                contentDiv.appendChild(toggle);
+            } else {
+                const spacer = document.createElement('div');
+                spacer.className = 'tree-toggle';
+                contentDiv.appendChild(spacer);
+            }
+
+            // Icon
+            const icon = document.createElement('div');
+            icon.className = 'tree-icon';
+            if (node.type === 'system') {
+                icon.innerHTML = '📁';
+            } else if (node.type === 'container') {
+                icon.innerHTML = '📂';
+            } else if (node.type === 'i') {
+                icon.innerHTML = '📥';
+            } else if (node.type === 'o') {
+                icon.innerHTML = '📤';
+            }
+            contentDiv.appendChild(icon);
+
+            // Label
+            const label = document.createElement('div');
+            label.className = 'tree-label';
+            label.textContent = node.name;
+            contentDiv.appendChild(label);
+
+            nodeDiv.appendChild(contentDiv);
+
+            // Children container
+            const childrenDiv = document.createElement('div');
+            childrenDiv.className = 'tree-children collapsed';
+
+            // Add child systems
+            Object.values(children).forEach(child => {
+                childrenDiv.appendChild(createTreeNode(child, depth + 1));
+            });
+
+            // Add variables
+            variables.forEach(variable => {
+                const varNode = {
+                    name: variable.name,
+                    fullName: variable.fullName,
+                    path: variable.path,
+                    type: variable.type,
+                    io: variable.io
+                };
+                childrenDiv.appendChild(createTreeNode(varNode, depth + 1));
+            });
+
+            nodeDiv.appendChild(childrenDiv);
+            return nodeDiv;
+        }
+
+        function toggleNode(nodeElement, toggle) {
+            const children = nodeElement.querySelector('.tree-children');
+            if (children.classList.contains('collapsed')) {
+                children.classList.remove('collapsed');
+                toggle.innerHTML = '▼';
+            } else {
+                children.classList.add('collapsed');
+                toggle.innerHTML = '▶';
+            }
+        }
+
+        function selectNode(node) {
+            // Remove previous selection
+            document.querySelectorAll('.tree-node-content.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
+
+            // Add selection to current node
+            event.currentTarget.classList.add('selected');
+            selectedNode = node;
+
+            console.log('Selected node:', node);
+
+            // Load the appropriate graph
+            if (node.type === 'system') {
+                console.log('Loading system graph for:', node.path);
+                updateCurrentSubsystem(node.path);
+                loadSubsystemGraph(node.path);
+            } else if (node.type === 'container') {
+                // For containers, show the subsystem graph for the container path
+                console.log('Loading container graph for:', node.path);
+                updateCurrentSubsystem(node.path);
+                loadSubsystemGraph(node.path);
+            } else if (node.type === 'i' || node.type === 'o') {
+                // For variables, load the variable-specific graph
+                console.log('Loading variable graph for:', node.fullName);
+                console.log('Variable node data:', node);
+                console.log('Variable keys:', Object.keys(node));
+                console.log('Variable fullName property:', node.fullName);
+                updateCurrentSubsystem(node.path);
+                loadVariableGraph(node.fullName);
+            }
+        }
+
+        // Update currentSubsystem when a system is selected
+        function updateCurrentSubsystem(systemPath) {
+            currentSubsystem = systemPath;
+            loadHelpColors(); // Reload colors for the new subsystem
         }
 
 
         function loadVariableGraph(variable) {
             showLoading('Loading variable graph...');
+            console.log('loadVariableGraph called with:', variable);
 
             fetch(`/api/variable/${encodeURIComponent(variable)}`)
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Variable API response:', response);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Variable API data:', data);
                     if (data.success) {
                         displayGraph(data.svg, `Variable: ${variable}`, data.nodes, data.edges);
                     } else {
+                        console.error('Variable API error:', data.error);
                         showError(`Error loading variable: ${data.error}`);
                     }
                 })
                 .catch(error => {
+                    console.error('Variable API fetch error:', error);
                     showError(`Error: ${error.message}`);
                 });
         }
