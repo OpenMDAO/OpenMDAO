@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """
-Simple AllConnGraph Web UI with better Graphviz integration.
+Simple Conection Graph Web UI with Graphviz integration.
 
 This creates a web interface that:
 1. Uses Graphviz for proper graph layouts
 2. Serves focused views of connection graphs
-3. Provides search and navigation
-4. Avoids complex D3.js force simulations
 """
 
 import json
@@ -307,6 +305,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         .container {
             height: 100vh;
             display: flex;
+            flex-direction: column;
             background: white;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
@@ -314,12 +313,24 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             background: #2c3e50;
             color: white;
             padding: 10px 20px;
-            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             flex-shrink: 0;
+            position: relative;
         }
         .header h1 {
             margin: 0;
             font-size: 24px;
+        }
+        .header button {
+            position: absolute;
+            right: 20px;
+        }
+        .content-area {
+            display: flex;
+            flex: 1;
+            min-height: 0;
         }
         .controls {
             padding: 15px 20px;
@@ -628,22 +639,23 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 </head>
 <body>
     <div class="container">
-        <!-- Sidebar with tree structure -->
-        <div class="sidebar">
-            <div class="tree-header">
-                <h3>Model Hierarchy</h3>
-            </div>
-            <div class="tree-container" id="tree-container">
-                <div class="loading">Loading model structure...</div>
-            </div>
+        <!-- Full-width header -->
+        <div class="header">
+            <h1>Connection Graph Explorer</h1>
+            <button onclick="showHelp()" style="padding: 8px 16px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">Help</button>
         </div>
 
-        <!-- Main content area -->
-        <div class="main-content">
-            <div class="header">
-                <h1>Connection Graph Explorer</h1>
-                <button onclick="showHelp()" style="padding: 8px 16px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 20px;">Help</button>
+        <!-- Content area with sidebar and main content -->
+        <div class="content-area">
+            <!-- Sidebar with tree structure -->
+            <div class="sidebar">
+                <div class="tree-container" id="tree-container">
+                    <div class="loading">Loading model structure...</div>
+                </div>
             </div>
+
+            <!-- Main content area -->
+            <div class="main-content">
 
             <div class="graph-container">
                 <div id="graph-content">
@@ -661,6 +673,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
             <div class="info" id="graph-info">
                 <strong>Ready to explore!</strong> Select a system or variable from the tree to view its connection graph.
+            </div>
             </div>
         </div>
     </div>
@@ -818,8 +831,18 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                         type: io,
                         io: io,
                         nodeId: nodeId,
-                        nodeData: nodeData
+                        nodeData: nodeData,
+                        isBidirectional: false
                     });
+                } else {
+                    // Variable already exists - check if it's bidirectional
+                    const existingVar = allVariables.get(varName);
+                    if (existingVar.io !== io) {
+                        // This is a bidirectional variable (has both input and output)
+                        existingVar.isBidirectional = true;
+                        existingVar.type = 'bidirectional';
+                        existingVar.io = 'bidirectional';
+                    }
                 }
             });
 
@@ -989,13 +1012,17 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             const icon = document.createElement('div');
             icon.className = 'tree-icon';
             if (node.type === 'system') {
-                icon.innerHTML = '📁';
+                icon.innerHTML = '⚙️';
             } else if (node.type === 'container') {
-                icon.innerHTML = '📂';
+                icon.innerHTML = '📁';
             } else if (node.type === 'i') {
-                icon.innerHTML = '📥';
+                icon.innerHTML = '⬇️';
             } else if (node.type === 'o') {
-                icon.innerHTML = '📤';
+                icon.innerHTML = '⬆️';
+            } else if (node.type === 'bidirectional') {
+                icon.innerHTML = '⬆️⬇️';
+            } else {
+                icon.innerHTML = '⬆️⬇️';
             }
             contentDiv.appendChild(icon);
 
@@ -1065,7 +1092,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 console.log('Loading container graph for:', node.path);
                 updateCurrentSubsystem(node.path);
                 loadSubsystemGraph(node.path);
-            } else if (node.type === 'i' || node.type === 'o') {
+            } else if (node.type === 'i' || node.type === 'o' || node.type === 'bidirectional') {
                 // For variables, load the variable-specific graph
                 console.log('Loading variable graph for:', node.fullName);
                 console.log('Variable node data:', node);
