@@ -1294,7 +1294,7 @@ class AllConnGraph(nx.DiGraph):
                         'tooltip': (node_meta['io'], node_meta['pathname'], node_meta['rel_name'],
                                     node_meta['units'], node_meta['_shape'],
                                     f"def: {node_meta.get('defaults', '')}"),
-                        'style': 'filled',
+                        'style': 'filled,rounded',
                         'shape': 'box',
                         'pathname': node_meta['pathname'],
                         'rel_name': node_meta['rel_name'],
