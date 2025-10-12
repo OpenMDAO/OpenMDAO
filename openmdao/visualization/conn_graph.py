@@ -97,7 +97,7 @@ class AllConnGraph(nx.DiGraph):
 
         raise KeyError(f"{pathname}: Variable '{varname}' not found in connection graph.")
 
-    def fullname(self, node):
+    def msgname(self, node):
         """
         Get full name of node, including absolute names if they differ from the promoted name.
 
@@ -129,6 +129,19 @@ class AllConnGraph(nx.DiGraph):
             return node[1]
 
         return f'{node[1]} ({absnames})'
+
+    def combined_name(self, node):
+        meta = self.nodes[node]
+        if meta['pathname']:
+            return f'{meta["pathname"]}.{meta["rel_name"]}'
+        else:
+            return meta["rel_name"]
+
+    def startswith(self, prefix, node):
+        if prefix:
+            return self.combined_name(node).startswith(prefix)
+
+        return True
 
     def get_val(self, system, name, units=None, indices=None, get_remote=False, rank=None,
                 vec_name='nonlinear', kind=None, flat=False, from_src=True):
@@ -170,13 +183,13 @@ class AllConnGraph(nx.DiGraph):
                     (val, src_units, ())
 
             if is_undefined(val):
-                raise ValueError(f"{system.msginfo}: Variable '{self.fullname(src_node)}' has not "
+                raise ValueError(f"{system.msginfo}: Variable '{self.msgname(src_node)}' has not "
                                  "been initialized.")
 
         try:
             val = self.convert_get(val, src_units, tgt_units, tgt_inds_list, units, indices)
         except Exception as err:
-            raise ValueError(f"{system.msginfo}: Can't get value of '{self.fullname(node)}': "
+            raise ValueError(f"{system.msginfo}: Can't get value of '{self.msgname(node)}': "
                              f"{str(err)}.")
 
         return val
@@ -292,9 +305,9 @@ class AllConnGraph(nx.DiGraph):
                 for p in self.predecessors(tgt):
                     if p[0] == 'o':
                         group._collect_error(
-                            f"{group.msginfo}: Target '{self.fullname(tgt)}' cannot be "
-                            f"connected to '{self.fullname(src)}' because it's already "
-                            f"connected to '{self.fullname(p)}'.", ident=(src, tgt))
+                            f"{group.msginfo}: Target '{self.msgname(tgt)}' cannot be "
+                            f"connected to '{self.msgname(src)}' because it's already "
+                            f"connected to '{self.msgname(p)}'.", ident=(src, tgt))
                         return False
                 return False
 
@@ -534,7 +547,7 @@ class AllConnGraph(nx.DiGraph):
                     units_list = [nodes[succ].get('units', None) for succ in succs]
                     units_list = [u for u in units_list if u is not None]
                     group._collect_error(f"{group.msginfo}: No default units have been set for "
-                                         f"input '{self.fullname(node)}' so the choice of units "
+                                         f"input '{self.msgname(node)}' so the choice of units "
                                          f"between {sorted(units_list)} is ambiguous. Call "
                                          f"model.set_input_defaults('{prom}', units=?) to remove "
                                          "the ambiguity.")
@@ -554,8 +567,8 @@ class AllConnGraph(nx.DiGraph):
             node_meta['units'] = default
             return
 
-        group._collect_error(f"{group.msginfo}: '{self.fullname(node)}' default units "
-                             f"'{default.name()}' and '{self.fullname(basenode)}' units of "
+        group._collect_error(f"{group.msginfo}: '{self.msgname(node)}' default units "
+                             f"'{default.name()}' and '{self.msgname(basenode)}' units of "
                              f"'{base_units.name()}' are incompatible.")
 
     def rollup_valshape(self, group, node, node_meta, succs, defaults, auto_ivc):
@@ -607,9 +620,9 @@ class AllConnGraph(nx.DiGraph):
                     sbase_shape = succ
                 else:
                     if not array_connection_compatible(shape_base, _shape):
-                        group._collect_error(f"{group.msginfo}: '{self.fullname(succ)}' shape of "
+                        group._collect_error(f"{group.msginfo}: '{self.msgname(succ)}' shape of "
                                              f"'{_shape}' is incompatible with "
-                                             f"'{self.fullname(sbase_shape)}' "
+                                             f"'{self.msgname(sbase_shape)}' "
                                              f"shape of '{shape_base}'.")
 
             if val is not None:
@@ -634,7 +647,7 @@ class AllConnGraph(nx.DiGraph):
                 absname = self.nodes[node]['absnames'][0]
                 prom = group._resolver.abs2prom(absname, 'input')
                 group._collect_error(f"{group.msginfo}: No default val has been set for input "
-                                     f"'{self.fullname(node)}' but different values feed into it. "
+                                     f"'{self.msgname(node)}' but different values feed into it. "
                                      f"Call model.set_input_defaults('{prom}', val=?) to remove "
                                      "the ambiguity.")
             node_meta['val'] = val_base
@@ -648,13 +661,13 @@ class AllConnGraph(nx.DiGraph):
                 # default overrides any node value as long as it's compatible
                 node_meta['val'] = default_val
             else:
-                group._collect_error(f"{group.msginfo}: '{self.fullname(node)}' default val "
-                                     f"'{default_val}' and '{self.fullname(sbase_val)}' val of "
+                group._collect_error(f"{group.msginfo}: '{self.msgname(node)}' default val "
+                                     f"'{default_val}' and '{self.msgname(sbase_val)}' val of "
                                      f"'{val_base}' are incompatible.")
 
         if not shape_good:
-            group._collect_error(f"{group.msginfo}: '{self.fullname(node)}' default shape "
-                                 f"'{default_shape}' and '{self.fullname(sbase_shape)}' shape of "
+            group._collect_error(f"{group.msginfo}: '{self.msgname(node)}' default shape "
+                                 f"'{default_shape}' and '{self.msgname(sbase_shape)}' shape of "
                                  f"'{shape_base}' are incompatible.")
 
     def rollup_to_node(self, group, start_node, auto_ivc=False):
@@ -681,7 +694,7 @@ class AllConnGraph(nx.DiGraph):
                             branch_meta['units'] = units
                         else:
                             group._collect_error(
-                                f"{group.msginfo}: '{self.fullname(node)}' "
+                                f"{group.msginfo}: '{self.msgname(node)}' "
                                 f"default units '{units}' and "
                                 f"units of '{branch_meta['units']}' are incompatible.")
 
@@ -690,7 +703,7 @@ class AllConnGraph(nx.DiGraph):
                                                                                branch_meta['val']):
                             branch_meta['val'] = val
                         else:
-                            group._collect_error(f"{group.msginfo}: '{self.fullname(node)}' "
+                            group._collect_error(f"{group.msginfo}: '{self.msgname(node)}' "
                                                  f"default val '{val}' and "
                                                  f"val of '{branch_meta['val']}' are incompatible.")
 
@@ -781,15 +794,15 @@ class AllConnGraph(nx.DiGraph):
                         src_inds.set_src_shape(shape)
                     except Exception:
                         type_exc, exc, tb = sys.exc_info()
-                        group._collect_error(f"When connecting '{self.fullname(u)}' to "
-                                             f"'{self.fullname(v)}': {exc}",
+                        group._collect_error(f"When connecting '{self.msgname(u)}' to "
+                                             f"'{self.msgname(v)}': {exc}",
                                              exc_type=type_exc, tback=tb, ident=(src[1], v[1]))
                     shape = src_inds.indexed_src_shape
 
                     if not array_connection_compatible(shape, vmeta['_shape']):
                         group._collect_error(f"After applying index {truncate_str(str(src_inds))} "
-                                             f"to '{self.fullname(u)}', shape {shape} != "
-                                             f"{vmeta['_shape']} of '{self.fullname(v)}'.",
+                                             f"to '{self.msgname(u)}', shape {shape} != "
+                                             f"{vmeta['_shape']} of '{self.msgname(v)}'.",
                                              ident=(u[1], v[1]))
 
                     # only make a copy if we are modifying the list
@@ -815,8 +828,8 @@ class AllConnGraph(nx.DiGraph):
                             sistr = f" after applying src_indices {[str(s) for s in src_inds_list]} "
                     else:
                         sistr = ""
-                    group._collect_error(f"When connecting '{self.fullname(src)}' to "
-                                        f"'{self.fullname(('i', abs_in))}'{sistr}: shape "
+                    group._collect_error(f"When connecting '{self.msgname(src)}' to "
+                                        f"'{self.msgname(('i', abs_in))}'{sistr}: shape "
                                         f"{expected_shape} != {abs_in_shape}.",
                                         ident=(src[1], abs_in))
 
@@ -1149,7 +1162,7 @@ class AllConnGraph(nx.DiGraph):
             pathname = pathname + '.'
 
         for node, data in self.nodes(data=True):
-            if pathname and not data['pathname'].startswith(pathname):
+            if pathname and not self.startswith(pathname, node):
                 continue
             newdata = {}
             if data['io'] == 'i':
@@ -1175,7 +1188,6 @@ class AllConnGraph(nx.DiGraph):
         tuple of the form (u, v, data)
             The edge and its metadata.
         """
-        nodes = self.nodes
         if pathname:
             pathname = pathname + '.'
 
@@ -1183,13 +1195,13 @@ class AllConnGraph(nx.DiGraph):
             style = data.get('style')
 
             if pathname:
-                u_internal = nodes[u]['pathname'].startswith(pathname)
+                u_internal = self.startswith(pathname, u)
                 if not u_internal:  # show as an external connection
                     if not show_cross_boundary:
                         continue
                     style = 'dotted'
 
-                v_internal = nodes[v]['pathname'].startswith(pathname)
+                v_internal = self.startswith(pathname, v)
                 if not v_internal:  # show as an external connection
                     if not show_cross_boundary:
                         continue

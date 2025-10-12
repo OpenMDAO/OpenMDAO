@@ -819,6 +819,22 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         function buildTreeFromVariables(nodesData, tree) {
             console.log('Building tree from variables:', nodesData);
 
+            // First, get the list of actual subsystems and their ancestors
+            const actualSubsystems = new Set();
+            Object.entries(nodesData).forEach(([nodeIdStr, nodeData]) => {
+                const pathname = nodeData.pathname || '';
+                if (pathname) {
+                    actualSubsystems.add(pathname);
+                    // Add all ancestor paths
+                    const parts = pathname.split('.');
+                    for (let i = 1; i < parts.length; i++) {
+                        const ancestorPath = parts.slice(0, i).join('.');
+                        actualSubsystems.add(ancestorPath);
+                    }
+                }
+            });
+            console.log('Actual subsystems found:', Array.from(actualSubsystems));
+
             // Process each node to extract variable information
             const allVariables = new Map();
 
@@ -855,10 +871,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
             console.log('All variables collected:', allVariables);
 
-            // Now build the tree structure
+            // Now build the tree structure from variable names
             allVariables.forEach((variable, key) => {
                 console.log('Processing variable:', key, variable);
-                const nameParts = variable.fullName.split('.');
+
+                // Use the full variable name to build the tree structure
+                const fullVariableName = variable.fullName;
+                const nameParts = fullVariableName.split('.');
                 let current = tree['model'];
 
                 // Create hierarchy based on variable name parts
@@ -871,16 +890,22 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                         if (!current.variables) {
                             current.variables = [];
                         }
+                        // Update the variable's path to match the tree hierarchy
+                        variable.path = path;
                         console.log('Adding variable to tree:', variable);
                         console.log('Variable fullName:', variable.fullName);
                         current.variables.push(variable);
                     } else {
                         // This is an intermediate part - create or find the container
                         if (!current.children[part]) {
+                            // Check if this path corresponds to an actual subsystem
+                            // or if it's a prefix of any actual subsystem
+                            const isActualSubsystem = actualSubsystems.has(path) ||
+                                Array.from(actualSubsystems).some(subsys => subsys.startsWith(path + '.'));
                             current.children[part] = {
                                 name: part,
                                 path: path,
-                                type: 'container',
+                                type: isActualSubsystem ? 'system' : 'container',
                                 children: {},
                                 variables: []
                             };
@@ -1056,7 +1081,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                     name: variable.name,
                     fullName: variable.fullName,
                     path: variable.path,
-                    type: variable.type,
+                    type: variable.io, // Use io as the type for variables
                     io: variable.io
                 };
                 childrenDiv.appendChild(createTreeNode(varNode, depth + 1));
@@ -1090,13 +1115,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             console.log('Selected node:', node);
 
             // Load the appropriate graph
-            if (node.type === 'system') {
+            if (node.type === 'system' || node.type === 'container') {
                 console.log('Loading system graph for:', node.path);
-                updateCurrentSubsystem(node.path);
-                loadSubsystemGraph(node.path);
-            } else if (node.type === 'container') {
-                // For containers, show the subsystem graph for the container path
-                console.log('Loading container graph for:', node.path);
                 updateCurrentSubsystem(node.path);
                 loadSubsystemGraph(node.path);
             } else if (node.type === 'i' || node.type === 'o' || node.type === 'bidirectional') {
