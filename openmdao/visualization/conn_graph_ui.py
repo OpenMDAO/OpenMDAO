@@ -80,10 +80,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
     def serve_subsystem_graph(self, subsystem):
         """Serve graph for a specific subsystem."""
         try:
-            print(f"Serving subsystem graph for: '{subsystem}'")
             subgraph = self.conn_graph.get_drawable_graph(subsystem)
-            print(f"Subgraph has {len(subgraph.nodes())} nodes and {len(subgraph.edges())} edges")
-
             pydot_graph = nx.drawing.nx_pydot.to_pydot(subgraph)
             try:
                 graphviz_svg = pydot_graph.create_svg().decode('utf-8')
@@ -108,8 +105,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             # Convert nodes to a format the frontend can use
             nodes_data = {}
             for node_id, node_data in subgraph.nodes(data=True):
-                # print(f"Raw node {node_id}: {node_data}")
-
                 # Extract the actual variable information from the node metadata
                 # The node_data contains the original rel_name and pathname
                 rel_name = node_data.get('rel_name', '')
@@ -126,7 +121,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                     'io': io_type,
                     'fillcolor': node_data.get('fillcolor', '')
                 }
-                #print(f"Processed node {node_id}: rel_name='{rel_name}', pathname='{pathname}', io='{io_type}'")
 
             response = {
                 'success': True,
@@ -137,14 +131,17 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 'help_colors': help_colors,
                 'svg': graphviz_svg
             }
-            # print(f"Returning {len(nodes_data)} nodes_data entries")
         except Exception as e:
             print(f"Error in serve_subsystem_graph: {e}")
             # Provide more helpful error message
             error_msg = str(e)
             if "not found" in error_msg.lower():
-                error_msg = f"Subsystem '{subsystem}' not found. Try searching for a different subsystem name."
-            response = {'success': False, 'error': error_msg}
+                error_msg = f"Subsystem '{subsystem}' not found. Try searching for a different " \
+                    "subsystem name."
+            response = {
+                'success': False,
+                'error': error_msg
+            }
 
         self.send_json_response(response)
 
@@ -176,7 +173,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                     nx_graph = nx.drawing.nx_pydot.from_pydot(pydot_graph)
                     graphviz_svg = self.create_text_graph(nx_graph, f"Variable: {variable}")
                 except Exception:
-                    graphviz_svg = f"<div style='padding: 20px; color: red;'>Error generating graph for variable: {variable}</div>"
+                    graphviz_svg = f"<div style='padding: 20px; color: red;'>Error generating " \
+                        f"graph for variable: {variable}</div>"
 
             # Count nodes and edges from the pydot graph
             nodes_count = len(pydot_graph.get_nodes())
@@ -193,7 +191,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             # Provide more helpful error message
             error_msg = str(e)
             if "not found" in error_msg.lower():
-                error_msg = f"Variable '{variable}' not found. Try searching for a different variable name."
+                error_msg = f"Variable '{variable}' not found. Try searching for a different " \
+                    "variable name."
             response = {'success': False, 'error': error_msg}
 
         self.send_json_response(response)
@@ -234,19 +233,18 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
     def get_subsystems(self):
         """Get list of unique subsystems."""
         subsystems = {'model'}
-        for node_id, node_data in self.conn_graph.nodes(data=True):
+        for _, node_data in self.conn_graph.nodes(data=True):
             pathname = node_data.get('pathname', '')
             if pathname:
                 subsystems.add(pathname)
 
-        # print(f"Found subsystems: {sorted(subsystems)}")
         return sorted(subsystems)
 
     def create_text_graph(self, subgraph, title):
         """Create a simple text-based graph representation when Graphviz is not available."""
         html = '<div style="font-family: monospace; padding: 20px;">'
         html += f'<h3>{title}</h3>'
-        html += f'<p><strong>Nodes:</strong> {len(subgraph.nodes())} | <strong>Edges:</strong> {len(subgraph.edges())}</p>'
+        html += f'<p><strong>Nodes:</strong> {len(subgraph.nodes())}</p>'
 
         # Show nodes
         html += '<h4>Variables:</h4><ul>'
@@ -754,7 +752,12 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
     <script>
         let currentGraph = null;
         let currentSubsystem = 'model';
-        let cachedColors = { input: '#3498db', output: '#e74c3c', highlight: '#ffd700', boundary: '#ff6b6b' }; // Cache the colors
+        let cachedColors = {
+            input: '#3498db',
+            output: '#e74c3c',
+            highlight: '#ffd700',
+            boundary: '#ff6b6b'
+        }; // Cache the colors
         let colorsLoaded = false; // Track if colors have been loaded
 
         // Color mapping function to convert color names to hex values

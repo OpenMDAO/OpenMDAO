@@ -832,9 +832,10 @@ class AllConnGraph(nx.DiGraph):
                     src_inds_list = nodes[('i', abs_in)]['src_inds_list']
                     if src_inds_list:
                         if len(src_inds_list) == 1:
-                            sistr = f" after applying src_indices {str(src_inds_list[0])} "
+                            s = str(src_inds_list[0])
                         else:
-                            sistr = f" after applying src_indices {[str(s) for s in src_inds_list]} "
+                            s = f"{[str(s) for s in src_inds_list]}"
+                        sistr = f" after applying src_indices {s} "
                     else:
                         sistr = ""
                     group._collect_error(f"When connecting '{self.msgname(src)}' to "
@@ -890,8 +891,6 @@ class AllConnGraph(nx.DiGraph):
         """
         tgt_syspath, tgt_prom = self.get_path_prom(tgt)
         edge_meta = {k: v for k, v in self.edges[inp_src, tgt].items() if k != 'input_input'}
-        # if 'conn_dict' in edge_meta:
-        #     del edge_meta['conn_dict'][tgt_prom]
         self.remove_edge(inp_src, tgt)
         self.add_edge(new_src, tgt, **edge_meta)
         if tgt_syspath:
@@ -1159,24 +1158,24 @@ class AllConnGraph(nx.DiGraph):
         if units is None:
             units = ''
         else:
-            units = f"{units}"
+            units = f"<TR><TD><b>{units}</b></TD></TR>"
+
         shape = meta['_shape']
         if shape is None:
             shape = ''
+        else:
+            shape = f"<TR><TD><i>{shape}</i></TD></TR>"
 
         # Get the combined name and check for custom formatting first
         name = self.combined_name(node)
 
-        # Always format the label with HTML: name (normal), units (bold), shape (italic)
-        # Add spacing between elements for better readability and use better typography
-        if units and shape:
-            return f"<{name}&nbsp;&nbsp;<b>{units}</b>&nbsp;&nbsp;<i>{shape}</i>>"
-        elif units:
-            return f"<{name}&nbsp;&nbsp;<b>{units}</b>>"
-        elif shape:
-            return f"<{name}&nbsp;&nbsp;<i>{shape}</i>>"
+        # return f"{name}\n{units}\n{shape}"
+
+        if units or shape:
+            return f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="1" CELLPADDING="0"><TR><TD>' \
+                f'{name}</TD></TR>{units}{shape}</TABLE>>'
         else:
-            return f"<{name}>"
+            return name
 
     def drawable_node_iter(self, pathname=''):
         """
@@ -1205,13 +1204,9 @@ class AllConnGraph(nx.DiGraph):
                 newdata['fillcolor'] = GRAPH_COLORS['output']
 
             newdata['label'] = self.create_node_label(node)
-            newdata['tooltip'] = (data['io'], data['pathname'], data['rel_name'], data['units'],
-                                  data['_shape'], f"def: {data.get('defaults', '')}")
+            newdata['tooltip'] = (data['pathname'], data['rel_name'])
             newdata['style'] = 'filled,rounded'
             newdata['shape'] = 'box'  # Use box shape with rounded corners
-            newdata['margin'] = '0.1,0.1'  # Add some margin around the text
-            newdata['fontname'] = 'Arial'  # Use a clean font
-            newdata['fontsize'] = '10'  # Set a readable font size
             newdata['pathname'] = data['pathname']
             newdata['rel_name'] = data['rel_name']
             yield node, newdata
@@ -1291,9 +1286,7 @@ class AllConnGraph(nx.DiGraph):
                     node_meta = nodes[node]
                     meta = {
                         'label': self.create_node_label(node),
-                        'tooltip': (node_meta['io'], node_meta['pathname'], node_meta['rel_name'],
-                                    node_meta['units'], node_meta['_shape'],
-                                    f"def: {node_meta.get('defaults', '')}"),
+                        'tooltip': (node_meta['pathname'], node_meta['rel_name']),
                         'style': 'filled,rounded',
                         'shape': 'box',
                         'pathname': node_meta['pathname'],
