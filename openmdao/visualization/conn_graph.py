@@ -500,8 +500,12 @@ class AllConnGraph(nx.DiGraph):
                 elif isinstance(val, Number):
                     src_shape = (1,)
 
+                if not meta['discrete']:
+                    if src_shape is None:
+                        val, _ = ensure_compatible(name, val, None)
+                    defaults['shape'] = val.shape
+
                 defaults['val'] = val
-                defaults['shape'] = val.shape
 
             if units is not None:
                 if not isinstance(units, str):

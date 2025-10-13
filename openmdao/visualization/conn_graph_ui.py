@@ -13,6 +13,8 @@ from urllib.parse import urlparse, parse_qs, unquote
 import networkx as nx
 
 from openmdao.visualization.conn_graph import GRAPH_COLORS
+from openmdao.utils.file_utils import _load_and_exec
+import openmdao.utils.hooks as hooks
 
 
 class ConnGraphHandler(SimpleHTTPRequestHandler):
@@ -152,16 +154,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             try:
                 pydot_graph = self.conn_graph.get_pydot_graph(varname=variable)
             except Exception:
-                # If that fails, try to find the variable in the graph
-                try:
-                    # Try to find the variable as an input
-                    pydot_graph = self.conn_graph.get_pydot_graph(varname=variable)
-                except Exception:
-                    try:
-                        # Try to find the variable as an output
-                        pydot_graph = self.conn_graph.get_pydot_graph(varname=variable)
-                    except Exception:
-                        raise ValueError(f"Variable '{variable}' not found in connection graph")
+                raise ValueError(f"Variable '{variable}' not found in connection graph")
 
             # pydot_graph is already a pydot.Dot object, so we can use it directly
             try:
@@ -556,6 +549,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         /* Tree structure styles */
         .sidebar {
             width: 300px;
+            min-width: 200px;
+            max-width: 600px;
             background: #f8f9fa;
             border-right: 1px solid #ddd;
             overflow-y: auto;
@@ -565,12 +560,71 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             height: 100vh;
         }
 
+        .resizer {
+            width: 4px;
+            background: #ddd;
+            cursor: col-resize;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .resizer:hover {
+            background: #007bff;
+        }
+
+        .resizer:active {
+            background: #0056b3;
+        }
+
         .tree-header {
             background: #2c3e50;
             color: white;
             padding: 15px;
             font-weight: bold;
             text-align: center;
+        }
+
+        .search-container {
+            padding: 10px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .search-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            color: #6c757d;
+            font-size: 16px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px 8px 40px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+
+        .search-input::placeholder {
+            color: #6c757d;
         }
 
         .tree-container {
@@ -597,6 +651,30 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         .tree-node-content.selected {
             background-color: #007bff;
             color: white;
+        }
+
+        .tree-node-content.search-highlight {
+            background-color: #ffd700;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .tree-label.search-highlight {
+            background-color: #ffd700;
+            color: #333;
+            font-weight: bold;
+            border-radius: 3px;
+            padding: 2px 4px;
+            display: inline-block;
+            width: fit-content;
+        }
+
+        .search-highlight-span {
+            background-color: #ffd700;
+            color: #333;
+            font-weight: bold;
+            border-radius: 3px;
+            padding: 2px 4px;
         }
 
         .tree-toggle {
@@ -659,11 +737,20 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         <!-- Content area with sidebar and main content -->
         <div class="content-area">
             <!-- Sidebar with tree structure -->
-            <div class="sidebar">
+            <div class="sidebar" id="sidebar">
+                <div class="search-container">
+                    <div class="search-wrapper">
+                        <div class="search-icon">🔍</div>
+                        <input type="text" id="fuzzy-search" class="search-input" placeholder="Search..." />
+                    </div>
+                </div>
                 <div class="tree-container" id="tree-container">
                     <div class="loading">Loading model structure...</div>
                 </div>
             </div>
+
+            <!-- Resizer -->
+            <div class="resizer" id="resizer"></div>
 
             <!-- Main content area -->
             <div class="main-content">
@@ -784,10 +871,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         let treeData = {};
         let selectedNode = null;
         let globalGraphColors = null; // Store graph colors from initial load
+        let isSearchNavigation = false; // Flag to track if we're navigating from search
 
         // Initialize the interface
         document.addEventListener('DOMContentLoaded', function() {
             loadTreeStructure();
+            setupFuzzySearch();
+            setupResizer();
         });
 
         function loadTreeStructure() {
@@ -1134,6 +1224,19 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 el.classList.remove('selected');
             });
 
+            // Clear any search highlights when selecting a new node (but not during search navigation)
+            if (!isSearchNavigation) {
+                document.querySelectorAll('.tree-node-content.search-highlight, .tree-label.search-highlight').forEach(el => {
+                    el.classList.remove('search-highlight');
+                });
+
+                // Remove any existing highlight spans
+                document.querySelectorAll('.search-highlight-span').forEach(span => {
+                    const parent = span.parentElement;
+                    parent.textContent = parent.textContent;
+                });
+            }
+
             // Add selection to current node
             event.currentTarget.classList.add('selected');
             selectedNode = node;
@@ -1332,11 +1435,304 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             }
         }
 
+        // Fuzzy search functionality
+        function setupFuzzySearch() {
+            const searchInput = document.getElementById('fuzzy-search');
+
+            searchInput.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const query = searchInput.value.trim();
+                    if (query) {
+                        navigateToBestMatch(query);
+                    }
+                }
+            });
+        }
+
+        // Simple fuzzy search algorithm
+        function fuzzyMatch(query, text) {
+            if (!query || !text) return 0;
+
+            const queryLower = query.toLowerCase();
+            const textLower = text.toLowerCase();
+
+            // Exact match gets highest score
+            if (textLower === queryLower) return 100;
+
+            // Starts with query gets high score
+            if (textLower.startsWith(queryLower)) return 90;
+
+            // Contains query gets medium score
+            if (textLower.includes(queryLower)) return 70;
+
+            // Fuzzy matching - check if all characters in query appear in order
+            let queryIndex = 0;
+            let score = 0;
+
+            for (let i = 0; i < textLower.length && queryIndex < queryLower.length; i++) {
+                if (textLower[i] === queryLower[queryIndex]) {
+                    score += 10;
+                    queryIndex++;
+                }
+            }
+
+            // If all query characters were found in order, return the score
+            if (queryIndex === queryLower.length) {
+                return score;
+            }
+
+            return 0;
+        }
+
+        // Find all tree nodes and their text content
+        function getAllTreeNodes() {
+            const nodes = [];
+            const treeElements = document.querySelectorAll('.tree-node');
+
+            treeElements.forEach(element => {
+                const labelElement = element.querySelector('.tree-label');
+                if (labelElement) {
+                    const text = labelElement.textContent;
+                    const path = element.getAttribute('data-path');
+                    const type = element.getAttribute('data-type');
+
+                    nodes.push({
+                        element: element,
+                        text: text,
+                        path: path,
+                        type: type
+                    });
+                }
+            });
+
+            return nodes;
+        }
+
+        // Navigate to the best match
+        function navigateToBestMatch(query) {
+            const allNodes = getAllTreeNodes();
+            let bestMatch = null;
+            let bestScore = 0;
+
+            // Find the best match
+            allNodes.forEach(node => {
+                const score = fuzzyMatch(query, node.text);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMatch = node;
+                }
+            });
+
+            if (bestMatch && bestScore > 0) {
+                // Clear previous highlights
+                document.querySelectorAll('.tree-node-content, .tree-label').forEach(el => {
+                    el.classList.remove('search-highlight');
+                });
+
+                // Remove any existing highlight spans
+                document.querySelectorAll('.search-highlight-span').forEach(span => {
+                    const parent = span.parentElement;
+                    parent.textContent = parent.textContent;
+                });
+
+                // Highlight only the label (name) part of the match
+                const labelElement = bestMatch.element.querySelector('.tree-label');
+                if (labelElement) {
+                    // Wrap the text content in a span for precise highlighting
+                    const originalText = labelElement.textContent;
+                    labelElement.innerHTML = `<span class="search-highlight-span">${originalText}</span>`;
+                }
+
+                // Expand parent nodes to make the match visible
+                expandToShowNode(bestMatch.element);
+
+                // Scroll to the match
+                bestMatch.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                // Select the node (which will load its graph)
+                const nodeData = getNodeDataFromElement(bestMatch.element);
+                if (nodeData) {
+                    isSearchNavigation = true; // Set flag before navigation
+                    selectNode(nodeData);
+                    isSearchNavigation = false; // Clear flag after navigation
+                }
+            } else {
+                // No match found - could show a message
+                console.log('No match found for:', query);
+            }
+        }
+
+        // Expand parent nodes to make a node visible
+        function expandToShowNode(nodeElement) {
+            // Get the path of the target node
+            const targetPath = nodeElement.getAttribute('data-path');
+            if (!targetPath) return;
+
+            // Split the target path into parts to find the hierarchy
+            const targetParts = targetPath.split('.');
+
+            // Find all tree nodes and expand only direct ancestors
+            const allTreeNodes = document.querySelectorAll('.tree-node');
+
+            allTreeNodes.forEach(node => {
+                const nodePath = node.getAttribute('data-path');
+                if (!nodePath) return;
+
+                // Check if this node is a direct ancestor of the target
+                const nodeParts = nodePath.split('.');
+                const isDirectAncestor = nodeParts.length < targetParts.length &&
+                                       targetParts.slice(0, nodeParts.length).join('.') === nodePath;
+
+                if (isDirectAncestor) {
+                    // This node is a direct ancestor of the target - expand it
+                    const childrenDiv = node.querySelector('.tree-children');
+                    if (childrenDiv && childrenDiv.classList.contains('collapsed')) {
+                        const toggle = node.querySelector('.tree-toggle');
+                        if (toggle) {
+                            toggleNode(node, toggle);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Get node data from DOM element
+        function getNodeDataFromElement(element) {
+            const path = element.getAttribute('data-path');
+            const type = element.getAttribute('data-type');
+            const labelElement = element.querySelector('.tree-label');
+            const text = labelElement ? labelElement.textContent : '';
+
+            // Find the corresponding node in treeData
+            return findNodeInTreeData(treeData, path, type, text);
+        }
+
+        // Find node in tree data structure
+        function findNodeInTreeData(tree, path, type, name) {
+            if (tree['model']) {
+                return findNodeInTreeDataRecursive(tree['model'], path, type, name);
+            }
+            return null;
+        }
+
+        function findNodeInTreeDataRecursive(node, path, type, name) {
+            if (node.path === path && node.type === type && node.name === name) {
+                return node;
+            }
+
+            // Check children
+            if (node.children) {
+                for (const child of Object.values(node.children)) {
+                    const found = findNodeInTreeDataRecursive(child, path, type, name);
+                    if (found) return found;
+                }
+            }
+
+            // Check variables
+            if (node.variables) {
+                for (const variable of node.variables) {
+                    if (variable.path === path && variable.type === type && variable.name === name) {
+                        return variable;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        // Resizer functionality
+        function setupResizer() {
+            const resizer = document.getElementById('resizer');
+            const sidebar = document.getElementById('sidebar');
+            let isResizing = false;
+
+            resizer.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+
+                const containerRect = document.querySelector('.content-area').getBoundingClientRect();
+                const newWidth = e.clientX - containerRect.left;
+
+                // Apply constraints
+                const minWidth = 200;
+                const maxWidth = 600;
+                const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+                sidebar.style.width = constrainedWidth + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
+
+            // Prevent text selection while resizing
+            resizer.addEventListener('selectstart', function(e) {
+                e.preventDefault();
+            });
+        }
+
     </script>
 </body>
 </html>
         '''
 
+
+def _conn_graph_setup_parser(parser):
+    """
+    Set up the openmdao subparser for the 'openmdao graph' command.
+
+    Parameters
+    ----------
+    parser : argparse subparser
+        The parser we're adding options to.
+    """
+    parser.description = ('This command requires pydot and graphviz to be installed. '
+                          'It displays the connection graph for the specified variable or system.')
+    parser.add_argument('file', nargs=1, help='Python file containing the model.')
+    parser.add_argument('--problem', action='store', dest='problem', help='Problem name')
+    parser.add_argument('--port', action='store', dest='port', default=8987, help='Port number')
+    parser.add_argument('-o', action='store', dest='outfile', help='file containing graph output.')
+    parser.add_argument('-s', '--system', action='store', dest='system',
+                        help='show the connection graph for the system.')
+    parser.add_argument('-v', '--variable', action='store', dest='variable',
+                        help='show the connection graph for the variable.')
+
+
+def _conn_graph_cmd(options, user_args):
+    """
+    Return the post_setup hook function for 'openmdao graph'.
+
+    Parameters
+    ----------
+    options : argparse Namespace
+        Command line options.
+    user_args : list of str
+        Args to be passed to the user script.
+    """
+    def _view_graph(model):
+        group = model._get_subsystem(options.group) if options.group else model
+        group._get_all_conn_graph().serve(port=options.port)
+
+    # register the hooks
+    def _set_dyn_hook(prob):
+        hooks._register_hook('_setup_global_connections', class_name='Group', inst_id=None,
+                             post=_view_graph, exit=True)
+        hooks._setup_hooks(prob.model)
+
+    # register the hooks
+    hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook, ncalls=1)
+    _load_and_exec(options.file[0], user_args)
 
 
 if __name__ == "__main__":
