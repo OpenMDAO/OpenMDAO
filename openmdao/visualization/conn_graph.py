@@ -19,6 +19,7 @@ from openmdao.utils.array_utils import array_connection_compatible
 from openmdao.utils.units import simplify_unit, is_compatible
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.units import unit_conversion
+# from openmdao.utils.indexer import indexer, Indexer
 
 
 # use hex colors here because the using english names was sometimes causing failure to show
@@ -801,8 +802,11 @@ class AllConnGraph(nx.DiGraph):
             src_inds_list = umeta['src_inds_list']
 
             if v[0] == 'i':  # target is an input
-                src_inds = edges[u, v].get('src_indices', None)
+                edge_meta = edges[u, v]
+                src_inds = edge_meta.get('src_indices', None)
                 if src_inds is not None:
+                    # if not isinstance(src_inds, Indexer):
+                    #     src_inds = indexer(src_inds, edge_meta.get('flat_src_indices', None))
                     try:
                         src_inds.set_src_shape(shape)
                     except Exception:

@@ -1702,11 +1702,6 @@ def _conn_graph_setup_parser(parser):
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('--problem', action='store', dest='problem', help='Problem name')
     parser.add_argument('--port', action='store', dest='port', default=8987, help='Port number')
-    parser.add_argument('-o', action='store', dest='outfile', help='file containing graph output.')
-    parser.add_argument('-s', '--system', action='store', dest='system',
-                        help='show the connection graph for the system.')
-    parser.add_argument('-v', '--variable', action='store', dest='variable',
-                        help='show the connection graph for the variable.')
 
 
 def _conn_graph_cmd(options, user_args):
@@ -1721,12 +1716,11 @@ def _conn_graph_cmd(options, user_args):
         Args to be passed to the user script.
     """
     def _view_graph(model):
-        group = model._get_subsystem(options.group) if options.group else model
-        group._get_all_conn_graph().serve(port=options.port)
+        model._get_all_conn_graph().serve(port=options.port)
 
     # register the hooks
     def _set_dyn_hook(prob):
-        hooks._register_hook('_setup_global_connections', class_name='Group', inst_id=None,
+        hooks._register_hook('_setup_part2', class_name='Group', inst_id='',
                              post=_view_graph, exit=True)
         hooks._setup_hooks(prob.model)
 

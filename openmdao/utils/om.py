@@ -68,6 +68,7 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
 from openmdao.visualization.graph_viewer import _graph_setup_parser, _graph_cmd
+from openmdao.visualization.conn_graph_ui import _conn_graph_setup_parser, _conn_graph_cmd
 from openmdao.visualization.realtime_plot.realtime_plot import \
     _realtime_plot_setup_parser, _realtime_plot_cmd, _rtplot_cmd, _rtplot_setup_parser
 from openmdao.recorders.view_cases import _view_cases_setup_parser, _view_cases_cmd
@@ -593,6 +594,7 @@ _command_map = {
         _compute_entry_points_exec,
         "Compute entry point declarations to add to the setup.py file.",
     ),
+    "conn_graph": (_conn_graph_setup_parser, _conn_graph_cmd, "Generate a graph for a group."),
     "dist_conns": (
         _dist_conns_setup_parser,
         _dist_conns_cmd,
