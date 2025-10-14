@@ -1,5 +1,4 @@
 """Define the Group class."""
-import os
 import sys
 from collections import Counter, defaultdict
 from collections.abc import Iterable
@@ -875,50 +874,6 @@ class Group(System):
         if self._var_existence is None:
             self._setup_var_existence()
         return self._var_existence
-
-    def _check_connections(self):
-        pass
-            # # check all connection shapes
-            # u_meta = nodes[u]
-            # v_meta = nodes[v]
-            # ushape = u_meta['_shape']
-            # vshape = v_meta['_shape']
-            # if ushape is not None and vshape is not None:
-            #     src_indices = graph.edges[u, v].get('src_indices', None)
-            #     if src_indices is not None:
-            #         ushape = src_indices.indexed_src_shape
-            #     if not array_connection_compatible(ushape, vshape):
-            #         if src_indices is not None:
-            #             self._collect_error(f"{self.msginfo}: '{u[1]}' shape {u_meta['_shape']} "
-            #                                 f"after indexing {ushape} and '{v[1]}' shape {vshape} are "
-            #                                 "incompatible.")
-            #         else:
-            #             self._collect_error(f"{self.msginfo}: '{u[1]}' shape {ushape} "
-            #                                 f"and '{v[1]}' shape {vshape} are "
-            #                                 "incompatible.")
-
-        # conns = self._conn_global_abs_in2out
-        # abs2meta_in = self._var_allprocs_abs2meta['input']
-        # discrete_in = self._var_allprocs_discrete['input']
-        # desvar = self.get_design_vars()
-        # resolver = self._resolver
-
-        # for abs_tgt, src in conns.items():
-        #     if src.startswith('_auto_ivc.'):
-        #         if abs_tgt in discrete_in:
-        #             continue
-
-        #         prom_tgt = resolver.abs2prom(abs_tgt, 'input')
-
-        #         # Ignore inputs that are declared as design vars.
-        #         if prom_tgt in desvar:
-        #             continue
-
-        #         if abs2meta_in[abs_tgt]['require_connection']:
-        #             promoted_as = f', promoted as "{prom_tgt}",' if prom_tgt != abs_tgt else ''
-        #             self._collect_error(f'{self.msginfo}: Input "{abs_tgt}"{promoted_as} '
-        #                                 'requires a connection but is not connected.',
-        #                                 ident=(prom_tgt, abs_tgt))
 
     def _get_dataflow_graph(self):
         """
@@ -2175,22 +2130,19 @@ class Group(System):
         # self._bad_conn_vars = set()
 
         if self.pathname == '':
-            # self.display_conn_graph()
-            # at this point, the conn graph has no connections, but all promotions are there.
-
             all_conn_graph.add_implicit_connections(self)
 
             # add nodes for all absolute inputs and connected absolute outputs
             all_conn_graph.add_abs_variable_meta(self)
 
-            for g in self.system_iter(include_self=True, recurse=True, typ=Group):
+            groups = list(self.system_iter(include_self=True, recurse=True, typ=Group))
+            for g in groups:
                 all_conn_graph.add_group_input_defaults(g)
 
-            for g in self.system_iter(include_self=True, recurse=True, typ=Group):
+            for g in groups:
                 all_conn_graph.add_manual_connections(g)
 
             # TODO: gather all manual connections and static info from all procs
-
 
             # check for cycles
             if not nx.is_directed_acyclic_graph(all_conn_graph):
@@ -2953,90 +2905,91 @@ class Group(System):
 
     @collect_errors
     @check_mpi_exceptions
-    def _setup_connections(self):
+    def _check_connections(self):
         """
         Compute dict of all connections owned by this Group.
 
         Also, check shapes of connected variables.
         """
+        conn_graph = self._get_all_conn_graph()
+
         # abs_in2out = self._conn_abs_in2out = {}
-        # self._conn_discrete_in2out = {}
-        # global_abs_in2out = self._conn_global_abs_in2out
+        self._conn_discrete_in2out = {}
+        global_abs_in2out = self._conn_global_abs_in2out
         # pathname = self.pathname
-        # allprocs_discrete_in = self._var_allprocs_discrete['input']
-        # allprocs_discrete_out = self._var_allprocs_discrete['output']
+        allprocs_discrete_in = self._var_allprocs_discrete['input']
+        allprocs_discrete_out = self._var_allprocs_discrete['output']
         # self._resolver._conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
 
-        # for subsys in self._sorted_sys_iter():
-        #     subsys._setup_connections()
+        for subsys in self._sorted_sys_iter():
+            subsys._check_connections()
 
         # path_dot = pathname + '.' if pathname else ''
         # path_len = len(path_dot)
 
-        # allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
-        # allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-        # abs2meta_in = self._var_abs2meta['input']
-        # abs2meta_out = self._var_abs2meta['output']
+        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+        abs2meta_in = self._var_abs2meta['input']
+        abs2meta_out = self._var_abs2meta['output']
 
-        # nproc = self.comm.size
+        nproc = self.comm.size
 
-        # # Check input/output units here, and set _has_input_scaling
-        # # to True for this Group if units are defined and different, or if
-        # # ref or ref0 are defined for the output.
-        # for abs_in, abs_out in global_abs_in2out.items():
-        #     # Check that they are in different subsystems of this system.
-        #     out_subsys = abs_out[path_len:].partition('.')[0]
-        #     in_subsys = abs_in[path_len:].partition('.')[0]
-        #     if out_subsys != in_subsys:
-        #         if abs_in in allprocs_discrete_in:
-        #             self._conn_discrete_in2out[abs_in] = abs_out
-        #         elif abs_out in allprocs_discrete_out:
-        #             self._collect_error(
-        #                 f"{self.msginfo}: Can't connect discrete output '{abs_out}' "
-        #                 f"to continuous input '{abs_in}'.", ident=(abs_out, abs_in))
-        #             continue
-        #         else:
-        #             abs_in2out[abs_in] = abs_out
+        # Check input/output units here, and set _has_input_scaling
+        # to True for this Group if units are defined and different, or if
+        # ref or ref0 are defined for the output.
+        for abs_in, abs_out in global_abs_in2out.items():
+            inode = ('i', abs_in)
+            if conn_graph.nodes[inode]['discrete']:
+                self._conn_discrete_in2out[abs_in] = abs_out
 
-        #         if nproc > 1 and self._vector_class is None:
-        #             # check for any cross-process data transfer.  If found, use
-        #             # self._problem_meta['distributed_vector_class'] as our vector class.
-        #             if (abs_in not in abs2meta_in or abs_out not in abs2meta_out or
-        #                     abs2meta_in[abs_in]['distributed'] or
-        #                     abs2meta_out[abs_out]['distributed']):
-        #                 self._vector_class = self._distributed_vector_class
+            # # Check that they are in different subsystems of this system.
+            # out_subsys = abs_out[path_len:].partition('.')[0]
+            # in_subsys = abs_in[path_len:].partition('.')[0]
+            # if out_subsys != in_subsys:
+            #     if abs_in in allprocs_discrete_in:
+            #         self._conn_discrete_in2out[abs_in] = abs_out
+            #     elif abs_out in allprocs_discrete_out:
+            #         self._collect_error(
+            #             f"{self.msginfo}: Can't connect discrete output '{abs_out}' "
+            #             f"to continuous input '{abs_in}'.", ident=(abs_out, abs_in))
+            #         continue
+            #     else:
+            #         abs_in2out[abs_in] = abs_out
 
-        #     # if connected output has scaling then we need input scaling
-        #     if not self._has_input_scaling and not (abs_in in allprocs_discrete_in or
-        #                                             abs_out in allprocs_discrete_out):
-        #         out_units = allprocs_abs2meta_out[abs_out]['units']
-        #         in_units = allprocs_abs2meta_in[abs_in]['units']
+            if True:
+                if nproc > 1 and self._vector_class is None:
+                    # check for any cross-process data transfer.  If found, use
+                    # self._problem_meta['distributed_vector_class'] as our vector class.
+                    if (abs_in not in abs2meta_in or abs_out not in abs2meta_out or
+                            abs2meta_in[abs_in]['distributed'] or
+                            abs2meta_out[abs_out]['distributed']):
+                        self._vector_class = self._distributed_vector_class
 
-        #         # if units are defined and different, or if a connected output has any scaling,
-        #         # we need input scaling.
-        #         self._has_input_scaling = self._has_output_scaling or \
-        #             (in_units and out_units and in_units != out_units)
+            # if connected output has scaling then we need input scaling
+            if not self._has_input_scaling and not (abs_in in allprocs_discrete_in or
+                                                    abs_out in allprocs_discrete_out):
+                out_units = allprocs_abs2meta_out[abs_out]['units']
+                in_units = allprocs_abs2meta_in[abs_in]['units']
 
-        # # check compatability for any discrete connections
-        # for abs_in, abs_out in self._conn_discrete_in2out.items():
-        #     in_type = self._var_allprocs_discrete['input'][abs_in]['type']
-        #     try:
-        #         out_type = self._var_allprocs_discrete['output'][abs_out]['type']
-        #     except KeyError:
-        #         self._collect_error(
-        #             f"{self.msginfo}: Can't connect continuous output '{abs_out}' "
-        #             f"to discrete input '{abs_in}'.", ident=(abs_out, abs_in))
-        #         continue
+                # if units are defined and different, or if a connected output has any scaling,
+                # we need input scaling.
+                self._has_input_scaling = self._has_output_scaling or \
+                    (in_units and out_units and in_units != out_units)
 
-        #     if not issubclass(in_type, out_type):
-        #         self._collect_error(
-        #             f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is "
-        #             f"incompatible with type '{in_type.__name__}' of input '{abs_in}'.",
-        #             ident=(abs_out, abs_in))
+        # check compatability for any discrete connections
+        for abs_in, abs_out in self._conn_discrete_in2out.items():
+            in_type = self._var_allprocs_discrete['input'][abs_in]['type']
+            out_type = self._var_allprocs_discrete['output'][abs_out]['type']
 
-        # # check unit/shape compatibility, but only for connections that are
-        # # either owned by (implicit) or declared by (explicit) this Group.
-        # # This way, we don't repeat the error checking in multiple groups.
+            if not issubclass(in_type, out_type):
+                self._collect_error(
+                    f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is "
+                    f"incompatible with type '{in_type.__name__}' of input '{abs_in}'.",
+                    ident=(abs_out, abs_in))
+
+        # check unit/shape compatibility, but only for connections that are
+        # either owned by (implicit) or declared by (explicit) this Group.
+        # This way, we don't repeat the error checking in multiple groups.
 
         # for abs_in, abs_out in abs_in2out.items():
         #     all_meta_out = allprocs_abs2meta_out[abs_out]
@@ -3142,7 +3095,6 @@ class Group(System):
         #                     f"The source has {len(out_shape)} dimensions but the indices expect at "
         #                     f"least {len(src_indices.indexed_src_shape)}.",
         #                     ident=(abs_out, abs_in))
-        pass
 
     def _transfer(self, vec_name, mode, sub=None):
         """
@@ -5313,33 +5265,14 @@ class Group(System):
         meta['base'] = 'Group'
         return meta
 
-    def write_graph(self, graph_type='dataflow', recurse=True, show_vars=True, display=True,
-                    show_boundary=False, stacked=False, exclude=(), outfile=None):
+    def display_dataflow_graph(self, recurse=True, show_vars=True, show_boundary=False, exclude=(),
+                               outfile=None):
         from openmdao.visualization.graph_viewer import GraphViewer
 
-        valid_types = {'tree', 'dataflow', 'cycle'}
-
-        if graph_type not in valid_types:
-            raise ValueError(f"{self.msginfo}: Invalid graph type '{graph_type}'. Valid types are "
-                             f"{sorted(valid_types)}.")
-
-        if stacked:
-            recurse = False
-            groups = self.system_iter(include_self=True, recurse=True, typ=Group)
-        else:
-            groups = [self]
-
-        orig_outfile = outfile
-        for g in groups:
-            if orig_outfile is not None:
-                orig, orig_ext = os.path.splitext(orig_outfile)
-                name = '_' + g.pathname.replace('.', '_') if g.pathname else ''
-                outfile = f"{orig}{name}{orig_ext}"
-
-            GraphViewer(g).write_graph(gtype=graph_type, recurse=recurse,
-                                       show_vars=show_vars, display=display,
-                                       exclude=exclude, show_boundary=show_boundary,
-                                       outfile=outfile)
+        GraphViewer(self).write_graph(gtype='dataflow', recurse=recurse,
+                                      show_vars=show_vars, display=True,
+                                      exclude=exclude, show_boundary=show_boundary,
+                                      outfile=outfile)
 
     def display_conn_graph(self, varname=None):
         self._get_all_conn_graph().display(self.pathname, varname=varname)

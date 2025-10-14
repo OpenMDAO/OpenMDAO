@@ -6632,6 +6632,9 @@ class System(object, metaclass=SystemMetaclass):
 
         raise KeyError(f"{self.msginfo}: Metadata for variable '{name}' not found.")
 
+    def _check_connections(self):
+        pass
+
     def _generate_md5_hash(self):
         """
         Generate an md5 hash for the data structure of this model.

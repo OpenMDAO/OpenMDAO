@@ -1053,7 +1053,7 @@ def convert_units(val, old_units, new_units=None):
     return (val + offset) * factor
 
 
-def _has_val_mismatch(units1, val1, units2, val2, rtol=1e-10):
+def has_val_mismatch(units1, val1, units2, val2, rtol=1e-10):
     """
     Return True if values differ after unit conversion or if values differ when units are None.
 

@@ -186,8 +186,7 @@ class AllConnGraph(nx.DiGraph):
 
         node = self.find_node(system.pathname, name)
         if node[0] == 'o':
-            tgt_units = None
-            tgt_inds_list = ()
+            tgt_units, tgt_inds_list = None, ()
         else:
             tgt_units, tgt_inds_list = self.get_conversion_info(node)
 
@@ -217,8 +216,7 @@ class AllConnGraph(nx.DiGraph):
                 val, src_units, tgt_inds_list = model._initial_condition_cache[src_node]
             else:
                 val = self.nodes[src_node]['val']
-                model._initial_condition_cache[src_node] = \
-                    (val, src_units, ())
+                model._initial_condition_cache[src_node] = (val, src_units, ())
 
             if is_undefined(val):
                 raise ValueError(f"{system.msginfo}: Variable '{self.msgname(src_node)}' has not "
@@ -237,8 +235,7 @@ class AllConnGraph(nx.DiGraph):
     def set_val(self, system, name, val, units=None, indices=None):
         node = self.find_node(system.pathname, name)
         if node[0] == 'o':
-            tgt_units = None
-            tgt_inds_list = ()
+            tgt_units, tgt_inds_list = None, ()
         else:
             tgt_units, tgt_inds_list = self.get_conversion_info(node)
 
@@ -588,6 +585,7 @@ class AllConnGraph(nx.DiGraph):
         return discs.pop()
 
     def rollup_units(self, group, node, succs, default, auto_ivc):
+        print(f"rolling up units to {node} from {succs}")
         base_units = None
         same = True
         nodes = self.nodes
@@ -622,14 +620,17 @@ class AllConnGraph(nx.DiGraph):
                     # get_val or set_val.  If a failure is forced here, it will break some existing
                     # models.
                     base_units = 'ambiguous'
+            print(f"returning base_units {base_units}")
             return base_units
 
         if base_units is None:
+            print(f"returning default {default}")
             return default
 
         # base and default are not None
         if is_compatible(base_units, default):
             # default overrides any node value as long as it's compatible
+            print(f"returning default {default}")
             return default
 
         group._collect_error(f"{group.msginfo}: '{self.msgname(node)}' default units "
@@ -637,6 +638,7 @@ class AllConnGraph(nx.DiGraph):
                              f"'{base_units.name()}' are incompatible.")
 
     def rollup_valshape(self, group, node, node_meta, succs, defaults, auto_ivc):
+        print(f"rolling up valshape to {node} from {succs}")
         shape_base = val_base = None
         same_val = True
         default_val = defaults.get('val', None)
@@ -718,15 +720,18 @@ class AllConnGraph(nx.DiGraph):
                                      f"'{self.msgname(node)}' but different values feed into it. "
                                      f"Call model.set_input_defaults('{prom}', val=?) to remove "
                                      "the ambiguity.")
+            print(f"returning val_base {val_base} and ret_shape {ret_shape}")
             return val_base, ret_shape
 
         elif val_base is None:
+            print(f"returning default_val {default_val} and ret_shape {ret_shape}")
             return default_val, ret_shape
 
         # val_base and default_val are not None
         else:
             if are_compatible_values(val_base, default_val):
                 # default overrides any node value as long as it's compatible
+                print(f"returning default_val {default_val} and ret_shape {ret_shape}")
                 return default_val, ret_shape
             else:
                 group._collect_error(f"{group.msginfo}: '{self.msgname(node)}' default val "
@@ -739,6 +744,7 @@ class AllConnGraph(nx.DiGraph):
                                  f"'{shape_base}' are incompatible.")
 
     def rollup_to_node(self, group, source_node):
+        print(f"rolling up to node {source_node}")
         auto_ivc = source_node[1].startswith('_auto_ivc.')
         nodes = self.nodes
 
@@ -746,6 +752,7 @@ class AllConnGraph(nx.DiGraph):
         # various properties from the bottom of the tree, and flag any incompatibilities.
         for node in dfs_postorder_nodes(self, source_node):
             if not auto_ivc and node[0] == 'o':
+                # don't roll up to the output sideif the source isn't an auto_ivc
                 continue
             node_meta = self.nodes[node]
             defaults = node_meta.get('defaults', {})
@@ -765,9 +772,10 @@ class AllConnGraph(nx.DiGraph):
                 if not node_meta['discrete']:
                     node_meta['units'] = \
                         self.rollup_units(group, node, succs, defaults.get('units', None), auto_ivc)
-                node_meta['val'], node_meta['_shape'] = \
-                    self.rollup_valshape(group, node, node_meta, succs, defaults, auto_ivc)
-            elif node[0] == 'i':  # leaf node (absolute input)
+                ret = self.rollup_valshape(group, node, node_meta, succs, defaults, auto_ivc)
+                if ret is not None:
+                    node_meta['val'], node_meta['_shape'] = ret
+            elif node[0] == 'i' and defaults:  # leaf node with group input defaults
                 units = defaults.get('units', None)
                 val = defaults.get('val', None)
                 if units is not None:
@@ -796,6 +804,7 @@ class AllConnGraph(nx.DiGraph):
         # start with outputs (the root node of each connection tree) and do a postorder traversal
         # that rolls up desired metada from bottom of the tree to either the top promoted input node
         # or, in the case of an auto_ivc source, all the way to the sourc node.
+        print("starting unresolved nodes", sorted(self._unresolved_nodes))
         resolved = []
         for node in self._unresolved_nodes:
             self.rollup_to_node(model, node)
@@ -825,6 +834,8 @@ class AllConnGraph(nx.DiGraph):
 
         for node in resolved:
             self._unresolved_nodes.discard(node)
+
+        print("ending unresolved nodes", sorted(self._unresolved_nodes))
 
     def add_auto_ivc_nodes(self, model):
         assert model.pathname == ''
