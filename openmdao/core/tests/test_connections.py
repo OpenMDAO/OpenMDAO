@@ -179,7 +179,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # Should not be allowed because the source and target shapes do not match
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
-        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: 'idvp.blammo' shape (1,) and 'arraycomp.inp' shape (2,) are incompatible."
+        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: 'idvp.blammo' shape (1,) != 'arraycomp.inp' shape (2,)."
         self.prob.setup()
         try:
             self.prob.final_setup()
@@ -194,7 +194,7 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_length')
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 0, 0])
 
-        expected = "<model> <class Group>: After applying index [0 0 0] to 'idvp.blammo', shape (3,) != (2,) of 'arraycomp.inp'."
+        expected = "<model> <class Group>: After applying index [0 0 0] to 'idvp.blammo', shape (3,) != 'arraycomp.inp' shape (2,)."
 
         self.prob.setup()
         try:
@@ -322,7 +322,7 @@ class TestShapes(unittest.TestCase):
                                                 y={'val': np.zeros((5, 2))}))
         p.model.connect('indep.x', 'C1.x')
 
-        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: 'indep.x' shape (1, 10, 1, 1) and 'C1.x' shape (5, 2) are incompatible."
+        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: 'indep.x' shape (1, 10, 1, 1) != 'C1.x' shape (5, 2)."
 
         p.setup()
         with self.assertRaises(Exception) as context:

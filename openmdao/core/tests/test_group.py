@@ -2528,7 +2528,7 @@ class TestConnect(unittest.TestCase):
 
     def test_connect_within_system(self):
         p = self.setup_problem('connect_within_system')
-        msg = "Output and input are in the same System for connection " + \
+        msg = "Source and target are in the same System for connection " + \
               "from 'tgt.y' to 'tgt.x'."
 
         p.model.sub.connect('tgt.y', 'tgt.x', src_indices=[1])
@@ -2766,6 +2766,8 @@ class TestConnect(unittest.TestCase):
         msg = "\nCollected errors for problem 'bad_indices_dimensions':\n   <model> <class Group>: " + \
               "When connecting 'sub.src.x' to 'sub.arr.x': Can't set source shape to (5, 3) because " + \
               "indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
+        p.setup()
+        p.final_setup()
         try:
             p.setup()
             p.final_setup()

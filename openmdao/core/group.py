@@ -25,7 +25,8 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
     shape_to_len, ValueRepeater, evenly_distrib_idxs
-from openmdao.utils.general_utils import convert_src_inds, shape2tuple, ensure_compatible, meta2src_iter, get_rev_conns, is_undefined, all_ancestors
+from openmdao.utils.general_utils import convert_src_inds, shape2tuple, ensure_compatible, \
+    meta2src_iter, get_rev_conns, is_undefined, all_ancestors
 from openmdao.utils.units import unit_conversion, simplify_unit, PhysicalUnit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
     get_unresolved_knowns, is_unresolved, get_active_edges, add_shape_node, \
@@ -220,8 +221,6 @@ class Group(System):
         after _auto_ivc is created.
     _is_explicit : bool or None
         True if neither this Group nor any of its descendants contains implicit systems or cycles.
-    _bad_conn_vars : set
-        Set of variables involved in invalid connections.
     _sys_graph_cache : dict
         Cache for the system graph.
     _key_owner : dict
@@ -261,7 +260,6 @@ class Group(System):
         self._fd_rev_xfer_correction_dist = {}
         self._auto_ivc_recorders = []
         self._is_explicit = None
-        self._bad_conn_vars = None
         self._sys_graph_cache = None
         self._key_owner = None
         self._var_existence = None
@@ -879,18 +877,25 @@ class Group(System):
         return self._var_existence
 
     def _check_connections(self):
-        graph = self._get_all_conn_graph()
-        nodes = graph.nodes
-
-        for u, v in graph.io_conn_iter():
-            # check all connection shapes
-            u_meta = nodes[u]
-            v_meta = nodes[v]
-            if u_meta['_shape'] is not None and v_meta['_shape'] is not None:
-                if not array_connection_compatible(u_meta['_shape'], v_meta['_shape']):
-                    self._collect_error(f"{self.msginfo}: '{u[1]}' shape {u_meta['_shape']} "
-                                        f"and '{v[1]}' shape {v_meta['_shape']} are "
-                                        "incompatible.")
+        pass
+            # # check all connection shapes
+            # u_meta = nodes[u]
+            # v_meta = nodes[v]
+            # ushape = u_meta['_shape']
+            # vshape = v_meta['_shape']
+            # if ushape is not None and vshape is not None:
+            #     src_indices = graph.edges[u, v].get('src_indices', None)
+            #     if src_indices is not None:
+            #         ushape = src_indices.indexed_src_shape
+            #     if not array_connection_compatible(ushape, vshape):
+            #         if src_indices is not None:
+            #             self._collect_error(f"{self.msginfo}: '{u[1]}' shape {u_meta['_shape']} "
+            #                                 f"after indexing {ushape} and '{v[1]}' shape {vshape} are "
+            #                                 "incompatible.")
+            #         else:
+            #             self._collect_error(f"{self.msginfo}: '{u[1]}' shape {ushape} "
+            #                                 f"and '{v[1]}' shape {vshape} are "
+            #                                 "incompatible.")
 
         # conns = self._conn_global_abs_in2out
         # abs2meta_in = self._var_allprocs_abs2meta['input']
@@ -1168,7 +1173,11 @@ class Group(System):
         self._setup_dynamic_properties()
 
         self._resolve_group_input_defaults()
-        self._setup_auto_ivcs()
+        # self._setup_auto_ivcs()
+        graph = self._get_all_conn_graph()
+        graph.rollup_node_meta(self)
+        graph.update_all_shapes(self)
+
         self._check_order()
         self._resolver._check_dup_prom_outs()
 
@@ -1470,19 +1479,18 @@ class Group(System):
                                         ident=('size', abs_name))
 
     def _top_level_post_sizes(self):
-        # this runs after the variable sizes are known
+        # # this runs after the variable sizes are known
+
         self._check_nondist_sizes()
 
         self._setup_global_shapes()
-
-        self._resolve_ambiguous_input_meta()
 
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         conns = self._conn_global_abs_in2out
 
         self._resolve_src_indices()
 
-        if self.comm.size > 1 and not self._bad_conn_vars:
+        if self.comm.size > 1:  # and not self._bad_conn_vars:
             abs2idx = self._var_allprocs_abs2idx
             all_abs2meta = self._var_allprocs_abs2meta
             all_abs2meta_in = all_abs2meta['input']
@@ -2164,7 +2172,7 @@ class Group(System):
         """
         all_conn_graph = self._get_all_conn_graph()
 
-        self._bad_conn_vars = set()
+        # self._bad_conn_vars = set()
 
         if self.pathname == '':
             # self.display_conn_graph()
@@ -2192,15 +2200,12 @@ class Group(System):
                 self._collect_error('Cycle detected in input-to-input connections. '
                                     f'This is not allowed.\n{errmsg}')
 
-            all_conn_graph.rollup_input_meta(self)
-            all_conn_graph.add_auto_ivcs(self)
-            all_conn_graph.update_shapes(self)
+            all_conn_graph.add_auto_ivc_nodes(self)
+            all_conn_graph.rollup_node_meta(self)
+            all_conn_graph.update_src_inds_lists(self)
             all_conn_graph.transform_input_input_connections(self)
-            # all_conn_graph.display()
 
             conn_dict = all_conn_graph.get_all_conns(self)
-            # import pprint
-            # pprint.pprint(conn_dict)
 
             global_conn_dict = {'': {}}
             root_dict = global_conn_dict['']
@@ -2767,7 +2772,7 @@ class Group(System):
                         else:
                             fail = True
 
-                    if fail and name not in self._bad_conn_vars:
+                    if fail and name:  #  not in self._bad_conn_vars:
                         # make this a warning because property may get resolved another way, and
                         # if not, there will be an error raised later.
                         issue_warning(f"{self.msginfo}: '{prop}_by_conn' was set for "
@@ -4694,49 +4699,14 @@ class Group(System):
             io, src = srcnode
             if io == 'o' and src.startswith('_auto_ivc.'):
                 auto2tgt[src] = [n[1] for n in conn_graph.leaf_input_iter(srcnode)]
-        self._auto2tgt = auto2tgt
 
-        # for tgt in all_abs2meta:
-        #     if tgt in conns or tgt in self._bad_conn_vars:
-        #         continue
-
-        #     all_meta = all_abs2meta[tgt]
-        #     if all_meta['distributed']:
-        #         # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
-        #         # distributed components.
-        #         if tgt not in self._bad_conn_vars:
-        #             prom_name = resolver.abs2prom(tgt, 'input')
-        #             promoted_as = f', promoted as "{prom_name}",' if prom_name != tgt else ''
-        #             raise RuntimeError(f'Distributed component input "{tgt}"'
-        #                                f'{promoted_as} is not connected.')
-
-        #     prom = resolver.abs2prom(tgt, 'input')
-        #     if prom in prom2auto:
-        #         # multiple connected inputs w/o a src. Connect them to the same IVC
-        #         src = prom2auto[prom][0]
-        #         auto_conns[tgt] = src
-        #     else:
-        #         src = f"_auto_ivc.v{count}"
-        #         count += 1
-        #         prom2auto[prom] = (src, tgt)
-        #         auto_conns[tgt] = src
-
-        #     if src in auto2tgt:
-        #         auto2tgt[src].append(tgt)
-        #     else:
-        #         auto2tgt[src] = [tgt]
-
-        # conns.update(auto_conns)
         auto_ivc.auto2tgt = auto2tgt
 
-        # vars_to_gather = self._vars_to_gather
-
         for src, tgts in auto2tgt.items():
-            node_meta = conn_graph.nodes[('o', src)]
-            units = node_meta['units']
-            # shape = node_meta['_shape']
-            val = node_meta['val']
-            discrete = node_meta['discrete']
+            tgt_node_meta = conn_graph.nodes[('i', tgts[0])]
+            abs_tgt_node = conn_graph.nodes[('i', tgt_node_meta['absnames'][0])]
+            # need to query discrete from a leaf node because internal nodes have not resolved yet
+            discrete = abs_tgt_node['discrete']
             remote = False  # TODO: fix this
 
             #prom = resolver.abs2prom(tgts[0], 'input')
@@ -4768,7 +4738,7 @@ class Group(System):
                     #else:   # t is duplicated in all procs
                         #break
                 #else:
-                    #if len(tgt_local_procs) < self.comm.size:  # don't have a local var in each proc
+                    #if len(tgt_local_procs) < self.comm.size:  # don't have local var in each proc
                         #tgt_local_procs = set()
                         #for t in self.comm.allgather(tgt):
                             #if t in vars_to_gather:
@@ -4783,9 +4753,9 @@ class Group(System):
 
             relsrc = src.rsplit('.', 1)[-1]
             if discrete:
-                auto_ivc.add_discrete_output(relsrc, val=val)
+                auto_ivc.add_discrete_output(relsrc, val=abs_tgt_node['val'])
             else:
-                auto_ivc.add_output(relsrc, val=np.atleast_1d(val), units=units)
+                auto_ivc.add_output(relsrc)
             if remote:
                 auto_ivc._add_remote(relsrc)
 
@@ -4828,75 +4798,6 @@ class Group(System):
         self._setup_procs_finished = True
 
         return auto_ivc
-
-    @collect_errors
-    def _resolve_ambiguous_input_meta(self):
-        """
-        Resolve ambiguous input units and values for auto_ivcs with multiple targets.
-
-        This should only be called on the top level Group.
-        """
-        pass
-        #all_abs2meta_in = self._var_allprocs_abs2meta['input']
-        #all_abs2meta_out = self._var_allprocs_abs2meta['output']
-
-        #abs2meta_in = self._var_abs2meta['input']
-        #all_discrete_outs = self._var_allprocs_discrete['output']
-        #all_discrete_ins = self._var_allprocs_discrete['input']
-        #resolver = self._resolver
-
-        #for src, tgts in self._auto_ivc.auto2tgt.items():
-            #if len(tgts) < 2:
-                #continue
-
-            #prom = resolver.abs2prom(tgts[0], 'input')
-            #if prom in self._group_inputs:
-                #gmeta = self._group_inputs[prom]
-            #else:
-                #gmeta = {'path': self.pathname, 'prom': prom, 'auto': True}
-
-            #if src not in all_discrete_outs:
-                #smeta = all_abs2meta_out[src]
-                #sunits = smeta['units'] if 'units' in smeta else None
-
-            #sval = self.get_val(src, kind='output', get_remote=True, from_src=False)
-            #errs = set()
-
-            #for tgt in tgts:
-                #tval = self.get_val(tgt, kind='input', get_remote=True, from_src=False)
-
-                #if tgt in all_discrete_ins:
-                    #if 'val' not in gmeta and sval != tval:
-                        #errs.add('val')
-                #else:
-                    #tmeta = all_abs2meta_in[tgt]
-                    #tunits = tmeta['units'] if 'units' in tmeta else None
-                    #if 'units' not in gmeta and sunits != tunits:
-
-                        ## Detect if either Source or Targe units are None.
-                        #if sunits is None or tunits is None:
-                            #errs.add('units')
-
-                        #elif _find_unit(sunits) != _find_unit(tunits):
-                            #errs.add('units')
-
-                    #if 'val' not in gmeta:
-                        #if tval.shape == sval.shape:
-                            #if _has_val_mismatch(tunits, tval, sunits, sval):
-                                #errs.add('val')
-                        #else:
-                            #if all_abs2meta_in[tgt]['has_src_indices'] and tgt in abs2meta_in:
-                                #if abs2meta_in[tgt]['flat_src_indices']:
-                                    #srcpart = sval.ravel()[abs2meta_in[tgt]['src_indices'].flat()]
-                                #else:
-                                    #srcpart = sval[abs2meta_in[tgt]['src_indices']()]
-                                #if _has_val_mismatch(tunits, tval, sunits, srcpart):
-                                    #errs.add('val')
-
-            #if errs:
-                #self._show_ambiguity_msg(prom, errs, tgts)
-            #elif src not in all_discrete_outs:
-                #gmeta['units'] = sunits
 
     def _show_ambiguity_msg(self, prom, metavars, tgts, metadata=None):
         errs = sorted(metavars)

@@ -38,21 +38,21 @@ class TestProblem(unittest.TestCase):
         class TestComp(om.ExplicitComponent):
             def setup(self):
                 self.add_input('foo', shape=(3,))
-                self.add_discrete_input('mul', val=1)
+                self.add_discrete_input('mul', val=[1])
 
                 self.add_output('bar', shape=(3,))
                 # add a mutable NumPy array as an output
                 self.add_discrete_output('obj', val=np.array([1, 'm', [2, 3, 4]], dtype=object))
 
             def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
-                outputs['bar'] = discrete_inputs['mul']*inputs['foo']
+                outputs['bar'] = discrete_inputs['mul'][0]*inputs['foo']
 
         p = om.Problem()
         p.model.add_subsystem('comp', TestComp(), promotes=['*'])
         p.setup()
 
         p.set_val('foo', np.array([5., 5., 5.]))
-        p.set_val('mul', 100)
+        p.set_val('mul', [100])
         p.run_model()
 
         foo = p.get_val('foo')
@@ -61,7 +61,7 @@ class TestProblem(unittest.TestCase):
         obj = p.get_val('obj')
 
         self.assertTrue(np.array_equal(foo, np.array([5., 5., 5.])))
-        self.assertEqual(mul, 100)
+        self.assertEqual(mul, [100])
         self.assertTrue(np.array_equal(bar, np.array([500., 500., 500.])))
 
         foo_copy = p.get_val('foo', copy=True)
@@ -74,7 +74,7 @@ class TestProblem(unittest.TestCase):
         self.assertTrue(np.array_equal(bar_copy, np.array([500., 500., 500.])))
 
         self.assertTrue(id(foo) != id(foo_copy), f"'foo' is not a copy, {id(foo)=} {id(foo_copy)=}")
-        self.assertTrue(id(mul) == id(mul_copy), f"'mul' is a copy, {id(foo)=} {id(foo_copy)=}")  # mul is a scalar
+        self.assertTrue(id(mul) != id(mul_copy), f"'mul' is a copy, {id(foo)=} {id(foo_copy)=}")
         self.assertTrue(id(bar) != id(bar_copy), f"'bar' is not a copy, {id(bar)=} {id(bar_copy)=}")
         self.assertTrue(id(obj) != id(obj_copy), f"'obj' is not a copy, {id(obj)=} {id(obj_copy)=}")
 
@@ -992,6 +992,8 @@ class TestProblem(unittest.TestCase):
 
         prob.set_val('axx', 30.0, 'degC', indices=0)
         assert_near_equal(prob['axx'][0], 86.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', indices=0), 86.0, 1e-6)
+        assert_near_equal(prob.get_val('axx', indices=1), 95.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([0])), 30.0, 1e-6)
 
         prob.final_setup()
@@ -1060,7 +1062,7 @@ class TestProblem(unittest.TestCase):
         except Exception as err:
             self.assertEqual(str(err),
                "\nCollected errors for problem 'get_set_with_units_diff_err':"
-               "\n   <model> <class Group>: No default units have been set for input 'x (['C1.x', 'C2.x'])' so the choice of units between '['ft', 'inch']' is ambiguous. Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
+               "\n   <model> <class Group>: No default units have been set for input 'x (['C1.x', 'C2.x'])' so the choice of units between ['ft', 'inch'] is ambiguous. Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -1173,7 +1175,7 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob['G1.x']
 
-        msg = "<model> <class Group>: No default units have been set for input 'G1.x (['G1.C1.x', 'G1.C2.x'])' so the choice of units between '['cm', 'mm']' is ambiguous. Call model.set_input_defaults('G1.x', units=?) to remove the ambiguity."
+        msg = "<model> <class Group>: Can't get value of 'G1.x (['G1.C1.x', 'G1.C2.x'])': The choice between units of ['cm', 'mm'] for input 'G1.x' is ambiguous. Call model.set_input_defaults('G1.x', units=?) to remove the ambiguity."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_get_set_with_units_error_messages(self):
@@ -1191,13 +1193,14 @@ class TestProblem(unittest.TestCase):
         with self.assertRaisesRegex(Exception, msg):
             prob.get_val('comp.x', 'degK')
 
-        with self.assertRaisesRegex(Exception, msg):
+        with self.assertRaisesRegex(Exception, "<model> <class Group>: Can't set value of 'comp.x': Can't express value with units of 'cm' in units of 'degK'."):
             prob.set_val('comp.x', 55.0, 'degK')
 
-        msg = "Can't express variable 'no_unit.x' with units of 'None' in units of 'degK'."
+        msg = "<model> <class Group>: Can't get value of 'no_unit.x': Can't express value with units of 'None' in units of 'degK'."
         with self.assertRaisesRegex(Exception, msg):
             prob.get_val('no_unit.x', 'degK')
 
+        msg = "<model> <class Group>: Can't set value of 'no_unit.x': Can't express value with units of 'None' in units of 'degK'."
         with self.assertRaisesRegex(Exception, msg):
             prob.set_val('no_unit.x', 55.0, 'degK')
 
@@ -2300,8 +2303,7 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.final_setup()
 
-        msg = "\nCollected errors for problem 'output_as_input_err':\n" + \
-              "   <model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
+        msg = "<model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
         self.assertEqual(str(cm.exception), msg)
 
     def test_design_var_connected_to_output(self):
@@ -2417,6 +2419,7 @@ class TestProblem(unittest.TestCase):
 
         # Setup the problem and run the optimization
         prob.setup()
+        prob.final_setup()
 
         for method in ['trf', 'dogbox', 'lm']:
             for loss in ['linear', 'soft_l1', 'huber', 'cauchy', 'arctan']:

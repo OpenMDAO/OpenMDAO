@@ -1,7 +1,7 @@
 import unittest
 import openmdao.api as om
 import numpy as np
-from openmdao.core.conn_graph import is_equal, are_compatible_values
+from openmdao.visualization.conn_graph import is_equal, are_compatible_values
 
 
 class TestAllConnectionTypes(unittest.TestCase):
