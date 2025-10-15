@@ -285,7 +285,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllConnGraph Explorer</title>
-    <style>
+    // <script src="https://d3js.org/d3.v7.min.js"></script>
+    // <script src="https://unpkg.com/@hpcc-js/wasm@2.20.0/dist/graphviz.umd.js"></script>
+    // <script src="https://unpkg.com/d3-graphviz@5.6.0/build/d3-graphviz.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://unpkg.com/@hpcc-js/wasm@2.20.0/dist/graphviz.umd.js"></script>
+    <script src="https://unpkg.com/d3-graphviz@5.6.0/build/d3-graphviz.js"></script>
+<style>
         * {
             box-sizing: border-box;
         }
@@ -425,8 +431,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             margin: auto;
             padding: 0;
             border-radius: 8px;
-            width: 80%;
-            max-width: 600px;
+            width: 90%;
+            max-width: 680px;
             max-height: 80%;
             overflow-y: auto;
             box-shadow: 0 4px 20px rgba(0,0,0,0.3);
@@ -487,17 +493,38 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             margin: 15px 0;
         }
 
-        .legend-item {
-            display: flex;
-            align-items: center;
-            margin: 10px 0;
+        .legend-table {
+            border: none;
+            border-collapse: collapse;
+            margin: 15px 0;
+            width: 100%;
+        }
+
+        .legend-line-cell {
+            text-align: center;
+            vertical-align: middle;
+            width: 80px;
+            padding: 5px 10px 5px 0;
+        }
+
+        .legend-description-cell {
+            text-align: left;
+            vertical-align: middle;
+            padding: 5px 0;
         }
 
         .legend-line {
-            width: 40px;
+            width: 50px;
             height: 3px;
-            margin-right: 15px;
             background-color: transparent;
+            margin: 0 auto;
+        }
+
+        /* Node Colors section - keep inline layout */
+        .legend .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
         }
 
         .legend-line.solid {
@@ -795,48 +822,58 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                     variable</li>
                 </ol>
 
-                <h3>Connection Graph Edge Types</h3>
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-line solid"></div>
-                        <span><strong>Solid Line:</strong> Manual connection (from a connect()
-                        call)</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-line dashed"></div>
-                        <span><strong>Dashed Line:</strong> Variable promotion</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-line dotted"></div>
-                        <span><strong>Dotted Line:</strong> Automatic connection when promoted
-                        input and output names match</span>
-                    </div>
-                </div>
+                <h3>Edge Types</h3>
+                <table class="legend-table">
+                    <tr>
+                        <td class="legend-line-cell">
+                            <div class="legend-line solid"></div>
+                        </td>
+                        <td class="legend-description-cell">
+                            Manual connection (from a connect call)
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="legend-line-cell">
+                            <div class="legend-line dashed"></div>
+                        </td>
+                        <td class="legend-description-cell">
+                            Variable promotion
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="legend-line-cell">
+                            <div class="legend-line dotted"></div>
+                        </td>
+                        <td class="legend-description-cell">
+                            Connection when promoted input name matches promoted output name
+                        </td>
+                    </tr>
+                </table>
 
-                <h3>Connection Graph Node Colors</h3>
+                <h3>Node Colors</h3>
                 <div class="legend">
                     <div class="legend-item">
                         <div class="legend-color input" id="input-color-swatch"></div>
-                        <span id="input-color-text"><strong>Input variables:</strong></span>
+                        <span id="input-color-text"><strong>Input variables</strong></span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color output" id="output-color-swatch"></div>
-                        <span id="output-color-text"><strong>Output variables:</strong></span>
+                        <span id="output-color-text"><strong>Output variables</strong></span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color highlight" id="highlight-color-swatch"></div>
-                        <span id="highlight-color-text"><strong>Highlighted variables:</strong></span>
+                        <span id="highlight-color-text"><strong>Selected variables</strong></span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color boundary" id="boundary-color-swatch"></div>
-                        <span id="boundary-color-text"><strong>Variables outside of the current system:</strong></span>
+                        <span id="boundary-color-text"><strong>Variables connecting from outside the system boundary</strong></span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
+    <script type="module">
         let currentGraph = null;
         let currentSubsystem = 'model';
         let cachedColors = {
@@ -846,6 +883,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             boundary: '#ff6b6b'
         }; // Cache the colors
         let colorsLoaded = false; // Track if colors have been loaded
+        let helpRetryCount = 0; // Track retry attempts for help
 
         // Color mapping function to convert color names to hex values
         function getColorHex(colorName) {
@@ -1360,6 +1398,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                     console.error('No boundary color in globalGraphColors');
                 }
                 colorsLoaded = true; // Mark as loaded
+                helpRetryCount = 0; // Reset retry counter
             } else {
                 // Fallback to old method if global colors not available
                 const subsystemPath = currentSubsystem === 'model' ? '' : currentSubsystem;
@@ -1378,52 +1417,54 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                             }
                         }
                         colorsLoaded = true; // Mark as loaded
+                        helpRetryCount = 0; // Reset retry counter
                     })
                     .catch(error => {
                         // Keep default colors if fetch fails
                         colorsLoaded = true; // Still mark as loaded even if failed
+                        helpRetryCount = 0; // Reset retry counter
                     });
             }
         }
 
-        function showHelp() {
-            // Wait for colors to load if they haven't loaded yet
-            if (!colorsLoaded) {
-                // Wait a bit and try again
-                setTimeout(showHelp, 50);
-                return;
-            }
+        window.showHelp = function() {
+            console.log('showHelp() called');
 
-            // Use cached colors - no delay!
-            const inputColorEl = document.getElementById('input-color-swatch');
-            const outputColorEl = document.getElementById('output-color-swatch');
-            const highlightColorEl = document.getElementById('highlight-color-swatch');
-            const boundaryColorEl = document.getElementById('boundary-color-swatch');
+            // Simple approach: just show the modal immediately
+            const modal = document.getElementById('help-modal');
+            if (modal) {
+                modal.style.display = 'flex';
+                console.log('Modal displayed successfully');
 
-            if (inputColorEl) {
-                inputColorEl.style.backgroundColor = cachedColors.input;
-            }
-            if (outputColorEl) {
-                outputColorEl.style.backgroundColor = cachedColors.output;
-            }
-            if (highlightColorEl && cachedColors.highlight) {
-                highlightColorEl.style.backgroundColor = cachedColors.highlight;
+                // Try to set colors if they're available, but don't block on it
+                try {
+                    const inputColorEl = document.getElementById('input-color-swatch');
+                    const outputColorEl = document.getElementById('output-color-swatch');
+                    const highlightColorEl = document.getElementById('highlight-color-swatch');
+                    const boundaryColorEl = document.getElementById('boundary-color-swatch');
+
+                    if (inputColorEl && cachedColors.input) {
+                        inputColorEl.style.backgroundColor = cachedColors.input;
+                    }
+                    if (outputColorEl && cachedColors.output) {
+                        outputColorEl.style.backgroundColor = cachedColors.output;
+                    }
+                    if (highlightColorEl && cachedColors.highlight) {
+                        highlightColorEl.style.backgroundColor = cachedColors.highlight;
+                    }
+                    if (boundaryColorEl && cachedColors.boundary) {
+                        boundaryColorEl.style.backgroundColor = cachedColors.boundary;
+                    }
+                } catch (error) {
+                    console.warn('Error setting colors:', error);
+                }
             } else {
-                console.error('Highlight color element or color not available:', highlightColorEl,
-                              cachedColors.highlight);
+                console.error('Modal element not found!');
             }
-            if (boundaryColorEl && cachedColors.boundary) {
-                boundaryColorEl.style.backgroundColor = cachedColors.boundary;
-            } else {
-                console.error('Boundary color element or color not available:', boundaryColorEl,
-                              cachedColors.boundary);
-            }
-
-            document.getElementById('help-modal').style.display = 'flex';
         }
 
 
-        function hideHelp() {
+        window.hideHelp = function() {
             document.getElementById('help-modal').style.display = 'none';
         }
 

@@ -1232,33 +1232,46 @@ class AllConnGraph(nx.DiGraph):
         return val
 
     def create_node_label(self, node):
+        name = self.combined_name(node)
         meta = self.nodes[node]
         units = meta['units']
         if units is None:
             units = ''
         else:
-            units = f"<TR><TD><i>{units}</i></TD></TR>"
+            units = f"units: <i>{units}</i>"
 
         shape = meta['_shape']
         if shape is None:
             shape = ''
         else:
-            shape = f"<TR><TD>{shape}</TD></TR>"
+            shape = f"shape: {shape}"
+
+        # Combine units and shape with proper spacing and smaller font
+        combined_content = ''
+        if units and shape:
+            combined_content = f"{units} &nbsp; {shape}"
+        elif units:
+            combined_content = f"{units}"
+        elif shape:
+            combined_content = f"{shape}"
+
+        if combined_content:
+            combined = f"<TR><TD ALIGN=\"LEFT\"><FONT POINT-SIZE=\"10\">{combined_content}</FONT></TD></TR>"
+        else:
+            combined = ''
 
         val = meta['val']
         if val is None:
             val = ''
         else:
-            val = f"<TR><TD>{truncate_str(str(val), 30)}</TD></TR>"
+            val = f"<TR><TD ALIGN=\"LEFT\"><FONT POINT-SIZE=\"10\">val: {truncate_str(str(val), max(30, int(len(name) * 1.2)))}</FONT></TD></TR>"
 
-        # Get the combined name and check for custom formatting first
-        name = self.combined_name(node)
 
         if units or shape:
-            return f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="1" CELLPADDING="0"><TR><TD>' \
-                f'<b>{name}</b></TD></TR>{units}{shape}{val}</TABLE>>'
+            return f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="1" CELLPADDING="0"><TR><TD ' \
+                f' ALIGN=\"LEFT\"><FONT POINT-SIZE=\"12\"><b>{name}</b></FONT></TD></TR>{combined}{val}</TABLE>>'
         else:
-            return f'<<b>{name}</b>>'
+            return f'<<FONT POINT-SIZE=\"12\"><b>{name}</b></FONT>>'
 
     def drawable_node_iter(self, pathname=''):
         """
