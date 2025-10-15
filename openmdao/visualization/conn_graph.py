@@ -1454,9 +1454,19 @@ class AllConnGraph(nx.DiGraph):
             dismeta = {k: meta[k] for k in mnames if k in meta and meta[k] is not None}
             print(f"{indent}{node[1]}  {dismeta}")
 
-    def serve(self, port=8001, open_browser=True):
+    def serve(self, port=None, open_browser=True):
         """Serve connection graph web UI."""
         from openmdao.visualization.conn_graph_ui import ConnGraphHandler
+        import socket
+
+        def find_unused_port():
+            """Find an unused port starting from 8001."""
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind(('', 0))
+                return s.getsockname()[1]
+
+        if port is None:
+            port = find_unused_port()
 
         def handler(*args, **kwargs):
             return ConnGraphHandler(self, *args, **kwargs)
