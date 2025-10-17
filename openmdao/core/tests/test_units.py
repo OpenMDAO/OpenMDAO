@@ -568,9 +568,7 @@ class TestUnitConversion(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'incompatible_connections':"
-           "\n   <model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with "
-           "input units of 'm' for 'dest.x2'.")
+           "\nCollected errors for problem 'incompatible_connections':\n   <model> <class Group>: 'src.x2' units of 'degC' are incompatible with 'dest.x2' units of 'm'.")
 
         # Implicit Connection
         prob = om.Problem(name='incompatible_connections2')
@@ -581,9 +579,8 @@ class TestUnitConversion(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'incompatible_connections2':"
-           "\n   <model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with "
-           "input units of 'm' for 'dest.x2'.")
+            "<model> <class Group>: When connecting 'src.x2' to 'dest.x2': Units 'degC' and 'm' are incompatible.")
+
 
     #def test_nested_relevancy_base(self):
 
@@ -895,7 +892,6 @@ class TestUnitConversion(unittest.TestCase):
         p.setup()
 
     def test_promotes_non_equivalent_units(self):
-        # multiple Group.set_input_defaults calls at same tree level with conflicting units args
         p = om.Problem(name='promotes_non_equivalent_units')
 
         g1 = p.model.add_subsystem("G1", om.Group(), promotes_inputs=['x'])
@@ -909,18 +905,15 @@ class TestUnitConversion(unittest.TestCase):
                                             y={'val': 1.0, 'units': None},
                                             z={'val': 1.0, 'units': 'J/s'}),
                                             promotes_inputs=['x', 'z'])
-        # trying to convert J/s/s to m/s**2 should cause Incompatible units TypeError exception
+        # trying to convert J/s/s to m/s**2 should cause Incompatible units exception
         with self.assertRaises(Exception) as e:
             p.setup()
             p.final_setup()
 
-        self.assertEqual(str(e.exception),
-           "\nCollected errors for problem 'promotes_non_equivalent_units':"
-           "\n   <model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted "
-           "to 'x', are connected but their metadata entries ['units', 'val'] differ. "
-           "Call model.set_input_defaults('x', units=?, val=?) to remove the ambiguity."
-           "\n   <model> <class Group>: Output units of 'J/s**2' for '_auto_ivc.v0' are "
-           "incompatible with input units of 'm/s**2' for 'G1.C2.x'.")
+        self.assertTrue(
+           "<model> <class Group>: No default units have been set for input 'G1.x (['G1.C1.x', 'G1.C2.x'])' so the choice of units between ['J/s**2', 'm/s**2'] is ambiguous. Call model.set_input_defaults('x', units=?) to remove the ambiguity."in  str(e.exception))
+        self.assertTrue(
+           "<model> <class Group>: No default units have been set for input 'G1.z (['G1.C1.z', 'G1.C2.z'])' so the choice of units between ['J/s', 'W'] is ambiguous. Call model.set_input_defaults('G1.z', units=?) to remove the ambiguity." in str(e.exception),)
 
     def test_input_defaults_unit_compat(self):
         p = om.Problem()

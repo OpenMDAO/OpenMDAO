@@ -24,7 +24,7 @@ from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, spars
 from openmdao.utils.deriv_display import _deriv_display, _deriv_display_compact
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, inconsistent_across_procs, LocalRangeIterable
-from openmdao.utils.indexer import Indexer, indexer
+from openmdao.utils.indexer import indexer
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation, OMInvalidCheckDerivativesOptionsWarning
@@ -1828,42 +1828,42 @@ class Component(System):
             if coloring_mod._use_partial_sparsity:
                 self._get_coloring()
 
-    def _resolve_src_inds(self):
-        abs2prom = self._resolver.abs2prom
-        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-        all_abs2meta_in = self._var_allprocs_abs2meta['input']
-        abs2meta_in = self._var_abs2meta['input']
-        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
-        all_abs2meta_out = self._problem_meta['model_ref']()._var_allprocs_abs2meta['output']
+    # def _resolve_src_inds(self):
+    #     abs2prom = self._resolver.abs2prom
+    #     abs_in2prom_info = self._problem_meta['abs_in2prom_info']
+    #     all_abs2meta_in = self._var_allprocs_abs2meta['input']
+    #     abs2meta_in = self._var_abs2meta['input']
+    #     conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
+    #     all_abs2meta_out = self._problem_meta['model_ref']()._var_allprocs_abs2meta['output']
 
-        for tgt, meta in abs2meta_in.items():
-            if tgt in abs_in2prom_info:
-                pinfo = abs_in2prom_info[tgt][-1]  # component always last in the plist
-                if pinfo is not None:
-                    inds, flat, shape = pinfo
-                    if inds is not None:
-                        all_abs2meta_in[tgt]['has_src_indices'] = True
-                        meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
-                        if inds._flat_src:
-                            meta['flat_src_indices'] = True
-                        elif meta['flat_src_indices'] is None:
-                            meta['flat_src_indices'] = flat
+    #     for tgt, meta in abs2meta_in.items():
+    #         if tgt in abs_in2prom_info:
+    #             pinfo = abs_in2prom_info[tgt][-1]  # component always last in the plist
+    #             if pinfo is not None:
+    #                 inds, flat, shape = pinfo
+    #                 if inds is not None:
+    #                     all_abs2meta_in[tgt]['has_src_indices'] = True
+    #                     meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
+    #                     if inds._flat_src:
+    #                         meta['flat_src_indices'] = True
+    #                     elif meta['flat_src_indices'] is None:
+    #                         meta['flat_src_indices'] = flat
 
-                        try:
-                            if not isinstance(inds, Indexer):
-                                meta['src_indices'] = inds = indexer(inds, flat_src=flat,
-                                                                     src_shape=shape)
-                            else:
-                                meta['src_indices'] = inds = inds.copy()
-                                inds.set_src_shape(shape)
-                                self._var_prom2inds[abs2prom(tgt, iotype='input')] = \
-                                    [shape, inds, flat]
-                        except Exception:
-                            type_exc, exc, tb = sys.exc_info()
-                            self._collect_error(f"When accessing '{conns[tgt]}' with src_shape "
-                                                f"{shape} from '{pinfo.prom_path()}' using "
-                                                f"src_indices {inds}: {exc}", exc_type=type_exc,
-                                                tback=tb, ident=(conns[tgt], tgt))
+    #                     try:
+    #                         if not isinstance(inds, Indexer):
+    #                             meta['src_indices'] = inds = indexer(inds, flat_src=flat,
+    #                                                                  src_shape=shape)
+    #                         else:
+    #                             meta['src_indices'] = inds = inds.copy()
+    #                             inds.set_src_shape(shape)
+    #                             self._var_prom2inds[abs2prom(tgt, iotype='input')] = \
+    #                                 [shape, inds, flat]
+    #                     except Exception:
+    #                         type_exc, exc, tb = sys.exc_info()
+    #                         self._collect_error(f"When accessing '{conns[tgt]}' with src_shape "
+    #                                             f"{shape} from '{pinfo.prom_path()}' using "
+    #                                             f"src_indices {inds}: {exc}", exc_type=type_exc,
+    #                                             tback=tb, ident=(conns[tgt], tgt))
 
     def _check_consistent_serial_dinputs(self, nz_dist_outputs):
         """

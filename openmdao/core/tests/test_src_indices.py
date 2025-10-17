@@ -406,9 +406,6 @@ class SrcIndicesFeatureTestCase(unittest.TestCase):
         # and after we slice it with [:,:-1], lower levels will see their source having a shape of (3,2)
         p.model.promotes('G', inputs=['x'], src_indices=om.slicer[:,:-1], src_shape=(3,3))
 
-        # This specifies that G.x assumes a source shape of (3,2)
-        G.set_input_defaults('x', src_shape=(3,2))
-
         g1 = G.add_subsystem('g1', om.Group(), promotes_inputs=['x'])
         g1.add_subsystem('C1', om.ExecComp('y = 3*x', x=np.random.random(3), y=np.random.random(3)))
 

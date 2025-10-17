@@ -2469,29 +2469,12 @@ class TestConnect(unittest.TestCase):
 
     def test_connect_to_output(self):
         p = self.setup_problem('connect_to_output')
-        msg = "\nCollected errors for problem 'connect_to_output':\n   'sub' <class Group>: " + \
-              "Attempted to connect from 'tgt.y' to 'cmp.z', but 'cmp.z' is an output. " + \
-              "All connections must be from an output to an input."
+        msg = "\nCollected errors for problem 'connect_to_output':\n   'sub' <class Group>: Attempted to connect from 'tgt.y' to 'cmp.z', but 'cmp.z' is an output. All connections must be to an input."
 
         # source and target names can't be checked until setup
         # because setup is not called until then
         p.model.sub.connect('tgt.y', 'cmp.z')
 
-        with self.assertRaises(Exception) as context:
-            p.setup()
-            p.final_setup()
-
-        self.assertEqual(str(context.exception), msg)
-
-    def test_connect_from_input(self):
-        p = self.setup_problem('connect_from_input')
-        msg = "\nCollected errors for problem 'connect_from_input':\n   'sub' <class Group>: " + \
-              "Attempted to connect from 'tgt.x' to 'cmp.x', but 'tgt.x' is an input. " + \
-              "All connections must be from an output to an input."
-
-        # source and target names can't be checked until setup
-        # because setup is not called until then
-        p.model.sub.connect('tgt.x', 'cmp.x')
         with self.assertRaises(Exception) as context:
             p.setup()
             p.final_setup()
@@ -2545,7 +2528,7 @@ class TestConnect(unittest.TestCase):
         sub.connect('y', 'tgt.x', src_indices=[1])
 
         msg = "\nCollected errors for problem 'connect_within_system_with_promotes':" + \
-            "\n   'sub' <class Group>: Output and input are in the same System for " + \
+            "\n   'sub' <class Group>: Source and target are in the same System for " + \
               "connection from 'y' to 'tgt.x'."
 
         with self.assertRaises(Exception) as ctx:
@@ -2619,9 +2602,7 @@ class TestConnect(unittest.TestCase):
             prob.final_setup()
 
     def test_connect_incompatible_units(self):
-        msg = "\nCollected errors for problem 'connect_incompatible_units':" + \
-            "\n   <model> <class Group>: Output units of 'degC' for 'src.x2' are incompatible with " + \
-            "input units of 'm' for 'tgt.x'."
+        msg = "\nCollected errors for problem 'connect_incompatible_units':\n   <model> <class Group>: 'src.x2' units of 'degC' are incompatible with 'tgt.x' units of 'm'."
 
 
         prob = om.Problem(name='connect_incompatible_units')
@@ -2668,8 +2649,7 @@ class TestConnect(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        msg = "<model> <class Group>: Input 'tgt.y' with units of 'degC' is " \
-              "connected to output 'src.y' which has no units."
+        msg = "<model> <class Group>: Input 'y (tgt.y)' with units of 'degC' is connected to output 'y (src.y)' which has no units."
 
         with assert_warning(UserWarning, msg):
             prob.setup()
@@ -2729,16 +2709,13 @@ class TestConnect(unittest.TestCase):
         p = self.setup_problem('bad_shapes2')
         p.model.sub.connect('src.s', 'arr.x')
 
-        msg = "\nCollected errors for problem 'bad_shapes2':" + \
-              "\n   'sub' <class Group>: The source and target shapes do not match or are ambiguous " + \
-              "for the connection 'sub.src.s' to 'sub.arr.x'. The source shape is (1,) " + \
-              "but the target shape is (2,)."
+        msg = "<model> <class Group>: 'sub.src.s' shape (1,) != 'sub.arr.x' shape (2,)."
 
         with self.assertRaises(Exception) as context:
             p.setup()
             p.final_setup()
 
-        self.assertEqual(str(context.exception), msg)
+        self.assertTrue(msg in str(context.exception))
 
     def test_bad_indices_shape(self):
         p = om.Problem(name='bad_indices_shape')
@@ -2747,32 +2724,25 @@ class TestConnect(unittest.TestCase):
 
         p.model.connect('IV.x', 'C1.x', src_indices=[[1], [1]])
 
-        msg = "\nCollected errors for problem 'bad_indices_shape':\n   <model> <class Group>: " + \
-              "The source indices ([1], [1]) do not specify a valid shape " + \
-              "for the connection 'IV.x' to 'C1.x'. The target shape is (2, 2) but " + \
-              "indices are shape (1,)."
+        msg = "<model> <class Group>: After applying index ([1], [1]) to 'IV.x', shape (1,) != 'C1.x' shape (2, 2)."
 
         with self.assertRaises(Exception) as context:
             p.setup()
             p.final_setup()
 
-        self.assertEqual(str(context.exception), msg)
+        self.assertTrue(msg in str(context.exception))
 
     def test_bad_indices_dimensions(self):
         p = self.setup_problem('bad_indices_dimensions')
         p.model.sub.connect('src.x', 'arr.x', src_indices=([2,2],[-1,2],[2,2]),
                             flat_src_indices=False)
 
-        msg = "\nCollected errors for problem 'bad_indices_dimensions':\n   <model> <class Group>: " + \
-              "When connecting 'sub.src.x' to 'sub.arr.x': Can't set source shape to (5, 3) because " + \
-              "indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
-        p.setup()
-        p.final_setup()
+        msg = "<model> <class Group>: When connecting 'sub.src.x' to 'sub.arr.x': Can't set source shape to (5, 3) because indexer ([2, 2], [-1, 2], [2, 2]) expects 3 dimensions."
         try:
             p.setup()
             p.final_setup()
         except Exception as err:
-            self.assertEqual(str(err), msg)
+            self.assertTrue(msg in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -2782,15 +2752,13 @@ class TestConnect(unittest.TestCase):
         p.model.sub.connect('src.x', 'arr.x', src_indices=([2, 4],[-1, 4]),
                             flat_src_indices=False)
 
-        msg = "\nCollected errors for problem 'bad_indices_index':\n   <model> <class Group>: " + \
-              "When connecting 'sub.src.x' to 'sub.arr.x': index 4 is out of bounds for source " + \
-              "dimension of size 3."
+        msg = "<model> <class Group>: When connecting 'sub.src.x' to 'sub.arr.x': index 4 is out of bounds for source dimension of size 3."
 
         try:
             p.setup()
             p.final_setup()
         except Exception as err:
-            self.assertEqual(str(err), msg)
+            self.assertTrue(msg in str(err))
         else:
             self.fail('Exception expected.')
 

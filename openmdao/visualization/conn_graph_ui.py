@@ -285,12 +285,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AllConnGraph Explorer</title>
-    // <script src="https://d3js.org/d3.v7.min.js"></script>
-    // <script src="https://unpkg.com/@hpcc-js/wasm@2.20.0/dist/graphviz.umd.js"></script>
-    // <script src="https://unpkg.com/d3-graphviz@5.6.0/build/d3-graphviz.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
-    <script src="https://unpkg.com/@hpcc-js/wasm@2.20.0/dist/graphviz.umd.js"></script>
-    <script src="https://unpkg.com/d3-graphviz@5.6.0/build/d3-graphviz.js"></script>
 <style>
         * {
             box-sizing: border-box;
@@ -370,7 +364,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         }
         .graph-container {
             flex: 1;
-            padding: 20px;
+            padding: 0;
             text-align: center;
             overflow: auto;
             display: flex;
@@ -378,12 +372,9 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             min-height: 0; /* Allow flex item to shrink */
         }
         .graph-svg {
-            max-width: 100%;
-            max-height: 100%;
-            width: auto;
+            width: 100%;
             height: auto;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            border: none;
             flex: 1;
             object-fit: contain;
         }
@@ -396,15 +387,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             margin: 10px 0;
             flex: 1;
             overflow: auto;
-        }
-        .info {
-            padding: 15px 20px;
-            background: #f8f9fa;
-            border-top: 1px solid #eee;
-            flex-shrink: 0;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
         }
         .loading {
             text-align: center;
@@ -681,13 +663,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         }
 
         .tree-node-content.search-highlight {
-            background-color: #ffd700;
+            background-color: #00ff00;
             color: #333;
             font-weight: bold;
         }
 
         .tree-label.search-highlight {
-            background-color: #ffd700;
+            background-color: #00ff00;
             color: #333;
             font-weight: bold;
             border-radius: 3px;
@@ -697,7 +679,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         }
 
         .search-highlight-span {
-            background-color: #ffd700;
+            background-color: #00ff00;
             color: #333;
             font-weight: bold;
             border-radius: 3px;
@@ -728,6 +710,59 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             align-items: center;
             justify-content: center;
             font-size: 12px;
+        }
+
+        .tree-icon-button {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+            background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3);
+            color: #333;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+            cursor: default;
+            user-select: none;
+        }
+
+        .tree-icon-button.input {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            border-color: #2980b9;
+            color: white;
+        }
+
+        .tree-icon-button.output {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            border-color: #c0392b;
+            color: white;
+        }
+
+        /* Graph node selection styling */
+        .graph-svg .node.selected {
+            stroke: #ffd700 !important;
+            stroke-width: 4px !important;
+            filter: drop-shadow(0 0 8px #ffd700) drop-shadow(0 0 4px #ffd700);
+        }
+
+        .graph-svg .node.selected circle {
+            stroke: #ffd700 !important;
+            stroke-width: 4px !important;
+        }
+
+        .graph-svg .node.selected ellipse {
+            stroke: #ffd700 !important;
+            stroke-width: 4px !important;
+        }
+
+        .graph-svg .node.selected polygon {
+            stroke: #ffd700 !important;
+            stroke-width: 4px !important;
         }
 
         .tree-label {
@@ -796,9 +831,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 </div>
             </div>
 
-            <div class="info" id="graph-info">
-                <strong></strong> Select a system or variable from the tree to view its connection graph.
-            </div>
             </div>
         </div>
     </div>
@@ -816,7 +848,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 </p>
 
                 <ol>
-                    <li>Click on any system (📁) to see all connection graphs involving that
+                    <li>Click on any system (⚙️) to see all connection graphs involving that
                     system</li>
                     <li>Click on any variable (⬇️ or ⬆️) to see only the connection graph for that
                     variable</li>
@@ -885,6 +917,114 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         let colorsLoaded = false; // Track if colors have been loaded
         let helpRetryCount = 0; // Track retry attempts for help
 
+        // Helper function to darken a color
+        function darkenColor(hex, factor) {
+            // Remove # if present
+            hex = hex.replace('#', '');
+
+            // Parse RGB values
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+
+            // Darken by factor
+            const newR = Math.floor(r * (1 - factor));
+            const newG = Math.floor(g * (1 - factor));
+            const newB = Math.floor(b * (1 - factor));
+
+            // Convert back to hex
+            return '#' + ((1 << 24) + (newR << 16) + (newG << 8) + newB).toString(16).slice(1);
+        }
+
+        // Helper function to get contrasting text color (black or white)
+        function getContrastColor(hex) {
+            // Remove # if present
+            hex = hex.replace('#', '');
+
+            // Parse RGB values
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+
+            // Calculate luminance
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+            // Return black for light backgrounds, white for dark backgrounds
+            return luminance > 0.5 ? '#000000' : '#ffffff';
+        }
+
+        // Function to update tree icon colors to match graph colors
+        function updateTreeIconColors() {
+            const inputIcons = document.querySelectorAll('.tree-icon-button.input');
+            const outputIcons = document.querySelectorAll('.tree-icon-button.output');
+
+            inputIcons.forEach(icon => {
+                if (cachedColors.input) {
+                    icon.style.background = `linear-gradient(135deg, ${cachedColors.input} 0%, ${darkenColor(cachedColors.input, 0.2)} 100%)`;
+                    icon.style.borderColor = darkenColor(cachedColors.input, 0.2);
+                    icon.style.color = getContrastColor(cachedColors.input);
+                }
+            });
+
+            outputIcons.forEach(icon => {
+                if (cachedColors.output) {
+                    icon.style.background = `linear-gradient(135deg, ${cachedColors.output} 0%, ${darkenColor(cachedColors.output, 0.2)} 100%)`;
+                    icon.style.borderColor = darkenColor(cachedColors.output, 0.2);
+                    icon.style.color = getContrastColor(cachedColors.output);
+                }
+            });
+        }
+
+        // Function to add selection styling to SVG content
+        function addSelectionStylingToSvg(svgContent) {
+            // Add CSS styles to the SVG for selection highlighting
+            const styleTag = `
+                <defs>
+                    <style>
+                        .node.selected {
+                            stroke: #ffd700 !important;
+                            stroke-width: 4px !important;
+                            filter: drop-shadow(0 0 8px #ffd700) drop-shadow(0 0 4px #ffd700);
+                        }
+                        .node.selected circle {
+                            stroke: #ffd700 !important;
+                            stroke-width: 4px !important;
+                        }
+                        .node.selected ellipse {
+                            stroke: #ffd700 !important;
+                            stroke-width: 4px !important;
+                        }
+                        .node.selected polygon {
+                            stroke: #ffd700 !important;
+                            stroke-width: 4px !important;
+                        }
+                    </style>
+                </defs>
+            `;
+
+            // Insert the style tag after the opening <svg> tag
+            return svgContent.replace(/<svg[^>]*>/, (match) => match + styleTag);
+        }
+
+        // Function to highlight a selected node in the graph
+        function highlightSelectedNode(variableName) {
+            // Remove previous selection
+            document.querySelectorAll('.graph-svg .node').forEach(node => {
+                node.classList.remove('selected');
+            });
+
+            // Find and highlight the selected node
+            if (variableName) {
+                const nodes = document.querySelectorAll('.graph-svg .node');
+                nodes.forEach(node => {
+                    const title = node.querySelector('title');
+                    if (title && title.textContent.includes(variableName)) {
+                        node.classList.add('selected');
+                    }
+                });
+            }
+        }
+
         // Color mapping function to convert color names to hex values
         function getColorHex(colorName) {
             const colorMap = {
@@ -903,7 +1043,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         // UI elements
         const treeContainer = document.getElementById('tree-container');
         const graphContent = document.getElementById('graph-content');
-        const graphInfo = document.getElementById('graph-info');
 
         // Tree data structure
         let treeData = {};
@@ -1191,18 +1330,35 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
 
             // Icon
             const icon = document.createElement('div');
-            icon.className = 'tree-icon';
             if (node.type === 'system') {
+                icon.className = 'tree-icon';
                 icon.innerHTML = '⚙️';
             } else if (node.type === 'container') {
+                icon.className = 'tree-icon';
                 icon.innerHTML = '📁';
             } else if (node.type === 'i') {
-                icon.innerHTML = '⬇️';
+                icon.className = 'tree-icon-button input';
+                icon.innerHTML = 'i';
+                // Set dynamic color to match graph input nodes
+                if (cachedColors.input) {
+                    icon.style.background = `linear-gradient(135deg, ${cachedColors.input} 0%, ${darkenColor(cachedColors.input, 0.2)} 100%)`;
+                    icon.style.borderColor = darkenColor(cachedColors.input, 0.2);
+                    icon.style.color = getContrastColor(cachedColors.input);
+                }
             } else if (node.type === 'o') {
-                icon.innerHTML = '⬆️';
+                icon.className = 'tree-icon-button output';
+                icon.innerHTML = 'o';
+                // Set dynamic color to match graph output nodes
+                if (cachedColors.output) {
+                    icon.style.background = `linear-gradient(135deg, ${cachedColors.output} 0%, ${darkenColor(cachedColors.output, 0.2)} 100%)`;
+                    icon.style.borderColor = darkenColor(cachedColors.output, 0.2);
+                    icon.style.color = getContrastColor(cachedColors.output);
+                }
             } else if (node.type === 'bidirectional') {
+                icon.className = 'tree-icon';
                 icon.innerHTML = '⬆️⬇️';
             } else {
+                icon.className = 'tree-icon';
                 icon.innerHTML = '⬆️⬇️';
             }
             contentDiv.appendChild(icon);
@@ -1287,6 +1443,10 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 // For variables, load the variable-specific graph
                 updateCurrentSubsystem(node.path);
                 loadVariableGraph(node.fullName);
+                // Highlight the selected variable in the graph after a short delay to allow graph to render
+                setTimeout(() => {
+                    highlightSelectedNode(node.name);
+                }, 100);
             }
         }
 
@@ -1341,8 +1501,10 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         function displayGraph(svgContent, title, nodes, edges) {
             // Check if content is SVG or HTML
             if (svgContent.trim().startsWith('<svg')) {
+                // Add selection styling to SVG content
+                const styledSvgContent = addSelectionStylingToSvg(svgContent);
                 graphContent.innerHTML = `
-                    <div class="graph-svg" style="flex: 1; display: flex; align-items: center; justify-content: center;">${svgContent}</div>
+                    <div class="graph-svg" style="flex: 1; display: flex; align-items: center; justify-content: center;">${styledSvgContent}</div>
                 `;
             } else {
                 graphContent.innerHTML = `
@@ -1363,10 +1525,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 name = title;
             }
 
-            graphInfo.innerHTML = `
-                <div><strong>${label}</strong> ${name}</div>
-                <div><strong>Nodes:</strong> ${nodes}</div>
-            `;
         }
 
         function showLoading(message) {
@@ -1387,6 +1545,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 if (globalGraphColors.output) {
                     cachedColors.output = getColorHex(globalGraphColors.output);
                 }
+                // Update tree icon colors to match
+                updateTreeIconColors();
                 if (globalGraphColors.highlight) {
                     cachedColors.highlight = getColorHex(globalGraphColors.highlight);
                 } else {
@@ -1415,6 +1575,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                             if (subsystemData.help_colors.o) {
                                 cachedColors.output = getColorHex(subsystemData.help_colors.o);
                             }
+                            // Update tree icon colors to match
+                            updateTreeIconColors();
                         }
                         colorsLoaded = true; // Mark as loaded
                         helpRetryCount = 0; // Reset retry counter
@@ -1742,7 +1904,7 @@ def _conn_graph_setup_parser(parser):
                           'It displays the connection graph for the specified variable or system.')
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('--problem', action='store', dest='problem', help='Problem name')
-    parser.add_argument('--port', action='store', dest='port', default=8987, help='Port number')
+    parser.add_argument('--port', action='store', dest='port', help='Port number')
 
 
 def _conn_graph_cmd(options, user_args):

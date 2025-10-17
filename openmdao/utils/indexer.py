@@ -610,7 +610,20 @@ class ShapedSliceIndexer(Indexer):
         str
             String representation.
         """
-        return f"{self._slice}"
+        start = self._slice.start if self._slice.start is not None else ''
+        stop = self._slice.stop if self._slice.stop is not None else ''
+
+        step = self._slice.step if self._slice.step is not None else 1
+        if step == 1:
+            step = ''
+
+        if step:
+            return f"{start}:{stop}:{step}"
+        elif start:
+            return f"{start}:{stop}"
+        elif stop:
+            return f":{stop}"
+        return ":"
 
     def apply_offset(self, offset, flat=True):
         """
@@ -1083,7 +1096,7 @@ class ShapedMultiIndexer(Indexer):
         str
             String representation.
         """
-        return str(self._tup)
+        return f"({', '.join(str(indexer(i)) for i in self._tup)})"
 
     def apply_offset(self, offset, flat=True):
         """
@@ -1531,6 +1544,8 @@ class IndexMaker(object):
                 idxer = MultiIndexer(idx, flat_src=flat_src)
             if flat_src and multi:
                 raise RuntimeError("Can't use a multdimensional index into a flat source.")
+        elif isinstance(idx, Indexer):
+            return idx
         else:
             arr = np.atleast_1d(idx)
             if arr.ndim == 1:

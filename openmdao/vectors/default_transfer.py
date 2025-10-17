@@ -168,6 +168,7 @@ class DefaultTransfer(Transfer):
 
         scaled_in_set = set()
         scale_factors = group._problem_meta['model_ref']()._scale_factors
+        conn_graph = group._all_conn_graph
 
         # Loop through all connections owned by this group
         for abs_in, abs_out in group._conn_abs_in2out.items():
@@ -180,10 +181,8 @@ class DefaultTransfer(Transfer):
                 idx_in = allprocs_abs2idx[abs_in]
                 idx_out = allprocs_abs2idx[abs_out]
 
-                # Read in and process src_indices
-                src_indices = meta_in['src_indices']
-                if src_indices is not None:
-                    src_indices = src_indices.shaped_array()
+                ## Read in and process src_indices
+                src_indices = conn_graph.get_src_index_array(abs_in)
 
                 # 1. Compute the output indices
                 offset = offsets_out[idx_out]

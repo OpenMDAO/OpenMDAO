@@ -1101,14 +1101,6 @@ class Problem(object, metaclass=ProblemMetaclass):
             'has_par_deriv_color': False,  # True if any dvs/responses have parallel deriv colors
             'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
             'orig_mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
-            'abs_in2prom_info': {},  # map of abs input name to list of length = sys tree height
-                                     # down to var location, to allow quick resolution of local
-                                     # src_shape/src_indices due to promotes.  For example,
-                                     # for abs_in of a.b.c.d, dict entry would be
-                                     # [None, None, None], corresponding to levels
-                                     # a, a.b, and a.b.c, with one of the Nones replaced
-                                     # by promotes info.  Dict entries are only created if
-                                     # src_indices are applied to the variable somewhere.
             'reports_dir': None,  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running

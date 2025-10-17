@@ -70,7 +70,7 @@ class TestProblem(unittest.TestCase):
         obj_copy = p.get_val('obj', copy=True)
 
         self.assertTrue(np.array_equal(foo_copy, np.array([5., 5., 5.])))
-        self.assertEqual(mul_copy, 100)
+        self.assertEqual(mul_copy, [100])
         self.assertTrue(np.array_equal(bar_copy, np.array([500., 500., 500.])))
 
         self.assertTrue(id(foo) != id(foo_copy), f"'foo' is not a copy, {id(foo)=} {id(foo_copy)=}")
