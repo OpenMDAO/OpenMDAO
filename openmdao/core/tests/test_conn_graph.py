@@ -164,15 +164,15 @@ class TestAllConnGraphUtilityFunctions(unittest.TestCase):
         # Test with compatible arrays
         a = np.array([1.0, 2.0, 3.0])
         b = np.array([1.0, 2.0, 3.0])
-        self.assertTrue(are_compatible_values(a, b))
+        self.assertTrue(are_compatible_values(a, b, False))
 
         # Test with incompatible shapes
         a = np.array([1.0, 2.0, 3.0])
         b = np.array([[1.0, 2.0], [3.0, 4.0]])
-        self.assertFalse(are_compatible_values(a, b))
+        self.assertFalse(are_compatible_values(a, b, False))
 
         # Test with different types
-        self.assertFalse(are_compatible_values(5, 5.0))
+        self.assertFalse(are_compatible_values(5, 5.0, True))
 
 
 

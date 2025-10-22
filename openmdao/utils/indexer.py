@@ -182,6 +182,22 @@ class Indexer(object):
         else:
             return arr[self()]
 
+    def indexed_val_set(self, arr, val):
+        """
+        Set the value of the indices in the array.
+
+        Parameters
+        ----------
+        arr : ndarray
+            The array to index into.
+        val : ndarray
+            The value to set.
+        """
+        if self._flat_src:
+            arr.ravel()[self.flat()] = val
+        else:
+            arr[self()] = val
+
     def copy(self, *args):
         """
         Copy this Indexer.
@@ -298,9 +314,9 @@ class Indexer(object):
             raise ValueError(f"Can't get shaped array of {self} because it has no source shape.")
         return s.as_array(copy=copy, flat=flat)
 
-    def apply(self, subidxer):
+    def sub_array_index(self, subidxer):
         """
-        Apply a sub-Indexer to this Indexer and return the resulting indices.
+        Apply a sub-Indexer to this Indexer and return the resulting index array.
 
         Parameters
         ----------

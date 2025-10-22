@@ -369,22 +369,29 @@ def array_connection_compatible(shape1, shape2):
     bool
         True if the two shapes are compatible for connection, else False.
     """
-    if shape1 == shape2:
+    if shape1 == shape2:  # most common case
         return True
 
+    # Shapes are not connection-compatible if size is different
+    if shape_to_len(shape1) != shape_to_len(shape2):
+        return False
+
+    # # if sizes are the same, then all 1's can just be eliminated and the
+    # # remaining dimensions compared
     # sqz1 = [d for d in shape1 if d != 1]
     # sqz2 = [d for d in shape2 if d != 1]
 
     # return sqz1 == sqz2
+
     ashape1 = np.asarray(shape1, dtype=INT_DTYPE)
     ashape2 = np.asarray(shape2, dtype=INT_DTYPE)
 
-    size1 = shape_to_len(ashape1)
-    size2 = shape_to_len(ashape2)
+    # size1 = shape_to_len(ashape1)
+    # size2 = shape_to_len(ashape2)
 
-    # Shapes are not connection-compatible if size is different
-    if size1 != size2:
-        return False
+    # # Shapes are not connection-compatible if size is different
+    # if size1 != size2:
+    #     return False
 
     nz1 = np.where(ashape1 > 1)[0]
     nz2 = np.where(ashape2 > 1)[0]

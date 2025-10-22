@@ -7,7 +7,7 @@ from openmdao.utils.testing_utils import use_tempdirs
 
 class Inner(om.Group):
     def setup(self):
-        comp = om.ExecComp('y=2*x', x=np.zeros((3, 2)), y=np.zeros((3, 2)))
+        comp = om.ExecComp('y=2*x', x=np.zeros((6, )), y=np.zeros((6, )))
         self.add_subsystem('comp', comp)
 
 
@@ -27,13 +27,10 @@ class SrcIndicesTestCase(unittest.TestCase):
         model.add_subsystem('outer', Outer())
         model.connect('src.y', 'outer.desvar_x', src_indices=[2, 4], flat_src_indices=True)
         prob.setup()
-        srcval = np.array([1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0])
-        prob.set_val('src.x', srcval)
+        prob.set_val('src.x', np.array([1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0]))
         prob.run_model()
         assert_near_equal(prob.get_val('outer.desvar_x'), [15., 27.], 1e-6)
-        expected = np.array([[15., 27.],
-                             [15., 27.],
-                             [15., 27.]])
+        expected = np.array([15., 27., 15., 27, 15., 27.])
         assert_near_equal(prob.get_val('outer.inner.comp.x'), expected, 1e-6)
 
     def test_broadcast_scalar_connection(self):
@@ -315,10 +312,11 @@ class SrcIndicesTestCase(unittest.TestCase):
             p.setup()
             p.final_setup()
 
-        self.assertEqual(cm.exception.args[0],
-           "\nCollected errors for problem 'src_shape_mismatch':"
-           "\n   <model> <class Group>: When connecting '_auto_ivc.v0' to 'G.g1.C1.x': Promoted "
-           "src_shape of (3, 3) for 'G.g1.C1.x' differs from src_shape (3, 2) for 'x'.")
+        self.assertEqual(cm.exception.args[0], ("The following inputs promoted to 'G.x' have different incompatible shapes:\n"
+                                                "  \n"
+                                                "G.g1.x  (3, 3)\n"
+                                                "G.g2.x  (3, 2)\n"
+                                                "  "))
 
     def test_src_indices_on_promotes(self):
         src_shape = (3, 3)
@@ -349,11 +347,7 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'src_indices_on_promotes':"
-            "\n   <model> <class Group>: When promoting 'x' from system 'C1' with src_indices "
-            "[4 5 7 9] and src_shape (3, 3): index 9 is out of bounds for source dimension of size 9."
-            "\n   <model> <class Group>: The source indices [4 5 7 9] do not specify a valid shape "
-            "for the connection '_auto_ivc.v0' to 'C1.x'. (target shape=(2, 2), indices_shape=(4,)):"
-            " index 9 is out of bounds for axis 0 with size 9")
+            "\n   <model> <class Group>: Can't promote 'C1.x' to 'x': index 9 is out of bounds for source dimension of size 9.")
 
     def test_connect_slice_src_indices_not_full_size(self):
         p = om.Problem()

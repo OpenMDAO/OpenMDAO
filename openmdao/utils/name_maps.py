@@ -1127,7 +1127,7 @@ class NameResolver(object):
         """
         return self._prom2abs['output'].keys() & self._prom2abs['input'].keys()
 
-    def _add_guesses(self, name, msg, n=10, cutoff=0.15, include_prom=True, include_abs=False):
+    def _add_guesses(self, name, msg, n=3, cutoff=0.15, include_prom=True, include_abs=False):
         """
         Add guess information to a message.
 

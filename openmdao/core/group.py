@@ -1132,8 +1132,7 @@ class Group(System):
 
         self._resolve_group_input_defaults()
         graph = self._get_all_conn_graph()
-        graph.rollup_node_meta(self)
-        graph.update_all_shapes(self)
+        graph.update_all_node_meta(self)
 
         self._check_order()
         self._resolver._check_dup_prom_outs()
@@ -1678,7 +1677,6 @@ class Group(System):
 
         self._has_distrib_vars = False
         self._has_fd_group = self._owns_approx_jac
-        #abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         rank = self.comm.rank
 
         # sort the subsystems alphabetically in order to make the ordering
@@ -1706,21 +1704,8 @@ class Group(System):
                                          subsys._var_discrete[io].items()})
 
                 for sub_prom, sub_abs in subsys._resolver.prom2abs_iter(io):
-                    # pinfo = None
                     if sub_prom in subprom2prom:
                         prom_name, _, pinfo, _ = subprom2prom[sub_prom]
-                        # if pinfo is not None and isinput:
-                        #     pinfo = pinfo.copy()
-                        #     pinfo.promoted_from = subsys.pathname
-                        #     pinfo.prom = sub_prom
-                        #     tree_level = subsys.pathname.count('.') + 1
-                        #     for abs_in in sub_abs:
-                        #         if abs_in not in abs_in2prom_info:
-                        #             # need a level for each system including '', so we still
-                        #             # add 1 to abs_in.count('.') which includes the var name
-                        #             abs_in2prom_info[abs_in] = [None] * (abs_in.count('.') + 1)
-                        #         abs_in2prom_info[abs_in][tree_level] = pinfo
-
                     else:
                         prom_name = sub_prefix + sub_prom
 
@@ -1734,19 +1719,6 @@ class Group(System):
                     if sub_prom in subprom2prom:
                         self._all_conn_graph.add_promotion(io, self, prom_name,
                                                            subsys, sub_prom, pinfo)
-
-            # if isinstance(subsys, Group):
-            #     # propagate any subsystem 'set_input_defaults' info up to this Group
-            #     subprom2prom = var_maps['input']
-            #     for sub_prom, metalist in subsys._group_inputs.items():
-            #         if sub_prom in subprom2prom:
-            #             key = subprom2prom[sub_prom][0]
-            #         else:
-            #             key = sub_prefix + sub_prom
-            #         if key not in self._group_inputs:
-            #             self._group_inputs[key] = [{'path': self.pathname, 'prom': key,
-            #                                         'auto': True}]
-            #         self._group_inputs[key].extend(metalist)
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -2158,10 +2130,10 @@ class Group(System):
 
             self._setup_auto_ivcs()
 
-            all_conn_graph.rollup_node_meta(self)
+            all_conn_graph.update_all_node_meta(self)
             all_conn_graph.transform_input_input_connections(self)
 
-            conn_dict = all_conn_graph.get_all_conns(self)
+            conn_dict = all_conn_graph.create_all_conns_dict(self)
 
             global_conn_dict = {'': {}}
             root_dict = global_conn_dict['']

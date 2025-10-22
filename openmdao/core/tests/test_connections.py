@@ -179,7 +179,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # Should not be allowed because the source and target shapes do not match
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
-        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: 'idvp.blammo' shape (1,) != 'arraycomp.inp' shape (2,)."
+        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: Can't connect 'idvp.blammo' to 'arraycomp.inp': shape (1,) of 'idvp.blammo' is incompatible with shape (2,) of 'arraycomp.inp'."
         self.prob.setup()
         try:
             self.prob.final_setup()
@@ -194,10 +194,11 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_length')
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 0, 0])
 
-        expected = "<model> <class Group>: After applying index [0 0 0] to 'idvp.blammo', shape (3,) != 'arraycomp.inp' shape (2,)."
+        expected = ("Collected errors for problem 'bad_length':\n"
+                    "   <model> <class Group>: Can't connect 'idvp.blammo' to 'arraycomp.inp' when applying index [0 0 0] : shape (3,) of 'idvp.blammo' is incompatible with shape (2,) of 'arraycomp.inp'.")
 
-        self.prob.setup()
         try:
+            self.prob.setup()
             self.prob.final_setup()
         except Exception as err:
             self.assertTrue(expected in str(err))
@@ -216,8 +217,7 @@ class TestConnectionsIndices(unittest.TestCase):
         except Exception as err:
             self.assertTrue(
                "\nCollected errors for problem 'bad_value':"
-               "\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': "
-               "index 100000 is out of bounds for source dimension of size 5." in str(err))
+               "\n   <model> <class Group>: Can't connect 'idvp.arrout' to 'arraycomp.inp1': index 100000 is out of bounds for source dimension of size 5." in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -233,8 +233,7 @@ class TestConnectionsIndices(unittest.TestCase):
         except Exception as err:
             self.assertTrue(
                "\nCollected errors for problem 'bad_value_bug':"
-               "\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': "
-               "index 100000 is out of bounds for source dimension of size 5." in str(err))
+               "\n   <model> <class Group>: Can't connect 'idvp.arrout' to 'arraycomp.inp': index 100000 is out of bounds for source dimension of size 5." in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -322,7 +321,7 @@ class TestShapes(unittest.TestCase):
                                                 y={'val': np.zeros((5, 2))}))
         p.model.connect('indep.x', 'C1.x')
 
-        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: 'indep.x' shape (1, 10, 1, 1) != 'C1.x' shape (5, 2)."
+        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: Can't connect 'indep.x' to 'C1.x': shape (1, 10, 1, 1) of 'indep.x' is incompatible with shape (5, 2) of 'C1.x'."
 
         p.setup()
         with self.assertRaises(Exception) as context:

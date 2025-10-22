@@ -312,7 +312,7 @@ class TestProblem(unittest.TestCase):
             prob['indep.num'] = bad_val
 
         self.assertEqual(cm.exception.args[0],
-                         "Failed to set value of 'indep.num': could not broadcast input array from shape (10,) into shape (1,).")
+                         "Failed to set value of 'indep.num': cannot reshape array of size 10 into shape (1,).")
         prob.model._initial_condition_cache = {}
 
         # check assign scalar to array
@@ -326,7 +326,7 @@ class TestProblem(unittest.TestCase):
         prob['indep.arr'] = new_val
         assert_near_equal(prob['indep.arr'], new_val, 1e-10)
 
-        msg = "Failed to set value of '.*': could not broadcast input array from shape (.*) into shape (.*)."
+        msg = "Failed to set value of '.*': cannot reshape array of size (.*) into shape (.*)."
         # check bad array value
         bad_val = -10*np.ones((9,1))
         with self.assertRaisesRegex(ValueError, msg):
@@ -1056,13 +1056,16 @@ class TestProblem(unittest.TestCase):
                                                      y={'val': 0.0, 'units': 'inch'}),
                                  promotes=['x'])
 
-        prob.setup()
         try:
-            prob.final_setup()
+            prob.setup()
         except Exception as err:
             self.assertEqual(str(err),
-               "\nCollected errors for problem 'get_set_with_units_diff_err':"
-               "\n   <model> <class Group>: No default units have been set for input 'x (['C1.x', 'C2.x'])' so the choice of units between ['ft', 'inch'] is ambiguous. Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
+               ("The following inputs promoted to 'x' have different units:\n"
+                "  \n"
+                "C1.x  ft  \n"
+                "C2.x  inch\n"
+                "  \n"
+                "Call model.set_input_defaults('x', units=?)' to remove the ambiguity."))
         else:
             self.fail("Exception expected.")
 
@@ -1172,11 +1175,19 @@ class TestProblem(unittest.TestCase):
 
         # using the promoted name of the inputs will raise an exception because the two promoted
         # inputs have different units and set_input_defaults was not called to disambiguate.
+        # Note that this only happens on a get/set, not during setup, because many promoted
+        # conn graph nodes are not accessed at all so ambiguity in them doesn't have to be
+        # an error as long as nodes that are accessed are unambiguous.
         with self.assertRaises(Exception) as cm:
             prob['G1.x']
 
-        msg = "<model> <class Group>: Can't get value of 'G1.x (['G1.C1.x', 'G1.C2.x'])': The choice between units of ['cm', 'mm'] for input 'G1.x' is ambiguous. Call model.set_input_defaults('G1.x', units=?) to remove the ambiguity."
-        self.assertEqual(cm.exception.args[0], msg)
+        self.assertEqual(cm.exception.args[0],
+                         ("The following inputs promoted to 'G1.x' have different units:\n"
+                          "  \n"
+                          "G1.C1.x  cm\n"
+                          "G1.C2.x  mm\n"
+                          "  \n"
+                          "Call model.set_input_defaults('G1.x', units=?)' to remove the ambiguity."))
 
     def test_get_set_with_units_error_messages(self):
 

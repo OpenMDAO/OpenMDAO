@@ -1099,59 +1099,64 @@ class Component(System):
         abs2meta_in = self._var_abs2meta['input']
         all_abs2meta_in = all_abs2meta['input']
         all_abs2meta_out = all_abs2meta['output']
-        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
         sizes_in = self._var_sizes['input']
         # src is outside of this component, so we need to use the all_sizes dict to get the sizes
         # of the output variables
         sizes_out = all_sizes['output']
         added_src_inds = []
+        graph = self._get_conn_graph()
+        nodes = graph.nodes()
+
         # loop over continuous local inputs
         for iname, meta_in in abs2meta_in.items():
-            if meta_in['src_indices'] is None and iname not in abs_in2prom_info:
-                src = abs_in2out[iname]
-                dist_in = meta_in['distributed']
-                dist_out = all_abs2meta_out[src]['distributed']
-                if dist_in or dist_out:
-                    i = self._var_allprocs_abs2idx[iname]
-                    gsize_out = all_abs2meta_out[src]['global_size']
-                    gsize_in = all_abs2meta_in[iname]['global_size']
-                    vout_sizes = sizes_out[:, all_abs2idx[src]]
+            src_inds_list = nodes[('i', iname)]['src_inds_list']
+            if src_inds_list:
+                continue
 
-                    offset = None
-                    if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes) == gsize_in):
-                        # This assumes one of:
-                        # 1) a distributed output with total size matching the total size of a
-                        #    distributed input
-                        # 2) a non-distributed output with local size matching the total size of a
-                        #    distributed input
-                        # 3) a non-distributed output with total size matching the total size of a
-                        #    distributed input
-                        if dist_in:
-                            offset = np.sum(sizes_in[:iproc, i])
-                            end = offset + sizes_in[iproc, i]
+            src = abs_in2out[iname]
+            dist_in = meta_in['distributed']
+            dist_out = all_abs2meta_out[src]['distributed']
+            if dist_in or dist_out:
+                i = self._var_allprocs_abs2idx[iname]
+                gsize_out = all_abs2meta_out[src]['global_size']
+                gsize_in = all_abs2meta_in[iname]['global_size']
+                vout_sizes = sizes_out[:, all_abs2idx[src]]
 
-                    # total sizes differ and output is distributed, so can't determine mapping
-                    if offset is None:
-                        self._collect_error(f"{self.msginfo}: Can't determine src_indices "
-                                            f"automatically for input '{iname}'. They must be "
-                                            "supplied manually.", ident=(self.pathname, iname))
-                        continue
+                offset = None
+                if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes) == gsize_in):
+                    # This assumes one of:
+                    # 1) a distributed output with total size matching the total size of a
+                    #    distributed input
+                    # 2) a non-distributed output with local size matching the total size of a
+                    #    distributed input
+                    # 3) a non-distributed output with total size matching the total size of a
+                    #    distributed input
+                    if dist_in:
+                        offset = np.sum(sizes_in[:iproc, i])
+                        end = offset + sizes_in[iproc, i]
 
-                    if dist_in and not dist_out:
-                        src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'],
-                                                              'output')
-                    else:
-                        src_shape = all_abs2meta_out[src]['global_shape']
+                # total sizes differ and output is distributed, so can't determine mapping
+                if offset is None:
+                    self._collect_error(f"{self.msginfo}: Can't determine src_indices "
+                                        f"automatically for input '{iname}'. They must be "
+                                        "supplied manually.", ident=(self.pathname, iname))
+                    continue
 
-                    if offset == end:
-                        idx = np.zeros(0, dtype=INT_DTYPE)
-                    else:
-                        idx = slice(offset, end)
+                if dist_in and not dist_out:
+                    src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'],
+                                                            'output')
+                else:
+                    src_shape = all_abs2meta_out[src]['global_shape']
 
-                    meta_in['src_indices'] = indexer(idx, flat_src=True, src_shape=src_shape)
-                    meta_in['flat_src_indices'] = True
-                    added_src_inds.append(iname)
+                if offset == end:
+                    idx = np.zeros(0, dtype=INT_DTYPE)
+                else:
+                    idx = slice(offset, end)
+
+                meta_in['src_indices'] = indexer(idx, flat_src=True, src_shape=src_shape)
+                meta_in['flat_src_indices'] = True
+                added_src_inds.append(iname)
 
         return added_src_inds
 

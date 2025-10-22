@@ -1650,6 +1650,13 @@ def generate_table(rows, tablefmt='text', **options):
         A table builder object.
     """
     _text_formats = {
+        'plain': {
+            'top_border': Line('', '  ', '', ''),
+            'header_line': Line('', '  ', ''),
+            'header_bottom_border': Line('', '  ', '', ''),
+            'bottom_border': Line('', '  ', '', ''),
+            'data_row_line': Line('', '  ', '')
+        },
         'rst': {
             'top_border': Line('', '  ', '', '='),
             'header_line': Line('', '  ', ''),

@@ -1096,33 +1096,38 @@ def common_subpath(pathnames):
     return ''
 
 
-def truncate_str(s, max_len=20):
+def truncate_str(s, max_len=20, middle=' .. '):
     """
     Truncate a string to a maximum length.
 
-    Truncated strings will look like this:  'first_part ... last_part'.
+    Truncated strings will look like this:  f'first_part{middle}last_part'.
 
     Parameters
     ----------
     s : str
         The string to be truncated.
-    max_len : int
-        The maximum length of the truncated string.  Must be greater than 7
+    max_len : int or None
+        The maximum length of the truncated string.  Must be greater than len(middle) + 2.
+    middle : str
+        The string to insert in the middle of the truncated string.  Defaults to ' .. '.
 
     Returns
     -------
     str
         The truncated string.
     """
-    if max_len < 7:
-        raise ValueError("max_len must be greater than 7.")
+    if not isinstance(s, str):
+        s = str(s)
 
-    s_len = len(s)
-    if s_len <= max_len:
+    if max_len is None or len(s) <= max_len:
         return s
 
-    div, rem = divmod(max_len - 5, 2)
-    return s[:(div + rem)] + ' ... ' + s[-div:]
+    midlen = len(middle)
+    if max_len < midlen + 2:
+        raise ValueError(f"max_len must be greater than len('{middle}') + 2.")
+
+    div, rem = divmod(max_len - midlen, 2)
+    return f'{s[:div + rem]}{middle}{s[-div:]}'
 
 
 def _is_slicer_op(indices):

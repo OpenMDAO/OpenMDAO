@@ -1,5 +1,4 @@
 from pprint import pformat
-import sys
 from difflib import get_close_matches
 import networkx as nx
 from networkx import dfs_edges, dfs_postorder_nodes
@@ -20,6 +19,7 @@ from openmdao.utils.units import unit_conversion
 from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.units import _is_unitless
+from openmdao.visualization.tables.table_builder import generate_table
 
 
 # use hex colors here because the using english names was sometimes causing failure to show
@@ -32,6 +32,10 @@ GRAPH_COLORS = {
 }
 
 
+_continuous_copy_meta = ['val', 'units', '_shape', 'discrete']
+_discrete_copy_meta = ['val', 'discrete']
+
+
 def is_equal(a, b):
     if not (isinstance(b, type(a)) or isinstance(a, type(b))):
         return False
@@ -42,7 +46,7 @@ def is_equal(a, b):
     return a == b
 
 
-def are_compatible_values(a, b, discrete):
+def are_compatible_values(a, b, discrete, src_indices=None):
     if discrete:
         return (isinstance(b, type(a)) or isinstance(a, type(b)))
 
@@ -54,7 +58,19 @@ def are_compatible_values(a, b, discrete):
     except TypeError:
         return False
 
-    return array_connection_compatible(a.shape, b.shape)
+    if src_indices is None:
+        return array_connection_compatible(a.shape, b.shape)
+
+    return array_connection_compatible(b.shape, src_indices.indexed_src_shape)
+
+
+class ConnError(ValueError):
+    """
+    An error raised when a connection is incompatible.
+    """
+    def __init__(self, msg, ident=None):
+        super().__init__(msg)
+        self.ident = ident
 
 
 class AllConnGraph(nx.DiGraph):
@@ -79,7 +95,7 @@ class AllConnGraph(nx.DiGraph):
         super().__init__(*args, **kwargs)
         self._mult_inconn_nodes = set()
         self._input_input_conns = set()
-        self._resolved_nodes = set()
+        self._first_pass = True
 
     def find_node(self, pathname, varname, io=None):
         """
@@ -111,7 +127,12 @@ class AllConnGraph(nx.DiGraph):
         if node in self:
             return node
 
-        raise KeyError(f"{pathname}: Variable '{varname}' not found in connection graph.")
+        msg = f"{pathname}: Variable '{varname}' not found."
+        guesses = sorted(set(get_close_matches(name, [n[1] for n in self.nodes()],
+                                               n=3, cutoff=0.15)))
+        if guesses:
+            msg = f"{msg} Perhaps you meant one of the following variables: {guesses}."
+        raise KeyError(msg)
 
     def top_name(self, node):
         if node[0] == 'i':
@@ -121,15 +142,82 @@ class AllConnGraph(nx.DiGraph):
             if self.out_degree(node) == 0:
                 return node[1]
 
-            for u, v in dfs_edges(self, node):
+            for _, v in dfs_edges(self, node):
                 if v[0] == 'o' and self.out_degree(v) == 0:
                     return v[1]
             return None
 
+    def base_error(self, msg, src, tgt, src_indices=None):
+        edge = (src, tgt)
+        edge_meta = self.edges[edge]
+        typ = edge_meta.get('type', None)
+        type_map = {None: 'promote', 'manual': 'connect', 'implicit': 'implicitly connect'}
+        typestr = type_map[typ]
+
+        if typestr == 'promote' and src[0] == 'i':
+            src, tgt = tgt, src   # promotion for inputs is up the tree
+
+        fromto = f"'{src[1]}' to '{tgt[1]}'"
+
+        if src_indices is not None:
+            indstr = f" when applying index {truncate_str(src_indices, max_len=50)} "
+        else:
+            indstr = ''
+
+        return f"Can't {typestr} {fromto}{indstr}: {msg}"
+
+    def shape_error(self, going_up, src, tgt, src_shape, tgt_shape, src_indices=None):
+        if going_up:
+            src, tgt = tgt, src
+            src_shape, tgt_shape = tgt_shape, src_shape
+
+        return self.base_error(f"shape {src_shape} of '{src[1]}' is incompatible with shape "
+                               f"{tgt_shape} of '{tgt[1]}'.", src, tgt, src_indices)
+
+    def value_error(self, going_up, src, tgt, src_val, tgt_val, src_indices=None):
+        if not self.nodes[src]['discrete']:
+            sshp = np.shape(src_val)
+            tshp = np.shape(tgt_val)
+            if sshp != tshp:
+                return self.shape_error(going_up, src, tgt, sshp, tshp, src_indices)
+
+        if going_up:
+            src, tgt = tgt, src
+            src_val, tgt_val = tgt_val, src_val
+
+        return self.base_error(f"value {truncate_str(src_val, max_len=50)} of '{src[1]}' is "
+                               f"incompatible with value {truncate_str(tgt_val, max_len=50)} of "
+                               f"'{tgt[1]}'.", src, tgt, src_indices=src_indices)
+
+    def units_error(self, going_up, src, tgt, src_units, tgt_units):
+        if going_up:
+            src, tgt = tgt, src
+            src_units, tgt_units = tgt_units, src_units
+
+        return self.base_error(f"units '{src_units}' of '{src[1]}' are incompatible with units "
+                               f"'{tgt_units}' of '{tgt[1]}'.", src, tgt)
+
+    def handle_error(self, model, going_up, src, tgt, exc, collect=True):
+        if going_up:
+            src, tgt = tgt, src
+
+        excstr = str(exc)
+        if isinstance(exc, ConnError):
+            ident = exc.ident
+        else:
+            ident = frozenset((src, tgt))
+            excstr = self.base_error(msg=excstr, src=src, tgt=tgt)
+
+        if collect:
+            model._collect_error(f"{model.msginfo}: {excstr}", tback=exc.__traceback__,
+                                 ident=ident)
+        else:
+            raise ValueError(f"{model.msginfo}: {excstr}").with_traceback(exc.__traceback__)
+
     def input_root(self, node):
         assert node[0] == 'i'
         ionode = None
-        for n in self.up_tree_iter(node):
+        for n in self.bfs_up_iter(node):
             if n[0] == 'i':
                 if self.in_degree(n) == 0:  # over-promoted input or dangling input
                     return n
@@ -191,14 +279,17 @@ class AllConnGraph(nx.DiGraph):
                 vec_name='nonlinear', kind=None, flat=False, from_src=True):
 
         node = self.find_node(system.pathname, name)
+        node_meta = self.nodes[node]
         if node[0] == 'o':
             tgt_units, tgt_inds_list = None, ()
         else:
-            tgt_units, tgt_inds_list = self.get_conversion_info(node)
+            tgt_inds_list = node_meta['src_inds_list']
+            tgt_units = node_meta['units']
+            if tgt_units == 'ambiguous':
+                raise ValueError(self.ambig_units_msg(node))
 
         if from_src:
             src_node = self.get_root(node)
-            src_units = self.nodes[src_node]['units']
         else:
             # getting a specific input
             # (must use absolute name or have only a single leaf node)
@@ -211,7 +302,9 @@ class AllConnGraph(nx.DiGraph):
                     "retrieve the value from the connected output.")
 
             src_node = leaves[0]
-            src_units = self.nodes[src_node]['units']
+
+        src_meta = self.nodes[src_node]
+        src_units = src_meta['units']
 
         if system.has_vectors():
             val = system._abs_get_val(src_node[1], get_remote, rank, vec_name, kind, flat,
@@ -221,7 +314,7 @@ class AllConnGraph(nx.DiGraph):
             if src_node in model._initial_condition_cache:
                 val, src_units, tgt_inds_list = model._initial_condition_cache[src_node]
             else:
-                val = self.nodes[src_node]['val']
+                val = src_meta['val']
                 model._initial_condition_cache[src_node] = (val, src_units, None)
 
             if is_undefined(val):
@@ -231,19 +324,21 @@ class AllConnGraph(nx.DiGraph):
         if indices is not None and not isinstance(indices, Indexer):
             indices = indexer(indices, flat_src=flat)
         try:
-            val = self.convert_get(node, val, src_units, tgt_units, tgt_inds_list, units, indices, flat)
+            val = self.convert_get(node, val, src_units, tgt_units, tgt_inds_list, units, indices,
+                                   flat=flat)
         except Exception as err:
-            raise ValueError(f"{system.msginfo}: Can't get value of '{self.msgname(node)}': "
-                             f"{str(err)}")
+            raise ValueError(f"{system.msginfo}: Can't get value of '{node[1]}': {str(err)}")
 
         return val
 
     def set_val(self, system, name, val, units=None, indices=None):
         node = self.find_node(system.pathname, name)
+        node_meta = self.nodes[node]
         if node[0] == 'o':
             tgt_units, tgt_inds_list = None, ()
         else:
-            tgt_units, tgt_inds_list = self.get_conversion_info(node)
+            tgt_units = node_meta['units']
+            tgt_inds_list = node_meta['src_inds_list']
 
         nodes = self.nodes
         src_node = self.get_root(node)
@@ -294,7 +389,7 @@ class AllConnGraph(nx.DiGraph):
                     nval = nodes[node]['val']
                     if nval is srcval:
                         nodes[node]['val'] = nval = nval.copy()
-                        for u, v in dfs_edges(self, node):
+                        for _, v in dfs_edges(self, node):
                             vval = nodes[v]['val']
                             if vval is srcval:
                                 nodes[v]['val'] = nval
@@ -311,6 +406,7 @@ class AllConnGraph(nx.DiGraph):
                     raise RuntimeError(f"Shape of '{name}' isn't known yet so you can't use "
                                        f"indices to set it.")
                 srcval = val
+
             model._initial_condition_cache[src_node] = (srcval, src_units, None)
 
             if indices is None:
@@ -338,72 +434,90 @@ class AllConnGraph(nx.DiGraph):
                             if abs_name in loc_meta_in:
                                 loc_meta_in[abs_name]['shape'] = shape
 
-    def up_tree_iter(self, node):
+    def bfs_up_iter(self, node, include_self=True):
         """
         Iterate up the tree from the given node.
-
-        The given node is included in the iteration.
 
         Parameters
         ----------
         node : tuple of the form ('i' or 'o', name)
             The node to start from.
+        include_self : bool, optional
+            Whether to include the given node in the iteration.
         """
-        yield node
-        stack = [self.predecessors(node)]
+        mypreds = self.pred
+        if include_self:
+            yield node
+        stack = [mypreds[node]]
         while stack:
             preds = stack.pop()
             for node in preds:
                 yield node
-                stack.append(self.predecessors(node))
+                stack.append(mypreds[node])
 
-    def get_conversion_info(self, node):
-        meta = self.nodes[node]
-        return meta['units'], meta['src_inds_list']
+    def bfs_down_iter(self, node, include_self=True):
+        """
+        Iterate down the tree from the given node.
+
+        Parameters
+        ----------
+        node : tuple of the form ('i' or 'o', name)
+            The node to start from.
+        include_self : bool, optional
+            Whether to include the given node in the iteration.
+        """
+        mysuccs = self.succ
+        if include_self:
+            yield node
+        stack = [mysuccs[node]]
+        while stack:
+            succs = stack.pop()
+            for node in succs:
+                yield node
+                stack.append(mysuccs[node])
 
     def check_add_edge(self, group, src, tgt, **kwargs):
         if (src, tgt) in self.edges():
-            return True
+            return
 
         if src not in self or tgt not in self:
             raise ValueError(f"Node {src} or {tgt} not found in the graph.")
 
         if self.in_degree(tgt) != 0:
             self._mult_inconn_nodes.add(tgt)
-            iotypes = [p[0] for p in self.predecessors(tgt)]
+            iotypes = [p[0] for p in self.pred[tgt]]
             if 'o' in iotypes and src[0] == 'o':
-                for p in self.predecessors(tgt):
+                for p in self.pred[tgt]:
                     if p[0] == 'o':
                         group._collect_error(
                             f"{group.msginfo}: Target '{self.msgname(tgt)}' cannot be "
                             f"connected to '{self.msgname(src)}' because it's already "
                             f"connected to '{self.msgname(p)}'.", ident=(src, tgt))
-                        return False
-                return False
+                        return
+                return
 
         self.add_edge(src, tgt, **kwargs)
-        return True
 
     def create_node_meta(self, group, name, io):
-        shape = val = units = discrete = varmeta = src_shape = None
-
         absnames = group._resolver.absnames(name, io, report_error=False)
         if absnames is None:
             # auto_ivcs may not have been added to the graph yet
             if name.startswith('_auto_ivc.'):
                 absnames = [name]
             else:
-                raise KeyError(f"{group.msginfo}: '{name} not found.")
+                raise KeyError(group._resolver._add_guesses(
+                    name, f"{group.msginfo}: '{name}' not found."))
 
         key = (io[0], '.'.join((group.pathname, name)) if group.pathname else name)
 
-        meta = {'io': io[0], 'pathname': group.pathname,
-                'rel_name': name, 'absnames': absnames, 'src_inds_list': [],
-                'units': units, 'val': val, '_shape': shape, 'src_shape': src_shape,
-                'meta': varmeta, 'discrete': discrete}
+        meta = {'pathname': group.pathname, 'rel_name': name, 'absnames': absnames,
+                'discrete': None, 'resolved': None,
+                'units': None, 'val': None, '_shape': None,
+                'meta': None}
 
         if io == 'input':
-            meta['require_connection'] = None
+            meta['require_connection'] = False
+            meta['src_inds_list'] = []
 
         return key, meta
 
@@ -420,14 +534,19 @@ class AllConnGraph(nx.DiGraph):
 
         node_meta = self.nodes[node]
 
-        node_meta['_shape'] = meta['shape']
-        node_meta['units'] = meta['units']
-        node_meta['discrete'] = None
+        node_meta['shape_by_conn'] = meta['shape_by_conn']
+        node_meta['_shape'] = shape = None if meta['shape_by_conn'] else meta['shape']
+        node_meta['units_by_conn'] = meta['units_by_conn']
+        node_meta['units'] = units = None if meta['units_by_conn'] else meta['units']
+        node_meta['discrete'] = False
+
+        node_meta['resolved'] = shape is not None and units is not None
+
         if io == 'input':
             node_meta['require_connection'] = meta['require_connection']
 
         if name in locmeta:
-            node_meta['val'] = locmeta[name]['val']
+            node_meta['val'] = None if meta['shape_by_conn'] else locmeta[name]['val']
             node_meta['meta'] = (meta, locmeta[name])
         else:
             node_meta['meta'] = (meta, None)
@@ -440,6 +559,7 @@ class AllConnGraph(nx.DiGraph):
 
         node_meta = self.nodes[node]
         node_meta['discrete'] = True
+        node_meta['resolved'] = True
 
         if name in locmeta:
             node_meta['val'] = locmeta[name]['val']
@@ -447,27 +567,23 @@ class AllConnGraph(nx.DiGraph):
         else:
             node_meta['meta'] = (meta, None)
 
-    def add_abs_variable_meta(self, group):
-        assert group.pathname == ''
+    def add_abs_variable_meta(self, model):
+        assert model.pathname == ''
         for io in ['input', 'output']:
-            loc = group._var_abs2meta[io]
-            for name, meta in group._var_allprocs_abs2meta[io].items():
-                self.add_continuous_var(group, name, meta, loc, io)
+            loc = model._var_abs2meta[io]
+            for name, meta in model._var_allprocs_abs2meta[io].items():
+                self.add_continuous_var(model, name, meta, loc, io)
 
-            loc = group._var_discrete[io]
-            for name, meta in group._var_allprocs_discrete[io].items():
-                self.add_discrete_var(group, name, meta, loc, io)
+            loc = model._var_discrete[io]
+            for name, meta in model._var_allprocs_discrete[io].items():
+                self.add_discrete_var(model, name, meta, loc, io)
 
     def add_promotion(self, io, group, prom_name, subsys, sub_prom, pinfo=None):
-        #node = (io[0], group.pathname + '.' + prom_name if group.pathname else prom_name)
-        #if node not in self:
-            #node, kwargs = self.create_node_meta(group, prom_name, io)
-            #self.add_node(node, **kwargs)
-        #subnode = (io[0], subsys.pathname + '.' + sub_prom)
-        #if subnode not in self:
-            #subnode, kwargs = self.create_node_meta(subsys, sub_prom, io)
-            #self.add_node(subnode, **kwargs)
-
+        # we invert the order here for inputs vs. outputs.  For inputs, the promoted name
+        # is the source and the subsys name is the target.  For outputs, the promoted name is the
+        # target and the subsys name is the source.  This gives us a nice tree that flows from
+        # the absolute output to all of the connected absolute inputs which lets us use
+        # dfs_postorder_nodes.
         if io == 'input':
             src, src_kwargs = self.create_node_meta(group, prom_name, io)
             tgt, tgt_kwargs = self.create_node_meta(subsys, sub_prom, io)
@@ -486,7 +602,7 @@ class AllConnGraph(nx.DiGraph):
             src_shape = pinfo.src_shape
 
         self.check_add_edge(group, src, tgt, src_indices=src_indices,
-                            flat_src_indices=flat_src_indices, prom=True, style='dashed')
+                            flat_src_indices=flat_src_indices, style='dashed')
 
         if src_shape is not None:
             # group input defaults haven't been added yet, so just put src_shape there so we
@@ -556,7 +672,7 @@ class AllConnGraph(nx.DiGraph):
             if input_input:
                 self._input_input_conns.add((src, tgt))
 
-            self.check_add_edge(group, src, tgt, src_indices=src_indices,
+            self.check_add_edge(group, src, tgt, type='manual', src_indices=src_indices,
                                 flat_src_indices=flat)
 
     def add_group_input_defaults(self, group):
@@ -578,285 +694,9 @@ class AllConnGraph(nx.DiGraph):
                         continue
                     defaults[k] = v
 
-            #src_shape = gin_meta['src_shape']
-            #val = gin_meta['val']
-            #units = gin_meta['units']
-
-            #if is_undefined(val):
-                #src_shape = shape2tuple(src_shape)
-            #else:
-                #if src_shape is None:
-                    #if isinstance(val, np.ndarray):
-                        #src_shape = val.shape
-                    #elif isinstance(val, Number):
-                        #src_shape = (1,)
-
-                ##if not meta['discrete']:
-                    ##if src_shape is None:
-                        ##val, _ = ensure_compatible(name, val, None)
-                    ##defaults['shape'] = val.shape
-
-                #defaults['val'] = val
-
-            #if units is not None:
-                #if not isinstance(units, str):
-                    #raise TypeError('%s: The units argument should be a str or None' % self.msginfo)
-                #defaults['units'] = simplify_unit(units, msginfo=group.msginfo)
-
-            #if src_shape is not None:
-                #defaults['src_shape'] = src_shape
-
-    def rollup_require_connection(self, succs):
-        # if any inputs require a connection, then all ancestors must require a connection
-        return succs and self.nodes[succs[0]]['require_connection']
-
-    def rollup_discrete(self, group, node, succs):
-        if len(succs) == 1:
-            return self.nodes[succs[0]]['discrete']
-
-        nodes = self.nodes
-        discs = {nodes[succ]['discrete'] for succ in succs}
-        if len(discs) > 1:
-            discvars = [n for n in succs if nodes[n]['discrete']]
-            nondiscvars = [n for n in succs if not nodes[n]['discrete']]
-            group._collect_error(f"{group.msginfo}: Variable '{node[1]}' "
-                                 f"connects to discrete variables {sorted(discvars)} and "
-                                 f"continuous variables {sorted(nondiscvars)}. Discrete and "
-                                 "continuous variables cannot be connected.")
-            return
-
-        return discs.pop()
-
-    def rollup_units(self, group, node, succs, default, auto_ivc):
-        print(f"rolling up units to {node} from {succs}")
-        base_units = None
-        same = True
-        nodes = self.nodes
-        for succ in succs:
-            succ_node = nodes[succ]
-
-            # use default units if they are set
-            sdefunits = succ_node.get('defaults', {}).get('units', None)
-            units = succ_node.get('units', None)
-            if sdefunits is not None:
-                if units is not None:
-                    if not is_compatible(sdefunits, units):
-                        group._collect_error(f"'{succ[1]}' units of '{units}' are "
-                                             f"incompatible with '{succ[1]}' default units of "
-                                             f"'{sdefunits}'.")
-                        continue
-                units = sdefunits
-
-            if units is not None:
-                if base_units is None:
-                    base_units = units
-                    basenode = succ
-                else:
-                    # if not is_compatible(base_units, units):
-                    #     group._collect_error(f"'{succ[1]}' units of '{units}' are "
-                    #                          f"incompatible with '{basenode[1]}' units of "
-                    #                          f"'{base_units}'.")
-                    same &= base_units == units
-
-        if default is None:
-            if not same:
-                if auto_ivc:
-                    prom = self.top_name(node)
-                    units_list = [nodes[succ].get('units', None) for succ in succs]
-                    units_list = [u for u in units_list if u is not None]
-                    group._collect_error(f"{group.msginfo}: No default units have been set for "
-                                         f"input '{self.msgname(node)}' so the choice of units "
-                                         f"between {sorted(units_list)} is ambiguous. Call "
-                                         f"model.set_input_defaults('{prom}', units=?) to remove "
-                                         "the ambiguity.")
-                base_units = '?'
-            print(f"returning base_units {base_units}")
-            return base_units
-
-        if base_units is None:
-            print(f"returning default {default}")
-            return default
-
-        # base and default are not None
-        if is_compatible(base_units, default):
-            # default overrides any node value as long as it's compatible
-            print(f"returning default {default}")
-            return default
-
-        group._collect_error(f"{group.msginfo}: '{self.msgname(node)}' default units "
-                             f"'{default.name()}' and '{self.msgname(basenode)}' units of "
-                             f"'{base_units.name()}' are incompatible.")
-
-    def rollup_valshape(self, group, node, node_meta, succs, defaults, auto_ivc):
-        print(f"rolling up valshape to {node} from {succs}")
-        shape_base = val_base = None
-        same_val = True
-        default_val = defaults.get('val', None)
-        default_shape = None
-        discrete = node_meta['discrete']
-
-        if not discrete:
-            if default_val is not None:
-                if isinstance(default_val, np.ndarray):
-                    default_shape = default_val.shape
-                elif isinstance(default_val, Number):
-                    default_shape = (1,)
-
-        shape_good = False
-        nodes = self.nodes
-        for succ in succs:
-            succmeta = nodes[succ]
-            sdefaults = succmeta.get('defaults', {})
-            src_inds = None if discrete else self.edges[node, succ].get('src_indices', None)
-            if 'meta' in succmeta:
-                metameta = succmeta['meta']
-                if metameta is not None:
-                    shape_by_conn = metameta[0].get('shape_by_conn', False)
-                    if shape_by_conn:
-                        continue
-
-            _shape = None
-            if src_inds is None:
-                val = succmeta.get('val', None)
-                if not discrete:
-                    _shape = succmeta.get('_shape', None)
-                    if _shape is None and val is not None:
-                        if isinstance(val, np.ndarray):
-                            _shape = val.shape
-                        elif isinstance(val, Number):
-                            _shape = (1,)
-            else:
-                val = None  # can't propagate value up because of src_indices
-
-            # if src_shape is in the defaults, we can use that and compare
-            # to '_shape' or defaults['src_shape'] in the other succs.
-            sdef_shape = sdefaults.get('src_shape', None)
-
-            if _shape is None:
-                _shape = sdef_shape
-            elif sdef_shape is not None and not array_connection_compatible(_shape, sdef_shape):
-                if not array_connection_compatible(sdef_shape, _shape):
-                    group._collect_error(f"{group.msginfo}: '{succ[1]}' src_shape of "
-                                         f"'{sdef_shape}' is incompatible with "
-                                         f"shape of '{_shape}'.")
-
-            if _shape is not None:
-                if shape_base is None:
-                    shape_base = _shape
-                    sbase_shape = succ
-                else:
-                    if not array_connection_compatible(shape_base, _shape):
-                        group._collect_error(f"{group.msginfo}: '{self.msgname(succ)}' shape of "
-                                             f"'{_shape}' is incompatible with "
-                                             f"'{self.msgname(sbase_shape)}' "
-                                             f"shape of '{shape_base}'.")
-
-            if val is not None:
-                if val_base is None:
-                    val_base = val
-                    sbase_val = succ
-                elif auto_ivc:
-                    same_val &= is_equal(val_base, val)
-
-        if default_shape is None:
-            ret_shape = shape_base
-            shape_good = True
-        elif shape_base is None:
-            ret_shape = default_shape
-            shape_good = True
-        elif array_connection_compatible(shape_base, default_shape):
-            ret_shape = default_shape
-            shape_good = True
-
-        if default_val is None:
-            if not same_val:
-                absname = self.nodes[node]['absnames'][0]
-                prom = group._resolver.abs2prom(absname, 'input')
-                group._collect_error(f"{group.msginfo}: No default val has been set for input "
-                                     f"'{self.msgname(node)}' but different values feed into it. "
-                                     f"Call model.set_input_defaults('{prom}', val=?) to remove "
-                                     "the ambiguity.")
-            print(f"returning val_base {val_base} and ret_shape {ret_shape}")
-            return val_base, ret_shape
-
-        elif val_base is None:
-            print(f"returning default_val {default_val} and ret_shape {ret_shape}")
-            return default_val, ret_shape
-
-        # val_base and default_val are not None
-        else:
-            if are_compatible_values(val_base, default_val, discrete):
-                # default overrides any node value as long as it's compatible
-                print(f"returning default_val {default_val} and ret_shape {ret_shape}")
-                return default_val, ret_shape
-            else:
-                group._collect_error(f"{group.msginfo}: '{self.msgname(node)}' default val "
-                                     f"'{default_val}' and '{self.msgname(sbase_val)}' val of "
-                                     f"'{val_base}' are incompatible.")
-
-        if not shape_good:
-            group._collect_error(f"{group.msginfo}: '{self.msgname(node)}' default shape "
-                                 f"'{default_shape}' and '{self.msgname(sbase_shape)}' shape of "
-                                 f"'{shape_base}' are incompatible.")
-
-    def rollup_to_node(self, group, source_node):
-        print(f"rolling up to node {source_node}")
-        auto_ivc = source_node[1].startswith('_auto_ivc.')
-        nodes = self.nodes
-
-        # do a postorder traversal from the source node to all connected inputs to rollup
-        # various properties from the bottom of the tree, and flag any incompatibilities.
-        for node in dfs_postorder_nodes(self, source_node):
-            if not auto_ivc and node[0] == 'o':
-                # don't roll up to the output side if the source isn't an auto_ivc
-                continue
-            node_meta = self.nodes[node]
-            defaults = node_meta.get('defaults', {})
-            if self.out_degree(node) > 0:
-                succs = list(self.successors(node))
-                if auto_ivc and node is source_node:
-                    for s in succs:
-                        if nodes[s].get('require_connection', False):
-                            group._collect_error(
-                                f"{self.msginfo}: Input {self.msgname(s)} requires a connection "
-                                "but is not connected.", ident=(source_node[1], s[1]))
-
-                if node[0] == 'i':
-                    node_meta['require_connection'] = self.rollup_require_connection(succs)
-
-                node_meta['discrete'] = self.rollup_discrete(group, node, succs)
-                if not node_meta['discrete']:
-                    def_units = defaults.get('units', None) if defaults else None
-                    node_meta['units'] = \
-                        self.rollup_units(group, node, succs, def_units, auto_ivc)
-                ret = self.rollup_valshape(group, node, node_meta, succs, defaults, auto_ivc)
-                if ret is not None:
-                    node_meta['val'], node_meta['_shape'] = ret
-            elif node[0] == 'i' and defaults:  # leaf node with group input defaults
-                units = defaults.get('units', None)
-                val = defaults.get('val', None)
-                if units is not None:
-                    if not (node_meta['units'] is None or is_compatible(units, node_meta['units'])):
-                    #     node_meta['units'] = units
-                    # else:
-                        group._collect_error(
-                            f"{group.msginfo}: '{self.msgname(node)}' "
-                            f"default units '{units}' and "
-                            f"units of '{node_meta['units']}' are incompatible.")
-
-                if val is not None:
-                    # FIXME: we're currently inconsistent in behavior between how we handle
-                    # input default units vs. values.  For absolute inputs, we don't override
-                    # the existing units but we do change the val.
-                    if node_meta['val'] is None or are_compatible_values(val, node_meta['val'],
-                                                                         node_meta['discrete']):
-                        node_meta['val'] = val
-                    else:
-                        group._collect_error(f"{group.msginfo}: '{self.msgname(node)}' "
-                                                f"default val '{val}' and "
-                                                f"val of '{node_meta['val']}' are incompatible.")
-
-    def rollup_node_meta(self, model):
+    def update_all_node_meta(self, model):
+        # this is called twice, once in _setup_global_connections and once after all of the
+        # dynamic shapes have been computed.
         abs2meta = model._var_allprocs_abs2meta['output']
         discrete2meta = model._var_allprocs_discrete['output']
         loc2meta = model._var_abs2meta['output']
@@ -866,35 +706,479 @@ class AllConnGraph(nx.DiGraph):
         # that rolls up desired metada from bottom of the tree to either the top promoted input node
         # or, in the case of an auto_ivc source, all the way to the sourc node.
         in_degree = self.in_degree
-        resolved = self._resolved_nodes
         for node, node_meta in self.nodes(data=True):
-            if node in resolved:
-                continue
-
             io, name = node
-            if io == 'o' and in_degree(node) == 0:
-                self.rollup_to_node(model, node)
-                if node_meta['discrete']:
-                    meta = discrete2meta[name]
-                    if node_meta['val'] is not None:
-                        meta['val'] = node_meta['val']
-                    if name in locdiscrete2meta:
-                        locdiscrete2meta[name]['val'] = node_meta['val']
-                    self._resolved_nodes.add(node)
+            if io == 'o' and in_degree(node) == 0:  # absolute output node
+                # if node_meta['resolved']:
+                #     continue
+                if self.out_degree(node) == 0:
+                    # node_meta['resolved'] = True
+                    continue
+
+                self.resolve_conn_tree(model, node)
+
+                # for auto_ivcs, transfer graph metadata to the variable metadata
+                if name.startswith('_auto_ivc.'):
+                    if node_meta['discrete']:
+                        meta = discrete2meta[name]
+                        if node_meta['val'] is not None:
+                            #meta['val'] = node_meta['val']
+                            if name in locdiscrete2meta:
+                                locdiscrete2meta[name]['val'] = node_meta['val']
+                    else:
+                        meta = abs2meta[name]
+                        if node_meta['_shape'] is not None and not (meta['units_by_conn'] and
+                                                                    node_meta['units'] is None):
+                            meta['shape'] = node_meta['_shape']
+                            meta['size'] = shape_to_len(node_meta['_shape'])
+                            meta['units'] = node_meta['units']
+                            if name in loc2meta:
+                                loc2meta[name]['val'] = node_meta['val']
+                                loc2meta[name]['shape'] = meta['shape']
+                                loc2meta[name]['size'] = meta['size']
+                                loc2meta[name]['units'] = meta['units']
+
+        self._first_pass = False
+
+    def get_upward_child_meta(self, parent, child):
+        child_meta = self.nodes[child]
+
+        val = child_meta['val']
+        required = child_meta.get('require_connection', False)
+        discrete = child_meta['discrete']
+        if discrete:
+            src_indices = None
+            shape = None
+            units = None
+            shape_by_conn = False
+            units_by_conn = False
+            defval, _, _ = self.get_defaults(child_meta)
+        else:
+            units = child_meta['units']
+            shape = child_meta['_shape']
+            shape_by_conn = child_meta['shape_by_conn']
+            units_by_conn = child_meta['units_by_conn']
+
+            src_indices = self.edges[(parent, child)].get('src_indices', None)
+            if src_indices is not None:
+                val = None
+                shape = None
+
+            defval, defunits, defshape = self.get_defaults(child_meta)
+            if defshape is not None:
+                shape = defshape
+            if defunits is not None:
+                units = defunits
+
+        if defval is not None:
+            val = defval
+
+        return units, shape, val, discrete, required, src_indices, shape_by_conn, units_by_conn
+
+    def resolve_from_children(self, model, node):
+        outdeg = self.out_degree(node)
+
+        if outdeg == 0:
+            return
+
+        units_list = []
+        shapes_list = []
+        vals_list = []
+        discretes_list = []
+        requireds_list = []
+        src_inds_list = []
+        shape_by_conn_list = []
+        units_by_conn_list = []
+        for child in self.succ[node]:
+            units, shape, val, discrete, required, src_inds, shape_by_conn, units_by_conn = \
+                self.get_upward_child_meta(node, child)
+            units_list.append(units)
+            shapes_list.append(shape)
+            vals_list.append(val)
+            discretes_list.append(discrete)
+            requireds_list.append(required)
+            src_inds_list.append(src_inds)
+            shape_by_conn_list.append(shape_by_conn)
+            units_by_conn_list.append(units_by_conn)
+
+        node_meta = self.nodes[node]
+        defaults = node_meta.get('defaults', None)
+        node_meta['discrete'] = discrete = self.update_discrete_from_children(node, discretes_list)
+        node_meta['require_connection'] = any(requireds_list)
+        if not discrete:
+            node_meta['_shape'] = self.update_shape_from_children(node, shapes_list, vals_list,
+                                                                  src_inds_list, defaults)
+            node_meta['units'] = self.update_units_from_children(node, units_list, defaults)
+            node_meta['shape_by_conn'] = all(shape_by_conn_list)
+            node_meta['units_by_conn'] = all(units_by_conn_list)
+
+        node_meta['val'] = self.update_val_from_children(node, vals_list, src_inds_list,
+                                                         discretes_list, defaults)
+
+    def ambig_units_msg(self, node):
+        # FIXE: it's possible that not all of the absolute input units should be included in this
+        # message because there could be set_input_defaults calls lower in the tree that remove the
+        # ambiguity for some subset of the inputs, but it's more complicated to determine that,
+        # so for now just include all of the absolute input units.
+        leaf_units = self.leaf_units(node)
+        leaf_nodes = [n for _, n in self.leaf_input_iter(node)]
+        rows = sorted((n, u) for n, u in zip(leaf_nodes, leaf_units))
+        table = generate_table(rows, tablefmt='plain')
+        return (f"The following inputs promoted to '{node[1]}' have different "
+                f"units:\n{table}\nCall model.set_input_defaults('"
+                f"{self.top_name(node)}', units=?)' to remove the ambiguity.")
+
+    def ambig_shapes_msg(self, node, shapes):
+        children = [n for _, n in self.succ[node]]
+        rows = sorted((n, s) for n, s in zip(children, shapes))
+        table = generate_table(rows, tablefmt='plain')
+        return (f"The following inputs promoted to '{node[1]}' have different "
+                f"incompatible shapes:\n{table}")
+
+    def update_units_from_children(self, node, units, defaults):
+        start = None
+        is_output = node[0] == 'o'
+        for i, u in enumerate(units):
+            if is_output and u == 'ambiguous':
+                # we want the ambiguous child for error reporting
+                for s in self.succ[node]:
+                    if self.nodes[s]['units'] == 'ambiguous':
+                        ambiguous_node = s
+                        break
+                raise ConnError(self.ambig_units_msg(ambiguous_node))
+
+            if u is not None:
+                if start is None:
+                    start = u
                 else:
-                    meta = abs2meta[name]
-                    if node_meta['_shape'] is not None and not (meta['units_by_conn'] and
-                                                                node_meta['units'] is None):
-                        meta['shape'] = shape = node_meta['_shape']
-                        meta['size'] = shape_to_len(node_meta['_shape'])
-                        meta['units'] = units = node_meta['units']
-                        if shape is not None and units is not None:
-                            resolved.add(node)  # this connection tree has been resolved
-                        if name in loc2meta:
-                            loc2meta[name]['val'] = node_meta['val']
-                            loc2meta[name]['shape'] = meta['shape']
-                            loc2meta[name]['size'] = meta['size']
-                            loc2meta[name]['units'] = meta['units']
+                    if not is_compatible(start, u):
+                        slist = list(self.succ[node])
+                        raise ConnError(self.units_error(True, slist[i], node, start, u))
+
+        if len(units) == 1 or len(set(units)) == 1:
+            final = start
+        else:
+            final = 'ambiguous'
+            if defaults:  # if default units are set, let them override the ambiguous units
+                defunits = defaults.get('units')
+                if defunits is not None:
+                    final = defunits
+
+        return final
+
+    def update_shape_from_children(self, node, shapes, vals, src_inds_list, defaults):
+        start = None
+        for i, shape in enumerate(shapes):
+            if shape is None and vals[i] is not None:
+                shape = np.shape(vals[i])
+
+            if shape is not None:
+                if start is None:
+                    start = shape
+                else:
+                    if not array_connection_compatible(start, shape):
+                        raise ConnError(self.ambig_shapes_msg(node, shapes))
+
+        # if defaults:
+        #     defval = defaults.get('val')
+        #     if defval is not None:
+        #         start = np.shape(defval)
+
+        return start
+
+    def update_val_from_children(self, node, vals, src_inds_list, discretes, defaults):
+        start = None
+        for i, val in enumerate(vals):
+            if val is not None:
+                if start is None:
+                    start = val
+                else:
+                    if not are_compatible_values(start, val, discretes[i], src_inds_list[i]):
+                        slist = list(self.succ[node])
+                        raise ConnError(self.value_error(True, slist[i], node, start, val,
+                                        src_indices=src_inds_list[i]))
+
+        #if defaults:
+            #start = defaults.get('val')
+
+        return start
+
+    def update_discrete_from_children(self, node, discretes):
+        dset = set(discretes)
+        if len(dset) == 1:
+            return dset.pop()
+        else:
+            slist = list(self.succ[node])
+            discs = [s for s, d in zip(slist, discretes) if d]
+            non_discs = [s for s, d in zip(slist, discretes) if not d]
+            raise ConnError(f"'{node[1]}' has discrete ({sorted(discs)}) and non-discrete "
+                            f"({sorted(non_discs)}) children.")
+
+    def get_defaults(self, meta):
+        defaults = meta.get('defaults', None)
+        if defaults:
+            return defaults.get('val'), defaults.get('units'), defaults.get('src_shape', None)
+        return None, None, None
+
+    def get_parent_val_shape_units(self, parent, child):
+        parent_meta = self.nodes[parent]
+        parent_shape = parent_meta['_shape']
+        parent_val = parent_meta['val']
+        parent_units = parent_meta['units']
+        src_indices = self.edges[(parent, child)].get('src_indices', None)
+        if src_indices is None or parent_shape is None:
+            return parent_val, parent_shape, parent_units, None
+        else:
+            src_indices.set_src_shape(parent_shape)
+            shape = src_indices.indexed_src_shape
+            if parent_val is None:
+                val = np.ones(shape)
+            else:
+                val = src_indices.indexed_val(np.atleast_1d(parent_val))
+            return val, shape, parent_units, src_indices
+
+    def check_connection(self, src, tgt):
+        """
+        Check the compatibility of a connection between an output and input node.
+
+        Parameters
+        ----------
+        model : Model
+            The model.
+        src : tuple
+            The source output node.
+        tgt : tuple
+            The target input node.
+        """
+        src_meta = self.nodes[src]
+        tgt_meta = self.nodes[tgt]
+        src_discrete = src_meta['discrete']
+        tgt_discrete = tgt_meta['discrete']
+
+        if src_discrete != tgt_discrete:
+            dmap = {True: 'discrete', False: 'continuous'}
+            raise TypeError(f"Can't connect {dmap[tgt_discrete]} variable "
+                            f"'{tgt[1]}' to {dmap[src_discrete]} variable '{src[1]}'.")
+
+        src_val = src_meta['val']
+        tgt_val = tgt_meta['val']
+
+        if src_discrete:
+            if not are_compatible_values(src_val, tgt_val, src_discrete):
+                raise ConnError(self.value_error(False, src, tgt, src_val, tgt_val))
+        else:
+            src_units = src_meta['units']
+            tgt_units = tgt_meta['units']
+            src_shape = src_meta['_shape']
+            tgt_shape = tgt_meta['_shape']
+
+            edge = (src, tgt)
+
+            src_indices = self.edges[edge].get('src_indices', None)
+            if src_indices is not None and src_shape is not None:
+                src_indices.set_src_shape(src_shape)
+                src_shape = src_indices.indexed_src_shape
+                src_val = src_indices.indexed_val(np.atleast_1d(src_val))
+
+            if src_shape is not None:
+                if tgt_shape is not None:
+                    if not array_connection_compatible(src_shape, tgt_shape):
+                        raise ConnError(self.shape_error(False, src, tgt, src_shape, tgt_shape,
+                                                        src_indices=src_indices))
+                #elif tgt_meta['shape_by_conn']:
+                    #tgt_meta['_shape'] = src_shape
+                else:
+                    tgt_meta['_shape'] = src_shape
+
+            if src_val is not None:
+                if tgt_val is not None:
+                    if not are_compatible_values(src_val, tgt_val, src_discrete, src_indices):
+                        raise ConnError(self.value_error(False, src, tgt, src_val, tgt_val,
+                                                        src_indices=src_indices))
+                else:
+                    tgt_meta['val'] = src_val
+
+            if src_units is not None:
+                if tgt_units is not None:
+                    if tgt_units != 'ambiguous' and not is_compatible(src_units, tgt_units):
+                        raise ConnError(self.units_error(False, src, tgt, src_units, tgt_units))
+                elif tgt_meta['units_by_conn']:
+                    tgt_meta['units'] = src_units
+
+    def resolve_output_to_output(self, model, src, tgt):
+        """
+        Resolve metadata for a target output node based on the metadata of a source output node.
+
+        Parameters
+        ----------
+        model : Model
+            The model.
+        src : tuple
+            The source output node.
+        tgt : tuple
+            The target output node.
+        """
+        tgt_meta = self.nodes[tgt]
+        src_meta = self.nodes[src]
+
+        if src_meta['discrete']:
+            for key in _discrete_copy_meta:
+                tgt_meta[key] = src_meta[key]
+        else:
+            for key in _continuous_copy_meta:
+                tgt_meta[key] = src_meta[key]
+
+        tgt_meta['resolved'] = True
+
+    def resolve_input_to_input_down(self, model, parent, child):
+        """
+        Resolve a connection between two input nodes.
+
+        Parameters
+        ----------
+        model : Model
+            The model.
+        parent : tuple
+            The parent input node.
+        child : tuple
+            The child input node.
+        """
+        child_meta = self.nodes[child]
+        parent_meta = self.nodes[parent]
+        parent_discrete = parent_meta['discrete']
+        if child_meta['resolved']:
+            self.get_parent_val_shape_units(parent, child)
+            return
+
+        child_val = child_meta['val']
+
+        val = None
+
+        if parent_discrete:
+            pass
+        else:  # continuous parent
+            shape = None
+            units = def_units = None
+
+            child_shape = child_meta['_shape']
+            child_units = child_meta['units']
+            child_val = child_meta['val']
+
+            val, shape, units, src_indices = self.get_parent_val_shape_units(parent, child)
+
+            #def_val, def_units, _ = self.get_defaults(child_meta)
+            #if def_val is not None:
+                #val = def_val
+                #src_indices = None  # src_indices were not applied to the default value
+
+            if val is not None:
+                if child_val is not None and  not child_meta.get('shape_by_conn'):
+                    if not are_compatible_values(val, child_val, parent_discrete):
+                        raise ConnError(self.value_error(False, parent, child, val, child_val,
+                                                        src_indices=src_indices))
+
+            if def_units is not None:
+                units = def_units
+
+            if units is not None:
+                if child_units is not None:
+                    if child_units != 'ambiguous' and units != 'ambiguous' and not is_compatible(child_units, units):
+                        raise ConnError(self.units_error(False, parent, child, child_units,
+                                                        units))
+                else:
+                    child_meta['units'] = units
+
+            if shape is None:
+                if val is not None:
+                    shape = np.shape(val)
+
+            if shape is not None:
+                if child_shape is not None:
+                        if not array_connection_compatible(shape, child_shape):
+                            raise ConnError(self.shape_error(False, parent, child, shape,
+                                                            child_shape, src_indices=src_indices))
+                else:
+                    child_meta['_shape'] = shape
+
+        if val is not None and shape is not None:
+            val = np.reshape(val, shape)
+
+        child_meta['val'] = val
+
+    def resolve_down(self, model, parent, child, orig_discrete):
+        """
+        Update the child node's metadata based on the parent node's metadata.
+
+        Parameters
+        ----------
+        model : Model
+            The model.
+        parent : tuple
+            The parent node.
+        child : tuple
+            The target node.
+        orig_discrete : bool
+            The original discrete status of the target node.
+        """
+        try:
+            if parent[0] == 'o':
+                if child[0] == 'i':
+                    self.check_connection(parent, child)
+                else:
+                    self.resolve_output_to_output(model, parent, child)
+            else:
+                self.resolve_input_to_input_down(model, parent, child)
+
+        except Exception as err:
+            self.handle_error(model, False, parent, child, exc=err, collect=True)
+
+    def postorder_collect(self, model, start_node):
+        for node in dfs_postorder_nodes(self, start_node):
+            pass
+
+    def resolve_conn_tree(self, model, src_node):
+        """
+        Resolve the connection tree rooted at src_node.
+
+        Metadata is first propagated up the tree from the absolute input nodes up to the root
+        input node.  For auto_ivc rooted trees, the propagation continues to the root auto_ivc node.
+        Then, metadata is propagated down the tree from the root output node.
+
+        Parameters
+        ----------
+        model : Model
+            The model.
+        src_node : tuple
+            The source node. This is always an absolute output node.
+        """
+        nodes = self.nodes
+
+        # first, resolve inputs up from the bottom of the tree to the root input node.
+        for node in dfs_postorder_nodes(self, src_node):
+            if node[0] == 'i':
+                node_meta = nodes[node]
+                if not node_meta['resolved']:
+                    self.resolve_from_children(model, node)
+
+        # resolve auto_ivc node  (these are never promoted so there is always only one output node)
+        if src_node[1].startswith('_auto_ivc.'):
+            src_meta = nodes[src_node]
+            self.resolve_from_children(model, src_node)
+            if src_meta['val'] is None:
+                shape = src_meta['_shape']
+                if shape is not None:
+                    src_meta['val'] = np.ones(shape)
+                else:
+                    model._collect_error(f"Auto_ivc variable '{src_node[1]}' "
+                                         "has no shape or value.")
+
+        # now try filling in any missing metadata going down the tree.  This can happen if
+        # for example there are src_indices that block propagation of val and shape below a node
+        # where shape or val has been set by set_input_defaults.  This will also fill in
+        # missing metadata for promoted output nodes, and it can also set shapes for
+        # shape_by_conn inputs.
+        for u, v in dfs_edges(self, src_node):
+            self.resolve_down(model, u, v, orig_discrete=nodes[u]['discrete'])
 
     def add_auto_ivc_nodes(self, model):
         assert model.pathname == ''
@@ -922,23 +1206,20 @@ class AllConnGraph(nx.DiGraph):
             self.add_edge(auto_node, n)
             auto_nodes.append(auto_node)
 
-        #model._setup_auto_ivcs()
-
         return auto_nodes
 
     def check(self, group):
+        nodes = self.nodes
         for u, v in self.edges():
             if u[0] == 'o' and v[0] == 'i':  # an output to input connection
-                u_meta = self.nodes[u]
-                v_meta = self.nodes[v]
-                uunits = u_meta.get('units', None)
-                vunits = v_meta.get('units', None)
+                uunits = nodes[u]['units']
+                vunits = nodes[v]['units']
                 if uunits == '?':
                     uunits = None
                 if vunits == '?':
                     vunits = None
                 if uunits is not None and vunits is not None:
-                    if not is_compatible(uunits, vunits):
+                    if uunits != 'ambiguous' and vunits != 'ambiguous' and not is_compatible(uunits, vunits):
                         group._collect_error(f"'{self.msgname(u)}' units of '{uunits}' are "
                                              f"incompatible with '{self.msgname(v)}' units of "
                                              f"'{vunits}'.")
@@ -960,8 +1241,8 @@ class AllConnGraph(nx.DiGraph):
         # implicit connections are added after all promotions are added, so any implicitly connected
         # nodes are guaranteed to already exist in the graph.
         for prom_name in model._resolver.get_implicit_conns():
-            self.check_add_edge(model, ('o', prom_name), ('i', prom_name), style='dotted')
-
+            self.check_add_edge(model, ('o', prom_name), ('i', prom_name), style='dotted',
+                                type='implicit')
 
     def update_src_inds_lists(self, model):
         # propagate src_indices down the tree, but don't update shapes because we don't
@@ -969,75 +1250,18 @@ class AllConnGraph(nx.DiGraph):
         edges = self.edges
         nodes = self.nodes
         for node in self.nodes():
-            if node[0] == 'o' and self.in_degree(node) == 0:
+            if self.in_degree(node) == 0:
                 for u, v in dfs_edges(self, node):
                     if v[0] == 'i':
                         edge_meta = edges[u, v]
                         src_inds = edge_meta.get('src_indices', None)
-                        src_inds_list = nodes[u]['src_inds_list']
+                        src_inds_list = nodes[u]['src_inds_list'] if u[0] == 'i' else []
                         if src_inds is not None:
-                            # only make a copy if we are modifying the list
                             src_inds_list = src_inds_list.copy()
                             flat = edge_meta.get('flat_src_indices', True)
                             src_inds_list.append((src_inds, flat))
 
                         nodes[v]['src_inds_list'] = src_inds_list
-
-    def update_all_shapes(self, model):
-        """
-        Update the shape, src_shape and src_indices for all nodes in the graph.
-
-        Parameters
-        ----------
-        model : Group
-            The top level group.
-        """
-        nodes = self.nodes
-        for abs_out in model._var_allprocs_abs2meta['output']:
-            node = ('o', abs_out)
-            if node in self:
-                node_meta = nodes[node]
-                src_shape = node_meta['_shape']
-                for u, v in dfs_edges(self, node):
-                    if v[0] == 'o':  # another output node, just pass shape along
-                        nodes[v]['_shape'] = vshape = src_shape
-                    else:  # an input node, need to check compatibility
-                        v_meta = nodes[v]
-                        vshape = v_meta['_shape']
-                        shape = src_shape
-                        src_inds_list = v_meta['src_inds_list']
-                        for src_inds, flat in src_inds_list:
-                            try:
-                                src_inds.set_src_shape(src_shape)
-                            except Exception:
-                                type_exc, exc, tb = sys.exc_info()
-                                model._collect_error(f"When connecting '{self.msgname(u)}' to "
-                                                    f"'{self.msgname(v)}': {exc}",
-                                                    exc_type=type_exc, tback=tb, ident=(node[1],
-                                                                                        v[1]))
-                            else:
-                                shape = src_inds.indexed_src_shape
-
-                        if vshape is not None:
-                            if array_connection_compatible(shape, vshape):
-                                shape = vshape  # keep it the same
-                            else:
-                                if src_inds_list:
-                                    indstr = ', '.join([truncate_str(str(ind), 40)
-                                                        for ind, _ in src_inds_list])
-                                    model._collect_error(
-                                        f"{model.msginfo}: After applying index {indstr} to "
-                                        f"'{node[1]}', shape {shape} != '{v[1]}' shape {vshape}.")
-                                else:
-                                    model._collect_error(
-                                        f"{model.msginfo}: '{node[1]}' shape {src_shape}"
-                                        f" != '{v[1]}' shape {vshape}.")
-                                continue
-
-                        nodes[v]['_shape'] = shape
-            else:
-                # this should never happen
-                raise RuntimeError(f"Output node '{node[1]}' not found in connection graph.")
 
     def transform_input_input_connections(self, model):
         """
@@ -1056,33 +1280,31 @@ class AllConnGraph(nx.DiGraph):
         for u, v, src in to_move:
             self.move_to_src(u, v, src, model)
 
-    def move_to_src(self, inp_src, tgt, new_src, group):
+    def move_to_src(self, inp_src, tgt, new_src, model):
         """
         Move the tgt node to the src node.
-
-        This is called from the top level group.
         """
         tgt_syspath, tgt_prom = self.get_path_prom(tgt)
-        edge_meta = {k: v for k, v in self.edges[inp_src, tgt].items() if k != 'input_input'}
+        edge_meta = self.edges[inp_src, tgt]
         self.remove_edge(inp_src, tgt)
         self.add_edge(new_src, tgt, **edge_meta)
         if tgt_syspath:
             tgt_meta = self.nodes[tgt]
-            tgt_prom = group._resolver.abs2prom(tgt_meta['absnames'][0], 'input')
+            tgt_prom = model._resolver.abs2prom(tgt_meta['absnames'][0], 'input')
 
         src_meta = self.nodes[new_src]
         absname0 = src_meta['absnames'][0]
         if absname0.startswith('_auto_ivc.'):
             src_prom = absname0
         else:
-            src_prom = group._resolver.abs2prom(absname0, 'output')
+            src_prom = model._resolver.abs2prom(absname0, 'output')
 
-        group._manual_connections[tgt_prom] = (src_prom, edge_meta.get('src_indices', None),
+        model._manual_connections[tgt_prom] = (src_prom, edge_meta.get('src_indices', None),
                                                edge_meta.get('flat_src_indices', None))
 
-    def get_all_conns(self, model):
+    def create_all_conns_dict(self, model):
         """
-        Get a dict of global connections 'owned' by a group, keyed by the group's pathname.
+        Create a dict of global connections 'owned' by a group, keyed by the group's pathname.
 
         This should only be called on the top level group.
 
@@ -1120,7 +1342,7 @@ class AllConnGraph(nx.DiGraph):
 
     def get_root(self, node):
         in_degree = self.in_degree
-        for n in self.up_tree_iter(node):
+        for n in self.bfs_up_iter(node):
             if n[0] == 'o' and in_degree(n) == 0:
                 return n
 
@@ -1217,10 +1439,7 @@ class AllConnGraph(nx.DiGraph):
         current = np.atleast_1d(arr)
         if indices_list is not None:
             for idx, flat in indices_list:
-                if flat:
-                    current = current.ravel()[idx.flat()]
-                else:
-                    current = current[idx()]
+                current = idx.indexed_val(current)
         return current
 
     def set_subarray(self, arr, indices_list, val, node):
@@ -1249,17 +1468,17 @@ class AllConnGraph(nx.DiGraph):
         try:
             if indices_list:
                 chain = [arr]
-                for idx, flat in indices_list:
-                    if flat:
-                        chain.append((chain[-1].ravel()[idx.flat()]))
-                    else:
-                        chain.append(chain[-1][idx()])
+                for idx, _ in indices_list:
+                    chain.append(idx.indexed_val(chain[-1]))
 
                 if np.shape(val) != () and np.squeeze(val).shape != np.squeeze(chain[-1]).shape:
                     err = (f"Value shape {np.squeeze(val).shape} does not match shape "
                            f"{np.squeeze(chain[-1]).shape} of the destination")
             else:
-                arr[:] = val
+                try:
+                    arr[:] = val
+                except ValueError:
+                    arr[:] = val.reshape(arr.shape)
                 return
         except Exception as err:
             msg = str(err)
@@ -1277,17 +1496,14 @@ class AllConnGraph(nx.DiGraph):
         for i in range(len(chain) - 2, -1, -1):
             sub = chain[i + 1]
             prev = chain[i]
-            idx, flat = indices_list[i]
+            idx, _ = indices_list[i]
             if sub.base is not prev:
-                if flat:
-                    prev.ravel()[idx.flat()] = sub
-                else:
-                    prev[idx()] = sub
+                idx.indexed_val_set(prev, sub)
 
     def get_src_index_array(self, abs_in):
         node = ('i', abs_in)
         if node not in self:
-            raise ValueError(f"Input '{abs_in}' not found in connection graph.")
+            raise ValueError(f"Input '{abs_in}' not found.")
         src_inds_list = self.nodes[node]['src_inds_list']
         if len(src_inds_list) == 0:
             return None
@@ -1297,11 +1513,8 @@ class AllConnGraph(nx.DiGraph):
             root = self.get_root(node)
             root_shape = self.nodes[root]['_shape']
             arr = np.arange(shape_to_len(root_shape)).reshape(root_shape)
-            for inds, flat in src_inds_list:
-                if flat:
-                    arr = arr.ravel()[inds.flat()]
-                else:
-                    arr = arr[inds()]
+            for inds, _ in src_inds_list:
+                arr = inds.indexed_val(arr)
             return arr
 
     def convert_get(self, node, val, src_units, tgt_units, src_inds_list=(), units=None,
@@ -1320,7 +1533,7 @@ class AllConnGraph(nx.DiGraph):
                 raise TypeError(f"Can't express value with units of '{src_units}' in units of "
                                 f"'{units}'.")
             elif src_units != units:
-                if units == '?':
+                if units == 'ambiguous':
                     raise TypeError(f"The choice between units of {self.leaf_units(node)} for "
                                      f"input '{node[1]}' is ambiguous. Call "
                                      f"model.set_input_defaults('{self.top_name(node)}', "
@@ -1360,46 +1573,62 @@ class AllConnGraph(nx.DiGraph):
         return val
 
     def create_node_label(self, node):
+
+        mapping = {'_shape': 'shape'}
+
+        def get_table_row(name, meta, mods=(), align='LEFT', max_width=None):
+            if '.' in name:
+                parent, _, child = name.rpartition('.')
+                meta = meta.get(parent, {})
+            else:
+                parent = None
+                child = name
+
+            content = meta.get(child, None)
+            if (content is not None and isinstance(content, np.ndarray)) or content:
+                if max_width is not None:
+                    content = truncate_str(content, max_width)
+
+                if mods:
+                    starts = []
+                    ends = []
+                    for mod in mods:
+                        starts.append(f"<{mod}>")
+                        ends.append(f"</{mod}>")
+
+                    content = ''.join(starts) + content + ''.join(ends)
+
+                if name in mapping:
+                    name = mapping[name]
+
+                content = f"<b>{name}:</b> {content}"
+
+                return \
+                    f"<TR><TD ALIGN=\"{align}\"><FONT POINT-SIZE=\"10\">{content}</FONT></TD></TR>"
+
+            return ''
+
         name = self.combined_name(node)
         meta = self.nodes[node]
-        units = meta['units']
-        if units is None:
-            units = ''
-        else:
-            units = f"units: <i>{units}</i>"
+        rows = []
+        rows.append(get_table_row('units', meta, ('i',)))
+        rows.append(get_table_row('_shape', meta))
+        rows.append(get_table_row('val', meta, max_width=max(30, int(len(name) * 1.2))))
+        rows.append(get_table_row('defaults.val', meta, max_width=max(30, int(len(name) * 1.2))))
+        rows.append(get_table_row('defaults.src_shape', meta))
+        rows.append(get_table_row('defaults.units', meta))
+        rows.append(get_table_row('src_inds_list', meta))
+        rows.append(get_table_row('shape_by_conn', meta))
+        rows.append(get_table_row('units_by_conn', meta))
+        rows = [r for r in rows if r]
 
-        shape = meta['_shape']
-        if shape is None:
-            shape = ''
-        else:
-            shape = f"shape: {shape}"
-
-        # Combine units and shape with proper spacing and smaller font
-        combined_content = ''
-        if units and shape:
-            combined_content = f"{units} &nbsp; {shape}"
-        elif units:
-            combined_content = f"{units}"
-        elif shape:
-            combined_content = f"{shape}"
-
-        if combined_content:
-            combined = f"<TR><TD ALIGN=\"LEFT\"><FONT POINT-SIZE=\"10\">{combined_content}</FONT></TD></TR>"
+        if rows:
+            combined = '\n'.join(rows)
         else:
             combined = ''
 
-        val = meta['val']
-        if val is None:
-            val = ''
-        else:
-            val = f"<TR><TD ALIGN=\"LEFT\"><FONT POINT-SIZE=\"10\">val: {truncate_str(str(val), max(30, int(len(name) * 1.2)))}</FONT></TD></TR>"
-
-
-        if units or shape:
-            return f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="1" CELLPADDING="0"><TR><TD ' \
-                f' ALIGN=\"LEFT\"><FONT POINT-SIZE=\"12\"><b>{name}</b></FONT></TD></TR>{combined}{val}</TABLE>>'
-        else:
-            return f'<<FONT POINT-SIZE=\"12\"><b>{name}</b></FONT>>'
+        return f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="1" CELLPADDING="0"><TR><TD ' \
+            f' ALIGN=\"LEFT\"><FONT POINT-SIZE=\"12\"><b>{name}</b></FONT></TD></TR>{combined}</TABLE>>'
 
     def drawable_node_iter(self, pathname=''):
         """
@@ -1422,7 +1651,7 @@ class AllConnGraph(nx.DiGraph):
             if pathname and not self.startswith(pathname, node):
                 continue
             newdata = {}
-            if data['io'] == 'i':
+            if node[0] == 'i':
                 newdata['fillcolor'] = GRAPH_COLORS['input']
             else:
                 newdata['fillcolor'] = GRAPH_COLORS['output']
@@ -1435,9 +1664,18 @@ class AllConnGraph(nx.DiGraph):
             newdata['rel_name'] = data['rel_name']
             yield node, newdata
 
-    def drawable_edge_iter(self, pathname='', show_cross_boundary=True):
+    def drawable_edge_iter(self, pathname='', show_cross_boundary=True, max_width=50):
         """
         Yield edges usable in a pydot graph.
+
+        Parameters
+        ----------
+        pathname : str, optional
+            The pathname of the group to draw.
+        show_cross_boundary : bool, optional
+            Whether to show cross boundary connections.
+        max_width : int or None
+            The maximum allowable width of an edge label.
 
         Yields
         ------
@@ -1447,31 +1685,34 @@ class AllConnGraph(nx.DiGraph):
         if pathname:
             pathname = pathname + '.'
 
+        # None means the edge is a promotion
+        type_map = {None: 'dashed', 'manual': None, 'implicit': 'dotted'}
+
         for u, v, data in self.edges(data=True):
-            style = data.get('style')
+            style = type_map[data.get('type')]
 
             if pathname:
                 u_internal = self.startswith(pathname, u)
-                if not u_internal:  # show as an external connection
-                    if not show_cross_boundary:
-                        continue
-                    style = 'dotted'
+                if not u_internal and not show_cross_boundary:
+                    continue
 
                 v_internal = self.startswith(pathname, v)
-                if not v_internal:  # show as an external connection
-                    if not show_cross_boundary:
-                        continue
-                    style = 'dotted'
+                if not v_internal and not show_cross_boundary:
+                    continue
 
                 if not (u_internal or v_internal):
                     continue
 
             newdata = {}
-            if 'style' in data:
+            if style:
                 newdata['style'] = style
 
-            if 'src_indices' in data and data['src_indices'] is not None:
-                newdata['label'] = str(data['src_indices'])
+            src_indices = data.get('src_indices')
+            if src_indices is not None:
+                newdata['label'] = truncate_str(src_indices, max_len=max_width)
+
+            if u[0] == 'i' and v[0] == 'i':  # show promotion arrows in the right direction
+                newdata['dir'] = 'back'  # show arrows going backwards w/o messing up tree layout
 
             yield u, v, newdata
 
@@ -1533,20 +1774,8 @@ class AllConnGraph(nx.DiGraph):
             varnode = self.find_node(pathname, varname)
             G.nodes[varnode]['color'] = GRAPH_COLORS['highlight']
             G.nodes[varnode]['penwidth'] = '4'  # Thick border
-            root = self.get_root(varnode)
-            nodes = {root}
-            nodes.update(v for _, v in dfs_edges(G, root))
-            orig = nodes.copy()
-
-            # look for other incoming edges into our inputs
-            for node in orig:
-                if G.in_degree(node) > 1:
-                    root = self.get_root(node)
-                    if root not in nodes:
-                        nodes.add(root)
-                        nodes.update(v for _, v in dfs_edges(G, root))
-
-            G = nx.subgraph(G, nodes)
+            tree = nx.node_connected_component(G.to_undirected(as_view=True), varnode)
+            G = nx.subgraph(G, tree)
 
         replace = {}
         for node in G.nodes():
