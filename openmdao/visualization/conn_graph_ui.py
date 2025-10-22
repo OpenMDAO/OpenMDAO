@@ -712,6 +712,28 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             font-size: 12px;
         }
 
+        .tree-icon.double {
+            width: 40px;
+            height: 16px;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .tree-icon.double .input {
+            margin-right: 2px;
+        }
+
+        .tree-icon.double .output {
+            margin-right: 0;
+        }
+
+        .tree-icon.double .input.hidden,
+        .tree-icon.double .output.hidden {
+            visibility: hidden;
+        }
+
         .tree-icon-button {
             width: 16px;
             height: 16px;
@@ -850,8 +872,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 <ol>
                     <li>Click on any system (⚙️) to see all connection graphs involving that
                     system</li>
-                    <li>Click on any variable (⬇️ or ⬆️) to see only the connection graph for that
-                    variable</li>
+                    <li>Click on any variable (<span class="tree-icon-button input" style="font-size: 11px; padding: 2px 4px; margin: 0 2px; display: inline;">i</span> or <span class="tree-icon-button output" style="font-size: 11px; padding: 2px 4px; margin: 0 2px; display: inline;">o</span>) to see only the connection graph for that variable</li>
                 </ol>
 
                 <h3>Edge Types</h3>
@@ -1363,8 +1384,25 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                     icon.style.color = getContrastColor(cachedColors.output);
                 }
             } else if (node.type === 'bidirectional') {
-                icon.className = 'tree-icon';
-                icon.innerHTML = '⬆️⬇️';
+                icon.className = 'tree-icon double';
+                icon.innerHTML = '<span class="tree-icon-button input" style="font-size: 11px; padding: 2px 4px;">i</span><span class="tree-icon-button output" style="font-size: 11px; padding: 2px 4px;">o</span>';
+                // Set dynamic colors for both input and output icons
+                if (cachedColors.input) {
+                    const inputIcon = icon.querySelector('.input');
+                    if (inputIcon) {
+                        inputIcon.style.background = `linear-gradient(135deg, ${cachedColors.input} 0%, ${darkenColor(cachedColors.input, 0.2)} 100%)`;
+                        inputIcon.style.borderColor = darkenColor(cachedColors.input, 0.2);
+                        inputIcon.style.color = getContrastColor(cachedColors.input);
+                    }
+                }
+                if (cachedColors.output) {
+                    const outputIcon = icon.querySelector('.output');
+                    if (outputIcon) {
+                        outputIcon.style.background = `linear-gradient(135deg, ${cachedColors.output} 0%, ${darkenColor(cachedColors.output, 0.2)} 100%)`;
+                        outputIcon.style.borderColor = darkenColor(cachedColors.output, 0.2);
+                        outputIcon.style.color = getContrastColor(cachedColors.output);
+                    }
+                }
             } else {
                 icon.className = 'tree-icon';
                 icon.innerHTML = '⬆️⬇️';
