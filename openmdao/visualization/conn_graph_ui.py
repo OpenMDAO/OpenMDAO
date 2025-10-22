@@ -1050,6 +1050,14 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         let globalGraphColors = null; // Store graph colors from initial load
         let isSearchNavigation = false; // Flag to track if we're navigating from search
 
+        // Search state tracking
+        let searchState = {
+            currentQuery: '',
+            currentMatchIndex: 0,
+            allMatches: [],
+            isSearchActive: false
+        };
+
         // Initialize the interface
         document.addEventListener('DOMContentLoaded', function() {
             loadTreeStructure();
@@ -1651,6 +1659,11 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                     }
                 }
             });
+
+            // Clear search state when user types
+            searchInput.addEventListener('input', function(event) {
+                clearSearchState();
+            });
         }
 
         // Simple fuzzy search algorithm
@@ -1712,58 +1725,125 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             return nodes;
         }
 
-        // Navigate to the best match
-        function navigateToBestMatch(query) {
+        // Find all matches for a query, sorted by score
+        function findAllMatches(query) {
             const allNodes = getAllTreeNodes();
-            let bestMatch = null;
-            let bestScore = 0;
+            const matches = [];
 
-            // Find the best match
             allNodes.forEach(node => {
                 const score = fuzzyMatch(query, node.text);
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMatch = node;
+                if (score > 0) {
+                    matches.push({
+                        ...node,
+                        score: score
+                    });
                 }
             });
 
-            if (bestMatch && bestScore > 0) {
-                // Clear previous highlights
-                document.querySelectorAll('.tree-node-content, .tree-label').forEach(el => {
-                    el.classList.remove('search-highlight');
-                });
+            // Sort by score (highest first)
+            matches.sort((a, b) => b.score - a.score);
+            return matches;
+        }
 
-                // Remove any existing highlight spans
-                document.querySelectorAll('.search-highlight-span').forEach(span => {
-                    const parent = span.parentElement;
-                    parent.textContent = parent.textContent;
-                });
-
-                // Highlight only the label (name) part of the match
-                const labelElement = bestMatch.element.querySelector('.tree-label');
-                if (labelElement) {
-                    // Wrap the text content in a span for precise highlighting
-                    const originalText = labelElement.textContent;
-                    labelElement.innerHTML = `<span class="search-highlight-span">${originalText}</span>`;
-                }
-
-                // Expand parent nodes to make the match visible
-                expandToShowNode(bestMatch.element);
-
-                // Scroll to the match
-                bestMatch.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-                // Select the node (which will load its graph)
-                const nodeData = getNodeDataFromElement(bestMatch.element);
-                if (nodeData) {
-                    isSearchNavigation = true; // Set flag before navigation
-                    selectNode(nodeData);
-                    isSearchNavigation = false; // Clear flag after navigation
-                }
+        // Navigate to the next match (or first match if new search)
+        function navigateToBestMatch(query) {
+            // Check if this is a new search or continuing with the same query
+            if (query !== searchState.currentQuery) {
+                // New search - find all matches
+                searchState.currentQuery = query;
+                searchState.allMatches = findAllMatches(query);
+                searchState.currentMatchIndex = 0;
+                searchState.isSearchActive = true;
+            } else if (searchState.isSearchActive) {
+                // Same query - move to next match
+                searchState.currentMatchIndex = (searchState.currentMatchIndex + 1) % searchState.allMatches.length;
             } else {
-                // No match found - could show a message
-                console.log('No match found for:', query);
+                // No active search - start new one
+                searchState.currentQuery = query;
+                searchState.allMatches = findAllMatches(query);
+                searchState.currentMatchIndex = 0;
+                searchState.isSearchActive = true;
             }
+
+            // Check if we have any matches
+            if (searchState.allMatches.length === 0) {
+                console.log('No match found for:', query);
+                searchState.isSearchActive = false;
+                return;
+            }
+
+            // Get the current match
+            const currentMatch = searchState.allMatches[searchState.currentMatchIndex];
+
+            // Clear previous highlights
+            document.querySelectorAll('.tree-node-content, .tree-label').forEach(el => {
+                el.classList.remove('search-highlight');
+            });
+
+            // Remove any existing highlight spans
+            document.querySelectorAll('.search-highlight-span').forEach(span => {
+                const parent = span.parentElement;
+                parent.textContent = parent.textContent;
+            });
+
+            // Highlight only the label (name) part of the match
+            const labelElement = currentMatch.element.querySelector('.tree-label');
+            if (labelElement) {
+                // Wrap the text content in a span for precise highlighting
+                const originalText = labelElement.textContent;
+                labelElement.innerHTML = `<span class="search-highlight-span">${originalText}</span>`;
+            }
+
+            // Expand parent nodes to make the match visible
+            expandToShowNode(currentMatch.element);
+
+            // Scroll to the match
+            currentMatch.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Select the node (which will load its graph)
+            const nodeData = getNodeDataFromElement(currentMatch.element);
+            if (nodeData) {
+                isSearchNavigation = true; // Set flag before navigation
+                selectNode(nodeData);
+                isSearchNavigation = false; // Clear flag after navigation
+            }
+
+            // Update search input placeholder to show current match position
+            updateSearchPlaceholder();
+        }
+
+        // Update search input placeholder to show current match position
+        function updateSearchPlaceholder() {
+            const searchInput = document.getElementById('fuzzy-search');
+            if (searchState.isSearchActive && searchState.allMatches.length > 0) {
+                const current = searchState.currentMatchIndex + 1;
+                const total = searchState.allMatches.length;
+                searchInput.placeholder = `Search... (${current} of ${total})`;
+            } else {
+                searchInput.placeholder = 'Search...';
+            }
+        }
+
+        // Clear search state when user types in search input
+        function clearSearchState() {
+            searchState.currentQuery = '';
+            searchState.currentMatchIndex = 0;
+            searchState.allMatches = [];
+            searchState.isSearchActive = false;
+
+            // Clear highlights
+            document.querySelectorAll('.tree-node-content, .tree-label').forEach(el => {
+                el.classList.remove('search-highlight');
+            });
+
+            // Remove any existing highlight spans
+            document.querySelectorAll('.search-highlight-span').forEach(span => {
+                const parent = span.parentElement;
+                parent.textContent = parent.textContent;
+            });
+
+            // Reset placeholder
+            updateSearchPlaceholder();
         }
 
         // Expand parent nodes to make a node visible
