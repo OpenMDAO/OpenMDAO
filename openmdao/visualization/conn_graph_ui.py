@@ -1403,9 +1403,6 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                         outputIcon.style.color = getContrastColor(cachedColors.output);
                     }
                 }
-            } else {
-                icon.className = 'tree-icon';
-                icon.innerHTML = '⬆️⬇️';
             }
             contentDiv.appendChild(icon);
 
