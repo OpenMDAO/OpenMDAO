@@ -312,11 +312,14 @@ class SrcIndicesTestCase(unittest.TestCase):
             p.setup()
             p.final_setup()
 
-        self.assertEqual(cm.exception.args[0], ("The following inputs promoted to 'G.x' have different incompatible shapes:\n"
-                                                "  \n"
-                                                "G.g1.x  (3, 3)\n"
-                                                "G.g2.x  (3, 2)\n"
-                                                "  "))
+        self.assertEqual(cm.exception.args[0],
+                         "\nCollected errors for problem 'src_shape_mismatch':"
+                         "\n   <model> <class Group>: The following inputs promoted to 'G.x' have different incompatible shapes:"
+                         "\n  "
+                         "\n   G.g1.x  (3, 3)"
+                         "\n   G.g2.x  (3, 2)"
+                         "\n  "
+                         "\n   <model> <class Group>: Can't promote 'G.g1.x' to 'G.x': shape (3, 2) of 'G.x' is incompatible with shape (3, 3) of 'G.g1.x'.")
 
     def test_src_indices_on_promotes(self):
         src_shape = (3, 3)
@@ -347,7 +350,7 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'src_indices_on_promotes':"
-            "\n   <model> <class Group>: Can't promote 'C1.x' to 'x': index 9 is out of bounds for source dimension of size 9.")
+            "\n   <model> <class Group>: Can't promote 'C1.x' to 'x' when applying index [4 5 7 9]: index 9 is out of bounds for source dimension of size 9.")
 
     def test_connect_slice_src_indices_not_full_size(self):
         p = om.Problem()

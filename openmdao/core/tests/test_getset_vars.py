@@ -367,21 +367,19 @@ class TestGetSetVariables(unittest.TestCase):
         p.model.promotes('C1', inputs=['x'], src_indices=list(range(7)))
         p.model.promotes('C2', inputs=['x'], src_indices=list(range(7, 10)))
 
-        with assert_warning(UserWarning,
-                            "The following inputs promoted to 'x' have different units:\n"
-                            "| ----------- |\n"
-                            "| C1.x | ft   |\n"
-                            "| C2.x | inch |\n"
-                            "| C3.x | mm   |\n"
-                            "| ----------- |\n"
-                            "Call model.set_input_defaults('x', units=?)' to remove the ambiguity. 'x' units were set to 'ft'.", contains_msg=True):
+        with self.assertRaises(Exception) as cm:
             p.setup()
             p.final_setup()
 
-        #self.assertEqual(str(cm.exception),
-           #"\nCollected errors for problem 'serial_multi_src_inds_units_promoted_no_src':"
-           #"\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x', 'C3.x'], promoted to 'x' are connected but their units differ. Call model.set_input_defaults('x', units=?) to remove the ambiguity."
-           #"\n   <model> <class Group>: Auto_ivc variable '_auto_ivc.v0' has no shape or value.")
+        self.assertEqual(str(cm.exception),
+                         "\nCollected errors for problem 'serial_multi_src_inds_units_promoted_no_src':"
+                         "\n   <model> <class Group>: The following inputs promoted to 'x' have different units:"
+                         "\n  "
+                         "\n   C1.x  ft  "
+                         "\n   C2.x  inch"
+                         "\n   C3.x  mm  "
+                         "\n  "
+                         "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
 
     def test_serial_multi_src_inds_units_setval_promoted(self):
         p = Problem()

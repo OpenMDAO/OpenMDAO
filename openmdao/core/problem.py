@@ -613,7 +613,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         if unique_errors:
             final_msg = [f"\nCollected errors for problem '{self._name}':"]
             for _, msg, exc_type, tback in unique_errors:
-                final_msg.append(f"   {msg}")
+                final_msg.append(textwrap.indent(msg, '   '))
 
                 # if there's only one error, include its traceback if it exists.
                 if len(unique_errors) == 1:

@@ -339,7 +339,7 @@ class Group(System):
         src_shape : int or tuple
             Assumed shape of any connected source or higher level promoted input.
         """
-        meta = {'prom': name, 'auto': False}
+        meta = {} # {'prom': name, 'auto': False}
         if is_undefined(val):
             src_shape = shape2tuple(src_shape)
             meta['val'] = None
@@ -369,7 +369,8 @@ class Group(System):
 
         if name in dct:
             old = dct[name]
-            overlap = set(old).intersection(meta)
+            oldnames = [k for k, v in old.items() if v is not None]
+            overlap = set(oldnames).intersection(k for k, v in meta.items() if v is not None)
             if overlap:
                 issue_warning(f"Setting input defaults for input '{name}' which "
                               f"override previously set defaults for {sorted(overlap)}.",
@@ -1143,6 +1144,8 @@ class Group(System):
 
         self._check_connections()
 
+        self._all_conn_graph.check(self)
+
         # setup of residuals must occur before setup of vectors and partials
         self._setup_residuals()
 
@@ -1653,11 +1656,6 @@ class Group(System):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
-        if self._resolver is None:
-            old_proms = set()
-        else:
-            old_proms = set(self._resolver.prom_iter('input'))
-
         self._var_existence = None
 
         super()._setup_var_data()
@@ -1780,20 +1778,20 @@ class Group(System):
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
-        if self._group_inputs:
-            extra = [gin for gin in self._group_inputs if not resolver.is_prom(gin, 'input')]
-            if extra:
-                # make sure that we don't have a leftover group input default entry from a previous
-                # execution of _setup_var_data before promoted names were updated.
-                ex = set()
-                for e in extra:
-                    if e in old_proms:
-                        del self._group_inputs[e]  # clean up old key using old promoted name
-                    else:
-                        ex.add(e)
-                if ex:
-                    self._collect_error(f"{self.msginfo}: The following group inputs, passed to "
-                                        f"set_input_defaults(), could not be found: {sorted(ex)}.")
+        #if self._group_inputs:
+            #extra = [gin for gin in self._group_inputs if not resolver.is_prom(gin, 'input')]
+            #if extra:
+                ## make sure that we don't have a leftover group input default entry from a previous
+                ## execution of _setup_var_data before promoted names were updated.
+                #ex = set()
+                #for e in extra:
+                    #if e in old_proms:
+                        #del self._group_inputs[e]  # clean up old key using old promoted name
+                    #else:
+                        #ex.add(e)
+                #if ex:
+                    #self._collect_error(f"{self.msginfo}: The following group inputs, passed to "
+                                        #f"set_input_defaults(), could not be found: {sorted(ex)}.")
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -2089,21 +2087,32 @@ class Group(System):
         """
         return self._owned_output_sizes[self.comm.rank, self._var_allprocs_abs2idx[abs_name]]
 
-    def _setup_global_connections(self, parent_conns=None):
+    def _get_implicit_connections(self):
+        """
+        Return a set of promoted variable names where an output and an input match.
+        """
+        if self.pathname:
+            implicit_connections = {self.pathname + '.' + n
+                                    for n in self._resolver.get_implicit_conns()}
+        else:
+            implicit_connections = self._resolver.get_implicit_conns()
+        for subsys in self._subsystems_myproc:
+            if isinstance(subsys, Group):
+                implicit_connections.update(subsys._get_implicit_connections())
+
+        return implicit_connections
+
+    def _setup_global_connections(self):
         """
         Compute dict of all connections between this system's inputs and outputs.
-
-        Parameters
-        ----------
-        parent_conns : dict
-            Dictionary of connections passed down from parent group.
         """
+        implicit_conns = self._get_implicit_connections()
+
         all_conn_graph = self._get_all_conn_graph()
 
-        # self._bad_conn_vars = set()
-
         if self.pathname == '':
-            all_conn_graph.add_implicit_connections(self)
+            all_conn_graph.add_implicit_connections(self, implicit_conns)
+            #all_conn_graph.add_implicit_connections(self)
 
             # add nodes for all absolute inputs and connected absolute outputs
             all_conn_graph.add_abs_variable_meta(self)
@@ -2891,19 +2900,11 @@ class Group(System):
 
         abs_in2out = self._conn_abs_in2out
         self._conn_discrete_in2out = {}
-        # pathname = self.pathname
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
-        # self._resolver._conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
-
-        if self.pathname == '':
-            conn_graph.check(self)
 
         for subsys in self._sorted_sys_iter():
             subsys._check_connections()
-
-        # path_dot = pathname + '.' if pathname else ''
-        # path_len = len(path_dot)
 
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
@@ -2919,20 +2920,6 @@ class Group(System):
             inode = ('i', abs_in)
             if conn_graph.nodes[inode]['discrete']:
                 self._conn_discrete_in2out[abs_in] = abs_out
-
-            # # Check that they are in different subsystems of this system.
-            # out_subsys = abs_out[path_len:].partition('.')[0]
-            # in_subsys = abs_in[path_len:].partition('.')[0]
-            # if out_subsys != in_subsys:
-            #     if abs_in in allprocs_discrete_in:
-            #         self._conn_discrete_in2out[abs_in] = abs_out
-            #     elif abs_out in allprocs_discrete_out:
-            #         self._collect_error(
-            #             f"{self.msginfo}: Can't connect discrete output '{abs_out}' "
-            #             f"to continuous input '{abs_in}'.", ident=(abs_out, abs_in))
-            #         continue
-            #     else:
-            #         abs_in2out[abs_in] = abs_out
 
             if True:
                 if nproc > 1 and self._vector_class is None:
@@ -2964,115 +2951,6 @@ class Group(System):
                     f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is "
                     f"incompatible with type '{in_type.__name__}' of input '{abs_in}'.",
                     ident=(abs_out, abs_in))
-
-        # check unit/shape compatibility, but only for connections that are
-        # either owned by (implicit) or declared by (explicit) this Group.
-        # This way, we don't repeat the error checking in multiple groups.
-
-        # for abs_in, abs_out in abs_in2out.items():
-        #     all_meta_out = allprocs_abs2meta_out[abs_out]
-        #     all_meta_in = allprocs_abs2meta_in[abs_in]
-
-        #     # check unit compatibility
-        #     out_units = all_meta_out['units']
-        #     in_units = all_meta_in['units']
-
-        #     if out_units:
-        #         if not in_units:
-        #             if not _is_unitless(out_units):
-        #                 msg = f"Output '{abs_out}' with units of '{out_units}' " + \
-        #                     f"is connected to input '{abs_in}' which has no units."
-        #                 issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
-        #         elif not is_compatible(in_units, out_units):
-        #             self._collect_error(
-        #                 f"{self.msginfo}: Output units of '{out_units}' for '{abs_out}' "
-        #                 f"are incompatible with input units of '{in_units}' for '{abs_in}'.",
-        #                 ident=(abs_out, abs_in))
-        #             continue
-        #     elif in_units is not None:
-        #         if not _is_unitless(in_units):
-        #             msg = f"Input '{abs_in}' with units of '{in_units}' is " + \
-        #                 f"connected to output '{abs_out}' which has no units."
-        #             issue_warning(msg, prefix=self.msginfo, category=UnitsWarning)
-
-        #     # check shape compatibility
-        #     if abs_in in abs2meta_in:
-        #         meta_in = abs2meta_in[abs_in]
-
-        #         # get output shape from allprocs meta dict, since it may
-        #         # be distributed (we want global shape)
-        #         out_shape = all_meta_out['global_shape']
-
-        #         # get input shape and src_indices from the local meta dict
-        #         # (input is always local)
-        #         if meta_in['distributed']:
-        #             # if output is non-distributed and input is distributed, make output shape the
-        #             # full distributed shape, i.e., treat it in this regard as a distributed output
-        #             out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'], 'output')
-
-        #         in_shape = meta_in['global_shape']
-        #         src_indices = meta_in['src_indices']
-
-        #         if src_indices is None and out_shape != in_shape:
-        #             # out_shape != in_shape is allowed if there's no ambiguity in storage order
-        #             if (in_shape is None or out_shape is None or
-        #                     not array_connection_compatible(in_shape, out_shape)):
-        #                 with np.printoptions(legacy='1.21'):
-        #                     self._collect_error(
-        #                         f"{self.msginfo}: The source and target shapes do not match or "
-        #                         f"are ambiguous for the connection '{abs_out}' to '{abs_in}'. "
-        #                         f"The source shape is {out_shape} "
-        #                         f"but the target shape is {in_shape}.", ident=(abs_out, abs_in))
-        #                 continue
-
-        #         elif src_indices is not None:
-
-        #             try:
-        #                 shp = (out_shape if all_meta_out['distributed'] else
-        #                        all_meta_out['global_shape'])
-        #                 if shp is None:  # a collected error has already happened, so continue
-        #                     continue
-        #                 src_indices.set_src_shape(shp, dist_shape=out_shape)
-        #                 src_indices = src_indices.shaped_instance()
-        #             except Exception:
-        #                 type_exc, exc, tb = sys.exc_info()
-        #                 s, src, tgt = get_connection_owner(self, abs_in)
-        #                 abs_out = self._conn_global_abs_in2out[tgt]
-        #                 self._collect_error(
-        #                     f"{s.msginfo}: When connecting '{src}' to '{tgt}': {exc}",
-        #                     exc_type=type_exc, tback=tb, ident=(abs_out, abs_in))
-        #                 continue
-
-        #             if src_indices.indexed_src_size == 0:
-        #                 continue
-
-        #             if src_indices.indexed_src_size != meta_in['size']:
-        #                 # initial dimensions of indices shape must be same shape as target
-        #                 for idx_d, inp_d in zip(src_indices.indexed_src_shape, in_shape):
-        #                     if idx_d != inp_d:
-        #                         self._collect_error(
-        #                             f"{self.msginfo}: The source indices {meta_in['src_indices']} "
-        #                             f"do not specify a valid shape for the connection '{abs_out}' "
-        #                             f"to '{abs_in}'. The target shape is {in_shape} but indices "
-        #                             f"are shape {src_indices.indexed_src_shape}.",
-        #                             ident=(abs_out, abs_in))
-        #                         break
-        #                 else:
-        #                     self._collect_error(
-        #                         f"{self.msginfo}: src_indices shape {src_indices.indexed_src_shape}"
-        #                         f" does not match {abs_in} shape {in_shape}.",
-        #                         ident=(abs_out, abs_in))
-        #                 continue
-
-        #             # any remaining dimension of indices must match shape of source
-        #             if not src_indices._flat_src and (len(src_indices.indexed_src_shape) >
-        #                                               len(out_shape)):
-        #                 self._collect_error(
-        #                     f"{self.msginfo}: The source indices {meta_in['src_indices']} do not "
-        #                     f"specify a valid shape for the connection '{abs_out}' to '{abs_in}'. "
-        #                     f"The source has {len(out_shape)} dimensions but the indices expect at "
-        #                     f"least {len(src_indices.indexed_src_shape)}.",
-        #                     ident=(abs_out, abs_in))
 
     def _transfer(self, vec_name, mode, sub=None):
         """

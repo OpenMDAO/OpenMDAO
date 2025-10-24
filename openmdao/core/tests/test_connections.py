@@ -195,7 +195,7 @@ class TestConnectionsIndices(unittest.TestCase):
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 0, 0])
 
         expected = ("Collected errors for problem 'bad_length':\n"
-                    "   <model> <class Group>: Can't connect 'idvp.blammo' to 'arraycomp.inp' when applying index [0 0 0] : shape (3,) of 'idvp.blammo' is incompatible with shape (2,) of 'arraycomp.inp'.")
+                    "   <model> <class Group>: Can't connect 'idvp.blammo' to 'arraycomp.inp' when applying index [0 0 0]: shape (3,) of 'idvp.blammo' is incompatible with shape (2,) of 'arraycomp.inp'.")
 
         try:
             self.prob.setup()
@@ -217,7 +217,7 @@ class TestConnectionsIndices(unittest.TestCase):
         except Exception as err:
             self.assertTrue(
                "\nCollected errors for problem 'bad_value':"
-               "\n   <model> <class Group>: Can't connect 'idvp.arrout' to 'arraycomp.inp1': index 100000 is out of bounds for source dimension of size 5." in str(err))
+               "\n   <model> <class Group>: Can't connect 'idvp.arrout' to 'arraycomp.inp1' when applying index [100000]: index 100000 is out of bounds for source dimension of size 5." in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -233,7 +233,7 @@ class TestConnectionsIndices(unittest.TestCase):
         except Exception as err:
             self.assertTrue(
                "\nCollected errors for problem 'bad_value_bug':"
-               "\n   <model> <class Group>: Can't connect 'idvp.arrout' to 'arraycomp.inp': index 100000 is out of bounds for source dimension of size 5." in str(err))
+               "\n   <model> <class Group>: Can't connect 'idvp.arrout' to 'arraycomp.inp' when applying index [     0 100000]: index 100000 is out of bounds for source dimension of size 5." in str(err))
         else:
             self.fail('Exception expected.')
 

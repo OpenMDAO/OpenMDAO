@@ -22,6 +22,8 @@ from math import floor, pi
 
 import numpy as np
 
+from openmdao.utils.array_utils import array_connection_compatible
+
 
 ####################################
 # Class Definitions
@@ -1081,7 +1083,7 @@ def has_val_mismatch(units1, val1, units2, val2, rtol=1e-10):
     val1 = np.asarray(val1)
     val2 = np.asarray(val2)
 
-    if val1.shape != val2.shape:
+    if not array_connection_compatible(val1.shape, val2.shape):
         return True
 
     absdiff = np.abs(val2 - val1)
