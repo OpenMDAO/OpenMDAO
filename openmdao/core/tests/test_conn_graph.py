@@ -120,7 +120,7 @@ class TestAllConnectionTypes(unittest.TestCase):
         #prob.model._get_all_conn_graph().display()
 
     def test_no_promotion_input_to_input(self):
-        prob = self.build_nested_model(promote=False)
+        prob = self.build_nested_model(promote=False, autoivc=True)
         model = prob.model
 
         model.connect('G1.G1A.C1.x', 'G2.G2A.C4.a')  # input-input
@@ -135,6 +135,19 @@ class TestAllConnectionTypes(unittest.TestCase):
         #prob.model.display_conn_graph()
         #prob.model._get_all_conn_graph().dump()
         #print('done')
+
+    #def test_promotion_input_to_input(self):
+        #self.fail("this test isn't implemented yet")
+        #prob = self.build_nested_model(promote=True, autoivc=True)
+        #model = prob.model
+
+
+        #prob.setup()
+        #prob.run_model()
+
+        #prob.model.display_conn_graph()
+        #prob.model._get_all_conn_graph().dump()
+        print('done')
 
 
 class TestAllConnGraphUtilityFunctions(unittest.TestCase):

@@ -118,7 +118,7 @@ class Ambiguous():
         return self.units or self.val
 
     def __contains__(self, item):
-        return item in ['units', 'val']
+        return item == 'units' or item == 'val'
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -132,6 +132,35 @@ class Ambiguous():
 
     def __repr__(self):
         return f"Ambiguous(units={self.units}, val={self.val})"
+
+
+# _flagattrs = frozenset({'discrete', 'resolved', 'require_connection', 'shape_by_conn',
+#                         'units_by_conn', 'ambig_units', 'ambig_val'})
+# _updateattrs = frozenset({'val', 'units', 'shape'})
+# _otherattrs = frozenset({'pathname', 'rel_name', 'absnames', 'src_inds_list', 'meta', 'defaults',
+#                          'errors'})
+# _allattrs = frozenset(_flagattrs | _updateattrs | _otherattrs)
+
+
+# class NodeAttrDict():
+#     def __init__(self, **kwargs):
+#         self.update(kwargs)
+
+#     def __getitem__(self, key):
+#         return getattr(self, key)
+
+#     def __setitem__(self, key, value):
+#         setattr(self, key, value)
+
+#     def __contains__(self, key):
+#         return hasattr(self, key)
+
+#     def update(self, kwargs):
+#         for key, value in kwargs.items():
+#             setattr(self, key, value)
+
+#     def get(self, key, default=None):
+#         return getattr(self, key, default)
 
 
 class AllConnGraph(nx.DiGraph):
@@ -151,6 +180,7 @@ class AllConnGraph(nx.DiGraph):
     _mult_inconn_nodes : set
         A set of nodes that have multiple input connections.
     """
+    # node_attr_dict_factory = NodeAttrDict
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1519,35 +1549,26 @@ class AllConnGraph(nx.DiGraph):
         model : Group
             The top level group.
         """
-        to_move = []
-        for u, v in self._input_input_conns:
-            src = self.get_root(u)
-            to_move.append((u, v, src))
+        for inp_src, tgt in self._input_input_conns:
+            new_src = self.get_root(inp_src)
 
-        for u, v, src in to_move:
-            self.move_to_src(u, v, src, model)
+            tgt_syspath, tgt_prom = self.get_path_prom(tgt)
+            edge_meta = self.edges[inp_src, tgt]
+            self.remove_edge(inp_src, tgt)
+            self.add_edge(new_src, tgt, **edge_meta)
+            if tgt_syspath:
+                tgt_meta = self.nodes[tgt]
+                tgt_prom = model._resolver.abs2prom(tgt_meta['absnames'][0], 'input')
 
-    def move_to_src(self, inp_src, tgt, new_src, model):
-        """
-        Move the tgt node to the src node.
-        """
-        tgt_syspath, tgt_prom = self.get_path_prom(tgt)
-        edge_meta = self.edges[inp_src, tgt]
-        self.remove_edge(inp_src, tgt)
-        self.add_edge(new_src, tgt, **edge_meta)
-        if tgt_syspath:
-            tgt_meta = self.nodes[tgt]
-            tgt_prom = model._resolver.abs2prom(tgt_meta['absnames'][0], 'input')
+            src_meta = self.nodes[new_src]
+            absname0 = src_meta['absnames'][0]
+            if absname0.startswith('_auto_ivc.'):
+                src_prom = absname0
+            else:
+                src_prom = model._resolver.abs2prom(absname0, 'output')
 
-        src_meta = self.nodes[new_src]
-        absname0 = src_meta['absnames'][0]
-        if absname0.startswith('_auto_ivc.'):
-            src_prom = absname0
-        else:
-            src_prom = model._resolver.abs2prom(absname0, 'output')
-
-        model._manual_connections[tgt_prom] = (src_prom, edge_meta.get('src_indices', None),
-                                               edge_meta.get('flat_src_indices', None))
+            model._manual_connections[tgt_prom] = (src_prom, edge_meta.get('src_indices', None),
+                                                   edge_meta.get('flat_src_indices', None))
 
     def create_all_conns_dict(self, model):
         """

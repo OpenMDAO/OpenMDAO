@@ -1105,7 +1105,7 @@ class Component(System):
         # of the output variables
         sizes_out = all_sizes['output']
         added_src_inds = []
-        graph = self._get_conn_graph()
+        graph = self._get_all_conn_graph()
         nodes = graph.nodes()
 
         # loop over continuous local inputs
