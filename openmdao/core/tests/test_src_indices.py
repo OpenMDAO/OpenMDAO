@@ -180,6 +180,13 @@ class SrcIndicesTestCase(unittest.TestCase):
         assert_near_equal(prob['C2.diameter'], np.ones(3) * 1.5)
 
     def test_flat_src_inds_2_levels(self):
+        # this was a corner case that required
+        # set_input_defaults('design:x', 75.3) not apply directly to
+        # promoted node burn1.design:x, but instead to its parent node 'design:x'.
+        # This is inconsistent with other tests that require directly setting the val based on the
+        # defaults val in order to avoid ambiguities coming from the child nodes.
+        # To make this test pass, the set_input_defaults call was moved up to the model
+        # level, setting the default value for 'design:x'.
         class Burn1(om.Group):
             def setup(self):
                 self.add_subsystem('comp1', om.ExecComp(['y1=x*2'], y1=np.ones(4), x=np.ones(4)),
@@ -192,7 +199,7 @@ class SrcIndicesTestCase(unittest.TestCase):
                 self.promotes('comp1', inputs=[('x', 'design:x')],
                               src_indices=[0, 0, 0, 0], flat_src_indices=True)
 
-                self.set_input_defaults('design:x', 75.3)
+                #self.set_input_defaults('design:x', 75.3)
 
 
         class Traj(om.Group):
@@ -202,6 +209,7 @@ class SrcIndicesTestCase(unittest.TestCase):
             def configure(self):
                 self.promotes('burn1', inputs=['design:x'],
                               src_indices=[0, 0, 0, 0], flat_src_indices=True)
+                self.set_input_defaults('design:x', 75.3)
 
         prob = om.Problem(model=Traj())
 

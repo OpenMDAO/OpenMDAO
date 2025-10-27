@@ -29,11 +29,12 @@ GRAPH_COLORS = {
     'input': 'peachpuff3',
     'output': 'skyblue3',
     'highlight': '#66ff00',
+    'ambiguous': '#FF0800',
     'boundary': '#D3D3D3',
 }
 
 
-_continuous_copy_meta = ['val', 'units', '_shape', 'discrete']
+_continuous_copy_meta = ['val', 'units', 'shape', 'discrete']
 _discrete_copy_meta = ['val', 'discrete']
 
 
@@ -65,37 +66,37 @@ def are_compatible_values(a, b, discrete, src_indices=None):
     return array_connection_compatible(b.shape, src_indices.indexed_src_shape)
 
 
-def has_ambiguous_child_values(vals, units_list, discretes_list):
-    """
-    Check if the values are compatible.
-    """
-    if 'ambiguous' in units_list:
-        return False  # ambiguous units will already cause an error, so don't double report
+# def has_ambiguous_child_values(vals, units_list, discretes_list):
+#     """
+#     Check if the values are compatible.
+#     """
+#     if 'ambiguous' in units_list:
+#         return False  # ambiguous units will already cause an error, so don't double report
 
-    start = None
-    for i, val in enumerate(vals):
-        if val is not None:
-            if start is None:
-                start = val
-                start_type = type(start)
-                start_units = units_list[i]
-            else:
-                if discretes_list[i]:
-                    if start_type is not type(val):
-                        return True
+#     start = None
+#     for i, val in enumerate(vals):
+#         if val is not None:
+#             if start is None:
+#                 start = val
+#                 start_type = type(start)
+#                 start_units = units_list[i]
+#             else:
+#                 if discretes_list[i]:
+#                     if start_type is not type(val):
+#                         return True
 
-                    if isinstance(start, np.ndarray):
-                        if not np.all(start == val):
-                            return True
+#                     if isinstance(start, np.ndarray):
+#                         if not np.all(start == val):
+#                             return True
 
-                    if start != val:
-                        return True
+#                     if start != val:
+#                         return True
 
-                else:  # continuous
-                    if has_val_mismatch(start_units, start, units_list[i], val):
-                        return True
+#                 else:  # continuous
+#                     if has_val_mismatch(start_units, start, units_list[i], val):
+#                         return True
 
-    return False
+#     return False
 
 
 class ConnError(ValueError):
@@ -105,6 +106,32 @@ class ConnError(ValueError):
     def __init__(self, msg, ident=None):
         super().__init__(msg)
         self.ident = ident
+
+
+class Ambiguous():
+    __slots__ = ['units', 'val']
+    def __init__(self):
+        self.units = False
+        self.val = False
+
+    def __bool__(self):
+        return self.units or self.val
+
+    def __contains__(self, item):
+        return item in ['units', 'val']
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+    def __setitem__(self, item, value):
+        setattr(self, item, value)
+
+    def __iter__(self):
+        yield self.units
+        yield self.val
+
+    def __repr__(self):
+        return f"Ambiguous(units={self.units}, val={self.val})"
 
 
 class AllConnGraph(nx.DiGraph):
@@ -165,6 +192,7 @@ class AllConnGraph(nx.DiGraph):
         msg = f"{pathname}: Variable '{varname}' not found."
         guesses = sorted(set(get_close_matches(name, [n[1] for n in self.nodes()],
                                                n=3, cutoff=0.15)))
+        guesses = [g for g in guesses if not g.startswith('_auto_ivc.')]
         if guesses:
             msg = f"{msg} Perhaps you meant one of the following variables: {guesses}."
         raise KeyError(msg)
@@ -322,7 +350,9 @@ class AllConnGraph(nx.DiGraph):
         else:
             tgt_inds_list = node_meta['src_inds_list']
             tgt_units = node_meta['units']
-            if tgt_units == 'ambiguous':
+            # ambiguous units aren't fatal during setup, but if we're getting a specific promoted
+            # input that has ambiguous units, it becomes fatal, so we need to check that here.
+            if node_meta['ambiguous'].units:
                 raise ValueError(self.ambig_units_msg(node))
 
         if from_src:
@@ -553,12 +583,13 @@ class AllConnGraph(nx.DiGraph):
 
         meta = {'pathname': group.pathname, 'rel_name': name, 'absnames': absnames,
                 'discrete': None, 'resolved': None,
-                'units': None, 'val': None, '_shape': None,
+                'units': None, 'val': None, 'shape': None,
                 'meta': None}
 
         if io == 'input':
             meta['require_connection'] = False
             meta['src_inds_list'] = []
+            meta['ambiguous'] = Ambiguous()
 
         return key, meta
 
@@ -576,7 +607,7 @@ class AllConnGraph(nx.DiGraph):
         node_meta = self.nodes[node]
 
         node_meta['shape_by_conn'] = meta['shape_by_conn']
-        node_meta['_shape'] = shape = None if meta['shape_by_conn'] else meta['shape']
+        node_meta['shape'] = shape = None if meta['shape_by_conn'] else meta['shape']
         node_meta['units_by_conn'] = meta['units_by_conn']
         node_meta['units'] = units = None if meta['units_by_conn'] else meta['units']
         node_meta['discrete'] = False
@@ -755,7 +786,7 @@ class AllConnGraph(nx.DiGraph):
 
         # start with outputs (the root node of each connection tree) and do a postorder traversal
         # that rolls up desired metada from bottom of the tree to either the top promoted input node
-        # or, in the case of an auto_ivc source, all the way to the sourc node.
+        # or, in the case of an auto_ivc source, all the way to the source node.
         in_degree = self.in_degree
         for node, node_meta in self.nodes(data=True):
             io, name = node
@@ -767,31 +798,55 @@ class AllConnGraph(nx.DiGraph):
 
         self._first_pass = False
 
-    def get_upward_child_meta(self, parent, child):
+    def get_upward_child_meta(self, model, parent, child):
+        """
+        Get the metadata for a child node.
+
+        This happens when going up the tree.  If src_indices is present on the edge, the val
+        and shape won't be propagated up the tree.  Also, defaults may override certain values.
+
+        Parameters
+        ----------
+        model : Model
+            The model.
+        parent : tuple
+            The parent node.
+        child : tuple
+            The child node.
+
+        Returns
+        -------
+        tuple
+            A tuple of the form: (units, shape, val, discrete, required, src_indices,
+            shape_by_conn, units_by_conn, ambiguous)
+        """
         child_meta = self.nodes[child]
 
         val = child_meta['val']
         required = child_meta.get('require_connection', False)
         discrete = child_meta['discrete']
+        units = child_meta['units']
+        shape = child_meta['shape']
+        shape_by_conn = child_meta.get('shape_by_conn')
+        units_by_conn = child_meta.get('units_by_conn')
+        defval, defunits, defshape = self.get_defaults(child_meta)
+        ambiguous = child_meta.get('ambiguous')
+        errors = []
+
         if discrete:
             src_indices = None
-            shape = None
-            units = None
-            shape_by_conn = False
-            units_by_conn = False
-            defval, _, _ = self.get_defaults(child_meta)
+            if defunits is not None:
+                errors.append(f"Cannot set 'units={defunits}' for "
+                              f"discrete variable '{child[1]}'.")
+            if defshape is not None:
+                errors.append(f"Cannot set 'shape={defshape}' for "
+                              f"discrete variable '{child[1]}'.")
         else:
-            units = child_meta['units']
-            shape = child_meta['_shape']
-            shape_by_conn = child_meta.get('shape_by_conn')
-            units_by_conn = child_meta.get('units_by_conn')
-
             src_indices = self.edges[(parent, child)].get('src_indices', None)
             if src_indices is not None:
                 val = None
                 shape = None
 
-            defval, defunits, defshape = self.get_defaults(child_meta)
             if defshape is not None:
                 shape = defshape
             if defunits is not None:
@@ -799,51 +854,57 @@ class AllConnGraph(nx.DiGraph):
 
         if defval is not None:
             val = defval
+            if defshape is None:
+                shape = np.shape(val)
 
-        return units, shape, val, discrete, required, src_indices, shape_by_conn, units_by_conn
+        return units, shape, val, discrete, required, src_indices, \
+            shape_by_conn, units_by_conn, ambiguous, errors
+
+    def get_upward_children_meta(self, model, node):
+        return [self.get_upward_child_meta(model, node, child) for child in self.succ[node]]
 
     def resolve_from_children(self, model, node, auto=False):
         outdeg = self.out_degree(node)
 
-        if outdeg == 0:
+        if outdeg == 0:  # skip leaf nodes
             return
 
-        units_list = []
-        shapes_list = []
-        vals_list = []
-        discretes_list = []
-        requireds_list = []
-        src_inds_list = []
-        shape_by_conn_list = []
-        units_by_conn_list = []
-        for child in self.succ[node]:
-            units, shape, val, discrete, required, src_inds, shape_by_conn, units_by_conn = \
-                self.get_upward_child_meta(node, child)
-            units_list.append(units)
-            shapes_list.append(shape)
-            vals_list.append(val)
-            discretes_list.append(discrete)
-            requireds_list.append(required)
-            src_inds_list.append(src_inds)
-            shape_by_conn_list.append(shape_by_conn)
-            units_by_conn_list.append(units_by_conn)
-
         try:
+            children_meta = self.get_upward_children_meta(model, node)
+
+            # each child_meta entry is a tuple of the form:
+            # units, shape, val, discrete, required, src_indices, shape_by_conn, units_by_conn,
+            # ambiguous
             node_meta = self.nodes[node]
             defaults = node_meta.get('defaults', None)
-            node_meta['discrete'] = discrete = \
-                self.update_discrete_from_children(node, discretes_list)
-            node_meta['require_connection'] = any(requireds_list)
-            if not discrete:
-                node_meta['_shape'] = self.update_shape_from_children(node, shapes_list, vals_list)
-                node_meta['units'] = self.update_units_from_children(node, units_list, defaults)
-                node_meta['shape_by_conn'] = all(shape_by_conn_list)
-                node_meta['units_by_conn'] = all(units_by_conn_list)
+            node_meta['require_connection'] = any(m[4] for m in children_meta)
+            node_meta['discrete'] = discrete = self.get_discrete_from_children(node, children_meta)
 
-            val = self.update_val_from_children(node, vals_list, units_list,
-                                                discretes_list, defaults, auto,
-                                                node_meta['units'] == 'ambiguous')
-            if auto:
+            for chmeta in children_meta:
+                for i, e in enumerate(chmeta[9]):
+                    model._collect_error(f"{model.msginfo}: {e}", ident=(i, node))
+
+            if node[0] == 'o':
+                for i, cm in enumerate(children_meta):
+                    ambig = cm[8]
+                    if ambig:
+                        nlist = [s for s in self.succ[node]]
+                        if ambig.units:
+                            raise ConnError(self.ambig_units_msg(nlist[i]))
+                        elif ambig.val:
+                            raise ConnError(self.ambig_values_msg(nlist[i]))
+
+            if not discrete:
+                node_meta['units_by_conn'] = ubyconn =all(m[7] for m in children_meta)
+                if not ubyconn or not self._first_pass:
+                    node_meta['units'] = self.get_units_from_children(model, node, children_meta,
+                                                                      defaults)
+                node_meta['shape_by_conn'] = shbyconn =all(m[6] for m in children_meta)
+                if not shbyconn or not self._first_pass:
+                    node_meta['shape'] = self.get_shape_from_children(node, children_meta, defaults)
+
+            val = self.get_val_from_children(model, node, children_meta, defaults, auto)
+            if val is not None and node[1].startswith('_auto_ivc.'):
                 val = deepcopy(val)
             node_meta['val'] = val
 
@@ -858,7 +919,8 @@ class AllConnGraph(nx.DiGraph):
 
     def ambig_units_msg(self, node):
         rows = []
-        self.find_ambiguous_causes(node, rows)
+        self.find_ambiguous_causes(node, rows, 'units')
+        rows = sorted(rows, key=lambda x: x[0])
         table = generate_table(rows, tablefmt='plain')
         return (f"The following inputs promoted to '{node[1]}' have different "
                 f"units:\n{table}\nCall model.set_input_defaults('"
@@ -871,8 +933,14 @@ class AllConnGraph(nx.DiGraph):
         return (f"The following inputs promoted to '{node[1]}' have different "
                 f"incompatible shapes:\n{table}")
 
-    def ambig_values_msg(self, node, vals, units_list):
-        children = [n for _, n in self.succ[node]]
+    def ambig_values_msg(self, node):
+        causes = []
+        self.find_ambiguous_causes(node, causes, 'val')
+        children = [n for n, _ in causes]
+        child_nodes = [('i', n) for n in children]
+        causing_meta = [self.nodes[n] for n in child_nodes]
+        units_list = [m['units'] for m in causing_meta]
+        vals = [m['val'] for m in causing_meta]
         ulist = [u if u is not None else '' for u in units_list]
         vlist = [truncate_str(v, max_len=60) for v in vals]
         rows = sorted((n, u, v) for n, u, v in zip(children, ulist, vlist))
@@ -882,65 +950,100 @@ class AllConnGraph(nx.DiGraph):
                 f"model.set_input_defaults('"
                 f"{self.top_name(node)}', val=?)' to remove the ambiguity.")
 
-    def find_ambiguous_causes(self, node, causes):
+    def find_ambiguous_causes(self, node, causes, data_name):
         """
         Starting from an ambiguous node, find all of the nodes that are causing the ambiguity.
+
+        Parameters
+        ----------
+        node : tuple
+            The node to start from.
+        causes : list
+            A list of tuples of the form (node_name, data_value).
+        data_name : str
+            The name of the data to find the causes of.
         """
         for child in self.succ[node]:
-            chunits = self.get_upward_child_meta(node, child)[0]
-            if chunits == 'ambiguous':
-                self.find_ambiguous_causes(child, causes)
+            child_meta = self.nodes[child]
+            ambiguous = child_meta['ambiguous']
+            if ambiguous[data_name]:
+                self.find_ambiguous_causes(child, causes, data_name)
             else:
-                causes.append((child[1], chunits))
+                causes.append((child[1], child_meta[data_name]))
 
-    def update_units_from_children(self, node, units, defaults):
+    def get_units_from_children(self, model, node, children_meta, defaults):
         start = None
         if defaults:
             defunits = defaults.get('units')
         else:
             defunits = None
 
+        nodes = self.nodes
+
         is_output = node[0] == 'o'
-        for i, u in enumerate(units):
-            if is_output and u == 'ambiguous':
+        node_ambig = False
+        differ = False
+        if children_meta:
+            start = children_meta[0][0]
+            node_ambig = children_meta[0][8].units
+
+        for i, chmeta in enumerate(children_meta):
+            if i == 0:
+                continue
+            u = chmeta[0]
+            ch_ambig = chmeta[8]
+            node_ambig |= ch_ambig.units
+            if is_output and node_ambig:
                 # we want the ambiguous child for error reporting
                 for s in self.succ[node]:
-                    if self.nodes[s]['units'] == 'ambiguous':
-                        ambiguous_node = s
-                        break
-                raise ConnError(self.ambig_units_msg(ambiguous_node))
+                    if nodes[s]['ambiguous'].units:
+                        raise ConnError(self.ambig_units_msg(s))
 
-            if u is not None:
-                if start is None:
-                    # if u == 'ambiguous':
-                    #     if defunits is None:
-                    #         return 'ambiguous'
-                    start = u
-                else:
-                    if u != 'ambiguous' and not is_compatible(start, u):
-                        slist = list(self.succ[node])
-                        raise ConnError(self.units_error(True, slist[i], node, start, u))
+            #if u is not None:
+            #if start is None:
+                #start = u
+            #else:
+            mismatch = (start is not None and u is None) or (start is None and u is not None)
+
+            if not mismatch and not is_compatible(start, u):
+                slist = list(self.succ[node])
+                raise ConnError(self.units_error(True, slist[i], node, start, u))
+
+            differ |= start != u
 
         if defunits is not None:
+            if not is_output:
+                nodes[node]['ambiguous'].units = False
             return defunits
-        elif len(units) == 1 or len(set(units)) == 1:
-            return start
-        else:
-            return 'ambiguous'
 
-    def update_shape_from_children(self, node, shapes, vals):
+        if not differ:
+            # if a child is ambiguous, this node is also ambiguous if the default units are not set
+            if node_ambig and not is_output:
+                nodes[node]['ambiguous'].units = True
+            return start
+
+        if not is_output:
+            nodes[node]['ambiguous'].units = True
+
+    def get_shape_from_children(self, node, children_meta, defaults):
+        defval = defaults.get('val') if defaults else None
         start = None
-        for i, shape in enumerate(shapes):
-            if shape is None and vals[i] is not None:
-                shape = np.shape(vals[i])
+        for chmeta in children_meta:
+            shape = chmeta[1]
+            val = chmeta[2]
+            if shape is None and val is not None:
+                shape = np.shape(val)
 
             if shape is not None:
                 if start is None:
                     start = shape
                 else:
                     if not array_connection_compatible(start, shape):
+                        shapes = [m[1] for m in children_meta]
                         raise ConnError(self.ambig_shapes_msg(node, shapes))
 
+        if defval is not None:
+            return np.shape(defval)
         return start
 
     # def dump_vals(self, msg):
@@ -951,37 +1054,61 @@ class AllConnGraph(nx.DiGraph):
     #         node_meta = self.nodes[node]
     #         print(node, node_meta['val'])
 
-    def update_val_from_children(self, node, vals, units_list, discretes_list, defaults, auto,
-                                 units_are_ambiguous):
-        if auto:
-            if units_are_ambiguous:
-                return None
-
-            if has_ambiguous_child_values(vals, units_list, discretes_list):
-                # if we have ambiguous values, use them to remove the ambiguity
-                if defaults:
-                    defval = defaults.get('val')
-                    if defval is not None:
-                        return defval
-                raise ConnError(self.ambig_values_msg(node, vals, units_list))
-
-            for val in vals:
-                if val is not None:
-                    return val
+    def get_val_from_children(self, model, node, children_meta, defaults, auto):
+        if defaults:
+            defval = defaults.get('val')
         else:
-            start = None
-            for i, val in enumerate(vals):
-                if val is not None:
-                    if start is None:
-                        start = val
-                    else:
-                        if not are_compatible_values(start, val, discretes_list[i]):
-                            slist = list(self.succ[node])
-                            raise ConnError(self.value_error(True, slist[i], node, start, val))
+            defval = None
 
+        ambiguous = self.nodes[node].get('ambiguous', Ambiguous())
+
+        start = None
+        for i, ch_meta in enumerate(children_meta):
+            val = ch_meta[2]
+            ch_ambig = ch_meta[8]
+            if ch_ambig.val:
+                ambiguous.val = True
+                if auto:
+                    continue
+
+            if val is not None:
+                if start is None:
+                    start = val
+                    start_type = type(start)
+                    start_units = ch_meta[0]
+                elif auto:  # values must be the same or value of auto_ivc will be ambiguous
+
+                    if ch_meta[3]:
+                        if start_type is not type(val):
+                            ambiguous.val = True
+                            continue
+
+                        if isinstance(start, np.ndarray):
+                            if not np.all(start == val):
+                                ambiguous.val = True
+                                continue
+
+                        if start != val:
+                            ambiguous.val = True
+
+                    else:  # continuous
+                        if has_val_mismatch(start_units, start, ch_meta[0], val):
+                            ambiguous.val = True
+                else:
+                    if not are_compatible_values(start, val, ch_meta[3], src_indices=ch_meta[5]):
+                        slist = list(self.succ[node])
+                        raise ConnError(self.value_error(True, slist[i], node, start, val))
+
+
+        if defval is not None:
+            ambiguous.val = False
+            return defval
+
+        if not ambiguous.val:
             return start
 
-    def update_discrete_from_children(self, node, discretes):
+    def get_discrete_from_children(self, node, children_meta):
+        discretes = [m[3] for m in children_meta]
         dset = set(discretes)
         if len(dset) == 1:
             return dset.pop()
@@ -1000,24 +1127,31 @@ class AllConnGraph(nx.DiGraph):
 
     def get_parent_val_shape_units(self, parent, child):
         parent_meta = self.nodes[parent]
-        parent_shape = parent_meta['_shape']
+        parent_shape = parent_meta['shape']
         parent_val = parent_meta['val']
         parent_units = parent_meta['units']
         src_indices = self.edges[(parent, child)].get('src_indices', None)
-        if src_indices is None or parent_shape is None:
-            return parent_val, parent_shape, parent_units, None
-        else:
+        if not (src_indices is None or parent_shape is None):
             src_indices.set_src_shape(parent_shape)
-            shape = src_indices.indexed_src_shape
+            parent_shape = src_indices.indexed_src_shape
             if parent_val is None:
-                val = np.ones(shape)
+                parent_val = np.ones(parent_shape)
             else:
-                val = src_indices.indexed_val(np.atleast_1d(parent_val))
-            return val, shape, parent_units, src_indices
+                parent_val = src_indices.indexed_val(np.atleast_1d(parent_val))
 
-    def check_connection(self, src, tgt):
+        parent_ambiguous = parent_meta['ambiguous']
+        if parent_ambiguous.val:
+            parent_val = None
+        if parent_ambiguous.units:
+            parent_units = None
+
+        return parent_val, parent_shape, parent_units, src_indices
+
+    def resolve_output_input_connection(self, src, tgt, auto):
         """
         Check the compatibility of a connection between an output and input node.
+
+        This happends when going down the tree.
 
         Parameters
         ----------
@@ -1047,8 +1181,10 @@ class AllConnGraph(nx.DiGraph):
         else:
             src_units = src_meta['units']
             tgt_units = tgt_meta['units']
-            src_shape = src_meta['_shape']
-            tgt_shape = tgt_meta['_shape']
+            src_shape = src_meta['shape']
+            tgt_shape = tgt_meta['shape']
+
+            tgt_ambiguous = tgt_meta['ambiguous']
 
             edge = (src, tgt)
 
@@ -1062,17 +1198,14 @@ class AllConnGraph(nx.DiGraph):
                 if tgt_shape is not None:
                     if not array_connection_compatible(src_shape, tgt_shape):
                         raise ConnError(self.shape_error(src, tgt, src_shape, tgt_shape))
-                #elif tgt_meta['shape_by_conn']:
-                    #tgt_meta['_shape'] = src_shape
-                else:
-                    tgt_meta['_shape'] = src_shape
+                elif not tgt_ambiguous.val:
+                    tgt_meta['shape'] = src_shape
 
             if src_val is not None:
                 if tgt_val is not None:
                     if not are_compatible_values(src_val, tgt_val, src_discrete, src_indices):
                         raise ConnError(self.value_error(False, src, tgt, src_val, tgt_val))
-                else:
-                    # self.dump_vals(f"check_connection")
+                elif not tgt_ambiguous.val:
                     tgt_meta['val'] = src_val
 
             if src_units is not None:
@@ -1082,30 +1215,30 @@ class AllConnGraph(nx.DiGraph):
                 elif tgt_meta['units_by_conn']:
                     tgt_meta['units'] = src_units
 
-    def resolve_output_to_output(self, src, tgt):
+    def resolve_output_to_output_down(self, parent, child):
         """
-        Resolve metadata for a target output node based on the metadata of a source output node.
+        Resolve metadata for a target output node based on the metadata of a parent output node.
 
         Parameters
         ----------
         model : Model
             The model.
-        src : tuple
+        parent : tuple
             The source output node.
-        tgt : tuple
+        child : tuple
             The target output node.
         """
-        tgt_meta = self.nodes[tgt]
-        src_meta = self.nodes[src]
+        child_meta = self.nodes[child]
+        parent_meta = self.nodes[parent]
 
-        if src_meta['discrete']:
+        if parent_meta['discrete']:
             for key in _discrete_copy_meta:
-                tgt_meta[key] = src_meta[key]
+                child_meta[key] = parent_meta[key]
         else:
             for key in _continuous_copy_meta:
-                tgt_meta[key] = src_meta[key]
+                child_meta[key] = parent_meta[key]
 
-        tgt_meta['resolved'] = True
+        child_meta['resolved'] = True
 
     def resolve_input_to_input_down(self, model, parent, child, auto):
         """
@@ -1140,7 +1273,7 @@ class AllConnGraph(nx.DiGraph):
             shape = None
             units = def_units = None
 
-            child_shape = child_meta['_shape']
+            child_shape = child_meta['shape']
             child_units = child_meta['units']
             child_val = child_meta['val']
 
@@ -1171,14 +1304,14 @@ class AllConnGraph(nx.DiGraph):
                 if child_shape is not None:
                         if not array_connection_compatible(shape, child_shape):
                             raise ConnError(self.shape_error(parent, child, shape, child_shape))
-                elif auto:
-                    child_meta['_shape'] = shape
+                else:
+                    child_meta['shape'] = shape
 
         if val is not None and shape is not None:
             val = np.reshape(val, shape)
 
         # self.dump_vals(f"resolve_input_to_input_down: setting")
-        if auto:
+        if auto and val is not None:
             child_meta['val'] = val
 
     def resolve_down(self, model, parent, child, auto):
@@ -1199,16 +1332,14 @@ class AllConnGraph(nx.DiGraph):
         try:
             if parent[0] == 'o':
                 if child[0] == 'i':
-                    self.check_connection(parent, child)
+                    self.resolve_output_input_connection(parent, child, auto)
                 else:
-                    self.resolve_output_to_output(parent, child)
+                    self.resolve_output_to_output_down(parent, child)
             else:
                 self.resolve_input_to_input_down(model, parent, child, auto)
 
         except Exception as err:
             self.handle_error(model, False, parent, child, exc=err)
-
-        # self.dump_vals(f"after resolve_down")
 
     def resolve_conn_tree(self, model, src_node):
         """
@@ -1247,23 +1378,27 @@ class AllConnGraph(nx.DiGraph):
             self.resolve_from_children(model, src_node, auto=auto)
 
             if src_meta['val'] is None:
-                shape = src_meta['_shape']
+                shape = src_meta['shape']
                 if shape is not None:
                     src_meta['val'] = np.ones(shape)
                 else:
-                    model._collect_error(f"Auto_ivc variable '{src_node[1]}' "
-                                         "has no shape or value.")
+                    for s in self.succ[src_node]:
+                        if nodes[s]['ambiguous']:
+                            break
+                    else:
+                        model._collect_error(f"Auto_ivc variable '{src_node[1]}' "
+                                             "has no shape or value.")
 
             # for auto_ivcs, transfer graph metadata to the variable metadata
             if src_meta['discrete']:
                 meta = discrete2meta[name]
                 if src_meta['val'] is not None and name in locdiscrete2meta:
                     locdiscrete2meta[name]['val'] = src_meta['val']
-            else:
+            elif name in abs2meta:  # check name here because may be an uninitialized discrete var
                 meta = abs2meta[name]
-                if src_meta['_shape'] is not None:
-                    meta['shape'] = src_meta['_shape']
-                    meta['size'] = shape_to_len(src_meta['_shape'])
+                if src_meta['shape'] is not None:
+                    meta['shape'] = src_meta['shape']
+                    meta['size'] = shape_to_len(src_meta['shape'])
                     if name in loc2meta:
                         loc2meta[name]['shape'] = meta['shape']
                         loc2meta[name]['size'] = meta['size']
@@ -1308,7 +1443,7 @@ class AllConnGraph(nx.DiGraph):
         for i, n in enumerate(dangling_inputs):
             auto_node, meta = self.create_node_meta(model, f'_auto_ivc.v{i}', 'output')
             self.add_node(auto_node, **meta)
-            self.add_edge(auto_node, n)
+            self.add_edge(auto_node, n, type='manual')
             auto_nodes.append(auto_node)
 
         return auto_nodes
@@ -1327,9 +1462,11 @@ class AllConnGraph(nx.DiGraph):
                                       f"'{vunits}' is connected to output '{u[1]}' "
                                       f"which has no units.")
                     elif not uunitless and vunitless:
-                        issue_warning(f"{group.msginfo}: Output '{u[1]}' with units of "
-                                      f"'{uunits}' is connected to input '{v[1]}' "
-                                      f"which has no units.")
+                        vambig = nodes[v]['ambiguous']
+                        if not vambig.units:
+                            issue_warning(f"{group.msginfo}: Output '{u[1]}' with units of "
+                                        f"'{uunits}' is connected to input '{v[1]}' "
+                                        f"which has no units.")
 
         desvars = group.get_design_vars()
         for req in self._required_conns:
@@ -1634,7 +1771,7 @@ class AllConnGraph(nx.DiGraph):
             return src_inds_list[0][0].shaped_array()
         else:
             root = self.get_root(node)
-            root_shape = self.nodes[root]['_shape']
+            root_shape = self.nodes[root]['shape']
             arr = np.arange(shape_to_len(root_shape)).reshape(root_shape)
             for inds, _ in src_inds_list:
                 arr = inds.indexed_val(arr)
@@ -1643,7 +1780,7 @@ class AllConnGraph(nx.DiGraph):
     def convert_get(self, node, val, src_units, tgt_units, src_inds_list=(), units=None,
                     indices=None, flat=None):
         if src_inds_list:
-            val = self.get_subarray(val, src_inds_list).reshape(self.nodes[node]['_shape'])
+            val = self.get_subarray(val, src_inds_list).reshape(self.nodes[node]['shape'])
 
         if indices:
             val = self.get_subarray(val, [(indices, flat)])
@@ -1697,8 +1834,6 @@ class AllConnGraph(nx.DiGraph):
 
     def create_node_label(self, node):
 
-        mapping = {'_shape': 'shape'}
-
         def get_table_row(name, meta, mods=(), align='LEFT', max_width=None):
             if '.' in name:
                 parent, _, child = name.rpartition('.')
@@ -1708,6 +1843,14 @@ class AllConnGraph(nx.DiGraph):
                 child = name
 
             content = meta.get(child, None)
+
+            if content is None:
+                ambig = meta.get('ambiguous', Ambiguous())
+                if name in ambig:
+                    ambig = ambig[name]
+                    if ambig:
+                        content = '?'
+
             if (content is not None and isinstance(content, np.ndarray)) or content:
                 if max_width is not None:
                     content = truncate_str(content, max_width)
@@ -1721,9 +1864,6 @@ class AllConnGraph(nx.DiGraph):
 
                     content = ''.join(starts) + content + ''.join(ends)
 
-                if name in mapping:
-                    name = mapping[name]
-
                 content = f"<b>{name}:</b> {content}"
 
                 return \
@@ -1735,7 +1875,7 @@ class AllConnGraph(nx.DiGraph):
         meta = self.nodes[node]
         rows = []
         rows.append(get_table_row('units', meta, ('i',)))
-        rows.append(get_table_row('_shape', meta))
+        rows.append(get_table_row('shape', meta))
         rows.append(get_table_row('val', meta, max_width=max(30, int(len(name) * 1.2))))
         rows.append(get_table_row('defaults.val', meta, max_width=max(30, int(len(name) * 1.2))))
         rows.append(get_table_row('defaults.src_shape', meta))
@@ -1743,6 +1883,7 @@ class AllConnGraph(nx.DiGraph):
         rows.append(get_table_row('src_inds_list', meta))
         rows.append(get_table_row('shape_by_conn', meta))
         rows.append(get_table_row('units_by_conn', meta))
+        rows.append(get_table_row('discrete', meta))
         rows = [r for r in rows if r]
 
         if rows:
@@ -1778,6 +1919,11 @@ class AllConnGraph(nx.DiGraph):
                 newdata['fillcolor'] = GRAPH_COLORS['input']
             else:
                 newdata['fillcolor'] = GRAPH_COLORS['output']
+
+            ambiguous = data.get('ambiguous', Ambiguous())
+            if ambiguous:
+                newdata['color'] = GRAPH_COLORS['ambiguous']
+                newdata['penwidth'] = '4'  # Thick border
 
             newdata['label'] = self.create_node_label(node)
             newdata['tooltip'] = (data['pathname'], data['rel_name'])
@@ -1946,7 +2092,7 @@ class AllConnGraph(nx.DiGraph):
         for node, depth in self.get_tree_iter(node):
             indent = '  ' * depth
             meta = nodes[node]
-            mnames = ['units', 'discrete', '_shape']
+            mnames = ['units', 'discrete', 'shape']
             dismeta = {k: meta[k] for k in mnames if k in meta and meta[k] is not None}
             print(f"{indent}{node[1]}  {dismeta}")
 

@@ -4607,22 +4607,22 @@ class Group(System):
 
         return auto_ivc
 
-    def _show_ambiguity_msg(self, prom, metavars, tgts, metadata=None):
-        errs = sorted(metavars)
-        if metadata is None:
-            meta = errs
-        else:
-            meta = sorted(metadata)
-        inputs = sorted(tgts)
+    # def _show_ambiguity_msg(self, prom, metavars, tgts, metadata=None):
+    #     errs = sorted(metavars)
+    #     if metadata is None:
+    #         meta = errs
+    #     else:
+    #         meta = sorted(metadata)
+    #     inputs = sorted(tgts)
 
-        model = self._problem_meta['model_ref']()
-        gprom = model._resolver.abs2prom(tgts[0], 'input')
+    #     model = self._problem_meta['model_ref']()
+    #     gprom = model._resolver.abs2prom(tgts[0], 'input')
 
-        args = ', '.join([f'{n}=?' for n in errs])
-        self._collect_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
-                            f"to '{gprom}', are connected but their metadata entries {meta}"
-                            f" differ. Call model.set_input_defaults('{gprom}', {args}) "
-                            "to remove the ambiguity.")
+    #     args = ', '.join([f'{n}=?' for n in errs])
+    #     self._collect_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
+    #                         f"to '{gprom}', are connected but their metadata entries {meta}"
+    #                         f" differ. Call model.set_input_defaults('{gprom}', {args}) "
+    #                         "to remove the ambiguity.")
 
     def _ordered_comp_name_iter(self):
         """

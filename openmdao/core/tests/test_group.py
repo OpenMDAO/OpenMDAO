@@ -1549,7 +1549,7 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'input_defaults_promotes_error':"
-           "\n   <model> <class Group>: Can't promote '_auto_ivc.v0' to 'G.test_param': shape (1,) of '_auto_ivc.v0' is incompatible with shape (5,) of 'G.test_param'.")
+           "\n   <model> <class Group>: Can't promote 'G.foo.test_param' to 'G.test_param': shape () of 'G.test_param' is incompatible with shape (5,) of 'G.foo.test_param'.")
 
     def test_set_input_defaults_keyerror(self):
         class Sub(om.Group):
@@ -1802,7 +1802,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['a']
 
         self.assertEqual(cm.exception.args[0],
-                         "<model> <class SimpleGroup>: Variable 'a' not found. Perhaps you meant one of the following variables: ['comp2.a'].")
+                         ": Variable 'a' not found. Perhaps you meant one of the following variables: ['comp2.a'].")
 
     def test_promotes_inputs_in_config(self):
 
@@ -1822,7 +1822,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['b']
 
         self.assertEqual(cm.exception.args[0],
-                         "<model> <class SimpleGroup>: Variable 'b' not found. Perhaps you meant one of the following variables: ['comp2.b'].")
+                         ": Variable 'b' not found. Perhaps you meant one of the following variables: ['comp2.b'].")
 
     def test_promotes_any_in_config(self):
 
@@ -1842,7 +1842,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['a']
 
         self.assertEqual(cm.exception.args[0],
-                         "<model> <class SimpleGroup>: Variable 'a' not found. Perhaps you meant one of the following variables: ['comp2.a'].")
+                         ": Variable 'a' not found. Perhaps you meant one of the following variables: ['comp2.a'].")
 
     def test_promotes_alias(self):
         class SubGroup(om.Group):
@@ -1999,7 +1999,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['Branch1.G1.comp1.a']
 
         self.assertEqual(cm.exception.args[0],
-                         "<model> <class BranchGroup>: Variable 'Branch1.G1.comp1.a' not found. Perhaps you meant one of the following variables: ['Branch1.G1.a', 'Branch1.G1.comp1.b'].")
+                         ": Variable 'Branch1.G1.comp1.a' not found. Perhaps you meant one of the following variables: ['Branch1.G1.G2.comp1.a', 'Branch1.G1.G2.comp1.b', 'Branch1.G1.comp1.b'].")
 
     def test_promotes_ivc_bug(self):
         # This used to fail with an index error
@@ -2174,10 +2174,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'src_indices_bad_shape':"
-            "\n   <model> <class SimpleGroup>: The source indices [0 1 2] do not specify a "
-            "valid shape for the connection '_auto_ivc.v0' to 'comp1.a'. (target shape=(5,), "
-            "indices_shape=(3,)): shape mismatch: value array of shape (5,) could not be "
-            "broadcast to indexing result of shape (3,)")
+            "\n   <model> <class SimpleGroup>: Can't promote 'comp1.a' to 'a' when applying index [0 1 2]: shape (3,) of 'a' is incompatible with shape (5,) of 'comp1.a'.")
 
     def test_promotes_src_indices_different(self):
 
@@ -2784,7 +2781,7 @@ class TestSrcIndices(unittest.TestCase):
 
     def test_src_indices_shape_bad_idx_flat(self):
         msg = "\nCollected errors for problem 'src_indices_shape_bad_idx_flat':" + \
-              "\n   <model> <class Group>: Can't connect 'indeps.x' to 'C1.x': index 9 is out of bounds for source dimension of size 9."
+              "\n   <model> <class Group>: Can't connect 'indeps.x' to 'C1.x' when applying index [4 7 5 9]: index 9 is out of bounds for source dimension of size 9."
 
         p = self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[4, 7, 5, 9], flat_src_indices=True,
@@ -2803,7 +2800,7 @@ class TestSrcIndices(unittest.TestCase):
                                 name='src_indices_shape_bad_idx_flat_promotes')
 
         msg = "\nCollected errors for problem 'src_indices_shape_bad_idx_flat_promotes':" + \
-              "\n   <model> <class Group>: Can't promote 'C1.x' to 'x': index 9 is out of bounds for source dimension of size 9."
+              "\n   <model> <class Group>: Can't promote 'C1.x' to 'x' when applying index [4 5 7 9]: index 9 is out of bounds for source dimension of size 9."
         try:
             p.setup()
             p.final_setup()
@@ -2814,7 +2811,7 @@ class TestSrcIndices(unittest.TestCase):
 
     def test_src_indices_shape_bad_idx_flat_neg(self):
         msg = "\nCollected errors for problem 'src_indices_shape_bad_idx_flat_neg':" + \
-              "\n   <model> <class Group>: Can't connect 'indeps.x' to 'C1.x': index -10 is out of bounds for source dimension of size 9."
+              "\n   <model> <class Group>: Can't connect 'indeps.x' to 'C1.x' when applying index [-10   5   7   8]: index -10 is out of bounds for source dimension of size 9."
         p = self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[-10, 5, 7, 8], flat_src_indices=True,
                                 name='src_indices_shape_bad_idx_flat_neg')
@@ -2836,13 +2833,13 @@ class TestSrcIndices(unittest.TestCase):
         # the 4 should be a 3
         p.model.connect('indep.x', 'row4_comp.x', src_indices=om.slicer[4, ...])
 
-        with self.assertRaises(Exception) as err:
+        with self.assertRaises(Exception) as cm:
             p.setup()
             p.final_setup()
 
         expected_error_msg = "\nCollected errors for problem 'slice_with_ellipsis_error_in_connect':" + \
-            "\n   <model> <class Group>: Can't connect 'indep.x' to 'row4_comp.x': index 4 is out of bounds of the source shape (4,)."
-        self.assertEqual(str(err.exception), expected_error_msg)
+            "\n   <model> <class Group>: Can't connect 'indep.x' to 'row4_comp.x' when applying index (4, ...): index 4 is out of bounds of the source shape (4,)."
+        self.assertEqual(str(cm.exception), expected_error_msg)
 
 
 class TestGroupAddInput(unittest.TestCase):
@@ -2930,10 +2927,13 @@ class TestGroupAddInput(unittest.TestCase):
             p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
-            "\nCollected errors for problem 'missing_diff_units':"
-            "\n   <model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted "
-            "to 'x', are connected but their metadata entries ['units', 'val'] differ. "
-            "Call model.set_input_defaults('x', units=?, val=?) to remove the ambiguity.")
+                         "\nCollected errors for problem 'missing_diff_units':"
+                         "\n   <model> <class Group>: The following inputs promoted to 'x' have different units:"
+                         "\n  "
+                         "\n   par.C1.x  ft  "
+                         "\n   par.C2.x  inch"
+                         "\n  "
+                         "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem(name="missing_diff_vals")
@@ -2948,10 +2948,13 @@ class TestGroupAddInput(unittest.TestCase):
             p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
-            "\nCollected errors for problem 'missing_diff_vals':"
-            "\n   <model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted "
-            "to 'x', are connected but their metadata entries ['val'] differ. "
-            "Call model.set_input_defaults('x', val=?) to remove the ambiguity.")
+                         "\nCollected errors for problem 'missing_diff_vals':"
+                         "\n   <model> <class Group>: The following inputs promoted to 'x' have different values, so the value of 'x' is ambiguous:"
+                         "\n    "
+                         "\n   par.C1.x    [1.] "
+                         "\n   par.C2.x    [1.1]"
+                         "\n    "
+                         "\n   Call model.set_input_defaults('x', val=?)' to remove the ambiguity.")
 
     def test_conflicting_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args
@@ -3017,7 +3020,7 @@ class TestGroupAddInput(unittest.TestCase):
 
     def test_override_units(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
-        p = self._make_tree_model()
+        p = self._make_tree_model(name='override_units')
         model = p.model
         g2 = model._get_subsystem('G1.G2')
         g2.set_input_defaults('x', units='km')
@@ -3025,12 +3028,19 @@ class TestGroupAddInput(unittest.TestCase):
         g1 = model._get_subsystem('G1')
         g1.set_input_defaults('x', units='inch', val=2.)
 
-        msg = "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (inch) from 'G1' will be used."
-        testlogger = TestLogger()
-        p.setup(check=True, logger=testlogger)
-        p.final_setup()
+        p.setup()
 
-        self.assertEqual(testlogger.get('warning')[1], msg)
+        with self.assertRaises(Exception) as cm:
+            p.final_setup()
+
+        self.assertEqual(cm.exception.args[0],
+                         "\nCollected errors for problem 'override_units':"
+                         "\n   <model> <class Group>: The following inputs promoted to 'x' have different units:"
+                         "\n  "
+                         "\n   G1.x   inch"
+                         "\n   par.x  ft  "
+                         "\n  "
+                         "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
 
     def test_units_checking(self):
         p = om.Problem()
@@ -3052,7 +3062,7 @@ class TestGroupAddInput(unittest.TestCase):
 
         # Simplification
         G1.set_input_defaults('x', units='ft*ft/ft')
-        self.assertEqual(G1._static_group_inputs['x'][0]['units'], 'ft')
+        self.assertEqual(G1._static_group_inputs['x']['units'], 'ft')
 
     def test_sub_sub_override(self):
         p = om.Problem()
@@ -3068,10 +3078,6 @@ class TestGroupAddInput(unittest.TestCase):
         p.setup(check=True, logger=testlogger)
         p.final_setup()
 
-        self.assertEqual(testlogger.get('warning')[1],
-                        "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' "
-                        "with conflicting 'units'. The value (mm) from 'G1' will be used.")
-
     def test_sub_sets_parent_meta(self):
         p = om.Problem()
         model = p.model
@@ -3080,12 +3086,8 @@ class TestGroupAddInput(unittest.TestCase):
         G2 = G1.add_subsystem('G2', om.Group(), promotes=['x'])
         G2.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
         G2.set_input_defaults('x', units='cm')
-        msg = "Group 'G1' did not set a default 'units' for input 'x', so the value of (cm) from group 'G1.G2' will be used."
-        testlogger = TestLogger()
-        p.setup(check=True, logger=testlogger)
+        p.setup()
         p.final_setup()
-
-        self.assertEqual(testlogger.get('warning')[1], msg)
 
     def test_sub_sub_override2(self):
         p = om.Problem()
@@ -3098,16 +3100,8 @@ class TestGroupAddInput(unittest.TestCase):
         G3.add_subsystem('C1', om.ExecComp('y = 3.*x', x={'units': 'm'}), promotes=['x'])
         G3.add_subsystem('C2', om.ExecComp('y = 4.*x', x={'units': 'cm'}), promotes=['x'])
         G3.set_input_defaults('x', units='cm')
-        testlogger = TestLogger()
-        p.setup(check=True, logger=testlogger)
-        msgs = [
-            "Groups 'G1' and 'G1.G2' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used.",
-            "Groups 'G1' and 'G1.G2.G3' called set_input_defaults for the input 'x' with conflicting 'units'. The value (mm) from 'G1' will be used."
-        ]
+        p.setup()
         p.final_setup()
-
-        self.assertEqual(testlogger.get('warning')[1], msgs[0])
-        self.assertEqual(testlogger.get('warning')[2], msgs[1])
 
     def test_conflicting_units_multi_level_par(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -3136,8 +3130,8 @@ class TestGroupAddInput(unittest.TestCase):
                          "\nCollected errors for problem 'conflicting_units_multi_level_par':"
                          "\n   <model> <class Group>: The following inputs promoted to 'x' have different units:"
                          "\n  "
-                         "\n   ('i', 'G1.x')   ft  "
-                         "\n   ('i', 'par.x')  inch"
+                         "\n   G1.x   ft  "
+                         "\n   par.x  inch"
                          "\n  "
                          "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
 
@@ -3161,17 +3155,16 @@ class TestGroupAddInput(unittest.TestCase):
             p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
-           "\nCollected errors for problem 'group_input_not_found':"
-           "\n   'G1.G2' <class Group>: The following group inputs, passed to set_input_defaults(), "
-           "could not be found: ['xx'].\n   'G1' <class Group>: The following group inputs, passed "
-           "to set_input_defaults(), could not be found: ['G2.xx']."
-           "\n   <model> <class Group>: The following group inputs, passed to set_input_defaults(), "
-           "could not be found: ['G1.G2.xx']."
-           "\n   <model> <class Group>: The following inputs, ['G1.G2.C1.x', 'G1.G2.C2.x', "
-           "'G1.G3.C3.x', 'G1.G3.C4.x', 'par.G4.C5.x', 'par.G4.C6.x', 'par.G5.C7.x', 'par.G5.C8.x'],"
-           " promoted to 'x', are connected but their metadata entries ['val'] differ. "
-           "Call model.set_input_defaults('x', val=?) to remove the "
-           "ambiguity.")
+                         "\nCollected errors for problem 'group_input_not_found':"
+                         "\n   'G1.G2' <class Group>: The following group inputs, passed to set_input_defaults(), could not be found: ['xx']."
+                         "\n   <model> <class Group>: The following inputs promoted to 'x' have different units:"
+                         "\n  "
+                         "\n   G1.G2.C1.x  inch"
+                         "\n   G1.G2.C2.x  ft  "
+                         "\n   G1.G3.x     ft  "
+                         "\n   par.x       ft  "
+                         "\n  "
+                         "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
 
     def test_conflicting_val(self):
         p = self._make_tree_model(diff_vals=True, name='conflicting_val')
@@ -3191,8 +3184,8 @@ class TestGroupAddInput(unittest.TestCase):
         g1 = model._get_subsystem('G1')
         g1.set_input_defaults('x', val=4.0)
 
+        p.setup()
         with self.assertRaises(Exception) as cm:
-            p.setup()
             p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
@@ -3262,7 +3255,7 @@ class TestGroupAddInput(unittest.TestCase):
         #
         # first check that we get errors when using invalid args to set defaults on a discrete
         #
-        p = om.Problem()
+        p = om.Problem(name='input_defaults_discrete')
         model = p.model
 
         model.add_subsystem('square', SquarePlate(), promotes_inputs=['material'])
@@ -3270,23 +3263,15 @@ class TestGroupAddInput(unittest.TestCase):
 
         # setting input defaults for units/src_shape is not valid for a discrete and will generate errors
         model.set_input_defaults('material', 'steel', units='kg', src_shape=(1,))
-        expect_errors = [
-            f"Collected errors for problem '{p._get_inst_id()}':",
-            "   <model> <class Group>: Cannot set 'units=kg' for discrete variable 'circle.material'.",
-            "   <model> <class Group>: Cannot set 'src_shape=(1,)' for discrete variable 'circle.material'.",
-            "   <model> <class Group>: Cannot set 'units=kg' for discrete variable 'square.material'.",
-            "   <model> <class Group>: Cannot set 'src_shape=(1,)' for discrete variable 'square.material'.",
-        ]
 
         p.setup()
         with self.assertRaises(Exception) as cm:
             p.final_setup()
 
-        err_msgs = cm.exception.args[0].split('\n')
-        for err_msg in expect_errors:
-            self.assertTrue(err_msg in err_msgs,
-                            err_msg + ' not found in:\n' + cm.exception.args[0])
-
+        self.assertEqual(str(cm.exception),
+                         "\nCollected errors for problem 'input_defaults_discrete':"
+                         "\n   <model> <class Group>: Cannot set 'units=kg' for discrete variable 'material'."
+                         "\n   <model> <class Group>: Cannot set 'shape=(1,)' for discrete variable 'material'.")
         #
         # now make sure that setting just the default value for a discrete works as expected
         #
