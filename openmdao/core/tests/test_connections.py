@@ -496,10 +496,8 @@ class TestConnectionsDistrib(unittest.TestCase):
             prob.setup()
             prob.final_setup()
         except Exception as err:
-            self.assertTrue(
-                             "\nCollected errors for problem 'serial_mpi_error':" \
-                             "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':" \
-                             " index 2 is out of bounds for source dimension of size 2." in str(err))
+            self.assertTrue("\nCollected errors for problem 'serial_mpi_error':" \
+                             "\n   <model> <class Group>: Can't connect 'p1.x' to 'c3.x' when applying index [1 2]: index 2 is out of bounds for source dimension of size 2." in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -530,7 +528,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         except Exception as err:
             self.assertTrue(
                              "\nCollected errors for problem 'serial_mpi_error_flat':" \
-                             "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':" \
+                             "\n   <model> <class Group>: Can't connect 'p1.x' to 'c3.x' when applying index [1 2]:" \
                              " index 2 is out of bounds for source dimension of size 2." in str(err))
         else:
             self.fail('Exception expected.')
@@ -586,7 +584,7 @@ class TestConnectionsError(unittest.TestCase):
 
         self.assertTrue(
             "\nCollected errors for problem 'incompatible_src_indices':"
-            "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':"
+            "\n   <model> <class Group>: Can't connect 'p1.x' to 'c3.x' when applying index [1 2]:"
             " index 2 is out of bounds for source dimension of size 2." in str(context.exception))
 
 
@@ -600,8 +598,8 @@ class TestConnectionsMPIBug(unittest.TestCase):
         class Burn(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('x', np.arange(12))
-                self.add_output('y', np.arange(12))
+                self.add_input('x', np.arange(12).reshape((3,4)))
+                self.add_output('y', np.arange(12).reshape((3,4)))
 
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['x'] * 2.0
@@ -609,9 +607,9 @@ class TestConnectionsMPIBug(unittest.TestCase):
         class LinkageComp(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('in1', np.zeros((3, 2)))
-                self.add_input('in2', np.zeros((3, 2)))
-                self.add_output('out', np.zeros((3, 2)))
+                self.add_input('in1', np.zeros((6,)))
+                self.add_input('in2', np.zeros((6,)))
+                self.add_output('out', np.zeros((6,)))
 
             def compute(self, inputs, outputs):
                 outputs['out'] = 3 * inputs['in2'] - 2.5 * inputs['in1']

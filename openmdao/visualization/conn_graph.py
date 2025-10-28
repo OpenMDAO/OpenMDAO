@@ -66,39 +66,6 @@ def are_compatible_values(a, b, discrete, src_indices=None):
     return array_connection_compatible(b.shape, src_indices.indexed_src_shape)
 
 
-# def has_ambiguous_child_values(vals, units_list, discretes_list):
-#     """
-#     Check if the values are compatible.
-#     """
-#     if 'ambiguous' in units_list:
-#         return False  # ambiguous units will already cause an error, so don't double report
-
-#     start = None
-#     for i, val in enumerate(vals):
-#         if val is not None:
-#             if start is None:
-#                 start = val
-#                 start_type = type(start)
-#                 start_units = units_list[i]
-#             else:
-#                 if discretes_list[i]:
-#                     if start_type is not type(val):
-#                         return True
-
-#                     if isinstance(start, np.ndarray):
-#                         if not np.all(start == val):
-#                             return True
-
-#                     if start != val:
-#                         return True
-
-#                 else:  # continuous
-#                     if has_val_mismatch(start_units, start, units_list[i], val):
-#                         return True
-
-#     return False
-
-
 class ConnError(ValueError):
     """
     An error raised when a connection is incompatible.
@@ -161,6 +128,73 @@ class Ambiguous():
 
 #     def get(self, key, default=None):
 #         return getattr(self, key, default)
+
+
+# class LocalVal():
+#     __slots__ = ['val']
+
+#     def __init__(self, val):
+#         self.val = val
+
+#     @property
+#     def shape(self):
+#         return np.shape(self.val)
+
+
+# class RemoteVal():
+
+#     __slots__ = ['comm', 'owner', 'val']
+
+#     def __init__(self, comm, owner, val=None):
+#         self.comm = comm
+#         self.owner = owner
+#         self.val = val
+
+#     @property
+#     def shape(self):
+#         if self.owner == self.comm.rank:
+#             shp = np.shape(self.val)
+#             self.comm.bcast(shp, root=self.owner)
+#             return shp
+#         else:
+#             return self.comm.bcast(None, root=self.owner)
+
+
+# class DistributedVal():
+#     def __init__(self, comm, val=None):
+#         self.comm = comm
+#         self.val = val
+
+
+# class RemoteIndexer():
+#     __slots__ = ['comm', 'owner', 'idxer']
+
+#     def __init__(self, comm, owner, idxer=None):
+#         self.comm = comm
+#         self.owner = owner
+#         self.idxer = idxer
+
+#     def indexed_val(self, arr):
+#         if self.idxer is None:
+#             val = self.comm.bcast(None, root=self.owner)
+#         elif self.owner == self.comm.rank:  # this proc is owner of the indexer
+#             idxval = self.idxer.indexed_val(arr)
+#             junk = self.comm.bcast(idxval, root=self.owner)
+#             return idxval
+#         else:  # indexer is local but this proc is not the owner
+#             junk = self.comm.bcast(None, root=self.owner)
+#             return self.idxer.indexed_val(arr)
+
+#     @property
+#     def indexed_src_shape(self):
+#         if self.idxer is None:
+#             return self.comm.bcast(None, root=self.owner)
+#         elif self.owner == self.comm.rank:  # this proc is owner of the indexer
+#             iss = self.idxer.indexed_src_shape
+#             self.comm.bcast(iss, root=self.owner)
+#             return iss
+#         else:  # indexer is local but this proc is not the owner
+#             return self.comm.bcast(None, root=self.owner)
 
 
 class AllConnGraph(nx.DiGraph):
@@ -347,15 +381,19 @@ class AllConnGraph(nx.DiGraph):
                 if node not in self:
                     raise ValueError(f"Node '{orig}' not found in the graph.")
 
-        meta = self.nodes[node]
-        absnames = sorted(meta['absnames'])
-        if len(absnames) == 1:
-            absnames = absnames[0]
+        if node[0] == 'i':
+            names = [n for _, n in self.leaf_input_iter(node)]
+        else:
+            names = [self.get_root(node)[1]]
 
-        if node[1] == absnames:
+        names = sorted(names)
+        if len(names) == 1:
+            names = names[0]
+
+        if node[1] == names:
             return node[1]
 
-        return f'{node[1]} ({absnames})'
+        return f'{node[1]} ({names})'
 
     def combined_name(self, node):
         meta = self.nodes[node]
@@ -600,21 +638,15 @@ class AllConnGraph(nx.DiGraph):
         self.add_edge(src, tgt, **kwargs)
 
     def create_node_meta(self, group, name, io):
-        absnames = group._resolver.absnames(name, io, report_error=False)
-        if absnames is None:
-            # auto_ivcs may not have been added to the graph yet
-            if name.startswith('_auto_ivc.'):
-                absnames = [name]
-            else:
-                raise KeyError(group._resolver._add_guesses(
-                    name, f"{group.msginfo}: '{name}' not found."))
+        if not (name.startswith('_auto_ivc.') or group._resolver.is_prom(name, io) or
+                group._resolver.is_abs(name, io)):
+            raise KeyError(group._resolver._add_guesses(
+                           name, f"{group.msginfo}: '{name}' not found."))
 
         key = (io[0], '.'.join((group.pathname, name)) if group.pathname else name)
 
-        meta = {'pathname': group.pathname, 'rel_name': name, 'absnames': absnames,
-                'discrete': None, 'resolved': None,
-                'units': None, 'val': None, 'shape': None,
-                'meta': None}
+        meta = {'pathname': group.pathname, 'rel_name': name, 'discrete': None, 'resolved': None,
+                'units': None, 'val': None, 'shape': None, 'meta': None}
 
         if io == 'input':
             meta['require_connection'] = False
@@ -724,7 +756,6 @@ class AllConnGraph(nx.DiGraph):
         for prom_tgt, (prom_src, src_indices, flat) in manual_connections.items():
             src_io = resolver.get_iotype(prom_src)
             if src_io is None:
-                # group._bad_conn_vars.update((prom_tgt, prom_src))
                 guesses = get_close_matches(prom_src, list(resolver.prom_iter('output')) +
                                             list(allprocs_discrete_out.keys()))
                 group._collect_error(f"{group.msginfo}: Attempted to connect from '{prom_src}' to "
@@ -740,14 +771,12 @@ class AllConnGraph(nx.DiGraph):
 
             if tgt_io == 'output':
                 # check that target is not also an input
-                # group._bad_conn_vars.update((prom_tgt, prom_src))
                 group._collect_error(f"{group.msginfo}: Attempted to connect from '{prom_src}' to "
                                     f"'{prom_tgt}', but '{prom_tgt}' is an output. All "
                                     "connections must be to an input.")
                 continue
 
             if tgt_io is None:
-                # group._bad_conn_vars.update((prom_tgt, prom_src))
                 guesses = get_close_matches(prom_tgt, list(resolver.prom_iter('input')) +
                                             list(allprocs_discrete_in.keys()))
                 group._collect_error(f"{group.msginfo}: Attempted to connect from '{prom_src}' to "
@@ -759,7 +788,6 @@ class AllConnGraph(nx.DiGraph):
             in_comps = {n.rpartition('.')[0] for n in resolver.absnames(prom_tgt, tgt_io)}
 
             if out_comps & in_comps:
-                # group._bad_conn_vars.update((prom_tgt, prom_src))
                 group._collect_error(f"{group.msginfo}: Source and target are in the same System "
                                      f"for connection from '{prom_src}' to '{prom_tgt}'.")
                 continue
@@ -776,7 +804,6 @@ class AllConnGraph(nx.DiGraph):
             if input_input:
                 self._input_input_conns.add((src, tgt))
 
-
             self.check_add_edge(group, src, tgt, type='manual', src_indices=src_indices,
                                 flat_src_indices=flat)
 
@@ -786,8 +813,7 @@ class AllConnGraph(nx.DiGraph):
             path = group.pathname + '.' + name if group.pathname else name
             node = ('i', path)
             if node not in self:
-                absnames = group._resolver.absnames(name, 'input', report_error=False)
-                if absnames is None:
+                if not group._resolver.is_prom(name, 'input'):
                     notfound.append(name)
                     continue
 
@@ -1222,7 +1248,8 @@ class AllConnGraph(nx.DiGraph):
             if src_indices is not None and src_shape is not None:
                 src_indices.set_src_shape(src_shape)
                 src_shape = src_indices.indexed_src_shape
-                src_val = src_indices.indexed_val(np.atleast_1d(src_val))
+                if src_val is not None:
+                    src_val = src_indices.indexed_val(np.atleast_1d(src_val))
 
             if src_shape is not None:
                 if tgt_shape is not None:
@@ -1550,25 +1577,31 @@ class AllConnGraph(nx.DiGraph):
             The top level group.
         """
         for inp_src, tgt in self._input_input_conns:
-            new_src = self.get_root(inp_src)
-
-            tgt_syspath, tgt_prom = self.get_path_prom(tgt)
+            root = self.get_root(inp_src)
             edge_meta = self.edges[inp_src, tgt]
             self.remove_edge(inp_src, tgt)
-            self.add_edge(new_src, tgt, **edge_meta)
+            self.add_edge(root, inp_src, **edge_meta)
+
+            tgt_syspath, tgt_prom = self.get_path_prom(tgt)
             if tgt_syspath:
-                tgt_meta = self.nodes[tgt]
-                tgt_prom = model._resolver.abs2prom(tgt_meta['absnames'][0], 'input')
+                for abs_in_node in self.leaf_input_iter(tgt):
+                    break
+                tgt_prom = model._resolver.abs2prom(abs_in_node[1], 'input')
+            del model._manual_connections[tgt_prom]
 
-            src_meta = self.nodes[new_src]
-            absname0 = src_meta['absnames'][0]
-            if absname0.startswith('_auto_ivc.'):
-                src_prom = absname0
+            _, abs_out = root
+            if abs_out.startswith('_auto_ivc.'):
+                src_prom = abs_out
             else:
-                src_prom = model._resolver.abs2prom(absname0, 'output')
+                src_prom = model._resolver.abs2prom(abs_out, 'output')
 
-            model._manual_connections[tgt_prom] = (src_prom, edge_meta.get('src_indices', None),
-                                                   edge_meta.get('flat_src_indices', None))
+            inp_src_syspath, inp_src_prom = self.get_path_prom(inp_src)
+            for abs_in_node in self.leaf_input_iter(inp_src):
+                break
+            inp_src_prom = model._resolver.abs2prom(abs_in_node[1], 'input')
+
+            model._manual_connections[inp_src_prom] = (src_prom, edge_meta.get('src_indices', None),
+                                                       edge_meta.get('flat_src_indices', None))
 
     def create_all_conns_dict(self, model):
         """

@@ -147,7 +147,7 @@ class TestAllConnectionTypes(unittest.TestCase):
 
         #prob.model.display_conn_graph()
         #prob.model._get_all_conn_graph().dump()
-        print('done')
+        #print('done')
 
 
 class TestAllConnGraphUtilityFunctions(unittest.TestCase):

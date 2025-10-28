@@ -1538,120 +1538,6 @@ class Group(System):
                                             "without specifying src_indices.",
                                             ident=(abs_out, abs_in))
 
-    # @collect_errors
-    # def _resolve_src_indices(self):
-    #     """
-    #     Populate the promotes info list for each absolute input.
-
-    #     This is called only at the top level of the system tree.
-    #     """
-    #     all_abs2meta_out = self._var_allprocs_abs2meta['output']
-    #     all_abs2meta_in = self._var_allprocs_abs2meta['input']
-    #     conns = self._conn_global_abs_in2out
-    #     resolver = self._resolver
-
-    #     for tgt, plist in self._problem_meta['abs_in2prom_info'].items():
-    #         src = conns[tgt]
-    #         smeta = all_abs2meta_out[src]
-    #         tmeta = all_abs2meta_in[tgt]
-
-    #         if not smeta['distributed'] and tmeta['distributed']:
-    #             root_shape = self._get_full_dist_shape(src, smeta['shape'], 'output')
-    #         else:
-    #             root_shape = smeta['global_shape']
-
-    #         # plist is a list of (pinfo, shape, use_tgt) tuples, one for each level in the
-    #         # system tree corresponding to an absolute input name, e.g., a plist for the
-    #         # input 'abc.def.ghi.x' would look like [tup0, tup1, tup2, tup3] corresponding to
-    #         # the ['', 'abc', 'abc.def', 'abc.def.ghi'] levels in the tree.
-
-    #         # After this routine runs, all pinfo entries will have src_indices wrt the root
-    #         # shape.
-
-    #         # use a _PromotesInfo for the top level even though there really isn't a promote there
-    #         current_pinfo = _PromotesInfo(src_shape=root_shape,
-    #                                       prom=resolver.abs2prom(tgt, 'input'))
-    #         if plist[0] is None:  # no top level pinfo
-    #             plist[0] = current_pinfo
-
-    #         for i, pinfo in enumerate(plist):
-    #             if pinfo is None:
-    #                 pass
-    #             elif current_pinfo.src_indices is None:
-    #                 try:
-    #                     if pinfo.src_shape is None:
-    #                         pinfo.set_src_shape(root_shape)
-    #                     elif pinfo.src_indices is not None and \
-    #                             not array_connection_compatible(root_shape, pinfo.src_shape):
-    #                         self._collect_error(f"When connecting '{src}' to "
-    #                                             f"'{pinfo.prom_path()}': Promoted src_shape of "
-    #                                             f"{pinfo.src_shape} for "
-    #                                             f"'{pinfo.prom_path()}' differs from src_shape "
-    #                                             f"{root_shape} for '{current_pinfo.prom_path()}'.",
-    #                                             ident=(src, tgt))
-    #                 except Exception:
-    #                     type_exc, exc, tb = sys.exc_info()
-    #                     self._collect_error(f"When connecting '{src}' to "
-    #                                         f"'{pinfo.prom_path()}': {exc}",
-    #                                         exc_type=type_exc, tback=tb, ident=(src, tgt))
-    #                 current_pinfo = pinfo
-    #                 continue
-    #             elif pinfo.src_indices is None:
-    #                 pinfo.src_indices = current_pinfo.src_indices
-    #                 if pinfo.src_shape is None:
-    #                     pinfo.set_src_shape(current_pinfo.src_shape)
-    #                 current_pinfo = pinfo
-    #             else:  # both have src_indices
-    #                 try:
-    #                     if pinfo.src_shape is None:
-    #                         pinfo.set_src_shape(current_pinfo.src_indices.indexed_src_shape)
-    #                     sinds = convert_src_inds(current_pinfo.src_indices,
-    #                                              pinfo.src_indices, pinfo.src_shape)
-    #                 except Exception:
-    #                     type_exc, exc, tb = sys.exc_info()
-    #                     self._collect_error(f"When connecting '{conns[tgt]}' to "
-    #                                         f"'{pinfo.prom_path()}': input "
-    #                                         f"'{current_pinfo.prom_path()}' src_indices are "
-    #                                         f"{current_pinfo.src_indices} and indexing into those "
-    #                                         f"failed using src_indices {pinfo.src_indices} from "
-    #                                         f"input '{pinfo.prom_path()}'. Error was: "
-    #                                         f"{exc}", exc_type=type_exc, tback=tb,
-    #                                         ident=(conns[tgt], tgt))
-    #                     continue
-
-    #                 # final src_indices are wrt original full sized source and are flat,
-    #                 # so use val.shape and flat_src=True
-    #                 # It would be nice if we didn't have to convert these and could just keep
-    #                 # them in their original form and stack them to get the final result. We can
-    #                 # do this when doing a get_val, but it doesn't work when doing a set_val.
-    #                 src_indices = indexer(sinds, src_shape=root_shape, flat_src=True)
-    #                 current_pinfo = _PromotesInfo(src_indices=src_indices, src_shape=root_shape,
-    #                                               flat=True, promoted_from=pinfo.promoted_from,
-    #                                               prom=pinfo.prom)
-    #             plist[i] = current_pinfo
-
-    #     with multi_proc_exception_check(self.comm):
-    #         self._resolve_src_inds()
-
-    # def _resolve_src_inds(self):
-    #     tree_level = self.pathname.count('.') + 1 if self.pathname else 0
-    #     abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-    #     seen = set()
-
-    #     for tgt, prom in self._resolver.abs2prom_iter('input', local=True):
-    #         if tgt in abs_in2prom_info and prom not in seen:
-    #             seen.add(prom)
-
-    #             plist = abs_in2prom_info[tgt]
-    #             pinfo = plist[tree_level]
-    #             if pinfo is not None:
-    #                 inds, flat, shape = pinfo
-    #                 if inds is not None:
-    #                     self._var_prom2inds[prom] = [shape, inds, flat]
-
-    #     for s in self._subsystems_myproc:
-    #         s._resolve_src_inds()
-
     def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
@@ -1669,9 +1555,6 @@ class Group(System):
         abs2meta = self._var_abs2meta
 
         allprocs_abs2meta = {'input': {}, 'output': {}}
-
-        for meta in self._group_inputs.values():
-            meta['path'] = self.pathname  # used for error reporting
 
         self._has_distrib_vars = False
         self._has_fd_group = self._owns_approx_jac
@@ -1778,21 +1661,6 @@ class Group(System):
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
-        #if self._group_inputs:
-            #extra = [gin for gin in self._group_inputs if not resolver.is_prom(gin, 'input')]
-            #if extra:
-                ## make sure that we don't have a leftover group input default entry from a previous
-                ## execution of _setup_var_data before promoted names were updated.
-                #ex = set()
-                #for e in extra:
-                    #if e in old_proms:
-                        #del self._group_inputs[e]  # clean up old key using old promoted name
-                    #else:
-                        #ex.add(e)
-                #if ex:
-                    #self._collect_error(f"{self.msginfo}: The following group inputs, passed to "
-                                        #f"set_input_defaults(), could not be found: {sorted(ex)}.")
-
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
@@ -1814,125 +1682,7 @@ class Group(System):
         show_warnings : bool
             Bool to show or hide the auto_ivc warnings.
         """
-        # skip = {'path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'}
-        # abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-        # abs2meta_in = self._var_allprocs_abs2meta['input']
-        # resolver = self._resolver
-
         self._auto_ivc_warnings = []
-
-        # for prom, metalist in self._group_inputs.items():
-        #     if not resolver.is_prom(prom, 'input'):
-        #         # this error was already collected in setup_var_data, so just continue here
-        #         continue
-        #     try:
-        #         paths = [(i, m['path']) for i, m in enumerate(metalist) if not m['auto']]
-        #         if paths:
-        #             top_origin = paths[0][1]
-        #             top_prom = metalist[paths[0][0]]['prom']
-        #     except KeyError:
-        #         issue_warning("No auto IVCs found", prefix=self.msginfo, category=PromotionWarning)
-        #     allmeta = set()
-        #     for meta in metalist:
-        #         allmeta.update(meta)
-        #     fullmeta = {n: _UNDEFINED for n in allmeta - skip}
-
-        #     for key in sorted(fullmeta):
-        #         for submeta in metalist:
-        #             if submeta['auto']:
-        #                 continue
-        #             if key in submeta:
-        #                 if is_undefined(fullmeta[key]):
-        #                     origin = submeta['path']
-        #                     origin_prom = submeta['prom']
-        #                     val = fullmeta[key] = submeta[key]
-        #                     if origin != top_origin:
-        #                         msg = (f"Group '{top_origin}' did not set a default "
-        #                                f"'{key}' for input '{top_prom}', so the value of "
-        #                                f"({val}) from group '{origin}' will be used.")
-        #                         if show_warnings:
-        #                             issue_warning(msg, category=PromotionWarning)
-        #                         else:
-        #                             self._auto_ivc_warnings.append(msg)
-
-        #                 else:
-        #                     eq = submeta[key] == val
-        #                     if isinstance(eq, np.ndarray):
-        #                         eq = np.all(eq)
-        #                     if not eq:
-        #                         # first, see if origin is an ancestor
-        #                         if not origin or submeta['path'].startswith(origin + '.'):
-        #                             msg = (f"Groups '{origin}' and '{submeta['path']}' "
-        #                                    f"called set_input_defaults for the input "
-        #                                    f"'{origin_prom}' with conflicting '{key}'. "
-        #                                    f"The value ({val}) from '{origin}' will be "
-        #                                    "used.")
-        #                             if show_warnings:
-        #                                 issue_warning(msg, category=PromotionWarning)
-        #                             else:
-        #                                 self._auto_ivc_warnings.append(msg)
-        #                         else:  # origin is not an ancestor, so we have an ambiguity
-        #                             if origin_prom != submeta['prom']:
-        #                                 prm = f"('{origin_prom}' / '{submeta['prom']}')"
-        #                             else:
-        #                                 prm = f"'{origin_prom}'"
-        #                             self._collect_error(f"{self.msginfo}: The subsystems {origin} "
-        #                                                 f"and {submeta['path']} called "
-        #                                                 f"set_input_defaults for promoted input "
-        #                                                 f"{prm} with conflicting values for "
-        #                                                 f"'{key}'. Call model.set_input_defaults("
-        #                                                 f"'{prom}', {key}=?) to remove the "
-        #                                                 "ambiguity.")
-
-        #     # update all metadata dicts with any missing metadata that was filled in elsewhere
-        #     # and update src_shape and use_tgt in abs_in2prom_info
-        #     for meta in metalist:
-        #         tree_level = meta['path'].count('.') + 1 if meta['path'] else 0
-        #         prefix = meta['path'] + '.' if meta['path'] else ''
-        #         src_shape = None
-        #         if 'val' in meta:
-        #             abs_in = resolver.absnames(prom, 'input')[0]
-        #             if abs_in in abs2meta_in:  # it's a continuous variable
-        #                 src_shape = np.asarray(meta['val']).shape
-        #         elif 'src_shape' in meta:
-        #             src_shape = meta['src_shape']
-
-        #         if src_shape is not None:
-        #             # Now update the global promotes info dict
-        #             for tgt in resolver.absnames(prom, 'input'):
-        #                 if tgt in abs_in2prom_info and tgt.startswith(prefix):
-        #                     pinfo = abs_in2prom_info[tgt][tree_level]
-        #                     if pinfo is not None:
-        #                         p2 = abs_in2prom_info[tgt][tree_level + 1]
-        #                         if p2 is not None:
-        #                             # src_shape from a set_input_defaults call actually
-        #                             # must match the promoted src_shape from one level
-        #                             # deeper in the tree.
-        #                             if p2.src_shape is not None and p2.src_shape != src_shape:
-        #                                 self._collect_error(f"{self.msginfo}: src_shape {src_shape}"
-        #                                                     f" set by set_input_defaults('{prom}', "
-        #                                                     f"...) in group '{meta['path']}' "
-        #                                                     "conflicts with src_shape of "
-        #                                                     f"{pinfo.src_shape} for promoted input "
-        #                                                     f"'{pinfo.prom_path()}")
-        #                             p2.set_src_shape(src_shape)
-        #                     else:
-        #                         abs_in2prom_info[tgt][tree_level] = \
-        #                             _PromotesInfo(src_shape=src_shape, prom=prom,
-        #                                           promoted_from=self.pathname)
-        #         else:
-        #             # check for discrete targets
-        #             for tgt in resolver.absnames(prom, 'input'):
-        #                 if tgt in self._discrete_inputs:
-        #                     for key, val in meta.items():
-        #                         # for discretes we can only set the value (not units/src_shape)
-        #                         if key == 'val':
-        #                             self._discrete_inputs[tgt] = val
-        #                         elif key in ('units', 'src_shape'):
-        #                             self._collect_error(f"{self.msginfo}: Cannot set '{key}={val}'"
-        #                                                 f" for discrete variable '{tgt}'.")
-
-        #         meta.update(fullmeta)
 
     def _find_vars_to_gather(self):
         """
@@ -2104,63 +1854,63 @@ class Group(System):
 
     def _setup_global_connections(self):
         """
-        Compute dict of all connections between this system's inputs and outputs.
+        Compute dict of all connections between inputs and outputs.
+
+        This should only be called on the top level group.
         """
-        implicit_conns = self._get_implicit_connections()
+        assert self.pathname == '', "call _setup_global_connections on the top level Group only."
 
         all_conn_graph = self._get_all_conn_graph()
 
-        if self.pathname == '':
-            all_conn_graph.add_implicit_connections(self, implicit_conns)
-            #all_conn_graph.add_implicit_connections(self)
+        all_conn_graph.add_implicit_connections(self, self._get_implicit_connections())
 
-            # add nodes for all absolute inputs and connected absolute outputs
-            all_conn_graph.add_abs_variable_meta(self)
+        # add nodes for all absolute inputs and connected absolute outputs
+        all_conn_graph.add_abs_variable_meta(self)
 
-            groups = list(self.system_iter(include_self=True, recurse=True, typ=Group))
-            for g in groups:
-                all_conn_graph.add_manual_connections(g)
+        groups = list(self.system_iter(include_self=True, recurse=True, typ=Group))
+        for g in groups:
+            all_conn_graph.add_manual_connections(g)
 
-            # TODO: gather all manual connections and static info from all procs
+        # TODO: gather all manual connections and static info from all procs
 
-            # check for cycles
-            if not nx.is_directed_acyclic_graph(all_conn_graph):
-                cycle_edges = nx.find_cycle(all_conn_graph, orientation='original')
-                errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}'
-                                    for edge in cycle_edges])
-                self._collect_error('Cycle detected in input-to-input connections. '
-                                    f'This is not allowed.\n{errmsg}')
+        # check for cycles
+        if not nx.is_directed_acyclic_graph(all_conn_graph):
+            cycle_edges = nx.find_cycle(all_conn_graph, orientation='original')
+            errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}'
+                                for edge in cycle_edges])
+            self._collect_error('Cycle detected in input-to-input connections. '
+                                f'This is not allowed.\n{errmsg}')
 
-            all_conn_graph.update_src_inds_lists(self)
-            all_conn_graph.add_auto_ivc_nodes(self)
+        all_conn_graph.update_src_inds_lists(self)
+        all_conn_graph.add_auto_ivc_nodes(self)
 
-            for g in groups:
-                all_conn_graph.add_group_input_defaults(g)
+        for g in groups:
+            all_conn_graph.add_group_input_defaults(g)
 
-            self._setup_auto_ivcs()
+        self._setup_auto_ivcs()
 
-            all_conn_graph.update_all_node_meta(self)
-            all_conn_graph.transform_input_input_connections(self)
+        all_conn_graph.update_all_node_meta(self)
+        all_conn_graph.transform_input_input_connections(self)
 
-            conn_dict = all_conn_graph.create_all_conns_dict(self)
+        conn_dict = all_conn_graph.create_all_conns_dict(self)
 
-            global_conn_dict = {'': {}}
-            root_dict = global_conn_dict['']
-            for path, conn_data in conn_dict.items():
-                for name in all_ancestors(path):
-                    if name in global_conn_dict:
-                        global_conn_dict[name].update(conn_data)
-                    else:
-                        global_conn_dict[name] = conn_data.copy()
+        global_conn_dict = {'': {}}
+        root_dict = global_conn_dict['']
+        for path, conn_data in conn_dict.items():
+            for name in all_ancestors(path):
+                if name in global_conn_dict:
+                    global_conn_dict[name].update(conn_data)
+                else:
+                    global_conn_dict[name] = conn_data.copy()
 
-                # don't forget the root path!
-                root_dict.update(conn_data)
+            # don't forget the root path!
+            root_dict.update(conn_data)
 
-            for system in self.system_iter(include_self=True, recurse=True):
-                if isinstance(system, Group):
-                    system._conn_abs_in2out = conn_dict.get(system.pathname, {})
-                    system._conn_global_abs_in2out = global_conn_dict.get(system.pathname, {})
-                system._resolver._conns = self._conn_global_abs_in2out
+        for system in self.system_iter(include_self=True, recurse=True):
+            if isinstance(system, Group):
+                system._conn_abs_in2out = conn_dict.get(system.pathname, {})
+                system._conn_global_abs_in2out = global_conn_dict.get(system.pathname, {})
+            system._resolver._conns = self._conn_global_abs_in2out
 
     def get_indep_vars(self, local, include_discrete=False):
         """
@@ -4324,173 +4074,6 @@ class Group(System):
 
         return graph
 
-    # def _get_auto_ivc_out_val(self, tgts, vars_to_gather):
-    #     # all tgts are continuous variables
-    #     # only called from top level group
-    #     info = None
-    #     src_idx_found = []
-    #     max_size = -1
-    #     found_dup = False
-    #     abs2meta_in = self._var_abs2meta['input']
-    #     abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-    #     abs2prom = self._resolver.abs2prom
-    #     start_val = val = None
-    #     val_shape = None
-    #     chosen_tgt = None
-
-    #     # first, find the auto_ivc output shape
-    #     loc_tgts = [t for t in tgts if t in abs2meta_in]
-    #     full_tgts = [t for t in loc_tgts if t not in abs_in2prom_info]
-    #     if full_tgts:  # full variable connections without any src_indices
-    #         val_shape = abs2meta_in[full_tgts[0]]['shape']
-    #         for tgt in full_tgts:
-    #             if tgt not in vars_to_gather:
-    #                 found_dup = True
-    #                 chosen_tgt = tgt
-    #                 break
-    #     else:
-    #         plist_tgts = [tgt for tgt in loc_tgts if tgt in abs_in2prom_info]
-    #         if plist_tgts:
-    #             plists = [abs_in2prom_info[tgt] for tgt in plist_tgts]
-    #             plens = [len(plist) for plist in plists]
-    #             nlevels = max(plens)
-    #             # find highest specification of src_shape in bfs order to shape the auto_ivc output
-    #             for i in range(nlevels):
-    #                 for tgt, plist, plen in zip(plist_tgts, plists, plens):
-    #                     if i < plen:
-    #                         pinfo = plist[i]
-    #                         if pinfo is not None and pinfo.src_shape is not None:
-    #                             val_shape = pinfo.src_shape
-    #                             break
-    #                 if val_shape is not None:
-    #                     chosen_tgt = tgt
-    #                     break
-
-    #     if val_shape is not None:
-    #         start_val = val = np.ones(val_shape)
-
-    #     info = None
-    #     for tgt in tgts:
-    #         if tgt in abs2meta_in:  # tgt is local
-    #             meta = abs2meta_in[tgt]
-    #             size = meta['size']
-    #             value = meta['val']
-    #             src_indices = None
-    #             if tgt in abs_in2prom_info:
-    #                 # traverse down the promotes list, (abs_in2prom_info[tgt]), to get the
-    #                 # final src_indices down at the component level so we can set the value of
-    #                 # that component input into the appropriate place(s) in the auto_ivc output.
-    #                 # If a tgt has no src_indices anywhere, it will not be found in
-    #                 # abs_in2prom_info.
-    #                 newshape = val_shape
-    #                 for pinfo in abs_in2prom_info[tgt]:
-    #                     if pinfo is None:
-    #                         continue
-    #                     inds, _, shape = pinfo
-    #                     if inds is not None:
-    #                         if shape is None:
-    #                             shape = newshape
-    #                             if inds._src_shape is None:
-    #                                 try:
-    #                                     inds.set_src_shape(shape)
-    #                                 except IndexError:
-    #                                     exc_class, exc, tb = sys.exc_info()
-    #                                     self._collect_error(f"When promoting '{pinfo.prom}' from "
-    #                                                         f"system '{pinfo.promoted_from}' with "
-    #                                                         f"src_indices {inds} and src_shape "
-    #                                                         f"{shape}: {exc}",
-    #                                                         exc_type=exc_class, tback=tb,
-    #                                                         ident=(pinfo.prom, pinfo.promoted_from))
-
-    #                         if src_indices is None:
-    #                             src_indices = inds
-    #                         else:
-    #                             sinds = convert_src_inds(src_indices, inds, shape)
-    #                             # final src_indices are wrt original full sized source and are flat,
-    #                             # so use val_shape and flat_src=True
-    #                             src_indices = indexer(sinds, src_shape=val_shape, flat_src=True)
-    #                         newshape = src_indices.indexed_src_shape
-
-    #             if src_indices is None:
-    #                 src_indices = meta['src_indices']
-
-    #             if src_indices is not None:
-    #                 if val is None:
-    #                     if val_shape is None and not found_dup:
-    #                         src_idx_found.append(tgt)
-    #                     val = value
-    #                 else:
-    #                     try:
-    #                         if src_indices._flat_src:
-    #                             val.ravel()[src_indices.flat()] = value.flat
-    #                         else:
-    #                             # Squeeze out singleton dimensions so that we can assign
-    #                             # values of different shapes when the storage order is unambiguous.
-    #                             np.squeeze(val[src_indices()])[...] = np.squeeze(value)
-    #                     except Exception as err:
-    #                         src = self._conn_global_abs_in2out[tgt]
-    #                         msg = f"{self.msginfo}: The source indices " + \
-    #                             f"{src_indices} do not specify a " + \
-    #                             f"valid shape for the connection '{src}' to " + \
-    #                             f"'{tgt}'. (target shape=" + \
-    #                             f"{meta['shape']}, indices_shape=" + \
-    #                             f"{src_indices.indexed_src_shape}): {err}"
-    #                         self._collect_error(msg, ident=(src, tgt))
-    #                         continue
-    #             else:
-    #                 if val is None:
-    #                     val = value
-    #                 elif np.ndim(value) == 0:
-    #                     if val.size > 1:
-    #                         src = self._conn_global_abs_in2out[tgt]
-    #                         self._collect_error(f"Shape of input '{tgt}', (), doesn't match shape "
-    #                                             f"{val.shape}.", ident=(src, tgt))
-    #                         continue
-    #                 elif np.squeeze(val).shape != np.squeeze(value).shape:
-    #                     src = self._conn_global_abs_in2out[tgt]
-    #                     self._collect_error(f"Shape of input '{tgt}', {value.shape}, doesn't match "
-    #                                         f"shape {val.shape}.", ident=(src, tgt))
-    #                     continue
-
-    #                 if val is not value:
-    #                     if val.shape:
-    #                         val = np.reshape(value, val.shape)
-    #                     else:
-    #                         val = value
-
-    #                 if tgt not in vars_to_gather:
-    #                     found_dup = True
-
-    #             if tgt == chosen_tgt or (chosen_tgt is None and size > max_size):
-    #                 max_size = size
-    #                 info = (tgt, val, False)
-
-    #             keep_val = val
-    #             val = start_val
-
-    #     if tgt in vars_to_gather:  # tgt var is remote somewhere (but not distributed)
-    #         owner = vars_to_gather[tgt]
-    #         if owner == self.comm.rank:  # this rank 'owns' the var
-    #             val = keep_val
-    #             self.comm.bcast(val, root=owner)
-    #         else:
-    #             val = self.comm.bcast(None, root=owner)
-
-    #         info = (tgt, val, False)
-
-    #     if src_idx_found:  # auto_ivc connected to local vars with src_indices
-    #         prom = abs2prom(src_idx_found[0], 'input')
-    #         self._collect_error("Attaching src_indices to inputs requires that the shape of the "
-    #                             "source variable is known, but the source shape for input "
-    #                             f"{prom} is unknown. You can specify the src shape "
-    #                             "for this input by setting 'val' or 'src_shape' in a call to "
-    #                             "set_input_defaults. For example: model.set_input_defaults"
-    #                             f"('{prom}', src_shape=?)",
-    #                             ident=(self.pathname, tuple(src_idx_found)))
-    #         return None
-
-    #     return info
-
     def _setup_auto_ivcs(self):
         # only happens at top level
         from openmdao.core.indepvarcomp import _AutoIndepVarComp
@@ -4500,64 +4083,21 @@ class Group(System):
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
-        conn_graph = self._all_conn_graph
+        graph = self._all_conn_graph
 
         auto2tgt = {}
-        for srcnode in conn_graph.nodes():
+        for srcnode in graph.nodes():
             io, src = srcnode
             if io == 'o' and src.startswith('_auto_ivc.'):
-                auto2tgt[src] = [n[1] for n in conn_graph.leaf_input_iter(srcnode)]
+                auto2tgt[src] = [n[1] for n in graph.leaf_input_iter(srcnode)]
 
         auto_ivc.auto2tgt = auto2tgt
 
         for src, tgts in auto2tgt.items():
-            tgt_node_meta = conn_graph.nodes[('i', tgts[0])]
-            abs_tgt_node = conn_graph.nodes[('i', tgt_node_meta['absnames'][0])]
+            abs_tgt_node = graph.nodes[('i', tgts[0])]
             # need to query discrete from a leaf node because internal nodes have not resolved yet
             discrete = abs_tgt_node['discrete']
             remote = False  # TODO: fix this
-
-            #prom = resolver.abs2prom(tgts[0], 'input')
-            #ret = self._get_auto_ivc_out_val(tgts, vars_to_gather)
-            #if ret is None:  # setup error occurred. Try to continue
-                #continue
-            #tgt, val, remote = ret
-            #prom = resolver.abs2prom(tgt, 'input')
-            #if prom not in self._group_inputs:
-                #self._group_inputs[prom] = {'use_tgt': tgt, 'auto': True, 'path': self.pathname,
-                                            #'prom': prom}
-            #else:
-                #self._group_inputs[prom]['use_tgt'] = tgt
-            #gmeta = self._group_inputs[prom]
-
-            #if 'units' in gmeta:
-                #units = gmeta['units']
-            #else:
-                #units = all_abs2meta[tgt]['units']
-
-            #if not remote and 'val' in gmeta:
-                #val = gmeta['val']
-
-            #if self.comm.size > 1:
-                #tgt_local_procs = set()
-                #for t in tgts:
-                    #if t in vars_to_gather:
-                        #tgt_local_procs.add(vars_to_gather[t])
-                    #else:   # t is duplicated in all procs
-                        #break
-                #else:
-                    #if len(tgt_local_procs) < self.comm.size:  # don't have local var in each proc
-                        #tgt_local_procs = set()
-                        #for t in self.comm.allgather(tgt):
-                            #if t in vars_to_gather:
-                                #tgt_local_procs.add(vars_to_gather[t])
-                        #if len(tgt_local_procs) > 1:
-                            ## the 'local' val can only exist on 1 proc (distrib auto_ivcs not
-                            ## allowed), so must consolidate onto one proc
-                            #rank = sorted(tgt_local_procs)[0]
-                            #if rank != self.comm.rank:
-                                #val = np.zeros(0)
-                                #remote = True
 
             relsrc = src.rsplit('.', 1)[-1]
             if discrete:
@@ -4606,23 +4146,6 @@ class Group(System):
         self._setup_procs_finished = True
 
         return auto_ivc
-
-    # def _show_ambiguity_msg(self, prom, metavars, tgts, metadata=None):
-    #     errs = sorted(metavars)
-    #     if metadata is None:
-    #         meta = errs
-    #     else:
-    #         meta = sorted(metadata)
-    #     inputs = sorted(tgts)
-
-    #     model = self._problem_meta['model_ref']()
-    #     gprom = model._resolver.abs2prom(tgts[0], 'input')
-
-    #     args = ', '.join([f'{n}=?' for n in errs])
-    #     self._collect_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
-    #                         f"to '{gprom}', are connected but their metadata entries {meta}"
-    #                         f" differ. Call model.set_input_defaults('{gprom}', {args}) "
-    #                         "to remove the ambiguity.")
 
     def _ordered_comp_name_iter(self):
         """
