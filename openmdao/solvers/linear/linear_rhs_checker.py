@@ -313,6 +313,8 @@ class LinearRHSChecker(object):
             self._ncompute_totals = system._problem_meta["ncompute_totals"]
             if self._stats is not None:
                 self._stats["resets"] += 1
+            # Since we just reset the cache, we know we won't find a match, so we can return early.
+            return None, False
 
         for i in range(len(self._caches) - 1, -1, -1):
             rhs_cache, sol_cache = self._caches[i]
