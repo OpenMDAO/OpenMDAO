@@ -1121,6 +1121,7 @@ class Group(System):
         return sarr, tarr, tsize, has_dist_data
 
     def _setup_dynamic_properties(self):
+        # called on the top level Group only
         self._setup_dynamic_property('shape')
         self._setup_dynamic_property('units')
 
@@ -2352,15 +2353,8 @@ class Group(System):
                 If the units of the variable are known, return the units.
                 Otherwise, return None.
             """
-            if to_var.startswith('#'):
-                return
-
-            from_meta = graph.nodes[from_var]
-            to_meta = graph.nodes[to_var]
-
-            from_units = from_meta['units']
-            to_meta['units'] = from_units
-
+            from_units = graph.nodes[from_var]['units']
+            graph.nodes[to_var]['units'] = from_units
             return from_units
 
         nprocs = self.comm.size
