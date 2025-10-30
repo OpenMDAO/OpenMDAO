@@ -1907,8 +1907,6 @@ class TestGroupPromotes(unittest.TestCase):
 
         self.assertEqual(str(context.exception),
             "\nCollected errors for problem 'alias_from_parent':"
-            "\n   'sub' <class SubGroup>: Trying to promote 'b' when it has been aliased to 'bb'."
-            "\n   'sub' <class SubGroup>: Trying to promote 'b' when it has been aliased to 'b'."
             "\n   'sub.comp1' <class ExecComp>: Can't alias promoted input 'b' to 'b' because 'b' "
             "has already been promoted as '('bb', 'b')'.")
 

@@ -465,7 +465,7 @@ def _get_output_inds(group, abs_out, abs_in):
             # src_indices are not allowed.
             raise RuntimeError(f"{group.msginfo}: Can't connect distributed output "
                                f"'{abs_out}' to non-distributed input '{abs_in}' "
-                               "without declaring src_indices.", ident=(abs_out, abs_in))
+                               "without declaring src_indices.")
         else:
             offset = offsets[rank]
             output_inds = range(offset, offset + sizes[rank])

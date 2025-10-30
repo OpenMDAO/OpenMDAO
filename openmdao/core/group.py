@@ -25,7 +25,7 @@ from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import _flatten_src_indices, \
     shape_to_len, ValueRepeater, evenly_distrib_idxs
 from openmdao.utils.general_utils import shape2tuple, ensure_compatible, \
-    meta2src_iter, get_rev_conns, is_undefined, all_ancestors
+    meta2src_iter, get_rev_conns, is_undefined, all_ancestors, env_truthy
 from openmdao.utils.units import unit_conversion, simplify_unit, PhysicalUnit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
     get_unresolved_knowns, is_unresolved, get_active_edges, add_shape_node, \
@@ -50,6 +50,8 @@ from openmdao.visualization.conn_graph import AllConnGraph
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
+
+dump_graphs = env_truthy('DUMP_GRAPHS')
 
 # use a class with slots instead of a namedtuple so that we can
 # change index after creation if needed.
@@ -1135,6 +1137,10 @@ class Group(System):
         graph = self._get_all_conn_graph()
         graph.update_all_node_meta(self)
 
+        if dump_graphs:
+            self.display_conn_graph(outfile=f'conn_graph_{self.comm.rank}.svg')
+            self.display_dataflow_graph(outfile=f'dataflow_graph_{self.comm.rank}.svg')
+
         self._check_order()
         self._resolver._check_dup_prom_outs()
 
@@ -1862,16 +1868,17 @@ class Group(System):
 
         all_conn_graph = self._get_all_conn_graph()
 
-        all_conn_graph.add_implicit_connections(self, self._get_implicit_connections())
-
         # add nodes for all absolute inputs and connected absolute outputs
         all_conn_graph.add_abs_variable_meta(self)
+
+        if self.comm.size > 1:
+            all_conn_graph.gather_data(self)
+
+        all_conn_graph.add_implicit_connections(self, self._get_implicit_connections())
 
         groups = list(self.system_iter(include_self=True, recurse=True, typ=Group))
         for g in groups:
             all_conn_graph.add_manual_connections(g)
-
-        # TODO: gather all manual connections and static info from all procs
 
         # check for cycles
         if not nx.is_directed_acyclic_graph(all_conn_graph):
@@ -2921,16 +2928,16 @@ class Group(System):
         if outputs:
             subsys._var_promotes['output'].extend((o, None) for o in outputs)
 
-        # check for attempt to promote with different alias
-        list_comp = [i if isinstance(i, tuple) else (i, i)
-                     for i, _ in subsys._var_promotes['input']]
+        # # check for attempt to promote with different alias
+        # list_comp = [i if isinstance(i, tuple) else (i, i)
+        #              for i, _ in subsys._var_promotes['input']]
 
-        for original, new in list_comp:
-            for original_inside, new_inside in list_comp:
-                if original == original_inside and new != new_inside:
-                    self._collect_error("%s: Trying to promote '%s' when it has been aliased to "
-                                        "'%s'." % (self.msginfo, original_inside, new))
-                    continue
+        # for original, new in list_comp:
+        #     for original_inside, new_inside in list_comp:
+        #         if original == original_inside and new != new_inside:
+        #             self._collect_error("%s: Trying to promote '%s' when it has been aliased to "
+        #                                 "'%s'." % (self.msginfo, original_inside, new))
+        #             continue
 
         # if this was called during configure(), mark this group as modified
         if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
@@ -4089,7 +4096,7 @@ class Group(System):
         for srcnode in graph.nodes():
             io, src = srcnode
             if io == 'o' and src.startswith('_auto_ivc.'):
-                auto2tgt[src] = [n[1] for n in graph.leaf_input_iter(srcnode)]
+                auto2tgt[src] = [n for _, n in graph.leaf_input_iter(srcnode)]
 
         auto_ivc.auto2tgt = auto2tgt
 
@@ -4653,8 +4660,8 @@ class Group(System):
                                       exclude=exclude, show_boundary=show_boundary,
                                       outfile=outfile)
 
-    def display_conn_graph(self, varname=None):
-        self._get_all_conn_graph().display(self.pathname, varname=varname)
+    def display_conn_graph(self, varname=None, outfile=None):
+        self._get_all_conn_graph().display(self.pathname, varname=varname, outfile=outfile)
 
     def _column_iotypes(self):
         """

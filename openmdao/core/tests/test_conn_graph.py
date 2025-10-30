@@ -2,6 +2,13 @@ import unittest
 import openmdao.api as om
 import numpy as np
 from openmdao.visualization.conn_graph import is_equal, are_compatible_values
+from openmdao.utils.mpi import MPI
+
+
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 
 class TestAllConnectionTypes(unittest.TestCase):
@@ -102,7 +109,7 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        # prob.model._get_all_conn_graph().display()
+        #prob.model.display_conn_graph()
 
     def test_no_promotion(self):
         prob = self.build_nested_model(promote=False)
@@ -187,6 +194,22 @@ class TestAllConnGraphUtilityFunctions(unittest.TestCase):
         # Test with different types
         self.assertFalse(are_compatible_values(5, 5.0, True))
 
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class TestMPI(unittest.TestCase):
+
+    N_PROCS = 2
+
+    def test_parallel_group(self):
+        p = om.Problem()
+        model = p.model
+        model.add_subsystem('indep', om.IndepVarComp('x', 10.0), promotes=['x'])
+        par = model.add_subsystem('par', om.ParallelGroup(), promotes=['x', 'y', 'z'])
+        par.add_subsystem('C1', om.ExecComp('y = 2.0 * x'), promotes=['y', 'x'])
+        par.add_subsystem('C2', om.ExecComp('z = 3.0 * x'), promotes=['z', 'x'])
+        model.add_subsystem('C3', om.ExecComp('w = 4.0 * y + 5.0 * z'), promotes=['y', 'z'])
+        p.setup()
+        p.run_model()
 
 
 if __name__ == '__main__':
