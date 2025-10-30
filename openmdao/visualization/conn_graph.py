@@ -907,8 +907,8 @@ class AllConnGraph(nx.DiGraph):
         else:
             units = child_meta['units']
             shape = child_meta['shape']
-            shape_by_conn = child_meta['shape_by_conn']
-            units_by_conn = child_meta['units_by_conn']
+            shape_by_conn = child_meta.get('shape_by_conn')
+            units_by_conn = child_meta.get('units_by_conn')
             distributed = child_meta['distributed']
             src_indices = self.edges[(parent, child)].get('src_indices', None)
             if src_indices is not None:
@@ -1064,14 +1064,19 @@ class AllConnGraph(nx.DiGraph):
                                      f"{err}", tback=err.__traceback__,
                                      ident=node)
 
-    def ambig_units_msg(self, node):
+    def ambig_units_msg(self, node, incompatible=False):
         rows = []
         self.find_ambiguous_causes(node, rows, 'units')
         rows = sorted(rows, key=lambda x: x[0])
         table = generate_table(rows, tablefmt='plain')
-        return (f"The following inputs promoted to '{node[1]}' have different "
-                f"units:\n{table}\nCall model.set_input_defaults('"
-                f"{self.top_name(node)}', units=?)' to remove the ambiguity.")
+        msg = (f"The following inputs promoted to '{node[1]}' have different "
+               f"units:\n{table}")
+        if incompatible:
+            msg += "\nThese units are incompatible."
+        else:
+            msg += ("\nCall model.set_input_defaults('"
+                    f"{self.top_name(node)}', units=?)' to remove the ambiguity.")
+        return msg
 
     def ambig_shapes_msg(self, node, shapes):
         children = [n for _, n in self.succ[node]]
@@ -1146,13 +1151,11 @@ class AllConnGraph(nx.DiGraph):
                     if nodes[s]['ambiguous'].units:
                         raise ConnError(self.ambig_units_msg(s))
 
-            mismatch = (start is not None and u is None) or (start is None and u is not None)
-
-            if not mismatch and not is_compatible(start, u):
-                slist = list(self.succ[node])
-                raise ConnError(self.units_error(True, slist[i], node, start, u))
-
+            one_none = (start is not None and u is None) or (start is None and u is not None)
             child_units_differ |= start != u
+
+            if not one_none and not is_compatible(start, u):
+                raise ConnError(self.ambig_units_msg(node, incompatible=True))
 
         if is_output:
             return start

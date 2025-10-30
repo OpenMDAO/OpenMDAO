@@ -157,11 +157,16 @@ class Indexer(object):
         """
         raise NotImplementedError("No implementation of '__call__' found.")
 
-    def __repr__(self):
+    def __str__(self):
         """
         Return string representation.
+
+        Returns
+        -------
+        str
+            String representation.
         """
-        return str(self)
+        return f"[{repr(self)}]"
 
     def indexed_val(self, arr):
         """
@@ -424,14 +429,9 @@ class ShapedIntIndexer(Indexer):
         """
         return self._idx
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return string representation.
-
-        Returns
-        -------
-        str
-            String representation.
         """
         return f"{self._idx}"
 
@@ -617,7 +617,7 @@ class ShapedSliceIndexer(Indexer):
         """
         return self._slice
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return string representation.
 
@@ -880,7 +880,7 @@ class ShapedArrayIndexer(Indexer):
         """
         return self._arr
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return string representation.
 
@@ -889,7 +889,7 @@ class ShapedArrayIndexer(Indexer):
         str
             String representation.
         """
-        return f"{self._arr}".replace('\n', '')
+        return f"{self._arr.tolist()}".replace('\n', '')
 
     def apply_offset(self, offset, flat=True):
         """
@@ -1103,7 +1103,7 @@ class ShapedMultiIndexer(Indexer):
         """
         return tuple(i() for i in self._idx_list)
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return string representation.
 
@@ -1112,7 +1112,7 @@ class ShapedMultiIndexer(Indexer):
         str
             String representation.
         """
-        return f"({', '.join(str(indexer(i)) for i in self._tup)})"
+        return f"{', '.join(repr(indexer(i)) for i in self._tup)}"
 
     def apply_offset(self, offset, flat=True):
         """
@@ -1336,7 +1336,7 @@ class EllipsisIndexer(Indexer):
         """
         return self._tup
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return string representation.
 
@@ -1350,9 +1350,9 @@ class EllipsisIndexer(Indexer):
             if i is ...:
                 s.append('...')
             else:
-                s.append(str(i))
+                s.append(repr(i))
 
-        return f"({', '.join(s)})"
+        return f"{', '.join(s)}"
 
     def apply_offset(self, offset, flat=True):
         """
@@ -1484,40 +1484,6 @@ class EllipsisIndexer(Indexer):
             A list or int version of self.
         """
         return self.as_array().tolist()
-
-
-class CompoundIndexer(Indexer):
-    """
-    An Indexer that applies multiple indexers in sequence.
-    """
-    def __init__(self, idxers):
-        super().__init__()
-        self._idxers = list(idxers)
-
-    def __call__(self):
-        return tuple(idxer() for idxer in self._idxers)
-
-    def __str__(self):
-        return f"CompoundIndexer: {self._idxers}"
-
-    def indexed_val(self, arr):
-        """
-        Return the value after indices are applied to the array.
-
-        Parameters
-        ----------
-        arr : ndarray
-            The array to index into.
-
-        Returns
-        -------
-        ndarray
-            The result of indexing into the array.
-        """
-        for idxer in self._idxers:
-            arr = idxer.indexed_val(arr)
-        return arr
-
 
 class IndexMaker(object):
     """

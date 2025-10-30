@@ -139,7 +139,7 @@ class IndexerTestCase(unittest.TestCase):
         try:
             ind.shaped_array()
         except Exception as err:
-            self.assertEqual(str(err), "Can't get shaped array of [ 5  3  7 -1] because it has no source shape.")
+            self.assertEqual(str(err), "Can't get shaped array of [[5, 3, 7, -1]] because it has no source shape.")
         else:
             self.fail("Exception expected")
 
@@ -165,7 +165,7 @@ class IndexerTestCase(unittest.TestCase):
         try:
             ind.shaped_array()
         except Exception as err:
-            self.assertEqual(str(err), "Can't get shaped array of [-1 -3 -5] because it has no source shape.")
+            self.assertEqual(str(err), "Can't get shaped array of [[-1, -3, -5]] because it has no source shape.")
         else:
             self.fail("Exception expected")
 
@@ -191,10 +191,10 @@ class IndexerTestCase(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             ind.indexed_src_shape
-        self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of slice(None, None, 1) because source shape is unknown.")
+        self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of [:] because source shape is unknown.")
         with self.assertRaises(Exception) as cm:
             ind.as_array()
-        self.assertEqual(cm.exception.args[0], "Can't get shaped array of slice(None, None, 1) because it has no source shape.")
+        self.assertEqual(cm.exception.args[0], "Can't get shaped array of [:] because it has no source shape.")
 
         ind.set_src_shape(src.shape)
 
@@ -256,7 +256,7 @@ class IndexerTestCase(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             ind.as_array()
-        self.assertEqual(cm.exception.args[0], "Can't get shaped array of slice(3, None, 1) because it has no source shape.")
+        self.assertEqual(cm.exception.args[0], "Can't get shaped array of [3:] because it has no source shape.")
 
         ind.set_src_shape(src.shape)
 
@@ -339,11 +339,11 @@ class IndexerMultiDimTestCase(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             ind.flat()
-        self.assertEqual(cm.exception.args[0], "Can't get shaped array of (slice(None, None, None), slice(None, None, None), slice(None, None, None)) because it has no source shape.")
+        self.assertEqual(cm.exception.args[0], "Can't get shaped array of [:, :, :] because it has no source shape.")
 
         with self.assertRaises(Exception) as cm:
             ind.indexed_src_shape
-        self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of (slice(None, None, None), slice(None, None, None), slice(None, None, None)) because source shape is unknown.")
+        self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of [:, :, :] because source shape is unknown.")
         with self.assertRaises(Exception) as cm:
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
@@ -389,7 +389,7 @@ class IndexerMultiDimTestCase(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             ind.indexed_src_shape
-        self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of (slice(None, -1, None), slice(None, None, None), slice(None, 2, None)) because source shape is unknown.")
+        self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of [:-1, :, :2] because source shape is unknown.")
         with self.assertRaises(Exception) as cm:
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
@@ -409,7 +409,7 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         assert_equal(ind(), ([0,2], slice(None, None, 1), [1,2]))
         with self.assertRaises(Exception) as cm:
             ind.indexed_src_shape
-        self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of ([0, 2], slice(None, None, None), [1, 2]) because source shape is unknown.")
+        self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of [[0, 2], :, [1, 2]] because source shape is unknown.")
         with self.assertRaises(Exception) as cm:
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")
@@ -429,7 +429,7 @@ class IndexerMultiDimTestCase(unittest.TestCase):
         assert_equal(ind(), ([[0,0],[2,2]], [[0,2], [0, 2]]))
         with self.assertRaises(Exception) as cm:
             ind.indexed_src_shape
-        self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of ([[0, 0], [2, 2]], [[0, 2], [0, 2]]) because source shape is unknown.")
+        self.assertEqual(cm.exception.args[0], "Can't get indexed_src_shape of [[0, 0], [2, 2], [0, 2], [0, 2]] because source shape is unknown.")
         with self.assertRaises(Exception) as cm:
             ind.as_array()
         self.assertEqual(cm.exception.args[0], "Can't determine extent of array because source shape is not known.")

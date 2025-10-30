@@ -210,6 +210,9 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         #
         # first optimize without Analysis Errors
         #
+        prob, comp = self.setup_problem(optimizer)
+        prob.run_driver()
+        
         try:
             prob, comp = self.setup_problem(optimizer)
             failed = not prob.run_driver().success

@@ -568,7 +568,7 @@ class TestUnitConversion(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'incompatible_connections':\n   <model> <class Group>: 'src.x2' units of 'degC' are incompatible with 'dest.x2' units of 'm'.")
+           "\nCollected errors for problem 'incompatible_connections':\n   <model> <class Group>: Can't connect 'src.x2' to 'dest.x2': units 'degC' of 'src.x2' are incompatible with units 'm' of 'dest.x2'.")
 
         # Implicit Connection
         prob = om.Problem(name='incompatible_connections2')
@@ -579,7 +579,7 @@ class TestUnitConversion(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(cm.exception),
-            "<model> <class Group>: When connecting 'src.x2' to 'dest.x2': Units 'degC' and 'm' are incompatible.")
+            "\nCollected errors for problem 'incompatible_connections2':\n   <model> <class Group>: Can't implicitly connect 'x2' to 'x2': units 'degC' of 'x2' are incompatible with units 'm' of 'x2'.")
 
 
     #def test_nested_relevancy_base(self):
@@ -910,10 +910,21 @@ class TestUnitConversion(unittest.TestCase):
             p.setup()
             p.final_setup()
 
-        self.assertTrue(
-           "<model> <class Group>: No default units have been set for input 'G1.x (['G1.C1.x', 'G1.C2.x'])' so the choice of units between ['J/s**2', 'm/s**2'] is ambiguous. Call model.set_input_defaults('x', units=?) to remove the ambiguity."in  str(e.exception))
-        self.assertTrue(
-           "<model> <class Group>: No default units have been set for input 'G1.z (['G1.C1.z', 'G1.C2.z'])' so the choice of units between ['J/s', 'W'] is ambiguous. Call model.set_input_defaults('G1.z', units=?) to remove the ambiguity." in str(e.exception),)
+        self.assertEqual(str(e.exception),
+                         "\nCollected errors for problem 'promotes_non_equivalent_units':"
+                         "\n   <model> <class Group>: The following inputs promoted to 'G1.z' have different units:"
+                         "\n  "
+                         "\n   G1.C1.z  W  "
+                         "\n   G1.C2.z  J/s"
+                         "\n  "
+                         "\n   Call model.set_input_defaults('G1.z', units=?)' to remove the ambiguity."
+                         "\n   <model> <class Group>: The following inputs promoted to 'G1.x' have different units:"
+                         "\n  "
+                         "\n   G1.C1.x  J/s**2"
+                         "\n   G1.C2.x  m/s**2"
+                         "\n  "
+                         "\n   These units are incompatible."
+                         "\n   <model> <class Group>: Auto_ivc variable '_auto_ivc.v1' has no shape or value.")
 
     def test_input_defaults_unit_compat(self):
         p = om.Problem()

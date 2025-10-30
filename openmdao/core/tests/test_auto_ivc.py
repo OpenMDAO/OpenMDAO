@@ -205,11 +205,14 @@ class SerialTests(unittest.TestCase):
         try:
             p.final_setup()
         except Exception as err:
-            self.assertTrue(
-              "\nCollected errors for problem 'discrete_fan_out2':"
-              "\n   <model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted "
-              "to 'x', are connected but their metadata entries ['val'] differ. Call "
-              "model.set_input_defaults('x', val=?) to remove the ambiguity." in str(err))
+            self.assertEqual(str(err),
+                             "\nCollected errors for problem 'discrete_fan_out2':"
+                             "\n   <model> <class Group>: The following inputs promoted to 'x' have different values, so the value of 'x' is ambiguous:"
+                             "\n    "
+                             "\n   par.C1.x    foo"
+                             "\n   par.C2.x    bar"
+                             "\n    "
+                             "\n   Call model.set_input_defaults('x', val=?)' to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -256,15 +259,13 @@ class SerialTests(unittest.TestCase):
         p.setup()
 
         p.set_val('exec.a', np.linspace(5, 10, 100))
-        p.set_val('exec.b', np.linspace(10, 20, 15))
-        p.set_val('exec.c', np.linspace(1, 3, 23))
 
         with self.assertRaises(ValueError) as cm:
-            p.final_setup()
+            p.set_val('exec.b', np.linspace(10, 20, 15))
 
         # can not broadcast input array from shape (15,) into shape (100,) for exec.b
-        self.assertTrue(str(cm.exception).startswith(
-                        "<model> <class Group>: Failed to set value of 'exec.b': "))
+        self.assertEqual(str(cm.exception), 
+                        "Failed to set value of 'exec.b': cannot reshape array of size 15 into shape (100,).")
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
