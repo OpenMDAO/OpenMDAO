@@ -358,7 +358,7 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'src_indices_on_promotes':"
-            "\n   <model> <class Group>: Can't promote 'C1.x' to 'x' when applying index [4 5 7 9]: index 9 is out of bounds for source dimension of size 9.")
+            "\n   <model> <class Group>: Can't promote 'C1.x' to 'x' when applying index [[4, 5, 7, 9]]: index 9 is out of bounds for source dimension of size 9.")
 
     def test_connect_slice_src_indices_not_full_size(self):
         p = om.Problem()

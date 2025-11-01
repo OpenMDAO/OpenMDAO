@@ -606,7 +606,7 @@ class TestGroup(unittest.TestCase):
             p.final_setup()
 
         self.assertEqual(str(context.exception),
-           "\nCollected errors for problem 'src_indices_error':\n   <model> <class Group>: Can't connect 'phase.comp1.x' to 'phase.comp2.x' when applying index [1]: shape (1,) of 'phase.comp1.x' is incompatible with shape (1, 2) of 'phase.comp2.x'.")
+           "\nCollected errors for problem 'src_indices_error':\n   <model> <class Group>: Can't connect 'phase.comp1.x' to 'phase.comp2.x' when applying index [[1]]: shape (1,) of 'phase.comp1.x' is incompatible with shape (1, 2) of 'phase.comp2.x'.")
 
     def test_connect_to_flat_array_with_slice(self):
         class SlicerComp(om.ExplicitComponent):
@@ -2172,7 +2172,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'src_indices_bad_shape':"
-            "\n   <model> <class SimpleGroup>: Can't promote 'comp1.a' to 'a' when applying index [0 1 2]: shape (3,) of 'a' is incompatible with shape (5,) of 'comp1.a'.")
+            "\n   <model> <class SimpleGroup>: Can't promote 'comp1.a' to 'a' when applying index [[0, 1, 2]]: shape (3,) of 'a' is incompatible with shape (5,) of 'comp1.a'.")
 
     def test_promotes_src_indices_different(self):
 
@@ -2298,7 +2298,7 @@ class TestGroupPromotes(unittest.TestCase):
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'src_indices_wildcard_output':"
             "\n   <model> <class SimpleGroup>: Trying to promote outputs ['*'] "
-            "while specifying src_indices [0 2 4] is not meaningful.")
+            "while specifying src_indices [[0, 2, 4]] is not meaningful.")
 
     def test_promotes_src_indices_collision(self):
 
@@ -2331,7 +2331,7 @@ class TestGroupPromotes(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'promotes_src_indices_collision':"
-            "\n   <model> <class TopGroup>: Can't promote 'sub.comp.a' to 'sub.a' when applying index [0 2 4]: index 4 is out of bounds for source dimension of size 3.")
+            "\n   <model> <class TopGroup>: Can't promote 'sub.comp.a' to 'sub.a' when applying index [[0, 2, 4]]: index 4 is out of bounds for source dimension of size 3.")
 
     def test_promotes_list_order(self):
         # This test verifies that the order we promote in the arguments to add_subsystem doesn't
@@ -2716,7 +2716,7 @@ class TestConnect(unittest.TestCase):
 
         p.model.connect('IV.x', 'C1.x', src_indices=[[1], [1]])
 
-        msg = "<model> <class Group>: Can't connect 'IV.x' to 'C1.x' when applying index ([1], [1]): shape (1,) of 'IV.x' is incompatible with shape (2, 2) of 'C1.x'."
+        msg = "<model> <class Group>: Can't connect 'IV.x' to 'C1.x' when applying index [[1], [1]]: shape (1,) of 'IV.x' is incompatible with shape (2, 2) of 'C1.x'."
 
         with self.assertRaises(Exception) as context:
             p.setup()
@@ -2729,7 +2729,7 @@ class TestConnect(unittest.TestCase):
         p.model.sub.connect('src.x', 'arr.x', src_indices=([2,2],[-1,2],[2,2]),
                             flat_src_indices=False)
 
-        msg = "<model> <class Group>: Can't connect 'sub.src.x' to 'sub.arr.x' when applying index ([2 2], [-1  2], [2 2]): Can't set source shape to (5, 3) because indexer ([2 2], [-1  2], [2 2]) expects 3 dimensions."
+        msg = "<model> <class Group>: Can't connect 'sub.src.x' to 'sub.arr.x' when applying index [[2, 2], [-1, 2], [2, 2]]: Can't set source shape to (5, 3) because indexer [[2, 2], [-1, 2], [2, 2]] expects 3 dimensions."
         try:
             p.setup()
             p.final_setup()
@@ -2744,7 +2744,7 @@ class TestConnect(unittest.TestCase):
         p.model.sub.connect('src.x', 'arr.x', src_indices=([2, 4],[-1, 4]),
                             flat_src_indices=False)
 
-        msg = "<model> <class Group>: Can't connect 'sub.src.x' to 'sub.arr.x' when applying index ([2 4], [-1  4]): index 4 is out of bounds for source dimension of size 3."
+        msg = "<model> <class Group>: Can't connect 'sub.src.x' to 'sub.arr.x' when applying index [[2, 4], [-1, 4]]: index 4 is out of bounds for source dimension of size 3."
 
         try:
             p.setup()
@@ -2779,7 +2779,7 @@ class TestSrcIndices(unittest.TestCase):
 
     def test_src_indices_shape_bad_idx_flat(self):
         msg = "\nCollected errors for problem 'src_indices_shape_bad_idx_flat':" + \
-              "\n   <model> <class Group>: Can't connect 'indeps.x' to 'C1.x' when applying index [4 7 5 9]: index 9 is out of bounds for source dimension of size 9."
+              "\n   <model> <class Group>: Can't connect 'indeps.x' to 'C1.x' when applying index [[4, 7, 5, 9]]: index 9 is out of bounds for source dimension of size 9."
 
         p = self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[4, 7, 5, 9], flat_src_indices=True,
@@ -2798,7 +2798,7 @@ class TestSrcIndices(unittest.TestCase):
                                 name='src_indices_shape_bad_idx_flat_promotes')
 
         msg = "\nCollected errors for problem 'src_indices_shape_bad_idx_flat_promotes':" + \
-              "\n   <model> <class Group>: Can't promote 'C1.x' to 'x' when applying index [4 5 7 9]: index 9 is out of bounds for source dimension of size 9."
+              "\n   <model> <class Group>: Can't promote 'C1.x' to 'x' when applying index [[4, 5, 7, 9]]: index 9 is out of bounds for source dimension of size 9."
         try:
             p.setup()
             p.final_setup()
@@ -2809,7 +2809,7 @@ class TestSrcIndices(unittest.TestCase):
 
     def test_src_indices_shape_bad_idx_flat_neg(self):
         msg = "\nCollected errors for problem 'src_indices_shape_bad_idx_flat_neg':" + \
-              "\n   <model> <class Group>: Can't connect 'indeps.x' to 'C1.x' when applying index [-10   5   7   8]: index -10 is out of bounds for source dimension of size 9."
+              "\n   <model> <class Group>: Can't connect 'indeps.x' to 'C1.x' when applying index [[-10, 5, 7, 8]]: index -10 is out of bounds for source dimension of size 9."
         p = self.create_problem(src_shape=(3, 3), tgt_shape=(2, 2),
                                 src_indices=[-10, 5, 7, 8], flat_src_indices=True,
                                 name='src_indices_shape_bad_idx_flat_neg')
@@ -2836,7 +2836,7 @@ class TestSrcIndices(unittest.TestCase):
             p.final_setup()
 
         expected_error_msg = "\nCollected errors for problem 'slice_with_ellipsis_error_in_connect':" + \
-            "\n   <model> <class Group>: Can't connect 'indep.x' to 'row4_comp.x' when applying index (4, ...): index 4 is out of bounds of the source shape (4,)."
+            "\n   <model> <class Group>: Can't connect 'indep.x' to 'row4_comp.x' when applying index [4, ...]: index 4 is out of bounds of the source shape (4,)."
         self.assertEqual(str(cm.exception), expected_error_msg)
 
 

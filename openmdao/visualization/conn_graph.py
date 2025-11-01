@@ -1,4 +1,3 @@
-from pprint import pformat
 from difflib import get_close_matches
 import networkx as nx
 from networkx import dfs_edges, dfs_postorder_nodes
@@ -15,6 +14,7 @@ from http.server import HTTPServer
 from openmdao.visualization.graph_viewer import write_graph
 from openmdao.utils.general_utils import common_subpath, is_undefined, truncate_str
 from openmdao.utils.array_utils import array_connection_compatible, shape_to_len
+from openmdao.utils.graph_utils import dump_nodes, dump_edges
 from openmdao.utils.units import is_compatible
 from openmdao.utils.units import unit_conversion
 from openmdao.utils.indexer import indexer, Indexer
@@ -494,7 +494,7 @@ class AllConnGraph(nx.DiGraph):
         else:
             if not isinstance(indices, Indexer):
                 indices = indexer(indices)
-            inds = list(tgt_inds_list) + [(indices, None)]
+            inds = list(tgt_inds_list) + [indices]
 
         # do unit conversion on given val if needed
         try:
@@ -639,10 +639,10 @@ class AllConnGraph(nx.DiGraph):
         self.add_edge(src, tgt, **kwargs)
 
     def create_node_meta(self, system, name, io):
-        # if not (name.startswith('_auto_ivc.') or group._resolver.is_prom(name, io) or
-        #         group._resolver.is_abs(name, io)):
-        #     raise KeyError(group._resolver._add_guesses(
-        #                    name, f"{group.msginfo}: '{name}' not found."))
+        # if not (name.startswith('_auto_ivc.') or system._resolver.is_prom(name, io) or
+        #         system._resolver.is_abs(name, io)):
+        #     raise KeyError(system._resolver._add_guesses(
+        #                    name, f"{system.msginfo}: '{name}' not found."))
 
         key = (io[0], system.pathname + '.' + name if system.pathname else name)
 
@@ -670,12 +670,13 @@ class AllConnGraph(nx.DiGraph):
 
         node_meta = self.nodes[node]
 
-        node_meta['shape_by_conn'] = meta['shape_by_conn']
+        for key in ('shape_by_conn', 'copy_shape', 'compute_shape',
+                    'units_by_conn', 'copy_units', 'compute_units', 'distributed'):
+            node_meta[key] = meta[key]
+
         node_meta['shape'] = shape = None if meta['shape_by_conn'] else meta['shape']
-        node_meta['units_by_conn'] = meta['units_by_conn']
         node_meta['units'] = units = None if meta['units_by_conn'] else meta['units']
         node_meta['discrete'] = False
-        node_meta['distributed'] = meta['distributed']
 
         node_meta['resolved'] = shape is not None and units is not None
 
@@ -1046,9 +1047,8 @@ class AllConnGraph(nx.DiGraph):
                 if not ubyconn or not self._first_pass:
                     node_meta['units'] = self.get_units_from_children(model, node, children_meta,
                                                                       defaults)
-                node_meta['shape_by_conn'] = shbyconn =all(m[6] for m in children_meta)
-                if not shbyconn or not self._first_pass:
-                    node_meta['shape'] = self.get_shape_from_children(node, children_meta, defaults)
+                node_meta['shape_by_conn'] = all(m[6] for m in children_meta)
+                node_meta['shape'] = self.get_shape_from_children(node, children_meta, defaults)
 
             val = self.get_val_from_children(model, node, children_meta, defaults, auto)
             if val is not None and node[1].startswith('_auto_ivc.'):
@@ -1563,8 +1563,9 @@ class AllConnGraph(nx.DiGraph):
                         if nodes[s]['ambiguous']:
                             break
                     else:
-                        model._collect_error(f"Auto_ivc variable '{src_node[1]}' "
-                                             "has no shape or value.")
+                        if not self._first_pass:
+                            model._collect_error(f"Auto_ivc variable '{src_node[1]}' "
+                                                 "has no shape or value.")
 
             # for auto_ivcs, transfer graph metadata to the variable metadata
             if src_meta['discrete']:
@@ -1619,6 +1620,9 @@ class AllConnGraph(nx.DiGraph):
         auto_nodes = []
         for i, n in enumerate(dangling_inputs):
             auto_node, meta = self.create_node_meta(model, f'_auto_ivc.v{i}', 'output')
+            for key in ('shape_by_conn', 'copy_shape', 'compute_shape',
+                        'units_by_conn', 'copy_units', 'compute_units', 'distributed'):
+                meta[key] = None
             self.add_node(auto_node, **meta)
             self.add_edge(auto_node, n, type='manual')
             auto_nodes.append(auto_node)
@@ -1681,8 +1685,7 @@ class AllConnGraph(nx.DiGraph):
                         src_inds_list = nodes[u]['src_inds_list'] if u[0] == 'i' else []
                         if src_inds is not None:
                             src_inds_list = src_inds_list.copy()
-                            flat = edge_meta.get('flat_src_indices', True)
-                            src_inds_list.append((src_inds, flat))
+                            src_inds_list.append(src_inds)
 
                         nodes[v]['src_inds_list'] = src_inds_list
 
@@ -1873,7 +1876,7 @@ class AllConnGraph(nx.DiGraph):
         """
         current = np.atleast_1d(arr)
         if indices_list is not None:
-            for idx, flat in indices_list:
+            for idx in indices_list:
                 current = idx.indexed_val(current)
         return current
 
@@ -1904,7 +1907,7 @@ class AllConnGraph(nx.DiGraph):
         try:
             if indices_list:
                 chain = [arr]
-                for idx, _ in indices_list:
+                for idx in indices_list:
                     chain.append(idx.indexed_val(chain[-1]))
 
                 if np.shape(val) != () and np.squeeze(val).shape != np.squeeze(chain[-1]).shape:
@@ -1931,7 +1934,7 @@ class AllConnGraph(nx.DiGraph):
         for i in range(len(chain) - 2, -1, -1):
             sub = chain[i + 1]
             prev = chain[i]
-            idx, _ = indices_list[i]
+            idx = indices_list[i]
             if sub.base is not prev:
                 idx.indexed_val_set(prev, sub)
 
@@ -1943,12 +1946,12 @@ class AllConnGraph(nx.DiGraph):
         if len(src_inds_list) == 0:
             return None
         elif len(src_inds_list) == 1:
-            return src_inds_list[0][0].shaped_array()
+            return src_inds_list[0].shaped_array()
         else:
             root = self.get_root(node)
             root_shape = self.nodes[root]['shape']
             arr = np.arange(shape_to_len(root_shape)).reshape(root_shape)
-            for inds, _ in src_inds_list:
+            for inds in src_inds_list:
                 arr = inds.indexed_val(arr)
             return arr
 
@@ -1958,7 +1961,7 @@ class AllConnGraph(nx.DiGraph):
             val = self.get_subarray(val, src_inds_list).reshape(self.nodes[node]['shape'])
 
         if indices:
-            val = self.get_subarray(val, [(indices, flat)])
+            val = self.get_subarray(val, [indices])
 
         if units is None:
             units = tgt_units
@@ -1985,7 +1988,7 @@ class AllConnGraph(nx.DiGraph):
 
     def convert_set(self, val, src_units, tgt_units, src_inds_list=(), units=None, indices=None):
         if indices:
-            src_inds_list = list(src_inds_list) + [(indices, None)]
+            src_inds_list = list(src_inds_list) + [indices]
 
         val = self.get_subarray(val, src_inds_list)
 
@@ -2057,7 +2060,11 @@ class AllConnGraph(nx.DiGraph):
         rows.append(get_table_row('defaults.units', meta))
         rows.append(get_table_row('src_inds_list', meta))
         rows.append(get_table_row('shape_by_conn', meta))
+        rows.append(get_table_row('copy_shape', meta))
+        # rows.append(get_table_row('compute_shape', meta))  # dot doesn't like node labels containing functions
         rows.append(get_table_row('units_by_conn', meta))
+        rows.append(get_table_row('copy_units', meta))
+        # rows.append(get_table_row('compute_units', meta))
         rows.append(get_table_row('discrete', meta))
         rows.append(get_table_row('distributed', meta, show_false=True))
         rows.append(get_table_row('remote', meta, show_false=True))
@@ -2309,20 +2316,8 @@ class AllConnGraph(nx.DiGraph):
         except KeyboardInterrupt:
             print("\n🛑 Server stopped")
 
-    def dump(self):
-        skip = {'style', 'tooltip', 'fillcolor', 'label'}
-        for node, data in sorted(self.nodes(data=True),
-                                 key=lambda x: (x[1]['pathname'].count('.'), x[1]['pathname'])):
-            dct = {}
-            dct.update({k: v for k, v in data.items() if k not in skip})
-            print(node[1], pformat(dct))
-
-        print()
+    def dump_nodes(self):
+        dump_nodes(self)
 
     def dump_edges(self):
-        skip = {'style', 'tooltip', 'fillcolor', 'label'}
-        for u, v, data in sorted(self.edges(data=True), key=lambda x: (x[0], x[1])):
-            dct = {k: v for k, v in data.items() if k not in skip and v is not None}
-            print(u, '->', v, pformat(dct))
-
-        print()
+        dump_edges(self)
