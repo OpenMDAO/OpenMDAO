@@ -7,6 +7,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
 from openmdao.utils.general_utils import common_subpath
+from openmdao.visualization.graph_viewer import write_graph
 
 
 def _view_dyn_shapes_setup_parser(parser):
@@ -140,13 +141,18 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
                 node_colors.append('green')
         node_labels[n] = f"{shape}: {n[common_idx:]}"
 
-    nx.draw_networkx(graph, with_labels=True, node_color=node_colors, labels=node_labels)
-    plt.axis('off')  # turn of axis
-    plt.title(title)
-    plt.savefig(outfile)
+    if outfile.endswith('.png'):
+        nx.draw_networkx(graph, with_labels=True, node_color=node_colors, labels=node_labels)
+        plt.axis('off')  # turn of axis
+        plt.title(title)
+        plt.savefig(outfile)
 
-    if show:
-        plt.show()
+        if show:
+            plt.show()
+    elif outfile.endswith('.html'):
+        write_graph(graph, display=show, outfile=outfile)
+    else:
+        raise ValueError(f"Unsupported file extension: {outfile}")
 
     # TODO: add a legend
     # TODO: use a better graph plotting lib, maybe D3 or something else, to get better layout

@@ -4,7 +4,7 @@ import sys
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warnings
+from openmdao.utils.assert_utils import assert_near_equal
 
 from openmdao.utils.mpi import MPI
 if MPI:
@@ -540,7 +540,7 @@ class TestDynShapes(unittest.TestCase):
             p.setup()
             p.final_setup()
 
-        msg = "\nCollected errors for problem 'copy_shape_in_in_unresolvable':\n   <model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x1' to 'comp.x1'. The source shape is (2, 3) but the target shape is None.\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indep.x2' to 'comp.x2'. The source shape is (2, 3) but the target shape is None."
+        msg = "\nCollected errors for problem 'copy_shape_in_in_unresolvable':\n   <model> <class Group>: Failed to resolve shapes for ['comp.x1', 'comp.x2']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_mismatched_dyn_shapes_err(self):
@@ -689,19 +689,13 @@ class TestDynShapes(unittest.TestCase):
                                                   y1={'shape_by_conn': True, 'copy_shape': 'x11'}))
         p.model.connect('indep.x1', 'sink.x1')
         p.setup()
-        expected_warnings = (
-            (om.OpenMDAOWarning, "<model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'."),
-            (om.OpenMDAOWarning, "<model> <class Group>: Can't copy shape of variable 'sink.x11'. Variable doesn't exist or is not continuous.")
-        )
-
-        with assert_warnings(expected_warnings):
-            p.model._setup_dynamic_properties()
 
         with self.assertRaises(Exception) as cm:
             p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
                          "\nCollected errors for problem 'bad_copy_shape_name':"
+                         "\n   <model> <class Group>: sink: copy_shape variable 'x11' not found."
                          "\n   <model> <class Group>: Failed to resolve shapes for ['sink.y1']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
 
     def test_unconnected_var_dyn_shape(self):
@@ -712,13 +706,6 @@ class TestDynShapes(unittest.TestCase):
                                                   y1={'shape_by_conn': True}))
         p.model.connect('indep.x1', 'sink.x1')
         p.setup()
-
-        expected_warnings = (
-            (om.OpenMDAOWarning, "<model> <class Group>: 'shape_by_conn' was set for unconnected variable 'sink.y1'."),
-        )
-
-        with assert_warnings(expected_warnings):
-            p.model._setup_dynamic_properties()
 
         with self.assertRaises(Exception) as cm:
             p.final_setup()
@@ -1121,7 +1108,13 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'shape_from_conn_input_mismatch':"
-           "\n   <model> <class Group>: Shape of input 'sub.comp3.x', (3,), doesn't match shape (2,).")
+           "\n   <model> <class Group>: The following inputs promoted to 'sub.x' have different incompatible shapes:"
+           "\n  "
+           "\n   sub.comp1.x      "
+           "\n   sub.comp2.x  (2,)"
+           "\n   sub.comp3.x  (3,)"
+           "\n  "
+           "\n   <model> <class Group>: Failed to resolve shapes for ['_auto_ivc.v0', 'sub.comp1.x', 'sub.comp1.y']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
 
     def test_shape_from_conn_input_mismatch_group_inputs(self):
         prob = om.Problem(name='shape_from_conn_input_mismatch_group_inputs')
@@ -1141,7 +1134,13 @@ class TestDynShapesWithInputConns(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'shape_from_conn_input_mismatch_group_inputs':"
-           "\n   <model> <class Group>: Shape of input 'sub.comp2.x', (2,), doesn't match shape (3,).")
+           "\n   <model> <class Group>: The following inputs promoted to 'sub.x' have different incompatible shapes:"
+           "\n  "
+           "\n   sub.comp1.x  (3,)"
+           "\n   sub.comp2.x  (2,)"
+           "\n  "
+           "\n   <model> <class Group>: Can't connect '_auto_ivc.v0' to 'sub.x': shape (3,) of '_auto_ivc.v0' is incompatible with shape (2,) of 'sub.x'."
+           "\n   <model> <class Group>: Can't promote 'sub.comp1.x' to 'sub.x': shape (2,) of 'sub.x' is incompatible with shape (3,) of 'sub.comp1.x'.")
 
 
 class MatMatProd(om.ExplicitComponent):

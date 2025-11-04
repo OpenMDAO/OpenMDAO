@@ -5547,10 +5547,11 @@ class System(object, metaclass=SystemMetaclass):
         discrete = distrib = False
         val = _UNDEFINED
         if from_root:
-            model = self._problem_meta['model_ref']()
+            model = system = self._problem_meta['model_ref']()
             all_meta = model._var_allprocs_abs2meta
             my_meta = model._var_abs2meta
         else:
+            system = self
             all_meta = self._var_allprocs_abs2meta
             my_meta = self._var_abs2meta
 
@@ -5590,14 +5591,14 @@ class System(object, metaclass=SystemMetaclass):
                                        "local process using `get_val(<name>, get_remote=False)`.")
         else:
             discrete = True
-            relname = abs_name[len(self.pathname) + 1:] if self.pathname else abs_name
-            if relname in self._discrete_outputs:
-                val = self._discrete_outputs[relname]
-            elif relname in self._discrete_inputs:
-                val = self._discrete_inputs[relname]
-            elif abs_name in self._var_allprocs_discrete['output']:
+            relname = abs_name[len(system.pathname) + 1:] if system.pathname else abs_name
+            if relname in system._discrete_outputs:
+                val = system._discrete_outputs[relname]
+            elif relname in system._discrete_inputs:
+                val = system._discrete_inputs[relname]
+            elif abs_name in system._var_allprocs_discrete['output']:
                 pass  # non-local discrete output
-            elif abs_name in self._var_allprocs_discrete['input']:
+            elif abs_name in system._var_allprocs_discrete['input']:
                 pass  # non-local discrete input
             elif get_remote:
                 raise ValueError(f"{self.msginfo}: Can't find variable named '{abs_name}'.")

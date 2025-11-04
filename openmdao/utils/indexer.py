@@ -1671,6 +1671,63 @@ class resolve_shape(object):
         return (1,)
 
 
+def idx_list_to_index_array(idx_list):
+    """
+    Convert a sequential list of indexers to an equivalent array indexer.
+
+    Parameters
+    ----------
+    idx_list : list of indexers
+        List of indexers.
+
+    Returns
+    -------
+    Indexer
+        The equivalent array indexer.
+    """
+    if len(idx_list) == 0:
+        return None
+    elif len(idx_list) == 1:
+        return idx_list[0].as_array()
+    else:
+        idx = idx_list[0]
+        arr = np.arange(shape_to_len(idx._src_shape)).reshape(idx._src_shape)
+        for i in range(len(idx_list)):
+            arr = idx_list[i].indexed_val(arr)
+        return arr
+
+
+def apply_idx_list(arr, idx_list):
+    """
+    Apply a sequential list of indexers to an array.
+    """
+    if len(idx_list) == 0:
+        return arr
+    elif len(idx_list) == 1:
+        return idx_list[0].indexed_val(arr)
+    else:
+        for i in range(len(idx_list)):
+            arr = idx_list[i].indexed_val(arr)
+        return arr
+
+
+def idx_list_to_shape(idx_list, src_shape):
+    """
+    Convert a sequential list of indexers to an equivalent shape.
+    """
+    if len(idx_list) == 0:
+        return src_shape
+    elif len(idx_list) == 1:
+        idx_list[0].set_src_shape(src_shape)
+        return idx_list[0].indexed_src_shape
+    else:
+        shp = src_shape
+        for i in range(len(idx_list)):
+            idx_list[i].set_src_shape(shp)
+            shp = idx_list[i].indexed_src_shape
+        return shp
+
+
 # Since this is already user facing we'll leave it as is, and just use the output of
 # __getitem__ to initialize our Indexer object that will be used internally.
 class Slicer(object):

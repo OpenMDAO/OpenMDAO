@@ -300,9 +300,9 @@ class Component(System):
                     meta_name: metadata[meta_name]
                     for meta_name in global_meta_names[io]
                 }
-                if is_input and 'src_indices' in metadata:
+                if is_input and 'src_inds_list' in metadata:
                     allprocs_abs2meta[abs_name]['has_src_indices'] = \
-                        metadata['src_indices'] is not None
+                        bool(metadata['src_inds_list'])
 
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
@@ -662,8 +662,8 @@ class Component(System):
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
-            'src_indices': None,
-            'flat_src_indices': None,
+            'src_inds_list': None,
+            # 'flat_src_indices': None,
             'units': units,
             'desc': desc,
             'tags': make_set(tags),
@@ -1154,8 +1154,8 @@ class Component(System):
                 else:
                     idx = slice(offset, end)
 
-                meta_in['src_indices'] = indexer(idx, flat_src=True, src_shape=src_shape)
-                meta_in['flat_src_indices'] = True
+                meta_in['src_inds_list'] = [indexer(idx, flat_src=True, src_shape=src_shape)]
+                # meta_in['flat_src_indices'] = True
                 added_src_inds.append(iname)
 
         return added_src_inds

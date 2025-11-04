@@ -611,6 +611,8 @@ class Problem(object, metaclass=ProblemMetaclass):
         self._metadata['saved_errors'] = None
 
         if unique_errors:
+            # self.model.display_conn_graph()
+            # self.model.display_dataflow_graph()
             final_msg = [f"\nCollected errors for problem '{self._name}':"]
             for _, msg, exc_type, tback in unique_errors:
                 final_msg.append(textwrap.indent(msg, '   '))

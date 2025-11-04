@@ -472,7 +472,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             root._resolver.source('f')
 
-        self.assertEqual(cm.exception.args[0], "<model> <class Group>: Can't find source for 'f' because connections are not yet known.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: Can't find source for 'f'.")
 
     def test_list_inputs_before_final_setup(self):
         class SpeedComp(ExplicitComponent):
@@ -525,7 +525,8 @@ class TestSystem(unittest.TestCase):
                         'size': 1,
                         'tags': set(),
                         'units': None,
-                        'units_by_conn': False},
+                        'units_by_conn': False,
+                        'val': np.array([1.])},
          'obj_cmp.x': {'compute_shape': None,
                        'compute_units': None,
                        'copy_shape': None,
@@ -543,7 +544,8 @@ class TestSystem(unittest.TestCase):
                        'size': 1,
                        'tags': set(),
                        'units': None,
-                       'units_by_conn': False}
+                       'units_by_conn': False, 
+                       'val': np.array([1.])}
         })
 
     def test_model_options_set_all(self):
