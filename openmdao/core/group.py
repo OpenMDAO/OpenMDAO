@@ -2369,14 +2369,16 @@ class Group(System):
             src_node = ('o', out_name)
             src_meta = conn_nodes[src_node]
 
-            src_by_conn = src_meta[prop_by_conn]
+            src_prop = src_meta[prop]
+            src_by_conn = src_meta[prop_by_conn] if src_prop is None else False
             src_info = (out_name, 'output', out_meta, src_meta)
 
             for tgt_node in conn_graph.leaf_input_iter(src_node):
                 _, abs_in = tgt_node
 
                 tgt_meta = conn_nodes[tgt_node]
-                tgt_prop_by_conn = tgt_meta.get(prop_by_conn)
+                tgt_prop = tgt_meta[prop]
+                tgt_prop_by_conn = tgt_meta.get(prop_by_conn) if tgt_prop is None else False
 
                 if tgt_prop_by_conn:
                     connect_nodes(src_info, (abs_in, 'input', None, tgt_meta))
@@ -2384,111 +2386,18 @@ class Group(System):
                 if src_by_conn:
                     connect_nodes((abs_in, 'input', None, tgt_meta), src_info)
 
-        # for io in ('input', 'output'):
-        #     abs2meta_loc = self._var_abs2meta[io]
-        #     for name, meta in self._var_allprocs_abs2meta[io].items():
-        #         if name in abs2meta_loc:
-        #             meta = abs2meta_loc[name]  # use local metadata if we have it
-
-        #         comp_path = name.rpartition('.')[0]
-        #         component_io[comp_path, io].append(name)
-        #         node_meta = conn_graph.nodes[(io[0], name)]
-
-        #         has_copy_prop = meta.get(copy_prop)
-        #         has_compute_prop = meta.get(compute_prop)
-
-        #         if meta.get(prop_by_conn):
-        #             add_node(graph, node_meta, name, io, meta)
-        #             fail = False
-        #             if io == 'input':
-        #                 if name in conn:  # it's a connected input
-        #                     abs_from = conn[name]
-        #                     if abs_from not in graph:
-        #                         from_meta = all_abs2meta_out[abs_from]
-        #                         add_node(graph, node_meta, abs_from, 'output', from_meta)
-        #                     graph.add_edge(abs_from, name, multi=False)
-        #             else:  # output
-        #                 if rev_conn is None:
-        #                     rev_conn = get_rev_conns(self._conn_global_abs_in2out)
-        #                 if name in rev_conn:  # connected output
-        #                     for inp in rev_conn[name]:
-        #                         if inp not in graph:
-        #                             if inp in my_abs2meta_in:
-        #                                 inmeta = my_abs2meta_in[inp]
-        #                             else:
-        #                                 inmeta = all_abs2meta_in[inp]
-        #                             add_node(graph, node_meta, inp, 'input', inmeta)
-        #                         graph.add_edge(inp, name, multi=False)
-        #                 else:
-        #                     fail = True
-
-        #             if fail and name:  #  not in self._bad_conn_vars:
-        #                 # make this a warning because property may get resolved another way, and
-        #                 # if not, there will be an error raised later.
-        #                 issue_warning(f"{self.msginfo}: '{prop}_by_conn' was set for "
-        #                               f"unconnected variable '{name}'.")
-
-        #         if has_copy_prop:
-        #             # variable whose shape is being copied must be on the same component, and
-        #             # name stored in copy_prop entry must be the relative name.
-        #             abs_from = name.rpartition('.')[0] + '.' + meta[copy_prop]
-        #             if abs_from in all_abs2meta_in or abs_from in all_abs2meta_out:
-        #                 a2m = all_abs2meta_in if abs_from in all_abs2meta_in else all_abs2meta_out
-        #                 if name not in graph:
-        #                     add_node(graph, node_meta, name, io, meta)
-        #                 if abs_from not in graph:
-        #                     from_io = 'input' if abs_from in all_abs2meta_in else 'output'
-        #                     from_meta = a2m[abs_from]
-        #                     add_node(graph, node_meta, abs_from, from_io, from_meta)
-
-        #                 graph.add_edge(abs_from, name, multi=False)
-        #             else:
-        #                 issue_warning(f"{self.msginfo}: Can't copy {prop} of variable "
-        #                               f"'{abs_from}'. Variable doesn't exist or is not continuous.")
-        #         elif has_compute_prop:
-        #             compute_prop_functs[name] = meta[compute_prop]
-        #             if name not in graph:
-        #                 add_node(graph, node_meta, name, io, meta)
-
-        #         if prop == 'shape':
-        #             # store known distributed size info needed for computing shapes
-        #             if nprocs > 1:
-        #                 my_abs2meta = my_abs2meta_in if name in my_abs2meta_in else my_abs2meta_out
-        #                 if name in my_abs2meta and my_abs2meta[name]['distributed']:
-        #                     dist_shp[name] = my_abs2meta[name]['shape']
-
-        # loop over any 'compute_property' variables and add edges to the graph
-        # This is done separately from the loop above because we need the component_io dict
-        # to tell us what variables are attached to each component.
-        # for name in compute_prop_functs:
-        #     comp_name = name.rpartition('.')[0]
-
-        #     if name in all_abs2meta_out:
-        #         io = 'input'
-        #         abs2meta = my_abs2meta_out if name in my_abs2meta_out else all_abs2meta_out
-        #     else:
-        #         io = 'output'
-        #         abs2meta = my_abs2meta_in if name in my_abs2meta_in else all_abs2meta_in
-
-        #     for abs_name in component_io[comp_name, io]:
-        #         node_meta = conn_graph.nodes[(io[0], abs_name)]
-        #         if abs_name not in graph:
-        #             add_node(graph, node_meta, abs_name, io, abs2meta[abs_name])
-
-        #         graph.add_edge(abs_name, name, multi=True)
+        if nprocs > 1 and prop == 'shape' and dist_shp:
+            self._dist_shapes = dist_shapes = defaultdict(lambda: [None] * nprocs)
+            for rank, dshp in enumerate(self.comm.allgather(dist_shp)):
+                for n, shp in dshp.items():
+                    dist_shapes[n][rank] = shp
+        else:
+            self._dist_shapes = dist_shapes = {}
 
         if graph.order() == 0:
             # we don't have any {prop}_by_conn or copy_{prop} or compute_{prop} variables,
             # so we're done
             return
-
-        if nprocs > 1 and prop == 'shape' and dist_shp:
-            dist_shapes = defaultdict(lambda: [None] * nprocs)
-            for rank, dshp in enumerate(self.comm.allgather(dist_shp)):
-                for n, shp in dshp.items():
-                    dist_shapes[n][rank] = shp
-        else:
-            dist_shapes = {}
 
         dist_sizes = {}
         for n, shapes in dist_shapes.items():

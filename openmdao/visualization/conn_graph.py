@@ -314,6 +314,10 @@ class NodeAttrs():
 
     @shape_by_conn.setter
     def shape_by_conn(self, value):
+        # if shape defaults are are set, then this node's shape is known
+        if self.defaults.src_shape is not None:
+            return
+
         if value:
             self.flags |= SHAPE_BY_CONN
         else:
@@ -325,6 +329,9 @@ class NodeAttrs():
 
     @units_by_conn.setter
     def units_by_conn(self, value):
+        # if unit defaults are are set, then this node's units are known
+        if self.defaults.units is not None:
+            return
         if value:
             self.flags |= UNITS_BY_CONN
         else:
@@ -958,15 +965,20 @@ class AllConnGraph(nx.DiGraph):
 
     def update_var_meta(self, node, meta, locmeta):
         node_meta = self.nodes[node]
+        val = node_meta['val']
         if node_meta['discrete']:
             if locmeta is not None:
-                locmeta['val'] = node_meta['val']
+                locmeta['val'] = val
         else:
             shape = node_meta['shape']
             size = shape_to_len(shape)
+            # aval = np.asarray(val)
+            # shp = aval.shape
+            # if shp == () and shape == (1,):
+            #     val = aval.reshape(shape)
             if locmeta is not None:
                 locmeta['src_inds_list'] = node_meta.get('src_inds_list')
-                locmeta['val'] = node_meta['val']
+                locmeta['val'] = val
                 locmeta['shape'] = shape
                 locmeta['size'] = size
                 locmeta['units'] = node_meta['units']
@@ -974,7 +986,7 @@ class AllConnGraph(nx.DiGraph):
             meta['shape'] = shape
             meta['size'] = size
             meta['units'] = node_meta['units']
-            meta['val'] = node_meta['val']
+            meta['val'] = val
 
     def add_promotion(self, io, group, prom_name, subsys, sub_prom, pinfo=None):
         # we invert the order here for inputs vs. outputs.  For inputs, the promoted name
@@ -1155,19 +1167,12 @@ class AllConnGraph(nx.DiGraph):
             attrs.ambiguous_val = ambiguous.val
 
         if attrs.discrete:
-            # shape_by_conn = units_by_conn = False
-            # src_indices = None
             if attrs.defaults.units is not None:
                 model._collect_error(f"Cannot set 'units={attrs.defaults.units}' for "
                                      f"discrete variable '{child[1]}'.")
             if attrs.defaults.src_shape is not None:
                 model._collect_error(f"Cannot set 'shape={attrs.defaults.src_shape}' for "
                                      f"discrete variable '{child[1]}'.")
-            # if attrs.defaults.val is not None:
-            #     val = attrs.defaults.val
-            #     if remote:
-            #         val = None
-            # return None, None, val, True, required, None, False, False, ambiguous, remote, False, errors
         else:
             attrs.units = child_meta['units']
             attrs.shape = child_meta['shape']
@@ -1175,22 +1180,8 @@ class AllConnGraph(nx.DiGraph):
             attrs.units_by_conn = child_meta.get('units_by_conn', False)
             attrs.distributed = child_meta['distributed']
 
-            # if defshape is not None:
-            #     shape = defshape
-            # if defunits is not None:
-            #     units = defunits
-
-            # if defval is not None:
-            #     val = defval
-            #     if defshape is None and src_indices is None:
-            #         shape = np.shape(val)
-            #     if remote:
-            #         val = None
-
             attrs.src_indices = self.edges[(parent, child)].get('src_indices', None)
 
-            # return units, shape, val, False, required, src_indices, \
-            #     shape_by_conn, units_by_conn, ambiguous, remote, distributed, errors
         return attrs
 
     def gather_data(self, model):
@@ -1275,9 +1266,6 @@ class AllConnGraph(nx.DiGraph):
         try:
             children_meta = self.get_upward_children_meta(model, node)
 
-            # each child_meta entry is a tuple of the form:
-            # units, shape, val, discrete, required, src_indices, shape_by_conn, units_by_conn,
-            # ambiguous
             node_meta = self.nodes[node]
             if auto or node[0] == 'i':
                 remote = all(m.remote for m in children_meta)
@@ -1288,10 +1276,6 @@ class AllConnGraph(nx.DiGraph):
             node_meta['require_connection'] = any(m.require_connection for m in children_meta)
             node_meta['discrete'] = discrete = self.get_discrete_from_children(node, children_meta)
             node_meta['distributed'] = self.get_distributed_from_children(node, children_meta, auto)
-
-            # for chmeta in children_meta:
-            #     for i, e in enumerate(chmeta[11]):
-            #         model._collect_error(f"{model.msginfo}: {e}", ident=(i, node))
 
             if node[0] == 'o':
                 for i, cm in enumerate(children_meta):
@@ -1305,10 +1289,9 @@ class AllConnGraph(nx.DiGraph):
 
             defaults = node_meta.get('defaults', None)
             if not discrete:
-                node_meta['units_by_conn'] = ubyconn =all(m.units_by_conn for m in children_meta)
-                if not ubyconn or not self._first_pass:
-                    node_meta['units'] = self.get_units_from_children(model, node, children_meta,
-                                                                      defaults)
+                node_meta['units_by_conn'] = all(m.units_by_conn for m in children_meta)
+                node_meta['units'] = self.get_units_from_children(model, node, children_meta,
+                                                                  defaults)
                 node_meta['shape_by_conn'] = all(m.shape_by_conn for m in children_meta)
                 node_meta['shape'] = self.get_shape_from_children(node, children_meta, defaults)
 
@@ -1402,9 +1385,16 @@ class AllConnGraph(nx.DiGraph):
             start = children_meta[0].upward_units
             node_ambig = children_meta[0].ambiguous_units
 
-        for i, chmeta in enumerate(children_meta):
-            if i == 0:
+        unset = object()
+        start = unset
+        for chmeta in children_meta:
+            if chmeta.units_by_conn and self._first_pass:
                 continue
+
+            if start is unset:
+                start = chmeta.upward_units
+                continue
+
             u = chmeta.upward_units
             node_ambig |= chmeta.ambiguous_units
             if is_output and node_ambig:
@@ -1418,6 +1408,9 @@ class AllConnGraph(nx.DiGraph):
 
             if not one_none and not is_compatible(start, u):
                 raise ConnError(self.ambig_units_msg(node, incompatible=True))
+
+        if start is unset:
+            start = None
 
         if is_output:
             return start
