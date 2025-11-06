@@ -2034,7 +2034,7 @@ def _conn_graph_cmd(options, user_args):
         Args to be passed to the user script.
     """
     def _view_graph(model):
-        model._get_all_conn_graph().serve(port=options.port)
+        model._get_conn_graph().serve(port=options.port)
 
     # register the hooks
     def _set_dyn_hook(prob):
@@ -2056,6 +2056,6 @@ if __name__ == "__main__":
     prob.setup()
 
     # Start web UI
-    prob.model._get_all_conn_graph().serve(port=8001)
+    prob.model._get_conn_graph().serve(port=8001)
 
     # serve_simple_conn_graph_ui(conn_graph, port=8001)

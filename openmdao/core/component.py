@@ -24,7 +24,7 @@ from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, spars
 from openmdao.utils.deriv_display import _deriv_display, _deriv_display_compact
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
     find_matches, make_set, inconsistent_across_procs, LocalRangeIterable
-from openmdao.utils.indexer import indexer
+from openmdao.utils.indexer import indexer, idx_list_to_shape
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation, OMInvalidCheckDerivativesOptionsWarning
@@ -1105,19 +1105,24 @@ class Component(System):
         # of the output variables
         sizes_out = all_sizes['output']
         added_src_inds = []
-        graph = self._get_all_conn_graph()
+        graph = self._get_conn_graph()
         nodes = graph.nodes()
 
         # loop over continuous local inputs
         for iname, meta_in in abs2meta_in.items():
-            src_inds_list = nodes[('i', iname)]['src_inds_list']
-            if src_inds_list:
-                continue
-
             src = abs_in2out[iname]
             dist_in = meta_in['distributed']
             dist_out = all_abs2meta_out[src]['distributed']
             if dist_in or dist_out:
+                node = ('i', iname)
+                node_meta = nodes[node]
+                src_inds_list = node_meta['src_inds_list']
+                if src_inds_list:
+                    # check shape after applying src_inds_list to actual shape, if same, done
+                    shape = idx_list_to_shape(src_inds_list, all_abs2meta_out[src]['global_shape'])
+                    if shape == meta_in['shape']:
+                        continue
+
                 i = self._var_allprocs_abs2idx[iname]
                 gsize_out = all_abs2meta_out[src]['global_size']
                 gsize_in = all_abs2meta_in[iname]['global_size']
@@ -1154,7 +1159,11 @@ class Component(System):
                 else:
                     idx = slice(offset, end)
 
-                meta_in['src_inds_list'] = [indexer(idx, flat_src=True, src_shape=src_shape)]
+                idx = indexer(idx, flat_src=True, src_shape=src_shape)
+
+                meta_in['src_inds_list'] = src_inds_list + [idx]
+                node_meta['src_inds_list'] = meta_in['src_inds_list']
+                # graph.set_src_indices(node, idx)
                 # meta_in['flat_src_indices'] = True
                 added_src_inds.append(iname)
 

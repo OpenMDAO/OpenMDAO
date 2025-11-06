@@ -246,7 +246,7 @@ class Group(System):
         self._static_group_inputs = {}
         self._static_manual_connections = {}
         self._static_conn_graph = AllConnGraph()
-        self._all_conn_graph = None
+        self._conn_graph = None
         self._conn_abs_in2out = {}
         self._conn_discrete_in2out = {}
         self._transfers = {}
@@ -320,11 +320,11 @@ class Group(System):
         """
         pass
 
-    def _get_all_conn_graph(self):
-        if self._all_conn_graph is None:
+    def _get_conn_graph(self):
+        if self._conn_graph is None:
             return self._static_conn_graph
 
-        return self._all_conn_graph
+        return self._conn_graph
 
     def set_input_defaults(self, name, val=_UNDEFINED, units=None, src_shape=None):
         """
@@ -649,9 +649,9 @@ class Group(System):
         self._group_inputs = self._static_group_inputs.copy()
 
         if self.pathname == '':
-            self._all_conn_graph = AllConnGraph()
+            self._conn_graph = AllConnGraph()
 
-        self._all_conn_graph.update(self._static_conn_graph)
+        self._conn_graph.update(self._static_conn_graph)
 
         # Call setup function for this group.
         self.setup()
@@ -708,7 +708,7 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            subsys._all_conn_graph = self._all_conn_graph
+            subsys._conn_graph = self._conn_graph
             subsys._setup_procs(subsys.pathname, sub_comm, prob_meta)
 
         # build a list of local subgroups to speed up later loops
@@ -1136,7 +1136,7 @@ class Group(System):
         self._setup_dynamic_properties()
 
         #self._resolve_group_input_defaults()
-        graph = self._get_all_conn_graph()
+        graph = self._get_conn_graph()
         graph.update_all_node_meta(self)
         graph.update_model_meta(self)
 
@@ -1153,7 +1153,7 @@ class Group(System):
 
         self._check_connections()
 
-        self._all_conn_graph.check(self)
+        self._conn_graph.check(self)
 
         # setup of residuals must occur before setup of vectors and partials
         self._setup_residuals()
@@ -1607,7 +1607,7 @@ class Group(System):
                                              distributed=flags & DISTRIBUTED)
 
                     if sub_prom in subprom2prom:
-                        self._all_conn_graph.add_promotion(io, self, prom_name,
+                        self._conn_graph.add_promotion(io, self, prom_name,
                                                            subsys, sub_prom, pinfo)
 
         # If running in parallel, allgather
@@ -1869,7 +1869,7 @@ class Group(System):
         """
         assert self.pathname == '', "call _setup_global_connections on the top level Group only."
 
-        all_conn_graph = self._get_all_conn_graph()
+        all_conn_graph = self._get_conn_graph()
 
         # add nodes for all absolute inputs and connected absolute outputs
         all_conn_graph.add_abs_variable_meta(self)
@@ -1977,7 +1977,7 @@ class Group(System):
 
         knowns = set()
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        conn_graph = self._get_all_conn_graph()
+        conn_graph = self._get_conn_graph()
         conn_nodes = conn_graph.nodes
 
         if prop == 'shape':
@@ -2525,7 +2525,7 @@ class Group(System):
 
         Also, check shapes of connected variables.
         """
-        conn_graph = self._get_all_conn_graph()
+        conn_graph = self._get_conn_graph()
 
         abs_in2out = self._conn_abs_in2out
         self._conn_discrete_in2out = {}
@@ -2570,16 +2570,16 @@ class Group(System):
                 self._has_input_scaling = self._has_output_scaling or \
                     (in_units and out_units and in_units != out_units)
 
-        # check compatability for any discrete connections
-        for abs_in, abs_out in self._conn_discrete_in2out.items():
-            in_type = self._var_allprocs_discrete['input'][abs_in]['type']
-            out_type = self._var_allprocs_discrete['output'][abs_out]['type']
+        # # check compatability for any discrete connections
+        # for abs_in, abs_out in self._conn_discrete_in2out.items():
+        #     in_type = self._var_allprocs_discrete['input'][abs_in]['type']
+        #     out_type = self._var_allprocs_discrete['output'][abs_out]['type']
 
-            if not issubclass(in_type, out_type):
-                self._collect_error(
-                    f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is "
-                    f"incompatible with type '{in_type.__name__}' of input '{abs_in}'.",
-                    ident=(abs_out, abs_in))
+        #     if not issubclass(in_type, out_type):
+        #         self._collect_error(
+        #             f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is "
+        #             f"incompatible with type '{in_type.__name__}' of input '{abs_in}'.",
+        #             ident=(abs_out, abs_in))
 
     def _transfer(self, vec_name, mode, sub=None):
         """
@@ -3962,7 +3962,7 @@ class Group(System):
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
-        graph = self._all_conn_graph
+        graph = self._conn_graph
 
         auto2tgt = {}
         for srcnode in graph.nodes():
@@ -4533,7 +4533,7 @@ class Group(System):
                                       outfile=outfile)
 
     def display_conn_graph(self, varname=None, outfile=None):
-        self._get_all_conn_graph().display(self.pathname, varname=varname, outfile=outfile)
+        self._get_conn_graph().display(self.pathname, varname=varname, outfile=outfile)
 
     def _column_iotypes(self):
         """

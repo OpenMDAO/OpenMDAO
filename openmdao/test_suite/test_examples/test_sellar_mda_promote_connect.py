@@ -191,9 +191,9 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
         prob.run_model()
 
         from openmdao.visualization.graph_viewer import write_graph
-        G =  prob.model._all_conn_graph
+        G =  prob.model._conn_graph
         import networkx as nx
-        
+
         write_graph(G)
 
         assert_near_equal((prob.get_val('cycle.d1.y1')[0], prob.get_val('cycle.d2.y2')[0], prob.get_val('obj_cmp.obj')[0], prob.get_val('con_cmp1.con1')[0], prob.get_val('con_cmp2.con2')[0]),

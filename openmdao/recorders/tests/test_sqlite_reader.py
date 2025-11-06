@@ -1813,7 +1813,11 @@ class TestSqliteCaseReader(unittest.TestCase):
 
             with self.assertRaises(expected_exception=ValueError) as e:
                 datasrc.get_val('acomp.tin', units='not_a_unit')
-            self.assertEqual("The units 'not_a_unit' are invalid.", str(e.exception))
+                
+            if datasrc is not case:
+                self.assertEqual("<model> <class Group>: Can't get value of 'acomp.tin': Can't express value with units of 'degC' in units of 'not_a_unit'.", str(e.exception))
+            else:
+                self.assertEqual("The units 'not_a_unit' are invalid.", str(e.exception))
 
         prob.set_val('comp.x', val=100.0, units='s*ft/s')
         prob.run_model()

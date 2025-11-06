@@ -923,8 +923,7 @@ class TestUnitConversion(unittest.TestCase):
                          "\n   G1.C1.x  J/s**2"
                          "\n   G1.C2.x  m/s**2"
                          "\n  "
-                         "\n   These units are incompatible."
-                         "\n   <model> <class Group>: Auto_ivc variable '_auto_ivc.v1' has no shape or value.")
+                         "\n   These units are incompatible.")
 
     def test_input_defaults_unit_compat(self):
         p = om.Problem()

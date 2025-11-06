@@ -2319,7 +2319,7 @@ class System(object, metaclass=SystemMetaclass):
         self._jac_wrts_cache = {}
 
         if self.pathname == '':
-            self._all_conn_graph = None
+            self._conn_graph = None
 
     def _setup_procs(self, pathname, comm, prob_meta):
         """
@@ -5505,10 +5505,13 @@ class System(object, metaclass=SystemMetaclass):
         return set(s for s in self.system_iter(include_self=True, recurse=True)
                    if s.nonlinear_solver and s.nonlinear_solver.supports['gradients'])
 
-    def _get_all_conn_graph(self):
+    def _get_conn_graph(self):
         if self._problem_meta is None:
             return None
-        return self._problem_meta['model_ref']()._get_all_conn_graph()
+        model =  self._problem_meta['model_ref']()
+        if model is None:
+            return None
+        return model._get_conn_graph()
 
     def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,
                      flat=False, from_root=False):
@@ -5555,7 +5558,7 @@ class System(object, metaclass=SystemMetaclass):
             all_meta = self._var_allprocs_abs2meta
             my_meta = self._var_abs2meta
 
-        graph = self._get_all_conn_graph()
+        graph = self._get_conn_graph()
         node = ('i', abs_name)
         if node in graph:
             typ = 'input'
@@ -5714,8 +5717,20 @@ class System(object, metaclass=SystemMetaclass):
         object
             The value of the requested output/input variable.
         """
-        val = self._get_all_conn_graph().get_val(self, name, units, indices, get_remote, rank,
-                                                 vec_name, kind, flat, from_src)
+        if self._problem_meta is not None and self._problem_meta['model_ref']() is None:
+            # This is a weird corner case where the Problem has been deleted.  We have a test
+            # case where a system contains a subproblem that it adds itself to, and the test checks that we can still
+            # call get_val on the system even after the subproblem has been deleted.
+            if self._inputs is not None:  # vectors are set up
+                iotype = self._resolver.get_iotype(name, report_error=True)
+                if iotype == 'input':
+                    val = self._inputs[name]
+                else:
+                    val = self._outputs[name]
+        else:
+            graph =   self._get_conn_graph()
+            val = graph.get_val(self, name, units, indices, get_remote, rank,
+                                vec_name, kind, flat, from_src)
 
         if copy:
             return deepcopy(val)
@@ -5748,8 +5763,19 @@ class System(object, metaclass=SystemMetaclass):
             # we'll do any necessary transfers later
             return
 
-        graph = self._get_all_conn_graph()
-        graph.set_val(self, name, val, units=units, indices=indices)
+        if self._problem_meta is not None and self._problem_meta['model_ref']() is None:
+            # This is a weird corner case where the Problem has been deleted.  We have a test
+            # case where a system contains a subproblem that it adds itself to, and the test checks that we can still
+            # call get_val on the system even after the subproblem has been deleted.
+            if self._inputs is not None:  # vectors are set up
+                iotype = self._resolver.get_iotype(name, report_error=True)
+                if iotype == 'input':
+                    self._inputs[name] = val
+                else:
+                    self._outputs[name] = val
+        else:
+            graph = self._get_conn_graph()
+            graph.set_val(self, name, val, units=units, indices=indices)
 
     def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, local=False):
         """
@@ -5882,7 +5908,7 @@ class System(object, metaclass=SystemMetaclass):
     #     float or ndarray of float
     #         The value converted to the specified units.
     #     """
-    #     base_units = self._get_all_conn_graph().get_meta(name)['units']
+    #     base_units = self._get_conn_graph().get_meta(name)['units']
 
     #     if base_units == units:
     #         return val

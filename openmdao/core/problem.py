@@ -578,7 +578,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         Set all initial conditions that have been saved in cache after setup.
         """
-        graph = self.model._get_all_conn_graph()
+        graph = self.model._get_conn_graph()
 
         # for value, set_units, pathname, name in self.model._initial_condition_cache.values():
         for node, tup in self.model._initial_condition_cache.items():

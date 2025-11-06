@@ -569,7 +569,7 @@ class TestGroup(unittest.TestCase):
                                                    x={'val': np.zeros(5), 'units': 'ft'},
                                                    y={'units': 'inch'}), promotes=['x'])
 
-        p.model.set_input_defaults('x', units='ft')
+        p.model.set_input_defaults('x', units='ft', val=np.ones(5))
 
         p.setup()
         p['comp2.x'] = np.ones(5)

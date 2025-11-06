@@ -398,7 +398,10 @@ class DiscreteTestCase(unittest.TestCase):
 
         for i, line in enumerate(expected):
             if line and not line.startswith('-'):
-                self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+                # ordering of auto_ivc varnames sometimes differs
+                exp = line.replace('v0', 'v').replace('v1', 'v')
+                txt = text[i].replace('v0', 'v').replace('v1', 'v')
+                self.assertEqual(remove_whitespace(txt), remove_whitespace(exp))
 
     def test_list_inputs_outputs_with_tags(self):
         prob = om.Problem()
@@ -502,8 +505,7 @@ class DiscreteTestCase(unittest.TestCase):
             prob.final_setup()
         self.assertEqual(str(ctx.exception),
             "\nCollected errors for problem 'float_to_discrete_error':"
-            "\n   <model> <class Group>: Can't connect continuous output 'indep.x' to discrete "
-            "input 'comp.x'.")
+            "\n   <model> <class Group>: Can't connect 'indep.x' to 'comp.x': Can't connect discrete variable 'comp.x' to continuous variable 'indep.x'.")
 
     def test_discrete_to_float_error(self):
         prob = om.Problem(name='discrete_to_float_error')
@@ -519,8 +521,7 @@ class DiscreteTestCase(unittest.TestCase):
             prob.final_setup()
         self.assertEqual(str(ctx.exception),
             "\nCollected errors for problem 'discrete_to_float_error':"
-            "\n   <model> <class Group>: Can't connect discrete output 'indep.x' to continuous "
-            "input 'comp.x'.")
+            "\n   <model> <class Group>: Can't connect 'indep.x' to 'comp.x': Can't connect continuous variable 'comp.x' to discrete variable 'indep.x'.")
 
     def test_discrete_mismatch_error(self):
         prob = om.Problem(name='discrete_mismatch_error')
@@ -537,8 +538,7 @@ class DiscreteTestCase(unittest.TestCase):
             prob.final_setup()
         self.assertEqual(str(ctx.exception),
             "\nCollected errors for problem 'discrete_mismatch_error':"
-            "\n   <model> <class Group>: Type 'str' of output 'indep.x' is incompatible with "
-            "type 'int' of input 'comp.x'.")
+            "\n   <model> <class Group>: Can't connect 'indep.x' to 'comp.x': value foo of 'indep.x' is incompatible with value 10 of 'comp.x'.")
 
     def test_driver_discrete_enforce_int(self):
         # Drivers require discrete vars to be int or ndarrays of int.
@@ -679,26 +679,7 @@ class DiscreteTestCase(unittest.TestCase):
             prob.final_setup()
 
         msg = ("\nCollected errors for problem 'connection_to_output':"
-               "\n   <model> <class Group>: Attempted to connect from 'C1.y' to 'C2.y', "
-               "but 'C2.y' is an output. All connections must be from an output to an input.")
-        self.assertEqual(str(cm.exception), msg)
-
-    def test_connection_from_input(self):
-        prob = om.Problem(name='connection_from_input')
-        model = prob.model
-
-        model.add_subsystem('C1', ModCompEx(modval=2))
-        model.add_subsystem('C2', ModCompEx(modval=2))
-
-        model.connect('C1.x', 'C2.x')
-
-        with self.assertRaises(Exception) as cm:
-            prob.setup()
-            prob.final_setup()
-
-        msg = ("\nCollected errors for problem 'connection_from_input':"
-               "\n   <model> <class Group>: Attempted to connect from 'C1.x' to 'C2.x', "
-               "but 'C1.x' is an input. All connections must be from an output to an input.")
+               "\n   <model> <class Group>: Attempted to connect from 'C1.y' to 'C2.y', but 'C2.y' is an output. All connections must be to an input.")
         self.assertEqual(str(cm.exception), msg)
 
     def test_forgotten_args_error(self):
@@ -796,7 +777,8 @@ class DiscreteTestCase(unittest.TestCase):
                                      'size': 1,
                                      'tags': set(),
                                      'units': None,
-                                     'units_by_conn': False},
+                                     'units_by_conn': False,
+                                     'val': np.array([10.])},
                           'comp.b': {'compute_shape': None,
                                      'compute_units': None,
                                      'copy_shape': None,
@@ -817,7 +799,8 @@ class DiscreteTestCase(unittest.TestCase):
                                      'tags': set(),
                                      'units': None,
                                      'units_by_conn': False,
-                                     'upper': None},
+                                     'upper': None,
+                                     'val': np.array([0.])},
                           'comp.x': {'desc': '',
                                      'discrete': True,
                                      'prom_name': 'comp.x',

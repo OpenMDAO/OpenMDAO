@@ -1086,7 +1086,9 @@ def has_val_mismatch(units1, val1, units2, val2, rtol=1e-10):
     if not array_connection_compatible(val1.shape, val2.shape):
         return True
 
-    absdiff = np.abs(val2 - val1)
+     # shapes are compatible but may not be the same, so compare
+     # flattened values
+    absdiff = np.abs(val2.ravel() - val1.ravel())
     denominator_basis = np.maximum(np.abs(val1), np.abs(val2))
     threshold = rtol * denominator_basis
     return np.any(absdiff > threshold)
