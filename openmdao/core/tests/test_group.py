@@ -3190,8 +3190,8 @@ class TestGroupAddInput(unittest.TestCase):
            "\nCollected errors for problem 'conflicting_val':"
            "\n   <model> <class Group>: The following inputs promoted to 'x' have different values, so the value of 'x' is ambiguous:"
            "\n    "
-           "\n   G1.x   ft  4.0"
-           "\n   par.x  ft  3.0"
+           "\n   G1.x   ft  4.0 "
+           "\n   par.x  ft  [3.]"
            "\n    "
            "\n   Call model.set_input_defaults('x', val=?)' to remove the ambiguity.")
 

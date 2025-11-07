@@ -1137,8 +1137,8 @@ class Group(System):
 
         #self._resolve_group_input_defaults()
         graph = self._get_conn_graph()
+        #graph.display()
         graph.update_all_node_meta(self)
-        graph.update_model_meta(self)
 
         if dump_graphs:
             self.display_conn_graph(outfile=f'conn_graph_{self.comm.rank}.svg')
@@ -1898,6 +1898,7 @@ class Group(System):
             all_conn_graph.add_group_input_defaults(g)
 
         self._setup_auto_ivcs()
+        #self.display_conn_graph()
 
         all_conn_graph.update_all_node_meta(self)
         all_conn_graph.transform_input_input_connections(self)
@@ -2044,7 +2045,7 @@ class Group(System):
                 Otherwise, return None.
             """
             from_meta = graph.nodes[from_var]
-            from_shape = from_meta['conn_meta']['shape']
+            from_shape = from_meta['conn_meta'].shape
             if from_shape is None:
                 return
             from_io = from_meta['io']
@@ -2058,9 +2059,9 @@ class Group(System):
             else:
                 fwd = from_io == 'output'
                 if fwd:
-                    src_inds_list = to_meta['conn_meta'].get('src_inds_list')
+                    src_inds_list = to_meta['conn_meta'].src_inds_list
                 else:  # rev
-                    src_inds_list = from_meta['conn_meta'].get('src_inds_list')
+                    src_inds_list = from_meta['conn_meta'].src_inds_list
 
             is_full_slice = False
             if src_inds_list:
@@ -2073,8 +2074,8 @@ class Group(System):
                                          (slc.step is None or slc.step == 0))
 
             if self.comm.size > 1:
-                dist_from = from_meta['conn_meta']['distributed']
-                dist_to = to_meta['conn_meta']['distributed']
+                dist_from = from_meta['conn_meta'].distributed
+                dist_to = to_meta['conn_meta'].distributed
             else:
                 dist_from = dist_to = False
 
@@ -2093,8 +2094,8 @@ class Group(System):
                            is_full_slice)
 
         def copy_var_units(from_var, to_var, ignored, ignored2):
-            from_units = graph.nodes[from_var]['conn_meta']['units']
-            graph.nodes[to_var]['conn_meta']['units'] = from_units
+            from_units = graph.nodes[from_var]['conn_meta'].units
+            graph.nodes[to_var]['conn_meta'].units = from_units
             return from_units
 
         def get_global_dist_shape(name, dist_shapes):
@@ -2115,32 +2116,32 @@ class Group(System):
         def serial2serialfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
                              is_full_slice):
             if not src_inds_list:
-                shp = graph.nodes[from_var]['conn_meta']['shape']
+                shp = graph.nodes[from_var]['conn_meta'].shape
             else:
-                shp = graph.nodes[from_var]['conn_meta']['shape']
+                shp = graph.nodes[from_var]['conn_meta'].shape
                 for inds in src_inds_list:
                     inds.set_src_shape(shp)
                     shp = inds.indexed_src_shape
 
-            graph.nodes[to_var]['conn_meta']['shape'] = shp
+            graph.nodes[to_var]['conn_meta'].shape = shp
             return shp
 
         def serial2serialrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
                              is_full_slice):
             if not src_inds_list or is_full_slice:
-                shp = graph.nodes[from_var]['conn_meta']['shape']
+                shp = graph.nodes[from_var]['conn_meta'].shape
             else:
                 self._collect_error(f"Input '{from_var}' has src_indices so the shape "
                                     f"of connected output '{to_var}' cannot be "
                                     "determined.")
                 return
 
-            graph.nodes[to_var]['conn_meta']['shape'] = shp
+            graph.nodes[to_var]['conn_meta'].shape = shp
             return shp
 
         def serial2distfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
                            is_full_slice):
-            from_shape = graph.nodes[from_var]['conn_meta']['shape']
+            from_shape = graph.nodes[from_var]['conn_meta'].shape
             existence = self._get_var_existence()
             exist_outs = existence['output'][:, self._var_allprocs_abs2idx[from_var]]
             exist_ins = existence['input'][:, self._var_allprocs_abs2idx[to_var]]
@@ -2232,7 +2233,7 @@ class Group(System):
                 exist_procs = self._get_var_existence()['output'][:, abs2idx[to_var]]
                 split_num = np.count_nonzero(exist_procs)
 
-                from_shape = graph.nodes[from_var]['conn_meta']['shape']
+                from_shape = graph.nodes[from_var]['conn_meta'].shape
                 sz, _ = evenly_distrib_idxs(split_num, shape_to_len(from_shape))
                 sizes = np.zeros(self.comm.size, dtype=int)
                 sizes[exist_procs] = sz
@@ -2248,10 +2249,10 @@ class Group(System):
                         return
                     else:
                         dist_shapes[to_var] = [from_shape[1:]] * self.comm.size
-                        shp = to_meta['shape'] = from_shape[1:]
+                        shp = to_meta.shape = from_shape[1:]
                 else:
                     dist_shapes[to_var] = [(s,) for s in sizes]
-                    shp = to_meta['shape'] = (sizes[sizes != 0][0],)
+                    shp = to_meta.shape = (sizes[sizes != 0][0],)
 
                 return shp
 
@@ -2269,8 +2270,8 @@ class Group(System):
                 return
 
             if not src_inds_list:
-                shp = graph.nodes[from_var]['conn_meta']['shape']
-                graph.nodes[to_var]['conn_meta']['shape'] = shp
+                shp = graph.nodes[from_var]['conn_meta'].shape
+                graph.nodes[to_var]['conn_meta'].shape = shp
                 dist_shapes[to_var] = dist_shapes[from_var].copy()
                 dist_sizes[to_var] = dist_sizes[from_var].copy()
             else:
@@ -2282,7 +2283,7 @@ class Group(System):
                 dsizes = np.zeros_like(dist_sizes[from_var])
                 dsizes[self.comm.rank] = src_inds_list[-1].indexed_src_size
                 self.comm.Allreduce(dsizes, dist_sizes[to_var], op=MPI.SUM)
-                graph.nodes[to_var]['conn_meta']['shape'] = shp
+                graph.nodes[to_var]['conn_meta'].shape = shp
                 dist_shapes[to_var] = self.comm.allgather(shp)
 
             return shp
@@ -2294,8 +2295,8 @@ class Group(System):
                                     f" distributed variables '{from_var}' and "
                                     f"'{to_var}' is invalid.")
             elif not src_inds_list:
-                shp = graph.nodes[from_var]['conn_meta']['shape']
-                graph.nodes[to_var]['conn_meta']['shape'] = shp
+                shp = graph.nodes[from_var]['conn_meta'].shape
+                graph.nodes[to_var]['conn_meta'].shape = shp
                 dist_shapes[to_var] = dist_shapes[from_var].copy()
                 dist_sizes[to_var] = dist_sizes[from_var].copy()
                 return shp
@@ -2354,7 +2355,8 @@ class Group(System):
                             cpy_meta = conn_nodes[(io[0], cpy_name)]
                             cp_io = io
                         else:
-                            self._collect_error(f"{comp_path}: copy_shape variable '{copy_var}' not found.")
+                            self._collect_error(f"{comp_path}: copy_shape variable '{copy_var}' "
+                                                f"not found.")
                             continue
                         connect_nodes((cpy_name, cp_io, None, cpy_meta), node_info)
                     elif compute_func:
@@ -3993,6 +3995,25 @@ class Group(System):
         auto_ivc._configure()
         auto_ivc._configure_check()
         auto_ivc._setup_var_data()
+
+        # bind auto_ivc conn graph nodes to their variable metadata
+        locmeta = auto_ivc._var_abs2meta['output']
+        for name, meta in auto_ivc._var_allprocs_abs2meta['output'].items():
+            node = ('o', name)
+            node_meta = graph.nodes[node]
+            node_meta.meta = meta
+            if name in locmeta:
+                node_meta.locmeta = locmeta[name]
+
+        locmeta = auto_ivc._var_discrete['output']
+        for name, meta in auto_ivc._var_allprocs_discrete['output'].items():
+            node = ('o', name)
+            node_meta = graph.nodes[node]
+            node_meta.discrete = True
+            node_meta.meta = meta
+            relname = name.rpartition('.')[-1]
+            if relname in locmeta:
+                node_meta.locmeta = locmeta[relname]
 
         # now update our own data structures based on the new auto_ivc component variables
         old = self._subsystems_allprocs

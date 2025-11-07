@@ -529,7 +529,7 @@ class SrcIndicesSerialMultipoint3(unittest.TestCase):
         p.setup()
         p.run_model()
 
-        assert_check_totals(p.check_totals(of=['par.g1.C1.y', 'par.g2.C2.y', 'par.g3.C3.y'], wrt=['par.x']))
+        assert_check_totals(p.check_totals(of=['par.g1.C1.y', 'par.g2.C2.y', 'par.g3.C3.y'], wrt=['par.x'], show_only_incorrect=True))
 
 
 @use_tempdirs
