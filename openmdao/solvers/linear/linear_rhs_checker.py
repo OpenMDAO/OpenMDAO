@@ -264,6 +264,7 @@ class LinearRHSChecker(object):
             # Since we just reset the cache, we know we won't find a match, so we can return early.
             return None, False
 
+        rhs_norm = None
         for i in range(len(self._caches) - 1, -1, -1):
             rhs_cache, sol_cache = self._caches[i]
             # Check if the RHS vector is the same as a cached vector. This part is not necessary,
@@ -298,10 +299,12 @@ class LinearRHSChecker(object):
             # If this is a distributed vector, we need to compute the dot product and norms for the full vector to avoid running into issues when the chunk of an otherwise non-zero vector stored on a given proc is zero
             if is_parallel:
                 dot_product = system.comm.allreduce(dot_product)
-                rhs_norm = np.sqrt(system.comm.allreduce(np.sum(rhs_arr**2)))
+                if rhs_norm is None:
+                    rhs_norm = np.sqrt(system.comm.allreduce(np.sum(rhs_arr**2)))
                 rhs_cache_norm = np.sqrt(system.comm.allreduce(np.sum(rhs_cache**2)))
             else:
-                rhs_norm = np.linalg.norm(rhs_arr)
+                if rhs_norm is None:
+                    rhs_norm = np.linalg.norm(rhs_arr)
                 rhs_cache_norm = np.linalg.norm(rhs_cache)
 
             rhs_are_parallel = isclose(abs(dot_product), rhs_norm * rhs_cache_norm, rel_tol=self._rtol, abs_tol=self._atol)
