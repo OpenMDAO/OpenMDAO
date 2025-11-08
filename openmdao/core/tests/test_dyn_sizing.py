@@ -913,8 +913,7 @@ class TestDistribDynShapeComboNoSrcIndsErrs(unittest.TestCase):
            "\nCollected errors for problem 'serial_dist_rev_err':"
            "\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same shape (shapes=[(3,), (6,), (9,)])."
            "\n   <model> <class Group>: Failed to resolve shapes for ['indeps.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-           "\n   'comp' <class DistCompDiffSizeKnownInput>: Can't determine src_indices automatically for input 'comp.x'. They must be supplied manually."
-           "\n   <model> <class Group>: The source and target shapes do not match or are ambiguous for the connection 'indeps.x' to 'comp.x'. The source shape is (0,) but the target shape is (18,).")
+           "\n   'comp' <class DistCompDiffSizeKnownInput>: Can't determine src_indices automatically for input 'comp.x'. They must be supplied manually.")
 
     def test_dist_serial_fwd_err(self):
         p = om.Problem(name='dist_serial_fwd_err')
@@ -1422,8 +1421,7 @@ class TestDynShapeSrcIndices(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'dist_dist':"
            "\n   <model> <class Group>: Input 'comp.x' has src_indices so the shape of connected output 'indep.x' cannot be determined."
-           "\n   <model> <class Group>: Failed to resolve shapes for ['indep.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-           "\n   <model> <class Group>: When connecting 'indep.x' to 'comp.x': Can't set source shape to (0,) because indexer (slice(None, None, None), [0, 2]) expects 2 dimensions.")
+           "\n   <model> <class Group>: Failed to resolve shapes for ['indep.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
 
 
 @unittest.skipUnless(MPI and  PETScVector and sys.version_info >= (3, 9), "MPI, PETSc, and python 3.9+ are required.")

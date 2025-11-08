@@ -1111,6 +1111,10 @@ class Component(System):
         # loop over continuous local inputs
         for iname, meta_in in abs2meta_in.items():
             src = abs_in2out[iname]
+            if all_abs2meta_out[src]['shape'] is None:
+                # a previous error has occurred that caused the shape to be None, so we can't
+                # determine src_indices automatically
+                continue
             dist_in = meta_in['distributed']
             dist_out = all_abs2meta_out[src]['distributed']
             if dist_in or dist_out:

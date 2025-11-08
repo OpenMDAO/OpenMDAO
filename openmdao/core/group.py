@@ -1506,6 +1506,7 @@ class Group(System):
                     # all non-distributed inputs must have src_indices if they connect to a
                     # distributed output.
                     owner = self._owning_rank[abs_in]
+                    src_inds = None
                     if abs_in in abs2meta_in:  # input is local
                         src_inds_list = abs2meta_in[abs_in]['src_inds_list']
                         if src_inds_list is not None:
@@ -1517,8 +1518,7 @@ class Group(System):
                                 continue
                             else:
                                 src_inds = shaped
-                    else:
-                        src_inds = None
+
                     if self.comm.rank == owner:
                         baseline = None
                         err = 0
@@ -2145,10 +2145,10 @@ class Group(System):
             existence = self._get_var_existence()
             exist_outs = existence['output'][:, self._var_allprocs_abs2idx[from_var]]
             exist_ins = existence['input'][:, self._var_allprocs_abs2idx[to_var]]
+            to_meta = graph.nodes[to_var]['conn_meta']
             if not src_inds_list:
                 shape = from_shape
             else:
-                to_meta = graph.nodes[to_var]['conn_meta']
                 num_exist = np.count_nonzero(exist_outs)
 
                 if to_meta.get('flat_src_indices') or len(from_shape) < 2:
@@ -2172,7 +2172,7 @@ class Group(System):
             sizes[exist_ins] = size
             dist_sizes[to_var] = sizes
             dist_shapes[to_var] = [shape if exist_ins[i] else None for i in range(self.comm.size)]
-            to_meta['shape'] = shape
+            to_meta.shape = shape
             return shape
 
         def serial2distrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
@@ -2192,7 +2192,7 @@ class Group(System):
                             f"(shapes={dshapes}).", ident=(from_var, to_var))
                         return
 
-                graph.nodes[to_var]['conn_meta']['shape'] = shape0
+                graph.nodes[to_var]['conn_meta'].shape = shape0
                 return shape0
 
         def dist2serialfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
@@ -2211,12 +2211,12 @@ class Group(System):
                     "supported.")
             else:
                 shp = get_global_dist_shape(from_var, dist_shapes[from_var])
-                graph.nodes[to_var]['conn_meta']['global_shape'] = shp
+                # graph.nodes[to_var]['conn_meta']['global_shape'] = shp
                 for src_indices in src_inds_list:
                     src_indices.set_src_shape(shp)
                     shp = src_indices.indexed_src_shape
 
-                graph.nodes[to_var]['conn_meta']['shape'] = shp
+                graph.nodes[to_var]['conn_meta'].shape = shp
                 return shp
 
         def dist2serialrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
@@ -2276,7 +2276,7 @@ class Group(System):
                 dist_sizes[to_var] = dist_sizes[from_var].copy()
             else:
                 shp = get_global_dist_shape(from_var, dist_shapes[from_var])
-                graph.nodes[from_var]['conn_meta']['global_shape'] = shp
+                # graph.nodes[from_var]['conn_meta']['global_shape'] = shp
                 for src_indices in src_inds_list:
                     src_indices.set_src_shape(shp)
                     shp = src_indices.indexed_src_shape
