@@ -256,7 +256,7 @@ class Indexer(object):
             raise RuntimeError(f"Can't get indexed_src_shape of {self} because source shape "
                                "is unknown.")
         if self._flat_src:
-            return resolve_shape(shape_to_len(self._src_shape)).get_shape(self.flat())
+            return resolve_shape((shape_to_len(self._src_shape),)).get_shape(self.flat())
         else:
             return resolve_shape(self._src_shape).get_shape(self())
 

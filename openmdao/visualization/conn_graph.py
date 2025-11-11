@@ -13,7 +13,7 @@ import time
 from http.server import HTTPServer
 
 from openmdao.visualization.graph_viewer import write_graph
-from openmdao.utils.general_utils import common_subpath, is_undefined, truncate_str
+from openmdao.utils.general_utils import common_subpath, is_undefined, truncate_str, all_ancestors
 from openmdao.utils.array_utils import array_connection_compatible, shape_to_len
 from openmdao.utils.graph_utils import dump_nodes, dump_edges
 from openmdao.utils.units import is_compatible
@@ -108,9 +108,9 @@ class Defaults():
 
 
 class NodeAttrs():
-    __slots__ = ('pathname', 'rel_name', '_val', '_shape', '_units', 'defaults', 'src_inds_list',
-                 'flags', '_meta', '_locmeta', 'copy_shape', 'compute_shape', 'copy_units',
-                 'compute_units')
+    __slots__ = ('pathname', 'rel_name', '_val', '_shape', '_global_shape', '_units', 'defaults',
+                 'src_inds_list', 'flags', '_meta', '_locmeta', 'copy_shape', 'compute_shape',
+                 'copy_units', 'compute_units')
 
     def __init__(self):
         self.pathname = None
@@ -119,6 +119,7 @@ class NodeAttrs():
         self.src_inds_list = []
         self._val = None
         self._shape = None
+        self._global_shape = None
         self._units = None
         self._meta = None
         self._locmeta = None
@@ -150,34 +151,37 @@ class NodeAttrs():
         table = generate_table(rows, tablefmt='plain')
         return f"{self.__class__.__name__}:\n{table}"
 
+    def set_model_meta(self, model, meta, locmeta):
+        # this is only called on nodes corresponding to variables in the model, not on
+        # nodes internal to the tree.
+        self._meta = meta
+        if meta is not None and not self.discrete:
+            self.distributed = meta['distributed']
+            if not self.dyn_shape and not self.rel_name.startswith('_auto_ivc.'):
+                self._shape = meta['shape']
+                if not self.distributed:
+                    self._global_shape = meta['shape']
+            if not self.dyn_units:
+                self._units = meta['units']
+            for key in ('shape_by_conn', 'copy_shape', 'compute_shape',
+                        'units_by_conn', 'copy_units', 'compute_units'):
+                setattr(self, key, meta[key])
+
+        if locmeta is not None:
+            self._locmeta = locmeta
+            if locmeta is None:
+                self.remote = True
+            else:
+                if not self.dyn_shape and not self.rel_name.startswith('_auto_ivc.'):
+                    self._val = locmeta['val']
+
     @property
     def meta(self):
         return self._meta
 
-    @meta.setter
-    def meta(self, meta):
-        self._meta = meta
-        if meta is not None and not self.discrete:
-            if not self.dyn_shape and not self.rel_name.startswith('_auto_ivc.'):
-                self._shape = meta['shape']
-            if not self.dyn_units:
-                self._units = meta['units']
-            for key in ('shape_by_conn', 'copy_shape', 'compute_shape',
-                        'units_by_conn', 'copy_units', 'compute_units', 'distributed'):
-                setattr(self, key, meta[key])
-
     @property
     def locmeta(self):
         return self._locmeta
-
-    @locmeta.setter
-    def locmeta(self, locmeta):
-        self._locmeta = locmeta
-        if locmeta is None:
-            self.remote = True
-        else:
-            if not self.dyn_shape and not self.rel_name.startswith('_auto_ivc.'):
-                self._val = locmeta['val']
 
     @property
     def val(self):
@@ -237,12 +241,30 @@ class NodeAttrs():
                     self._locmeta['size'] = size
 
     @property
+    def size(self):
+        return shape_to_len(self._shape)
+
+    @property
+    def global_shape(self):
+        return self._global_shape
+
+    @global_shape.setter
+    def global_shape(self, global_shape):
+        self._global_shape = global_shape
+        if self._meta is not None:
+            self._meta['global_shape'] = global_shape
+
+    @property
+    def global_size(self):
+        return shape_to_len(self._global_shape)
+
+    @property
     def units(self):
         return self._units
 
     @units.setter
     def units(self, units):
-        if self._units is None and units is not None:
+        if units is not None and self._units is None:
             self._units = units
             if self._meta is not None:
                 self._meta['units'] = units
@@ -365,19 +387,18 @@ class NodeAttrs():
         return self.dyn_shape or self.dyn_units
 
     def upward_shape(self, src_indices):
-        shape = self.defaults.src_shape
-        if shape is not None:
-            return shape
+        if self.defaults.src_shape is not None:
+            return self.defaults.src_shape
 
         if src_indices is not None:
+            # can't determine the shape of the parent if src_indices are present
             return None
 
         return self.shape
 
     def upward_units(self):
-        units = self.defaults.units
-        if units is not None:
-            return units
+        if self.defaults.units is not None:
+            return self.defaults.units
 
         if self.ambiguous_units:
             return None
@@ -388,18 +409,17 @@ class NodeAttrs():
         if self.flags & NONE_UP_VAL or src_indices is not None:
             return None
 
-        val = self.defaults.val
-        if val is not None:
-            return val
+        if self.defaults.val is not None:
+            return self.defaults.val
 
         if self.ambiguous_val:
             return None
 
-        if self.defaults.src_shape is not None:
+        if self.defaults.src_shape is not None and self.val is not None:
             # this covers the situation where they set the src_shape but not the default val
             # and the val in the node is not compatible with the src_shape being passed to the
             # parent.
-            if self.val is None or np.shape(self.val) != self.defaults.src_shape:
+            if np.shape(self.val) != self.defaults.src_shape:
                 return None
 
         return self.val
@@ -432,6 +452,8 @@ class AllConnGraph(nx.DiGraph):
         self._first_pass = True
         self._required_conns = set()
         self._resolved = set()
+        self._has_dynamic_shapes = False
+        self._has_dynamic_units = False
 
     def find_node(self, pathname, varname, io=None):
         """
@@ -761,36 +783,6 @@ class AllConnGraph(nx.DiGraph):
             # propagate shape and value down the tree
             self.set_tree_val(model, src_node, srcval)
 
-    def assign_node_val(self, model, node, val):
-        node_meta = self.nodes[node]
-        if node_meta.meta is None:
-            return  # don't bother updating internal nodes
-
-        node_meta.val = val
-        vlocmeta = node_meta.locmeta
-
-        if node_meta.discrete:
-            if vlocmeta is not None:
-                vlocmeta['val'] = node_meta.val
-        else:
-            if vlocmeta is not None:
-                vlocshape = vlocmeta['shape']
-                if vlocshape is None:
-                    vlocmeta['val'] = node_meta.val
-                    vlocmeta['shape'] = node_meta.meta['shape'] = node_meta.shape
-                elif node_meta.shape == ():
-                    vlocmeta['val'] = node_meta.val
-                else:
-                    vlocmeta['val'][:] = node_meta.val
-
-                if node[0] == 'i':
-                    vec = model._inputs
-                else:
-                    vec = model._outputs
-
-                if vec is not None:
-                    vec._abs_set_val(node[1], val.reshape(vlocmeta['shape']))
-
     def set_tree_discrete_val(self, model, src_node, srcval):
         nodes = self.nodes
         for u, v in dfs_edges(self, src_node):
@@ -806,14 +798,12 @@ class AllConnGraph(nx.DiGraph):
             return self.set_tree_discrete_val(model, src_node, srcval)
 
         srcval = np.asarray(srcval)
-        # self.assign_node_val(model, src_node, srcval)
         src_meta.val = srcval
 
         for u, v in dfs_edges(self, src_node):
             vmeta = nodes[v]
             shape = nodes[u].shape
             if v[0] == 'i':
-                # vallmeta = vmeta.meta
                 src_indices = self.edges[(u, v)].get('src_indices', None)
                 if src_indices is not None:
                     if src_indices._src_shape is None:
@@ -824,19 +814,9 @@ class AllConnGraph(nx.DiGraph):
 
                 if vmeta.locmeta is not None:  # local absolute input node
                     val = apply_idx_list(srcval, src_inds_list)
-                    # self.assign_node_val(model, v, val)
                     vmeta.val = val
                 else:
                     val = srcval
-
-                # if shape is None:
-                #     shape = val.shape
-
-                # if vallmeta is not None:
-                #     if vallmeta['shape'] is None or vallmeta['shape_by_conn']:
-                #         vallmeta['shape'] = shape
-                #         if vmeta.locmeta is not None:
-                #             vmeta.locmeta['shape'] = shape
 
             else:  # output node
                 if vmeta.shape is None:
@@ -915,50 +895,46 @@ class AllConnGraph(nx.DiGraph):
         meta = self.nodes[node]
         return meta.pathname, meta.rel_name
 
-    def add_continuous_var(self, group, name, meta, locmeta, io):
+    def add_continuous_var(self, model, name, meta, locmeta, io):
         node = (io[0], name)
 
         if node not in self:
-            node, node_meta = self.create_node_meta(group, name, io)
+            node, node_meta = self.create_node_meta(model, name, io)
             self.add_node(node, **node_meta)
 
         node_meta = self.nodes[node]
-        node_meta.meta = meta
-        node_meta.locmeta = locmeta
         node_meta.discrete = False
+        node_meta.set_model_meta(model, meta, locmeta)
+
+        if node_meta.dyn_shape:
+            self._has_dynamic_shapes = True
+        if node_meta.dyn_units:
+            self._has_dynamic_units = True
 
         if io == 'input' and meta['require_connection']:
             self._required_conns.add(name)
             node_meta.require_connection = True
 
-    def add_discrete_var(self, group, name, meta, locmeta, io):
+    def add_discrete_var(self, model, name, meta, locmeta, io):
         node = (io[0], name)
         if node not in self:
-            node, node_meta = self.create_node_meta(group, name, io)
+            node, node_meta = self.create_node_meta(model, name, io)
             self.add_node(node, **node_meta)
 
         node_meta = self.nodes[node]
         node_meta.discrete = True
-        node_meta.meta = meta
-        node_meta.locmeta = locmeta
+        node_meta.set_model_meta(model, meta, locmeta)
 
-    def add_abs_variable_meta(self, model):
-        assert model.pathname == ''
+    def add_variable_meta(self, model):
         for io in ['input', 'output']:
             loc = model._var_abs2meta[io]
             for name, meta in model._var_allprocs_abs2meta[io].items():
-                if name in loc:
-                    locmeta = loc[name]
-                else:
-                    locmeta = None
+                locmeta = loc[name] if name in loc else None
                 self.add_continuous_var(model, name, meta, locmeta, io)
 
             loc = model._var_discrete[io]
             for name, meta in model._var_allprocs_discrete[io].items():
-                if name in loc:
-                    locmeta = loc[name]
-                else:
-                    locmeta = None
+                locmeta = loc[name] if name in loc else None
                 self.add_discrete_var(model, name, meta, locmeta, io)
 
     def add_promotion(self, io, group, prom_name, subsys, sub_prom, pinfo=None):
@@ -1204,7 +1180,7 @@ class AllConnGraph(nx.DiGraph):
             node_meta.require_connection = any(m.require_connection for m, _ in children_meta)
             node_meta.discrete = discrete = self.get_discrete_from_children(model, node,
                                                                             children_meta)
-            node_meta.distributed = self.get_distributed_from_children(node, children_meta, auto)
+            # node_meta.distributed = self.get_distributed_from_children(node, children_meta, auto)
 
             ambig_units = ambig_val = None
             if node[0] == 'o':
@@ -1468,23 +1444,23 @@ class AllConnGraph(nx.DiGraph):
             raise ConnError(f"'{node[1]}' has discrete ({sorted(discs)}) and non-discrete "
                             f"({sorted(non_discs)}) children.")
 
-    def get_distributed_from_children(self, node, children_meta, auto):
-        # if any children have different 'distributed' metadata, then we leave the parent
-        # as unknown by setting 'distributed' to None.  This value will later be filled in
-        # based on the value coming down the tree.
+    # def get_distributed_from_children(self, node, children_meta, auto):
+    #     # if any children have different 'distributed' metadata, then we leave the parent
+    #     # as unknown by setting 'distributed' to None.  This value will later be filled in
+    #     # based on the value coming down the tree.
 
-        dist = set(m.distributed for m, _ in children_meta)
-        if auto and True in dist:
-            bad = [n[1] for n, meta in zip(self.succ[node], children_meta) if meta.distributed]
-            raise ConnError(f"'{self.get_root(node)[1]}' is connected to distributed inputs "
-                            f"({sorted(bad)}), but distributed variables cannot be connected to "
-                            "an auto_ivc output.  Declare an IndepVarComp and connect it to "
-                            "these inputs to get rid of this error.")
+    #     dist = set(m.distributed for m, _ in children_meta)
+    #     if auto and True in dist:
+    #         bad = [n[1] for n, meta in zip(self.succ[node], children_meta) if meta.distributed]
+    #         raise ConnError(f"'{self.get_root(node)[1]}' is connected to distributed inputs "
+    #                         f"({sorted(bad)}), but distributed variables cannot be connected to "
+    #                         "an auto_ivc output.  Declare an IndepVarComp and connect it to "
+    #                         "these inputs to get rid of this error.")
 
-        if len(dist) == 1:
-            return dist.pop()
-        else:
-            return None
+    #     if len(dist) == 1:
+    #         return dist.pop()
+    #     else:
+    #         return None
 
     def get_defaults(self, meta):
         return meta.defaults.val, meta.defaults.units, meta.defaults.src_shape
@@ -1494,7 +1470,6 @@ class AllConnGraph(nx.DiGraph):
         parent_meta = self.nodes[parent]
         src_indices = self.edges[(parent, child)].get('src_indices', None)
         val = parent_meta.val
-        units = parent_meta.units
         shape = parent_meta.shape
 
         if not (src_indices is None or shape is None):
@@ -1506,8 +1481,8 @@ class AllConnGraph(nx.DiGraph):
 
         if parent_meta.ambiguous_val:
             val = None
-        if parent_meta.ambiguous_units:
-            units = None
+
+        units = None if parent_meta.ambiguous_units else parent_meta.units
 
         return val, shape, units, src_indices
 
@@ -1547,10 +1522,10 @@ class AllConnGraph(nx.DiGraph):
             src_shape = src_meta.shape
             tgt_shape = tgt_meta.shape
 
-            # if the target node has unknown 'distributed' metadata, then use the source node's
-            # value.
-            if tgt_meta.distributed is None:
-                tgt_meta.distributed = src_meta.distributed
+            # # if the target node has unknown 'distributed' metadata, then use the source node's
+            # # value.
+            # if tgt_meta.distributed is None:
+            #     tgt_meta.distributed = src_meta.distributed
 
             edge = (src, tgt)
 
@@ -1632,8 +1607,8 @@ class AllConnGraph(nx.DiGraph):
             shape = None
             units = None
 
-            if child_meta.distributed is None:
-                child_meta.distributed = parent_meta.distributed
+            # if child_meta.distributed is None:
+            #     child_meta.distributed = parent_meta.distributed
 
             val, shape, units, _ = self.get_parent_val_shape_units(parent, child)
 
@@ -1779,22 +1754,36 @@ class AllConnGraph(nx.DiGraph):
 
     def check(self, group):
         nodes = self.nodes
-        for u, v in self.edges():
-            if u[0] == 'o' and v[0] == 'i':  # an output to input connection
-                uunits = nodes[u].units
-                vunits = nodes[v].units
-                if uunits is None or vunits is None:
-                    uunitless = _is_unitless(uunits)
-                    vunitless = _is_unitless(vunits)
-                    if uunitless and not vunitless:
-                        issue_warning(f"{group.msginfo}: Input '{v[1]}' with units of "
-                                      f"'{vunits}' is connected to output '{u[1]}' "
-                                      f"which has no units.")
-                    elif not uunitless and vunitless:
-                        if not nodes[v].ambiguous_units:
-                            issue_warning(f"{group.msginfo}: Output '{u[1]}' with units of "
-                                        f"'{uunits}' is connected to input '{v[1]}' "
-                                        f"which has no units.")
+        in_degree = self.in_degree
+        for node in nodes():
+            if node[0] == 'o' and in_degree(node) == 0:  # a root output node
+
+                auto = node[1].startswith('_auto_ivc.')
+
+                for u, v in dfs_edges(self, node):
+                    if u[0] == 'o' and v[0] == 'i':  # an output to input connection
+                        uunits = nodes[u].units
+                        vmeta = nodes[v]
+                        if auto and vmeta.distributed:
+                            raise ConnError(f"'{node[1]}' is connected to distributed input "
+                                            f"'{v[1]}', but distributed variables cannot be "
+                                            "connected to an auto_ivc output.  Declare an "
+                                            "IndepVarComp and connect it to these inputs to "
+                                            "eliminate this error.")
+
+                        vunits = vmeta.units
+                        if uunits is None or vunits is None:
+                            uunitless = _is_unitless(uunits)
+                            vunitless = _is_unitless(vunits)
+                            if uunitless and not vunitless:
+                                issue_warning(f"{group.msginfo}: Input '{v[1]}' with units of "
+                                            f"'{vunits}' is connected to output '{u[1]}' "
+                                            f"which has no units.")
+                            elif not uunitless and vunitless:
+                                if not nodes[v].ambiguous_units:
+                                    issue_warning(f"{group.msginfo}: Output '{u[1]}' with units of "
+                                                f"'{uunits}' is connected to input '{v[1]}' "
+                                                f"which has no units.")
 
         desvars = group.get_design_vars()
         for req in self._required_conns:
@@ -2090,7 +2079,7 @@ class AllConnGraph(nx.DiGraph):
         if node not in self:
             raise ValueError(f"Input '{abs_in}' not found.")
         src_inds_list = self.nodes[node]['src_inds_list']
-        if len(src_inds_list) == 0:
+        if not src_inds_list:
             return None
         elif len(src_inds_list) == 1:
             return src_inds_list[0].shaped_array()
@@ -2156,6 +2145,73 @@ class AllConnGraph(nx.DiGraph):
                 return (val + offset) * scale
 
         return val
+
+    def setup_global_connections(self, model):
+        """
+        Compute dict of all connections between inputs and outputs.
+        """
+        from openmdao.core.group import Group
+
+        #if model.comm.size > 1:
+            ## do a preliminary gathering of variable sizing data for variables that are not
+            ## dynamically shaped so we know sizes of distributed variables.  This sizing info is
+            ## only computed at the top level of the system tree.
+            #model._setup_var_sizes()
+
+        # add nodes for all absolute inputs and connected absolute outputs
+        self.add_variable_meta(model)
+
+        if model.comm.size > 1:
+            self.gather_data(model)
+
+        self.add_implicit_connections(model, model._get_implicit_connections())
+
+        systems = list(model.system_iter(include_self=True, recurse=True))
+        groups = [s for s in systems if isinstance(s, Group)]
+        for g in groups:
+            self.add_manual_connections(g)
+
+        # check for cycles
+        if not nx.is_directed_acyclic_graph(self):
+            cycle_edges = nx.find_cycle(self, orientation='original')
+            errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}'
+                                for edge in cycle_edges])
+            model._collect_error('Cycle detected in input-to-input connections. '
+                                f'This is not allowed.\n{errmsg}')
+
+        self.update_src_inds_lists(model)
+        self.add_auto_ivc_nodes(model)
+
+        for g in groups:
+            self.add_group_input_defaults(g)
+
+        model._setup_auto_ivcs()
+
+        self.update_all_node_meta(model)
+        self.transform_input_input_connections(model)
+
+        conn_dict = self.create_all_conns_dict(model)
+
+        global_conn_dict = {'': {}}
+        root_dict = global_conn_dict['']
+        for path, conn_data in conn_dict.items():
+            for name in all_ancestors(path):
+                if name in global_conn_dict:
+                    global_conn_dict[name].update(conn_data)
+                else:
+                    global_conn_dict[name] = conn_data.copy()
+
+            # don't forget the root path!
+            root_dict.update(conn_data)
+
+        for system in systems:
+            if isinstance(system, Group):
+                system._conn_abs_in2out = conn_dict.get(system.pathname, {})
+                system._conn_global_abs_in2out = global_conn_dict.get(system.pathname, {})
+
+            system._resolver._conns = model._conn_global_abs_in2out
+
+        # model._setup_var_sizes()
 
     def create_node_label(self, node):
 

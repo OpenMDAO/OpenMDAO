@@ -25,11 +25,11 @@ from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import _flatten_src_indices, \
     shape_to_len, ValueRepeater, evenly_distrib_idxs
 from openmdao.utils.general_utils import shape2tuple, ensure_compatible, \
-    meta2src_iter, is_undefined, all_ancestors, env_truthy
-from openmdao.utils.units import unit_conversion, simplify_unit, PhysicalUnit, _find_unit
+    meta2src_iter, is_undefined, env_truthy
+from openmdao.utils.units import unit_conversion, simplify_unit, _find_unit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
     get_unresolved_knowns, is_unresolved, get_active_edges, are_connected
-from openmdao.utils.mpi import MPI, check_mpi_exceptions
+from openmdao.utils.mpi import MPI, check_mpi_exceptions, translate_ranks
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.relevance import get_relevance
@@ -319,12 +319,6 @@ class Group(System):
             system hieararchy with attribute access
         """
         pass
-
-    def _get_conn_graph(self):
-        if self._conn_graph is None:
-            return self._static_conn_graph
-
-        return self._conn_graph
 
     def set_input_defaults(self, name, val=_UNDEFINED, units=None, src_shape=None):
         """
@@ -651,7 +645,7 @@ class Group(System):
         if self.pathname == '':
             self._conn_graph = AllConnGraph()
 
-        self._conn_graph.update(self._static_conn_graph)
+        self._get_conn_graph().update(self._static_conn_graph)
 
         # Call setup function for this group.
         self.setup()
@@ -708,7 +702,6 @@ class Group(System):
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
-            subsys._conn_graph = self._conn_graph
             subsys._setup_procs(subsys.pathname, sub_comm, prob_meta)
 
         # build a list of local subgroups to speed up later loops
@@ -875,7 +868,7 @@ class Group(System):
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
         # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
         # the connections.
-        self._setup_global_connections()
+        self._get_conn_graph().setup_global_connections(self)
 
     def _get_var_existence(self):
         if self._var_existence is None:
@@ -1123,8 +1116,11 @@ class Group(System):
 
     def _setup_dynamic_properties(self):
         # called on the top level Group only
-        self._setup_dynamic_property('shape')
-        self._setup_dynamic_property('units')
+        graph = self._get_conn_graph()
+        if graph._has_dynamic_shapes:
+            self._setup_dynamic_property('shape')
+        if graph._has_dynamic_units:
+            self._setup_dynamic_property('units')
 
     def _setup_part2(self):
         """
@@ -1153,7 +1149,7 @@ class Group(System):
 
         self._check_connections()
 
-        self._conn_graph.check(self)
+        self._get_conn_graph().check(self)
 
         # setup of residuals must occur before setup of vectors and partials
         self._setup_residuals()
@@ -1568,6 +1564,7 @@ class Group(System):
         self._has_distrib_vars = False
         self._has_fd_group = self._owns_approx_jac
         rank = self.comm.rank
+        conn_graph = self._get_conn_graph()
 
         # sort the subsystems alphabetically in order to make the ordering
         # of vars in vectors and other data structures independent of the
@@ -1607,8 +1604,7 @@ class Group(System):
                                              distributed=flags & DISTRIBUTED)
 
                     if sub_prom in subprom2prom:
-                        self._conn_graph.add_promotion(io, self, prom_name,
-                                                           subsys, sub_prom, pinfo)
+                        conn_graph.add_promotion(io, self, prom_name, subsys, sub_prom, pinfo)
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
@@ -1670,6 +1666,11 @@ class Group(System):
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
+        self._var_allprocs_abs2idx = {n: i for i, n in enumerate(allprocs_abs2meta['input'])}
+        self._var_allprocs_abs2idx.update({
+            n: i for i, n in enumerate(allprocs_abs2meta['output'])
+        })
+
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
@@ -1698,7 +1699,7 @@ class Group(System):
         Return a mapping of var pathname to owning rank.
 
         The mapping will contain ONLY systems that are remote on at least one proc.
-        Distributed variables are not included. Discrete variables ARE included.
+        Discrete variables ARE included.
 
         Returns
         -------
@@ -1715,7 +1716,7 @@ class Group(System):
             for io in ('input', 'output'):
 
                 # var order must be same on all procs
-                sorted_names = sorted(self._resolver.abs_iter(io, distributed=False))
+                sorted_names = sorted(self._resolver.abs_iter(io))
                 locality = np.zeros((nprocs, len(sorted_names)), dtype=bool)
                 for i, name in enumerate(sorted_names):
                     if resflags(name, io) & LOCAL:
@@ -1735,7 +1736,6 @@ class Group(System):
         """
         Compute the arrays of variable existence for all variables/procs on this system.
         """
-        abs2idx = self._var_allprocs_abs2idx = {}
         all_abs2meta = self._var_allprocs_abs2meta
         self._var_existence = {
             'input': np.zeros((self.comm.size, len(all_abs2meta['input'])), dtype=bool),
@@ -1746,7 +1746,6 @@ class Group(System):
         for io, existence in self._var_existence.items():
             abs2meta = self._var_abs2meta[io]
             for i, name in enumerate(self._var_allprocs_abs2meta[io]):
-                abs2idx[name] = i
                 if name in abs2meta:
                     existence[iproc, i] = True
 
@@ -1754,39 +1753,11 @@ class Group(System):
                 row = existence[iproc, :].copy()
                 self.comm.Allgather(row, existence)
 
-    @collect_errors
-    def _setup_var_sizes(self):
-        """
-        Compute the arrays of variable sizes for all variables/procs on this system.
-        """
-        self._var_offsets = None
-        abs2idx = self._var_allprocs_abs2idx = {}
-        all_abs2meta = self._var_allprocs_abs2meta
-        self._var_sizes = {
-            'input': np.zeros((self.comm.size, len(all_abs2meta['input'])), dtype=INT_DTYPE),
-            'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=INT_DTYPE),
-        }
-
-        for subsys in self._sorted_sys_iter():
-            subsys._setup_var_sizes()
-
-        iproc = self.comm.rank
-        for io, sizes in self._var_sizes.items():
-            abs2meta = self._var_abs2meta[io]
-            for i, name in enumerate(self._var_allprocs_abs2meta[io]):
-                abs2idx[name] = i
-                if name in abs2meta:
-                    sz = abs2meta[name]['size']
-                    sizes[iproc, i] = 0 if sz is None else sz
-
-            if self.comm.size > 1:
-                my_sizes = sizes[iproc, :].copy()
-                self.comm.Allgather(my_sizes, sizes)
-
+    def _setup_vector_class(self):
         if self.comm.size > 1:
             if (self._has_distrib_vars or self._contains_parallel_group or
                 not np.all(self._var_sizes['output']) or
-               not np.all(self._var_sizes['input'])):
+                not np.all(self._var_sizes['input'])):
 
                 if self._distributed_vector_class is not None:
                     self._vector_class = self._distributed_vector_class
@@ -1795,6 +1766,55 @@ class Group(System):
                                        "vector type has been set.".format(self.msginfo))
         else:
             self._vector_class = self._local_vector_class
+
+    @collect_errors
+    def _setup_var_sizes(self):
+        """
+        Compute the arrays of variable sizes for all variables/procs in the model.
+
+        This should only be called at the top level of the system tree.
+        """
+        self._var_offsets = None
+        all_abs2meta = self._var_allprocs_abs2meta
+        # only allocate these arrays the first time through
+        self._var_sizes = {
+            'input': np.zeros((self.comm.size, len(all_abs2meta['input'])), dtype=INT_DTYPE),
+            'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=INT_DTYPE),
+        }
+
+        iproc = self.comm.rank
+        nprocs = self.comm.size
+        for io, sizes in self._var_sizes.items():
+            abs2meta = self._var_abs2meta[io]
+            for i, name in enumerate(self._var_allprocs_abs2meta[io]):
+                if name in abs2meta:
+                    sz = abs2meta[name]['size']
+                    sizes[iproc, i] = 0 if sz is None else sz
+
+            if nprocs > 1:
+                my_sizes = sizes[iproc, :].copy()
+                self.comm.Allgather(my_sizes, sizes)
+
+        # TODO: see about moving vector class setup elsewhere
+        self._setup_vector_class()
+
+        for subsys in self.system_iter(recurse=True, include_self=False):
+            abs2idx = subsys._var_allprocs_abs2idx
+            ranks = translate_ranks(self.comm, subsys.comm, try_slice=True)
+            subins = list(subsys._var_abs2meta['input'])
+            istart = abs2idx[subins[0]] if subins else 0
+            iend = abs2idx[subins[-1]] + 1 if subins else 0
+            subsys._var_sizes['input'] = self._var_sizes['input'][ranks, istart:iend]
+
+            subouts = list(subsys._var_abs2meta['output'])
+            ostart = abs2idx[subouts[0]] if subouts else 0
+            oend = abs2idx[subouts[-1]] + 1 if subouts else 0
+            subsys._var_sizes['output'] = self._var_sizes['output'][ranks, ostart:oend]
+
+            if isinstance(subsys, Group):
+                subsys._setup_vector_class()
+            else:
+                subsys._owned_output_sizes = subsys._var_sizes['output']
 
         self._compute_owning_ranks()
 
@@ -1861,67 +1881,67 @@ class Group(System):
 
         return implicit_connections
 
-    def _setup_global_connections(self):
-        """
-        Compute dict of all connections between inputs and outputs.
+    # def _setup_global_connections(self):
+    #     """
+    #     Compute dict of all connections between inputs and outputs.
 
-        This should only be called on the top level group.
-        """
-        assert self.pathname == '', "call _setup_global_connections on the top level Group only."
+    #     This should only be called on the top level group.
+    #     """
+    #     assert self.pathname == '', "call _setup_global_connections on the top level Group only."
 
-        all_conn_graph = self._get_conn_graph()
+    #     conn_graph = self._get_conn_graph()
 
-        # add nodes for all absolute inputs and connected absolute outputs
-        all_conn_graph.add_abs_variable_meta(self)
+    #     # add nodes for all absolute inputs and connected absolute outputs
+    #     conn_graph.add_variable_meta(self)
 
-        if self.comm.size > 1:
-            all_conn_graph.gather_data(self)
+    #     if self.comm.size > 1:
+    #         conn_graph.gather_data(self)
 
-        all_conn_graph.add_implicit_connections(self, self._get_implicit_connections())
+    #     conn_graph.add_implicit_connections(self, self._get_implicit_connections())
 
-        groups = list(self.system_iter(include_self=True, recurse=True, typ=Group))
-        for g in groups:
-            all_conn_graph.add_manual_connections(g)
+    #     groups = list(self.system_iter(include_self=True, recurse=True, typ=Group))
+    #     for g in groups:
+    #         conn_graph.add_manual_connections(g)
 
-        # check for cycles
-        if not nx.is_directed_acyclic_graph(all_conn_graph):
-            cycle_edges = nx.find_cycle(all_conn_graph, orientation='original')
-            errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}'
-                                for edge in cycle_edges])
-            self._collect_error('Cycle detected in input-to-input connections. '
-                                f'This is not allowed.\n{errmsg}')
+    #     # check for cycles
+    #     if not nx.is_directed_acyclic_graph(conn_graph):
+    #         cycle_edges = nx.find_cycle(conn_graph, orientation='original')
+    #         errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}'
+    #                             for edge in cycle_edges])
+    #         self._collect_error('Cycle detected in input-to-input connections. '
+    #                             f'This is not allowed.\n{errmsg}')
 
-        all_conn_graph.update_src_inds_lists(self)
-        all_conn_graph.add_auto_ivc_nodes(self)
+    #     conn_graph.update_src_inds_lists(self)
+    #     conn_graph.add_auto_ivc_nodes(self)
 
-        for g in groups:
-            all_conn_graph.add_group_input_defaults(g)
+    #     for g in groups:
+    #         conn_graph.add_group_input_defaults(g)
 
-        self._setup_auto_ivcs()
-        #self.display_conn_graph()
+    #     self._setup_auto_ivcs()
+    #     #self.display_conn_graph()
 
-        all_conn_graph.update_all_node_meta(self)
-        all_conn_graph.transform_input_input_connections(self)
+    #     conn_graph.update_all_node_meta(self)
+    #     conn_graph.transform_input_input_connections(self)
 
-        conn_dict = all_conn_graph.create_all_conns_dict(self)
+    #     conn_dict = conn_graph.create_all_conns_dict(self)
 
-        global_conn_dict = {'': {}}
-        root_dict = global_conn_dict['']
-        for path, conn_data in conn_dict.items():
-            for name in all_ancestors(path):
-                if name in global_conn_dict:
-                    global_conn_dict[name].update(conn_data)
-                else:
-                    global_conn_dict[name] = conn_data.copy()
+    #     global_conn_dict = {'': {}}
+    #     root_dict = global_conn_dict['']
+    #     for path, conn_data in conn_dict.items():
+    #         for name in all_ancestors(path):
+    #             if name in global_conn_dict:
+    #                 global_conn_dict[name].update(conn_data)
+    #             else:
+    #                 global_conn_dict[name] = conn_data.copy()
 
-            # don't forget the root path!
-            root_dict.update(conn_data)
+    #         # don't forget the root path!
+    #         root_dict.update(conn_data)
 
-        for system in self.system_iter(include_self=True, recurse=True):
-            if isinstance(system, Group):
-                system._conn_abs_in2out = conn_dict.get(system.pathname, {})
-                system._conn_global_abs_in2out = global_conn_dict.get(system.pathname, {})
-            system._resolver._conns = self._conn_global_abs_in2out
+    #     for system in self.system_iter(include_self=True, recurse=True):
+    #         if isinstance(system, Group):
+    #             system._conn_abs_in2out = conn_dict.get(system.pathname, {})
+    #             system._conn_global_abs_in2out = global_conn_dict.get(system.pathname, {})
+    #         system._resolver._conns = self._conn_global_abs_in2out
 
     def get_indep_vars(self, local, include_discrete=False):
         """
@@ -1978,8 +1998,6 @@ class Group(System):
 
         knowns = set()
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        conn_graph = self._get_conn_graph()
-        conn_nodes = conn_graph.nodes
 
         if prop == 'shape':
             dist_shp = {}  # local distrib sizes
@@ -2071,7 +2089,7 @@ class Group(System):
                     if isinstance(ind, slice):
                         slc = src_indices._slice
                         is_full_slice = ((slc.start is None or slc.start == 0) and slc.stop is None and
-                                         (slc.step is None or slc.step == 0))
+                                         (slc.step is None or slc.step == 1))
 
             if self.comm.size > 1:
                 dist_from = from_meta['conn_meta'].distributed
@@ -2146,12 +2164,12 @@ class Group(System):
             exist_outs = existence['output'][:, self._var_allprocs_abs2idx[from_var]]
             exist_ins = existence['input'][:, self._var_allprocs_abs2idx[to_var]]
             to_meta = graph.nodes[to_var]['conn_meta']
+            num_exist = np.count_nonzero(exist_outs)
+
             if not src_inds_list:
                 shape = from_shape
             else:
-                num_exist = np.count_nonzero(exist_outs)
-
-                if to_meta.get('flat_src_indices') or len(from_shape) < 2:
+                if len(from_shape) < 2:
                     global_src_shape = (num_exist * shape_to_len(from_shape),)
                 else:
                     shapelst = list(from_shape)
@@ -2326,6 +2344,9 @@ class Group(System):
         do_dist = nprocs > 1 and prop == 'shape'
         my_abs2meta = self._var_abs2meta
 
+        conn_graph = self._get_conn_graph()
+        conn_nodes = conn_graph.nodes
+
         # determine all component inputs and outputs
         for io in ['input', 'output']:
             a2m = my_abs2meta[io]
@@ -2345,7 +2366,6 @@ class Group(System):
                     node_meta = conn_nodes[(io[0], name)]
                     node_info = (name, io, None, node_meta)
                     copy_var = node_meta[copy_prop]
-                    compute_func = node_meta[compute_prop]
                     if copy_var:
                         cpy_name = comp_path + '.' + copy_var
                         if (opposite[io][0], cpy_name) in conn_graph:
@@ -2359,7 +2379,7 @@ class Group(System):
                                                 f"not found.")
                             continue
                         connect_nodes((cpy_name, cp_io, None, cpy_meta), node_info)
-                    elif compute_func:
+                    elif node_meta[compute_prop]:
                         oi = opposite[io]
                         for vname in io_dict[oi]:
                             comp_info = (vname, oi, None, conn_nodes[(oi[0], vname)])
@@ -2468,34 +2488,34 @@ class Group(System):
                             progress = True
 
         # update variable metadata based on graph data
-        for node, data in graph.nodes(data=True):
-            io = data['io']
-            allmeta = self._var_allprocs_abs2meta[io][node]
+        #for node, data in graph.nodes(data=True):
+            #io = data['io']
+            #allmeta = self._var_allprocs_abs2meta[io][node]
 
-            propval = data['conn_meta'][prop]
+            #propval = data['conn_meta'][prop]
 
-            if prop == 'shape':
-                size = shape_to_len(propval)
-                allmeta['size'] = size
-            elif isinstance(propval, PhysicalUnit):
-                propval = propval.name()
+            #if prop == 'shape':
+                #size = shape_to_len(propval)
+                #allmeta['size'] = size
+            #elif isinstance(propval, PhysicalUnit):
+                #propval = propval.name()
 
-            allmeta[prop] = propval
+            #allmeta[prop] = propval
 
-            try:
-                meta = self._var_abs2meta[io][node]
-            except KeyError:
-                pass  # node is not local, so no need to update local metadata
-            else:
-                meta[prop] = propval
-                if prop == 'shape':
-                    meta['size'] = size
-                    # Passing None into shape arguments as alias for () is deprecated (Numpy 1.20)
-                    shape = propval if propval is not None else ()
-                    try:
-                        meta['val'] = np.full(shape, meta['val'], dtype=float)
-                    except ValueError:
-                        pass  # ignore this here. will be caught later in final conn graph pass
+            #try:
+                #meta = self._var_abs2meta[io][node]
+            #except KeyError:
+                #pass  # node is not local, so no need to update local metadata
+            #else:
+                #meta[prop] = propval
+                #if prop == 'shape':
+                    #meta['size'] = size
+                    ## Passing None into shape arguments as alias for () is deprecated (Numpy 1.20)
+                    #shape = propval if propval is not None else ()
+                    #try:
+                        #meta['val'] = np.full(shape, meta['val'], dtype=float)
+                    #except ValueError:
+                        #pass  # ignore this here. will be caught later in final conn graph pass
 
         unresolved = set(graph.nodes()) - all_knowns
         if unresolved:
@@ -2549,7 +2569,7 @@ class Group(System):
         # ref or ref0 are defined for the output.
         for abs_in, abs_out in abs_in2out.items():
             inode = ('i', abs_in)
-            if conn_graph.nodes[inode]['discrete']:
+            if conn_graph.nodes[inode].discrete:
                 self._conn_discrete_in2out[abs_in] = abs_out
 
             if True:
@@ -3964,7 +3984,7 @@ class Group(System):
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
-        graph = self._conn_graph
+        graph = self._get_conn_graph()
 
         auto2tgt = {}
         for srcnode in graph.nodes():
@@ -3999,21 +4019,13 @@ class Group(System):
         # bind auto_ivc conn graph nodes to their variable metadata
         locmeta = auto_ivc._var_abs2meta['output']
         for name, meta in auto_ivc._var_allprocs_abs2meta['output'].items():
-            node = ('o', name)
-            node_meta = graph.nodes[node]
-            node_meta.meta = meta
-            if name in locmeta:
-                node_meta.locmeta = locmeta[name]
+            graph.nodes[('o', name)].set_model_meta(self, meta, locmeta.get(name))
 
         locmeta = auto_ivc._var_discrete['output']
         for name, meta in auto_ivc._var_allprocs_discrete['output'].items():
-            node = ('o', name)
-            node_meta = graph.nodes[node]
+            node_meta = graph.nodes[('o', name)]
             node_meta.discrete = True
-            node_meta.meta = meta
-            relname = name.rpartition('.')[-1]
-            if relname in locmeta:
-                node_meta.locmeta = locmeta[relname]
+            node_meta.set_model_meta(self, meta, locmeta.get(name.rpartition('.')[-1]))
 
         # now update our own data structures based on the new auto_ivc component variables
         old = self._subsystems_allprocs
@@ -4036,11 +4048,14 @@ class Group(System):
         # rebuild _var_abs2meta in the correct order
         for s in self._sorted_sys_iter():
             self._var_abs2meta[io].update(s._var_abs2meta[io])
-
+            
         self._var_allprocs_abs2meta[io] = {}
         for sysname in self._sorted_sys_iter_all_procs():
             self._var_allprocs_abs2meta[io].update(
                 self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
+
+        self._var_allprocs_abs2idx = {n: i for i, n in enumerate(self._var_allprocs_abs2meta['input'])}
+        self._var_allprocs_abs2idx.update({n: i for i, n in enumerate(self._var_allprocs_abs2meta['output'])})
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True

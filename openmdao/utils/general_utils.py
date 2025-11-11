@@ -20,7 +20,6 @@ import numpy as np
 
 from openmdao.core.constants import INF_BOUND, _UNDEFINED
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.mpi import MPI
 
 
 _float_inf = float('inf')
@@ -1351,6 +1350,8 @@ def generate_launch_json_file(vscode_dir, base_port, ranks):
     ranks : int
         The specific ranks to debug.
     """
+    from openmdao.utils.mpi import MPI
+
     _remove_old_configs(vscode_dir)
 
     launch_path = os.path.join(vscode_dir, 'launch.json')
@@ -1416,6 +1417,8 @@ def setup_dbg():
     """
     If WING_DBG or VSCODE_DBG is truthy in the environment, set up their debuggers.
     """
+    from openmdao.utils.mpi import MPI
+
     # Get the base port from the VSCODE_DBG environment variable if set
     vscode_dbg = os.environ.get("VSCODE_DBG")
 

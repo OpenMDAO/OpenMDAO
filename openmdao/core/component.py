@@ -13,7 +13,7 @@ from numpy import ndarray, isscalar, ndim, atleast_1d
 from scipy.sparse import issparse, coo_matrix, csr_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, collect_errors, _iter_derivs
+    global_meta_names, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.subjac import Subjac
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
@@ -238,11 +238,11 @@ class Component(System):
         self.setup()
         self._setup_check()
 
-        self._set_vector_class()
+        self._setup_vector_class()
 
-    def _set_vector_class(self):
+    def _setup_vector_class(self):
         if self._has_distrib_vars:
-            dist_vec_class = self._problem_meta['distributed_vector_class']
+            dist_vec_class = self._distributed_vector_class
             if dist_vec_class is not None:
                 self._vector_class = dist_vec_class
             else:
@@ -251,9 +251,9 @@ class Component(System):
                               "available. The default non-distributed vectors will be used.",
                               prefix=self.msginfo, category=DistributedComponentWarning)
 
-                self._vector_class = self._problem_meta['local_vector_class']
+                self._vector_class = self._local_vector_class
         else:
-            self._vector_class = self._problem_meta['local_vector_class']
+            self._vector_class = self._local_vector_class
 
     def _configure_check(self):
         """
@@ -313,6 +313,13 @@ class Component(System):
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
                 del v['val']
 
+        self._var_allprocs_abs2idx = {
+            n: i for i, n in enumerate(self._var_allprocs_abs2meta['input'])
+        }
+        self._var_allprocs_abs2idx.update({
+            n: i for i, n in enumerate(self._var_allprocs_abs2meta['output'])
+        })
+
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
@@ -366,28 +373,28 @@ class Component(System):
                 break
         return msg
 
-    @collect_errors
-    def _setup_var_sizes(self):
-        """
-        Compute the arrays of variable sizes for all variables/procs on this system.
-        """
-        iproc = self.comm.rank
-        abs2idx = self._var_allprocs_abs2idx = {}
+    # @collect_errors
+    # def _setup_var_sizes(self):
+    #     """
+    #     Compute the arrays of variable sizes for all variables/procs on this system.
+    #     """
+    #     iproc = self.comm.rank
+    #     abs2idx = self._var_allprocs_abs2idx = {}
 
-        for io in ('input', 'output'):
-            sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(self._var_rel_names[io])),
-                                                   dtype=INT_DTYPE)
+    #     for io in ('input', 'output'):
+    #         sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(self._var_rel_names[io])),
+    #                                                dtype=INT_DTYPE)
 
-            for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
-                sz = metadata['size']
-                sizes[iproc, i] = 0 if sz is None else sz
-                abs2idx[name] = i
+    #         for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
+    #             sz = metadata['size']
+    #             sizes[iproc, i] = 0 if sz is None else sz
+    #             abs2idx[name] = i
 
-            if self.comm.size > 1:
-                my_sizes = sizes[iproc, :].copy()
-                self.comm.Allgather(my_sizes, sizes)
+    #         if self.comm.size > 1:
+    #             my_sizes = sizes[iproc, :].copy()
+    #             self.comm.Allgather(my_sizes, sizes)
 
-        self._owned_output_sizes = self._var_sizes['output']
+    #     self._owned_output_sizes = self._var_sizes['output']
 
     def _setup_partials(self):
         """
@@ -1122,7 +1129,7 @@ class Component(System):
                 node_meta = nodes[node]
                 src_inds_list = node_meta['src_inds_list']
                 if src_inds_list:
-                    # check shape after applying src_inds_list to actual shape, if same, done
+                    # check shape after applying src_inds_list to actual shape. if same, done.
                     shape = idx_list_to_shape(src_inds_list, all_abs2meta_out[src]['global_shape'])
                     if shape == meta_in['shape']:
                         continue
@@ -1845,43 +1852,6 @@ class Component(System):
             self._first_call_to_linearize = False  # only do this once
             if coloring_mod._use_partial_sparsity:
                 self._get_coloring()
-
-    # def _resolve_src_inds(self):
-    #     abs2prom = self._resolver.abs2prom
-    #     abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-    #     all_abs2meta_in = self._var_allprocs_abs2meta['input']
-    #     abs2meta_in = self._var_abs2meta['input']
-    #     conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
-    #     all_abs2meta_out = self._problem_meta['model_ref']()._var_allprocs_abs2meta['output']
-
-    #     for tgt, meta in abs2meta_in.items():
-    #         if tgt in abs_in2prom_info:
-    #             pinfo = abs_in2prom_info[tgt][-1]  # component always last in the plist
-    #             if pinfo is not None:
-    #                 inds, flat, shape = pinfo
-    #                 if inds is not None:
-    #                     all_abs2meta_in[tgt]['has_src_indices'] = True
-    #                     meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
-    #                     if inds._flat_src:
-    #                         meta['flat_src_indices'] = True
-    #                     elif meta['flat_src_indices'] is None:
-    #                         meta['flat_src_indices'] = flat
-
-    #                     try:
-    #                         if not isinstance(inds, Indexer):
-    #                             meta['src_indices'] = inds = indexer(inds, flat_src=flat,
-    #                                                                  src_shape=shape)
-    #                         else:
-    #                             meta['src_indices'] = inds = inds.copy()
-    #                             inds.set_src_shape(shape)
-    #                             self._var_prom2inds[abs2prom(tgt, iotype='input')] = \
-    #                                 [shape, inds, flat]
-    #                     except Exception:
-    #                         type_exc, exc, tb = sys.exc_info()
-    #                         self._collect_error(f"When accessing '{conns[tgt]}' with src_shape "
-    #                                             f"{shape} from '{pinfo.prom_path()}' using "
-    #                                             f"src_indices {inds}: {exc}", exc_type=type_exc,
-    #                                             tback=tb, ident=(conns[tgt], tgt))
 
     def _check_consistent_serial_dinputs(self, nz_dist_outputs):
         """

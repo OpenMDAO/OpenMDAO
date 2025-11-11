@@ -80,3 +80,75 @@ class WeakMethodWrapper(object):
             The return value of the wrapped method called with the given args.
         """
         return getattr(self._ref(), self.__name__)(*args, **kwargs)
+
+
+class _ForwardDescriptor:
+    """
+    Descriptor that forwards attribute access to a wrapped object.
+
+    Parameters
+    ----------
+    wrapped_attr : str
+        Name of the attribute in the wrapping class that holds the wrapped instance.
+    attr_name : str
+        Name of the attribute to forward.
+    """
+    def __init__(self, wrapped_attr, attr_name):
+        self.wrapped_attr = wrapped_attr
+        self.attr_name = attr_name
+
+    def __get__(self, instance, objtype=None):
+        if instance is None:  # class level access
+            return self
+        return getattr(getattr(instance, self.wrapped_attr), self.attr_name)
+
+    def __set__(self, instance, value):
+        setattr(getattr(instance, self.wrapped_attr), self.attr_name, value)
+
+    def __delete__(self, instance):
+        delattr(getattr(instance, self.wrapped_attr), self.attr_name)
+
+
+def auto_forward(wrapped_attr, attr_names):
+    """
+    Class decorator that automatically forwards attributes from the wrapping class
+    to the wrapped class using descriptors.
+
+    Parameters
+    ----------
+    wrapped_attr : str
+        Name of the attribute in the wrapping class that holds the wrapped instance.
+    attr_names : list of str
+        List of attribute names to forward from the wrapping class to the wrapped instance.
+
+    Returns
+    -------
+    function
+        The class decorator function.
+
+    Examples
+    --------
+    >>> class Wrapped:
+    ...     def __init__(self):
+    ...         self.x = 1
+    ...         self.y = 2
+    ...
+    >>> @auto_forward('wrapped_obj', ['x', 'y'])
+    ... class Wrapper:
+    ...     def __init__(self):
+    ...         self.wrapped_obj = Wrapped()
+    ...
+    >>> w = Wrapper()
+    >>> w.x  # Accesses w.wrapped_obj.x
+    1
+    >>> w.y  # Accesses w.wrapped_obj.y
+    2
+    """
+    def decorator(cls):
+        for attr_name in attr_names:
+            if attr_name in cls.__dict__:
+                raise TypeError(f"Class {cls.__name__} already has an attribute named {attr_name}.")
+            setattr(cls, attr_name, _ForwardDescriptor(wrapped_attr, attr_name))
+        return cls
+    return decorator
+

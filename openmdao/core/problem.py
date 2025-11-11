@@ -1088,7 +1088,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             'solver_info': SolverInfo(),
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,  # forces allocation of complex vectors
-            'vars_to_gather': {},  # vars that are remote somewhere. does not include distrib vars
+            'vars_to_gather': {},  # vars that are remote somewhere.
             'static_mode': False,  # used to determine where various 'static'
                                    # and 'dynamic' data structures are stored.
                                    # Dynamic ones are added during System

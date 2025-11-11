@@ -3,9 +3,16 @@
 from difflib import get_close_matches
 from itertools import chain
 
-LOCAL = 1 << 0
-CONTINUOUS = 1 << 1
-DISTRIBUTED = 1 << 2
+import numpy as np
+
+
+flag_type = np.uint8
+
+base = flag_type(1)
+
+LOCAL = base << 0
+CONTINUOUS = base << 1
+DISTRIBUTED = base << 2
 
 
 def _get_flags(local=None, continuous=None, distributed=None):
@@ -30,8 +37,8 @@ def _get_flags(local=None, continuous=None, distributed=None):
     expected : int
         The expected value for the given flags.
     """
-    mask = 0
-    expected = 0
+    mask = flag_type(0)
+    expected = flag_type(0)
 
     if local is not None:
         mask |= LOCAL

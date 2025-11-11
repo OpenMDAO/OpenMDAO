@@ -618,9 +618,8 @@ class TestN2(unittest.TestCase):
 
         browser_arg = '' if DEBUG_BROWSER else '--no_browser'
 
-        for values_arg in ('', '--no_values'):
-            with self.subTest(values_arg=values_arg):
-                check_call(f'openmdao n2 {values_arg} {browser_arg} {filename}')
+        check_call(f'openmdao n2 --no_values {browser_arg} {filename}')
+        check_call(f'openmdao n2 {browser_arg} {filename}')
 
     def test_n2_set_title(self):
         """
@@ -650,8 +649,7 @@ class TestN2(unittest.TestCase):
         p = om.Problem(BadConnectionModel(), name='n2_connection_error')
 
         msg = "\nCollected errors for problem 'n2_connection_error':" \
-              "\n   'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but " \
-              "'tgt.x' is an input. All connections must be from an output to an input."
+              "\n   <model> <class BadConnectionModel>: Can't connect 'sub.src.x' to 'sub.arr.x': shape (5, 3) of 'sub.src.x' is incompatible with shape (2,) of 'sub.arr.x'."
 
         with self.assertRaises(Exception) as cm:
             p.setup()

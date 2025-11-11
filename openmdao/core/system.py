@@ -241,8 +241,6 @@ class System(object, metaclass=SystemMetaclass):
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
-    _var_prom2inds : dict
-        Maps promoted name to src_indices in scope of system.
     _var_allprocs_abs2meta : dict
         Dictionary mapping absolute names to metadata dictionaries for allprocs continuous
         variables.
@@ -458,7 +456,6 @@ class System(object, metaclass=SystemMetaclass):
         self._var_promotes = {'input': [], 'output': [], 'any': []}
 
         self._resolver = NameResolver(self.pathname, self.msginfo)
-        self._var_prom2inds = {}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_abs2meta = {'input': {}, 'output': {}}
         self._var_discrete = {'input': {}, 'output': {}}
@@ -2306,6 +2303,7 @@ class System(object, metaclass=SystemMetaclass):
         self._vectors = {}
         self._full_comm = None
         self._approx_subjac_keys = None
+        self._var_offsets = None
 
         self.options._parent_name = self.msginfo
         self.recording_options._parent_name = self.msginfo
@@ -2318,8 +2316,15 @@ class System(object, metaclass=SystemMetaclass):
         self._jac_ofs_cache = None
         self._jac_wrts_cache = {}
 
-        if self.pathname == '':
-            self._conn_graph = None
+    def _get_conn_graph(self):
+        if self._problem_meta is None:
+            return self._static_conn_graph
+
+        model = self._problem_meta['model_ref']()
+        if model is None:
+            return self._static_conn_graph
+
+        return model._conn_graph
 
     def _setup_procs(self, pathname, comm, prob_meta):
         """
@@ -2347,7 +2352,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
-        self._var_prom2inds = {}
         self._var_abs2meta = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_allprocs_discrete = {'input': {}, 'output': {}}
@@ -2367,8 +2371,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         Compute the global size and shape of all variables on this system.
         """
-        loc_meta = self._var_abs2meta
-
         for io in ('input', 'output'):
             # now set global sizes and shapes into metadata for distributed variables
             sizes = self._var_sizes[io]
@@ -2386,9 +2388,9 @@ class System(object, metaclass=SystemMetaclass):
                     mymeta['global_size'] = mymeta['size']
                     mymeta['global_shape'] = local_shape
 
-                if abs_name in loc_meta[io]:
-                    loc_meta[io][abs_name]['global_shape'] = mymeta['global_shape']
-                    loc_meta[io][abs_name]['global_size'] = mymeta['global_size']
+                # if abs_name in loc_meta[io]:
+                #     loc_meta[io][abs_name]['global_shape'] = mymeta['global_shape']
+                #     loc_meta[io][abs_name]['global_size'] = mymeta['global_size']
 
     def _setup_driver_units(self, abs2meta=None):
         """
@@ -5511,7 +5513,7 @@ class System(object, metaclass=SystemMetaclass):
         model =  self._problem_meta['model_ref']()
         if model is None:
             return None
-        return model._get_conn_graph()
+        return model._conn_graph
 
     def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,
                      flat=False, from_root=False):

@@ -168,7 +168,7 @@ class DefaultTransfer(Transfer):
 
         scaled_in_set = set()
         scale_factors = group._problem_meta['model_ref']()._scale_factors
-        conn_graph = group._conn_graph
+        conn_graph = group._get_conn_graph()
 
         # Loop through all connections owned by this group
         for abs_in, abs_out in group._conn_abs_in2out.items():
