@@ -47,7 +47,7 @@ class InterpNDSemi(object):
         When True, raise a warning for any point that is extrapolated.
         Default is True (just warn).
     extrapolated_points : None or ndarray of bool
-        Boolean array to save the indices of points where extrapolated.
+        Boolean array to save the indices of points where extrapolation occurred.
     grid : tuple
         Collection of points that determine the regular grid.
     table : <InterpTable>
