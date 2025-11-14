@@ -46,6 +46,8 @@ class InterpNDSemi(object):
         When False, raise an exception for any point that is extrapolated.
         When True, raise a warning for any point that is extrapolated.
         Default is True (just warn).
+    extrapolated_points : None or ndarray of bool
+        Boolean array to save the indices of points where extrapolated.
     grid : tuple
         Collection of points that determine the regular grid.
     table : <InterpTable>
@@ -94,6 +96,7 @@ class InterpNDSemi(object):
         self.grid = points
         self.values = values
         self.extrapolate = extrapolate
+        self.extrapolated_points = None
 
         self._xi = None
         self._d_dx = None
@@ -178,8 +181,10 @@ class InterpNDSemi(object):
             derivs_val = np.zeros((n_nodes, len(self.values)), dtype=xi.dtype)
 
         # Loop over n_nodes because there isn't a way to vectorize.
+        self.extrapolated_points = np.zeros(n_nodes, dtype=bool)
         for j in range(n_nodes):
             val, d_x, d_values_tuple, extrapolate = table.interpolate(xi[j, :])
+            self.extrapolated_points[j] = extrapolate
             result[j] = val.item()
             derivs_x[j, :] = d_x.ravel()
             if self._compute_d_dvalues:
