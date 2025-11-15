@@ -23,7 +23,7 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import _flatten_src_indices, \
-    shape_to_len, ValueRepeater, evenly_distrib_idxs
+    shape_to_len, ValueRepeater, evenly_distrib_idxs, array_hash
 from openmdao.utils.general_utils import shape2tuple, ensure_compatible, \
     meta2src_iter, is_undefined, env_truthy
 from openmdao.utils.units import unit_conversion, simplify_unit, _find_unit
@@ -815,7 +815,7 @@ class Group(System):
         """
         # save a ref to the problem level options.
         self._problem_meta = prob_meta
-        self._initial_condition_cache = {}
+        # self._initial_condition_cache = {}
         self._auto_ivc_recorders = []
         self._sys_graph_cache = None
         self._remote_sets = []
@@ -1495,14 +1495,11 @@ class Group(System):
                 out_dist = allprocs_abs2meta_out[abs_out]['distributed']
 
                 # check that src_indices match for dist->serial connection
-                # FIXME: this transfers src_indices from all ranks to the owning rank so we could
-                # run into memory issues if src_indices are large.  Maybe try something like
-                # computing a hash in each rank and comparing those?
                 if out_dist and not in_dist:
                     # all non-distributed inputs must have src_indices if they connect to a
                     # distributed output.
                     owner = self._owning_rank[abs_in]
-                    src_inds = None
+                    src_inds_hash = None
                     if abs_in in abs2meta_in:  # input is local
                         src_inds_list = abs2meta_in[abs_in]['src_inds_list']
                         if src_inds_list is not None:
@@ -1513,24 +1510,24 @@ class Group(System):
                                                     "shape.", ident=(abs_out, abs_in))
                                 continue
                             else:
-                                src_inds = shaped
+                                src_inds_hash = array_hash(shaped)
 
                     if self.comm.rank == owner:
                         baseline = None
                         err = 0
-                        for sinds in self.comm.gather(src_inds, root=owner):
+                        for sinds in self.comm.gather(src_inds_hash, root=owner):
                             if sinds is not None:
                                 if baseline is None:
-                                    baseline = sinds.as_array()
+                                    baseline = sinds
                                 else:
-                                    if not np.all(sinds.as_array() == baseline):
+                                    if sinds != baseline:
                                         err = 1
                                         break
                         if baseline is None:  # no src_indices were set
                             err = -1
                         self.comm.bcast(err, root=owner)
                     else:
-                        self.comm.gather(src_inds, root=owner)
+                        self.comm.gather(src_inds_hash, root=owner)
                         err = self.comm.bcast(None, root=owner)
                     if err == 1:
                         self._collect_error(f"{self.msginfo}: Can't connect distributed output "
@@ -1798,8 +1795,8 @@ class Group(System):
         # TODO: see about moving vector class setup elsewhere
         self._setup_vector_class()
 
+        abs2idx = self._var_allprocs_abs2idx
         for subsys in self.system_iter(recurse=True, include_self=False):
-            abs2idx = subsys._var_allprocs_abs2idx
             ranks = translate_ranks(self.comm, subsys.comm, try_slice=True)
             subins = list(subsys._var_abs2meta['input'])
             istart = abs2idx[subins[0]] if subins else 0
@@ -1982,6 +1979,25 @@ class Group(System):
             if isinstance(subsys, Group) or subsys.options['derivs_method'] == 'jax':
                 subsys._setup_jax()
 
+    def get_global_dist_shape(self, name, dist_shapes):
+        dshapelists = [list(dshape) for dshape in dist_shapes if dshape is not None]
+        upper_dims = [dshape[1:] for dshape in dshapelists]
+
+        first_dim_size = dshapelists[0][0] if len(dshapelists[0]) > 0 else 1
+        first_upper = upper_dims[0]
+
+        # verify that all dshapes have equal higher dimensions (besides the first)
+        for dshape, upper in zip(dshapelists[1:], upper_dims[1:]):
+            if upper != first_upper:
+                self._collect_error(f"Can't get global shape of distributed variable '{name}' "
+                                    "because the shapes on each rank do not match in their "
+                                    "upper dimensions.")
+                return
+
+            first_dim_size += dshape[0] if dshape else 1
+
+        return (first_dim_size,) + tuple(dshapelists[0][1:])
+
     def _setup_dynamic_property(self, prop):
         """
         Dynamically add property metadata for variables.
@@ -2116,21 +2132,6 @@ class Group(System):
             graph.nodes[to_var]['conn_meta'].units = from_units
             return from_units
 
-        def get_global_dist_shape(name, dist_shapes):
-            dshapelists = [list(dshape) for dshape in dist_shapes if dshape is not None]
-            first_dim_size = dshapelists[0][0] if len(dshapelists[0]) > 0 else 1
-            # verify that all dshapes have equal higher dimensions (besides the first)
-            for dshape in dshapelists[1:]:
-                if dshape != dshapelists[0]:
-                    self._collect_error(f"Can't get global shape of distributed variable '{name}' "
-                                        "because the shapes on each rank do not match in their "
-                                        "upper dimensions.")
-                    return
-
-                first_dim_size += dshape[0] if dshape else 1
-
-            return (first_dim_size,) + tuple(dshapelists[0][1:])
-
         def serial2serialfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
                              is_full_slice):
             if not src_inds_list:
@@ -2228,7 +2229,7 @@ class Group(System):
                     f"from distributed {from_io} '{from_var}' without src_indices is not "
                     "supported.")
             else:
-                shp = get_global_dist_shape(from_var, dist_shapes[from_var])
+                shp = self.get_global_dist_shape(from_var, dist_shapes[from_var])
                 # graph.nodes[to_var]['conn_meta']['global_shape'] = shp
                 for src_indices in src_inds_list:
                     src_indices.set_src_shape(shp)
@@ -2293,7 +2294,7 @@ class Group(System):
                 dist_shapes[to_var] = dist_shapes[from_var].copy()
                 dist_sizes[to_var] = dist_sizes[from_var].copy()
             else:
-                shp = get_global_dist_shape(from_var, dist_shapes[from_var])
+                shp = self.get_global_dist_shape(from_var, dist_shapes[from_var])
                 # graph.nodes[from_var]['conn_meta']['global_shape'] = shp
                 for src_indices in src_inds_list:
                     src_indices.set_src_shape(shp)
@@ -4019,13 +4020,13 @@ class Group(System):
         # bind auto_ivc conn graph nodes to their variable metadata
         locmeta = auto_ivc._var_abs2meta['output']
         for name, meta in auto_ivc._var_allprocs_abs2meta['output'].items():
-            graph.nodes[('o', name)].set_model_meta(self, meta, locmeta.get(name))
+            graph.set_model_meta(self, ('o', name), meta, locmeta.get(name))
 
         locmeta = auto_ivc._var_discrete['output']
         for name, meta in auto_ivc._var_allprocs_discrete['output'].items():
             node_meta = graph.nodes[('o', name)]
             node_meta.discrete = True
-            node_meta.set_model_meta(self, meta, locmeta.get(name.rpartition('.')[-1]))
+            graph.set_model_meta(self, ('o', name), meta, locmeta.get(name.rpartition('.')[-1]))
 
         # now update our own data structures based on the new auto_ivc component variables
         old = self._subsystems_allprocs
@@ -4048,7 +4049,7 @@ class Group(System):
         # rebuild _var_abs2meta in the correct order
         for s in self._sorted_sys_iter():
             self._var_abs2meta[io].update(s._var_abs2meta[io])
-            
+
         self._var_allprocs_abs2meta[io] = {}
         for sysname in self._sorted_sys_iter_all_procs():
             self._var_allprocs_abs2meta[io].update(

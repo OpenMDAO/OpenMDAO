@@ -579,24 +579,28 @@ class Problem(object, metaclass=ProblemMetaclass):
         Set all initial conditions that have been saved in cache after setup.
         """
         graph = self.model._get_conn_graph()
+        for node in graph.nodes:
+            if node[0] == 'o' and graph.in_degree(node) == 0:  # root output node
+                node_meta = graph.nodes[node]
+                graph.set_tree_val(self.model, node, node_meta.val)  # forces updates of input values
 
         # for value, set_units, pathname, name in self.model._initial_condition_cache.values():
-        for node, tup in self.model._initial_condition_cache.items():
-            value, units, indices = tup
-            node_meta = graph.nodes[node]
-            pathname = node_meta['pathname']
-            relname = node_meta['rel_name']
-            if pathname:
-                system = self.model._get_subsystem(pathname)
-                if system is None or not system._is_local:
-                    pass
-                else:
-                    system.set_val(relname, value, units=units, indices=indices)
-            else:
-                self.model.set_val(relname, value, units=units, indices=indices)
+        # for node, tup in self.model._initial_condition_cache.items():
+        #     value, units, indices = tup
+        #     node_meta = graph.nodes[node]
+        #     pathname = node_meta['pathname']
+        #     relname = node_meta['rel_name']
+        #     if pathname:
+        #         system = self.model._get_subsystem(pathname)
+        #         if system is None or not system._is_local:
+        #             pass
+        #         else:
+        #             system.set_val(relname, value, units=units, indices=indices)
+        #     else:
+        #         self.model.set_val(relname, value, units=units, indices=indices)
 
         # Clean up cache
-        self.model._initial_condition_cache = {}
+        # self.model._initial_condition_cache = {}
 
     def _check_collected_errors(self):
         """

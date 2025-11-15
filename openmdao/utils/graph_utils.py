@@ -336,7 +336,7 @@ def meta2node_data(meta, to_extract):
     return {k: meta[k] for k in to_extract}
 
 
-def dump_nodes(G, show_none=False):
+def dump_nodes(G):
     """
     Dump the nodes of the given graph.
 
@@ -346,12 +346,7 @@ def dump_nodes(G, show_none=False):
         Directed graph of Systems and variables.
     """
     for node, data in G.nodes(data=True):
-        print(f"{node}:")
-        if show_none:
-            print(textwrap.indent(pformat(data), '  '))
-        else:
-            dct = {k: v for k, v in data.items() if v is not None}
-            print(textwrap.indent(pformat(dct), '  '))
+        print(f"{node}: {data}")
 
 
 def dump_edges(G, show_none=False):

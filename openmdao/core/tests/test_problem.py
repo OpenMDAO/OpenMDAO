@@ -53,6 +53,10 @@ class TestProblem(unittest.TestCase):
 
         p.set_val('foo', np.array([5., 5., 5.]))
         p.set_val('mul', [100])
+        
+        p.model._get_conn_graph().dump_nodes()
+        p.model._get_conn_graph().dump_edges()
+        
         p.run_model()
 
         foo = p.get_val('foo')
@@ -313,7 +317,7 @@ class TestProblem(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
                          "Failed to set value of 'indep.num': cannot reshape array of size 10 into shape (1,).")
-        prob.model._initial_condition_cache = {}
+        # prob.model._initial_condition_cache = {}
 
         # check assign scalar to array
         arr_val = new_val*np.ones((10, 1))

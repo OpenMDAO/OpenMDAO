@@ -1549,7 +1549,8 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'input_defaults_promotes_error':"
-           "\n   <model> <class Group>: Can't promote 'G.foo.test_param' to 'G.test_param': shape () of 'G.test_param' is incompatible with shape (5,) of 'G.foo.test_param'.")
+           "\n   <model> <class Group>: While resolving children of 'G.test_param': cannot reshape array of size 1 into shape (5,)"
+           "\n   <model> <class Group>: Can't connect '_auto_ivc.v0' to 'G.test_param': shape (1,) of '_auto_ivc.v0' is incompatible with shape (5,) of 'G.test_param'.")
 
     def test_set_input_defaults_keyerror(self):
         class Sub(om.Group):
@@ -3190,7 +3191,7 @@ class TestGroupAddInput(unittest.TestCase):
            "\nCollected errors for problem 'conflicting_val':"
            "\n   <model> <class Group>: The following inputs promoted to 'x' have different values, so the value of 'x' is ambiguous:"
            "\n    "
-           "\n   G1.x   ft  4.0 "
+           "\n   G1.x   ft  [4.]"
            "\n   par.x  ft  [3.]"
            "\n    "
            "\n   Call model.set_input_defaults('x', val=?)' to remove the ambiguity.")

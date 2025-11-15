@@ -117,8 +117,8 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
                 cycle.connect('d1.y1', 'd2.y1')
                 cycle.connect('d2.y2', 'd1.y2')
 
-                cycle.set_input_defaults('x', 1.0)
-                cycle.set_input_defaults('z', np.array([5.0, 2.0]))
+                self.set_input_defaults('x', 1.0)
+                self.set_input_defaults('z', np.array([5.0, 2.0]))
 
                 # Nonlinear Block Gauss Seidel is a gradient free solver
                 cycle.nonlinear_solver = om.NonlinearBlockGS()
@@ -190,11 +190,6 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
 
         prob.run_model()
 
-        from openmdao.visualization.graph_viewer import write_graph
-        G =  prob.model._conn_graph
-        import networkx as nx
-
-        write_graph(G)
 
         assert_near_equal((prob.get_val('cycle.d1.y1')[0], prob.get_val('cycle.d2.y2')[0], prob.get_val('obj_cmp.obj')[0], prob.get_val('con_cmp1.con1')[0], prob.get_val('con_cmp2.con2')[0]),
                          (2.10951651, -0.54758253, 6.8385845, 1.05048349, -24.54758253), 1e-5)

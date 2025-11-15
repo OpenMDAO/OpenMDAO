@@ -168,6 +168,9 @@ class Indexer(object):
         """
         return f"[{repr(self)}]"
 
+    def is_full_slice(self):
+        return False
+
     def indexed_val(self, arr):
         """
         Return the value of the indices in the array.
@@ -640,6 +643,10 @@ class ShapedSliceIndexer(Indexer):
         elif stop:
             return f":{stop}"
         return ":"
+
+    def is_full_slice(self):
+        return self._slice.stop is None and self._slice.start is None and \
+            self._slice.step in (None, 1)
 
     def apply_offset(self, offset, flat=True):
         """
@@ -1682,8 +1689,8 @@ def idx_list_to_index_array(idx_list):
 
     Returns
     -------
-    Indexer
-        The equivalent array indexer.
+    ndarray
+        The equivalent index array.
     """
     if len(idx_list) == 0:
         return None

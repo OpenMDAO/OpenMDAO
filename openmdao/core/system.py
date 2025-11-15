@@ -44,6 +44,7 @@ from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
 from openmdao.jacobians.jacobian import DenseJacobian, CSCJacobian, CSRJacobian
+from openmdao.visualization.tables.table_builder import generate_table
 
 
 # Suppored methods for derivatives
@@ -548,6 +549,51 @@ class System(object, metaclass=SystemMetaclass):
             self.compute_primal = None
 
         self._jac_func_ = None  # for computing jacobian using AD (jax)
+
+    def __repr__(self):
+        return self.msginfo
+
+    def _get_var_sizing_info(self, abs_name, io):
+        """
+        Get sizing info for a continuous variable.
+        """
+        allmeta = self._var_allprocs_abs2meta[io]
+        locmeta = self._var_abs2meta[io]
+        if abs_name in locmeta:
+            loc = locmeta[abs_name]
+            val = loc['val']
+            locshape = loc['shape']
+            locsize = loc['size']
+        else:
+            val = locshape = locsize = None
+
+        shape = allmeta[abs_name]['shape']
+        size = allmeta[abs_name]['size']
+        global_size = allmeta[abs_name]['global_size']
+        global_shape = allmeta[abs_name]['global_shape']
+
+        if abs_name in self._var_allprocs_abs2idx:
+            idx = self._var_allprocs_abs2idx[abs_name]
+            sizes = self._var_sizes[io][:, idx]
+        else:
+            sizes = None
+
+        return shape, size, global_shape, global_size, val, locshape, locsize, sizes
+
+    def _dump_shape_table(self):
+        print(self.msginfo)
+        print("Inputs:")
+        rows = []
+        for name in self._var_allprocs_abs2meta['input']:
+            rows.append((name,) + self._get_var_sizing_info(name, 'input'))
+        generate_table(rows, headers=['Name', 'Shape', 'Size', 'Gshape', 'Gsize',
+                                      'Val', 'Lshape', 'Lsize', 'Vsizes']).display()
+        print("\n\nOutputs:")
+        rows = []
+        for name in self._var_allprocs_abs2meta['output']:
+            rows.append((name,) + self._get_var_sizing_info(name, 'output'))
+        generate_table(rows, headers=['Name', 'Shape', 'Size', 'Gshape', 'Gsize',
+                                      'Val', 'Lshape', 'Lsize', 'Vsizes']).display()
 
     if _om_dump:
         @property
