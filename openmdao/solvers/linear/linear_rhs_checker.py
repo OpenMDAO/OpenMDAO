@@ -185,7 +185,7 @@ class LinearRHSChecker(object):
         """
         self._caches.clear()
 
-    def add_solution(self, rhs, solution, copy):
+    def add_solution(self, rhs, solution, system, copy):
         """
         Add a solution to the cache.
 
@@ -195,6 +195,8 @@ class LinearRHSChecker(object):
             The RHS vector.
         solution : ndarray
             The solution vector.
+        system : System
+            The system that owns the solver that owns this LinearRHSChecker.
         copy : bool
             If True, make a copy of the RHS and solution vectors before storing them.
         """
@@ -202,7 +204,11 @@ class LinearRHSChecker(object):
             if copy:
                 rhs = rhs.copy()
                 solution = solution.copy()
-            self._caches.append((rhs, solution))
+            rhs_norm = np.sum(rhs**2)
+            if system.comm.size > 1:
+                rhs_norm = system.comm.allreduce(rhs_norm)
+            rhs_norm = np.sqrt(rhs_norm)
+            self._caches.append((rhs, solution, rhs_norm))
 
     def get_solution(self, rhs_arr, system):
         """
@@ -266,7 +272,7 @@ class LinearRHSChecker(object):
 
         rhs_norm = None
         for i in range(len(self._caches) - 1, -1, -1):
-            rhs_cache, sol_cache = self._caches[i]
+            rhs_cache, sol_cache, rhs_cache_norm = self._caches[i]
             # Check if the RHS vector is the same as a cached vector. This part is not necessary,
             # but is less expensive than checking if two vectors are parallel.
             rhs_are_equal = allclose(rhs_arr, rhs_cache, rtol=self._rtol, atol=self._atol)
@@ -301,11 +307,9 @@ class LinearRHSChecker(object):
                 dot_product = system.comm.allreduce(dot_product)
                 if rhs_norm is None:
                     rhs_norm = np.sqrt(system.comm.allreduce(np.sum(rhs_arr**2)))
-                rhs_cache_norm = np.sqrt(system.comm.allreduce(np.sum(rhs_cache**2)))
             else:
                 if rhs_norm is None:
                     rhs_norm = np.linalg.norm(rhs_arr)
-                rhs_cache_norm = np.linalg.norm(rhs_cache)
 
             rhs_are_parallel = isclose(abs(dot_product), rhs_norm * rhs_cache_norm, rel_tol=self._rtol, abs_tol=self._atol)
             if is_parallel:
