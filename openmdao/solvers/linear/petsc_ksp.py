@@ -437,7 +437,7 @@ class PETScKrylov(LinearSolver):
         sol_petsc_vec = rhs_petsc_vec = None
 
         if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
-            self._lin_rhs_checker.add_solution(rhs_array, sol_array, copy=False)
+            self._lin_rhs_checker.add_solution(rhs_array, sol_array, system, copy=False)
 
     def apply(self, mat, in_vec, result):
         """
