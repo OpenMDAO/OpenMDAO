@@ -180,8 +180,10 @@ class InterpNDSemi(object):
         if self._compute_d_dvalues:
             derivs_val = np.zeros((n_nodes, len(self.values)), dtype=xi.dtype)
 
+        if self.extrapolated_points is None:
+            self.extrapolated_points = np.zeros(n_nodes, dtype=bool)
+
         # Loop over n_nodes because there isn't a way to vectorize.
-        self.extrapolated_points = np.zeros(n_nodes, dtype=bool)
         for j in range(n_nodes):
             val, d_x, d_values_tuple, extrapolate = table.interpolate(xi[j, :])
             self.extrapolated_points[j] = extrapolate
