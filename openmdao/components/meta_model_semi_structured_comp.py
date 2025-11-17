@@ -272,7 +272,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
             extrapolated_points = interp.extrapolated_points
             msg = ''
             for j, extrap_flag in enumerate(extrapolated_points):
-                if extrap_flag == True:
+                if extrap_flag:
                     if msg == '':
                         msg = f"Interpolation of '{out_name}' in '{self.pathname}' encountered "
                         msg += "extrapolation for the following points:\n  "
