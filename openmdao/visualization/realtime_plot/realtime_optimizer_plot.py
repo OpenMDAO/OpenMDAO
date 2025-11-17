@@ -818,8 +818,10 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             checkbox = Checkbox(
                 active=False,
                 # visible=False,
-                html_attributes={"title":
-                    "Turn on/off plot of bounds for this variable. Variable must be plotted to turn on."},
+                html_attributes={
+                    "title": "Turn on/off plot of bounds for this variable. "
+                    "Variable must be plotted to turn on."
+                },
                 disabled=True,
                 margin=(12, 0, 8, 4),
                 tags=[{"var_type": var_type, "index": index, "varname": varname}],
