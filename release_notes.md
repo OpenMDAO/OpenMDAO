@@ -1,4 +1,38 @@
 ***********************************
+# Release Notes for OpenMDAO 3.41.0
+
+September 30, 2025
+
+OpenMDAO 3.41.0 features several bug fixes and a few new features.
+
+The automatic detection of systems involved in optimization is now turned on by default.  This will automatically categorize models in your
+system into those that need to be run before optimization (pre), during optimization (opt), and after optimization (post). By only executing these systems when necessary, it can save considerable time.  This has a been an experimental feature for a while but we're now confident enough to turn it on by default.
+
+Real time plotting has gotten several upgrades, including being more performant.
+
+Its now easier to turn on debug printing using the `Problem.set_solver_print` interface. In addition, debug printing will now work regardless of the value of the `err_on_non_converge` option.
+
+## New Features
+
+- Turn on pre-opt-post default. Move warning about redundant adjoint solves into optional checks. Remove warning about overwriting recorder files. [#3604](https://github.com/OpenMDAO/OpenMDAO/pull/3604)
+- Added ability to set solver debug_print option via set_solver_print. [#3608](https://github.com/OpenMDAO/OpenMDAO/pull/3608)
+- Problem.compute_jacvec_product can now accept promoted or absolute names. [#3614](https://github.com/OpenMDAO/OpenMDAO/pull/3614)
+- Several improvements in the real-time plot  [#3597](https://github.com/OpenMDAO/OpenMDAO/pull/3597)
+
+## Bug Fixes
+
+- Fix for an earlier change to ExplicitComponent.add_output that caused a regression in pyCycle [#3600](https://github.com/OpenMDAO/OpenMDAO/pull/3600)
+- Fixed a bug that prevented CaseReader from handling array constraints with indices. [#3609](https://github.com/OpenMDAO/OpenMDAO/pull/3609)
+- Fixed an OpenMDAO Jacobian bug that raised a KeyError when accessing irrelevant subjacs [#3612](https://github.com/OpenMDAO/OpenMDAO/pull/3612)
+- Fix `Vector.items()` for [#3623](https://github.com/OpenMDAO/OpenMDAO/pull/3623)
+- Allow AnalysisError to be specified with `inspect.currentframe()` per the documentation. [#3620](https://github.com/OpenMDAO/OpenMDAO/pull/3620)
+
+## Miscellaneous
+
+- Expanded the documentation of the 'find_feasible' feature. [#3622](https://github.com/OpenMDAO/OpenMDAO/pull/3622)
+- Fixed deprecation warnings in jax when using jacobian functions in func_comp_common.py [#3624](https://github.com/OpenMDAO/OpenMDAO/pull/3624)
+
+***********************************
 # Release Notes for OpenMDAO 3.40.0
 
 August 19, 2025

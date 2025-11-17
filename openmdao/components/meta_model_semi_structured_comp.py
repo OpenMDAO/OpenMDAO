@@ -1,5 +1,6 @@
 """Define the MetaModelSemiStructuredComp class."""
 import inspect
+import warnings
 
 import numpy as np
 
@@ -21,8 +22,9 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
     sample points, but an fifth order quintic spline is specified) the order of the
     fitted spline with be automatically reduced for that dimension alone.
 
-    Extrapolation is supported, but disabled by default. It can be enabled via initialization
-    option.
+    Extrapolation is enabled by default. With unstructured metamodels, it is common to fall in a
+    region where extrapolation is needed in at least one dimension because of internal clustering
+    of table points. It can be turned off, though this will raise an error when it happens.
 
     Parameters
     ----------
@@ -217,8 +219,7 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
                           f"because input '{varname_causing_error}' required extrapolation while "
                           f"interpolating dimension {err.idx + 1}, where its value '{err.value}'"
                           f" exceeded the range ('{err.lower}', '{err.upper}')")
-                raise AnalysisError(errmsg, inspect.getframeinfo(inspect.currentframe()),
-                                    self.msginfo)
+                raise AnalysisError(errmsg, inspect.currentframe(), self.msginfo)
 
             except ValueError as err:
                 raise ValueError(f"{self.msginfo}: Error interpolating output '{out_name}':\n"
@@ -251,3 +252,34 @@ class MetaModelSemiStructuredComp(ExplicitComponent):
                 train_name = f"{out_name}_train"
                 d_dvalues = interp._d_dvalues
                 partials[out_name, train_name] = d_dvalues
+
+    def validate(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+        """
+        Warn if any internal extrapolation is present with the current table points.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables read via inputs[key].
+        outputs : Vector
+            Unscaled, dimensional output variables read via outputs[key].
+        discrete_inputs : dict-like or None
+            If not None, dict-like object containing discrete input values.
+        discrete_outputs : dict-like or None
+            If not None, dict-like object containing discrete output values.
+        """
+        for out_name, interp in self.interps.items():
+            extrapolated_points = interp.extrapolated_points
+            msg = ''
+            for j, extrap_flag in enumerate(extrapolated_points):
+                if extrap_flag:
+                    if msg == '':
+                        msg = f"Interpolation of '{out_name}' in '{self.pathname}' encountered "
+                        msg += "extrapolation for the following points:\n  "
+
+                    for in_name in self.training_inputs:
+                        msg = f"{msg}{in_name}: {inputs[in_name][j]}; "
+                    msg = f"{msg}\n  "
+
+            if msg != "":
+                warnings.warn(msg)
