@@ -65,7 +65,9 @@ _toggle_styles = """
         0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
         inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
-_bounds_infinity = 1e8
+
+# Used for the outer bounds for the hstrips used to indicate the out of bounds for variables
+# TODO need to come up with a better way. But if made too big, get glitches in plots
 _bounds_infinity = 1e5
 
 # colors used for the plot lines and associated buttons and axes labels
