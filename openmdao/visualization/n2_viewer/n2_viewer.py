@@ -664,8 +664,7 @@ def _run_n2_report(prob, report_filename=_default_n2_filename):
 
 
 def _run_n2_report_w_errors(prob, report_filename=_default_n2_filename):
-    if (prob._metadata['saved_errors'] is not None and
-            prob._metadata['saved_errors'].any_rank_has_saved_errors(prob.comm)):
+    if prob._any_rank_has_saved_errors():
         n2_filepath = prob.get_reports_dir() / report_filename
         # only run the n2 here if we've had setup errors. Normally we'd wait until
         # after final_setup in order to have correct values for all of the I/O variables.

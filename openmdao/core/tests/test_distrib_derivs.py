@@ -284,7 +284,7 @@ def _test_func_name(func, num, param):
     return func.__name__ + '_' + '_'.join(args)
 
 
-# @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @use_tempdirs
 class MPITests2(unittest.TestCase):
 

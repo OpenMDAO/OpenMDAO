@@ -6247,7 +6247,7 @@ class System(object, metaclass=SystemMetaclass):
         self._problem_meta = prob_meta
         # transfer any temporarily stored error msgs to the Problem
         if self._saved_errors and prob_meta['saved_errors'] is not None:
-            prob_meta['saved_errors'].update(self._saved_errors)
+            prob_meta['saved_errors'].extend(self._saved_errors)
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
 
     def _get_inconsistent_keys(self):

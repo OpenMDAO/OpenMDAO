@@ -12,6 +12,7 @@ import pathlib
 import textwrap
 import time
 import atexit
+import traceback
 
 from itertools import chain
 
@@ -55,7 +56,6 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.file_utils import _get_outputs_dir, text2html, _get_work_dir
 from openmdao.utils.testing_utils import _fix_comp_check_data
 from openmdao.utils.name_maps import DISTRIBUTED
-from openmdao.utils.err_collector import ErrCollector
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -609,8 +609,26 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         if self._metadata['saved_errors'] is None:
             return
-        else:
-            self._metadata['saved_errors'].check_collected_errors(self.comm)
+
+        unique_errors = self._get_unique_saved_errors()
+
+        # set the errors to None so that all future calls will immediately raise an exception.
+        self._metadata['saved_errors'] = None
+
+        if unique_errors:
+            final_msg = [f"\nCollected errors for problem '{self._name}':"]
+            for _, msg, exc_type, tback in unique_errors:
+                final_msg.append(f"   {msg}")
+
+                # if there's only one error, include its traceback if it exists.
+                if len(unique_errors) == 1:
+                    if isinstance(tback, str):
+                        final_msg.append('Traceback (most recent call last):')
+                        final_msg.append(tback)
+                    else:
+                        raise exc_type('\n'.join(final_msg)).with_traceback(tback)
+
+            raise RuntimeError('\n'.join(final_msg))
 
     def run_model(self, case_prefix=None, reset_iter_counts=True):
         """
@@ -1089,7 +1107,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
             'orig_mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
             'reports_dir': None,  # directory where reports will be written
-            'saved_errors': ErrCollector(self._name),  # store setup errors until after final_setup
+            'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
             'model_options': self.model_options,  # A dict of options passed to all systems in tree
             'allow_post_setup_reorder': self.options['allow_post_setup_reorder'],  # see option
@@ -2543,6 +2561,57 @@ class Problem(object, metaclass=ProblemMetaclass):
                 print(f"    {name}", file=out)
         else:
             print("\nPost-optimization components: []", file=out)
+
+    def _any_rank_has_saved_errors(self):
+        """
+        Return True if any rank has saved errors.
+
+        Returns
+        -------
+        bool
+            True if any rank has errors.
+        """
+        if self._metadata is None:
+            return False
+        else:
+            if MPI and self.comm is not None and self.comm.size > 1:
+                if self._metadata['saved_errors'] is None:
+                    nerrs = 0
+                else:
+                    nerrs = len(self._metadata['saved_errors'])
+                return self.comm.allreduce(nerrs, op=MPI.SUM) > 0
+            else:
+                return bool(self._metadata['saved_errors'])
+
+    def _get_unique_saved_errors(self):
+        """
+        Get a list of unique saved errors.
+
+        Returns
+        -------
+        list
+            List of unique saved errors.
+        """
+        unique_errors = []
+        if self._metadata is not None:
+            if self._any_rank_has_saved_errors():
+                # traceback won't pickle, so convert to string
+                if self.comm.size > 1:
+                    saved = [(ident, msg, exc_type, ''.join(traceback.format_tb(tback)))
+                             for ident, msg, exc_type, tback in self._metadata['saved_errors']]
+                    all_errors = self.comm.allgather(saved)
+                else:
+                    all_errors = [self._metadata['saved_errors']]
+
+                seen = set()
+                for errors in all_errors:
+                    for ident, msg, exc_type, tback in errors:
+                        if (ident is None and msg not in seen) or ident not in seen:
+                            unique_errors.append((ident, msg, exc_type, tback))
+                            seen.add(ident)
+                            seen.add(msg)
+
+        return unique_errors
 
     def get_total_coloring(self, coloring_info=None, of=None, wrt=None, run_model=None):
         """

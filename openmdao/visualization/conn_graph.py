@@ -674,12 +674,14 @@ class AllConnGraph(nx.DiGraph):
                                 "value using 'get_remote=True'.")
 
         if system.has_vectors():
-            if from_src and node[0] == 'i':
-                val = self.get_input_from_src(system, node, src_node, get_remote, rank, vec_name,
-                                              flat)
-            else:
-                val = system._abs_get_val(src_node[1], get_remote, rank, vec_name, kind, flat,
-                                          from_root=True)
+            # if from_src and node[0] == 'i':
+            #     val = self.get_input_from_src(system, node, src_node, get_remote, rank, vec_name,
+            #                                   flat)
+            # else:
+            #     val = system._abs_get_val(src_node[1], get_remote, rank, vec_name, kind, flat,
+            #                               from_root=True)
+            val = system._abs_get_val(src_node[1], get_remote, rank, vec_name, kind, flat,
+                                      from_root=True)
         else:
             # model = system._problem_meta['model_ref']()
             # if src_node in model._initial_condition_cache:

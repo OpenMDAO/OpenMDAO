@@ -913,7 +913,6 @@ class ExecComp(ExplicitComponent):
         for i, expr in enumerate(self._codes):
             try:
                 exec(expr, _expr_dict, self._viewdict)  # nosec:
-                # exec(expr, self._viewdict, _expr_dict)  # nosec:
             except Exception as err:
                 raise RuntimeError(f"{self.msginfo}: Error occurred evaluating "
                                    f"'{self._exprs[i]}':\n{err}")
@@ -1140,12 +1139,10 @@ class _ViewDict(object):
 
     def __getitem__(self, name):
         val, is_scalar = self.dct[name]
-        # val, is_scalar = super().__getitem__(name)
         return val.item() if is_scalar else val
 
     def __setitem__(self, name, value):
         val, _ = self.dct[name]
-        # val, _ = super().__getitem__(name)
         try:
             val[:] = value
         except ValueError:
