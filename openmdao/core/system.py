@@ -5767,8 +5767,9 @@ class System(object, metaclass=SystemMetaclass):
         """
         if self._problem_meta is not None and self._problem_meta['model_ref']() is None:
             # This is a weird corner case where the Problem has been deleted.  We have a test
-            # case where a system contains a subproblem that it adds itself to, and the test checks that we can still
-            # call get_val on the system even after the subproblem has been deleted.
+            # case where a system contains a subproblem that it adds itself to, and the test checks
+            # that we can still call get_val on the system even after the subproblem has been
+            # deleted.
             if self._inputs is not None:  # vectors are set up
                 iotype = self._resolver.get_iotype(name, report_error=True)
                 if iotype == 'input':
@@ -6246,7 +6247,7 @@ class System(object, metaclass=SystemMetaclass):
         self._problem_meta = prob_meta
         # transfer any temporarily stored error msgs to the Problem
         if self._saved_errors and prob_meta['saved_errors'] is not None:
-            prob_meta['saved_errors'].extend(self._saved_errors)
+            prob_meta['saved_errors'].update(self._saved_errors)
         self._saved_errors = None if env_truthy('OPENMDAO_FAIL_FAST') else []
 
     def _get_inconsistent_keys(self):

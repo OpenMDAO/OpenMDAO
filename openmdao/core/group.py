@@ -1798,18 +1798,19 @@ class Group(System):
         abs2idx = self._var_allprocs_abs2idx
         for subsys in self.system_iter(recurse=True, include_self=False):
             ranks = translate_ranks(self.comm, subsys.comm, try_slice=True)
-            subins = list(subsys._var_abs2meta['input'])
+            subins = list(subsys._var_allprocs_abs2meta['input'])
             istart = abs2idx[subins[0]] if subins else 0
             iend = abs2idx[subins[-1]] + 1 if subins else 0
             subsys._var_sizes['input'] = self._var_sizes['input'][ranks, istart:iend]
 
-            subouts = list(subsys._var_abs2meta['output'])
+            subouts = list(subsys._var_allprocs_abs2meta['output'])
             ostart = abs2idx[subouts[0]] if subouts else 0
             oend = abs2idx[subouts[-1]] + 1 if subouts else 0
             subsys._var_sizes['output'] = self._var_sizes['output'][ranks, ostart:oend]
 
             if isinstance(subsys, Group):
                 subsys._setup_vector_class()
+                subsys._compute_owning_ranks()
             else:
                 subsys._owned_output_sizes = subsys._var_sizes['output']
 
@@ -2555,8 +2556,10 @@ class Group(System):
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
 
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._subsystems_myproc:
             subsys._check_connections()
+            if subsys._has_input_scaling:
+                self._has_input_scaling = True
 
         allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
         allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
@@ -3501,6 +3504,8 @@ class Group(System):
         Call setup_partials in components.
         """
         self._subjacs_info = info = {}
+        graph = self._get_conn_graph()
+        nodes = graph.nodes()
 
         for subsys in self._sorted_sys_iter():
             subsys._setup_partials()
@@ -3509,10 +3514,9 @@ class Group(System):
         if self._has_distrib_vars and self._owns_approx_jac:
             # We currently cannot approximate across a group with a distributed component if the
             # inputs are distributed via src_indices.
-            for iname, meta in self._var_allprocs_abs2meta['input'].items():
-                if meta['has_src_indices'] and \
-                   meta['distributed'] and \
-                   iname not in self._conn_abs_in2out:
+            for iname in self._var_allprocs_abs2meta['input']:
+                node = nodes[('i', iname)]
+                if node.distributed and node.src_inds_list and iname not in self._conn_abs_in2out:
                     msg = "{}: Approx_totals is not supported on a group with a distributed "
                     msg += "component whose input '{}' is distributed using src_indices. "
                     raise RuntimeError(msg.format(self.msginfo, iname))
