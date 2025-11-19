@@ -578,8 +578,8 @@ class _TotalJacInfo(object):
         """
         iproc = self.comm.rank
         model = self.model
+        graph = model._get_conn_graph()
         has_par_deriv_color = False
-        all_abs2meta_out = model._var_allprocs_abs2meta['output']
         var_sizes = model._var_sizes
         var_offsets = model._get_var_offsets()
         abs2idx = model._var_allprocs_abs2idx
@@ -599,13 +599,23 @@ class _TotalJacInfo(object):
 
             source = meta['source']
 
-            in_var_meta = all_abs2meta_out[source]
-            dist = in_var_meta['distributed']
+            #in_var_meta = all_abs2meta_out[source]
+            node_meta = graph.nodes[('o', source)]
+            dist = node_meta.distributed
 
-            if dist:
-                end += meta['global_size']
+            in_idxs = meta['indices'] if 'indices' in meta else None
+
+            if in_idxs is None:
+                # if the var is not distributed, global_size == local size
+                irange = np.arange(node_meta.global_size, dtype=INT_DTYPE)
             else:
-                end += meta['size']
+                irange = in_idxs.shaped_array(copy=True)
+
+            # if dist:
+            #     end += node_meta.global_size
+            # else:
+            #     end += node_meta.size
+            end += len(irange)
 
             cache_lin_sol = meta['cache_linear_solution']
             if model.comm.size > 1:
@@ -620,14 +630,6 @@ class _TotalJacInfo(object):
                     self.par_deriv_printnames[parallel_deriv_color] = []
 
                 self.par_deriv_printnames[parallel_deriv_color].append(name)
-
-            in_idxs = meta['indices'] if 'indices' in meta else None
-
-            if in_idxs is None:
-                # if the var is not distributed, global_size == local size
-                irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
-            else:
-                irange = in_idxs.shaped_array(copy=True)
 
             in_var_idx = abs2idx[source]
             sizes = var_sizes['output']

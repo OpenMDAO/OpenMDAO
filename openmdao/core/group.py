@@ -23,7 +23,7 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import _flatten_src_indices, \
-    shape_to_len, ValueRepeater, evenly_distrib_idxs, array_hash
+    shape_to_len, ValueRepeater, evenly_distrib_idxs
 from openmdao.utils.general_utils import shape2tuple, ensure_compatible, \
     meta2src_iter, is_undefined, env_truthy
 from openmdao.utils.units import unit_conversion, simplify_unit, _find_unit
@@ -440,6 +440,7 @@ class Group(System):
             Mapping of each absolute var name to its corresponding scaling factor tuple.
         """
         scale_factors = {}
+        graph = self._get_conn_graph()
 
         if self._has_output_scaling or self._has_resid_scaling:
             for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
@@ -469,6 +470,8 @@ class Group(System):
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
             for abs_in, meta_in in self._var_abs2meta['input'].items():
                 src = self._conn_global_abs_in2out[abs_in]
+                in_node_meta = graph.nodes[('i', abs_in)]
+                src_node_meta = graph.nodes[('o', src)]
 
                 src_meta = allprocs_meta_out[src]
                 ref = src_meta['ref']
@@ -479,8 +482,8 @@ class Group(System):
 
                 has_scaling = not scalar_ref or not scalar_ref0 or ref != 1.0 or ref0 != 0.0
 
-                units_in = meta_in['units']
-                units_out = src_meta['units']
+                units_in = in_node_meta.units
+                units_out = src_node_meta.units
 
                 has_unit_conv = \
                     units_in is not None and units_out is not None and units_in != units_out
@@ -499,8 +502,8 @@ class Group(System):
                 if not has_scaling and not has_unit_conv:
                     continue
 
-                units_in = meta_in['units']
-                units_out = src_meta['units']
+                # units_in = meta_in['units']
+                # units_out = src_meta['units']
 
                 src_inds_list = meta_in['src_inds_list']
 
@@ -509,16 +512,16 @@ class Group(System):
                         # TODO: if either ref or ref0 are not scalar and the output is
                         # distributed, we need to do a scatter
                         # to obtain the values needed due to global src_indices
-                        if src_meta['distributed']:
+                        if src_node_meta.distributed:
                             raise RuntimeError("{}: vector scalers with distrib vars "
                                                "not supported yet.".format(self.msginfo))
 
                         src_indices = idx_list_to_index_array(src_inds_list)
                         if not np.ndim(src_indices) < 2:
                             src_indices = _flatten_src_indices(src_indices,
-                                                               meta_in['shape'],
-                                                               src_meta['global_shape'],
-                                                               src_meta['global_size'])
+                                                               in_node_meta.shape,
+                                                               src_node_meta.global_shape,
+                                                               src_node_meta.global_size)
 
                         if not scalar_ref:
                             ref = ref[src_indices]
@@ -971,15 +974,17 @@ class Group(System):
                 else:
                     srcdict[src] = [meta]
 
-        abs2meta_out = self._var_allprocs_abs2meta['output']
+        graph = self._get_conn_graph()
 
         # loop over any sources having multiple aliases to ensure no overlap of indices
         for src, metalist in srcdict.items():
             if len(metalist) == 1:
                 continue
 
-            size = abs2meta_out[src]['global_size']
-            shape = abs2meta_out[src]['global_shape']
+            src_meta = graph.nodes[('o', src)]
+
+            size = src_meta.global_size
+            shape = src_meta.global_shape
             mat = np.zeros(size, dtype=np.ushort)
 
             for meta in metalist:
@@ -1447,98 +1452,98 @@ class Group(System):
 
         self._check_nondist_sizes()
 
-        self._setup_global_shapes()
+        # self._setup_global_shapes()
 
-        all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        conns = self._conn_global_abs_in2out
+        # all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        # conns = self._conn_global_abs_in2out
 
         # self._resolve_src_indices()
 
-        if self.comm.size > 1:  # and not self._bad_conn_vars:
-            abs2idx = self._var_allprocs_abs2idx
-            all_abs2meta = self._var_allprocs_abs2meta
-            all_abs2meta_in = all_abs2meta['input']
+        # if self.comm.size > 1:  # and not self._bad_conn_vars:
+        #     abs2idx = self._var_allprocs_abs2idx
+        #     all_abs2meta = self._var_allprocs_abs2meta
+        #     all_abs2meta_in = all_abs2meta['input']
 
-            # the code below is to handle the case where src_indices were not specified
-            # for a distributed input or an input connected to a distributed auto_ivc
-            # output. This update can't happen until sizes are known.
-            dist_ins = (n for n, m in all_abs2meta_in.items() if m['distributed'] or
-                        (conns[n].startswith('_auto_ivc.') and
-                         all_abs2meta_out[conns[n]]['distributed']))
-            dcomp_names = set(d.rpartition('.')[0] for d in dist_ins)
-            if dcomp_names:
-                added_src_inds = []
+        #     # the code below is to handle the case where src_indices were not specified
+        #     # for a distributed input or an input connected to a distributed auto_ivc
+        #     # output. This update can't happen until sizes are known.
+        #     dist_ins = (n for n, m in all_abs2meta_in.items() if m['distributed'] or
+        #                 (conns[n].startswith('_auto_ivc.') and
+        #                  all_abs2meta_out[conns[n]]['distributed']))
+        #     dcomp_names = set(d.rpartition('.')[0] for d in dist_ins)
+        #     if dcomp_names:
+        #         added_src_inds = []
 
-                for comp in self.system_iter(recurse=True, typ=Component):
-                    if comp.pathname in dcomp_names:
-                        added_src_inds.extend(
-                            comp._update_dist_src_indices(conns, all_abs2meta, abs2idx,
-                                                          self._var_sizes))
+        #         for comp in self.system_iter(recurse=True, typ=Component):
+        #             if comp.pathname in dcomp_names:
+        #                 added_src_inds.extend(
+        #                     comp._update_dist_src_indices(conns, all_abs2meta, abs2idx,
+        #                                                   self._var_sizes))
 
-                updated = set()
-                for alist in self.comm.allgather(added_src_inds):
-                    updated.update(alist)
+        #         updated = set()
+        #         for alist in self.comm.allgather(added_src_inds):
+        #             updated.update(alist)
 
-                for a in updated:
-                    all_abs2meta_in[a]['has_src_indices'] = True
+        #         for a in updated:
+        #             all_abs2meta_in[a]['has_src_indices'] = True
 
-        abs2meta_in = self._var_abs2meta['input']
-        allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
-        allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
+        # abs2meta_in = self._var_abs2meta['input']
+        # allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
+        # allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
 
-        if self.comm.size > 1:
-            for abs_in, abs_out in sorted(conns.items()):
-                if abs_out not in allprocs_abs2meta_out:
-                    continue  # discrete var
+        # if self.comm.size > 1:
+        #     for abs_in, abs_out in sorted(conns.items()):
+        #         if abs_out not in allprocs_abs2meta_out:
+        #             continue  # discrete var
 
-                in_dist = allprocs_abs2meta_in[abs_in]['distributed']
-                out_dist = allprocs_abs2meta_out[abs_out]['distributed']
+        #         in_dist = allprocs_abs2meta_in[abs_in]['distributed']
+        #         out_dist = allprocs_abs2meta_out[abs_out]['distributed']
 
-                # check that src_indices match for dist->serial connection
-                if out_dist and not in_dist:
-                    # all non-distributed inputs must have src_indices if they connect to a
-                    # distributed output.
-                    owner = self._owning_rank[abs_in]
-                    src_inds_hash = None
-                    if abs_in in abs2meta_in:  # input is local
-                        src_inds_list = abs2meta_in[abs_in]['src_inds_list']
-                        if src_inds_list is not None:
-                            shaped = idx_list_to_index_array(src_inds_list)
-                            if shaped is None:
-                                self._collect_error(f"For connection from '{abs_out}' to '{abs_in}'"
-                                                    f", src_indices {src_inds_list} have no source "
-                                                    "shape.", ident=(abs_out, abs_in))
-                                continue
-                            else:
-                                src_inds_hash = array_hash(shaped)
+        #         # check that src_indices match for dist->serial connection
+        #         if out_dist and not in_dist:
+        #             # all non-distributed inputs must have src_indices if they connect to a
+        #             # distributed output.
+        #             owner = self._owning_rank[abs_in]
+        #             src_inds_hash = None
+        #             if abs_in in abs2meta_in:  # input is local
+        #                 src_inds_list = abs2meta_in[abs_in]['src_inds_list']
+        #                 if src_inds_list is not None:
+        #                     shaped = idx_list_to_index_array(src_inds_list)
+        #                     if shaped is None:
+        #                         self._collect_error(f"For connection from '{abs_out}' to '{abs_in}'"
+        #                                             f", src_indices {src_inds_list} have no source "
+        #                                             "shape.", ident=(abs_out, abs_in))
+        #                         continue
+        #                     else:
+        #                         src_inds_hash = array_hash(shaped)
 
-                    if self.comm.rank == owner:
-                        baseline = None
-                        err = 0
-                        for sinds in self.comm.gather(src_inds_hash, root=owner):
-                            if sinds is not None:
-                                if baseline is None:
-                                    baseline = sinds
-                                else:
-                                    if sinds != baseline:
-                                        err = 1
-                                        break
-                        if baseline is None:  # no src_indices were set
-                            err = -1
-                        self.comm.bcast(err, root=owner)
-                    else:
-                        self.comm.gather(src_inds_hash, root=owner)
-                        err = self.comm.bcast(None, root=owner)
-                    if err == 1:
-                        self._collect_error(f"{self.msginfo}: Can't connect distributed output "
-                                            f"'{abs_out}' to non-distributed input '{abs_in}' "
-                                            "because src_indices differ on different ranks.",
-                                            ident=(abs_out, abs_in))
-                    elif err == -1:
-                        self._collect_error(f"{self.msginfo}: Can't connect distributed output "
-                                            f"'{abs_out}' to non-distributed input '{abs_in}' "
-                                            "without specifying src_indices.",
-                                            ident=(abs_out, abs_in))
+        #             if self.comm.rank == owner:
+        #                 baseline = None
+        #                 err = 0
+        #                 for sinds in self.comm.gather(src_inds_hash, root=owner):
+        #                     if sinds is not None:
+        #                         if baseline is None:
+        #                             baseline = sinds
+        #                         else:
+        #                             if sinds != baseline:
+        #                                 err = 1
+        #                                 break
+        #                 if baseline is None:  # no src_indices were set
+        #                     err = -1
+        #                 self.comm.bcast(err, root=owner)
+        #             else:
+        #                 self.comm.gather(src_inds_hash, root=owner)
+        #                 err = self.comm.bcast(None, root=owner)
+        #             if err == 1:
+        #                 self._collect_error(f"{self.msginfo}: Can't connect distributed output "
+        #                                     f"'{abs_out}' to non-distributed input '{abs_in}' "
+        #                                     "because src_indices differ on different ranks.",
+        #                                     ident=(abs_out, abs_in))
+        #             elif err == -1:
+        #                 self._collect_error(f"{self.msginfo}: Can't connect distributed output "
+        #                                     f"'{abs_out}' to non-distributed input '{abs_in}' "
+        #                                     "without specifying src_indices.",
+        #                                     ident=(abs_out, abs_in))
 
     def _setup_var_data(self):
         """
@@ -3666,11 +3671,11 @@ class Group(System):
         if self._owns_approx_of:
             total = self.pathname == ''
 
-            abs2meta = self._var_allprocs_abs2meta['output']
             abs2idx = self._var_allprocs_abs2idx
             sizes = self._var_sizes['output']
+            graph = self._get_conn_graph()
 
-            szname = 'global_size' if total else 'size'
+            # szname = 'global_size' if total else 'size'
             # we're computing totals/semi-totals (vars may not be local)
             start = end = 0
             for name, ofmeta in self._owns_approx_of.items():
@@ -3683,8 +3688,9 @@ class Group(System):
                 if not total and src not in self._var_abs2meta['output']:
                     continue
 
-                meta = abs2meta[src]
-                if meta['distributed']:
+                # meta = abs2meta[src]
+                meta = graph.nodes[('o', src)]
+                if meta.distributed:
                     dist_sizes = sizes[:, abs2idx[src]]
                 else:
                     dist_sizes = None
@@ -3694,7 +3700,7 @@ class Group(System):
                     end += indices.indexed_src_size
                     yield src, start, end, indices.shaped_array().ravel(), dist_sizes
                 else:
-                    end += abs2meta[src][szname]
+                    end += meta.global_size if total else meta.size
                     yield src, start, end, _full_slice, dist_sizes
 
                 start = end
@@ -3736,8 +3742,9 @@ class Group(System):
             abs2meta = self._var_allprocs_abs2meta
             local_ins = self._var_abs2meta['input']
             local_outs = self._var_abs2meta['output']
+            graph = self._get_conn_graph()
 
-            szname = 'global_size' if total else 'size'
+            # szname = 'global_size' if total else 'size'
 
             seen = set()
             start = end = 0
@@ -3759,17 +3766,18 @@ class Group(System):
 
                 if (wrt_matches is None or wrt in wrt_matches) and wrt not in seen:
                     io = 'input' if wrt in abs2meta['input'] else 'output'
-                    meta = abs2meta[io][wrt]
+                    # meta = abs2meta[io][wrt]
+                    meta = graph.nodes[(io[0], wrt)]
                     if total and approx_meta['indices'] is not None:
                         sub_wrt_idx = approx_meta['indices'].as_array()
                         size = sub_wrt_idx.size
                     else:
                         sub_wrt_idx = _full_slice
-                        size = abs2meta[io][wrt][szname]
+                        size = meta.global_size if total else meta.size
                     if vec is None:
                         sub_wrt_idx = ValueRepeater(None, size)
                     end += size
-                    dist_sizes = sizes[io][:, toidx[wrt]] if meta['distributed'] else None
+                    dist_sizes = sizes[io][:, toidx[wrt]] if meta.distributed else None
                     yield wrt, start, end, vec, sub_wrt_idx, dist_sizes
                     start = end
         else:

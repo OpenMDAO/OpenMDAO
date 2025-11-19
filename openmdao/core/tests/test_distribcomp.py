@@ -808,15 +808,14 @@ class MPITests(unittest.TestCase):
     def test_auto_ivc_error(self):
         size = 2
 
-        prob = om.Problem()
+        prob = om.Problem(name='auto_ivc_error')
         prob.model.add_subsystem("C", DistribCompSimple(arr_size=size))
 
-        with self.assertRaises(RuntimeError) as context:
+        with self.assertRaises(Exception) as context:
             prob.setup()
             prob.final_setup()
 
-        err_msg = str(context.exception).split(':')[-1]
-        self.assertEqual(err_msg, 'Distributed component input "C.invec" is not connected.')
+        self.assertEqual(str(context.exception), "Distributed input 'C.invec', is not connected.  Declare an IndepVarComp and connect it to this input to eliminate this error.")
 
     def test_auto_ivc_error_promoted(self):
         size = 2

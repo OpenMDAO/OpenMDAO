@@ -14,6 +14,7 @@ from openmdao.utils.reports_system import register_report
 from openmdao.utils.file_utils import text2html, _load_and_exec
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.visualization.tables.table_builder import generate_table
+from openmdao.utils.array_utils import shape_to_len
 
 
 class _NoColor(object):
@@ -325,7 +326,8 @@ def config_summary(problem, stream=sys.stdout):
     noutputs = len(output_names)
     if setup_done:
         printer("Output variables:        %5d   Total size: %8d" %
-                (noutputs, sum(meta['output'][n]['global_size'] for n in output_names)))
+                (noutputs, sum(shape_to_len(meta['output'][n]['global_shape'])
+                               for n in output_names)))
     else:
         printer("Output variables:        %5d" % noutputs)
 

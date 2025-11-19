@@ -1548,18 +1548,22 @@ class LocalRangeIterable(object):
         self._vname = vname
         self._var_size = 0
 
+        graph = system._get_conn_graph()
+
         all_abs2meta = system._var_allprocs_abs2meta['output']
         if vname in all_abs2meta:
             sizes = system._var_sizes['output']
             vec = system._outputs
             abs2meta = system._var_abs2meta['output']
+            node_meta = graph.nodes[('o', vname)]
         else:
             all_abs2meta = system._var_allprocs_abs2meta['input']
             sizes = system._var_sizes['input']
             vec = system._inputs
             abs2meta = system._var_abs2meta['input']
+            node_meta = graph.nodes[('i', vname)]
 
-        if all_abs2meta[vname]['distributed']:
+        if node_meta.distributed:
             var_idx = system._var_allprocs_abs2idx[vname]
             rank = system.comm.rank
             self._offset = np.sum(sizes[rank, :var_idx]) if use_vec_offset else 0
@@ -1570,7 +1574,7 @@ class LocalRangeIterable(object):
             self._var_size = np.sum(sizes[:, var_idx])
         elif vname not in abs2meta:  # variable is remote
             self._iter = self._remote_iter
-            self._var_size = all_abs2meta[vname]['global_size']
+            self._var_size = node_meta.global_size
         else:
             self._iter = self._serial_iter
             start, stop = vec.get_range(vname)
@@ -1578,7 +1582,7 @@ class LocalRangeIterable(object):
                 self._inds = range(start, stop)
             else:
                 self._inds = range(stop - start)
-            self._var_size = all_abs2meta[vname]['global_size']
+            self._var_size = node_meta.global_size
 
     def __repr__(self):
         """
