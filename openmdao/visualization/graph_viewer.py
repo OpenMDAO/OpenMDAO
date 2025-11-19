@@ -883,6 +883,9 @@ def _graph_cmd(options, user_args):
     """
     def _view_graph(model):
         group = model._get_subsystem(options.group) if options.group else model
+        if group is None:
+            raise ValueError(f"Group '{options.group}' not found in model.")
+
         if not options.auto_ivc:
             exclude = {'_auto_ivc'}
         else:
