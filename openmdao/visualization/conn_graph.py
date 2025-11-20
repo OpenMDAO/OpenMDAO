@@ -643,11 +643,11 @@ class AllConnGraph(nx.DiGraph):
         node = self.find_node(system.pathname, name)
         node_meta = self.nodes[node]
         need_gr = system.comm.size > 1 and not get_remote
-        if need_gr and node_meta.distributed:
-            raise RuntimeError(f"{system.msginfo}: Variable '{name}' is a distributed variable. "
-                               "You can retrieve values from all processes using "
-                               "`get_val(<name>, get_remote=True)` or from the local process using "
-                               "`get_val(<name>, get_remote=False)`.")
+        # if need_gr and node_meta.distributed:
+        #     raise RuntimeError(f"{system.msginfo}: Variable '{name}' is a distributed variable. "
+        #                        "You can retrieve values from all processes using "
+        #                        "`get_val(<name>, get_remote=True)` or from the local process using "
+        #                        "`get_val(<name>, get_remote=False)`.")
 
         if node[0] == 'o':
             tgt_units, tgt_inds_list = None, ()
@@ -1928,15 +1928,16 @@ class AllConnGraph(nx.DiGraph):
                     return
 
                 if tgt_dist:  # serial --> dist
-                    src_inds_shape = (shape_to_len(src_shape) * model.comm.size,)
+                    # src_inds_shape = (shape_to_len(src_shape) * model.comm.size,)
+                    src_inds_shape = src_meta.global_shape
                     if not src_inds_list:
                         # we can automatically add src_indices to match up this distributed target
                         # with the serial source
                         if tgt_shape is not None:
-                            offset, sz = self.get_dist_offset(tgt, model.comm.rank, True)
+                            offset, sz = self.get_dist_offset(tgt, model.comm.rank, False)
                             src_indices = \
                                 indexer(slice(offset, offset + sz),
-                                                                    flat_src=True,
+                                                                    flat_src=False,
                                                                     src_shape=src_inds_shape)
 
                             path = nx.shortest_path(self, src_node, tgt)
