@@ -1768,75 +1768,14 @@ class AllConnGraph(nx.DiGraph):
             if not are_compatible_values(src_val, tgt_meta.val, src_discrete):
                 raise ConnError(self.value_error(False, src, tgt, src_val, tgt_meta.val))
         else:
-            # if tgt_meta.distributed or src_meta.distributed or tgt_meta.distributed is None:
-            #     # handle dist-dist, dist-serial, serial-dist, and some serial-serial cases later
-            #     if model.comm.size > 1:
-            #         return False
-
             edge = (src, tgt)
             src_indices = self.edges[edge].get('src_indices', None)
-
-            # if tgt_meta.distributed:
-            #     if tgt_meta.global_shape is None:
-            #         tgt_meta.global_shape = self.compute_global_shape(model, tgt)
-
-            # if src_meta.distributed:
-            #     if src_meta.global_shape is None:
-            #         src_meta.global_shape = self.compute_global_shape(model, src)
-            #     src_inds_shape = src_meta.global_shape
-            # else:
-            #     src_inds_shape = src_meta.shape
 
             src_units = src_meta.units
             tgt_units = tgt_meta.units
 
             skip_val_shape = (src_meta.distributed or tgt_meta.distributed) and model.comm.size > 1
 
-            # if (src_meta.distributed or tgt_meta.distributed) and model.comm.size > 1:
-            #     if tgt_meta.distributed:
-            #         if src_meta.distributed:  # dist --> dist
-            #             src_shape = src_meta.global_shape
-            #             tgt_shape = tgt_meta.global_shape
-            #         else:  # serial --> dist
-            #             src_shape = src_meta.shape
-            #             tgt_shape = tgt_meta.shape
-            #             if src_indices is None:
-            #                 # we can automatically add src_indices to match up this distributed target
-            #                 # with the serial source
-            #                 if tgt_shape is not None:
-            #                     dshapes = self._dist_shapes[tgt[1]]
-            #                     offset = 0
-            #                     for rank, dshape in enumerate(dshapes):
-            #                         if rank == model.comm.rank:
-            #                             break
-            #                         if dshape is not None:
-            #                             offset += shape_to_len(dshape)
-            #                     src_indices = \
-            #                         indexer(slice(offset,
-            #                                                            offset +
-            #                                                            shape_to_len(tgt_shape)),
-            #                                                            flat_src=True,
-            #                                                            src_shape=src_shape)
-
-            #                     self.edges[edge]['src_indices'] = src_indices
-            #                     src_inds_list = tgt_meta.src_inds_list
-            #                     if src_inds_list:
-            #                         save = src_inds_list.copy()
-            #                         src_inds_list[:] = [src_indices] + save
-            #                     else:
-            #                         src_inds_list = [src_indices]
-            #                     tgt_meta.src_inds_list = src_inds_list
-            #     else:   # dist --> serial
-            #         if src_indices is None:
-            #             model._collect_error(f"Can't automatically determine src_indices for "
-            #                                 f"connection from distributed variable '{src[1]}' to "
-            #                                 f"serial variable '{tgt[1]}'.")
-            #             return
-            #         src_shape = src_meta.global_shape
-            #         tgt_shape = tgt_meta.shape
-
-            #     do_val_copy = src_indices is not None
-            # else:
             src_shape = src_meta.shape
             tgt_shape = tgt_meta.shape
 
@@ -1909,13 +1848,23 @@ class AllConnGraph(nx.DiGraph):
     #     else:
     #         pass
 
-    def get_dist_offset(self, node, rank):
+    def get_dist_offset(self, node, rank, flat):
         offset = 0
         for i, dshape in enumerate(self._dist_shapes[node[1]]):
             if i == rank:
-                return offset
+                break
             if dshape is not None:
-                offset += shape_to_len(dshape)
+                if flat:
+                    offset += shape_to_len(dshape)
+                else:
+                    offset += dshape[0] if len(dshape) > 0 else 1
+
+        if flat:
+            sz = shape_to_len(dshape)
+        else:
+            sz = dshape[0] if len(dshape) > 0 else 1
+
+        return offset, sz
 
     def check_dist_connection(self, model, src_node):
         """
@@ -1952,11 +1901,10 @@ class AllConnGraph(nx.DiGraph):
                         # each rank, and we must specify src_indices to match src and tgt on
                         # each rank.
                         if tgt_shape is not None:
-                            offset = self.get_dist_offset(tgt, model.comm.rank)
+                            offset, sz = self.get_dist_offset(tgt, model.comm.rank, False)
                             src_indices = \
-                                indexer(slice(offset, offset +
-                                                                    shape_to_len(tgt_shape)),
-                                                                    flat_src=True,
+                                indexer(slice(offset, offset + sz),
+                                                                    flat_src=False,
                                                                     src_shape=src_meta.global_shape)
 
                             path = nx.shortest_path(self, src_node, tgt)
@@ -1984,10 +1932,9 @@ class AllConnGraph(nx.DiGraph):
                         # we can automatically add src_indices to match up this distributed target
                         # with the serial source
                         if tgt_shape is not None:
-                            offset = self.get_dist_offset(tgt, model.comm.rank)
+                            offset, sz = self.get_dist_offset(tgt, model.comm.rank, True)
                             src_indices = \
-                                indexer(slice(offset, offset +
-                                                                    shape_to_len(tgt_shape)),
+                                indexer(slice(offset, offset + sz),
                                                                     flat_src=True,
                                                                     src_shape=src_inds_shape)
 
@@ -2148,7 +2095,7 @@ class AllConnGraph(nx.DiGraph):
         first_pass = self._first_pass
         has_dist = False
 
-        if first_pass and src_dist:
+        if src_dist:
             self.dist_nodes.add(src_node)
             has_dist = True
 
