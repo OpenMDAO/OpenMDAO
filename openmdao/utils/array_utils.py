@@ -4,6 +4,7 @@ Utils for dealing with arrays.
 import sys
 from itertools import product
 import hashlib
+from math import prod
 
 import numpy as np
 
@@ -12,51 +13,26 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.omnumba import numba
 
 
-if sys.version_info >= (3, 8):
-    from math import prod
+def shape_to_len(shape):
+    """
+    Compute length given a shape tuple.
 
-    def shape_to_len(shape):
-        """
-        Compute length given a shape tuple.
+    Parameters
+    ----------
+    shape : tuple of int or None
+        Numpy shape tuple.
 
-        Parameters
-        ----------
-        shape : tuple of int or None
-            Numpy shape tuple.
+    Returns
+    -------
+    int
+        Length of array.
+    """
+    if shape is None:
+        return None
+    if shape == ():
+        return 1  # otherwise prod will return float 1.0
 
-        Returns
-        -------
-        int
-            Length of array.
-        """
-        if shape is None:
-            return None
-        return prod(shape)
-else:
-    def shape_to_len(shape):
-        """
-        Compute length given a shape tuple.
-
-        For realistic-dimension arrays, looping over the shape tuple is much faster than np.prod.
-
-        Parameters
-        ----------
-        shape : tuple of int
-            Numpy shape tuple.
-
-        Returns
-        -------
-        int
-            Length of multidimensional array.
-        """
-        if shape is None:
-            return None
-
-        length = 1
-        for dim in shape:
-            length *= dim
-
-        return length
+    return prod(shape)
 
 
 def evenly_distrib_idxs(num_divisions, arr_size):

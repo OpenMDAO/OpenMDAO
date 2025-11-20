@@ -144,6 +144,7 @@ class NodeAttrs():
         return getattr(self, key, default)
 
     def update(self, kwargs):
+        # networkx uses this to populate the initial node attributes.
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -460,7 +461,7 @@ class AllConnGraph(nx.DiGraph):
         self._has_dynamic_shapes = False
         self._has_dynamic_units = False
         self._dist_shapes = None
-        self.dist_nodes = set()
+        self._dist_nodes = set()
 
     def find_node(self, pathname, varname, io=None):
         """
@@ -935,7 +936,7 @@ class AllConnGraph(nx.DiGraph):
         #     umeta = nodes[u]
         #     shape = umeta.shape
         #     if v[0] == 'i':
-        #         if vmeta.locmeta is None or v in self.dist_nodes:
+        #         if vmeta.locmeta is None or v in self._dist_nodes:
         #             continue
 
         #         src_indices = self.edges[(u, v)].get('src_indices', None)
@@ -1106,7 +1107,7 @@ class AllConnGraph(nx.DiGraph):
                 locmeta = loc[name] if name in loc else None
                 self.add_discrete_var(model, name, meta, locmeta, io)
 
-    def get_dist_shapes(self, model, node):
+    def get_dist_shapes(self, model, node=None):
         if self._dist_shapes is None:
             if model.comm.size > 1:
                 dshapes = {}
@@ -1130,6 +1131,9 @@ class AllConnGraph(nx.DiGraph):
                 self._dist_shapes = all_dshapes
             else:
                 self._dist_shapes = {}
+
+        if node is None:
+            return self._dist_shapes
 
         _, name = node
         if name in self._dist_shapes:
@@ -2098,16 +2102,16 @@ class AllConnGraph(nx.DiGraph):
         has_dist = False
 
         if src_dist:
-            self.dist_nodes.add(src_node)
+            self._dist_nodes.add(src_node)
             has_dist = True
 
-        dist_nodes = self.dist_nodes
+        dist_nodes = self._dist_nodes
         abs2meta_in = model._var_allprocs_abs2meta['input']
 
         # first, resolve inputs up from the bottom of the tree to the root input node.
         for node in dfs_postorder_nodes(self, src_node):
             if src_dist and first_pass and node[1] in abs2meta_in:
-                self.dist_nodes.update(nx.shortest_path(self, src_node, node))
+                self._dist_nodes.update(nx.shortest_path(self, src_node, node))
             if node[0] == 'i':
                 node_meta = nodes[node]
                 if node_meta.dynamic:
@@ -2116,9 +2120,9 @@ class AllConnGraph(nx.DiGraph):
                 if first_pass and node[1] in abs2meta_in:
                     if not src_dist and node_meta.distributed:
                         has_dist = True
-                        self.dist_nodes.update(nx.shortest_path(self, src_node, node))
+                        self._dist_nodes.update(nx.shortest_path(self, src_node, node))
                         if auto:
-                            self.dist_nodes.add(src_node)
+                            self._dist_nodes.add(src_node)
 
                 self.resolve_from_children(model, src_node, node, auto=auto)
 

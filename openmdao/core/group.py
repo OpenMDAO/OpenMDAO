@@ -2016,10 +2016,10 @@ class Group(System):
         prop : str
             Name of the property to compute.
         """
-        nprocs = self.comm.size
-
         knowns = set()
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
+        conn_graph = self._get_conn_graph()
+        conn_nodes = conn_graph.nodes
 
         if prop == 'shape':
             dist_shp = {}  # local distrib sizes
@@ -2028,6 +2028,17 @@ class Group(System):
             self._units_graph = graph = nx.DiGraph()
         else:
             raise ValueError(f"Invalid property name: {prop}")
+
+        nprocs = self.comm.size
+        do_dist = nprocs > 1 and prop == 'shape'
+        if do_dist and self._has_distrib_vars:
+            self._dist_shapes = dist_shapes = conn_graph.get_dist_shapes(self)
+        else:
+            self._dist_shapes = dist_shapes = {}
+
+        def get_conn_node(name):
+            mynode = graph.nodes[name]
+            return conn_nodes[(mynode['io'][0], name)]
 
         def compute_var_property(to_var, prop_dict, func):
             """
@@ -2061,7 +2072,7 @@ class Group(System):
 
             return from_prop
 
-        def copy_var_shape(from_var, to_var, dist_shapes, dist_sizes):
+        def copy_var_shape(from_var, to_var):
             """
             Copy shape info from from_var's metadata to to_var's metadata in the graph.
 
@@ -2073,10 +2084,6 @@ class Group(System):
                 Name of variable to copy shape info from.
             to_var : str
                 Name of variable to copy shape info to.
-            dist_shapes : dict
-                Mapping of distributed variable name to shapes in each rank.
-            dist_sizes : dict
-                Mapping of distributed variable name to sizes in each rank.
 
             Returns
             -------
@@ -2084,12 +2091,12 @@ class Group(System):
                 If the shape of the variable is known, return the shape.
                 Otherwise, return None.
             """
-            from_meta = graph.nodes[from_var]
-            from_shape = from_meta['conn_meta'].shape
-            if from_shape is None:
+            from_conn_meta = get_conn_node(from_var)
+            if from_conn_meta.shape is None:
                 return
+            from_meta = graph.nodes[from_var]
             from_io = from_meta['io']
-            to_meta = graph.nodes[to_var]
+            to_conn_meta = get_conn_node(to_var)
 
             # is this a connection internal to a component?
             internal = to_var.rpartition('.')[0] == from_var.rpartition('.')[0]
@@ -2099,23 +2106,16 @@ class Group(System):
             else:
                 fwd = from_io == 'output'
                 if fwd:
-                    src_inds_list = to_meta['conn_meta'].src_inds_list
+                    src_inds_list = to_conn_meta.src_inds_list
                 else:  # rev
-                    src_inds_list = from_meta['conn_meta'].src_inds_list
+                    src_inds_list = from_conn_meta.src_inds_list
 
-            is_full_slice = False
-            if src_inds_list:
-                if len(src_inds_list) == 1:
-                    src_indices = src_inds_list[0]
-                    ind = src_indices()
-                    if isinstance(ind, slice):
-                        slc = src_indices._slice
-                        is_full_slice = ((slc.start is None or slc.start == 0) and slc.stop is None and
-                                         (slc.step is None or slc.step == 1))
+            is_full_slice = \
+                src_inds_list and len(src_inds_list) == 1 and src_inds_list[0].is_full_slice()
 
             if self.comm.size > 1:
-                dist_from = from_meta['conn_meta'].distributed
-                dist_to = to_meta['conn_meta'].distributed
+                dist_from = from_conn_meta.distributed
+                dist_to = to_conn_meta.distributed
             else:
                 dist_from = dist_to = False
 
@@ -2130,47 +2130,43 @@ class Group(System):
                 else:
                     shpfunc = serial2distrev if dist_from else serial2serialrev
 
-            return shpfunc(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
-                           is_full_slice)
+            return shpfunc(graph, from_var, to_var, src_inds_list, is_full_slice)
 
-        def copy_var_units(from_var, to_var, ignored, ignored2):
-            from_units = graph.nodes[from_var]['conn_meta'].units
-            graph.nodes[to_var]['conn_meta'].units = from_units
+        def copy_var_units(from_var, to_var):
+            from_units = get_conn_node(from_var).units
+            conn_to = get_conn_node(to_var)
+            conn_to.units = from_units
             return from_units
 
-        def serial2serialfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
-                             is_full_slice):
-            if not src_inds_list:
-                shp = graph.nodes[from_var]['conn_meta'].shape
-            else:
-                shp = graph.nodes[from_var]['conn_meta'].shape
+        def serial2serialfwd(graph, from_var, to_var, src_inds_list, is_full_slice):
+            shp = get_conn_node(from_var).shape
+            if src_inds_list:
                 for inds in src_inds_list:
                     inds.set_src_shape(shp)
                     shp = inds.indexed_src_shape
 
-            graph.nodes[to_var]['conn_meta'].shape = shp
+            get_conn_node(to_var).shape = shp
             return shp
 
-        def serial2serialrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
-                             is_full_slice):
+        def serial2serialrev(graph, from_var, to_var, src_inds_list, is_full_slice):
             if not src_inds_list or is_full_slice:
-                shp = graph.nodes[from_var]['conn_meta'].shape
+                shp = get_conn_node(from_var).shape
             else:
                 self._collect_error(f"Input '{from_var}' has src_indices so the shape "
                                     f"of connected output '{to_var}' cannot be "
                                     "determined.")
                 return
 
-            graph.nodes[to_var]['conn_meta'].shape = shp
+            get_conn_node(to_var).shape = shp
             return shp
 
-        def serial2distfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
-                           is_full_slice):
-            from_shape = graph.nodes[from_var]['conn_meta'].shape
+        def serial2distfwd(graph, from_var, to_var, src_inds_list, is_full_slice):
+            # serial_out --> dist_in
+            from_shape = get_conn_node(from_var).shape
             existence = self._get_var_existence()
             exist_outs = existence['output'][:, self._var_allprocs_abs2idx[from_var]]
             exist_ins = existence['input'][:, self._var_allprocs_abs2idx[to_var]]
-            to_meta = graph.nodes[to_var]['conn_meta']
+            to_meta = get_conn_node(to_var)
             num_exist = np.count_nonzero(exist_outs)
 
             if not src_inds_list:
@@ -2198,10 +2194,16 @@ class Group(System):
             dist_sizes[to_var] = sizes
             dist_shapes[to_var] = [shape if exist_ins[i] else None for i in range(self.comm.size)]
             to_meta.shape = shape
+            nexist = len([i for i in exist_ins if i])
+            if len(shape) > 1:
+                firstdim = shape[0] * nexist
+                gshape = (firstdim,) + shape[1:]
+            else:
+                gshape = (size * nexist,)
+            to_meta.global_shape = gshape
             return shape
 
-        def serial2distrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
-                           is_full_slice):
+        def serial2distrev(graph, from_var, to_var, src_inds_list, is_full_slice):
             # serial_out <-- dist_in
             dshapes = dist_shapes[from_var]
             if len(dshapes) >= 1:
@@ -2217,35 +2219,30 @@ class Group(System):
                             f"(shapes={dshapes}).", ident=(from_var, to_var))
                         return
 
-                graph.nodes[to_var]['conn_meta'].shape = shape0
+                get_conn_node(to_var).shape = shape0
                 return shape0
 
-        def dist2serialfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
-                           is_full_slice):
+        def dist2serialfwd(graph, from_var, to_var, src_inds_list, is_full_slice):
             # dist_out --> serial_in
-            if not src_inds_list:
-                # We don't allow this case because
-                # serial variables must have the same value on all procs and the only way
-                # this is possible is if the src_indices on each proc are identical, but that's not
-                # possible if we assume 'always local' transfer (see POEM 46).
-                to_io = graph.nodes[to_var]['io']
-                from_io = graph.nodes[from_var]['io']
-                self._collect_error(
-                    f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
-                    f"from distributed {from_io} '{from_var}' without src_indices is not "
-                    "supported.")
-            else:
+            if src_inds_list:
                 shp = self.get_global_dist_shape(from_var, dist_shapes[from_var])
-                # graph.nodes[to_var]['conn_meta']['global_shape'] = shp
                 for src_indices in src_inds_list:
                     src_indices.set_src_shape(shp)
                     shp = src_indices.indexed_src_shape
 
-                graph.nodes[to_var]['conn_meta'].shape = shp
+                get_conn_node(to_var).shape = shp
                 return shp
+            else:
+                # We don't allow this case because
+                # serial variables must have the same value on all procs and the only way
+                # this is possible is if the src_indices on each proc are identical, but that's not
+                # possible if we assume 'always local' transfer (see POEM 46).
+                self._collect_error(
+                    f"{self.msginfo}: dynamic sizing of non-distributed input '{to_var}' "
+                    f"from distributed output '{from_var}' without src_indices is not "
+                    "supported.")
 
-        def dist2serialrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
-                           is_full_slice):
+        def dist2serialrev(graph, from_var, to_var, src_inds_list, is_full_slice):
             # dist_out <-- serial_in
             if is_full_slice:
                 abs2idx = self._var_allprocs_abs2idx
@@ -2258,12 +2255,12 @@ class Group(System):
                 exist_procs = self._get_var_existence()['output'][:, abs2idx[to_var]]
                 split_num = np.count_nonzero(exist_procs)
 
-                from_shape = graph.nodes[from_var]['conn_meta'].shape
+                from_shape = get_conn_node(from_var).shape
                 sz, _ = evenly_distrib_idxs(split_num, shape_to_len(from_shape))
                 sizes = np.zeros(self.comm.size, dtype=int)
                 sizes[exist_procs] = sz
                 dist_sizes[to_var] = sizes.copy()
-                to_meta = graph.nodes[to_var]['conn_meta']
+                to_meta = get_conn_node(to_var)
                 if len(from_shape) > 1:
                     if from_shape[0] != self.comm.size:
                         self._collect_error(f"Serial input '{from_var}' has shape "
@@ -2279,6 +2276,8 @@ class Group(System):
                     dist_shapes[to_var] = [(s,) for s in sizes]
                     shp = to_meta.shape = (sizes[sizes != 0][0],)
 
+                to_meta.global_shape = from_shape
+
                 return shp
 
             else:
@@ -2286,44 +2285,50 @@ class Group(System):
                                     f"of connected output '{to_var}' cannot be "
                                     "determined.")
 
-        def dist2distfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
-                         is_full_slice):
+        def dist2distfwd(graph, from_var, to_var, src_inds_list, is_full_slice):
             if is_full_slice:
                 self._collect_error(f"Using a full slice [:] as src_indices between"
                                     f" distributed variables '{from_var}' and "
                                     f"'{to_var}' is invalid.")
                 return
 
+            from_conn_meta = get_conn_node(from_var)
+            to_conn_meta = get_conn_node(to_var)
+
             if not src_inds_list:
-                shp = graph.nodes[from_var]['conn_meta'].shape
-                graph.nodes[to_var]['conn_meta'].shape = shp
+                shp = from_conn_meta.shape
+                to_conn_meta.shape = shp
                 dist_shapes[to_var] = dist_shapes[from_var].copy()
                 dist_sizes[to_var] = dist_sizes[from_var].copy()
+                to_conn_meta.global_shape = from_conn_meta.global_shape
             else:
                 shp = self.get_global_dist_shape(from_var, dist_shapes[from_var])
-                # graph.nodes[from_var]['conn_meta']['global_shape'] = shp
                 for src_indices in src_inds_list:
                     src_indices.set_src_shape(shp)
                     shp = src_indices.indexed_src_shape
+
+                to_conn_meta.shape = shp
+
                 dsizes = np.zeros_like(dist_sizes[from_var])
                 dsizes[self.comm.rank] = src_inds_list[-1].indexed_src_size
                 self.comm.Allreduce(dsizes, dist_sizes[to_var], op=MPI.SUM)
-                graph.nodes[to_var]['conn_meta'].shape = shp
                 dist_shapes[to_var] = self.comm.allgather(shp)
+                to_conn_meta.global_shape = self.get_global_dist_shape(to_var, dist_shapes[to_var])
 
             return shp
 
-        def dist2distrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_inds_list,
-                         is_full_slice):
+        def dist2distrev(graph, from_var, to_var, src_inds_list, is_full_slice):
             if is_full_slice:
                 self._collect_error(f"Using a full slice [:] as src_indices between"
                                     f" distributed variables '{from_var}' and "
                                     f"'{to_var}' is invalid.")
             elif not src_inds_list:
-                shp = graph.nodes[from_var]['conn_meta'].shape
-                graph.nodes[to_var]['conn_meta'].shape = shp
+                shp = get_conn_node(from_var).shape
+                to_conn_meta = get_conn_node(to_var)
+                to_conn_meta.shape = shp
                 dist_shapes[to_var] = dist_shapes[from_var].copy()
                 dist_sizes[to_var] = dist_sizes[from_var].copy()
+                to_conn_meta.global_shape = self.get_global_dist_shape(to_var, dist_shapes[to_var])
                 return shp
             else:
                 self._collect_error(f"Input '{from_var}' has src_indices so the shape "
@@ -2331,8 +2336,8 @@ class Group(System):
                                     "determined.")
 
         def connect_nodes(src_info, tgt_info, multi=False):
-            src, src_io, src_meta, src_conn_meta = src_info
-            tgt, tgt_io, tgt_meta, tgt_conn_meta = tgt_info
+            src, src_io, src_conn_meta = src_info
+            tgt, tgt_io, tgt_conn_meta = tgt_info
             if src not in graph:
                 graph.add_node(src, io=src_io, meta=None, conn_meta=src_conn_meta)
             if tgt not in graph:
@@ -2348,48 +2353,44 @@ class Group(System):
 
         component_io = {}
 
-        do_dist = nprocs > 1 and prop == 'shape'
         my_abs2meta = self._var_abs2meta
-
-        conn_graph = self._get_conn_graph()
-        conn_nodes = conn_graph.nodes
 
         # determine all component inputs and outputs
         for io in ['input', 'output']:
             a2m = my_abs2meta[io]
-            for name in self._var_allprocs_abs2meta[io]:
-                comp_path = name.rpartition('.')[0]
+            for abs_name in self._var_allprocs_abs2meta[io]:
+                comp_path = abs_name.rpartition('.')[0]
                 if comp_path not in component_io:
                     component_io[comp_path] = {'input': [], 'output': []}
-                component_io[comp_path][io].append(name)
+                component_io[comp_path][io].append(abs_name)
 
-                if do_dist and name in a2m and a2m[name]['distributed']:
-                    dist_shp[name] = a2m[name]['shape']
+                if do_dist and abs_name in a2m and a2m[abs_name]['distributed']:
+                    dist_shp[abs_name] = a2m[abs_name]['shape']
 
         opposite = {'input': 'output', 'output': 'input'}
         for comp_path, io_dict in component_io.items():
             for io in ['input', 'output']:
-                for name in io_dict[io]:
-                    node_meta = conn_nodes[(io[0], name)]
-                    node_info = (name, io, None, node_meta)
+                for abs_name in io_dict[io]:
+                    node_meta = conn_nodes[(io[0], abs_name)]
+                    node_info = (abs_name, io, node_meta)
                     copy_var = node_meta[copy_prop]
                     if copy_var:
-                        cpy_name = comp_path + '.' + copy_var
-                        if (opposite[io][0], cpy_name) in conn_graph:
-                            cpy_meta = conn_nodes[(opposite[io][0], cpy_name)]
+                        cpy_var_path = comp_path + '.' + copy_var
+                        if (opposite[io][0], cpy_var_path) in conn_graph:
+                            cpy_meta = conn_nodes[(opposite[io][0], cpy_var_path)]
                             cp_io = opposite[io]
-                        elif (io[0], cpy_name) in conn_graph:
-                            cpy_meta = conn_nodes[(io[0], cpy_name)]
+                        elif (io[0], cpy_var_path) in conn_graph:
+                            cpy_meta = conn_nodes[(io[0], cpy_var_path)]
                             cp_io = io
                         else:
                             self._collect_error(f"{comp_path}: copy_shape variable '{copy_var}' "
                                                 f"not found.")
                             continue
-                        connect_nodes((cpy_name, cp_io, None, cpy_meta), node_info)
+                        connect_nodes((cpy_var_path, cp_io, cpy_meta), node_info)
                     elif node_meta[compute_prop]:
                         oi = opposite[io]
-                        for vname in io_dict[oi]:
-                            comp_info = (vname, oi, None, conn_nodes[(oi[0], vname)])
+                        for vabs_name in io_dict[oi]:
+                            comp_info = (vabs_name, oi, conn_nodes[(oi[0], vabs_name)])
                             connect_nodes(comp_info, node_info, multi=True)
 
         # find all variables that have an unknown property (across all procs) and connect them
@@ -2400,7 +2401,7 @@ class Group(System):
 
             src_prop = src_meta[prop]
             src_by_conn = src_meta[prop_by_conn] if src_prop is None else False
-            src_info = (out_name, 'output', out_meta, src_meta)
+            src_info = (out_name, 'output', src_meta)
 
             for tgt_node in conn_graph.leaf_input_iter(src_node):
                 _, abs_in = tgt_node
@@ -2410,18 +2411,10 @@ class Group(System):
                 tgt_prop_by_conn = tgt_meta.get(prop_by_conn) if tgt_prop is None else False
 
                 if tgt_prop_by_conn:
-                    connect_nodes(src_info, (abs_in, 'input', None, tgt_meta))
+                    connect_nodes(src_info, (abs_in, 'input', tgt_meta))
 
                 if src_by_conn:
-                    connect_nodes((abs_in, 'input', None, tgt_meta), src_info)
-
-        if nprocs > 1 and prop == 'shape' and dist_shp:
-            self._dist_shapes = dist_shapes = defaultdict(lambda: [None] * nprocs)
-            for rank, dshp in enumerate(self.comm.allgather(dist_shp)):
-                for n, shp in dshp.items():
-                    dist_shapes[n][rank] = shp
-        else:
-            self._dist_shapes = dist_shapes = {}
+                    connect_nodes((abs_in, 'input', tgt_meta), src_info)
 
         if graph.order() == 0:
             # we don't have any {prop}_by_conn or copy_{prop} or compute_{prop} variables,
@@ -2432,10 +2425,13 @@ class Group(System):
         for n, shapes in dist_shapes.items():
             dist_sizes[n] = np.array([0 if s is None else shape_to_len(s) for s in shapes])
 
-        knowns = {n for n, d in graph.nodes(data=True) if d['conn_meta'][prop] is not None}
+        knowns = set()
+        for n, meta in graph.nodes(data=True):
+            if getattr(conn_graph.nodes[(meta['io'][0], n)], prop) is not None:
+                knowns.add(n)
+
         all_knowns = knowns.copy()
 
-        nodes = graph.nodes
         do_sort = self.comm.size > 1
 
         # connected_components needs an undirected graph
@@ -2458,8 +2454,8 @@ class Group(System):
                     active_single_edges = sorted(active_single_edges)
 
                 for k, u in active_single_edges:
-                    shp = copy_var_property(k, u, dist_shapes, dist_sizes)
-                    if shp is not None:
+                    copied_prop = copy_var_property(k, u)
+                    if copied_prop is not None:
                         if is_unresolved(graph, u, prop):
                             unresolved_knowns.add(u)
 
@@ -2468,27 +2464,28 @@ class Group(System):
 
                 for mnode in computed_nodes:
                     for k, _, data in graph.in_edges(mnode, data=True):
-                        if nodes[k]['conn_meta'][prop] is None and data['multi']:
+                        if data['multi'] and get_conn_node(k)[prop] is None:
                             # if any preds are unknown, we can't compute the property yet
                             break
                     else:
                         # all compute_prop preds are known so compute the property
                         if prop == 'shape':
                             props = {
-                                n.rpartition('.')[-1]: nodes[n]['conn_meta'][prop]
+                                n.rpartition('.')[-1]: get_conn_node(n)[prop]
                                 for n in graph.predecessors(mnode)
                             }
                         elif prop == 'units':
                             props = {
-                                n.rpartition('.')[-1]: _find_unit(nodes[n]['conn_meta'][prop])
+                                n.rpartition('.')[-1]: _find_unit(get_conn_node(n)[prop])
                                 for n in graph.predecessors(mnode)
                             }
 
-                        val = compute_var_property(mnode, props, nodes[mnode]['conn_meta'][compute_prop])
+                        mnode_meta = get_conn_node(mnode)
+                        val = compute_var_property(mnode, props, getattr(mnode_meta, compute_prop))
                         if val is not None:
                             if prop == 'units':
                                 val = val.name()
-                            graph.nodes[mnode]['conn_meta'][prop] = val
+                            setattr(mnode_meta, prop, val)
                             if is_unresolved(graph, mnode, prop):
                                 unresolved_knowns.add(mnode)
                             all_knowns.add(mnode)
@@ -2531,9 +2528,9 @@ class Group(System):
                 # throw out any that have units of None but are not dynamic
                 dyn = set()
                 for name in unresolved:
-                    gmeta = graph.nodes[name]['conn_meta']
+                    gmeta = get_conn_node(name)
                     for metaname in to_check:
-                        if gmeta[metaname]:
+                        if getattr(gmeta, metaname):
                             dyn.add(name)
                 unresolved = dyn
             if unresolved:
