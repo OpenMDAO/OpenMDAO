@@ -4282,12 +4282,17 @@ class System(object, metaclass=SystemMetaclass):
                 else:
                     if metadata_keys is None:
                         ret_meta = dict(meta)
+                        # for backward compat
+                        if 'global_shape' in meta:
+                            ret_meta['global_size'] = shape_to_len(meta['global_shape'])
                     else:
                         ret_meta = {}
                         for key in keyset:
                             try:
                                 ret_meta[key] = meta[key]
                             except KeyError:
+                                if key == 'global_size' and 'global_shape' in meta:
+                                    ret_meta[key] = shape_to_len(meta['global_shape'])
                                 ret_meta[key] = NA
 
                     if 'shape' in meta and meta['shape'] is None and 'val' in ret_meta:
