@@ -88,6 +88,9 @@ else:
             abs2meta_in = group._var_abs2meta['input']
             myrank = group.comm.rank
 
+            if not group._var_allprocs_abs2meta['input']:
+                return transfers
+
             offsets_in = group._get_var_offsets()['input'][myrank, :]
             mypathlen = len(group.pathname) + 1 if group.pathname else 0
 

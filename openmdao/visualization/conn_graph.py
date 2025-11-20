@@ -1770,8 +1770,9 @@ class AllConnGraph(nx.DiGraph):
         src_val = src_meta.val
 
         if src_discrete:
-            if not are_compatible_values(src_val, tgt_meta.val, src_discrete):
-                raise ConnError(self.value_error(False, src, tgt, src_val, tgt_meta.val))
+            if not src_meta.remote and not tgt_meta.remote:
+                if not are_compatible_values(src_val, tgt_meta.val, src_discrete):
+                    raise ConnError(self.value_error(False, src, tgt, src_val, tgt_meta.val))
         else:
             edge = (src, tgt)
             src_indices = self.edges[edge].get('src_indices', None)
