@@ -641,7 +641,7 @@ class pyOptSparseDriver(Driver):
         self.pyopt_solution = sol
 
         try:
-            exit_status = sol.optInform['value']
+            exit_status = None if sol.optInform is None else sol.optInform['value']
             self.fail = False
 
             # These are various failed statuses.

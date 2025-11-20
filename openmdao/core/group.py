@@ -2308,11 +2308,8 @@ class Group(System):
                     shp = src_indices.indexed_src_shape
 
                 to_conn_meta.shape = shp
-
-                dsizes = np.zeros_like(dist_sizes[from_var])
-                dsizes[self.comm.rank] = src_inds_list[-1].indexed_src_size
-                self.comm.Allreduce(dsizes, dist_sizes[to_var], op=MPI.SUM)
                 dist_shapes[to_var] = self.comm.allgather(shp)
+                dist_sizes[to_var] = np.array([shape_to_len(s) for s in dist_shapes[to_var]])
                 to_conn_meta.global_shape = self.get_global_dist_shape(to_var, dist_shapes[to_var])
 
             return shp
