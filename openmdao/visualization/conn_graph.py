@@ -6,6 +6,7 @@ from numpy import isscalar, reshape
 from numbers import Number
 from collections import deque
 from copy import deepcopy
+import textwrap
 
 import webbrowser
 import threading
@@ -927,7 +928,7 @@ class AllConnGraph(nx.DiGraph):
                     if src_inds_list:
                         tgt_meta.val = self.get_subarray(srcval, src_inds_list)
                     else:
-                        pass
+                        tgt_meta.val = srcval
 
         # for u, v in dfs_edges(self, src_node):
         #     vmeta = nodes[v]
@@ -1465,13 +1466,13 @@ class AllConnGraph(nx.DiGraph):
         rows = []
         self.find_ambiguous_causes(node, rows, 'units')
         rows = sorted(rows, key=lambda x: x[0])
-        table = generate_table(rows, tablefmt='plain')
+        table = textwrap.indent(str(generate_table(rows, tablefmt='plain')), '   ')
         msg = (f"The following inputs promoted to '{node[1]}' have different "
                f"units:\n{table}")
         if incompatible:
-            msg += "\nThese units are incompatible."
+            msg += "\n   These units are incompatible."
         else:
-            msg += ("\nCall model.set_input_defaults('"
+            msg += ("\n   Call model.set_input_defaults('"
                     f"{self.top_name(node)}', units=?)' to remove the ambiguity.")
         return msg
 
@@ -1480,7 +1481,7 @@ class AllConnGraph(nx.DiGraph):
         shapes = [m.shape_from_child(node_meta, src_indices) for m, src_indices in children_meta]
         children = [n for _, n in self.succ[node]]
         rows = sorted((n, s) for n, s in zip(children, shapes))
-        table = generate_table(rows, tablefmt='plain')
+        table = textwrap.indent(str(generate_table(rows, tablefmt='plain')), '   ')
         return (f"The following inputs promoted to '{node[1]}' have different "
                 f"incompatible shapes:\n{table}")
 
@@ -1495,9 +1496,9 @@ class AllConnGraph(nx.DiGraph):
         ulist = [u if u is not None else '' for u in units_list]
         vlist = [truncate_str(v, max_len=60) for v in vals]
         rows = sorted((n, u, v) for n, u, v in zip(children, ulist, vlist))
-        table = generate_table(rows, tablefmt='plain')
+        table = textwrap.indent(str(generate_table(rows, tablefmt='plain')), '   ')
         return (f"The following inputs promoted to '{node[1]}' have different "
-                f"values, so the value of '{node[1]}' is ambiguous:\n{table}\nCall "
+                f"values, so the value of '{node[1]}' is ambiguous:\n{table}\n   Call "
                 f"model.set_input_defaults('"
                 f"{self.top_name(node)}', val=?)' to remove the ambiguity.")
 
