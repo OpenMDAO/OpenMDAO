@@ -648,11 +648,10 @@ class AllConnGraph(nx.DiGraph):
             if node_meta.ambiguous_units:
                 raise ValueError(self.ambig_units_msg(node))
 
-        if from_src:
-            if node[0] == 'i':
-                src_node = self.get_root(node)
-            else:
-                src_node = node
+        if node[0] == 'o':
+            src_node = node
+        elif from_src:
+            src_node = self.get_root(node)
         else:
             # getting a specific input
             # (must use absolute name or have only a single leaf node)
@@ -695,9 +694,12 @@ class AllConnGraph(nx.DiGraph):
             indices = indexer(indices, flat_src=flat)
         try:
             val = self.convert_get(node, val, src_units, tgt_units, tgt_inds_list, units, indices,
-                                   flat=flat)
+                                   get_remote=get_remote)
         except Exception as err:
             raise ValueError(f"{system.msginfo}: Can't get value of '{node[1]}': {str(err)}")
+
+        if flat:
+            val = val.ravel()
 
         return val
 
@@ -2513,9 +2515,17 @@ class AllConnGraph(nx.DiGraph):
             return arr
 
     def convert_get(self, node, val, src_units, tgt_units, src_inds_list=(), units=None,
-                    indices=None, flat=None):
-        if src_inds_list:
-            val = self.get_subarray(val, src_inds_list).reshape(self.nodes[node]['shape'])
+                    indices=None, get_remote=False):
+        node_meta = self.nodes[node]
+
+        if not node_meta.discrete:
+            if src_inds_list:
+                val = self.get_subarray(val, src_inds_list)
+
+            if get_remote and not src_inds_list:
+                val = val.reshape(node_meta.global_shape)
+            else:
+                val = val.reshape(node_meta.shape)
 
         if indices:
             val = self.get_subarray(val, [indices])

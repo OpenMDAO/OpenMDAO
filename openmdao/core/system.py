@@ -5920,7 +5920,7 @@ class System(object, metaclass=SystemMetaclass):
                                               vec_name=vec_name, kind='output')
             else:
                 for name in variables:
-                    vdict[name] = self.get_val(name, get_remote=True, rank=0,
+                    vdict[name] = self.get_val(name, get_remote=True, rank=None,
                                                vec_name=vec_name, kind=kind, from_src=False)
 
         return vdict
