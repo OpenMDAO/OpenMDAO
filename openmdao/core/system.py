@@ -552,6 +552,9 @@ class System(object, metaclass=SystemMetaclass):
     def __repr__(self):
         return self.msginfo
 
+    def __str__(self):
+        return self.__class__.__name__
+
     # def _get_var_sizing_info(self, abs_name, io):
     #     """
     #     Get sizing info for a continuous variable.
