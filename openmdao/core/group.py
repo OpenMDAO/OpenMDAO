@@ -1654,13 +1654,14 @@ class Group(System):
                 proc_resolvers[rank] = proc_resolver
 
                 for io in ['input', 'output']:
-                    allprocs_abs2meta[io].update(proc_abs2meta[io])
+                    if rank != myrank:
+                        allprocs_abs2meta[io].update(proc_abs2meta[io])
                     allprocs_discrete[io].update(proc_discrete[io])
 
             self._resolver.update_from_ranks(myrank, proc_resolvers)
 
             for io in ('input', 'output'):
-                if allprocs_abs2meta[io]:
+                if old_abs2meta[io]:
                     # update new allprocs_abs2meta with our local version (now that we have a
                     # consistent order for our dict), so that the 'size' metadata will
                     # accurately reflect this proc's var size instead of one from some other proc.

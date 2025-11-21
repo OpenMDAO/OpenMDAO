@@ -252,18 +252,6 @@ class NodeAttrs():
     def global_size(self):
         return shape_to_len(self._global_shape)
 
-    def effective_shape(self, model, tgt_dist, flat_src):
-        if tgt_dist:
-            if self.distributed:  # dist --> dist
-                pass
-            else:  # serial --> dist
-                pass
-        else:
-            if self.distributed:  # dist --> serial
-                pass
-            else:  # serial --> serial
-                pass
-
     @property
     def units(self):
         return self._units
@@ -689,8 +677,9 @@ class AllConnGraph(nx.DiGraph):
                                 "value using 'get_remote=True'.")
 
         if system.has_vectors():
-            if system._resolver.is_prom(src_node[1], 'input' if src_node[0] == 'i' else 'output'):
-                abs_name = system._resolver.prom2abs(src_node[1])
+            model = system._problem_meta['model_ref']()
+            if model._resolver.is_prom(src_node[1], 'input' if src_node[0] == 'i' else 'output'):
+                abs_name = model._resolver.prom2abs(src_node[1])
             else:
                 abs_name = src_node[1]
             val = system._abs_get_val(abs_name, get_remote, rank, vec_name, kind, flat,
