@@ -1748,7 +1748,7 @@ class Group(System):
         iproc = self.comm.rank
         for io, existence in self._var_existence.items():
             abs2meta = self._var_abs2meta[io]
-            for i, name in enumerate(self._var_allprocs_abs2meta[io]):
+            for i, name in enumerate(sorted(self._var_allprocs_abs2meta[io])):
                 if name in abs2meta:
                     existence[iproc, i] = True
 
@@ -1819,11 +1819,21 @@ class Group(System):
             subsys._var_sizes['output'] = self._var_sizes['output'][ranks, ostart:oend]
             subsys._var_allprocs_abs2idx.update({n: i for i, n in enumerate(subouts)})
 
+            # print(subsys.pathname)
+
             if isinstance(subsys, Group):
                 subsys._setup_vector_class()
                 subsys._compute_owning_ranks()
             else:
                 subsys._owned_output_sizes = subsys._var_sizes['output']
+
+            # for io in ('input', 'output'):
+            #     for name in subsys._var_allprocs_abs2meta[io]:
+            #         subsize = subsys._var_sizes[io][:, subsys._var_allprocs_abs2idx[name]]
+            #         size = self._var_sizes[io][:, self._var_allprocs_abs2idx[name]]
+            #         print(name, size, subsize)
+            #         if not np.all(subsize == size):
+            #             print("SIZE MISMATCH!!!!!")
 
         self._compute_owning_ranks()
 
@@ -4067,8 +4077,8 @@ class Group(System):
             self._var_allprocs_abs2meta[io].update(
                 self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
 
-        self._var_allprocs_abs2idx = {n: i for i, n in enumerate(self._var_allprocs_abs2meta['input'])}
-        self._var_allprocs_abs2idx.update({n: i for i, n in enumerate(self._var_allprocs_abs2meta['output'])})
+        # self._var_allprocs_abs2idx = {n: i for i, n in enumerate(self._var_allprocs_abs2meta['input'])}
+        # self._var_allprocs_abs2idx.update({n: i for i, n in enumerate(self._var_allprocs_abs2meta['output'])})
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True

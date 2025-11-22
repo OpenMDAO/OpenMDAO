@@ -461,7 +461,7 @@ class System(object, metaclass=SystemMetaclass):
         self._var_discrete = {'input': {}, 'output': {}}
         self._var_allprocs_discrete = {'input': {}, 'output': {}}
 
-        self._var_allprocs_abs2idx = {}
+        self._var_allprocs_abs2idx = None
 
         self._var_sizes = None
         self._owned_output_sizes = None
@@ -2405,7 +2405,7 @@ class System(object, metaclass=SystemMetaclass):
         self._var_abs2meta = {'input': {}, 'output': {}}
         self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
         self._var_allprocs_discrete = {'input': {}, 'output': {}}
-        self._var_allprocs_abs2idx = {}
+        self._var_allprocs_abs2idx = None
         self._owning_rank = defaultdict(int)
         self._var_sizes = {}
         self._owned_output_sizes = None
@@ -6530,6 +6530,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         sizes = self._var_sizes
         vmeta = self._var_allprocs_abs2meta
+        abs2idx = self._var_allprocs_abs2idx
 
         topranks = np.arange(top_comm.size)
 
@@ -6539,8 +6540,8 @@ class System(object, metaclass=SystemMetaclass):
         mytopranks = topranks[toprank - myrank: toprank - myrank + self.comm.size]
 
         for rank in range(self.comm.size):
-            for ivar, vname in enumerate(vmeta[io]):
-                sz = sizes[io][rank, ivar]
+            for vname in vmeta[io]:
+                sz = sizes[io][rank, abs2idx[vname]]
                 if sz > 0:
                     yield (vname, mytopranks[rank]), sz
 

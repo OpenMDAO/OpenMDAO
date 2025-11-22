@@ -703,98 +703,6 @@ class AllConnGraph(nx.DiGraph):
 
         return val
 
-    # def get_input_from_src(self, system, node, src_node, get_remote, rank, vec_name, flat):
-    #     # get value of the source
-    #     val = system._abs_get_val(src_node[1], get_remote, rank, vec_name, 'output', flat,
-    #                               from_root=True)
-    #     node_meta = self.nodes[node]
-    #     if node_meta.src_inds_list:
-    #         val = apply_idx_list(val, node_meta.src_inds_list)
-
-        # if has_src_indices:
-        #     if not is_local:
-        #         val = np.zeros(0)
-        #     elif src_indices is None:
-        #         if vshape is not None:
-        #             val = val.reshape(vshape)
-        #     else:
-        #         var_idx = self._var_allprocs_abs2idx[src]
-        #         sizes = self._var_sizes['output'][:, var_idx]
-        #         if distrib and (sdistrib or dynshape or not slocal) and not get_remote:
-        #             # sizes for src var in each proc
-        #             start = np.sum(sizes[:self.comm.rank])
-        #             end = start + sizes[self.comm.rank]
-        #             src_indices = src_indices.shaped_array(copy=True)
-        #             if np.all(np.logical_and(src_indices >= start, src_indices < end)):
-        #                 if src_indices.size > 0:
-        #                     src_indices = src_indices - start
-        #                 val = val.ravel()[src_indices]
-        #                 fail = 0
-        #             else:
-        #                 fail = 1
-        #             if self.comm.allreduce(fail) > 0:
-        #                 raise RuntimeError(f"{self.msginfo}: Can't retrieve distributed variable "
-        #                                    f"'{abs_name}' because its src_indices reference "
-        #                                    "entries from other processes. You can retrieve values "
-        #                                    "from all processes using "
-        #                                    "`get_val(<name>, get_remote=True)`.")
-        #         else:
-        #             if src_indices._flat_src:
-        #                 val = val.ravel()[src_indices.flat()]
-        #                 # if at component level, just keep shape of the target and don't flatten
-        #                 if not flat and not is_prom:
-        #                     shp = vmeta['shape']
-        #                     val = np.reshape(val, shp)
-        #             else:
-        #                 val = val[src_indices()]
-        #                 if vshape is not None and val.shape != vshape:
-        #                     val = np.reshape(val, vshape)
-        #                 elif not is_prom and vmeta is not None and val.shape != vmeta['shape']:
-        #                     val = np.reshape(val, vmeta['shape'])
-
-        #     if get_remote and self.comm.size > 1:
-        #         if distrib:
-        #             if rank is None:
-        #                 parts = self.comm.allgather(val)
-        #                 parts = [p for p in parts if p.size > 0]
-        #                 val = np.concatenate(parts, axis=0)
-        #             else:
-        #                 parts = self.comm.gather(val, root=rank)
-        #                 if rank == self.comm.rank:
-        #                     parts = [p for p in parts if p.size > 0]
-        #                     val = np.concatenate(parts, axis=0)
-        #                 else:
-        #                     val = None
-        #         else:  # non-distrib input
-        #             if self.comm.rank == self._owning_rank[abs_name]:
-        #                 self.comm.bcast(val, root=self.comm.rank)
-        #             else:
-        #                 val = self.comm.bcast(None, root=self._owning_rank[abs_name])
-
-        #     if distrib and get_remote:
-        #         val = np.reshape(val, abs2meta_all_ins[abs_name]['global_shape'])
-        #     elif not flat and val.size > 0 and vshape is not None:
-        #         val = np.reshape(val, vshape)
-        # elif vshape is not None and vshape != ():
-        #     val = val.reshape(vshape)
-
-        # if indices is not None:
-        #     val = val[indices]
-
-        # if units is not None:
-        #     if smeta['units'] is not None:
-        #         try:
-        #             val = self.convert2units(src, val, units)
-        #         except TypeError:  # just call this to get the right error message
-        #             self.convert2units(abs_name, val, units)
-        #     else:
-        #         val = self.convert2units(abs_name, val, units)
-        # elif (vmeta['units'] is not None and smeta['units'] is not None and
-        #       vmeta['units'] != smeta['units']):
-        #     val = self.convert2units(src, val, vmeta['units'])
-
-        # return val
-
     def set_val(self, system, name, val, units=None, indices=None):
         node = self.find_node(system.pathname, name)
         node_meta = self.nodes[node]
@@ -1925,11 +1833,10 @@ class AllConnGraph(nx.DiGraph):
 
                 if tgt_dist:  # serial --> dist
                     # src_inds_shape = (shape_to_len(src_shape) * model.comm.size,)
-                    src_inds_shape = src_meta.global_shape
                     if not src_inds_list:
                         # we can automatically add src_indices to match up this distributed target
                         # with the serial source
-                        if tgt_shape is not None:
+                        if tgt_shape is not None and src_shape == tgt_shape:
                             offset, sz = self.get_dist_offset(tgt, model.comm.rank, False)
                             src_indices = \
                                 indexer(slice(offset, offset + sz),

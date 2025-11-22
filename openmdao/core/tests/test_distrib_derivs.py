@@ -313,16 +313,11 @@ class MPITests2(unittest.TestCase):
                                                       y=np.zeros((9, 3))))
 
         if prob.comm.rank == 0:
-            prob.model.connect('indep.x', 'comp.invec',
-                               src_indices=[[0,0,0,1,1,1,2,2,2,3,3,3,4,4,4],
-                                            [0,1,2,0,1,2,0,1,2,0,1,2,0,1,2]])
+            prob.model.connect('indep.x', 'comp.invec', src_indices=om.slicer[:5])
         else:
-            prob.model.connect('indep.x', 'comp.invec',
-                               # use some negative indices here to make sure they work
-                               src_indices=[[5,5,5,6,6,6,7,7,7,-1,8,-1],
-                                            [0,1,2,0,1,2,0,1,2,0,1,2]])
+            prob.model.connect('indep.x', 'comp.invec', src_indices=om.slicer[5:])
 
-        prob.model.connect('comp.outvec', 'total.x', src_indices=om.slicer[:], flat_src_indices=True)
+        prob.model.connect('comp.outvec', 'total.x', src_indices=om.slicer[:])
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
