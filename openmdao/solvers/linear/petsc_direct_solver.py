@@ -461,7 +461,7 @@ class PETScDirectSolver(DirectSolver):
             raise RuntimeError(format_singular_error(system, matrix))
 
         if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
-            self._lin_rhs_checker.add_solution(b_vec, sol_array, copy=True)
+            self._lin_rhs_checker.add_solution(b_vec, sol_array, system, copy=True)
 
     def preferred_sparse_format(self):
         """
