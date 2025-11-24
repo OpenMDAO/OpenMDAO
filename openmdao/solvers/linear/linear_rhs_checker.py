@@ -8,12 +8,12 @@ from collections import deque
 import atexit
 
 import numpy as np
-from mpi4py import MPI
 
 from math import isclose
 from openmdao.utils.array_utils import allclose, allzero
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
 from openmdao.visualization.tables.table_builder import generate_table
+from openmdao.utils.mpi import MPI
 
 
 _cache_stats = {}
