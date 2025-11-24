@@ -302,7 +302,9 @@ class LinearRHSChecker(object):
 
             # Check if the RHS vector and a cached vector are parallel
             dot_product = np.dot(rhs_arr, rhs_cache)
-            # If this is a distributed vector, we need to compute the dot product and norms for the full vector to avoid running into issues when the chunk of an otherwise non-zero vector stored on a given proc is zero
+            # If this is a distributed vector, we need to compute the dot product and norms for the
+            # full vector to avoid running into issues when the chunk of an otherwise non-zero
+            # vector stored on a given proc is zero
             if is_parallel:
                 dot_product = system.comm.allreduce(dot_product)
                 if rhs_norm is None:
@@ -311,7 +313,9 @@ class LinearRHSChecker(object):
                 if rhs_norm is None:
                     rhs_norm = np.linalg.norm(rhs_arr)
 
-            rhs_are_parallel = isclose(abs(dot_product), rhs_norm * rhs_cache_norm, rel_tol=self._rtol, abs_tol=self._atol)
+            rhs_are_parallel = isclose(
+                abs(dot_product), rhs_norm * rhs_cache_norm, rel_tol=self._rtol, abs_tol=self._atol
+            )
             if is_parallel:
                 rhs_are_parallel = system.comm.allreduce(rhs_are_parallel, op=MPI.LAND)
             if rhs_are_parallel:
@@ -325,7 +329,6 @@ class LinearRHSChecker(object):
                         print(f"{self._solver_msginfo}: Skipping linear solve. RHS is parallel to "
                               f"previous solution. (scaler={scaler})")
                     break
-
 
         matched_cache = sol_array is not None
         if is_parallel:
