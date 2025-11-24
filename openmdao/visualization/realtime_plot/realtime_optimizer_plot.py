@@ -65,7 +65,10 @@ _toggle_styles = """
         0 1px 3px rgba(0, 0, 0, 0.08),   /* Close shadow */
         inset 0 2px 2px rgba(255, 255, 255, 0.2);  /* Top inner highlight */
 """
-_bounds_infinity = 1e8
+
+# Used for the outer bounds for the hstrips used to indicate the out of bounds for variables
+# TODO need to come up with a better way. But if made too big, get glitches in plots
+_bounds_infinity = 1e5
 
 # colors used for the plot lines and associated buttons and axes labels
 # start with color-blind friendly colors and then use others if needed
@@ -814,7 +817,11 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             index = len(self._bounds_off_on_checkboxes)
             checkbox = Checkbox(
                 active=False,
-                visible=False,
+                # visible=False,
+                html_attributes={
+                    "title": "Turn on/off plot of bounds for this variable. "
+                    "Variable must be plotted to turn on."
+                },
                 disabled=True,
                 margin=(12, 0, 8, 4),
                 tags=[{"var_type": var_type, "index": index, "varname": varname}],
@@ -978,11 +985,16 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
 
         self._lines.append(line)
         if not use_varea:  # hover tool does not work with Varea
+            if var_type == "desvars":
+                datasource_name = f"{varname}_min"
+            else:
+                datasource_name = varname
             hover = HoverTool(
                 renderers=[line],
+                # list of tuples. Each is label followed by value
                 tooltips=[
                     ("Iteration", "@iteration"),
-                    (varname, "@{%s}" % varname + "{0.00}"),
+                    (varname, "@{%s}" % datasource_name + "{0.00}"),
                 ],
                 mode="vline",
                 visible=visible,
@@ -1018,10 +1030,15 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                 "Optimization Progress Plot for: "
                 f"{self._case_tracker.get_case_recorder_filename()}"
             )
+
+        # need to do these separate since we want to make them the default
+        pan_tool = PanTool()
+        wheel_zoom_both = WheelZoomTool()
         self.plot_figure = figure(
             tools=[
-                PanTool(),
+                pan_tool,
                 WheelZoomTool(dimensions="width"),
+                wheel_zoom_both,
                 ZoomInTool(),
                 ZoomOutTool(),
                 BoxZoomTool(),
@@ -1032,8 +1049,8 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             height_policy="max",
             sizing_mode="stretch_both",
             title=title,
-            active_drag=None,
-            active_scroll="auto",
+            active_drag=pan_tool,
+            active_scroll=wheel_zoom_both,
             active_tap=None,
             output_backend="webgl",
         )
