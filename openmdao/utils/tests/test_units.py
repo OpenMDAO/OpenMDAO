@@ -321,6 +321,11 @@ class TestModuleFunctions(unittest.TestCase):
         else:
             self.fail("Expecting Key Error")
 
+    def test_add_unit_non_base_units(self):
+        add_unit('DU', '1.495978707E8*km')
+        DU2AU = om.convert_units(1.0, 'DU', 'AU')
+        assert_near_equal(DU2AU, 1.0)
+
     def test_connect_unitless_to_none(self):
         import warnings
         p = om.Problem()
