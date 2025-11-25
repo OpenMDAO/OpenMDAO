@@ -776,7 +776,6 @@ def import_library(libfilepointer):
                          f"{missing}, at least {required_base_types} required.")
 
     _update_library(_UNIT_LIB)
-    print('UNITS IMPORTED')
     return _UNIT_LIB
 
 
