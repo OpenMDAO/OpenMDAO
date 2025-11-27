@@ -654,14 +654,35 @@ def add_unit(name, unit, comment=''):
         The name of the unit being added. For example: 'Hz'.
     unit : str
         Definition of the unit w.r.t. some other unit.  For example: '1/s'.
+        This can reference prefixed units like 'km', which will be automatically
+        resolved.
     comment : str
         Optional comment to describe unit.
     """
     if comment:
         _UNIT_LIB.help.append((name, comment, unit))
     if isinstance(unit, str):
-        unit = eval(unit, {'__builtins__': None, 'pi': pi},  # nosec: scope limited
-                    _UNIT_LIB.unit_table)
+        try:
+            unit = eval(unit, {'__builtins__': None, 'pi': pi},  # nosec: scope limited
+                        _UNIT_LIB.unit_table)
+        except (TypeError, NameError, KeyError):
+            # Use _find_unit to parse and add any prefixed units to the unit_table.
+            regex = re.compile(r'(?<!\d)[A-Za-z]+[A-Za-z0-9]*')
+            potential_units = regex.findall(unit)
+            for item in potential_units:
+                if item != 'pi':  # Skip the constant pi
+                    _find_unit(item, error=False)
+
+            # Now try evaluating again
+            try:
+                unit = eval(unit, {'__builtins__': None, 'pi': pi},  # nosec: scope limited
+                            _UNIT_LIB.unit_table)
+            except Exception as eval_error:
+                raise ValueError(
+                    f"Could not evaluate unit definition '{unit}' for new unit '{name}'. "
+                    f'Original error: {eval_error}. '
+                ) from eval_error
+
     unit.set_name(name)
     if name in _UNIT_LIB.unit_table:
         if (_UNIT_LIB.unit_table[name]._factor != unit._factor or
