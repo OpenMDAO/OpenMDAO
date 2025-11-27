@@ -326,6 +326,14 @@ class TestModuleFunctions(unittest.TestCase):
         DU2AU = om.convert_units(1.0, 'DU', 'AU')
         assert_near_equal(DU2AU, 1.0)
 
+    def test_add_double_prefix(self):
+        add_unit('kkm', '1000.*km')
+        kkm2m = om.convert_units(1.0, 'kkm', 'm')
+        assert_near_equal(kkm2m, 1_000_000.0)
+        # Make sure we have no trouble reading km
+        km2m = om.convert_units(1.0, 'km', 'm')
+        assert_near_equal(km2m, 1000.0)
+
     def test_connect_unitless_to_none(self):
         import warnings
         p = om.Problem()
