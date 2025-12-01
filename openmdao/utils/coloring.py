@@ -32,15 +32,6 @@ from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.devtools.memory import mem_usage
 
 try:
-    import matplotlib as mpl
-    from matplotlib import pyplot
-
-    if Version(mpl.__version__) < Version("3.6"):
-        from matplotlib import cm
-except ImportError:
-    mpl = None
-
-try:
     import jax
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
     import jax.numpy as jnp
@@ -1437,7 +1428,13 @@ class Coloring(object):
         issue_warning('display is deprecated. Use display_bokeh for rich html displays of coloring'
                       'or display_txt for a text-based display.', category=OMDeprecationWarning)
 
-        if mpl is None:
+        try:
+            import matplotlib as mpl
+            from matplotlib import pyplot
+
+            if Version(mpl.__version__) < Version("3.6"):
+                from matplotlib import cm
+        except ImportError:
             print("matplotlib is not installed so the coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
                   "object or by using 'openmdao view_coloring --textview <your_coloring_file>' "
