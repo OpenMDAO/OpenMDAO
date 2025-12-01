@@ -1,4 +1,5 @@
 """Unit Tests for the code that does automatic report generation"""
+from importlib.util import find_spec
 import unittest
 import pathlib
 import sys
@@ -633,8 +634,7 @@ class TestReportsSystem(unittest.TestCase):
     @hooks_active
     def test_report_generation_extra_compute_totals_from_scaling_report(self):
         clear_reports()
-        from openmdao.drivers.pyoptsparse_driver import pyoptsparse
-        if pyoptsparse is None:
+        if find_spec('pyoptsparse') is None:
             raise unittest.SkipTest("pyoptsparse is required.")
         prob = self.setup_and_run_simple_problem(driver=om.pyOptSparseDriver(optimizer='SLSQP'),
                                                  reports=['scaling'], linear=True)

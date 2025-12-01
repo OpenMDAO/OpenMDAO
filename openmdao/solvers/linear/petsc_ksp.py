@@ -190,7 +190,7 @@ class PETScKrylov(LinearSolver):
         else:
             self._PETSc = None
 
-        if self._PETSC is None:
+        if self._PETSc is None:
             raise RuntimeError(f"{self.msginfo}: PETSc is not available. "
                                "Set shell variable OPENMDAO_USE_MPI=1 to detect earlier.")
 
