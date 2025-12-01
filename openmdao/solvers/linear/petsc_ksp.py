@@ -168,6 +168,8 @@ class PETScKrylov(LinearSolver):
         Dictionary of KSP instances (keyed on vector name).
     _lin_rhs_checker : LinearRHSChecker or None
         Object for checking the right-hand side of the linear solve.
+    _PETSc : <petsc4py.PETSc>
+        Lazily imported petsc4py.PETSc module.
     """
 
     SOLVER = 'LN: PETScKrylov'

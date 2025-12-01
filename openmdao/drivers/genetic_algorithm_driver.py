@@ -570,8 +570,6 @@ class GeneticAlgorithm:
         If the model in objfun is also parallel, then this will contain a tuple with the the
         total number of population points to evaluate concurrently, and the color of the point
         to evaluate on this rank.
-    _lhs : function
-        The pyDOE3 latin hypercube sampling function, lazily imported.
 
     Attributes
     ----------

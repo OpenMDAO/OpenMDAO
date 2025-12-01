@@ -76,6 +76,8 @@ class PETScLU:
         The system MPI communicator.
     _x : <petsc4py.PETSc.Vec>
         Sequential (non-distributed) PETSc vector to store the solve solution.
+    _PETSc : <petsc4py.PETSc>
+        Lazily imported petsc4py.PETSc module.
     """
 
     def __init__(self, A: scipy.sparse.spmatrix, sparse_solver_name: str = None,
