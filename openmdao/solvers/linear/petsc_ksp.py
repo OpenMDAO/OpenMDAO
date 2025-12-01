@@ -100,6 +100,7 @@ if find_spec('petsc4py') is not None:
 else:
     petsc_version = '3.5'
 
+
 class Monitor(object):
     """
     Prints output from PETSc's KSP solvers.

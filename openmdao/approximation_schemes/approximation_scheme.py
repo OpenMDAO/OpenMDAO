@@ -312,7 +312,8 @@ class ApproximationScheme(object):
                         from petsc4py import PETSc
                     except ImportError:
                         if use_mpi:
-                            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
+                            raise ImportError("Importing petsc4py failed and '"
+                                              "'OPENMDAO_USE_MPI is true.")
                         PETSc = None
 
                 src_vec = PETSc.Vec().createWithArray(np.zeros(len(system._outputs), dtype=float),

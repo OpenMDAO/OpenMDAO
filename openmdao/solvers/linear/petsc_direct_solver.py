@@ -83,7 +83,6 @@ class PETScLU:
         """
         Initialize and setup the PETSc LU Direct Solver object.
         """
-
         # Lazy import of PETSc
         try:
             from petsc4py import PETSc
