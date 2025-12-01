@@ -656,8 +656,9 @@ class pyOptSparseDriver(Driver):
                 if exit_status and exit_status > 2:
                     self.fail = True
 
-        except KeyError:
+        except (TypeError, KeyError):
             # optimizers other than pySNOPT may not populate this dict
+            # for some optimizers, sol is None and not subscriptable.
             pass
 
         # revert signal handler to cached version

@@ -25,11 +25,6 @@ import copy
 
 import numpy as np
 
-try:
-    from pyDOE3 import lhs
-except ModuleNotFoundError:
-    lhs = None
-
 from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.concurrent_utils import concurrent_eval
@@ -69,12 +64,6 @@ class SimpleGADriver(Driver):
         """
         Initialize the SimpleGADriver driver.
         """
-        if lhs is None:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
-                               "which can be installed with one of the following commands:\n"
-                               "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
-
         super().__init__(**kwargs)
 
         # What we support
@@ -564,7 +553,7 @@ class SimpleGADriver(Driver):
         return fun, success, icase
 
 
-class GeneticAlgorithm(object):
+class GeneticAlgorithm:
     """
     Simple Genetic Algorithm.
 
@@ -581,6 +570,8 @@ class GeneticAlgorithm(object):
         If the model in objfun is also parallel, then this will contain a tuple with the the
         total number of population points to evaluate concurrently, and the color of the point
         to evaluate on this rank.
+    _lhs : function
+        The pyDOE3 latin hypercube sampling function, lazily imported.
 
     Attributes
     ----------
@@ -611,7 +602,10 @@ class GeneticAlgorithm(object):
         """
         Initialize genetic algorithm object.
         """
-        if lhs is None:
+        try:
+            from pyDOE3 import lhs
+            self._lhs = lhs
+        except ImportError:
             raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
@@ -694,8 +688,8 @@ class GeneticAlgorithm(object):
             Pm = (self.lchrom + 1.0) / (2.0 * pop_size * np.sum(bits))
         elite = self.elite
 
-        new_gen = np.round(lhs(self.lchrom, self.npop, criterion='center',
-                               random_state=random_state))
+        new_gen = np.round(self._lhs(self.lchrom, self.npop, criterion='center',
+                                     random_state=random_state))
         new_gen[0] = self.encode(x0, vlb, vub, bits)
 
         # Main Loop
