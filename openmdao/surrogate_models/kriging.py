@@ -3,7 +3,6 @@ import numpy as np
 import scipy.linalg as linalg
 import os.path
 from hashlib import md5
-from scipy.optimize import minimize
 
 from openmdao.surrogate_models.surrogate_model import SurrogateModel
 from openmdao.utils.om_warnings import issue_warning, CacheWarning
@@ -49,6 +48,8 @@ class KrigingSurrogate(SurrogateModel):
         Mean of training model response values, normalized.
     Y_std : ndarray
         Standard deviation of training model response values, normalized.
+    _minimize : function
+        Lazily imported scipy.optimize.minimize function.
     """
 
     def __init__(self, **kwargs):
@@ -77,6 +78,9 @@ class KrigingSurrogate(SurrogateModel):
         self.X_std = np.zeros(0)
         self.Y_mean = np.zeros(0)
         self.Y_std = np.zeros(0)
+
+        from scipy.optimize import minimize
+        self._minimize = minimize
 
     def _declare_options(self):
         """
@@ -195,9 +199,9 @@ class KrigingSurrogate(SurrogateModel):
             options['disp'] = True
             options['iprint'] = 2
 
-        optResult = minimize(_calcll, 1e-1 * np.ones(self.n_dims), method='slsqp',
-                             options=options,
-                             bounds=bounds)
+        optResult = self._minimize(_calcll, 1e-1 * np.ones(self.n_dims), method='slsqp',
+                                   options=options,
+                                   bounds=bounds)
 
         if not optResult.success:
             raise ValueError(f'Kriging Hyper-parameter optimization failed: {optResult.message}')
