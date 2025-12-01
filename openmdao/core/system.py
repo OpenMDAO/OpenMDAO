@@ -4296,7 +4296,8 @@ class System(object, metaclass=SystemMetaclass):
                             except KeyError:
                                 if key == 'global_size' and 'global_shape' in meta:
                                     ret_meta[key] = shape_to_len(meta['global_shape'])
-                                ret_meta[key] = NA
+                                else:
+                                    ret_meta[key] = NA
 
                     if 'shape' in meta and meta['shape'] is None and 'val' in ret_meta:
                         issue_warning(f"{self.msginfo}: Can't retrieve 'val' for '{prom}' because "

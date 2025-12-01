@@ -247,6 +247,9 @@ class NodeAttrs():
         if self._meta is not None:
             self._meta['global_shape'] = global_shape
             self._meta['global_size'] = self.global_size
+            if self._locmeta is not None:
+                self._locmeta['global_shape'] = global_shape
+                self._locmeta['global_size'] = self.global_size
 
     @property
     def global_size(self):
@@ -952,10 +955,9 @@ class AllConnGraph(nx.DiGraph):
                     if not node_meta.dyn_shape:
                         node_meta._shape = meta['shape']
                         if node_meta.distributed:
-                            node_meta._global_shape = self.compute_global_shape(model, node)
+                            node_meta.global_shape = self.compute_global_shape(model, node)
                         else:
-                            node_meta._global_shape = meta['shape']
-                        meta['global_shape'] = node_meta._global_shape
+                            node_meta.global_shape = meta['shape']
                         if locmeta is not None:
                             node_meta._val = locmeta['val']
 
@@ -1836,7 +1838,7 @@ class AllConnGraph(nx.DiGraph):
                     if not src_inds_list:
                         # we can automatically add src_indices to match up this distributed target
                         # with the serial source
-                        if tgt_shape is not None and src_shape == tgt_shape:
+                        if tgt_shape is not None and src_shape == tgt_meta.global_shape:
                             offset, sz = self.get_dist_offset(tgt, model.comm.rank, False)
                             src_indices = \
                                 indexer(slice(offset, offset + sz),
@@ -2594,15 +2596,15 @@ class AllConnGraph(nx.DiGraph):
         rows.append(get_table_row('src_inds_list', meta))
         rows.append(get_table_row('shape_by_conn', meta))
         rows.append(get_table_row('copy_shape', meta))
-        # dot doesn't like node labels containing functions
-        # rows.append(get_table_row('compute_shape', meta))
-        rows.append(get_table_row('compute_shape',
+
+        # dot doesn't like node labels containing functions, so just show yes if set
+        rows.append(get_table_row('compute_shape', meta,
                                   {'compute_shape': 'yes' if meta.compute_shape else None}))
-        rows.append(get_table_row('units_by_conn', meta))
-        rows.append(get_table_row('copy_units', meta))
-        # rows.append(get_table_row('compute_units', meta))
         rows.append(get_table_row('compute_units',
                                   {'compute_units': 'yes' if meta.compute_units else None}))
+
+        rows.append(get_table_row('units_by_conn', meta))
+        rows.append(get_table_row('copy_units', meta))
         rows.append(get_table_row('discrete', meta))
         rows.append(get_table_row('distributed', meta, show_always=True))
         rows.append(get_table_row('remote', meta))
@@ -2835,7 +2837,7 @@ class AllConnGraph(nx.DiGraph):
         def handler(*args, **kwargs):
             return ConnGraphHandler(self, *args, **kwargs)
 
-        print(f"🌐 Starting Simple Connection Graph Web UI on port {port}")
+        print(f"🌐 Starting Connection Graph UI on port {port}")
         print(f"📱 Open your browser to: http://localhost:{port}")
 
         if open_browser:
