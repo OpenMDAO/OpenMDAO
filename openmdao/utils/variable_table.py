@@ -9,7 +9,7 @@ from io import TextIOBase
 import numpy as np
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
-from openmdao.utils.notebook_utils import notebook, display, HTML
+from openmdao.utils.notebook_utils import notebook
 from openmdao.visualization.tables.table_builder import generate_table
 
 # string to display when an attribute is not available
@@ -117,6 +117,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
             meta['tags'] = list(meta['tags'])
 
     if use_html and var_list:
+        from IPython.display import display, HTML
         rows = []
         for name in var_list:
             rows.append([name] + [var_dict[name][field] for field in column_names])
@@ -224,6 +225,9 @@ def write_source_table(source_dicts, out_stream):
 
     # use table_builder if we are in a notebook and are using the default out_stream
     use_html = notebook and out_stream is _DEFAULT_OUT_STREAM
+
+    if use_html:
+        from IPython.display import display, HTML
 
     if out_stream is _DEFAULT_OUT_STREAM:
         out_stream = sys.stdout
