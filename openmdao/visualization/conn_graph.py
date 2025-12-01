@@ -89,6 +89,7 @@ SHAPE_BY_CONN = base << 3
 UNITS_BY_CONN = base << 4
 AMBIGUOUS_UNITS = base << 5
 AMBIGUOUS_VAL = base << 6
+# NOTE: if adding more flags, make sure the flag_type is large enough to hold all the flags.
 
 AMBIGUOUS = AMBIGUOUS_VAL | AMBIGUOUS_UNITS
 NONE_UP_VAL = REMOTE | AMBIGUOUS_VAL
@@ -421,6 +422,14 @@ class NodeAttrs():
             return comm.allgather(self.shape)
         else:
             return [self.shape]
+
+    def as_dict(self):
+        skip = {'_meta', '_locmeta', '_val'}
+        ret = {}
+        for name in self.__slots__:
+            if name not in skip:
+                ret[name] = getattr(self, name)
+        return ret
 
 
 class AllConnGraph(nx.DiGraph):
@@ -865,15 +874,14 @@ class AllConnGraph(nx.DiGraph):
         include_self : bool, optional
             Whether to include the given node in the iteration.
         """
-        mypreds = self.pred
+        mypreds = self.predecessors
         if include_self:
             yield node
-        stack = [mypreds[node]]
+        stack = [mypreds(node)]
         while stack:
-            preds = stack.pop()
-            for node in preds:
-                yield node
-                stack.append(mypreds[node])
+            for n in stack.pop():
+                yield n
+                stack.append(mypreds(n))
 
     def bfs_down_iter(self, node, include_self=True):
         """
@@ -886,15 +894,14 @@ class AllConnGraph(nx.DiGraph):
         include_self : bool, optional
             Whether to include the given node in the iteration.
         """
-        mysuccs = self.succ
+        mysuccs = self.successors
         if include_self:
             yield node
-        stack = [mysuccs[node]]
+        stack = [mysuccs(node)]
         while stack:
-            succs = stack.pop()
-            for node in succs:
-                yield node
-                stack.append(mysuccs[node])
+            for n in stack.pop():
+                yield n
+                stack.append(mysuccs(n))
 
     def check_add_edge(self, group, src, tgt, **kwargs):
         if (src, tgt) in self.edges():
@@ -1205,48 +1212,81 @@ class AllConnGraph(nx.DiGraph):
         self._first_pass = False
 
     def gather_data(self, model):
-        def include_edge(edge):
-            # include any edges that are manual connections or have src_indices
-            edge_meta = self.edges[edge]
-            if edge_meta.get('type') == 'manual' or edge_meta.get('src_indices', None) is not None:
-                return True
+        # def include_edge(edge):
+        #     # include any edges that are manual connections or have src_indices
+        #     edge_meta = self.edges[edge]
+        #     if edge_meta.get('type') == 'manual' or edge_meta.get('src_indices', None) is not None:
+        #         return True
 
         myrank = model.comm.rank
         resolver = model._resolver
-        nodes_to_send = set()
-        for name, owner in model._vars_to_gather.items():
-            if myrank == owner:
-                io = resolver.get_iotype(name)
-                if io == 'input':
-                    node = ('i', name)
-                    for n in self.bfs_up_iter(node):
-                        nodes_to_send.add(n)
-                        if n[0] == 'o':
-                            if include_edge((n, node)):
-                                nodes_to_send.add(n)
-                            break
-                else:
-                    node = ('o', name)
-                    for n in self.bfs_down_iter(node):
-                        nodes_to_send.add(n)
+        vars_to_gather = model._vars_to_gather
+        nodes_to_send = {}
+        edges_to_send = {}
+        for abs_out in resolver.abs_iter('output'):
+            own_out = abs_out in vars_to_gather and vars_to_gather[abs_out] == myrank
+            out_node = ('o', abs_out)
+            if own_out:
+                for u, v in nx.dfs_edges(self, out_node):
+                    if v[0] == 'i':
+                        break
+                    nodes_to_send[u] = self.nodes[u].as_dict()
+                    edges_to_send[u, v] = self.edges[u, v]
+
+            for in_node in self.leaf_input_iter(out_node):
+                own_in = in_node[1] in vars_to_gather and vars_to_gather[in_node[1]] == myrank
+                if own_out or own_in:
+                    path = nx.shortest_path(self, out_node, in_node)
+                    for i, n in enumerate(path):
                         if n[0] == 'i':
-                            if include_edge((node, n)):
-                                nodes_to_send.add(n)
+                            opath = path[:i]
+                            ipath = path[i:]
                             break
 
-        if nodes_to_send:
+                    if own_in:
+                        edges_to_send[opath[-1], ipath[0]] = self.edges[opath[-1], ipath[0]]
+                        for i, p in enumerate(ipath):
+                            nodes_to_send[p] = self.nodes[p].as_dict()
+                            if i > 0:
+                                edges_to_send[ipath[i-1], p] = self.edges[ipath[i-1], p]
+                    else:  # own_out
+                        if ipath:
+                            edges_to_send[opath[-1], ipath[0]] = self.edges[opath[-1], ipath[0]]
 
-            # read-only view of the subgraph
-            subview = self.subgraph(nodes_to_send)
+        # for name, owner in model._vars_to_gather.items():
+        #     if myrank == owner:
+        #         seen = False
+        #         io = resolver.get_iotype(name)
+        #         if io == 'input':
+        #             node = ('i', name)
+        #             for n in self.bfs_up_iter(node):
+        #                 if n[0] == 'o':
+        #                     if not seen:
+        #                         edge = (n, node)
+        #                         edges_to_send[edge] = self.edges[edge]
+        #                         seen = True
+        #                     continue
+        #                 nodes_to_send[n] = self.nodes[n].as_dict()
+        #         else:
+        #             node = ('o', name)
+        #             for n in self.bfs_down_iter(node):
+        #                 if n[0] == 'i':
+        #                     break
+        #                 nodes_to_send[n] = self.nodes[n].as_dict()
 
-            includes = ('pathname', 'rel_name', 'shape', 'units', 'defaults', 'flags',
-                        'copy_shape', 'compute_shape', 'copy_units', 'compute_units', 'val',
-                        'compute_units')
-            subgraph = nx.DiGraph()
-            for node, nodeattrs in subview.nodes(data=True):
-                dct = {key: getattr(nodeattrs, key) for key in includes}
-                subgraph.add_node(node, **dct)
-            subgraph.add_edges_from(subview.edges(data=True))
+        # if nodes_to_send:
+
+            # # read-only view of the subgraph
+            # subview = self.subgraph(nodes_to_send)
+
+            # includes = ('pathname', 'rel_name', 'shape', 'units', 'defaults', 'flags',
+            #             'copy_shape', 'compute_shape', 'copy_units', 'compute_units', 'val',
+            #             'compute_units')
+            # subgraph = nx.DiGraph()
+            # for node, nodeattrs in subview.nodes(data=True):
+            #     dct = {key: getattr(nodeattrs, key) for key in includes}
+            #     subgraph.add_node(node, **dct)
+            # subgraph.add_edges_from(subview.edges(data=True))
 
             # TODO: for now just allow src_indices to be transferred.  Probably need to handle case
             #       where src_indices are a large array...
@@ -1256,17 +1296,16 @@ class AllConnGraph(nx.DiGraph):
             #         pass
             #     data['src_indices'] = None
             #     data['flat_src_indices'] = None
-        else:
-            subgraph = None
+        # else:
+        #     subgraph = None
 
-        subgraphs = [s for s in model.comm.allgather(subgraph) if s is not None]
+        # subgraphs = [s for s in model.comm.allgather(subgraph) if s is not None]
+        graph_info = model.comm.allgather((nodes_to_send, edges_to_send))
 
-        edges = self.edges
-        nodes = self.nodes
         all_abs2meta = model._var_allprocs_abs2meta
         all_discrete = model._var_allprocs_discrete
-        for sub in subgraphs:
-            for node, data in sub.nodes(data=True):
+        for nodes, edges in graph_info:
+            for node, data in nodes.items():
                 if node not in self:
                     data['remote'] = True
                     self.add_node(node, **data)
@@ -1282,15 +1321,41 @@ class AllConnGraph(nx.DiGraph):
                     elif node[1] in ndisc:
                         nodes[node].meta = ndisc[node[1]]
 
-            for u, v, data in sub.edges(data=True):
-                edge = (u, v)
-                if edge in edges:
+            for edge, data in edges.items():
+                if edge in self.edges:
                     if data.get('src_indices', None) is not None:
-                        if edges[edge].get('src_indices', None) is None:
-                            edges[edge]['src_indices'] = data['src_indices']
-                            edges[edge]['flat_src_indices'] = data['flat_src_indices']
+                        if self.edges[edge].get('src_indices', None) is None:
+                            self.edges[edge]['src_indices'] = data['src_indices']
+                            self.edges[edge]['flat_src_indices'] = data['flat_src_indices']
                 else:
                     self.add_edge(edge[0], edge[1], **data)
+
+        # for sub in subgraphs:
+        #     for node, data in sub.nodes(data=True):
+        #         if node not in self:
+        #             data['remote'] = True
+        #             self.add_node(node, **data)
+        #             if node[0] == 'i':
+        #                 na2m = all_abs2meta['input']
+        #                 ndisc = all_discrete['input']
+        #             else:
+        #                 na2m = all_abs2meta['output']
+        #                 ndisc = all_discrete['output']
+
+        #             if node[1] in na2m:
+        #                 nodes[node].meta = na2m[node[1]]
+        #             elif node[1] in ndisc:
+        #                 nodes[node].meta = ndisc[node[1]]
+
+        #     for u, v, data in sub.edges(data=True):
+        #         edge = (u, v)
+        #         if edge in edges:
+        #             if data.get('src_indices', None) is not None:
+        #                 if edges[edge].get('src_indices', None) is None:
+        #                     edges[edge]['src_indices'] = data['src_indices']
+        #                     edges[edge]['flat_src_indices'] = data['flat_src_indices']
+        #         else:
+        #             self.add_edge(edge[0], edge[1], **data)
 
     def resolve_from_children(self, model, src_node, node, auto=False):
         if self.out_degree(node) == 0:  # skip leaf nodes
@@ -1766,6 +1831,9 @@ class AllConnGraph(nx.DiGraph):
                 else:
                     offset += dshape[0] if len(dshape) > 0 else 1
 
+        if dshape is None:
+            return offset, None
+
         if flat:
             sz = shape_to_len(dshape)
         else:
@@ -1809,14 +1877,15 @@ class AllConnGraph(nx.DiGraph):
                         # each rank.
                         if tgt_shape is not None:
                             offset, sz = self.get_dist_offset(tgt, model.comm.rank, False)
-                            src_indices = \
-                                indexer(slice(offset, offset + sz),
-                                                                    flat_src=False,
-                                                                    src_shape=src_meta.global_shape)
+                            if sz is not None:
+                                src_indices = \
+                                    indexer(slice(offset, offset + sz),
+                                                                        flat_src=False,
+                                                                        src_shape=src_meta.global_shape)
 
-                            path = nx.shortest_path(self, src_node, tgt)
-                            self.edges[(path[-2], tgt)]['src_indices'] = src_indices
-                            tgt_meta.src_inds_list = src_inds_list = [src_indices]
+                                path = nx.shortest_path(self, src_node, tgt)
+                                self.edges[(path[-2], tgt)]['src_indices'] = src_indices
+                                tgt_meta.src_inds_list = src_inds_list = [src_indices]
 
                 else:  # dist --> serial
                     if not src_inds_list:
@@ -2496,15 +2565,15 @@ class AllConnGraph(nx.DiGraph):
         # add nodes for all absolute inputs and connected absolute outputs
         self.add_variable_meta(model)
 
-        if model.comm.size > 1:
-            self.gather_data(model)
-
         self.add_implicit_connections(model, model._get_implicit_connections())
 
         systems = list(model.system_iter(include_self=True, recurse=True))
         groups = [s for s in systems if isinstance(s, Group)]
         for g in groups:
             self.add_manual_connections(g)
+
+        if model.comm.size > 1:
+            self.gather_data(model)
 
         # check for cycles
         if not nx.is_directed_acyclic_graph(self):
