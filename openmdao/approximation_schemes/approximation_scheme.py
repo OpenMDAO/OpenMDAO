@@ -12,18 +12,6 @@ from openmdao.utils.mpi import check_mpi_env
 from openmdao.utils.rangemapper import RangeMapper
 
 
-use_mpi = check_mpi_env()
-if use_mpi is False:
-    PETSc = None
-else:
-    try:
-        from petsc4py import PETSc
-    except ImportError:
-        if use_mpi:
-            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
-        PETSc = None
-
-
 class ApproximationScheme(object):
     """
     Base class used to define the interface for derivative approximation schemes.
@@ -316,6 +304,17 @@ class ApproximationScheme(object):
             # compute scatter from the results vector into a column of the total jacobian
             sinds, tinds, colsize, has_dist_data = system._get_jac_col_scatter()
             if has_dist_data:
+                use_mpi = check_mpi_env()
+                if use_mpi is False:
+                    PETSc = None
+                else:
+                    try:
+                        from petsc4py import PETSc
+                    except ImportError:
+                        if use_mpi:
+                            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
+                        PETSc = None
+
                 src_vec = PETSc.Vec().createWithArray(np.zeros(len(system._outputs), dtype=float),
                                                       comm=system._comm)
                 tgt_vec = PETSc.Vec().createWithArray(np.zeros(colsize, dtype=float),

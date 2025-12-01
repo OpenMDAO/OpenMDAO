@@ -1,5 +1,6 @@
 """LinearSolver that uses PETSc for LU factor/solve."""
 
+from importlib.util import find_spec
 import numpy as np
 import scipy.linalg
 import scipy.sparse.linalg
@@ -10,17 +11,7 @@ from openmdao.solvers.linear.direct import format_singular_error
 from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
-from openmdao.utils.mpi import FakeComm
 
-try:
-    from petsc4py import PETSc
-except ImportError:
-    PETSc = None
-try:
-    from mpi4py import MPI
-    DEFAULT_COMM = MPI.COMM_WORLD
-except ImportError:
-    DEFAULT_COMM = FakeComm()
 
 PC_SERIAL_TYPES = [
     "superlu",
@@ -88,17 +79,33 @@ class PETScLU:
     """
 
     def __init__(self, A: scipy.sparse.spmatrix, sparse_solver_name: str = None,
-                 comm=DEFAULT_COMM):
+                 comm=None):
         """
         Initialize and setup the PETSc LU Direct Solver object.
         """
-        self.comm = comm
+
+        # Lazy import of PETSc
+        try:
+            from petsc4py import PETSc
+            self._PETSc = PETSc
+        except ImportError:
+            self._PETSc = None
+
+        if comm is None:
+            from openmdao.utils.mpi import MPI, FakeComm
+            if MPI is None:
+                self.comm = FakeComm()
+            else:
+                self.comm = MPI.COMM_WORLD
+        else:
+            self.comm = comm
+
         self.running_mpi = not comm.size == 1
         self.orig_A = A
         # Create PETSc matrix
         # Dense
         if isinstance(A, np.ndarray):
-            self.A = PETSc.Mat().createDense(A.shape, array=A, comm=PETSc.COMM_SELF)
+            self.A = self._PETSc.Mat().createDense(A.shape, array=A, comm=self._PETSc.COMM_SELF)
 
         # Sparse
         else:
@@ -111,7 +118,7 @@ class PETScLU:
             # to do frequent reallocations
             if self.running_mpi and sparse_solver_name in PC_DISTRIBUTED_TYPES:
                 # Parallel: build local CSR
-                self.A = PETSc.Mat().create(comm=comm)
+                self.A = self._PETSc.Mat().create(comm=comm)
                 self.A.setSizes(A.shape)
                 self.A.setType('aij')
                 self.A.setUp()
@@ -132,17 +139,17 @@ class PETScLU:
             else:
                 # Serial: build full CSR (if you're running a serial solver
                 # while using MPI, then it will solve the full thing on each rank)
-                self.A = PETSc.Mat().createAIJ(
+                self.A = self._PETSc.Mat().createAIJ(
                     size=A.shape,
                     csr=(A.indptr, A.indices, A.data),
-                    comm=PETSc.COMM_SELF,
+                    comm=self._PETSc.COMM_SELF,
                 )
 
             self.A.assemble()
 
         # Create PETSc solver (KSP is the iterative linear solver [Krylov SPace
         # solver] and PC is the preconditioner)
-        self.ksp = PETSc.KSP().create()
+        self.ksp = self._PETSc.KSP().create()
         self.ksp.setOperators(self.A)
         # Use only the preconditioner (e.g. direct LU solve) and skip the
         # iterative solve
@@ -210,15 +217,15 @@ class PETScLU:
             # Create the sequential vector on COMM_SELF so it's not part of the
             # distributed communication and is only on one process.
             if self._x.comm.getRank() == 0:
-                x_seq = PETSc.Vec().createSeq(self._x.getSize(), comm=PETSc.COMM_SELF)
+                x_seq = self._PETSc.Vec().createSeq(self._x.getSize(), comm=self._PETSc.COMM_SELF)
             else:
-                x_seq = PETSc.Vec().createSeq(0, comm=PETSc.COMM_SELF)
+                x_seq = self._PETSc.Vec().createSeq(0, comm=self._PETSc.COMM_SELF)
 
             # Have to call scatter on all ranks or MPI will error out (each
             # rank is a process being run in the MPI)
-            scatter, _ = PETSc.Scatter.toZero(self._x)
-            scatter.scatter(self._x, x_seq, addv=PETSc.InsertMode.INSERT,
-                            mode=PETSc.ScatterMode.FORWARD)
+            scatter, _ = self._PETSc.Scatter.toZero(self._x)
+            scatter.scatter(self._x, x_seq, addv=self._PETSc.InsertMode.INSERT,
+                            mode=self._PETSc.ScatterMode.FORWARD)
             scatter.destroy()
 
             # Rank 0 owns x, broadcast (or send a copy of) it to the other ranks
@@ -253,7 +260,8 @@ class PETScDirectSolver(DirectSolver):
         """
         super().__init__(**kwargs)
 
-        if PETSc is None:
+        # Lazy import of PETSc
+        if find_spec('petsc4py.PETSc') is None:
             raise RuntimeError(f"{self.msginfo}: PETSc is not available. ")
 
     def _declare_options(self):
@@ -369,13 +377,13 @@ class PETScDirectSolver(DirectSolver):
                 try:
                     self._lu = PETScLU(matrix, self.options['sparse_solver_name'],
                                        comm=system.comm)
-                except PETSc.Error as e:
+                except self._PETSc.Error as e:
                     self.raise_petsc_error(e, system, matrix)
 
             elif isinstance(matrix, np.ndarray):  # dense
                 try:
                     self._lup = PETScLU(matrix)
-                except PETSc.Error as e:
+                except self._PETSc.Error as e:
                     self.raise_petsc_error(e, system, matrix)
 
             # Note: calling scipy.sparse.linalg.splu on a COO actually transposes
@@ -392,7 +400,7 @@ class PETScDirectSolver(DirectSolver):
             try:
                 self._lup = PETScLU(matrix)
 
-            except PETSc.Error as e:
+            except self._PETSc.Error as e:
                 self.raise_petsc_error(e, system, matrix)
 
         if self._lin_rhs_checker is not None:
