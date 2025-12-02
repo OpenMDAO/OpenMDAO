@@ -25,8 +25,8 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
                                     promotes_inputs=['z', 'y1'],
                                     promotes_outputs=['y2'])
 
-                cycle.set_input_defaults('x', 1.0)
-                cycle.set_input_defaults('z', np.array([5.0, 2.0]))
+                self.set_input_defaults('x', 1.0)
+                self.set_input_defaults('z', np.array([5.0, 2.0]))
 
                 # Nonlinear Block Gauss Seidel is a gradient free solver
                 cycle.nonlinear_solver = om. NonlinearBlockGS()
@@ -160,11 +160,11 @@ class TestSellarMDAPromoteConnect(unittest.TestCase):
                                     promotes_inputs=['x', 'z'])
                 cycle.add_subsystem('d2', SellarDis2(),
                                     promotes_inputs=['z'])
-                cycle.connect('d1.y1', 'd2.y1')
-                cycle.connect('d2.y2', 'd1.y2')
+                self.connect('d1.y1', 'd2.y1')
+                self.connect('d2.y2', 'd1.y2')
 
-                cycle.set_input_defaults('x', 1.0)
-                cycle.set_input_defaults('z', np.array([5.0, 2.0]))
+                self.set_input_defaults('x', 1.0)
+                self.set_input_defaults('z', np.array([5.0, 2.0]))
 
                 # Nonlinear Block Gauss Seidel is a gradient free solver
                 cycle.nonlinear_solver = om.NonlinearBlockGS()
