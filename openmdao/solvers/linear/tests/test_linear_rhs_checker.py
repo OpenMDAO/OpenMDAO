@@ -9,9 +9,14 @@ Here are the behaviours we'd like to test:
 
 import unittest
 import numpy as np
+from parameterized import parameterized_class
 
 import openmdao.api as om
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
+try:
+    from openmdao.vectors.petsc_vector import PETScVector
+except ImportError:
+    PETScVector = None
 
 VEC_SIZE = 2
 
@@ -56,7 +61,14 @@ class DistIVC(om.IndepVarComp):
     def setup(self):
         self.add_output("x", val=np.ones(VEC_SIZE), distributed=True)
 
-
+# Run tests with 1 and 2 procs
+@parameterized_class(
+    ("N_PROCS",),
+    [
+        (1,),
+        (2,),
+    ]
+)
 class TestLinearRHSChecker(unittest.TestCase):
     """
     Unit tests for LinearRHSChecker that directly test the add_solution/get_solution logic.
@@ -64,8 +76,6 @@ class TestLinearRHSChecker(unittest.TestCase):
     These tests manually add solutions to the cache and check that get_solution returns
     the correct cached solution. We bypass the relevance checks by subclassing.
     """
-
-    N_PROCS = 2
 
     def setUp(self):
         # Create a problem with redundant adjoint systems:
@@ -77,7 +87,15 @@ class TestLinearRHSChecker(unittest.TestCase):
         G = model.add_subsystem("G", om.Group())
         G.add_subsystem("ivc", DistIVC(), promotes=["x"])
         G.add_subsystem("comp", DistComp(), promotes=["x", "y"])
-        G.linear_solver = om.PETScKrylov()
+
+        # If running in parallel, we can only use PETSc linear solver. Otherwise we can use direct
+        self.isSerial = self.N_PROCS == 1
+        if self.isSerial:
+            G.linear_solver = om.DirectSolver()
+        else:
+            if PETScVector is None:
+                raise unittest.SkipTest("PETSc is required for parallel tests.")
+            G.linear_solver = om.PETScKrylov()
 
         # Two downstream components that depend on G.y - creates redundant adjoints
         model.add_subsystem("sum1", Summer())
@@ -94,7 +112,6 @@ class TestLinearRHSChecker(unittest.TestCase):
 
         self.system = G
         self.comm = self.system.comm
-        self.isSerial = self.comm.size == 1
 
         # Create checker with stats collection enabled
         self.checker = LinearRHSChecker(self.system, check_zero=True, verbose=True)
