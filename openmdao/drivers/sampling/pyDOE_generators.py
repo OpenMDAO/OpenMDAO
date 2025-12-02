@@ -179,7 +179,8 @@ class FullFactorialGenerator(_pyDOE_AnalysisGenerator):
         lower and upper bound.  Dictionary input is supported by Full Factorial or
         Generalized Subset Design.
         Defaults to 2.
-    _full
+    _fullfact : function
+        A lazily imported pyDOE full factorial function.
     """
 
     def __init__(self, var_dict, levels=_LEVELS):

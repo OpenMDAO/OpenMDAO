@@ -1,9 +1,6 @@
 """LinearSolver that uses PETSc for LU factor/solve."""
 
-from importlib.util import find_spec
 import numpy as np
-import scipy.linalg
-import scipy.sparse.linalg
 import scipy.sparse
 
 from openmdao.solvers.linear.direct import DirectSolver
@@ -101,7 +98,7 @@ class PETScLU:
         else:
             self.comm = comm
 
-        self.running_mpi = not comm.size == 1
+        self.running_mpi = not self.comm.size == 1
         self.orig_A = A
         # Create PETSc matrix
         # Dense
@@ -251,6 +248,11 @@ class PETScDirectSolver(DirectSolver):
     ----------
     **kwargs : dict
         Options dictionary.
+
+    Attributes
+    ----------
+    _PETSc : <petsc4py.PETSc>
+        A lazily imported petsc4py.PETSc module.
     """
 
     SOLVER = 'LN: PETScDirect'
@@ -261,9 +263,11 @@ class PETScDirectSolver(DirectSolver):
         """
         super().__init__(**kwargs)
 
-        # Lazy import of PETSc
-        if find_spec('petsc4py.PETSc') is None:
-            raise RuntimeError(f"{self.msginfo}: PETSc is not available. ")
+        try:
+            from petsc4py import PETSc
+            self._PETSc = PETSc
+        except ImportError:
+            self._PETSc = None
 
     def _declare_options(self):
         """
