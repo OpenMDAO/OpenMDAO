@@ -1264,12 +1264,30 @@ class Group(System):
     def set_initial_values(self):
         """
         Set all input and output variables to their declared initial values.
+
+        This should only be called on the top level group.
         """
+        assert self.pathname == '', "set_initial_values must be called on the top level group"
+
+        if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+            self._problem_meta['setup_status'] = _SetupStatus.POST_FINAL_SETUP
+
+        graph = self._get_conn_graph()
+        for name in self._var_abs2meta['output']:
+            node = ('o', name)
+            node_meta = graph.nodes[node]
+            if node_meta.val is not None:
+                graph.set_tree_val(self, node, node_meta.val)  # force updates of input values
+
         for abs_name, meta in self._var_abs2meta['input'].items():
+            # print("setting", abs_name, "to", meta['val'])
             self._inputs.set_var(abs_name, meta['val'])
+        # print("Inputs:", self._inputs.asarray())
 
         for abs_name, meta in self._var_abs2meta['output'].items():
+            # print("setting", abs_name, "to", meta['val'])
             self._outputs.set_var(abs_name, meta['val'])
+        # print("Outputs:", self._outputs.asarray())
 
     def _get_root_vectors(self):
         """
@@ -1748,7 +1766,7 @@ class Group(System):
         iproc = self.comm.rank
         for io, existence in self._var_existence.items():
             abs2meta = self._var_abs2meta[io]
-            for i, name in enumerate(sorted(self._var_allprocs_abs2meta[io])):
+            for i, name in enumerate(sorted(all_abs2meta[io])):
                 if name in abs2meta:
                     existence[iproc, i] = True
 
@@ -1794,7 +1812,8 @@ class Group(System):
             for i, name in enumerate(sorted(self._var_allprocs_abs2meta[io])):
                 if name in abs2meta:  # local var
                     sz = abs2meta[name]['size']
-                    sizes[iproc, i] = 0 if sz is None else sz
+                    if sz is not None:
+                        sizes[iproc, i] = sz
 
                 abs2idx[name] = i
 

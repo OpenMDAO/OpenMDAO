@@ -53,10 +53,10 @@ class TestProblem(unittest.TestCase):
 
         p.set_val('foo', np.array([5., 5., 5.]))
         p.set_val('mul', [100])
-        
+
         p.model._get_conn_graph().dump_nodes()
         p.model._get_conn_graph().dump_edges()
-        
+
         p.run_model()
 
         foo = p.get_val('foo')
@@ -1190,10 +1190,10 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
                          ("The following inputs promoted to 'G1.x' have different units:\n"
                           "  \n"
-                          "G1.C1.x  cm\n"
-                          "G1.C2.x  mm\n"
+                          "   G1.C1.x  cm\n"
+                          "   G1.C2.x  mm\n"
                           "  \n"
-                          "Call model.set_input_defaults('G1.x', units=?)' to remove the ambiguity."))
+                          "   Call model.set_input_defaults('G1.x', units=?)' to remove the ambiguity."))
 
     def test_get_set_with_units_error_messages(self):
 

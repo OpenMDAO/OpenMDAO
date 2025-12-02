@@ -735,14 +735,14 @@ class AllConnGraph(nx.DiGraph):
                         if abs_in in model._discrete_inputs:
                             model._discrete_inputs[abs_in] = val
             else:
-                # model._initial_condition_cache[node] = (val, None, None)
                 self.set_tree_val(model, src_node, val)
 
             return
 
         # every variable is continuous from here down
         if node[0] == 'o':
-            tgt_units, tgt_inds_list = None, ()
+            tgt_units = None
+            tgt_inds_list = ()
         else:
             tgt_units = node_meta.units
             tgt_inds_list = node_meta.src_inds_list
@@ -782,10 +782,6 @@ class AllConnGraph(nx.DiGraph):
                 srcval = val
                 system._outputs._abs_set_val(src, srcval)
         else:
-            # if src_node in model._initial_condition_cache:
-            #     srcval, src_units, _ = model._initial_condition_cache[src_node]
-            # else:
-            #     srcval = src_meta.val
             srcval = src_meta.val
 
             if srcval is not None:
@@ -801,8 +797,6 @@ class AllConnGraph(nx.DiGraph):
                     raise RuntimeError(f"Shape of '{name}' isn't known yet so you can't use "
                                        f"indices to set it.")
                 srcval = val
-
-            # model._initial_condition_cache[src_node] = (srcval, src_units, None)
 
         # propagate shape and value down the tree
         self.set_tree_val(model, src_node, srcval)
@@ -826,6 +820,9 @@ class AllConnGraph(nx.DiGraph):
 
         for leaf in self.leaf_input_iter(src_node):
             tgt_meta = nodes[leaf]
+            if tgt_meta.remote:
+                continue
+
             src_inds_list = tgt_meta.src_inds_list
 
             if tgt_meta.distributed:
