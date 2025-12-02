@@ -181,8 +181,8 @@ class NodeAttrs():
     def val(self, value):
         if self.flags & DISCRETE:
             self._val = value
-            if self._locmeta is not None:
-                self._locmeta['val'] = value
+            # if self._locmeta is not None:
+            #     self._locmeta['val'] = value
         elif value is not None:
             if self._shape is None:
                 self._val = value
@@ -200,8 +200,8 @@ class NodeAttrs():
                 else:
                     self._val[:] = reshape(value, self._shape)
 
-            if self._locmeta is not None:
-                self._locmeta['val'] = self._val
+            # if self._locmeta is not None:
+            #     self._locmeta['val'] = self._val
 
     @property
     def shape(self):
@@ -210,13 +210,13 @@ class NodeAttrs():
     @shape.setter
     def shape(self, shape):
         if self._shape is None and shape is not None:
-            val_updated = False
+            # val_updated = False
             self._shape = shape
             if self._shape != ():
                 if self._val is not None and np.ndim(self._val) == 0:
                     # if val is a scalar, reshape it to the new shape
                     self._val = np.full(shape, self._val)
-                    val_updated = True
+                    # val_updated = True
 
             if self.distributed is False:
                 self.global_shape = shape
@@ -228,9 +228,9 @@ class NodeAttrs():
                 if self._locmeta is not None:
                     if self._val is None:
                         self._val = np.ones(shape)
-                        val_updated = True
-                    if val_updated:
-                        self._locmeta['val'] = self._val
+                        # val_updated = True
+                    # if val_updated:
+                    #     self._locmeta['val'] = self._val
                     self._locmeta['shape'] = shape
                     self._locmeta['size'] = size
 

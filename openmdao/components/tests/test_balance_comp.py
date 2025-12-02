@@ -56,8 +56,6 @@ class TestBalanceComp(unittest.TestCase):
         prob.model.linear_solver = om.DirectSolver()
         prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
         
-        print('second setup')
-
         prob.setup()
 
         prob.run_model()

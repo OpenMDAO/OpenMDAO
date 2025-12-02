@@ -1282,12 +1282,12 @@ class Group(System):
 
         for abs_name, meta in self._var_abs2meta['input'].items():
             # print("setting", abs_name, "to", meta['val'])
-            self._inputs.set_var(abs_name, meta['val'])
+            self._inputs.set_var(abs_name, graph.nodes[('i', abs_name)].val)
         # print("Inputs:", self._inputs.asarray())
 
         for abs_name, meta in self._var_abs2meta['output'].items():
             # print("setting", abs_name, "to", meta['val'])
-            self._outputs.set_var(abs_name, meta['val'])
+            self._outputs.set_var(abs_name, graph.nodes[('o', abs_name)].val)
         # print("Outputs:", self._outputs.asarray())
 
     def _get_root_vectors(self):
