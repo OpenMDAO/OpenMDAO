@@ -660,23 +660,23 @@ class Problem(object, metaclass=ProblemMetaclass):
 
             self.model._clear_iprint()
 
-            # print("model stats")
-            # print("inputs", self.model._inputs.asarray())
-            # print(list(self.model._inputs))
-            # print("outputs", self.model._outputs.asarray())
-            # print(list(self.model._outputs))
+            print("model stats")
+            print("inputs", self.model._inputs.asarray())
+            print(list(self.model._inputs))
+            print("outputs", self.model._outputs.asarray())
+            print(list(self.model._outputs))
 
-            # import pprint
-            # print("var sizes")
-            # pprint.pprint(self.model._var_sizes)
-            # print("var allprocs abs2meta")
-            # pprint.pprint(self.model._var_allprocs_abs2meta)
-            # print("var abs2meta")
-            # pprint.pprint(self.model._var_abs2meta)
-            # print("var allprocs abs2idx")
-            # pprint.pprint(self.model._var_allprocs_abs2idx)
-            # print('conns')
-            # pprint.pprint(self.model._conn_global_abs_in2out)
+            import pprint
+            print("var sizes")
+            pprint.pprint(self.model._var_sizes)
+            print("var allprocs abs2meta")
+            pprint.pprint(self.model._var_allprocs_abs2meta)
+            print("var abs2meta")
+            pprint.pprint(self.model._var_abs2meta)
+            print("var allprocs abs2idx")
+            pprint.pprint(self.model._var_allprocs_abs2idx)
+            print('conns')
+            pprint.pprint(self.model._conn_global_abs_in2out)
 
             self.model.run_solve_nonlinear()
         finally:

@@ -2494,6 +2494,7 @@ class AllConnGraph(nx.DiGraph):
         node_meta = self.nodes[node]
 
         if not node_meta.discrete:
+            val = np.asarray(val)
             if src_inds_list:
                 val = self.get_subarray(val, src_inds_list)
 
