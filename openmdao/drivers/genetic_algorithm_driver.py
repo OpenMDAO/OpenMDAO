@@ -563,9 +563,6 @@ class SimpleGADriver(Driver):
                     elif has_eq_con and not (has_lower_con or has_upper_con):
                         diff = val - con['equals']
                         violation = np.absolute(diff)
-                    elif has_eq_con and (has_lower_con or has_upper_con):
-                        violation = np.zeros_like(val)
-                        raise ValueError("Constraint cannot be both equality and inequality")
                     
                     constraint_violations = np.hstack((constraint_violations, violation))
                 fun = obj + penalty * sum(np.power(constraint_violations, exponent))
