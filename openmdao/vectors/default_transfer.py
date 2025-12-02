@@ -207,7 +207,7 @@ class DefaultTransfer(Transfer):
                 fwd_xfer_in[sub_in].append(input_inds)
                 fwd_xfer_out[sub_in].append(output_inds)
 
-                print(group.msginfo, sub_in, "input_inds", input_inds, "output_inds", output_inds)
+                print(group.msginfo, sub_in, f"{abs_out} --> {abs_in}", "input_inds", input_inds, "output_inds", output_inds)
 
                 if rev and abs_out in abs2meta['output']:
                     sub_out = abs_out[mypathlen:].split('.', 1)[0]
