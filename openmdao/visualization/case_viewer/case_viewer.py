@@ -345,161 +345,127 @@ class CaseViewer(object):
         """
         Define the widgets for the CaseViewer and display them.
         """
-        from IPython import display
+        from IPython.display import display
+        ipw = self._ipw
 
         self._widgets = {}
 
-        self._widgets['source_select'] = self._ipw.Dropdown(description='Source',
-                                                            layout=self._ipw.Layout(width='30%',
-                                                                                    height='auto'))
+        self._widgets['source_select'] = ipw.Dropdown(description='Source',
+                                                      layout=ipw.Layout(width='30%',
+                                                                        height='auto'))
 
-        self._widgets['cases_select'] = self._ipw.SelectMultiple(
-            description='Cases',
-            layout=self._ipw.Layout(width='40%', height='auto')
-        )
+        self._widgets['cases_select'] = ipw.SelectMultiple(description='Cases',
+                                                           layout=ipw.Layout(width='40%',
+                                                                             height='auto'))
 
-        self._widgets['case_select_button'] = self._ipw.Button(description='Select ' + '\u27F6',
-                                                               layout={'width': '100%'})
+        self._widgets['case_select_button'] = ipw.Button(description='Select ' + '\u27F6',
+                                                         layout={'width': '100%'})
 
-        self._widgets['case_select_all_button'] = self._ipw.Button(
-            description='Select All ' + '\u27F9',
-            layout={'width': '100%'}
-        )
+        self._widgets['case_select_all_button'] = ipw.Button(description='Select All ' + '\u27F9',
+                                                             layout={'width': '100%'})
 
-        self._widgets['case_remove_button'] = self._ipw.Button(description='Remove ' + '\u274c',
-                                                               layout={'width': '100%'})
+        self._widgets['case_remove_button'] = ipw.Button(description='Remove ' + '\u274c',
+                                                         layout={'width': '100%'})
 
-        self._widgets['cases_list'] = self._ipw.Select(
-            layout=self._ipw.Layout(width='40%', height='auto')
-        )
+        self._widgets['cases_list'] = ipw.Select(layout=ipw.Layout(width='40%', height='auto'))
 
-        self._widgets['x_filter'] = self._ipw.Text(
-            '', description='X-Axis Filter',
-            layout=self._ipw.Layout(width='49%', height='auto')
-        )
+        self._widgets['x_filter'] = ipw.Text('', description='X-Axis Filter',
+                                             layout=ipw.Layout(width='49%', height='auto'))
 
         var_types_list = ['outputs', 'inputs', 'optimization', 'desvars',
                           'constraints', 'objectives', 'residuals']
 
-        self._widgets['x_var_type'] = self._ipw.Dropdown(options=var_types_list,
-                                                         description='X Var Type',
-                                                         value='outputs',
-                                                         layout={'width': '49%'})
+        self._widgets['x_var_type'] = ipw.Dropdown(options=var_types_list,
+                                                   description='X Var Type',
+                                                   value='outputs',
+                                                   layout={'width': '49%'})
 
-        self._widgets['x_select'] = self._ipw.Select(
-            description='X-Axis',
-            layout=self._ipw.Layout(width='auto', height='auto')
-        )
+        self._widgets['x_select'] = ipw.Select(description='X-Axis',
+                                               layout=ipw.Layout(width='auto', height='auto'))
 
-        self._widgets['x_transform_select'] = self._ipw.Dropdown(
-            options=_func_map.keys(),
-            value='None',
-            description='X Transform',
-            layout=self._ipw.Layout(width='95%', height='auto')
-        )
+        self._widgets['x_transform_select'] = ipw.Dropdown(options=_func_map.keys(),
+                                                           value='None',
+                                                           description='X Transform',
+                                                           layout=ipw.Layout(width='95%',
+                                                                             height='auto'))
 
-        self._widgets['x_slice'] = self._ipw.Text(
-            '[...]', description='X Slice',
-            layout=self._ipw.Layout(width='95%', height='auto')
-        )
+        self._widgets['x_slice'] = ipw.Text('[...]', description='X Slice',
+                                            layout=ipw.Layout(width='95%', height='auto'))
 
-        self._widgets['x_info'] = self._ipw.HTML(value='', description='X Shape',
-                                                 layout={'width': '95%'})
+        self._widgets['x_info'] = ipw.HTML(value='', description='X Shape',
+                                           layout={'width': '95%'})
 
-        self._widgets['x_scale'] = self._ipw.Dropdown(
-            options=['linear', 'log'], value='linear',
-            description='X Scale', layout={'width': '95%'}
-        )
+        self._widgets['x_scale'] = ipw.Dropdown(options=['linear', 'log'], value='linear',
+                                                description='X Scale', layout={'width': '95%'})
 
-        self._widgets['y_filter'] = self._ipw.Text('', description='Y-Axis Filter',
-                                                   layout={'width': '49%', 'height': 'auto'})
+        self._widgets['y_filter'] = ipw.Text('', description='Y-Axis Filter',
+                                             layout={'width': '49%', 'height': 'auto'})
 
-        self._widgets['y_var_type'] = self._ipw.Dropdown(options=var_types_list,
-                                                         description='Y Var Type',
-                                                         value='outputs',
-                                                         layout={'width': '49%'})
+        self._widgets['y_var_type'] = ipw.Dropdown(options=var_types_list,
+                                                   description='Y Var Type',
+                                                   value='outputs',
+                                                   layout={'width': '49%'})
 
-        self._widgets['y_select'] = self._ipw.Select(
-            description='Y-Axis',
-            layout=self._ipw.Layout(width='auto', height='auto')
-        )
+        self._widgets['y_select'] = ipw.Select(description='Y-Axis',
+                                               layout=ipw.Layout(width='auto', height='auto'))
 
-        self._widgets['y_transform_select'] = self._ipw.Dropdown(
-            options=_func_map.keys(),
-            value='None',
-            description='Y Transform',
-            layout=self._ipw.Layout(width='95%', height='auto')
-        )
+        self._widgets['y_transform_select'] = ipw.Dropdown(options=_func_map.keys(),
+                                                           value='None',
+                                                           description='Y Transform',
+                                                           layout=ipw.Layout(width='95%',
+                                                                             height='auto'))
 
-        self._widgets['y_slice'] = self._ipw.Text(
-            '[...]',
-            description='Y Slice',
-            layout=self._ipw.Layout(width='95%', height='auto')
-        )
+        self._widgets['y_slice'] = ipw.Text('[...]',
+                                            description='Y Slice',
+                                            layout=ipw.Layout(width='95%', height='auto'))
 
-        self._widgets['y_info'] = self._ipw.HTML(value='', description='Y Shape',
-                                                 layout={'width': '95%'})
+        self._widgets['y_info'] = ipw.HTML(value='', description='Y Shape',
+                                           layout={'width': '95%'})
 
-        self._widgets['y_scale'] = self._ipw.Dropdown(options=['linear', 'log'], value='linear',
-                                                      description='Y Scale',
-                                                      layout={'width': '95%'})
+        self._widgets['y_scale'] = ipw.Dropdown(options=['linear', 'log'], value='linear',
+                                                description='Y Scale',
+                                                layout={'width': '95%'})
 
-        self._widgets['case_slider'] = self._ipw.IntSlider(value=1, min=0, max=1, step=1,
-                                                           description='Case #',
-                                                           disabled=False, continuous_update=True,
-                                                           orientation='horizontal',
-                                                           readout=True, readout_format='d',
-                                                           layout={'width': '95%'})
+        self._widgets['case_slider'] = ipw.IntSlider(value=1, min=0, max=1, step=1,
+                                                     description='Case #',
+                                                     disabled=False, continuous_update=True,
+                                                     orientation='horizontal',
+                                                     readout=True, readout_format='d',
+                                                     layout={'width': '95%'})
 
-        self._widgets['debug_output'] = self._ipw.Output(description='',
-                                                         layout={'border': '0px solid black',
-                                                                 'width': '95%',
-                                                                 'height': '400'})
+        self._widgets['debug_output'] = ipw.Output(description='',
+                                                   layout={'border': '0px solid black',
+                                                           'width': '95%',
+                                                           'height': '400'})
 
-        display(self._ipw.VBox([
-            self._widgets['source_select'],
-            self._ipw.HBox([
-                self._widgets['cases_select'],
-                self._ipw.VBox([
-                    self._widgets['case_select_button'],
-                    self._widgets['case_select_all_button'],
-                    self._widgets['case_remove_button']
-                ]),
-                self._widgets['cases_list']
-            ], layout={'width': '95%'}),
-            self._ipw.HBox([
-                self._ipw.VBox([
-                    self._ipw.HBox([
-                        self._widgets['x_filter'],
-                        self._widgets['x_var_type']
-                    ]),
-                    self._widgets['x_select']
-                ], layout={'width': '50%'}),
-                self._ipw.VBox([
-                    self._widgets['x_info'],
-                    self._widgets['x_slice'],
-                    self._widgets['x_transform_select'],
-                    self._widgets['x_scale']
-                ], layout={'width': '20%'}),
-            ]),
-            self._ipw.HBox([
-                self._ipw.VBox([
-                    self._ipw.HBox([
-                        self._widgets['y_filter'],
-                        self._widgets['y_var_type']
-                    ]),
-                    self._widgets['y_select']
-                ], layout={'width': '50%'}),
-                self._ipw.VBox([
-                    self._widgets['y_info'],
-                    self._widgets['y_slice'],
-                    self._widgets['y_transform_select'],
-                    self._widgets['y_scale']
-                ], layout={'width': '20%'})
-            ]),
-            self._widgets['case_slider'],
-            self._widgets['debug_output']
-        ]))
+        display(ipw.VBox([self._widgets['source_select'],
+                          ipw.HBox([self._widgets['cases_select'],
+                                    ipw.VBox([self._widgets['case_select_button'],
+                                              self._widgets['case_select_all_button'],
+                                              self._widgets['case_remove_button']]),
+                                    self._widgets['cases_list']], layout={'width': '95%'}),
+                          ipw.HBox([ipw.VBox([ipw.HBox([self._widgets['x_filter'],
+                                                        self._widgets['x_var_type']]),
+                                              self._widgets['x_select']],
+                                             layout={'width': '50%'}),
+                                    ipw.VBox([self._widgets['x_info'],
+                                              self._widgets['x_slice'],
+                                              self._widgets['x_transform_select'],
+                                              self._widgets['x_scale']],
+                                             layout={'width': '20%'}),
+                                    ]),
+                          ipw.HBox([ipw.VBox([ipw.HBox([self._widgets['y_filter'],
+                                                        self._widgets['y_var_type']]),
+                                              self._widgets['y_select']],
+                                             layout={'width': '50%'}),
+                                    ipw.VBox([self._widgets['y_info'],
+                                              self._widgets['y_slice'],
+                                              self._widgets['y_transform_select'],
+                                              self._widgets['y_scale']],
+                                             layout={'width': '20%'})
+                                    ]),
+                          self._widgets['case_slider'],
+                          self._widgets['debug_output']]))
 
     def _update_source_options(self):
         """
