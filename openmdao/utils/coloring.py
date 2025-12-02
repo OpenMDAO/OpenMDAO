@@ -40,7 +40,8 @@ except ImportError:
     jax = None
     jnp = np
 
-bokeh_available = find_spec('bokeh.resources') is not None
+
+bokeh_available = find_spec('bokeh') is not None
 
 
 CITATIONS = """
