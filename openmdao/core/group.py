@@ -245,7 +245,7 @@ class Group(System):
         self._pre_config_group_inputs = {}
         self._static_group_inputs = {}
         self._static_manual_connections = {}
-        self._static_conn_graph = AllConnGraph()
+        # self._static_conn_graph = AllConnGraph()
         self._conn_graph = None
         self._conn_abs_in2out = {}
         self._conn_discrete_in2out = {}
@@ -648,7 +648,7 @@ class Group(System):
         if self.pathname == '':
             self._conn_graph = AllConnGraph()
 
-        self._get_conn_graph().update(self._static_conn_graph)
+        # self._get_conn_graph().update(self._static_conn_graph)
 
         # Call setup function for this group.
         self.setup()
@@ -822,6 +822,7 @@ class Group(System):
         self._auto_ivc_recorders = []
         self._sys_graph_cache = None
         self._remote_sets = []
+        self._conn_graph = None
 
         # reset any coloring if a Coloring object was not set explicitly
         if self._coloring_info.dynamic or self._coloring_info.static is not None:

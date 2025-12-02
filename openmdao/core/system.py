@@ -2366,16 +2366,6 @@ class System(object, metaclass=SystemMetaclass):
         self._jac_ofs_cache = None
         self._jac_wrts_cache = {}
 
-    def _get_conn_graph(self):
-        if self._problem_meta is None:
-            return self._static_conn_graph
-
-        model = self._problem_meta['model_ref']()
-        if model is None:
-            return self._static_conn_graph
-
-        return model._conn_graph
-
     def _setup_procs(self, pathname, comm, prob_meta):
         """
         Execute first phase of the setup process.
@@ -5570,6 +5560,16 @@ class System(object, metaclass=SystemMetaclass):
         """
         return set(s for s in self.system_iter(include_self=True, recurse=True)
                    if s.nonlinear_solver and s.nonlinear_solver.supports['gradients'])
+
+    # def _get_conn_graph(self):
+    #     if self._problem_meta is None:
+    #         return self._static_conn_graph
+
+    #     model = self._problem_meta['model_ref']()
+    #     if model is None:
+    #         return self._static_conn_graph
+
+    #     return model._conn_graph
 
     def _get_conn_graph(self):
         if self._problem_meta is None:
