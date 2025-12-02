@@ -662,7 +662,10 @@ class Problem(object, metaclass=ProblemMetaclass):
 
             print("model stats")
             print("inputs", self.model._inputs.asarray())
+            print(list(self.model._inputs))
             print("outputs", self.model._outputs.asarray())
+            print(list(self.model._outputs))
+
             import pprint
             print("var sizes")
             pprint.pprint(self.model._var_sizes)
@@ -672,6 +675,8 @@ class Problem(object, metaclass=ProblemMetaclass):
             pprint.pprint(self.model._var_abs2meta)
             print("var allprocs abs2idx")
             pprint.pprint(self.model._var_allprocs_abs2idx)
+            print('conns')
+            pprint.pprint(self.model._conn_global_abs_in2out)
 
             self.model.run_solve_nonlinear()
         finally:
