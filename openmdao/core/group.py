@@ -1766,7 +1766,7 @@ class Group(System):
         iproc = self.comm.rank
         for io, existence in self._var_existence.items():
             abs2meta = self._var_abs2meta[io]
-            for i, name in enumerate(sorted(all_abs2meta[io])):
+            for i, name in enumerate(all_abs2meta[io]):
                 if name in abs2meta:
                     existence[iproc, i] = True
 
@@ -1809,7 +1809,7 @@ class Group(System):
         nprocs = self.comm.size
         for io, sizes in self._var_sizes.items():
             abs2meta = self._var_abs2meta[io]
-            for i, name in enumerate(sorted(self._var_allprocs_abs2meta[io])):
+            for i, name in enumerate(self._var_allprocs_abs2meta[io]):
                 if name in abs2meta:  # local var
                     sz = abs2meta[name]['size']
                     if sz is not None:
@@ -1826,13 +1826,13 @@ class Group(System):
 
         for subsys in self.system_iter(recurse=True, include_self=False):
             ranks = translate_ranks(self.comm, subsys.comm, try_slice=True)
-            subins = sorted(subsys._var_allprocs_abs2meta['input'])
+            subins = list(subsys._var_allprocs_abs2meta['input'])
             istart = abs2idx[subins[0]] if subins else 0
             iend = abs2idx[subins[-1]] + 1 if subins else 0
             subsys._var_sizes['input'] = self._var_sizes['input'][ranks, istart:iend]
             subsys._var_allprocs_abs2idx = {n: i for i, n in enumerate(subins)}
 
-            subouts = sorted(subsys._var_allprocs_abs2meta['output'])
+            subouts = list(subsys._var_allprocs_abs2meta['output'])
             ostart = abs2idx[subouts[0]] if subouts else 0
             oend = abs2idx[subouts[-1]] + 1 if subouts else 0
             subsys._var_sizes['output'] = self._var_sizes['output'][ranks, ostart:oend]
