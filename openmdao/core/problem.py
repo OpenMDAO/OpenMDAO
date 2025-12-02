@@ -659,6 +659,20 @@ class Problem(object, metaclass=ProblemMetaclass):
             record_model_options(self, self._run_counter)
 
             self.model._clear_iprint()
+
+            print("model stats")
+            print("inputs", self.model._inputs.asarray())
+            print("outputs", self.model._outputs.asarray())
+            import pprint
+            print("var sizes")
+            pprint.pprint(self.model._var_sizes)
+            print("var allprocs abs2meta")
+            pprint.pprint(self.model._var_allprocs_abs2meta)
+            print("var abs2meta")
+            pprint.pprint(self.model._var_abs2meta)
+            print("var allprocs abs2idx")
+            pprint.pprint(self.model._var_allprocs_abs2idx)
+
             self.model.run_solve_nonlinear()
         finally:
             self._recording_iter.prefix = old_prefix
