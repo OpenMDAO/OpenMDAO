@@ -1,6 +1,6 @@
 """ Unit tests for the Driver base class."""
 
-
+from importlib.util import find_spec
 from packaging.version import Version
 from io import StringIO
 import sys
@@ -19,12 +19,15 @@ from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 from openmdao.utils.om_warnings import OpenMDAOWarning
 from openmdao.utils.mpi import MPI
-from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver, pyoptsparse
+from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
+
+
+has_pyoptsparse = find_spec('pyoptsparse') is not None
 
 
 @use_tempdirs
@@ -1169,7 +1172,7 @@ class TestLinearOnlyDVs(unittest.TestCase):
 
         return prob
 
-    @unittest.skipIf(pyoptsparse is None, "pyoptsparse is required.")
+    @unittest.skipIf(not has_pyoptsparse, "pyoptsparse is required.")
     def test_pyoptsparse(self):
         OPTIMIZER = set_pyoptsparse_opt('SLSQP')[1]
 

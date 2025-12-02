@@ -179,6 +179,9 @@ class FullFactorialGenerator(_pyDOE_AnalysisGenerator):
         lower and upper bound.  Dictionary input is supported by Full Factorial or
         Generalized Subset Design.
         Defaults to 2.
+
+    Attributes
+    ----------
     _fullfact : function
         A lazily imported pyDOE full factorial function.
     """
@@ -187,8 +190,6 @@ class FullFactorialGenerator(_pyDOE_AnalysisGenerator):
         """
         Initialize the FullFactorialGenerator.
         """
-        super().__init__(var_dict=var_dict, levels=levels)
-
         try:
             from pyDOE3 import fullfact
             self._fullfact = fullfact
@@ -197,6 +198,8 @@ class FullFactorialGenerator(_pyDOE_AnalysisGenerator):
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
                                "    pip install pyDOE3")
+
+        super().__init__(var_dict=var_dict, levels=levels)
 
     def _generate_design(self, size):
         """
@@ -258,7 +261,6 @@ class GeneralizedSubsetGenerator(_pyDOE_AnalysisGenerator):
         """
         self._reduction = reduction
         self._n = n
-        super().__init__(var_dict, levels=levels)
 
         try:
             from pyDOE3 import gsd
@@ -268,6 +270,8 @@ class GeneralizedSubsetGenerator(_pyDOE_AnalysisGenerator):
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
                                "    pip install pyDOE3")
+
+        super().__init__(var_dict, levels=levels)
 
     def _generate_design(self, size):
         """
@@ -308,8 +312,6 @@ class PlackettBurmanGenerator(_pyDOE_AnalysisGenerator):
         """
         Initialize the PlackettBurmanGenerator.
         """
-        super().__init__(var_dict, levels=2)
-
         try:
             from pyDOE3 import pbdesign
             self._pbdesign = pbdesign
@@ -318,6 +320,8 @@ class PlackettBurmanGenerator(_pyDOE_AnalysisGenerator):
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
                                "    pip install pyDOE3")
+
+        super().__init__(var_dict, levels=2)
 
     def _generate_design(self, size):
         """
@@ -365,8 +369,6 @@ class BoxBehnkenGenerator(_pyDOE_AnalysisGenerator):
         Initialize the BoxBehnkenGenerator.
         """
         self._center = center
-        super().__init__(var_dict, levels=3)
-
         try:
             from pyDOE3 import bbdesign
             self._bbdesign = bbdesign
@@ -375,6 +377,8 @@ class BoxBehnkenGenerator(_pyDOE_AnalysisGenerator):
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
                                "    pip install pyDOE3")
+
+        super().__init__(var_dict, levels=3)
 
     def _generate_design(self, size):
         """
@@ -462,8 +466,6 @@ class LatinHypercubeGenerator(AnalysisGenerator):
         self._iterations = iterations
         self._seed = seed
 
-        super().__init__(var_dict)
-
         try:
             from pyDOE3 import lhs
             self._lhs = lhs
@@ -472,6 +474,8 @@ class LatinHypercubeGenerator(AnalysisGenerator):
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
                                "    pip install pyDOE3")
+
+        super().__init__(var_dict)
 
     def _setup(self):
         """

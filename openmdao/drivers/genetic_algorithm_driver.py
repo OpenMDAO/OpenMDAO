@@ -20,6 +20,7 @@ Sobieszczanski-Sobieski, J., Morris, A. J., van Tooren, M. J. L. (2015)
 Multidisciplinary Design Optimization Supported by Knowledge Based Engineering.
 John Wiley & Sons, Ltd.
 """
+from importlib.util import find_spec
 import os
 import copy
 
@@ -64,6 +65,12 @@ class SimpleGADriver(Driver):
         """
         Initialize the SimpleGADriver driver.
         """
+        if find_spec('pyDOE3') is None:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+                               "which can be installed with one of the following commands:\n"
+                               "    pip install openmdao[doe]\n"
+                               "    pip install pyDOE3")
+
         super().__init__(**kwargs)
 
         # What we support
