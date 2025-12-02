@@ -528,7 +528,7 @@ class DirectSolver(LinearSolver):
             x_vec[:] = sol_array = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)
 
         if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
-            self._lin_rhs_checker.add_solution(b_vec, sol_array, copy=True)
+            self._lin_rhs_checker.add_solution(b_vec, sol_array, system, copy=True)
 
     def preferred_sparse_format(self):
         """

@@ -286,7 +286,7 @@ class ScipyKrylov(LinearSolver):
             self.report_failure(msg)
 
         if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
-            self._lin_rhs_checker.add_solution(b_vec.asarray(), x, copy=True)
+            self._lin_rhs_checker.add_solution(b_vec.asarray(), x, system, copy=True)
 
     def _apply_precon(self, in_vec):
         """
