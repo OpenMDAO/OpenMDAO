@@ -710,7 +710,7 @@ class AllConnGraph(nx.DiGraph):
         except Exception as err:
             raise ValueError(f"{system.msginfo}: Can't get value of '{node[1]}': {str(err)}")
 
-        if flat:
+        if flat and not node_meta.discrete:
             val = val.ravel()
 
         return val
@@ -801,26 +801,19 @@ class AllConnGraph(nx.DiGraph):
         # propagate shape and value down the tree
         self.set_tree_val(model, src_node, srcval)
 
-    def set_tree_discrete_val(self, model, src_node, srcval):
-        nodes = self.nodes
-        for u, v in dfs_edges(self, src_node):
-            if v[0] == 'i':
-                vmeta = nodes[v]
-                if vmeta.locmeta is not None:
-                    vmeta.locmeta['val'] = srcval
-
     def set_tree_val(self, model, src_node, srcval):
         nodes = self.nodes
         src_meta = nodes[src_node]
         src_meta.val = srcval
         src_dist = src_meta.distributed
 
-        if src_meta.discrete:
-            return self.set_tree_discrete_val(model, src_node, srcval)
-
         for leaf in self.leaf_input_iter(src_node):
             tgt_meta = nodes[leaf]
             if tgt_meta.remote:
+                continue
+
+            if tgt_meta.discrete:
+                tgt_meta.val = srcval
                 continue
 
             src_inds_list = tgt_meta.src_inds_list
@@ -838,27 +831,6 @@ class AllConnGraph(nx.DiGraph):
                         tgt_meta.val = self.get_subarray(srcval, src_inds_list)
                     else:
                         tgt_meta.val = srcval
-
-        # for u, v in dfs_edges(self, src_node):
-        #     vmeta = nodes[v]
-        #     umeta = nodes[u]
-        #     shape = umeta.shape
-        #     if v[0] == 'i':
-        #         if vmeta.locmeta is None or v in self._dist_nodes:
-        #             continue
-
-        #         src_indices = self.edges[(u, v)].get('src_indices', None)
-        #         if src_indices is not None:
-        #             if src_indices._src_shape is None:
-        #                 src_indices.set_src_shape(shape)
-        #             shape = src_indices.indexed_src_shape
-
-        #         val = apply_idx_list(srcval, vmeta.src_inds_list)
-        #         vmeta.val = val
-
-        #     else:  # output node
-        #         if vmeta.shape is None:
-        #             vmeta.shape = shape
 
     def bfs_up_iter(self, node, include_self=True):
         """
@@ -963,7 +935,11 @@ class AllConnGraph(nx.DiGraph):
                         else:
                             node_meta.global_shape = meta['shape']
                         if locmeta is not None:
-                            node_meta._val = locmeta['val']
+                            val = locmeta['val']
+                            if isinstance(val, Number):
+                                node_meta._val = val
+                            else:
+                                node_meta._val = val.copy()
 
                 if not node_meta.dyn_units:
                     node_meta._units = meta['units']
