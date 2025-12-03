@@ -542,15 +542,28 @@ class SimpleGADriver(Driver):
                 for name, val in self.get_constraint_values().items():
                     con = self._cons[name]
                     # The not used fields will either None or a very large number
-                    if (con['lower'] is not None) and np.any(con['lower'] > -almost_inf):
-                        diff = val - con['lower']
-                        violation = np.array([0. if d >= 0 else abs(d) for d in diff])
-                    elif (con['upper'] is not None) and np.any(con['upper'] < almost_inf):
-                        diff = val - con['upper']
-                        violation = np.array([0. if d <= 0 else abs(d) for d in diff])
-                    elif (con['equals'] is not None) and np.any(np.abs(con['equals']) < almost_inf):
+                    has_lower_con = (con['lower'] is not None) and \
+                        np.any(con['lower'] > -almost_inf)
+                    has_upper_con = (con['upper'] is not None) and \
+                        np.any(con['upper'] < almost_inf)
+                    has_eq_con = (con['equals'] is not None) and \
+                        np.any(np.abs(con['equals']) < almost_inf)
+                    if has_lower_con:
+                        lb_diff = val - con['lower']
+                        lb_violation = np.array([0. if d >= 0 else abs(d) for d in lb_diff])
+                    if has_upper_con:
+                        ub_diff = val - con['upper']
+                        ub_violation = np.array([0. if d <= 0 else abs(d) for d in ub_diff])
+                    if has_lower_con and (not has_upper_con):
+                        violation = lb_violation
+                    elif has_upper_con and (not has_lower_con):
+                        violation = ub_violation
+                    elif has_upper_con and has_lower_con:
+                        violation = np.maximum(lb_violation, ub_violation)
+                    elif has_eq_con and not (has_lower_con or has_upper_con):
                         diff = val - con['equals']
                         violation = np.absolute(diff)
+
                     constraint_violations = np.hstack((constraint_violations, violation))
                 fun = obj + penalty * sum(np.power(constraint_violations, exponent))
             # Record after getting obj to assure they have
