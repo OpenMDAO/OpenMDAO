@@ -312,12 +312,12 @@ class Component(System):
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
                 del v['val']
 
-        # self._var_allprocs_abs2idx = {
-        #     n: i for i, n in enumerate(self._var_allprocs_abs2meta['input'])
-        # }
-        # self._var_allprocs_abs2idx.update({
-        #     n: i for i, n in enumerate(self._var_allprocs_abs2meta['output'])
-        # })
+        self._var_allprocs_abs2idx = {
+            n: i for i, n in enumerate(self._var_allprocs_abs2meta['input'])
+        }
+        self._var_allprocs_abs2idx.update({
+            n: i for i, n in enumerate(self._var_allprocs_abs2meta['output'])
+        })
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])

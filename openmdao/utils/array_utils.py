@@ -35,6 +35,42 @@ def shape_to_len(shape):
     return prod(shape)
 
 
+def get_global_dist_shape(dist_shapes):
+    """
+    Get the global shape of a distributed variable given its shapes on each rank.
+
+    Parameters
+    ----------
+    dist_shapes : list of tuple
+        The shapes of the distributed variable on each rank.
+
+    Returns
+    -------
+    tuple or None
+        The global shape of the distributed variable.
+    """
+    dshapelists = [list(dshape) for dshape in dist_shapes if dshape is not None]
+
+    # during some error conditions, there may be no shapes that are not None on any rank, so
+    # we need to check for that
+    if not dshapelists:
+        return None
+
+    upper_dims = [dshape[1:] for dshape in dshapelists]
+
+    first_dim_size = dshapelists[0][0] if len(dshapelists[0]) > 0 else 1
+    first_upper = upper_dims[0]
+
+    # verify that all dshapes have equal higher dimensions (besides the first)
+    for dshape, upper in zip(dshapelists[1:], upper_dims[1:]):
+        if upper != first_upper:
+            raise ValueError("Shapes on each rank do not match in their upper dimensions.")
+
+        first_dim_size += dshape[0] if dshape else 1
+
+    return (first_dim_size,) + tuple(dshapelists[0][1:])
+
+
 def evenly_distrib_idxs(num_divisions, arr_size):
     """
     Return evenly distributed entries for the given array size.

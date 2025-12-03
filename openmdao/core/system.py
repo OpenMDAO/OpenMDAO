@@ -38,8 +38,8 @@ from openmdao.utils.om_warnings import issue_warning, \
     PromotionWarning, UnusedOptionWarning, warn_deprecation
 from openmdao.utils.general_utils import determine_adder_scaler, is_undefined, \
     format_as_float_or_array, all_ancestors, match_prom_or_abs, \
-    ensure_compatible, env_truthy, make_traceback, _wrap_comm, _unwrap_comm, \
-    _om_dump, SystemMetaclass
+    ensure_compatible, env_truthy, _wrap_comm, _unwrap_comm, \
+    _om_dump, SystemMetaclass, collect_error
 from openmdao.utils.file_utils import _get_outputs_dir
 from openmdao.approximation_schemes.complex_step import ComplexStep
 from openmdao.approximation_schemes.finite_difference import FiniteDifference
@@ -6238,23 +6238,7 @@ class System(object, metaclass=SystemMetaclass):
         ident : int
             Identifier of the object responsible for issuing the error.
         """
-        if exc_type is None:
-            exc_type = RuntimeError
-
-        if tback is None:
-            tback = make_traceback()
-
-        if self.msginfo not in msg:
-            msg = f"{self.msginfo}: {msg}"
-
-        saved_errors = self._get_saved_errors()
-
-        # if saved_errors is None it means we have already finished setup and all errors should
-        # be raised as exceptions immediately.
-        if saved_errors is None or env_truthy('OPENMDAO_FAIL_FAST'):
-            raise exc_type(msg).with_traceback(tback)
-
-        saved_errors.append((ident, msg, exc_type, tback))
+        collect_error(msg, self._get_saved_errors(), exc_type, tback, ident, msginfo=self.msginfo)
 
     def _get_saved_errors(self):
         if self._problem_meta is None:

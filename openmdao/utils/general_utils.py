@@ -1667,6 +1667,42 @@ def make_traceback():
     return TracebackType(None, finfo.frame, finfo.frame.f_lasti, finfo.frame.f_lineno)
 
 
+def collect_error(msg, saved_errors, exc_type=None, tback=None, ident=None, msginfo=None):
+    """
+    Save an error message to raise as an exception later.
+
+    Parameters
+    ----------
+    msg : str
+        The connection error message to be saved.
+    saved_errors : list
+        List of saved errors.
+    exc_type : class or None
+        The type of exception to be raised if this error is the only one collected.
+    tback : traceback or None
+        The traceback of a caught exception.
+    ident : int
+        Identifier of the object responsible for issuing the error.
+    msginfo : str or None
+        Message info to add to the error message if it is not already present.
+    """
+    if exc_type is None:
+        exc_type = RuntimeError
+
+    if tback is None:
+        tback = make_traceback()
+
+    if msginfo and msginfo not in msg:
+        msg = f"{msginfo}: {msg}"
+
+    # if saved_errors is None it means we have already finished setup and all errors should
+    # be raised as exceptions immediately.
+    if saved_errors is None or env_truthy('OPENMDAO_FAIL_FAST'):
+        raise exc_type(msg).with_traceback(tback)
+
+    saved_errors.append((ident, msg, exc_type, tback))
+
+
 def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):
     """
     Check serial deriv values across ranks.

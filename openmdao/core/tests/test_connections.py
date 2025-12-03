@@ -356,7 +356,7 @@ class TestMultiConns(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(context.exception),
-           "\nCollected errors for problem 'mult_conns':\n   <model> <class Group>: Target 'sub.y (sub.c2.y)' cannot be connected to 'y (indeps.y)' because it's already connected to 'sub.y (sub.c1.y)'.")
+           "\nCollected errors for problem 'mult_conns':\n   <model> <class Group>: Target 'sub.y (sub.c2.y)' cannot be connected to 'sub.y (sub.c1.y)' because it's already connected to 'y (indeps.y)'.")
 
     def test_mixed_conns_same_level(self):
 
