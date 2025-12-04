@@ -322,6 +322,11 @@ class Component(System):
             n: i for i, n in enumerate(self._var_allprocs_abs2meta['output'])
         })
 
+        #DBG
+        import pprint
+        print(f"{self.msginfo}: var_allprocs_abs2idx")
+        pprint.pprint(self._var_allprocs_abs2idx)
+
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])
@@ -1082,105 +1087,6 @@ class Component(System):
         """
         if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
             self._problem_meta['config_info']._var_added(self.pathname, name)
-
-    # def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes):
-    #     """
-    #     Set default src_indices for any distributed inputs where they aren't set.
-
-    #     Parameters
-    #     ----------
-    #     abs_in2out : dict
-    #         Mapping of connected inputs to their source.  Names are absolute.
-    #     all_abs2meta : dict
-    #         Mapping of absolute names to metadata for all variables in the model.
-    #     all_abs2idx : dict
-    #         Dictionary mapping an absolute name to its allprocs variable index for the
-    #         whole model.
-    #     all_sizes : dict
-    #         Mapping of types to sizes of each variable in all procs for the whole model.
-
-    #     Returns
-    #     -------
-    #     list
-    #         Names of inputs where src_indices were added.
-    #     """
-    #     iproc = self.comm.rank
-    #     abs2meta_in = self._var_abs2meta['input']
-    #     all_abs2meta_in = all_abs2meta['input']
-    #     all_abs2meta_out = all_abs2meta['output']
-
-    #     sizes_in = self._var_sizes['input']
-    #     # src is outside of this component, so we need to use the all_sizes dict to get the sizes
-    #     # of the output variables
-    #     sizes_out = all_sizes['output']
-    #     added_src_inds = []
-    #     graph = self._get_conn_graph()
-    #     nodes = graph.nodes()
-
-    #     # loop over continuous local inputs
-    #     for iname, meta_in in abs2meta_in.items():
-    #         src = abs_in2out[iname]
-    #         if all_abs2meta_out[src]['shape'] is None:
-    #             # a previous error has occurred that caused the shape to be None, so we can't
-    #             # determine src_indices automatically
-    #             continue
-    #         dist_in = meta_in['distributed']
-    #         dist_out = all_abs2meta_out[src]['distributed']
-    #         if dist_in or dist_out:
-    #             node = ('i', iname)
-    #             node_meta = nodes[node]
-    #             src_inds_list = node_meta['src_inds_list']
-    #             if src_inds_list:
-    #                 # check shape after applying src_inds_list to actual shape. if same, done.
-    #                 shape = idx_list_to_shape(src_inds_list, all_abs2meta_out[src]['global_shape'])
-    #                 if shape == meta_in['shape']:
-    #                     continue
-
-    #             i = self._var_allprocs_abs2idx[iname]
-    #             gsize_out = all_abs2meta_out[src]['global_size']
-    #             gsize_in = all_abs2meta_in[iname]['global_size']
-    #             vout_sizes = sizes_out[:, all_abs2idx[src]]
-
-    #             offset = None
-    #             if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes) == gsize_in):
-    #                 # This assumes one of:
-    #                 # 1) a distributed output with total size matching the total size of a
-    #                 #    distributed input
-    #                 # 2) a non-distributed output with local size matching the total size of a
-    #                 #    distributed input
-    #                 # 3) a non-distributed output with total size matching the total size of a
-    #                 #    distributed input
-    #                 if dist_in:
-    #                     offset = np.sum(sizes_in[:iproc, i])
-    #                     end = offset + sizes_in[iproc, i]
-
-    #             # total sizes differ and output is distributed, so can't determine mapping
-    #             if offset is None:
-    #                 self._collect_error(f"{self.msginfo}: Can't determine src_indices "
-    #                                     f"automatically for input '{iname}'. They must be "
-    #                                     "supplied manually.", ident=(self.pathname, iname))
-    #                 continue
-
-    #             if dist_in and not dist_out:
-    #                 src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'],
-    #                                                         'output')
-    #             else:
-    #                 src_shape = all_abs2meta_out[src]['global_shape']
-
-    #             if offset == end:
-    #                 idx = np.zeros(0, dtype=INT_DTYPE)
-    #             else:
-    #                 idx = slice(offset, end)
-
-    #             idx = indexer(idx, flat_src=True, src_shape=src_shape)
-
-    #             meta_in['src_inds_list'] = src_inds_list + [idx]
-    #             node_meta['src_inds_list'] = meta_in['src_inds_list']
-    #             # graph.set_src_indices(node, idx)
-    #             # meta_in['flat_src_indices'] = True
-    #             added_src_inds.append(iname)
-
-    #     return added_src_inds
 
     def _approx_partials(self, of, wrt, method='fd', **kwargs):
         """

@@ -1022,6 +1022,11 @@ class Group(System):
                 else:
                     offsets[io] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
 
+        #DBG
+        import pprint
+        print(f"{self.msginfo}: var_offsets")
+        pprint.pprint(self._var_offsets)
+
         return self._var_offsets
 
     def _get_jac_col_scatter(self):
@@ -1975,264 +1980,11 @@ class Group(System):
 
             return from_prop
 
-        # def copy_var_shape(from_var, to_var):
-        #     """
-        #     Copy shape info from from_var's metadata to to_var's metadata in the graph.
-
-        #     Parameters
-        #     ----------
-        #     graph : nx.DiGraph
-        #         Graph containing all variables with shape info.
-        #     from_var : str
-        #         Name of variable to copy shape info from.
-        #     to_var : str
-        #         Name of variable to copy shape info to.
-
-        #     Returns
-        #     -------
-        #     tuple or None
-        #         If the shape of the variable is known, return the shape.
-        #         Otherwise, return None.
-        #     """
-        #     from_conn_meta = conn_nodes[from_var]
-        #     if from_conn_meta.shape is None:
-        #         return
-        #     from_io = from_var[0]
-        #     to_conn_meta = conn_nodes[to_var]
-
-        #     # is this a connection internal to a component?
-        #     internal = to_var[1].rpartition('.')[0] == from_var[1].rpartition('.')[0]
-        #     if internal:  # if internal to a component, src_indices isn't used
-        #         fwd = from_io == 'i'
-        #         src_inds_list = None
-        #     else:
-        #         fwd = from_io == 'o'
-        #         if fwd:
-        #             src_inds_list = to_conn_meta.src_inds_list
-        #         else:  # rev
-        #             src_inds_list = from_conn_meta.src_inds_list
-
-        #     is_full_slice = \
-        #         src_inds_list and len(src_inds_list) == 1 and src_inds_list[0].is_full_slice()
-
-        #     if self.comm.size > 1:
-        #         dist_from = from_conn_meta.distributed
-        #         dist_to = to_conn_meta.distributed
-        #     else:
-        #         dist_from = dist_to = False
-
-        #     if fwd:
-        #         if dist_to:
-        #             shpfunc = dist2distfwd if dist_from else serial2distfwd
-        #         else:
-        #             shpfunc = dist2serialfwd if dist_from else serial2serialfwd
-        #     else:  # rev
-        #         if dist_to:
-        #             shpfunc = dist2distrev if dist_from else dist2serialrev
-        #         else:
-        #             shpfunc = serial2distrev if dist_from else serial2serialrev
-
-        #     return shpfunc(graph, from_var, to_var, src_inds_list, is_full_slice)
-
         def copy_var_units(from_var, to_var):
             from_units = conn_nodes[from_var].units
             conn_to = conn_nodes[to_var]
             conn_to.units = from_units
             return from_units
-
-        # def serial2serialfwd(graph, from_var, to_var, src_inds_list, is_full_slice):
-        #     shp = conn_nodes[from_var].shape
-        #     if src_inds_list:
-        #         for inds in src_inds_list:
-        #             inds.set_src_shape(shp)
-        #             shp = inds.indexed_src_shape
-
-        #     conn_nodes[to_var].shape = shp
-        #     return shp
-
-        # def serial2serialrev(graph, from_var, to_var, src_inds_list, is_full_slice):
-        #     if not src_inds_list or is_full_slice:
-        #         shp = conn_nodes[from_var].shape
-        #     else:
-        #         self._collect_error(f"Input '{from_var}' has src_indices so the shape "
-        #                             f"of connected output '{to_var}' cannot be "
-        #                             "determined.")
-        #         return
-
-        #     conn_nodes[to_var].shape = shp
-        #     return shp
-
-        # def serial2distfwd(graph, from_var, to_var, src_inds_list, is_full_slice):
-        #     # serial_out --> dist_in
-        #     from_shape = conn_nodes[from_var].shape
-        #     existence = self._get_var_existence()
-        #     exist_outs = existence['output'][:, self._var_allprocs_abs2idx[from_var]]
-        #     exist_ins = existence['input'][:, self._var_allprocs_abs2idx[to_var]]
-        #     to_meta = conn_nodes[to_var]
-        #     num_exist = np.count_nonzero(exist_outs)
-
-        #     if not src_inds_list:
-        #         shape = from_shape
-        #     else:
-        #         if len(from_shape) < 2:
-        #             global_src_shape = (num_exist * shape_to_len(from_shape),)
-        #         else:
-        #             shapelst = list(from_shape)
-        #             # stack the shapes across procs
-        #             first_dim = shapelst[0] * num_exist
-        #             shapelst[0] = first_dim
-        #             global_src_shape = tuple(shapelst)
-
-        #         shp = global_src_shape
-        #         for inds in src_inds_list:
-        #             inds.set_src_shape(shp)
-        #             shp = inds.indexed_src_shape
-
-        #         shape = shp
-
-        #     size = shape_to_len(shape)
-        #     sizes = np.zeros(self.comm.size, dtype=int)
-        #     sizes[exist_ins] = size
-        #     dist_sizes[to_var] = sizes
-        #     dist_shapes[to_var] = [shape if exist_ins[i] else None for i in range(self.comm.size)]
-        #     to_meta.shape = shape
-        #     nexist = len([i for i in exist_ins if i])
-        #     if len(shape) > 1:
-        #         firstdim = shape[0] * nexist
-        #         gshape = (firstdim,) + shape[1:]
-        #     else:
-        #         gshape = (size * nexist,)
-        #     to_meta.global_shape = gshape
-        #     return shape
-
-        # def serial2distrev(graph, from_var, to_var, src_inds_list, is_full_slice):
-        #     # serial_out <-- dist_in
-        #     dshapes = dist_shapes[from_var]
-        #     if len(dshapes) >= 1:
-        #         shape0 = dshapes[0]
-        #         for ds in dshapes:
-        #             if ds != shape0:
-        #                 to_io = graph.nodes[to_var]['io']
-        #                 from_io = graph.nodes[from_var]['io']
-        #                 self._collect_error(
-        #                     f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
-        #                     f"from distributed {from_io} '{from_var}' is not supported because not "
-        #                     f"all {from_var} ranks are the same shape "
-        #                     f"(shapes={dshapes}).", ident=(from_var, to_var))
-        #                 return
-
-        #         conn_nodes[to_var].shape = shape0
-        #         return shape0
-
-        # def dist2serialfwd(graph, from_var, to_var, src_inds_list, is_full_slice):
-        #     # dist_out --> serial_in
-        #     if src_inds_list:
-        #         shp = self.get_global_dist_shape(from_var, dist_shapes[from_var])
-        #         for src_indices in src_inds_list:
-        #             src_indices.set_src_shape(shp)
-        #             shp = src_indices.indexed_src_shape
-
-        #         conn_nodes[to_var].shape = shp
-        #         return shp
-        #     else:
-        #         # We don't allow this case because
-        #         # serial variables must have the same value on all procs and the only way
-        #         # this is possible is if the src_indices on each proc are identical, but that's not
-        #         # possible if we assume 'always local' transfer (see POEM 46).
-        #         self._collect_error(
-        #             f"{self.msginfo}: dynamic sizing of non-distributed input '{to_var}' "
-        #             f"from distributed output '{from_var}' without src_indices is not "
-        #             "supported.")
-
-        # def dist2serialrev(graph, from_var, to_var, src_inds_list, is_full_slice):
-        #     # dist_out <-- serial_in
-        #     if is_full_slice:
-        #         abs2idx = self._var_allprocs_abs2idx
-        #         # serial input is using full slice here, so contains the full
-        #         # distributed value of the distributed output (and serial input will
-        #         # have the same value on all procs).
-
-        #         # dist input may not exist on all procs, so distribute the serial
-        #         # entries across only the procs where the dist output exists.
-        #         exist_procs = self._get_var_existence()['output'][:, abs2idx[to_var]]
-        #         split_num = np.count_nonzero(exist_procs)
-
-        #         from_shape = conn_nodes[from_var].shape
-        #         sz, _ = evenly_distrib_idxs(split_num, shape_to_len(from_shape))
-        #         sizes = np.zeros(self.comm.size, dtype=int)
-        #         sizes[exist_procs] = sz
-        #         dist_sizes[to_var] = sizes.copy()
-        #         to_meta = conn_nodes[to_var]
-        #         if len(from_shape) > 1:
-        #             if from_shape[0] != self.comm.size:
-        #                 self._collect_error(f"Serial input '{from_var}' has shape "
-        #                                     f"{from_shape} but output '{to_var}' "
-        #                                     f"is distributed over {self.comm.size} "
-        #                                     f"procs and {from_shape[0]} != "
-        #                                     f"{self.comm.size}.")
-        #                 return
-        #             else:
-        #                 dist_shapes[to_var] = [from_shape[1:]] * self.comm.size
-        #                 shp = to_meta.shape = from_shape[1:]
-        #         else:
-        #             dist_shapes[to_var] = [(s,) for s in sizes]
-        #             shp = to_meta.shape = (sizes[sizes != 0][0],)
-
-        #         to_meta.global_shape = from_shape
-
-        #         return shp
-
-        #     else:
-        #         self._collect_error(f"Input '{from_var}' has src_indices so the shape "
-        #                             f"of connected output '{to_var}' cannot be "
-        #                             "determined.")
-
-        # def dist2distfwd(graph, from_var, to_var, src_inds_list, is_full_slice):
-        #     if is_full_slice:
-        #         self._collect_error(f"Using a full slice [:] as src_indices between"
-        #                             f" distributed variables '{from_var}' and "
-        #                             f"'{to_var}' is invalid.")
-        #         return
-
-        #     from_conn_meta = conn_nodes[from_var]
-        #     to_conn_meta = conn_nodes[to_var]
-
-        #     if not src_inds_list:
-        #         shp = from_conn_meta.shape
-        #         to_conn_meta.shape = shp
-        #         dist_shapes[to_var] = dist_shapes[from_var].copy()
-        #         dist_sizes[to_var] = dist_sizes[from_var].copy()
-        #         to_conn_meta.global_shape = from_conn_meta.global_shape
-        #     else:
-        #         shp = self.get_global_dist_shape(from_var, dist_shapes[from_var])
-        #         for src_indices in src_inds_list:
-        #             src_indices.set_src_shape(shp)
-        #             shp = src_indices.indexed_src_shape
-
-        #         to_conn_meta.shape = shp
-        #         dist_shapes[to_var] = self.comm.allgather(shp)
-        #         dist_sizes[to_var] = np.array([shape_to_len(s) for s in dist_shapes[to_var]])
-        #         to_conn_meta.global_shape = self.get_global_dist_shape(to_var, dist_shapes[to_var])
-
-        #     return shp
-
-        # def dist2distrev(graph, from_var, to_var, src_inds_list, is_full_slice):
-        #     if is_full_slice:
-        #         self._collect_error(f"Using a full slice [:] as src_indices between"
-        #                             f" distributed variables '{from_var}' and "
-        #                             f"'{to_var}' is invalid.")
-        #     elif not src_inds_list:
-        #         shp = conn_nodes[from_var].shape
-        #         to_conn_meta = conn_nodes[to_var]
-        #         to_conn_meta.shape = shp
-        #         dist_shapes[to_var] = dist_shapes[from_var].copy()
-        #         dist_sizes[to_var] = dist_sizes[from_var].copy()
-        #         to_conn_meta.global_shape = self.get_global_dist_shape(to_var, dist_shapes[to_var])
-        #         return shp
-        #     else:
-        #         self._collect_error(f"Input '{from_var}' has src_indices so the shape "
-        #                             f"of connected output '{to_var}' cannot be "
-        #                             "determined.")
 
         def connect_nodes(src_node, tgt_node, multi=False):
             if src_node not in graph:
@@ -2448,17 +2200,6 @@ class Group(System):
                 # we need input scaling.
                 self._has_input_scaling = self._has_output_scaling or \
                     (in_units and out_units and in_units != out_units)
-
-        # # check compatability for any discrete connections
-        # for abs_in, abs_out in self._conn_discrete_in2out.items():
-        #     in_type = self._var_allprocs_discrete['input'][abs_in]['type']
-        #     out_type = self._var_allprocs_discrete['output'][abs_out]['type']
-
-        #     if not issubclass(in_type, out_type):
-        #         self._collect_error(
-        #             f"{self.msginfo}: Type '{out_type.__name__}' of output '{abs_out}' is "
-        #             f"incompatible with type '{in_type.__name__}' of input '{abs_in}'.",
-        #             ident=(abs_out, abs_in))
 
     def _transfer(self, vec_name, mode, sub=None):
         """

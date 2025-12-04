@@ -216,6 +216,21 @@ class DefaultTransfer(Transfer):
                     rev_xfer_in[sub_out].append(input_inds)
                     rev_xfer_out[sub_out].append(output_inds)
 
+        #DBG
+        import pprint
+        print(f"{group.msginfo}: fwd_xfer_in")
+        pprint.pprint(fwd_xfer_in)
+        print(f"{group.msginfo}: fwd_xfer_out")
+        pprint.pprint(fwd_xfer_out)
+
+        if rev:
+            #DBG
+            import pprint
+            print(f"{group.msginfo}: rev_xfer_in")
+            pprint.pprint(rev_xfer_in)
+            print(f"{group.msginfo}: rev_xfer_out")
+            pprint.pprint(rev_xfer_out)
+
         transfers['fwd'] = _setup_index_arrays(tot_size, fwd_xfer_in, fwd_xfer_out, vectors,
                                                scaled_in_set)
         if rev:
