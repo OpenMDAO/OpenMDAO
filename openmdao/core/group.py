@@ -1596,15 +1596,17 @@ class Group(System):
                     allprocs_abs2meta[io].update(old_abs2meta[io])
 
         for io in ('input', 'output'):
+            dct = abs2meta[io]
+            self._var_abs2meta[io] = {k: dct[k] for k in sorted(dct)}
             dct = allprocs_abs2meta[io]
             allprocs_abs2meta[io] = {k: dct[k] for k in sorted(dct)}
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
-        self._var_allprocs_abs2idx = {n: i for i, n in enumerate(allprocs_abs2meta['input'])}
-        self._var_allprocs_abs2idx.update({
-            n: i for i, n in enumerate(allprocs_abs2meta['output'])
-        })
+        # self._var_allprocs_abs2idx = {n: i for i, n in enumerate(allprocs_abs2meta['input'])}
+        # self._var_allprocs_abs2idx.update({
+        #     n: i for i, n in enumerate(allprocs_abs2meta['output'])
+        # })
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -3658,8 +3660,8 @@ class Group(System):
         #     self._var_allprocs_abs2meta[io].update(
         #         self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
 
-        self._var_allprocs_abs2idx.update(
-            {n: i for i, n in enumerate(self._var_allprocs_abs2meta[io])})
+        #self._var_allprocs_abs2idx.update(
+            #{n: i for i, n in enumerate(self._var_allprocs_abs2meta[io])})
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True

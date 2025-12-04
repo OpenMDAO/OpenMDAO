@@ -312,15 +312,16 @@ class Component(System):
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
                 del v['val']
 
+            self._var_abs2meta[io] = {k: abs2meta[k] for k in sorted(abs2meta)}
             self._var_allprocs_abs2meta[io] = \
                 {k: allprocs_abs2meta[k] for k in sorted(allprocs_abs2meta)}
 
-        self._var_allprocs_abs2idx = {
-            n: i for i, n in enumerate(self._var_allprocs_abs2meta['input'])
-        }
-        self._var_allprocs_abs2idx.update({
-            n: i for i, n in enumerate(self._var_allprocs_abs2meta['output'])
-        })
+        # self._var_allprocs_abs2idx = {
+        #     n: i for i, n in enumerate(self._var_allprocs_abs2meta['input'])
+        # }
+        # self._var_allprocs_abs2idx.update({
+        #     n: i for i, n in enumerate(self._var_allprocs_abs2meta['output'])
+        # })
 
         #DBG
         import pprint
