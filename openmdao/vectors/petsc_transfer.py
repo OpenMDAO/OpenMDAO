@@ -124,6 +124,8 @@ else:
                         if 'input' in factors:
                             scaled_in_set.add(sub_in)
 
+                    print(f"xfer {sub_in} input_inds: {input_inds} output_inds: {output_inds}")
+
                     xfer_in[sub_in].append(input_inds)
                     xfer_out[sub_in].append(output_inds)
                 else:
@@ -473,6 +475,8 @@ def _get_output_inds(group, abs_out, abs_in):
             offset = offsets[rank]
             output_inds = range(offset, offset + sizes[rank])
 
+        print(f"output_inds: {abs_out} {abs_in} {output_inds}")
+        print("orig_src_inds: None")
         return output_inds, None
 
     else:
@@ -480,6 +484,7 @@ def _get_output_inds(group, abs_out, abs_in):
         orig_src_inds = src_indices
 
         if not (out_dist or meta_in['distributed']):  # serial --> serial
+            print("serial --> serial!")
             if offsets[rank] > 0.:
                 return src_indices + offsets[rank], orig_src_inds
             else:
@@ -507,4 +512,6 @@ def _get_output_inds(group, abs_out, abs_in):
 
             start = end
 
+        print(f"output_inds: {abs_out} {abs_in} {output_inds}")
+        print(f"orig_src_inds: {orig_src_inds}")
         return output_inds, orig_src_inds
