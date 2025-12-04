@@ -1683,6 +1683,10 @@ class Group(System):
                     # accurately reflect this proc's var size instead of one from some other proc.
                     allprocs_abs2meta[io].update(old_abs2meta[io])
 
+        for io in ('input', 'output'):
+            dct = allprocs_abs2meta[io]
+            allprocs_abs2meta[io] = {k: dct[k] for k in sorted(dct)}
+
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
         self._var_allprocs_abs2idx = {n: i for i, n in enumerate(allprocs_abs2meta['input'])}
@@ -3996,12 +4000,15 @@ class Group(System):
         for s in self._sorted_sys_iter():
             self._var_abs2meta[io].update(s._var_abs2meta[io])
 
-        self._var_allprocs_abs2meta[io] = {}
-        for sysname in self._sorted_sys_iter_all_procs():
-            self._var_allprocs_abs2meta[io].update(
-                self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
+        self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
+        old = self._var_allprocs_abs2meta[io]
+        self._var_allprocs_abs2meta[io] = {k: old[k] for k in sorted(old)}
+        # for sysname in self._sorted_sys_iter_all_procs():
+        #     self._var_allprocs_abs2meta[io].update(
+        #         self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
 
-        self._var_allprocs_abs2idx.update({n: i for i, n in enumerate(self._var_allprocs_abs2meta['output'])})
+        self._var_allprocs_abs2idx.update(
+            {n: i for i, n in enumerate(self._var_allprocs_abs2meta[io])})
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True

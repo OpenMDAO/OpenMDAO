@@ -105,7 +105,7 @@ def view_dyn_units(root, outfile='unit_dep_graph.png', show=True, title=None):
 
     if title is None:
         # keep the names from being super long by removing any common subpath
-        common = common_subpath(graph.nodes())
+        common = common_subpath(n[1] for n in graph.nodes())
 
         if common:
             title = f"Dynamic unit dependencies in group '{common}'"
@@ -122,9 +122,11 @@ def view_dyn_units(root, outfile='unit_dep_graph.png', show=True, title=None):
     # prepend the unit onto the variable name
     node_colors = []
     node_labels = {}
-    for n in graph:
+    for io, n in graph.nodes():
+        io = 'input' if io == 'i' else 'output'
+        graph.nodes[io, n]['label'] = n
         try:
-            meta = abs2meta['input'][n] if n in abs2meta['input'] else abs2meta['output'][n]
+            meta = abs2meta[io][n]
             units = meta['units']
         except KeyError:
             units = None
