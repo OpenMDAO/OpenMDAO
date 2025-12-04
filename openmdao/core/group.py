@@ -29,7 +29,7 @@ from openmdao.utils.general_utils import shape2tuple, ensure_compatible, \
 from openmdao.utils.units import unit_conversion, simplify_unit, _find_unit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
     get_unresolved_knowns, is_unresolved, get_active_edges, are_connected
-from openmdao.utils.mpi import MPI, check_mpi_exceptions, translate_ranks
+from openmdao.utils.mpi import MPI, check_mpi_exceptions  # , translate_ranks
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.relevance import get_relevance
@@ -1468,99 +1468,6 @@ class Group(System):
 
         self._check_nondist_sizes()
 
-        # self._setup_global_shapes()
-
-        # all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        # conns = self._conn_global_abs_in2out
-
-        # self._resolve_src_indices()
-
-        # if self.comm.size > 1:  # and not self._bad_conn_vars:
-        #     abs2idx = self._var_allprocs_abs2idx
-        #     all_abs2meta = self._var_allprocs_abs2meta
-        #     all_abs2meta_in = all_abs2meta['input']
-
-        #     # the code below is to handle the case where src_indices were not specified
-        #     # for a distributed input or an input connected to a distributed auto_ivc
-        #     # output. This update can't happen until sizes are known.
-        #     dist_ins = (n for n, m in all_abs2meta_in.items() if m['distributed'] or
-        #                 (conns[n].startswith('_auto_ivc.') and
-        #                  all_abs2meta_out[conns[n]]['distributed']))
-        #     dcomp_names = set(d.rpartition('.')[0] for d in dist_ins)
-        #     if dcomp_names:
-        #         added_src_inds = []
-
-        #         for comp in self.system_iter(recurse=True, typ=Component):
-        #             if comp.pathname in dcomp_names:
-        #                 added_src_inds.extend(
-        #                     comp._update_dist_src_indices(conns, all_abs2meta, abs2idx,
-        #                                                   self._var_sizes))
-
-        #         updated = set()
-        #         for alist in self.comm.allgather(added_src_inds):
-        #             updated.update(alist)
-
-        #         for a in updated:
-        #             all_abs2meta_in[a]['has_src_indices'] = True
-
-        # abs2meta_in = self._var_abs2meta['input']
-        # allprocs_abs2meta_in = self._var_allprocs_abs2meta['input']
-        # allprocs_abs2meta_out = self._var_allprocs_abs2meta['output']
-
-        # if self.comm.size > 1:
-        #     for abs_in, abs_out in sorted(conns.items()):
-        #         if abs_out not in allprocs_abs2meta_out:
-        #             continue  # discrete var
-
-        #         in_dist = allprocs_abs2meta_in[abs_in]['distributed']
-        #         out_dist = allprocs_abs2meta_out[abs_out]['distributed']
-
-        #         # check that src_indices match for dist->serial connection
-        #         if out_dist and not in_dist:
-        #             # all non-distributed inputs must have src_indices if they connect to a
-        #             # distributed output.
-        #             owner = self._owning_rank[abs_in]
-        #             src_inds_hash = None
-        #             if abs_in in abs2meta_in:  # input is local
-        #                 src_inds_list = abs2meta_in[abs_in]['src_inds_list']
-        #                 if src_inds_list is not None:
-        #                     shaped = idx_list_to_index_array(src_inds_list)
-        #                     if shaped is None:
-        #                         self._collect_error(f"For connection from '{abs_out}' to '{abs_in}'"
-        #                                             f", src_indices {src_inds_list} have no source "
-        #                                             "shape.", ident=(abs_out, abs_in))
-        #                         continue
-        #                     else:
-        #                         src_inds_hash = array_hash(shaped)
-
-        #             if self.comm.rank == owner:
-        #                 baseline = None
-        #                 err = 0
-        #                 for sinds in self.comm.gather(src_inds_hash, root=owner):
-        #                     if sinds is not None:
-        #                         if baseline is None:
-        #                             baseline = sinds
-        #                         else:
-        #                             if sinds != baseline:
-        #                                 err = 1
-        #                                 break
-        #                 if baseline is None:  # no src_indices were set
-        #                     err = -1
-        #                 self.comm.bcast(err, root=owner)
-        #             else:
-        #                 self.comm.gather(src_inds_hash, root=owner)
-        #                 err = self.comm.bcast(None, root=owner)
-        #             if err == 1:
-        #                 self._collect_error(f"{self.msginfo}: Can't connect distributed output "
-        #                                     f"'{abs_out}' to non-distributed input '{abs_in}' "
-        #                                     "because src_indices differ on different ranks.",
-        #                                     ident=(abs_out, abs_in))
-        #             elif err == -1:
-        #                 self._collect_error(f"{self.msginfo}: Can't connect distributed output "
-        #                                     f"'{abs_out}' to non-distributed input '{abs_in}' "
-        #                                     "without specifying src_indices.",
-        #                                     ident=(abs_out, abs_in))
-
     def _setup_var_data(self):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
@@ -1778,13 +1685,16 @@ class Group(System):
         """
         self._var_offsets = None
         all_abs2meta = self._var_allprocs_abs2meta
-        abs2idx = self._var_allprocs_abs2idx # = {}
+        abs2idx = self._var_allprocs_abs2idx = {}
 
         # only allocate these arrays the first time through
         self._var_sizes = {
             'input': np.zeros((self.comm.size, len(all_abs2meta['input'])), dtype=INT_DTYPE),
             'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=INT_DTYPE),
         }
+
+        for subsys in self._sorted_sys_iter():
+            subsys._setup_var_sizes()
 
         iproc = self.comm.rank
         nprocs = self.comm.size
@@ -1796,7 +1706,7 @@ class Group(System):
                     if sz is not None:
                         sizes[iproc, i] = sz
 
-                # abs2idx[name] = i
+                abs2idx[name] = i
 
             if nprocs > 1:
                 my_sizes = sizes[iproc, :].copy()
@@ -1805,27 +1715,27 @@ class Group(System):
         # TODO: see about moving vector class setup elsewhere
         self._setup_vector_class()
 
-        for subsys in self.system_iter(recurse=True, include_self=False):
-            ranks = translate_ranks(self.comm, subsys.comm, try_slice=True)
-            subins = list(subsys._var_allprocs_abs2meta['input'])
-            istart = abs2idx[subins[0]] if subins else 0
-            iend = abs2idx[subins[-1]] + 1 if subins else 0
-            subsys._var_sizes['input'] = self._var_sizes['input'][ranks, istart:iend]
-            # subsys._var_allprocs_abs2idx = {n: i for i, n in enumerate(subins)}
+        # for subsys in self.system_iter(recurse=True, include_self=False):
+        #     ranks = translate_ranks(self.comm, subsys.comm, try_slice=True)
+        #     subins = list(subsys._var_allprocs_abs2meta['input'])
+        #     istart = abs2idx[subins[0]] if subins else 0
+        #     iend = abs2idx[subins[-1]] + 1 if subins else 0
+        #     subsys._var_sizes['input'] = self._var_sizes['input'][ranks, istart:iend]
+        #     # subsys._var_allprocs_abs2idx = {n: i for i, n in enumerate(subins)}
 
-            subouts = list(subsys._var_allprocs_abs2meta['output'])
-            ostart = abs2idx[subouts[0]] if subouts else 0
-            oend = abs2idx[subouts[-1]] + 1 if subouts else 0
-            subsys._var_sizes['output'] = self._var_sizes['output'][ranks, ostart:oend]
-            # subsys._var_allprocs_abs2idx.update({n: i for i, n in enumerate(subouts)})
+        #     subouts = list(subsys._var_allprocs_abs2meta['output'])
+        #     ostart = abs2idx[subouts[0]] if subouts else 0
+        #     oend = abs2idx[subouts[-1]] + 1 if subouts else 0
+        #     subsys._var_sizes['output'] = self._var_sizes['output'][ranks, ostart:oend]
+        #     # subsys._var_allprocs_abs2idx.update({n: i for i, n in enumerate(subouts)})
 
-            # print(subsys.pathname)
+        #     # print(subsys.pathname)
 
-            if isinstance(subsys, Group):
-                subsys._setup_vector_class()
-                subsys._compute_owning_ranks()
-            else:
-                subsys._owned_output_sizes = subsys._var_sizes['output']
+        #     if isinstance(subsys, Group):
+        #         subsys._setup_vector_class()
+        #         subsys._compute_owning_ranks()
+        #     else:
+        #         subsys._owned_output_sizes = subsys._var_sizes['output']
 
             # for io in ('input', 'output'):
             #     for name in subsys._var_allprocs_abs2meta[io]:

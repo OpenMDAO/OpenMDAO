@@ -13,7 +13,7 @@ from numpy import ndarray, isscalar, ndim, atleast_1d
 from scipy.sparse import issparse, coo_matrix, csr_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, _iter_derivs
+    global_meta_names, collect_errors, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.subjac import Subjac
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
@@ -375,28 +375,28 @@ class Component(System):
                 break
         return msg
 
-    # @collect_errors
-    # def _setup_var_sizes(self):
-    #     """
-    #     Compute the arrays of variable sizes for all variables/procs on this system.
-    #     """
-    #     iproc = self.comm.rank
-    #     abs2idx = self._var_allprocs_abs2idx = {}
+    @collect_errors
+    def _setup_var_sizes(self):
+        """
+        Compute the arrays of variable sizes for all variables/procs on this system.
+        """
+        iproc = self.comm.rank
+        abs2idx = self._var_allprocs_abs2idx = {}
 
-    #     for io in ('input', 'output'):
-    #         sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(self._var_rel_names[io])),
-    #                                                dtype=INT_DTYPE)
+        for io in ('input', 'output'):
+            sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(self._var_rel_names[io])),
+                                                   dtype=INT_DTYPE)
 
-    #         for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
-    #             sz = metadata['size']
-    #             sizes[iproc, i] = 0 if sz is None else sz
-    #             abs2idx[name] = i
+            for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
+                sz = metadata['size']
+                sizes[iproc, i] = 0 if sz is None else sz
+                abs2idx[name] = i
 
-    #         if self.comm.size > 1:
-    #             my_sizes = sizes[iproc, :].copy()
-    #             self.comm.Allgather(my_sizes, sizes)
+            if self.comm.size > 1:
+                my_sizes = sizes[iproc, :].copy()
+                self.comm.Allgather(my_sizes, sizes)
 
-    #     self._owned_output_sizes = self._var_sizes['output']
+        self._owned_output_sizes = self._var_sizes['output']
 
     def _setup_partials(self):
         """
