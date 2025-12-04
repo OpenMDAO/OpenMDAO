@@ -135,11 +135,10 @@ else:
                     xfer_out[sub_in]
 
             #DBG
-            import pprint
-            print(f"{group.msginfo}: fwd_xfer_in")
-            pprint.pprint(xfer_in)
-            print(f"{group.msginfo}: fwd_xfer_out")
-            pprint.pprint(xfer_out)
+            # om_dump(f"{group.msginfo}: fwd_xfer_in")
+            # om_dump_pprint(xfer_in)
+            # om_dump(f"{group.msginfo}: fwd_xfer_out")
+            # om_dump_pprint(xfer_out)
 
             if xfer_in:
                 full_xfer_in, full_xfer_out = _setup_index_views(total_len, xfer_in, xfer_out)
@@ -334,11 +333,10 @@ else:
                         xfer_out_nocolor[sub_out]
 
             #DBG
-            import pprint
-            print(f"{group.msginfo}: rev_xfer_in")
-            pprint.pprint(xfer_in)
-            print(f"{group.msginfo}: rev_xfer_out")
-            pprint.pprint(xfer_out)
+            # om_dump(f"{group.msginfo}: rev_xfer_in")
+            # om_dump_pprint(xfer_in)
+            # om_dump(f"{group.msginfo}: rev_xfer_out")
+            # om_dump_pprint(xfer_out)
 
             full_xfer_in, full_xfer_out = _setup_index_views(total_size, xfer_in, xfer_out)
 
@@ -527,6 +525,6 @@ def _get_output_inds(group, abs_out, abs_in):
             start = end
 
         #DBG
-        print(f"output_inds: {abs_out} {abs_in} {output_inds}")
-        print(f"orig_src_inds: {orig_src_inds}")
+        # om_dump(f"output_inds: {abs_out} {abs_in} {output_inds}")
+        # om_dump(f"orig_src_inds: {orig_src_inds}")
         return output_inds, orig_src_inds

@@ -661,23 +661,22 @@ class Problem(object, metaclass=ProblemMetaclass):
             self.model._clear_iprint()
 
             #DBG
-            print("model stats")
-            print("inputs", self.model._inputs.asarray())
-            print(list(self.model._inputs))
-            print("outputs", self.model._outputs.asarray())
-            print(list(self.model._outputs))
+            # om_dump("model stats")
+            # om_dump("inputs", self.model._inputs.asarray())
+            # om_dump(list(self.model._inputs))
+            # om_dump("outputs", self.model._outputs.asarray())
+            # om_dump(list(self.model._outputs))
 
-            import pprint
-            print("var sizes")
-            pprint.pprint(self.model._var_sizes)
-            print("var allprocs abs2idx")
-            pprint.pprint(self.model._var_allprocs_abs2idx)
-            print("var allprocs abs2meta")
-            pprint.pprint(self.model._var_allprocs_abs2meta)
-            print("var abs2meta")
-            pprint.pprint(self.model._var_abs2meta)
-            print('conns')
-            pprint.pprint(self.model._conn_global_abs_in2out)
+            # om_dump("var sizes")
+            # om_dump_pprint(self.model._var_sizes)
+            # om_dump("var allprocs abs2idx")
+            # om_dump_pprint(self.model._var_allprocs_abs2idx)
+            # om_dump("var allprocs abs2meta")
+            # om_dump_pprint(self.model._var_allprocs_abs2meta)
+            # om_dump("var abs2meta")
+            # om_dump_pprint(self.model._var_abs2meta)
+            # om_dump('conns')
+            # om_dump_pprint(self.model._conn_global_abs_in2out)
 
             self.model.run_solve_nonlinear()
         finally:

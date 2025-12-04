@@ -6,6 +6,7 @@ import textwrap
 import json
 import functools
 import atexit
+import pprint
 from types import TracebackType
 import unittest
 from contextlib import contextmanager
@@ -1876,7 +1877,7 @@ def om_dump(*args, **kwargs):
     pass
 
 
-om_dump_indent = om_dump
+om_dump_indent = om_dump_pprint = om_dump
 
 
 def dbg(funct):
@@ -1983,6 +1984,12 @@ if _om_dump:
         kwargs['file'] = _dump_stream
         kwargs['flush'] = True
         print(*args, **kwargs)
+
+    def om_dump_pprint(*args, **kwargs):
+        """
+        Dump to a stream with pformat if OPENMDAO_DUMP is truthy in the environment.
+        """
+        om_dump(pprint.pformat(*args, **kwargs))
 
     def om_dump_indent(pathobj, *args, **kwargs):
         """

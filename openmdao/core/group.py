@@ -1023,9 +1023,8 @@ class Group(System):
                     offsets[io] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
 
         #DBG
-        import pprint
-        print(f"{self.msginfo}: var_offsets")
-        pprint.pprint(self._var_offsets)
+        # om_dump(f"{self.msginfo}: var_offsets")
+        # om_dump_pprint(self._var_offsets)
 
         return self._var_offsets
 
@@ -1484,7 +1483,7 @@ class Group(System):
         resolver = self._resolver
         self._cross_keys = set()
 
-        var_discrete = self._var_discrete
+        var_discrete = self._var_discrete = {'input': {}, 'output': {}}
         allprocs_discrete = self._var_allprocs_discrete
 
         abs2meta = self._var_abs2meta

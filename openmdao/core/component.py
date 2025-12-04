@@ -324,9 +324,8 @@ class Component(System):
         # })
 
         #DBG
-        import pprint
-        print(f"{self.msginfo}: var_allprocs_abs2idx")
-        pprint.pprint(self._var_allprocs_abs2idx)
+        # om_dump(f"{self.msginfo}: var_allprocs_abs2idx")
+        # om_dump_pprint(self._var_allprocs_abs2idx)
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
