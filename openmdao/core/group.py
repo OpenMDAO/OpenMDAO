@@ -3620,21 +3620,11 @@ class Group(System):
         self._var_allprocs_discrete[io].update(auto_ivc._var_allprocs_discrete[io])
 
         self._var_abs2meta[io] = {}
-        # rebuild _var_abs2meta in the correct order
+        self._var_allprocs_abs2meta[io] = {}
+        # rebuild _var_abs2meta and _var_allprocs_abs2meta in the correct order
         for s in self._sorted_subsystems_myproc:
             self._var_abs2meta[io].update(s._var_abs2meta[io])
-
-        self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
-        old = self._var_allprocs_abs2meta
-        self._var_allprocs_abs2meta = {'input': old['input'], 'output': {}}
-        self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
-        self._var_allprocs_abs2meta[io].update(old[io])
-        # for sysname in self._sorted_subsystems_allprocs_iter():
-        #     self._var_allprocs_abs2meta[io].update(
-        #         self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
-
-        #self._var_allprocs_abs2idx.update(
-            #{n: i for i, n in enumerate(self._var_allprocs_abs2meta[io])})
+            self._var_allprocs_abs2meta[io].update(s._var_allprocs_abs2meta[io])
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True
@@ -4232,6 +4222,7 @@ class Group(System):
         pprint.pprint(self._var_sizes)
         print('abs2idx:')
         pprint.pprint(self._var_allprocs_abs2idx)
+        print('', flush=True)
 
 
 def iter_solver_info(system):

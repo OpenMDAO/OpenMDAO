@@ -124,7 +124,8 @@ else:
                         if 'input' in factors:
                             scaled_in_set.add(sub_in)
 
-                    print(f"xfer {sub_in} input_inds: {input_inds} output_inds: {output_inds}")
+                    #DBG
+                    # print(f"xfer {sub_in} input_inds: {input_inds} output_inds: {output_inds}")
 
                     xfer_in[sub_in].append(input_inds)
                     xfer_out[sub_in].append(output_inds)
@@ -487,8 +488,9 @@ def _get_output_inds(group, abs_out, abs_in):
             offset = offsets[rank]
             output_inds = range(offset, offset + sizes[rank])
 
-        print(f"output_inds: {abs_out} {abs_in} {output_inds}")
-        print("orig_src_inds: None")
+        #DBG
+        # print(f"output_inds: {abs_out} {abs_in} {output_inds}")
+        # print("orig_src_inds: None")
         return output_inds, None
 
     else:

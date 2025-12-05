@@ -2319,14 +2319,6 @@ class AllConnGraph(nx.DiGraph):
         else:
             return [self.get_root(node)[1]]
 
-    def source_iter(self):
-        """
-        Iterate over all source nodes in the graph.
-        """
-        for node in self.nodes():
-            if node[0] == 'o' and self.in_degree(node) == 0:
-                yield node
-
     def io_conn_iter(self):
         """
         Iterate over all output-input connections in the graph.
