@@ -1253,7 +1253,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         if (not self._metadata['allow_post_setup_reorder'] and
                 self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
-            raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
+            raise RuntimeError(f"{self.msginfo}: Can't call set_order without calling setup after.")
 
         # set up recording, including any new recorders since last setup
         # TODO: We should be smarter and only setup the recording when new recorders have

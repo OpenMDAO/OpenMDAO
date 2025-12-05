@@ -312,17 +312,6 @@ class Component(System):
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
                 del v['val']
 
-            self._var_abs2meta[io] = {k: abs2meta[k] for k in sorted(abs2meta)}
-            self._var_allprocs_abs2meta[io] = \
-                {k: allprocs_abs2meta[k] for k in sorted(allprocs_abs2meta)}
-
-        # self._var_allprocs_abs2idx = {
-        #     n: i for i, n in enumerate(self._var_allprocs_abs2meta['input'])
-        # }
-        # self._var_allprocs_abs2idx.update({
-        #     n: i for i, n in enumerate(self._var_allprocs_abs2meta['output'])
-        # })
-
         #DBG
         # om_dump(f"{self.msginfo}: var_allprocs_abs2idx")
         # om_dump_pprint(self._var_allprocs_abs2idx)
@@ -474,8 +463,6 @@ class Component(System):
             Subjacobian key.  Names are absolute.
         """
         yield from self._subjacs_info.keys()
-
-    _subjac_keys_iter = _declared_partials_iter
 
     def _get_missing_partials(self, missing):
         """

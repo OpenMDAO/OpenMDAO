@@ -124,6 +124,15 @@ class NameResolver(object):
         self._conns = None
         self.msginfo = msginfo if msginfo else pathname
 
+    # def sort_abs_names(self):
+    #     """
+    #     Sort the absolute names in the _abs2prom dictionary.
+    #     """
+    #     self._abs2prom['input'] = dict(sorted(self._abs2prom['input'].items()))
+    #     self._abs2prom['output'] = dict(sorted(self._abs2prom['output'].items()))
+    #     self._abs2prom_in = self._abs2prom['input']
+    #     self._abs2prom_out = self._abs2prom['output']
+
     def reset_prom_maps(self):
         """
         Reset the _prom2abs dictionary.

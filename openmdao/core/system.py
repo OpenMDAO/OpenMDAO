@@ -451,6 +451,7 @@ class System(object, metaclass=SystemMetaclass):
 
         self._subsystems_allprocs = {}
         self._subsystems_myproc = []
+        self._sorted_subsystems_myproc = []
         self._vars_to_gather = {}
 
         self._var_promotes = {'input': [], 'output': [], 'any': []}
@@ -6463,7 +6464,7 @@ class System(object, metaclass=SystemMetaclass):
         # return regular dict sorted by system pathname
         return {spath: data for spath, data in sorted(sys_prom_map.items(), key=lambda x: x[0])}
 
-    def _sorted_sys_iter(self):
+    def _sorted_subsystems_myproc_iter(self):
         yield from ()
 
     def load_case(self, case):

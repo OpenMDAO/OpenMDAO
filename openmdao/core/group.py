@@ -581,7 +581,7 @@ class Group(System):
         self.matrix_free = False
         self._has_guess = overrides_method('guess_nonlinear', self, Group)
 
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._sorted_subsystems_myproc:
             subsys._configure()
             subsys._setup_var_data()
 
@@ -698,13 +698,15 @@ class Group(System):
             sub_comm = comm
             self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
 
+        self._sorted_subsystems_myproc = list(self._sorted_subsystems_myproc_iter())
+
         # need to set pathname correctly even for non-local subsystems
         for s, _ in self._subsystems_allprocs.values():
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
             s._problem_meta = prob_meta
 
         # Perform recursion
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_subsystems_myproc:
             subsys._setup_procs(subsys.pathname, sub_comm, prob_meta)
 
         # build a list of local subgroups to speed up later loops
@@ -780,7 +782,7 @@ class Group(System):
             List of all states.
         """
         states = []
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._sorted_subsystems_myproc:
             states.extend(subsys._list_states())
 
         return states
@@ -1220,7 +1222,7 @@ class Group(System):
         """
         super()._setup_vectors(parent_vectors)
 
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._sorted_subsystems_myproc:
             subsys._scale_factors = self._scale_factors
             subsys._setup_vectors(self._vectors)
 
@@ -1498,7 +1500,7 @@ class Group(System):
         # sort the subsystems alphabetically in order to make the ordering
         # of vars in vectors and other data structures independent of the
         # execution order.
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._sorted_subsystems_myproc:
             self._has_output_scaling |= subsys._has_output_scaling
             self._has_output_adder |= subsys._has_output_adder
             self._has_resid_scaling |= subsys._has_resid_scaling
@@ -1594,18 +1596,16 @@ class Group(System):
                     # accurately reflect this proc's var size instead of one from some other proc.
                     allprocs_abs2meta[io].update(old_abs2meta[io])
 
-        for io in ('input', 'output'):
-            dct = abs2meta[io]
-            self._var_abs2meta[io] = {k: dct[k] for k in sorted(dct)}
-            dct = allprocs_abs2meta[io]
-            allprocs_abs2meta[io] = {k: dct[k] for k in sorted(dct)}
+        # # make sure the absolute names we iterate over are in the same order on all procs
+        # for io in ('input', 'output'):
+        #     dct = abs2meta[io]
+        #     self._var_abs2meta[io] = {k: dct[k] for k in sorted(dct)}
+        #     dct = allprocs_abs2meta[io]
+        #     allprocs_abs2meta[io] = {k: dct[k] for k in sorted(dct)}
+
+        # self._resolver.sort_abs_names()
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
-
-        # self._var_allprocs_abs2idx = {n: i for i, n in enumerate(allprocs_abs2meta['input'])}
-        # self._var_allprocs_abs2idx.update({
-        #     n: i for i, n in enumerate(allprocs_abs2meta['output'])
-        # })
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -1699,7 +1699,7 @@ class Group(System):
             'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=INT_DTYPE),
         }
 
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._sorted_subsystems_myproc:
             subsys._setup_var_sizes()
 
         iproc = self.comm.rank
@@ -1720,36 +1720,6 @@ class Group(System):
 
         # TODO: see about moving vector class setup elsewhere
         self._setup_vector_class()
-
-        # for subsys in self.system_iter(recurse=True, include_self=False):
-        #     ranks = translate_ranks(self.comm, subsys.comm, try_slice=True)
-        #     subins = list(subsys._var_allprocs_abs2meta['input'])
-        #     istart = abs2idx[subins[0]] if subins else 0
-        #     iend = abs2idx[subins[-1]] + 1 if subins else 0
-        #     subsys._var_sizes['input'] = self._var_sizes['input'][ranks, istart:iend]
-        #     # subsys._var_allprocs_abs2idx = {n: i for i, n in enumerate(subins)}
-
-        #     subouts = list(subsys._var_allprocs_abs2meta['output'])
-        #     ostart = abs2idx[subouts[0]] if subouts else 0
-        #     oend = abs2idx[subouts[-1]] + 1 if subouts else 0
-        #     subsys._var_sizes['output'] = self._var_sizes['output'][ranks, ostart:oend]
-        #     # subsys._var_allprocs_abs2idx.update({n: i for i, n in enumerate(subouts)})
-
-        #     # print(subsys.pathname)
-
-        #     if isinstance(subsys, Group):
-        #         subsys._setup_vector_class()
-        #         subsys._compute_owning_ranks()
-        #     else:
-        #         subsys._owned_output_sizes = subsys._var_sizes['output']
-
-            # for io in ('input', 'output'):
-            #     for name in subsys._var_allprocs_abs2meta[io]:
-            #         subsize = subsys._var_sizes[io][:, subsys._var_allprocs_abs2idx[name]]
-            #         size = self._var_sizes[io][:, self._var_allprocs_abs2idx[name]]
-            #         print(name, size, subsize)
-            #         if not np.all(subsize == size):
-            #             print("SIZE MISMATCH!!!!!")
 
         self._compute_owning_ranks()
 
@@ -1810,7 +1780,7 @@ class Group(System):
                                     for n in self._resolver.get_implicit_conns()}
         else:
             implicit_connections = self._resolver.get_implicit_conns()
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_subsystems_myproc:
             if isinstance(subsys, Group):
                 implicit_connections.update(subsys._get_implicit_connections())
 
@@ -2703,6 +2673,7 @@ class Group(System):
 
         if not self._static_mode:
             self._subsystems_myproc = [s for s, _ in self._subsystems_allprocs.values()]
+            self._sorted_subsystems_myproc = list(self._sorted_subsystems_myproc_iter())
 
         self._order_set = True
         if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder']:
@@ -3102,7 +3073,7 @@ class Group(System):
         graph = self._get_conn_graph()
         nodes = graph.nodes()
 
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._sorted_subsystems_myproc:
             subsys._setup_partials()
             info.update(subsys._subjacs_info)
 
@@ -3120,7 +3091,7 @@ class Group(System):
         """
         Call setup_residuals in components.
         """
-        for subsys in self._sorted_sys_iter():
+        for subsys in self._sorted_subsystems_myproc:
             subsys._setup_residuals()
 
     def _declared_partials_iter(self):
@@ -3132,7 +3103,7 @@ class Group(System):
         key : tuple (of, wrt)
             Subjacobian key.
         """
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_subsystems_myproc:
             yield from subsys._declared_partials_iter()
 
     def _get_missing_partials(self, missing):
@@ -3146,7 +3117,7 @@ class Group(System):
         """
         if self._has_approx:
             return
-        for subsys in self._subsystems_myproc:
+        for subsys in self._sorted_subsystems_myproc:
             subsys._get_missing_partials(missing)
 
     def _get_jacobian(self):
@@ -3639,6 +3610,7 @@ class Group(System):
             s.index = i + 1
 
         self._subsystems_myproc = [auto_ivc] + self._subsystems_myproc
+        self._sorted_subsystems_myproc = list(self._sorted_subsystems_myproc_iter())
 
         self._resolver._auto_ivc_update(auto_ivc._resolver, auto2tgt)
 
@@ -3649,13 +3621,13 @@ class Group(System):
 
         self._var_abs2meta[io] = {}
         # rebuild _var_abs2meta in the correct order
-        for s in self._sorted_sys_iter():
+        for s in self._sorted_subsystems_myproc:
             self._var_abs2meta[io].update(s._var_abs2meta[io])
 
         self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
         old = self._var_allprocs_abs2meta[io]
         self._var_allprocs_abs2meta[io] = {k: old[k] for k in sorted(old)}
-        # for sysname in self._sorted_sys_iter_all_procs():
+        # for sysname in self._sorted_subsystems_allprocs_iter():
         #     self._var_allprocs_abs2meta[io].update(
         #         self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
 
@@ -3680,7 +3652,7 @@ class Group(System):
             else:
                 yield s.pathname
 
-    def _sorted_sys_iter(self):
+    def _sorted_subsystems_myproc_iter(self):
         """
         Yield subsystems in sorted order if Problem option allow_post_setup_reorder is True.
 
@@ -3697,7 +3669,7 @@ class Group(System):
         else:
             yield from self._subsystems_myproc
 
-    def _sorted_sys_iter_all_procs(self):
+    def _sorted_subsystems_allprocs_iter(self):
         """
         Yield subsystem names in sorted order if Problem option allow_post_setup_reorder is True.
 
@@ -3818,7 +3790,7 @@ class Group(System):
                 # assembled in the same order under mpi as for serial runs.
                 out_by_sys = {}
 
-                for subsys in self._sorted_sys_iter():
+                for subsys in self._sorted_subsystems_myproc:
                     sub_out = {}
                     name = subsys.name
                     dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
@@ -3846,14 +3818,14 @@ class Group(System):
                     for name, meta in outs.items():
                         all_outs_by_sys[name] = meta
 
-                for subsys_name in self._sorted_sys_iter_all_procs():
+                for subsys_name in self._sorted_subsystems_allprocs_iter():
                     for name, meta in all_outs_by_sys[subsys_name].items():
                         if name not in out:
                             out[name] = meta
 
             else:
 
-                for subsys in self._sorted_sys_iter():
+                for subsys in self._sorted_subsystems_myproc:
                     dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
                                                  use_prom_ivc=use_prom_ivc)
                     if use_prom_ivc:
@@ -3918,7 +3890,7 @@ class Group(System):
                 # assembled in the same order under mpi as for serial runs.
                 out_by_sys = {}
 
-                for subsys in self._sorted_sys_iter():
+                for subsys in self._sorted_subsystems_myproc:
                     name = subsys.name
                     sub_out = {}
 
@@ -3952,12 +3924,12 @@ class Group(System):
                     for name, meta in outs.items():
                         all_outs_by_sys[name] = meta
 
-                for subsys_name in self._sorted_sys_iter_all_procs():
+                for subsys_name in self._sorted_subsystems_allprocs_iter():
                     for name, meta in all_outs_by_sys[subsys_name].items():
                         out[name] = meta
 
             else:
-                for subsys in self._sorted_sys_iter():
+                for subsys in self._sorted_subsystems_myproc:
                     subresps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
                                                     use_prom_ivc=use_prom_ivc)
                     if use_prom_ivc:
