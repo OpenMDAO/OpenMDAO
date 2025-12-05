@@ -39,7 +39,7 @@ GRAPH_COLORS = {
 }
 
 _shape_func_map = {
-    # (from_distributed, to_distributed, fwd)
+    # (src distributed, tgt distributed, fwd)
     (False, False, True): 'serial2serialfwd',
     (False, False, False): 'serial2serialrev',
     (False, True, True): 'serial2distfwd',
@@ -2940,7 +2940,14 @@ class AllConnGraph(nx.DiGraph):
         else:
             dist_from = dist_to = False
 
-        fname = _shape_func_map[(dist_from, dist_to, fwd)]
+        if fwd:
+            dist_src = dist_from
+            dist_tgt = dist_to
+        else:
+            dist_src = dist_to
+            dist_tgt = dist_from
+
+        fname = _shape_func_map[(dist_src, dist_tgt, fwd)]
         return getattr(self, fname)(from_node, to_node, src_inds_list, is_full_slice)
 
     def _get_var_existence(self):

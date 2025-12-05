@@ -1595,6 +1595,10 @@ class Group(System):
                     # accurately reflect this proc's var size instead of one from some other proc.
                     allprocs_abs2meta[io].update(old_abs2meta[io])
 
+        for io in ('input', 'output'):
+            self._var_allprocs_abs2idx.update(
+                {n: i for i, n in enumerate(allprocs_abs2meta[io])})
+
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
         if self._var_discrete['input'] or self._var_discrete['output']:
@@ -1681,7 +1685,6 @@ class Group(System):
         """
         self._var_offsets = None
         all_abs2meta = self._var_allprocs_abs2meta
-        abs2idx = self._var_allprocs_abs2idx = {}
 
         # only allocate these arrays the first time through
         self._var_sizes = {
@@ -1701,8 +1704,6 @@ class Group(System):
                     sz = abs2meta[name]['size']
                     if sz is not None:
                         sizes[iproc, i] = sz
-
-                abs2idx[name] = i
 
             if nprocs > 1:
                 my_sizes = sizes[iproc, :].copy()
@@ -3615,6 +3616,9 @@ class Group(System):
         for s in self._sorted_subsystems_myproc:
             self._var_abs2meta[io].update(s._var_abs2meta[io])
             self._var_allprocs_abs2meta[io].update(s._var_allprocs_abs2meta[io])
+
+        self._var_allprocs_abs2idx.update(
+            {n: i for i, n in enumerate(self._var_allprocs_abs2meta[io])})
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True

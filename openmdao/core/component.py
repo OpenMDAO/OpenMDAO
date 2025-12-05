@@ -312,6 +312,9 @@ class Component(System):
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
                 del v['val']
 
+            self._var_allprocs_abs2idx.update(
+                {n: i for i, n in enumerate(allprocs_abs2meta)})
+
         #DBG
         # om_dump(f"{self.msginfo}: var_allprocs_abs2idx")
         # om_dump_pprint(self._var_allprocs_abs2idx)
@@ -375,7 +378,6 @@ class Component(System):
         Compute the arrays of variable sizes for all variables/procs on this system.
         """
         iproc = self.comm.rank
-        abs2idx = self._var_allprocs_abs2idx = {}
 
         for io in ('input', 'output'):
             sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(self._var_rel_names[io])),
@@ -384,7 +386,6 @@ class Component(System):
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 sz = metadata['size']
                 sizes[iproc, i] = 0 if sz is None else sz
-                abs2idx[name] = i
 
             if self.comm.size > 1:
                 my_sizes = sizes[iproc, :].copy()
