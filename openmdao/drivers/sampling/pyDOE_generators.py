@@ -6,11 +6,6 @@ import numpy as np
 from openmdao.drivers.analysis_generator import AnalysisGenerator
 from openmdao.drivers.sampling.sampling_util import _get_size
 
-try:
-    import pyDOE3
-except ImportError:
-    pyDOE3 = None
-
 
 _LEVELS = 2  # default number of levels for pyDOE generators
 
@@ -44,12 +39,6 @@ class _pyDOE_AnalysisGenerator(AnalysisGenerator):
         """
         Initialize the _pyDOE_AnalysisGenerator.
         """
-        if pyDOE3 is None:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
-                               "which can be installed with one of the following commands:\n"
-                               "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
-
         self._levels = levels
         self._sizes = sizes = {}
 
@@ -190,7 +179,27 @@ class FullFactorialGenerator(_pyDOE_AnalysisGenerator):
         lower and upper bound.  Dictionary input is supported by Full Factorial or
         Generalized Subset Design.
         Defaults to 2.
+
+    Attributes
+    ----------
+    _fullfact : function
+        A lazily imported pyDOE full factorial function.
     """
+
+    def __init__(self, var_dict, levels=_LEVELS):
+        """
+        Initialize the FullFactorialGenerator.
+        """
+        try:
+            from pyDOE3 import fullfact
+            self._fullfact = fullfact
+        except ImportError:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+                               "which can be installed with one of the following commands:\n"
+                               "    pip install openmdao[doe]\n"
+                               "    pip install pyDOE3")
+
+        super().__init__(var_dict=var_dict, levels=levels)
 
     def _generate_design(self, size):
         """
@@ -206,7 +215,7 @@ class FullFactorialGenerator(_pyDOE_AnalysisGenerator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        return pyDOE3.fullfact(self._get_all_levels())
+        return self._fullfact(self._get_all_levels())
 
 
 class GeneralizedSubsetGenerator(_pyDOE_AnalysisGenerator):
@@ -242,6 +251,8 @@ class GeneralizedSubsetGenerator(_pyDOE_AnalysisGenerator):
         designs are balanced analogous to fold-over in two-level fractional
         factorial designs.
         Defaults to 1.
+    _gsd : function
+        The pyDOE3 generalized subset function, lazily imported.
     """
 
     def __init__(self, var_dict, levels, reduction, n=1):
@@ -250,6 +261,16 @@ class GeneralizedSubsetGenerator(_pyDOE_AnalysisGenerator):
         """
         self._reduction = reduction
         self._n = n
+
+        try:
+            from pyDOE3 import gsd
+            self._gsd = gsd
+        except ImportError:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+                               "which can be installed with one of the following commands:\n"
+                               "    pip install openmdao[doe]\n"
+                               "    pip install pyDOE3")
+
         super().__init__(var_dict, levels=levels)
 
     def _generate_design(self, size):
@@ -266,7 +287,7 @@ class GeneralizedSubsetGenerator(_pyDOE_AnalysisGenerator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        return pyDOE3.gsd(levels=self._get_all_levels(), reduction=self._reduction, n=self._n)
+        return self._gsd(levels=self._get_all_levels(), reduction=self._reduction, n=self._n)
 
 
 class PlackettBurmanGenerator(_pyDOE_AnalysisGenerator):
@@ -280,12 +301,26 @@ class PlackettBurmanGenerator(_pyDOE_AnalysisGenerator):
         values are the arguments to `set_val` and may include additional metadata such
         as size, global_size, val, lower, and upper.  Both 'lower' and 'upper' keys
         are required to define the range of each factor.
+
+    Attributes
+    ----------
+    _pbdesign : function
+        The pyDOE3 Plackett-Burman function, lazily imported.
     """
 
     def __init__(self, var_dict):
         """
         Initialize the PlackettBurmanGenerator.
         """
+        try:
+            from pyDOE3 import pbdesign
+            self._pbdesign = pbdesign
+        except ImportError:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+                               "which can be installed with one of the following commands:\n"
+                               "    pip install openmdao[doe]\n"
+                               "    pip install pyDOE3")
+
         super().__init__(var_dict, levels=2)
 
     def _generate_design(self, size):
@@ -302,7 +337,7 @@ class PlackettBurmanGenerator(_pyDOE_AnalysisGenerator):
         ndarray
             The design matrix as a size x levels array of indices.
         """
-        doe = pyDOE3.pbdesign(size)
+        doe = self._pbdesign(size)
 
         doe[doe < 0] = 0  # replace -1 with zero
 
@@ -325,6 +360,8 @@ class BoxBehnkenGenerator(_pyDOE_AnalysisGenerator):
     ----------
     _center : int
         The number of center points to include.
+    _bbdesign : function
+        The pyDOE3 Box-Behnken function, lazily imported.
     """
 
     def __init__(self, var_dict, center=None):
@@ -332,6 +369,15 @@ class BoxBehnkenGenerator(_pyDOE_AnalysisGenerator):
         Initialize the BoxBehnkenGenerator.
         """
         self._center = center
+        try:
+            from pyDOE3 import bbdesign
+            self._bbdesign = bbdesign
+        except ImportError:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+                               "which can be installed with one of the following commands:\n"
+                               "    pip install openmdao[doe]\n"
+                               "    pip install pyDOE3")
+
         super().__init__(var_dict, levels=3)
 
     def _generate_design(self, size):
@@ -353,7 +399,7 @@ class BoxBehnkenGenerator(_pyDOE_AnalysisGenerator):
                                "but must be at least 3 when using %s. " %
                                (size, self.__class__.__name__))
 
-        doe = pyDOE3.bbdesign(size, center=self._center)
+        doe = self._bbdesign(size, center=self._center)
 
         return doe + 1  # replace [-1, 0, 1] with [0, 1, 2]
 
@@ -390,6 +436,8 @@ class LatinHypercubeGenerator(AnalysisGenerator):
         The number of iterations to use for maximin and correlations algorithms.
     _seed : int or None
         Random seed.
+    _lhs : function
+        The pyDOE3 latin hypercube sampling function, lazily imported.
     """
 
     # supported pyDOE criterion names.
@@ -418,6 +466,15 @@ class LatinHypercubeGenerator(AnalysisGenerator):
         self._iterations = iterations
         self._seed = seed
 
+        try:
+            from pyDOE3 import lhs
+            self._lhs = lhs
+        except ImportError:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+                               "which can be installed with one of the following commands:\n"
+                               "    pip install openmdao[doe]\n"
+                               "    pip install pyDOE3")
+
         super().__init__(var_dict)
 
     def _setup(self):
@@ -435,10 +492,10 @@ class LatinHypercubeGenerator(AnalysisGenerator):
             self._samples = size
 
         # generate design
-        doe = pyDOE3.lhs(size, samples=self._samples,
-                         criterion=self._criterion,
-                         iterations=self._iterations,
-                         random_state=self._seed)
+        doe = self._lhs(size, samples=self._samples,
+                        criterion=self._criterion,
+                        iterations=self._iterations,
+                        random_state=self._seed)
 
         # construct iterator for doe values
         # rows = vars (# rows/var = var size), cols = levels

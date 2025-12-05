@@ -10,24 +10,6 @@ from openmdao.recorders.case_reader import CaseReader
 # Enable _DEBUG to prevent the debug_output display from clearing itself.
 _DEBUG = False
 
-try:
-    import matplotlib.pyplot as plt
-    import matplotlib as mpl
-    from matplotlib import cm
-except ImportError:
-    mpl = None
-
-try:
-    import ipywidgets as ipw
-except ImportError:
-    ipw = None
-
-try:
-    from IPython.display import display
-    from IPython import get_ipython
-except ImportError:
-    get_ipython = None
-
 
 _func_map = {'None': lambda x: x,
              'ravel': np.ravel,
@@ -292,17 +274,37 @@ class CaseViewer(object):
         The colorbar shown on the right side of the figure.
     _case_index_str : str
         Constant defining the "Case Index" string used throughout the CaseViewer.
+    _ipw : module
+        A lazily imported instance of the ipywidgets module
     """
 
     def __init__(self, f):
         """
         Initialize the case viewer interface.
         """
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib as mpl
+            from matplotlib import cm
+        except ImportError:
+            mpl = None
+
+        try:
+            import ipywidgets as ipw
+            self._ipw = ipw
+        except ImportError:
+            self._ipw = None
+
+        try:
+            from IPython import get_ipython
+        except ImportError:
+            get_ipython = None
+
         if mpl is None:
             raise RuntimeError('CaseViewer requires matplotlib and ipympl')
         if get_ipython is None:
             raise RuntimeError('CaseViewer requires jupyter')
-        if ipw is None:
+        if self._ipw is None:
             raise RuntimeError('CaseViewer requires ipywidgets')
         if get_ipython() is None:
             raise RuntimeError('CaseViewer must be run from within a Jupyter notebook.')
@@ -343,6 +345,9 @@ class CaseViewer(object):
         """
         Define the widgets for the CaseViewer and display them.
         """
+        from IPython.display import display
+        ipw = self._ipw
+
         self._widgets = {}
 
         self._widgets['source_select'] = ipw.Dropdown(description='Source',

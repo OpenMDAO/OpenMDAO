@@ -5,6 +5,8 @@ pyoptsparse is based on pyOpt, which is an object-oriented framework for
 formulating and solving nonlinear constrained optimization problems, with
 additional MPI capability.
 """
+from importlib.util import find_spec
+import importlib.metadata as ilmd
 import sys
 import json
 import signal
@@ -12,14 +14,6 @@ from packaging.version import Version
 
 import numpy as np
 from scipy.sparse import coo_matrix
-
-try:
-    import pyoptsparse
-    Optimization = pyoptsparse.Optimization
-except ImportError:
-    pyoptsparse = None
-except Exception as err:
-    pyoptsparse = err
 
 from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.analysis_error import AnalysisError
@@ -30,8 +24,8 @@ from openmdao.utils.mpi import FakeComm, MPI
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation
 
 # what version of pyoptspare are we working with
-if pyoptsparse and hasattr(pyoptsparse, '__version__'):
-    pyoptsparse_version = Version(pyoptsparse.__version__)
+if find_spec('pyoptsparse') is not None:
+    pyoptsparse_version = Version(ilmd.version('pyoptsparse'))
 else:
     pyoptsparse_version = None
 
@@ -180,12 +174,22 @@ class pyOptSparseDriver(Driver):
         This is set to True when the user sends a signal to terminate the job.
     _model_ran : bool
         This is set to True after the full model has been run at least once.
+    _Optimization: class
+        The pyoptsparse Optimization class, lazily imported.
     """
 
     def __init__(self, **kwargs):
         """
         Initialize pyopt.
         """
+        try:
+            import pyoptsparse
+            self._Optimization = pyoptsparse.Optimization
+        except ImportError:
+            pyoptsparse = None
+        except Exception as err:
+            pyoptsparse = err
+
         if pyoptsparse is None:
             # pyoptsparse is not installed
             raise ImportError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
@@ -382,8 +386,8 @@ class pyOptSparseDriver(Driver):
         self._coloring_info.run_model = not model_ran
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
-        opt_prob = Optimization(self.options['title'], WeakMethodWrapper(self, '_objfunc'),
-                                comm=comm)
+        opt_prob = self._Optimization(self.options['title'], WeakMethodWrapper(self, '_objfunc'),
+                                      comm=comm)
 
         input_vals = self.get_design_var_values()
 
@@ -656,8 +660,9 @@ class pyOptSparseDriver(Driver):
                 if exit_status and exit_status > 2:
                     self.fail = True
 
-        except KeyError:
+        except (TypeError, KeyError):
             # optimizers other than pySNOPT may not populate this dict
+            # for some optimizers, sol is None and not subscriptable.
             pass
 
         # revert signal handler to cached version

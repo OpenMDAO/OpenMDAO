@@ -20,15 +20,11 @@ Sobieszczanski-Sobieski, J., Morris, A. J., van Tooren, M. J. L. (2015)
 Multidisciplinary Design Optimization Supported by Knowledge Based Engineering.
 John Wiley & Sons, Ltd.
 """
+from importlib.util import find_spec
 import os
 import copy
 
 import numpy as np
-
-try:
-    from pyDOE3 import lhs
-except ModuleNotFoundError:
-    lhs = None
 
 from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
@@ -69,7 +65,7 @@ class SimpleGADriver(Driver):
         """
         Initialize the SimpleGADriver driver.
         """
-        if lhs is None:
+        if find_spec('pyDOE3') is None:
             raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
@@ -577,7 +573,7 @@ class SimpleGADriver(Driver):
         return fun, success, icase
 
 
-class GeneticAlgorithm(object):
+class GeneticAlgorithm:
     """
     Simple Genetic Algorithm.
 
@@ -618,13 +614,18 @@ class GeneticAlgorithm(object):
         Population size.
     objfun : function
         Objective function callback.
+    _lhs : function
+        A lazily imported instance of the pyDOE3 latin hypercube sampling function.
     """
 
     def __init__(self, objfun, comm=None, model_mpi=None):
         """
         Initialize genetic algorithm object.
         """
-        if lhs is None:
+        try:
+            from pyDOE3 import lhs
+            self._lhs = lhs
+        except ImportError:
             raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
@@ -707,8 +708,8 @@ class GeneticAlgorithm(object):
             Pm = (self.lchrom + 1.0) / (2.0 * pop_size * np.sum(bits))
         elite = self.elite
 
-        new_gen = np.round(lhs(self.lchrom, self.npop, criterion='center',
-                               random_state=random_state))
+        new_gen = np.round(self._lhs(self.lchrom, self.npop, criterion='center',
+                                     random_state=random_state))
         new_gen[0] = self.encode(x0, vlb, vub, bits)
 
         # Main Loop

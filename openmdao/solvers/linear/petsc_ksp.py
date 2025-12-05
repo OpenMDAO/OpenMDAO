@@ -1,22 +1,13 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
+from importlib.util import find_spec
+import importlib.metadata as ilmd
 import numpy as np
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 from openmdao.utils.mpi import check_mpi_env
 
-use_mpi = check_mpi_env()
-if use_mpi is not False:
-    try:
-        import petsc4py
-        from petsc4py import PETSc
-    except ImportError:
-        PETSc = None
-        if use_mpi is True:
-            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
-else:
-    PETSc = None
 
 KSP_TYPES = [
     "richardson",
@@ -100,17 +91,14 @@ def _get_petsc_vec_array_old(vec):
     return vec.getArray()
 
 
-if PETSc:
-    try:
-        petsc_version = petsc4py.__version__
-    except AttributeError:  # hack to fix doc-tests
-        petsc_version = "3.5"
-
-
-if PETSc and int((petsc_version).split('.')[1]) >= 6:
-    _get_petsc_vec_array = _get_petsc_vec_array_new
+if find_spec('petsc4py') is not None:
+    petsc_version = ilmd.version('petsc4py')
+    if int(petsc_version.split('.')[1]) >= 6:
+        _get_petsc_vec_array = _get_petsc_vec_array_new
+    else:
+        _get_petsc_vec_array = _get_petsc_vec_array_old
 else:
-    _get_petsc_vec_array = _get_petsc_vec_array_old
+    petsc_version = '3.5'
 
 
 class Monitor(object):
@@ -180,6 +168,8 @@ class PETScKrylov(LinearSolver):
         Dictionary of KSP instances (keyed on vector name).
     _lin_rhs_checker : LinearRHSChecker or None
         Object for checking the right-hand side of the linear solve.
+    _PETSc : <petsc4py.PETSc>
+        Lazily imported petsc4py.PETSc module.
     """
 
     SOLVER = 'LN: PETScKrylov'
@@ -190,7 +180,19 @@ class PETScKrylov(LinearSolver):
         """
         super().__init__(**kwargs)
 
-        if PETSc is None:
+        use_mpi = check_mpi_env()
+        if use_mpi is not False:
+            try:
+                from petsc4py import PETSc
+                self._PETSc = PETSc
+            except ImportError:
+                self._PETSc = None
+                if use_mpi is True:
+                    raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
+        else:
+            self._PETSc = None
+
+        if self._PETSc is None:
             raise RuntimeError(f"{self.msginfo}: PETSc is not available. "
                                "Set shell variable OPENMDAO_USE_MPI=1 to detect earlier.")
 
@@ -415,8 +417,8 @@ class PETScKrylov(LinearSolver):
         sol_array = x_vec.asarray(copy=True)
 
         # create PETSc vectors from numpy arrays
-        sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system._comm)
-        rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system._comm)
+        sol_petsc_vec = self._PETSc.Vec().createWithArray(sol_array, comm=system._comm)
+        rhs_petsc_vec = self._PETSc.Vec().createWithArray(rhs_array, comm=system._comm)
 
         # run PETSc solver
         self._iter_count = 0
@@ -505,20 +507,20 @@ class PETScKrylov(LinearSolver):
         lsize = np.sum(system._var_sizes['output'][iproc, :])
         size = np.sum(system._var_sizes['output'])
 
-        jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
-                                           comm=system.comm)
+        jac_mat = self._PETSc.Mat().createPython([(lsize, size), (lsize, size)],
+                                                 comm=system.comm)
         jac_mat.setPythonContext(self)
         jac_mat.setUp()
 
-        ksp = self._ksp = PETSc.KSP().create(comm=system.comm)
+        ksp = self._ksp = self._PETSc.KSP().create(comm=system.comm)
 
         ksp.setOperators(jac_mat)
         ksp.setType(self.options['ksp_type'])
         ksp.setGMRESRestart(self.options['restart'])
         if self.options['precon_side'] == 'left':
-            ksp.setPCSide(PETSc.PC.Side.LEFT)
+            ksp.setPCSide(self._PETSc.PC.Side.LEFT)
         else:
-            ksp.setPCSide(PETSc.PC.Side.RIGHT)
+            ksp.setPCSide(self._PETSc.PC.Side.RIGHT)
         ksp.setMonitor(Monitor(self))
         ksp.setInitialGuessNonzero(True)
 

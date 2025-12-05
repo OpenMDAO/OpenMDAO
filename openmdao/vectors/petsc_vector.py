@@ -52,6 +52,10 @@ else:
             version.
         _comm : MPI.Comm
             The MPI communicator for the owning system.
+        _petsc : PETSc.Vec
+            The PETSc vector.
+        _imag_petsc : PETSc.Vec
+            The PETSc imaginary vector.
         """
 
         TRANSFER = PETScTransfer
