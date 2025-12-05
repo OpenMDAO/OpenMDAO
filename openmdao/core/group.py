@@ -1583,8 +1583,7 @@ class Group(System):
                 proc_resolvers[rank] = proc_resolver
 
                 for io in ['input', 'output']:
-                    if rank != myrank:
-                        allprocs_abs2meta[io].update(proc_abs2meta[io])
+                    allprocs_abs2meta[io].update(proc_abs2meta[io])
                     allprocs_discrete[io].update(proc_discrete[io])
 
             self._resolver.update_from_ranks(myrank, proc_resolvers)
@@ -1595,15 +1594,6 @@ class Group(System):
                     # consistent order for our dict), so that the 'size' metadata will
                     # accurately reflect this proc's var size instead of one from some other proc.
                     allprocs_abs2meta[io].update(old_abs2meta[io])
-
-        # # make sure the absolute names we iterate over are in the same order on all procs
-        # for io in ('input', 'output'):
-        #     dct = abs2meta[io]
-        #     self._var_abs2meta[io] = {k: dct[k] for k in sorted(dct)}
-        #     dct = allprocs_abs2meta[io]
-        #     allprocs_abs2meta[io] = {k: dct[k] for k in sorted(dct)}
-
-        # self._resolver.sort_abs_names()
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
