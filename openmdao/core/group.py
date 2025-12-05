@@ -4214,6 +4214,23 @@ class Group(System):
 
         return self._key_owner
 
+    def debug_dump(self):
+        print('subsystems:', [s.pathname for s in self._subsystems_myproc])
+        print('sorted_subsystems:', [s.pathname for s in self._sorted_subsystems_myproc])
+        print('global_inputs:', list(self._var_allprocs_abs2meta['input']))
+        print('local_inputs:', list(self._var_abs2meta['input']))
+        print('inputs:', list(self._inputs))
+        print('invec:', self._inputs.asarray())
+        print('global_outputs:', list(self._var_allprocs_abs2meta['output']))
+        print('local_outputs:', list(self._var_abs2meta['output']))
+        print('outputs:', list(self._outputs))
+        print('outvec:', self._outputs.asarray())
+        import pprint
+        print('var_sizes:')
+        pprint.pprint(self._var_sizes)
+        print('abs2idx:')
+        pprint.pprint(self._var_allprocs_abs2idx)
+
 
 def iter_solver_info(system):
     """
