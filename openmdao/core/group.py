@@ -1490,7 +1490,7 @@ class Group(System):
 
         abs2meta = self._var_abs2meta
 
-        allprocs_abs2meta = {'input': {}, 'output': {}}
+        allprocs_abs2meta = self._var_allprocs_abs2meta = {'input': {}, 'output': {}}
 
         self._has_distrib_vars = False
         self._has_fd_group = self._owns_approx_jac
@@ -3625,8 +3625,10 @@ class Group(System):
             self._var_abs2meta[io].update(s._var_abs2meta[io])
 
         self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
-        old = self._var_allprocs_abs2meta[io]
-        self._var_allprocs_abs2meta[io] = {k: old[k] for k in sorted(old)}
+        old = self._var_allprocs_abs2meta
+        self._var_allprocs_abs2meta = {'input': old['input'], 'output': {}}
+        self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
+        self._var_allprocs_abs2meta[io].update(old[io])
         # for sysname in self._sorted_subsystems_allprocs_iter():
         #     self._var_allprocs_abs2meta[io].update(
         #         self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
