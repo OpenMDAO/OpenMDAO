@@ -486,9 +486,14 @@ class Problem(object, metaclass=ProblemMetaclass):
         float or ndarray or any python object
             the requested output/input variable.
         """
-        return self.get_val(name, get_remote=None)
+        meta_in = self.model._var_allprocs_abs2meta['input']
+        if name in meta_in and meta_in[name]['distributed']:
+            from_src = False
+        else:
+            from_src = True
+        return self.get_val(name, get_remote=None, from_src=from_src)
 
-    def get_val(self, name, units=None, indices=None, get_remote=False, copy=False):
+    def get_val(self, name, units=None, indices=None, get_remote=False, copy=False, from_src=True):
         """
         Get an output/input variable.
 
@@ -501,33 +506,33 @@ class Problem(object, metaclass=ProblemMetaclass):
         units : str, optional
             Units to convert to before return.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
-            Indices or slice to return.
+            Indices or slice of the named variable to return.
         get_remote : bool or None
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
             If False, only retrieve the value if it is on the current process, or only the part
             of the value that's on the current process for a distributed variable.
-            If None and the variable is remote or distributed, a RuntimeError will be raised.
+            If False and the variable is remote or distributed, a RuntimeError will be raised.
         copy : bool, optional
             If True, return a copy of the value.  If False, return a reference to the value.
+        from_src : bool
+            If True, retrieve value of an input variable from its connected source. This is
+            ignored and assumed to be True in all cases except when the name is the absolute name
+            of an input variable and the variable vectors have been initialized.  In that case the
+            value will be retrieved from the variable input vector directly.
 
         Returns
         -------
         object
             The value of the requested output/input variable.
         """
-        #if self._metadata['setup_status'] <= _SetupStatus.POST_SETUP2:
-            #abs_names = self.model._resolver.absnames(name)
-            #val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
-            #if not is_undefined(val):
-                #if indices is not None:
-                    #val = val[indices]
-                #if units is not None:
-                    #val = self.model.convert2units(name, val, simplify_unit(units))
-        #else:
+        abs2meta = self.model._var_allprocs_abs2meta
+        if name not in abs2meta['input']:
+            from_src = True
+
         val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
-                                 from_src=True, copy=copy)
+                                 from_src=from_src, copy=copy)
 
         if is_undefined(val):
             if get_remote:
@@ -1202,6 +1207,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
                 responses = model.get_responses(recurse=True, use_prom_ivc=True)
                 designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
+
                 response_size, desvar_size = driver._update_voi_meta(model, responses,
                                                                      designvars)
 

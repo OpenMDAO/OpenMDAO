@@ -1138,9 +1138,7 @@ class Group(System):
         """
         self._setup_dynamic_properties()
 
-        #self._resolve_group_input_defaults()
         graph = self._get_conn_graph()
-        #graph.display()
         graph.update_all_node_meta(self)
 
         if dump_graphs:
@@ -1156,7 +1154,15 @@ class Group(System):
 
         self._check_connections()
 
-        self._get_conn_graph().check(self)
+        graph.check(self)
+
+        nodes = graph.nodes
+
+        # now make sure all graph data is in sync with the variable metadata
+        for io in ['input', 'output']:
+            for name in self._var_allprocs_abs2meta[io]:
+                node = (io[0], name)
+                nodes[node].update_model_meta()
 
         # setup of residuals must occur before setup of vectors and partials
         self._setup_residuals()

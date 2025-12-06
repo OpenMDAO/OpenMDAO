@@ -259,7 +259,7 @@ class _AutoIndepVarComp(IndepVarComp):
     def _add_remote(self, name):
         self._remotes.add(name)
 
-    def _set_vector_class(self):
+    def _setup_vector_class(self):
         if self.comm.size > 1:
             all_remotes = set()
             for remotes in self.comm.allgather(self._remotes):
@@ -272,7 +272,7 @@ class _AutoIndepVarComp(IndepVarComp):
                 for name in all_remotes:
                     self._static_var_rel2meta[name]['distributed'] = True
 
-        super()._set_vector_class()
+        super()._setup_vector_class()
 
     def add_output(self, name, val=1.0, units=None):
         """

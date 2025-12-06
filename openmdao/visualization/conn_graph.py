@@ -125,6 +125,10 @@ class Defaults():
         yield self.src_shape
 
 
+_global_to_update = ['global_shape', 'global_size']
+_local_to_update = ['global_shape', 'global_size']
+
+
 class NodeAttrs():
     __slots__ = ('pathname', 'rel_name', '_val', '_shape', '_global_shape', '_units', 'defaults',
                  '_src_inds_list', 'flags', '_meta', '_locmeta', 'copy_shape', 'compute_shape',
@@ -231,13 +235,11 @@ class NodeAttrs():
     @shape.setter
     def shape(self, shape):
         if self._shape is None and shape is not None:
-            # val_updated = False
             self._shape = shape
             if self._shape != ():
                 if self._val is not None and np.ndim(self._val) == 0:
                     # if val is a scalar, reshape it to the new shape
                     self._val = np.full(shape, self._val)
-                    # val_updated = True
 
             if self.distributed is False:
                 self.global_shape = shape
@@ -249,9 +251,6 @@ class NodeAttrs():
                 if self._locmeta is not None:
                     if self._val is None:
                         self._val = np.ones(shape)
-                        # val_updated = True
-                    # if val_updated:
-                    #     self._locmeta['val'] = self._val
                     self._locmeta['shape'] = shape
                     self._locmeta['size'] = size
 
@@ -261,7 +260,9 @@ class NodeAttrs():
 
     @property
     def global_shape(self):
-        return self._global_shape
+        if self.distributed:
+            return self._global_shape
+        return self._shape
 
     @global_shape.setter
     def global_shape(self, global_shape):
@@ -456,6 +457,16 @@ class NodeAttrs():
                 if metaval is not None:
                     ret[name] = metaval
         return ret
+
+    def update_model_meta(self):
+        g_to_update = _global_to_update
+        l_to_update = _local_to_update
+        if self._meta is not None:
+            for key in g_to_update:
+                self._meta[key] = getattr(self, key)
+            if self._locmeta is not None:
+                for key in l_to_update:
+                    self._locmeta[key] = getattr(self, key)
 
 
 class AllConnGraph(nx.DiGraph):
@@ -698,6 +709,7 @@ class AllConnGraph(nx.DiGraph):
                 vec_name='nonlinear', kind=None, flat=False, from_src=True):
 
         node = self.find_node(system.pathname, name)
+        shape_node = node
         node_meta = self.nodes[node]
         need_gr = system.comm.size > 1 and not get_remote
         # if need_gr and node_meta.distributed:
@@ -708,33 +720,39 @@ class AllConnGraph(nx.DiGraph):
 
         if node[0] == 'o':
             tgt_units, tgt_inds_list = None, ()
+            src_node = node
         else:
-            tgt_inds_list = node_meta.src_inds_list
-            tgt_units = node_meta.units
             # ambiguous units aren't fatal during setup, but if we're getting a specific promoted
             # input that has ambiguous units, it becomes fatal, so we need to check that here.
             if node_meta.ambiguous_units:
                 raise ValueError(self.ambig_units_msg(node))
 
-        if node[0] == 'o':
-            src_node = node
-        elif from_src:
-            src_node = self.get_root(node)
-        else:
-            # getting a specific input
-            # (must use absolute name or have only a single leaf node)
-            leaves = list(self.leaf_input_iter(node))
+            tgt_inds_list = node_meta.src_inds_list
+            tgt_units = node_meta.units
 
-            if leaves:
-                if len(leaves) > 1:
-                    raise ValueError(
-                        f"{system.msginfo}: Promoted variable '{name}' refers to multiple "
-                        "input variables so the choice of input is ambiguous.  Either "
-                        "use the absolute name of the input or set 'from_src=True' to "
-                        "retrieve the value from the connected output.")
-                src_node = leaves[0]
+            if from_src:
+                src_node = self.get_root(node)
             else:
-                src_node = node
+                # getting a specific input
+                # (must use absolute name or have only a single leaf node)
+                leaves = list(self.leaf_input_iter(node))
+
+                if leaves:
+                    if len(leaves) > 1:
+                        raise ValueError(
+                            f"{system.msginfo}: Promoted variable '{name}' refers to multiple "
+                            "input variables so the choice of input is ambiguous.  Either "
+                            "use the absolute name of the input or set 'from_src=True' to "
+                            "retrieve the value from the connected output.")
+                    src_node = leaves[0]
+                    shape_node = src_node
+                    if get_remote:
+                        tgt_inds_list = ()
+                else:
+                    src_node = node
+
+        if indices is not None and not isinstance(indices, Indexer):
+            indices = indexer(indices, flat_src=flat)
 
         src_meta = self.nodes[src_node]
         src_units = src_meta.units
@@ -758,10 +776,8 @@ class AllConnGraph(nx.DiGraph):
                 raise ValueError(f"{system.msginfo}: Variable '{self.msgname(src_node)}' has not "
                                  "been initialized.")
 
-        if indices is not None and not isinstance(indices, Indexer):
-            indices = indexer(indices, flat_src=flat)
         try:
-            val = self.convert_get(node, val, src_units, tgt_units, tgt_inds_list, units, indices,
+            val = self.convert_get(shape_node, val, src_units, tgt_units, tgt_inds_list, units, indices,
                                    get_remote=get_remote)
         except Exception as err:
             raise ValueError(f"{system.msginfo}: Can't get value of '{node[1]}': {str(err)}")
@@ -962,6 +978,8 @@ class AllConnGraph(nx.DiGraph):
         return meta.pathname, meta.rel_name
 
     def set_model_meta(self, model, node, meta, locmeta):
+        # this helps us keep graph nodes and variable metadata in sync. Ultimately these need
+        # to be consolidated into a single data structure.
         node_meta = self.nodes[node]
 
         # this is only called on nodes corresponding to variables in the model, not on
@@ -985,13 +1003,13 @@ class AllConnGraph(nx.DiGraph):
 
                 if not node_meta.rel_name.startswith('_auto_ivc.'):
                     if node_meta.distributed:
-                        self._distributed_vars.add(node)
+                        self._distributed_nodes.add(node)
                     if not node_meta.dyn_shape:
                         node_meta._shape = meta['shape']
-                        if node_meta.distributed:
-                            node_meta.global_shape = self.compute_global_shape(node)
-                        else:
-                            node_meta.global_shape = meta['shape']
+                        # if node_meta.distributed:
+                        #     node_meta.global_shape = self.compute_global_shape(node)
+                        # else:
+                        #     node_meta.global_shape = meta['shape']
                         if locmeta is not None:
                             val = locmeta['val']
                             if isinstance(val, Number):
@@ -1038,7 +1056,8 @@ class AllConnGraph(nx.DiGraph):
         self._problem_meta = model._problem_meta
         self.msginfo = model.msginfo
 
-        self._distributed_vars = set()
+        self._distributed_nodes = set()
+
         for io in ['input', 'output']:
             loc = model._var_abs2meta[io]
             for name, meta in model._var_allprocs_abs2meta[io].items():
@@ -1050,14 +1069,20 @@ class AllConnGraph(nx.DiGraph):
                 locmeta = loc[name] if name in loc else None
                 self.add_discrete_var(model, name, meta, locmeta, io)
 
+        # update global shapes for distributed vars
+        for dnode in self._distributed_nodes:
+            node_meta = self.nodes[dnode]
+            if not node_meta.dyn_shape:
+                node_meta.global_shape = self.compute_global_shape(dnode)
+
     def get_dist_shapes(self, node=None):
         if self._dist_shapes is None:
             if self.comm.size > 1:
+                # make sure we have all of the distributed vars
                 dshapes = {}
-                for gnode in self._distributed_vars:
-                    node_meta = self.nodes[gnode]
-                    if node_meta.shape is not None:
-                        dshapes[gnode] = node_meta.shape
+                # at this point, _distributed_nodes only contains local vars
+                for gnode in self._distributed_nodes:
+                    dshapes[gnode] = self.nodes[gnode].shape
 
                 all_dshapes = {}
 
@@ -1067,6 +1092,7 @@ class AllConnGraph(nx.DiGraph):
                             all_dshapes[n] = [None] * self.comm.size
                         all_dshapes[n][rank] = shp
 
+                self._distributed_nodes.update(all_dshapes.keys())
                 self._dist_shapes = all_dshapes
             else:
                 self._dist_shapes = {}
@@ -1075,9 +1101,11 @@ class AllConnGraph(nx.DiGraph):
             return self._dist_shapes
 
         if node in self._dist_shapes:
-            return self._dist_shapes[node]
+            for s in self._dist_shapes[node]:
+                if s is not None:
+                    return self._dist_shapes[node]
 
-        if node in self._distributed_vars:
+        if node in self._distributed_nodes:
             node_meta = self.nodes[node]
             dist_shapes = self.comm.allgather(node_meta.shape)
             self._dist_shapes[node] = dist_shapes
@@ -1103,7 +1131,7 @@ class AllConnGraph(nx.DiGraph):
         if node in self._dist_sizes:
             return self._dist_sizes[node]
 
-        if node in self._distributed_vars:
+        if node in self._distributed_nodes:
             shapes = self.get_dist_shapes(node)
             sizes = [shape_to_len(shape) if shape is not None else 0 for shape in shapes]
             self._dist_sizes[node] = sizes
@@ -1900,7 +1928,8 @@ class AllConnGraph(nx.DiGraph):
             for key in _continuous_copy_meta:
                 setattr(child_meta, key, getattr(parent_meta, key))
             if parent_meta.distributed:
-                self._dist_shapes[child] = self._dist_shapes[parent]
+                shapes = self.get_dist_shapes()
+                shapes[child] = shapes[parent]
 
     def resolve_input_to_input_down(self, model, parent, child, auto):
         """
@@ -2603,7 +2632,7 @@ class AllConnGraph(nx.DiGraph):
         rows.append(get_table_row('copy_shape', meta))
 
         # dot doesn't like node labels containing functions, so just show yes if set
-        rows.append(get_table_row('compute_shape', meta,
+        rows.append(get_table_row('compute_shape',
                                   {'compute_shape': 'yes' if meta.compute_shape else None}))
         rows.append(get_table_row('compute_units',
                                   {'compute_units': 'yes' if meta.compute_units else None}))
