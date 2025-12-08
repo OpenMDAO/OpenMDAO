@@ -782,6 +782,8 @@ class AllConnGraph(nx.DiGraph):
                 "use the absolute name of the input or set 'from_src=True' to "
                 "retrieve the value from the connected output.")
 
+        leaf_meta = self.nodes[leaves[0]]
+
         if system.has_vectors():
             model = system._problem_meta['model_ref']()
             if model._resolver.is_prom(node[1], 'input' if node[0] == 'i' else 'output'):
@@ -791,7 +793,6 @@ class AllConnGraph(nx.DiGraph):
             val = system._abs_get_val(abs_name, get_remote, rank, vec_name, kind, flat,
                                       from_root=True)
         else:
-            leaf_meta = self.nodes[leaves[0]]
             val = leaf_meta.val
 
         if is_undefined(val):
