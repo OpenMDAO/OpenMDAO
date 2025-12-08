@@ -3966,14 +3966,14 @@ class System(object, metaclass=SystemMetaclass):
 
     def _update_response_meta(self, meta, get_size=False, use_prom_ivc=False):
         """
-        Update the design variable metadata.
+        Update the response variablemetadata.
 
         Parameters
         ----------
         meta : dict
             Metadata dictionary.
         get_size : bool
-            If True, compute the size of each design variable.
+            If True, compute the size of each response.
         use_prom_ivc : bool
             Use promoted names for inputs, else convert to absolute source names.
         """
@@ -5580,7 +5580,7 @@ class System(object, metaclass=SystemMetaclass):
             return None
         return model._conn_graph
 
-    def _abs_get_val(self, abs_name, get_remote=False, rank=None, vec_name=None, kind=None,
+    def _abs_get_val(self, abs_name, get_remote=None, rank=None, vec_name=None, kind=None,
                      flat=False, from_root=False):
         """
         Return the value of the variable specified by the given absolute name.
@@ -5614,53 +5614,42 @@ class System(object, metaclass=SystemMetaclass):
         object or None
             The value of the requested output/input/resid variable.  None if variable is not found.
         """
-        discrete = distrib = False
         val = _UNDEFINED
         if from_root:
             model = system = self._problem_meta['model_ref']()
-            all_meta = model._var_allprocs_abs2meta
-            my_meta = model._var_abs2meta
         else:
             system = self
-            all_meta = self._var_allprocs_abs2meta
-            my_meta = self._var_abs2meta
 
         graph = self._get_conn_graph()
-        node = ('i', abs_name)
+        node = ('o', abs_name)
         if node in graph:
-            typ = 'input'
+            typ = 'output'
         else:
-            node = ('o', abs_name)
+            node = ('i', abs_name)
             if node in graph:
-                typ = 'output'
+                typ = 'input'
             else:
                 raise KeyError(f"{self.msginfo}: Variable '{abs_name}' not found.")
 
-        all_meta = all_meta[typ]
-        my_meta = my_meta[typ]
+        node_meta = graph.nodes[node]
 
         vars_to_gather = self._problem_meta['vars_to_gather']
+        distrib = node_meta.distributed
+        discrete = node_meta.discrete
 
-        # if abs_name is non-discrete it should be found in all_meta
-        if abs_name in all_meta:
-            if get_remote:
-                meta = all_meta[abs_name]
-                distrib = meta['distributed']
-            elif self.comm.size > 1:
-                if abs_name in vars_to_gather and vars_to_gather[abs_name] != self.comm.rank:
+        if not discrete:
+            if not get_remote and self.comm.size > 1:
+                if node_meta.remote:
                     raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is not local to "
                                        f"rank {self.comm.rank}. You can retrieve values from "
                                        "other processes using `get_val(<name>, get_remote=True)`.")
 
-                meta = my_meta[abs_name]
-                distrib = meta['distributed']
-                if distrib and get_remote is None:
+                if distrib and get_remote is None:  # user didn't specify get_remote
                     raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is a distributed "
                                        "variable. You can retrieve values from all processes "
                                        "using `get_val(<name>, get_remote=True)` or from the "
                                        "local process using `get_val(<name>, get_remote=False)`.")
         else:
-            discrete = True
             relname = abs_name[len(system.pathname) + 1:] if system.pathname else abs_name
             if relname in system._discrete_outputs:
                 val = system._discrete_outputs[relname]
@@ -5684,12 +5673,11 @@ class System(object, metaclass=SystemMetaclass):
             try:
                 vec = self._vectors[kind][vec_name]
             except KeyError:
-                if abs_name in my_meta:
-                    if vec_name != 'nonlinear':
-                        raise ValueError(f"{self.msginfo}: Can't get variable named '{abs_name}' "
-                                         "because linear vectors are not available before "
-                                         "final_setup.")
-                    val = my_meta[abs_name]['val']
+                if vec_name != 'nonlinear':
+                    raise ValueError(f"{self.msginfo}: Can't get variable named '{abs_name}' "
+                                     "because linear vectors are not available before "
+                                     "final_setup.")
+                val = node_meta.val
             else:
                 if from_root:
                     vec = model._vectors[kind][vec_name]
@@ -5714,8 +5702,7 @@ class System(object, metaclass=SystemMetaclass):
                 if distrib:
                     self.comm.Allgatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE])
                     if not flat:
-                        val = np.reshape(val, meta['global_shape']) if get_remote \
-                            else np.reshape(val, meta['shape'])
+                        val = np.reshape(val, node_meta.global_shape)
                 else:
                     if owner != self.comm.rank:
                         val = None
@@ -5726,8 +5713,7 @@ class System(object, metaclass=SystemMetaclass):
                 if distrib:
                     self.comm.Gatherv(loc_val, [val, sizes, offsets, MPI.DOUBLE], root=rank)
                     if not flat:
-                        val = np.reshape(val, meta['global_shape']) if get_remote \
-                            else np.reshape(val, meta['shape'])
+                        val = np.reshape(val, node_meta.global_shape)
                 else:
                     if rank != owner:
                         tag = self._var_allprocs_abs2idx[abs_name]

@@ -26,6 +26,8 @@ from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.units import _is_unitless, has_val_mismatch
 from openmdao.visualization.tables.table_builder import generate_table
+from openmdao.core.constants import INT_DTYPE
+from openmdao.utils.mpi import MPI
 
 
 # use hex colors here because the using english names was sometimes causing failure to show
@@ -276,7 +278,7 @@ class NodeAttrs():
 
     @property
     def global_size(self):
-        return shape_to_len(self._global_shape)
+        return shape_to_len(self.global_shape)
 
     @property
     def units(self):
@@ -705,69 +707,20 @@ class AllConnGraph(nx.DiGraph):
 
         return True
 
-    def get_val(self, system, name, units=None, indices=None, get_remote=False, rank=None,
-                vec_name='nonlinear', kind=None, flat=False, from_src=True):
-
+    def get_val_from_src(self, system, name, units=None, indices=None, get_remote=False, rank=None,
+                         vec_name='nonlinear', kind=None, flat=False):
         node = self.find_node(system.pathname, name)
-        shape_node = node
         node_meta = self.nodes[node]
-        need_gr = system.comm.size > 1 and not get_remote
-        # if need_gr and node_meta.distributed:
-        #     raise RuntimeError(f"{system.msginfo}: Variable '{name}' is a distributed variable. "
-        #                        "You can retrieve values from all processes using "
-        #                        "`get_val(<name>, get_remote=True)` or from the local process using "
-        #                        "`get_val(<name>, get_remote=False)`.")
-
-        if node[0] == 'o':
-            tgt_units, tgt_inds_list = None, ()
-            src_node = node
-        else:
-            # ambiguous units aren't fatal during setup, but if we're getting a specific promoted
-            # input that has ambiguous units, it becomes fatal, so we need to check that here.
-            if node_meta.ambiguous_units:
-                raise ValueError(self.ambig_units_msg(node))
-
-            tgt_inds_list = node_meta.src_inds_list
-            tgt_units = node_meta.units
-
-            if from_src:
-                src_node = self.get_root(node)
-            else:
-                # getting a specific input
-                # (must use absolute name or have only a single leaf node)
-                leaves = list(self.leaf_input_iter(node))
-
-                if leaves:
-                    if len(leaves) > 1:
-                        raise ValueError(
-                            f"{system.msginfo}: Promoted variable '{name}' refers to multiple "
-                            "input variables so the choice of input is ambiguous.  Either "
-                            "use the absolute name of the input or set 'from_src=True' to "
-                            "retrieve the value from the connected output.")
-                    src_node = leaves[0]
-                    shape_node = src_node
-                    if get_remote:
-                        tgt_inds_list = ()
-                else:
-                    src_node = node
-
-        if indices is not None and not isinstance(indices, Indexer):
-            indices = indexer(indices, flat_src=flat)
-
+        src_node = self.get_root(node)
         src_meta = self.nodes[src_node]
-        src_units = src_meta.units
-        if need_gr and src_meta.distributed and not node_meta.distributed:
+
+        if not get_remote and self.comm.size > 1 and src_meta.distributed and not node_meta.distributed:
             raise RuntimeError(f"{self.msginfo}: Non-distributed variable '{node[1]}' has "
                                 f"a distributed source, '{src_node[1]}', so you must retrieve its "
                                 "value using 'get_remote=True'.")
 
         if system.has_vectors():
-            model = system._problem_meta['model_ref']()
-            if model._resolver.is_prom(src_node[1], 'input' if src_node[0] == 'i' else 'output'):
-                abs_name = model._resolver.prom2abs(src_node[1])
-            else:
-                abs_name = src_node[1]
-            val = system._abs_get_val(abs_name, get_remote, rank, vec_name, kind, flat,
+            val = system._abs_get_val(src_node[1], get_remote, rank, vec_name, kind, flat,
                                       from_root=True)
         else:
             val = src_meta.val
@@ -777,7 +730,84 @@ class AllConnGraph(nx.DiGraph):
                                  "been initialized.")
 
         try:
-            val = self.convert_get(shape_node, val, src_units, tgt_units, tgt_inds_list, units, indices,
+            val = self.convert_get(node, val, src_meta.units, node_meta.units,
+                                   node_meta.src_inds_list, units, indices,
+                                   get_remote=get_remote)
+        except Exception as err:
+            raise ValueError(f"{system.msginfo}: Can't get value of '{node[1]}': {str(err)}")
+
+        if node[0] == 'i' and get_remote and node_meta.distributed and self.comm.size > 1:
+            # gather parts of the distrib input value from all procs
+            full_val = np.zeros(shape_to_len(node_meta.global_shape))
+            sizes = np.asarray(self.get_dist_sizes(node), dtype=INT_DTYPE)
+            offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
+            offsets[1:] = np.cumsum(sizes[:-1])
+            self.comm.Allgatherv(val.ravel(), [full_val, sizes, offsets, MPI.DOUBLE])
+            # self.comm.Allgather(val.ravel(), full_val)
+            val = np.reshape(full_val, node_meta.global_shape)
+
+        if flat and not node_meta.discrete:
+            val = val.ravel()
+
+        return val
+
+    def get_val(self, system, name, units=None, indices=None, get_remote=False, rank=None,
+                vec_name='nonlinear', kind=None, flat=False, from_src=True):
+
+        if indices is not None and not isinstance(indices, Indexer):
+            indices = indexer(indices, flat_src=flat)
+
+        node = self.find_node(system.pathname, name)
+        node_meta = self.nodes[node]
+
+        # ambiguous units aren't fatal during setup, but if we're getting a specific promoted
+        # input that has ambiguous units, it becomes fatal, so we need to check that here.
+        if node_meta.ambiguous_units:
+            raise ValueError(self.ambig_units_msg(node))
+
+        if from_src or node[0] == 'o':
+            return self.get_val_from_src(system, name, units=units, indices=indices,
+                                         get_remote=get_remote, rank=rank, vec_name=vec_name,
+                                         kind=kind, flat=flat)
+
+        # since from_src is False, we're getting a specific input
+        # (must use absolute name or have only a single leaf node and no src_indices between the
+        # promoted input node and the leaf node)
+        leaves = list(self.leaf_input_iter(node))
+
+        if len(leaves) > 1:
+            raise ValueError(
+                f"{system.msginfo}: Promoted variable '{name}' refers to multiple "
+                "input variables so the choice of input is ambiguous.  Either "
+                "use the absolute name of the input or set 'from_src=True' to "
+                "retrieve the value from the connected output.")
+
+        if system.has_vectors():
+            model = system._problem_meta['model_ref']()
+            if model._resolver.is_prom(node[1], 'input' if node[0] == 'i' else 'output'):
+                abs_name = model._resolver.prom2abs(node[1])
+            else:
+                abs_name = node[1]
+            val = system._abs_get_val(abs_name, get_remote, rank, vec_name, kind, flat,
+                                      from_root=True)
+        else:
+            leaf_meta = self.nodes[leaves[0]]
+            val = leaf_meta.val
+
+        if is_undefined(val):
+            raise ValueError(f"{system.msginfo}: Variable '{self.msgname(node)}' has not "
+                                "been initialized.")
+
+        if node != leaves[0]:
+            if leaf_meta.src_inds_list:
+                src_inds_list = leaf_meta.src_inds_list[len(node_meta.src_inds_list):]
+                if src_inds_list:
+                    raise RuntimeError(f"Can't get the value of promoted input '{node[1]}' when "
+                                       "from_src is False because src_indices exist between the "
+                                       f"promoted input and the actual input '{leaves[0][1]}'.")
+
+        try:
+            val = self.convert_get(node, val, node_meta.units, leaf_meta.units, (), units, indices,
                                    get_remote=get_remote)
         except Exception as err:
             raise ValueError(f"{system.msginfo}: Can't get value of '{node[1]}': {str(err)}")

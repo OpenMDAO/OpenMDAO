@@ -1752,6 +1752,13 @@ class Group(System):
         else:
             self._owned_output_sizes = self._var_sizes['output']
 
+        if self.pathname == '':
+            graph = self._get_conn_graph()
+            graph._owned_output_sizes = self._owned_output_sizes
+            graph._var_allprocs_abs2idx = self._var_allprocs_abs2idx
+            graph._owning_rank = self._owning_rank
+            graph._var_sizes = self._var_sizes
+
     def _owned_size(self, abs_name):
         """
         Return the size of the variable on the owning rank.

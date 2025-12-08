@@ -1074,6 +1074,9 @@ def common_subpath(pathnames):
         Common dotted subpath.  Returns '' if no common subpath is found.
     """
     if pathnames:
+        if not isinstance(pathnames, (list, tuple)):
+            pathnames = list(pathnames)
+
         npaths = len(pathnames)
 
         if npaths == 1:

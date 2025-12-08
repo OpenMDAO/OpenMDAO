@@ -123,9 +123,10 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
     # prepend the shape onto the variable name
     node_colors = []
     node_labels = {}
-    for io, n in graph:
+    for node, meta in graph.nodes(data=True):
+        io, n = node
+        # meta['label'] = n
         io = 'input' if io == 'i' else 'output'
-        graph.nodes[io, n]['label'] = n
         try:
             meta = abs2meta[io][n]
             shape = meta['shape']
