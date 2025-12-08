@@ -300,12 +300,13 @@ jobs:
         id: run_tests_windows
         if: runner.os == 'Windows'
         timeout-minutes: 90
+        shell: pwsh
         env:
           OPENMDAO_CHECK_ALL_PARTIALS: true
           # Coverage debug print issues with later versions of python
           COVERAGE_CORE: ctrace  # Avoid verbose sysmon on Python 3.13
         run: |
-          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }} | Invoke-Expression
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
           echo "============================================================="
