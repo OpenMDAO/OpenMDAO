@@ -271,8 +271,6 @@ jobs:
           # MPI settings for CI (all platforms)
           PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
           OMPI_MCA_rmaps_base_oversubscribe: "1"
-          # Coverage debug print issues with later versions of python
-          COVERAGE_CORE: ctrace  # Avoid verbose sysmon on Python 3.13
         run: |
           eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
           echo "============================================================="
@@ -283,6 +281,10 @@ jobs:
           echo "###################################################"
           cp .coveragerc "$HOME"
           cd "$HOME"
+
+          if python -c "import sys; exit(0 if sys.version_info >= (3, 12) else 1)"; then
+            echo "COVERAGE_CORE=sysmon" >> "$GITHUB_ENV"
+          fi
 
           # Build testflo command
           TESTFLO_CMD="testflo -n 2 openmdao --timeout=240 --coverage --coverpkg openmdao --durations=20"

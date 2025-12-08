@@ -74,7 +74,7 @@ generator.  You can install everything needed for development by running:
 
 ## Using Pixi for reproducable environments
 
-Fully utilizing OpenMDAO means relying on a number of third-party dependencies, notably [pyoptsparse](https://github.com/mdolab/pyoptsparse), [mpi4py](https://github.com/mpi4py/mpi4py), [petsc4py](https://pypi.org/project/petsc4py), [numpy](https://github.com/numpy/numpy), and [scipy](https://github.com/scipy/scipy). Keeping so many dependencies in sync can be a challenge. To help users, OpenMDAO uses pixi to maintain reproduceable environments. The goal of this is to ensure that users of a given OpenMDAO release can reproduce theenvironment against which that release was tested.
+Fully utilizing OpenMDAO means relying on a number of third-party dependencies, notably [pyoptsparse](https://github.com/mdolab/pyoptsparse), [mpi4py](https://github.com/mpi4py/mpi4py), [petsc4py](https://pypi.org/project/petsc4py), [numpy](https://github.com/numpy/numpy), and [scipy](https://github.com/scipy/scipy). Keeping so many dependencies in sync can be a challenge. To help users, OpenMDAO uses pixi to maintain reproduceable environments. The goal of this is to ensure that users of a given OpenMDAO release can reproduce the environment against which that release was tested.
 
 Starting with version 3.42.0, OpenMDAO provides [Pixi](https://pixi.sh) environments for dependency management. Pixi is especially useful because some OpenMDAO dependencies (like MPI, PETSc) are not available on PyPI but are needed for parallel computing features.
 
