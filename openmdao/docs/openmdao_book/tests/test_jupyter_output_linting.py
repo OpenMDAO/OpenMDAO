@@ -85,8 +85,8 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
         for file in _get_files():
             with open(file, 'r') as f:
 
-                # This one is exempt from these lint rules.
-                if 'getting_started.ipynb'  in file:
+                # Notebooks that are exempt from this test.
+                if 'getting_started.ipynb' in file or 'pixi_environmment.ipynb':
                     continue
 
                 json_data = json.load(f)

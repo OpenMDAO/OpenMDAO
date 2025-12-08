@@ -4,6 +4,7 @@ parts:
 - caption: Getting Started
   chapters:
   - file: getting_started/getting_started
+  - file: getting_started/pixi_environment
 - caption: Basic User Guide
   chapters:
   - file: basic_user_guide/basic_user_guide

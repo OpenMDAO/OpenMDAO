@@ -1,3 +1,6 @@
+"""
+Script to disable SNOPT cells in notebooks if SNOPT is not available.
+"""
 import json
 
 def disable_snopt_cells(fname):
@@ -36,11 +39,24 @@ def disable_snopt_cells(fname):
 
 
 if __name__ == '__main__':
+    import pyoptsparse
 
-    notebooks = [
-        'features/building_blocks/drivers/pyoptsparse_driver.ipynb',
-        'advanced_user_guide/analysis_errors/analysis_error.ipynb'
-    ]
 
-    for notebook in notebooks:
-        disable_snopt_cells(notebook)
+
+    if 'SNOPT' not in [opt.name for opt in pyoptsparse.list_optimizers()]:
+
+        print("=============================================================")
+        print("Disabling SNOPT cells in notebooks.")
+        print("=============================================================")
+
+        notebooks = [
+            'features/building_blocks/drivers/pyoptsparse_driver.ipynb',
+            'advanced_user_guide/analysis_errors/analysis_error.ipynb'
+        ]
+
+        for notebook in notebooks:
+            disable_snopt_cells(notebook)
+    else:
+        print("=============================================================")
+        print("Building docs with SNOPT examples.")
+        print("=============================================================")
