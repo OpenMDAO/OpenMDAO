@@ -44,18 +44,18 @@ authors = ["OpenMDAO Team <https://github.com/OpenMDAO>"]
 channels = ["conda-forge"]
 platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
 
+###############################################
+# Base Dependencies
+###############################################
+
 [dependencies]
-# Universal deps (same everywhere)
 python = ">=3.11"
 numpy = ">=2.0"
+scipy = ">=1.13"
 networkx = ">=3.3"
 pip = ">=25.3"
 packaging = ">=25.0"
 requests = ">=2.32.5"
-
-# Get scipy from pypi due to some issues with the conda version.
-[pypi-dependencies]
-scipy = ">=1.13"
 
 ###############################################
 # Python version features
@@ -71,17 +71,17 @@ python = "3.12.*"
 python = "3.13.*"
 
 ###############################################
-# Pin scipy <= 1.16 for windows
+# Pin scipy <= 1.16 for for some environments
 ###############################################
 
-# [target.win-64.dependencies]
-# scipy = ">=1.13,<1.16"
+[target.win-64.dependencies]
+scipy = ">=1.13,<1.16"
 
-# [target.osx-64.dependencies]
-# scipy = ">=1.13,<1.16"
+[target.osx-64.dependencies]
+scipy = ">=1.13,<1.16"
 
-# [target.osx-arm64.dependencies]
-# scipy = ">=1.13,<1.16"
+[target.osx-arm64.dependencies]
+scipy = ">=1.13,<1.16"
 
 ##########################################################
 # Optional features (version-agnostic as much as possible)
