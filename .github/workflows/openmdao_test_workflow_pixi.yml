@@ -166,10 +166,9 @@ jobs:
 
             echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
             echo "TMPDIR=/tmp" >> "$GITHUB_ENV"
-            else
-              echo "mpi4py or petsc4py not installed in this environment, skipping MPI checks"
-              exit 1
-            fi
+          else
+            echo "mpi4py or petsc4py not installed in this environment, skipping MPI checks"
+          fi
 
       # - name: Build SNOPT
       #   if: matrix.SNOPT && runner.os != 'Windows'
@@ -313,8 +312,7 @@ jobs:
           copy .coveragerc "$HOME"
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
           cd "$HOME"
-          # Exclude test_1d_ill_conditioned which hangs on Windows due to scipy.linalg.svd behavior with ill-conditioned matrices
-          testflo -n 1 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20 --pre_announce --exclude='*test_1d_ill_conditioned*'
+          testflo -n 1 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20 --pre_announce
 
       - name: Submit coverage
         id: coveralls
