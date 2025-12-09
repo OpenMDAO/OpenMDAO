@@ -96,8 +96,8 @@ class LintAttributesTestCase(unittest.TestCase):
                         print(f' Module: {module_name}')
                     try:
                         mod = importlib.import_module(module_name)
-                    except ImportError:
-                        print(f'Error: could not import `{module_name}`')
+                    except ImportError as err:
+                        print(f'Skipped: {err}')
                         continue
 
                     fpath = os.path.join(dirpath, file_name)
