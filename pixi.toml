@@ -54,6 +54,10 @@ pip = ">=25.3"
 packaging = ">=25.0"
 requests = ">=2.32.5"
 
+# Get scipy from pypi due to some issues with the conda version.
+[pypi-dependencies]
+scipy = ">=1.13"
+
 ###############################################
 # Python version features
 ###############################################
@@ -66,16 +70,6 @@ python = "3.12.*"
 
 [feature.py313.dependencies]
 python = "3.13.*"
-
-###############################################
-# Pin scipy <= 1.16 for osx for now
-###############################################
-
-[target.osx-arm64.dependencies]
-scipy = ">=1.13,<1.16"
-
-[target.osx-64.dependencies]
-scipy = ">=1.13,<1.16"
 
 ##########################################################
 # Optional features (version-agnostic as much as possible)
@@ -145,7 +139,7 @@ testflo = "*"
 websockets = "*"
 actionlint = "*"
 ruff = "*"
-coverage = ">=7.6.9"
+coverage = "*"
 nbdime = "*"
 
 [feature.visualization.dependencies]
