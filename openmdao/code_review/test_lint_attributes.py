@@ -3,6 +3,7 @@ import os.path
 import importlib
 import inspect
 import re
+from pathlib import Path
 
 from openmdao.utils.code_utils import get_class_attributes
 
@@ -78,8 +79,14 @@ class LintAttributesTestCase(unittest.TestCase):
                         print(f'File: {file_name}')
 
                     # to construct module name, remove part of abs path that
-                    # precedes 'openmdao', and then replace '/' with '.' in the remainder.
-                    mod1 = re.sub(r'.*openmdao', 'openmdao', dir_name).replace('/', '.')
+                    # precedes 'openmdao', and then replace path separator with '.' in the remainder.
+                    path_parts = Path(dir_name).parts
+                    if 'openmdao' in path_parts:
+                        openmdao_idx = path_parts.index('openmdao')
+                        mod1 = '.'.join(path_parts[openmdao_idx:])
+                    else:
+                        # Fallback if 'openmdao' not found in path
+                        mod1 = re.sub(r'.*openmdao', 'openmdao', dir_name).replace(os.sep, '.')
                     # then, get rid of the '.py' to get final part of module name.
                     mod2 = file_name[:-3]
 
