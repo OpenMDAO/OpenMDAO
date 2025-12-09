@@ -525,8 +525,7 @@ class TestSystem(unittest.TestCase):
                         'size': 1,
                         'tags': set(),
                         'units': None,
-                        'units_by_conn': False,
-                        'val': np.array([1.])},
+                        'units_by_conn': False},
          'obj_cmp.x': {'compute_shape': None,
                        'compute_units': None,
                        'copy_shape': None,
@@ -544,8 +543,7 @@ class TestSystem(unittest.TestCase):
                        'size': 1,
                        'tags': set(),
                        'units': None,
-                       'units_by_conn': False, 
-                       'val': np.array([1.])}
+                       'units_by_conn': False}
         })
 
     def test_model_options_set_all(self):

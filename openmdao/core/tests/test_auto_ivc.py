@@ -201,8 +201,8 @@ class SerialTests(unittest.TestCase):
         par.add_subsystem('C1', PathCompEx('foo'), promotes=['x'])
         par.add_subsystem('C2', PathCompEx('bar'), promotes=['x'])
 
-        p.setup()
         try:
+            p.setup()
             p.final_setup()
         except Exception as err:
             self.assertEqual(str(err),

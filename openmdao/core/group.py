@@ -23,7 +23,7 @@ from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import _flatten_src_indices, \
-    shape_to_len, ValueRepeater
+    ValueRepeater
 from openmdao.utils.general_utils import shape2tuple, ensure_compatible, \
     meta2src_iter, is_undefined, env_truthy
 from openmdao.utils.units import unit_conversion, simplify_unit, _find_unit
@@ -1918,10 +1918,6 @@ class Group(System):
 
         nprocs = self.comm.size
         do_dist = nprocs > 1 and prop == 'shape'
-        if do_dist and self._has_distrib_vars:
-            self._dist_shapes = dist_shapes = conn_graph.get_dist_shapes()
-        else:
-            self._dist_shapes = dist_shapes = {}
 
         def compute_var_property(to_var, prop_dict, func):
             """
@@ -2039,9 +2035,9 @@ class Group(System):
             # so we're done
             return
 
-        dist_sizes = {}
-        for n, shapes in dist_shapes.items():
-            dist_sizes[n] = np.array([0 if s is None else shape_to_len(s) for s in shapes])
+        # dist_sizes = {}
+        # for n, shapes in dist_shapes.items():
+        #     dist_sizes[n] = np.array([0 if s is None else shape_to_len(s) for s in shapes])
 
         knowns = {n for n in graph.nodes() if getattr(conn_nodes[n], prop) is not None}
         all_knowns = knowns.copy()

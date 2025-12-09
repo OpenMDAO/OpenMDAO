@@ -183,13 +183,16 @@ def get_unresolved_knowns(graph, meta_name, nodes):
     gnodes = graph.nodes
     unresolved = set()
     for node in nodes:
-        if gnodes[node]['conn_meta'][meta_name] is not None:  # node has known shape
+        if node in unresolved:
+            continue
+
+        if getattr(gnodes[node]['conn_meta'], meta_name, None) is not None:  # node has known shape
             for succ in graph.successors(node):
-                if gnodes[succ]['conn_meta'][meta_name] is None:
+                if getattr(gnodes[succ]['conn_meta'], meta_name, None) is None:
                     unresolved.add(node)
                     break
             for pred in graph.predecessors(node):
-                if gnodes[pred]['conn_meta'][meta_name] is None:
+                if getattr(gnodes[pred]['conn_meta'], meta_name, None) is None:
                     unresolved.add(node)
                     break
 

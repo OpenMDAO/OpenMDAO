@@ -1379,7 +1379,7 @@ class TestDynShapeSrcIndices(unittest.TestCase):
 
         model.add_subsystem('comp', om.ExecComp('y=2*x', shape=(2,3)))
 
-        model.connect('indep.x', 'comp.x', src_indices=om.slicer[:], flat_src_indices=False)
+        model.connect('indep.x', 'comp.x', src_indices=[0, 1, 2], flat_src_indices=False)
 
         p.setup()
 

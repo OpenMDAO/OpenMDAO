@@ -337,7 +337,7 @@ class NodeAttrs():
     def shape_by_conn(self, value):
         # if shape defaults are are set, then this node's shape is known
         if self.defaults.src_shape is not None:
-            return False
+            return
 
         if value:
             self.flags |= SHAPE_BY_CONN
@@ -909,6 +909,7 @@ class AllConnGraph(nx.DiGraph):
         src_meta = nodes[src_node]
         src_meta.val = srcval
         src_dist = src_meta.distributed
+        has_vecs = model.has_vectors()
 
         for leaf in self.leaf_input_iter(src_node):
             tgt_meta = nodes[leaf]
@@ -934,6 +935,12 @@ class AllConnGraph(nx.DiGraph):
                         tgt_meta.val = self.get_subarray(srcval, src_inds_list)
                     else:
                         tgt_meta.val = srcval
+
+            if has_vecs:
+                if tgt_meta.discrete:
+                    pass
+                else:
+                    model._inputs._abs_set_val(leaf[1], tgt_meta.val)
 
     def bfs_up_iter(self, node, include_self=True):
         """
@@ -1045,8 +1052,12 @@ class AllConnGraph(nx.DiGraph):
                             val = locmeta['val']
                             if isinstance(val, Number):
                                 node_meta._val = val
+                                if not node_meta.discrete:
+                                    node_meta._val = float(val)
                             else:
                                 node_meta._val = val.copy()
+                                if not node_meta.discrete:
+                                    node_meta._val = np.asarray(node_meta._val, dtype=float)
 
                 if not node_meta.dyn_units:
                     node_meta._units = meta['units']
@@ -1757,7 +1768,7 @@ class AllConnGraph(nx.DiGraph):
         src_val = src_meta.val
 
         if src_discrete:
-            if not src_meta.remote and not tgt_meta.remote:
+            if not src_meta.remote and not tgt_meta.remote and not tgt_meta.ambiguous_val:
                 if not are_compatible_values(src_val, tgt_meta.val, src_discrete):
                     raise ConnError(self.value_error(False, src, tgt, src_val, tgt_meta.val))
         else:
@@ -1848,6 +1859,9 @@ class AllConnGraph(nx.DiGraph):
         """
         nodes = self.nodes
         src_meta = nodes[src_node]
+        if src_meta.shape is None:
+            return  # an earlier error has occurred, so skip
+
         src_dist = src_meta.distributed
 
         if src_dist:

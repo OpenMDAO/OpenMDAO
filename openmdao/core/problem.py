@@ -2256,6 +2256,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         abs2idx = model._var_allprocs_abs2idx
         resolver = self.model._resolver
+        # graph = model._get_conn_graph()
 
         if inputs:
             for abs_name in inputs:
@@ -2273,6 +2274,9 @@ class Problem(object, metaclass=ProblemMetaclass):
                         model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                     else:
                         model.set_val(abs_name, val)
+
+                    # if abs_name in abs2idx:
+                    #     model._inputs.set_var(abs_name, graph.nodes[('i', abs_name)].val)
                 else:
                     issue_warning(f"{model.msginfo}: Input variable, '{abs_name}', recorded "
                                   "in the case is not found in the model.")
@@ -2297,7 +2301,6 @@ class Problem(object, metaclass=ProblemMetaclass):
                             model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                         else:
                             model.set_val(abs_name, val)
-
                 else:
                     issue_warning(f"{model.msginfo}: Output variable, '{name}', recorded "
                                   "in the case is not found in the model.")
