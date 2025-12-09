@@ -303,8 +303,8 @@ jobs:
         shell: pwsh
         env:
           OPENMDAO_CHECK_ALL_PARTIALS: true
-          # Coverage debug print issues with later versions of python
-          COVERAGE_CORE: ctrace  # Avoid verbose sysmon on Python 3.13
+          # Use sysmon for Python 3.12+ (minimal env uses 3.13)
+          COVERAGE_CORE: sysmon
         run: |
           & pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }} -s powershell | Out-String | Invoke-Expression
           echo "============================================================="
