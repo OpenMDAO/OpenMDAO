@@ -708,18 +708,19 @@ class AllConnGraph(nx.DiGraph):
         return True
 
     def get_val_from_src(self, system, name, units=None, indices=None, get_remote=False, rank=None,
-                         vec_name='nonlinear', kind=None, flat=False):
+                         vec_name='nonlinear', kind=None, flat=False, use_vec=False, src_node=None):
         node = self.find_node(system.pathname, name)
         node_meta = self.nodes[node]
-        src_node = self.get_root(node)
-        src_meta = self.nodes[src_node]
+        if src_node is None:
+            src_node = self.get_root(node)
+            src_meta = self.nodes[src_node]
 
         if not get_remote and self.comm.size > 1 and src_meta.distributed and not node_meta.distributed:
             raise RuntimeError(f"{self.msginfo}: Non-distributed variable '{node[1]}' has "
                                 f"a distributed source, '{src_node[1]}', so you must retrieve its "
                                 "value using 'get_remote=True'.")
 
-        if system.has_vectors():
+        if use_vec:
             val = system._abs_get_val(src_node[1], get_remote, rank, vec_name, kind, flat,
                                       from_root=True)
         else:
@@ -768,7 +769,7 @@ class AllConnGraph(nx.DiGraph):
         if from_src or node[0] == 'o':
             return self.get_val_from_src(system, name, units=units, indices=indices,
                                          get_remote=get_remote, rank=rank, vec_name=vec_name,
-                                         kind=kind, flat=flat)
+                                         kind=kind, flat=flat, use_vec=system.has_vectors())
 
         # since from_src is False, we're getting a specific input
         # (must use absolute name or have only a single leaf node and no src_indices between the

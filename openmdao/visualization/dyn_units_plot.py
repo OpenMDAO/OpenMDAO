@@ -122,21 +122,20 @@ def view_dyn_units(root, outfile='unit_dep_graph.png', show=True, title=None):
     # prepend the unit onto the variable name
     node_colors = []
     node_labels = {}
-    for io, n in graph.nodes():
+    for node in graph.nodes():
+        io, n = node
         io = 'input' if io == 'i' else 'output'
-        graph.nodes[io, n]['label'] = n
         try:
             meta = abs2meta[io][n]
             units = meta['units']
         except KeyError:
             units = None
 
+        is_dynamic = False
         for shname in dyn_names:
             if meta.get(shname, False):
                 is_dynamic = True
                 break
-        else:
-            is_dynamic = False
 
         if is_dynamic:
             if units is None:
@@ -149,7 +148,7 @@ def view_dyn_units(root, outfile='unit_dep_graph.png', show=True, title=None):
                 units = 'None'
             node_colors.append('green')
 
-        node_labels[n] = f"{units}: {n[common_idx:]}"
+        node_labels[node] = f"{units}: {n[common_idx:]}"
 
     nx.draw_networkx(graph, with_labels=True, node_color=node_colors, labels=node_labels)
     plt.axis('off')  # turn of axis

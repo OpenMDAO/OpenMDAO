@@ -125,7 +125,6 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
     node_labels = {}
     for node, meta in graph.nodes(data=True):
         io, n = node
-        # meta['label'] = n
         io = 'input' if io == 'i' else 'output'
         try:
             meta = abs2meta[io][n]
@@ -142,7 +141,7 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
                     break
             else:
                 node_colors.append('green')
-        node_labels[n] = f"{shape}: {n[common_idx:]}"
+        node_labels[node] = f"{shape}: {n[common_idx:]}"
 
     if outfile.endswith('.png'):
         nx.draw_networkx(graph, with_labels=True, node_color=node_colors, labels=node_labels)

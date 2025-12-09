@@ -692,15 +692,15 @@ class ExecComp(ExplicitComponent):
                     self.options['do_coloring'] = False
                     self._coloring_info.dynamic = False
 
-            meta = self._var_rel2meta
             decl_partials = super().declare_partials
+            nodes = self._get_conn_graph().nodes
             for outs, vs, _ in self._exprs_info:
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):
                     for inp in ins:
                         if has_diag_partials:
-                            ival = meta[inp]['val']
-                            oval = meta[out]['val']
+                            ival = nodes[('i', self.pathname + '.' + inp)].val
+                            oval = nodes[('o', self.pathname + '.' + out)].val
                             iarray = isinstance(ival, ndarray) and ival.size > 1
                             if iarray and isinstance(oval, ndarray) and oval.size > 1:
                                 if oval.size != ival.size:
