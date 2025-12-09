@@ -306,14 +306,13 @@ jobs:
           # Coverage debug print issues with later versions of python
           COVERAGE_CORE: ctrace  # Avoid verbose sysmon on Python 3.13
         run: |
-          pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }} | Invoke-Expression
           echo "============================================================="
           echo "Run tests with coverage (from directory other than repo root)"
           echo "============================================================="
           copy .coveragerc "$HOME"
           cd "$HOME"
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
-          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20 -s
+          pixi run -e ${{ matrix.PIXI_ENVIRONMENT }} testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20 -s
 
       - name: Submit coverage
         id: coveralls
