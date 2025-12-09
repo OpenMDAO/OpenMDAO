@@ -281,10 +281,6 @@ jobs:
           cp .coveragerc "$HOME"
           cd "$HOME"
 
-          if python -c "import sys; exit(0 if sys.version_info >= (3, 12) else 1)"; then
-            echo "COVERAGE_CORE=sysmon" >> "$GITHUB_ENV"
-          fi
-
           # Build testflo command
           TESTFLO_CMD="testflo -n 2 openmdao --timeout=240 --coverage --coverpkg openmdao --durations=20"
 
@@ -302,8 +298,6 @@ jobs:
         shell: pwsh
         env:
           OPENMDAO_CHECK_ALL_PARTIALS: true
-          # Use sysmon for Python 3.12+ (minimal env uses 3.13)
-          COVERAGE_CORE: sysmon
         run: |
           & pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }} -s powershell | Out-String | Invoke-Expression
           echo "============================================================="
