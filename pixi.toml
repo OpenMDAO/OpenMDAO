@@ -46,9 +46,8 @@ platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
 
 [dependencies]
 # Universal deps (same everywhere)
-python = ">=3.11.14"
+python = ">=3.11"
 numpy = ">=2.0"
-scipy = ">=1.13"
 networkx = ">=3.3"
 pip = ">=25.3"
 packaging = ">=25.0"
@@ -70,6 +69,19 @@ python = "3.12.*"
 
 [feature.py313.dependencies]
 python = "3.13.*"
+
+###############################################
+# Pin scipy <= 1.16 for windows
+###############################################
+
+# [target.win-64.dependencies]
+# scipy = ">=1.13,<1.16"
+
+# [target.osx-64.dependencies]
+# scipy = ">=1.13,<1.16"
+
+# [target.osx-arm64.dependencies]
+# scipy = ">=1.13,<1.16"
 
 ##########################################################
 # Optional features (version-agnostic as much as possible)
