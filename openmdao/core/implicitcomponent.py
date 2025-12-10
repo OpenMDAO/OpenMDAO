@@ -2,6 +2,7 @@
 
 from scipy.sparse import coo_matrix
 from itertools import chain
+from types import MethodType
 import numpy as np
 
 from openmdao.core.component import Component, _allowed_types
@@ -108,6 +109,49 @@ class ImplicitComponent(Component):
 
         if is_undefined(self.matrix_free):
             self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
+
+    def add_method(self, name, method):
+        """
+        Dynamically add a method to this component instance.
+
+        Parameters
+        ----------
+        name : str
+            The name of the method to add. Must be one of: 'solve_nonlinear', 'linearize',
+            'apply_linear', 'solve_linear', or 'guess_nonlinear'.
+        method : function
+            The function to add as a method. Will be converted to a MethodType if necessary.
+
+        Raises
+        ------
+        ValueError
+            If name is not one of the allowed method names.
+        """
+        allowed_methods = ('solve_nonlinear', 'linearize', 'apply_linear', 'solve_linear',
+                          'guess_nonlinear')
+
+        if name not in allowed_methods:
+            raise ValueError(f"{self.msginfo}: name must be one of {allowed_methods}, "
+                             f"but got '{name}'.")
+
+        # Convert to MethodType if not already a bound method
+        if not isinstance(method, MethodType):
+            method = MethodType(method, self)
+
+        # Set the method on the instance
+        setattr(self, name, method)
+
+        # Update the appropriate attribute
+        if name == 'solve_nonlinear':
+            self._has_solve_nl = True
+        elif name == 'linearize':
+            self._has_linearize = True
+        elif name == 'apply_linear':
+            self.matrix_free = True
+        elif name == 'solve_linear':
+            self._has_solve_linear = True
+        elif name == 'guess_nonlinear':
+            self._has_guess = True
 
     def _apply_nonlinear(self):
         """
