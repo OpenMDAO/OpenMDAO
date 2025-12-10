@@ -1,0 +1,213 @@
+from datetime import datetime, timezone, timedelta
+import os
+from pathlib import Path
+from typing import Optional
+
+from github import Github
+from pydantic import BaseModel, Field
+
+
+# The GitHub repository for which we're getting pull requests
+REPO = 'OpenMDAO/OpenMDAO'
+
+# Use a PAT for private repos or to increase the rate limit of requests.
+PERSONAL_ACCESS_TOKEN = os.environ['GITHUB_PAT']
+
+# Only show pull requests merged after this date
+SINCE = datetime(2025, 10, 1, tzinfo=timezone.utc)
+
+# Cache file location
+CACHE_FILE = Path(f'{REPO.split("/")[-1]}_pulls.json')
+
+# When creating a new cache, fetch PRs from this far back
+INITIAL_LOOKBACK_DAYS = 365
+
+
+class PullRequest(BaseModel):
+    """Pydantic model for a GitHub pull request."""
+
+    number: int
+    title: str
+    merged_at: datetime
+    author: str = Field(default="unknown")
+    url: str
+
+    @classmethod
+    def from_github_pr(cls, pr):
+        """Create a PullRequest from a PyGithub PullRequest object."""
+        return cls(
+            number=pr.number,
+            title=pr.title,
+            merged_at=pr.merged_at.replace(tzinfo=timezone.utc) if pr.merged_at else None,
+            author=pr.user.login if pr.user else "unknown",
+            url=pr.html_url
+        )
+
+
+class PullRequestCache(BaseModel):
+    """Container for cached pull requests."""
+
+    pulls: list[PullRequest] = Field(default_factory=list)
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    def get_most_recent_merge_date(self) -> Optional[datetime]:
+        """Get the most recent merge date from cached pulls."""
+        if not self.pulls:
+            return None
+        return max(pr.merged_at for pr in self.pulls)
+
+    def add_pull(self, pr: PullRequest):
+        """Add a pull request to the cache."""
+        # Check if PR already exists (by number)
+        if not any(p.number == pr.number for p in self.pulls):
+            self.pulls.append(pr)
+
+    def sort_by_merge_date(self):
+        """Sort pulls by merge date (ascending)."""
+        self.pulls.sort(key=lambda pr: pr.merged_at)
+
+    def save(self, filepath: Path):
+        """Save cache to JSON file."""
+        with open(filepath, 'w') as f:
+            f.write(self.model_dump_json(indent=2))
+
+    @classmethod
+    def load(cls, filepath: Path) -> 'PullRequestCache':
+        """Load cache from JSON file."""
+        if not filepath.exists():
+            return cls()
+
+        with open(filepath, 'r') as f:
+            return cls.model_validate_json(f.read())
+
+
+def fetch_initial_pulls(repo, lookback_days=INITIAL_LOOKBACK_DAYS, state='closed', base='master'):
+    """
+    Fetch initial set of pull requests from the past year.
+
+    Parameters
+    ----------
+    repo : github.Repository.Repository
+        The GitHub repository object
+    lookback_days : int
+        Number of days to look back for initial fetch
+    state : str
+        One of either 'open' or 'closed'
+    base : str
+        The branch upon which the pull request is applied.
+
+    Returns
+    -------
+    PullRequestCache
+        A new cache populated with PRs from the lookback period
+    """
+    cutoff_date = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+    print(f"Creating new cache with PRs merged after {cutoff_date.isoformat()}")
+
+    cache = PullRequestCache()
+    pulls = repo.get_pulls(state=state, base=base, sort='updated', direction='desc')
+
+    count = 0
+    for pr in pulls:
+        # Only process merged PRs
+        if pr.merged_at is None:
+            continue
+
+        pr_merge_time = pr.merged_at.replace(tzinfo=timezone.utc)
+
+        # Stop if we've gone past the lookback period
+        if pr_merge_time < cutoff_date:
+            break
+
+        cache.add_pull(PullRequest.from_github_pr(pr))
+        count += 1
+
+        # Progress indicator for initial fetch
+        if count % 50 == 0:
+            print(f"  Fetched {count} PRs...")
+
+    print(f"Initial cache created with {count} pull request(s)")
+    cache.sort_by_merge_date()
+    cache.last_updated = datetime.now(timezone.utc)
+
+    return cache
+
+
+def fetch_and_update_pulls(repo, cache: PullRequestCache, state='closed', base='master'):
+    """
+    Fetch pull requests from GitHub and update the cache.
+
+    Only fetches PRs merged after the most recent cached PR to minimize API calls.
+
+    Parameters
+    ----------
+    repo : github.Repository.Repository
+        The GitHub repository object
+    cache : PullRequestCache
+        The existing cache to update
+    state : str
+        One of either 'open' or 'closed'
+    base : str
+        The branch upon which the pull request is applied.
+    """
+    most_recent = cache.get_most_recent_merge_date()
+
+    if most_recent:
+        print(f"Fetching PRs merged after {most_recent.isoformat()}")
+    else:
+        print("No cached PRs found. Fetching all merged PRs...")
+
+    pulls = repo.get_pulls(state=state, base=base, sort='updated', direction='desc')
+
+    new_count = 0
+    for pr in pulls:
+        # Only process merged PRs
+        if pr.merged_at is None:
+            continue
+
+        pr_merge_time = pr.merged_at.replace(tzinfo=timezone.utc)
+
+        # Stop if we've reached PRs we already have
+        if most_recent and pr_merge_time <= most_recent:
+            break
+
+        cache.add_pull(PullRequest.from_github_pr(pr))
+        new_count += 1
+
+    if new_count > 0:
+        print(f"Added {new_count} new pull request(s)")
+        cache.sort_by_merge_date()
+        cache.last_updated = datetime.now(timezone.utc)
+    else:
+        print("No new pull requests found")
+
+
+if __name__ == '__main__':
+    g = Github(PERSONAL_ACCESS_TOKEN)
+    repo = g.get_repo(REPO)
+
+    # Check if cache exists
+    if not CACHE_FILE.exists():
+        print(f"Cache file not found. Creating initial cache from past {INITIAL_LOOKBACK_DAYS} days...\n")
+        cache = fetch_initial_pulls(repo, lookback_days=INITIAL_LOOKBACK_DAYS)
+    else:
+        print(f"Loading existing cache from {CACHE_FILE}\n")
+        cache = PullRequestCache.load(CACHE_FILE)
+        # Fetch new PRs since last update
+        fetch_and_update_pulls(repo, cache)
+
+    # Save updated cache
+    cache.save(CACHE_FILE)
+    print(f"\nCache saved to {CACHE_FILE}")
+    print(f"Total PRs in cache: {len(cache.pulls)}")
+    print(f"Last updated: {cache.last_updated.isoformat()}")
+
+    # Display PRs merged since SINCE date
+    print(f"\nPull requests merged since {SINCE.isoformat()}:\n")
+    matching_prs = [pr for pr in cache.pulls if pr.merged_at >= SINCE]
+
+    if matching_prs:
+        for pr in matching_prs:
+            print(f'- {pr.title} [#{pr.number}]({pr.url})')
+    else:
+        print("No pull requests found in the specified date range.")
