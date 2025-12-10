@@ -31,3 +31,6 @@ openmdao/docs/openmdao_book/other_useful_docs/sqlite_test
 driver_scaling_report.html
 *.dat
 .ipynb_checkpoints/
+CLAUDE.md
+OpenMDAO_pulls.pkl
+dymos_pulls.pkl
