@@ -754,8 +754,8 @@ class ShapedSliceIndexer(Indexer):
             start = self._slice.start
             stop = self._slice.stop
             sz = shape_to_len(self._dist_shape)
-            if (start is not None and (start >= sz or start < -sz)
-                    or (stop is not None and (stop > sz or stop < -sz))):
+            if start != stop and ((start is not None and (start >= sz or start < -sz)
+                                  or (stop is not None and (stop > sz or stop < -sz)))):
                 raise IndexError(f"{self._slice} is out of bounds of the source shape "
                                  f"{self._dist_shape}.")
 

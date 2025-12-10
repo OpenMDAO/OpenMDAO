@@ -1895,10 +1895,13 @@ class AllConnGraph(nx.DiGraph):
                         if tgt_shape is not None:
                             offset, sz = self.get_dist_offset(tgt_node, self.comm.rank, False)
                             if sz is not None:
-                                src_indices = \
-                                    indexer(slice(offset, offset + sz),
-                                                                        flat_src=False,
-                                                                        src_shape=src_meta.global_shape)
+                                if sz == 0:
+                                    src_indices = \
+                                        indexer(slice(0, 0), flat_src=True, src_shape=(0,))
+                                else:
+                                    src_indices = \
+                                        indexer(slice(offset, offset + sz),
+                                                flat_src=False, src_shape=src_meta.global_shape)
 
                                 path = nx.shortest_path(self, src_node, tgt_node)
                                 self.edges[(path[-2], tgt_node)]['src_indices'] = src_indices
