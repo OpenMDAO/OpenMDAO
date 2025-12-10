@@ -16,6 +16,14 @@ inputs:
   publish:
     description: '"true" if docs should be uploaded.'
     required: false
+  use_pixi:
+    description: '"true" if the pixi environment should be used, otherwise use conda.'
+    required: false
+    default: 'false'
+  pixi_env:
+    description: 'The name of the pixi environment to use.'
+    required: false
+    default: 'dev'
 runs:
   using: 'composite'
   steps:
@@ -32,45 +40,77 @@ runs:
     - name: Build docs
       id: build_docs
       continue-on-error: true
+      env:
+        PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
+        OMPI_MCA_rmaps_base_oversubscribe: "1"
       shell: bash -l {0}
       run: |
+        eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
+
+        set +e           # Don't exit on error
+        set -o pipefail  # But catch pipeline failures
+
         export OPENMDAO_REPORTS=0
         export PYDEVD_DISABLE_FILE_VALIDATION=1
 
+        BUILD_FAILED=0
+
+        # Cleanup function
+        cleanup() {
+          echo "Stopping ipcluster..."
+          pkill -f ipcluster || true
+        }
+        trap cleanup EXIT
+
+        # Helper function to track failures
+        run_and_track() {
+          echo "Running: $*"
+          "$@"
+          local exit_code=$?
+          if [ $exit_code -ne 0 ]; then
+            echo "❌ Command failed with exit code $exit_code"
+            BUILD_FAILED=1
+          fi
+          return $exit_code
+        }
+
         cd openmdao/docs
 
-        if [[ "${{ inputs.use_snopt }}" == 'true' ]]; then
-          echo "============================================================="
-          echo "Building docs with SNOPT examples."
-          echo "============================================================="
-        else
-          echo "============================================================="
-          echo "Disabling SNOPT cells in notebooks."
-          echo "============================================================="
-          python openmdao_book/other/disable_snopt_cells.py
-        fi
+        run_and_track python openmdao_book/other/disable_snopt_cells.py
 
-        # start ipcluster to run MPI under notebooks
-        ./ipcluster_start.sh
+        # Start ipcluster and wait for it to be ready
+        run_and_track ./ipcluster_start.sh
+        echo "Waiting for ipcluster to be ready..."
         sleep 12
 
         echo "============================================================="
         echo "Build the docs"
         echo "============================================================="
-        python build_source_docs.py
-        jupyter-book build -W --keep-going openmdao_book
-        python copy_build_artifacts.py
+        run_and_track python build_source_docs.py
+        run_and_track jupyter-book build -W --keep-going openmdao_book
+        run_and_track python copy_build_artifacts.py
+
+        # Exit with failure if any command failed
+        exit $BUILD_FAILED
 
     - name: Display doc build reports
       if: steps.build_docs.outcome == 'failure'
       shell: bash -l {0}
       run: |
-        for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log'); do
-          echo "============================================================="
-          echo $f
-          echo "============================================================="
-          cat $f
-        done
+        echo ""
+        echo "============================================================="
+        echo "Log files from reports directory"
+        echo "============================================================="
+        if [ -d /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports ]; then
+          for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log' 2>/dev/null); do
+            echo "============================================================="
+            echo $f
+            echo "============================================================="
+            cat $f
+          done
+        else
+          echo "No jupyter-book reports directory found"
+        fi
         exit 1
 
     - name: Archive built docs

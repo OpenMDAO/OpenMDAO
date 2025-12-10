@@ -350,7 +350,7 @@ def get_class_attributes(fname, class_dict=None):
     if class_dict is None:
         class_dict = {}
 
-    with open(fname, 'r') as f:
+    with open(fname, 'r', encoding='utf-8') as f:
         source = f.read()
         node = ast.parse(source, mode='exec')
         visitor = _AttrCollector(class_dict)

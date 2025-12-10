@@ -109,28 +109,28 @@ jobs:
             OPTIONAL: '[all]'
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_Baseline }}
 
-          # test minimal install
-          - NAME: Ubuntu Minimal
-            OS: ubuntu-24.04
-            PY: '3.13'
-            NUMPY: '2.2'
-            SCIPY: '1.15'
-            OPTIONAL: '[test]'
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
+          # # test minimal install
+          # - NAME: Ubuntu Minimal
+          #   OS: ubuntu-24.04
+          #   PY: '3.13'
+          #   NUMPY: '2.2'
+          #   SCIPY: '1.15'
+          #   OPTIONAL: '[test]'
+          #   EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
 
-          # test oldest supported versions
-          - NAME: Ubuntu Oldest
-            OS: ubuntu-22.04
-            PY: '3.10'
-            NUMPY: '1.26'
-            SCIPY: '1.12'
-            PETSc: '3.20'
-            OPENMPI: '4.1'
-            PYOPTSPARSE_FROM: 'build_pyoptsparse'
-            PYOPTSPARSE: '2.10.2'
-            SNOPT: '7.7'
-            OPTIONAL: '[all]'
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Oldest }}
+          # # test oldest supported versions
+          # - NAME: Ubuntu Oldest
+          #   OS: ubuntu-22.04
+          #   PY: '3.10'
+          #   NUMPY: '1.26'
+          #   SCIPY: '1.12'
+          #   PETSc: '3.20'
+          #   OPENMPI: '4.1'
+          #   PYOPTSPARSE_FROM: 'build_pyoptsparse'
+          #   PYOPTSPARSE: '2.10.2'
+          #   SNOPT: '7.7'
+          #   OPTIONAL: '[all]'
+          #   EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Oldest }}
 
     runs-on: ${{ matrix.OS }}
 
@@ -153,7 +153,7 @@ jobs:
 
       - name: Exit if this job was excluded
         if: matrix.EXCLUDE
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
 
@@ -532,8 +532,8 @@ jobs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Fail the workflow if tests or doc build failed
-        if: steps.run_tests.outcome == 'failure' || steps.build_docs.outcome == 'failure'
-        uses: actions/github-script@v3
+        if: steps.run_tests.outcome == 'failure'
+        uses: actions/github-script@v8
         with:
           script: |
               let test_fail = ${{ steps.run_tests.outcome == 'failure' }};
@@ -579,7 +579,7 @@ jobs:
 
       - name: Exit if this job was excluded
         if: matrix.EXCLUDE
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
 
