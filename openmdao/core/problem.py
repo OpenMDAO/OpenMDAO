@@ -579,20 +579,6 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         self.model.set_val(name, val, units=units, indices=indices)
 
-    # def _set_initial_conditions(self):
-    #     """
-    #     Set all initial conditions that have been saved in cache after setup.
-    #     """
-    #     graph = self.model._get_conn_graph()
-    #     for node in graph.nodes:
-    #         if node[0] == 'o' and graph.in_degree(node) == 0:  # root output node
-    #             node_meta = graph.nodes[node]
-    #             if node_meta.val is not None:
-    #                 graph.set_tree_val(self.model, node, node_meta.val)  # forces updates of input values
-
-    #     # now update vectors based on metadata values
-    #     self.model._set_vectors_from_metadata()
-
     def _check_collected_errors(self):
         """
         If any collected errors are found, raise an exception containing all of them.

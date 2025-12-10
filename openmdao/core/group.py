@@ -1286,6 +1286,10 @@ class Group(System):
             node_meta = graph.nodes[node]
             if node_meta.val is not None:
                 graph.set_tree_val(self, node, node_meta.val)  # force updates of input values
+                if node_meta.discrete:
+                    self._discrete_outputs[name] = node_meta.val
+                else:
+                    self._outputs.set_var(name, node_meta.val)
 
         for abs_name, meta in self._var_abs2meta['input'].items():
             self._inputs.set_var(abs_name, graph.nodes[('i', abs_name)].val)
@@ -1293,11 +1297,11 @@ class Group(System):
         for name in self._discrete_inputs:
             self._discrete_inputs[name] = graph.nodes[('i', name)].val
 
-        for abs_name, meta in self._var_abs2meta['output'].items():
-            self._outputs.set_var(abs_name, graph.nodes[('o', abs_name)].val)
+        # for abs_name, meta in self._var_abs2meta['output'].items():
+        #     self._outputs.set_var(abs_name, graph.nodes[('o', abs_name)].val)
 
-        for name in self._discrete_outputs:
-            self._discrete_outputs[name] = graph.nodes[('o', name)].val
+        # for name in self._discrete_outputs:
+        #     self._discrete_outputs[name] = graph.nodes[('o', name)].val
 
     def _get_root_vectors(self):
         """
@@ -2034,10 +2038,6 @@ class Group(System):
             # we don't have any {prop}_by_conn or copy_{prop} or compute_{prop} variables,
             # so we're done
             return
-
-        # dist_sizes = {}
-        # for n, shapes in dist_shapes.items():
-        #     dist_sizes[n] = np.array([0 if s is None else shape_to_len(s) for s in shapes])
 
         knowns = {n for n in graph.nodes() if getattr(conn_nodes[n], prop) is not None}
         all_knowns = knowns.copy()

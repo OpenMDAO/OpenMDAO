@@ -461,13 +461,12 @@ class NodeAttrs():
         return ret
 
     def update_model_meta(self):
-        g_to_update = _global_to_update
-        l_to_update = _local_to_update
+        # update system metadata with the metadata from this node
         if self._meta is not None:
-            for key in g_to_update:
+            for key in _global_to_update:
                 self._meta[key] = getattr(self, key)
             if self._locmeta is not None:
-                for key in l_to_update:
+                for key in _local_to_update:
                     self._locmeta[key] = getattr(self, key)
 
 
@@ -906,6 +905,8 @@ class AllConnGraph(nx.DiGraph):
         self.set_tree_val(model, src_node, srcval)
 
     def set_tree_val(self, model, src_node, srcval):
+        # given a source node, set its ultimate source (if different than src_node), and set
+        # all of its leaf values.  Intermediate node values are not modified.
         nodes = self.nodes
         src_meta = nodes[src_node]
         src_meta.val = srcval
