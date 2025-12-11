@@ -116,7 +116,7 @@ class ImplicitComponent(Component):
 
         This allows users to create an `ImplicitComponent` that uses optional
         methods like `linearize`, `guess_nonlinear`, etc. that aren't defined
-        statically, but instead is dynamically created during `setup`. The
+        statically, but instead are dynamically created during `setup`. The
         motivating use case is the `omjlcomps` library, where the optional
         methods are implemented in the Julia programming language (see
         `omjlcomps.JuliaImplicitComp` in byuflowlab/OpenMDAO.jl).
