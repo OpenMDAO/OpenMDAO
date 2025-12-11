@@ -128,7 +128,7 @@ class ImplicitComponent(Component):
             If name is not one of the allowed method names.
         """
         allowed_methods = ('solve_nonlinear', 'linearize', 'apply_linear', 'solve_linear',
-                          'guess_nonlinear')
+                           'guess_nonlinear')
 
         if name not in allowed_methods:
             raise ValueError(f"{self.msginfo}: name must be one of {allowed_methods}, "
