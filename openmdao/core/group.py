@@ -2926,10 +2926,9 @@ class Group(System):
 
             if name in all_abs2meta_out:
                 io = 'input'
-                abs2meta = my_abs2meta_out if name in my_abs2meta_out else all_abs2meta_out
             else:
                 io = 'output'
-                abs2meta = my_abs2meta_in if name in my_abs2meta_in else all_abs2meta_in
+            abs2meta = self._var_allprocs_abs2meta[io]
 
             for abs_name in component_io[comp_name, io]:
                 if abs_name not in graph:
