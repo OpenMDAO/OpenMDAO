@@ -2,22 +2,14 @@ from datetime import datetime, timezone, timedelta
 import os
 from pathlib import Path
 from typing import Optional
+import argparse
 
 from github import Github
 from pydantic import BaseModel, Field
 
 
-# The GitHub repository for which we're getting pull requests
-REPO = 'OpenMDAO/OpenMDAO'
-
 # Use a PAT for private repos or to increase the rate limit of requests.
 PERSONAL_ACCESS_TOKEN = os.environ['GITHUB_PAT']
-
-# Only show pull requests merged after this date
-SINCE = datetime(2025, 10, 1, tzinfo=timezone.utc)
-
-# Cache file location
-CACHE_FILE = Path(f'{REPO.split("/")[-1]}_pulls.json')
 
 # When creating a new cache, fetch PRs from this far back
 INITIAL_LOOKBACK_DAYS = 365
@@ -25,7 +17,6 @@ INITIAL_LOOKBACK_DAYS = 365
 
 class PullRequest(BaseModel):
     """Pydantic model for a GitHub pull request."""
-
     number: int
     title: str
     merged_at: datetime
@@ -46,7 +37,6 @@ class PullRequest(BaseModel):
 
 class PullRequestCache(BaseModel):
     """Container for cached pull requests."""
-
     pulls: list[PullRequest] = Field(default_factory=list)
     last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -79,6 +69,31 @@ class PullRequestCache(BaseModel):
 
         with open(filepath, 'r') as f:
             return cls.model_validate_json(f.read())
+
+
+def get_latest_release_date(repo) -> Optional[datetime]:
+    """
+    Get the date of the latest release from GitHub.
+
+    Parameters
+    ----------
+    repo : github.Repository.Repository
+        The GitHub repository object
+
+    Returns
+    -------
+    Optional[datetime]
+        The published date of the latest release, or None if no releases found
+    """
+    try:
+        releases = repo.get_releases()
+        latest_release = releases[0]
+        release_date = latest_release.published_at.replace(tzinfo=timezone.utc)
+        print(f"Latest release: {latest_release.tag_name} published on {release_date.date()}")
+        return release_date
+    except Exception as e:
+        print(f"Warning: Could not get latest release: {e}")
+        return None
 
 
 def fetch_initial_pulls(repo, lookback_days=INITIAL_LOOKBACK_DAYS, state='closed', base='master'):
@@ -182,32 +197,62 @@ def fetch_and_update_pulls(repo, cache: PullRequestCache, state='closed', base='
         print("No new pull requests found")
 
 
-if __name__ == '__main__':
+def main():
+    parser = argparse.ArgumentParser(
+        description='Fetch and cache GitHub pull requests, showing PRs since the latest release.'
+    )
+    parser.add_argument(
+        '-r', '--repo',
+        default='OpenMDAO/OpenMDAO',
+        help='GitHub repository in format owner/repo (default: OpenMDAO/OpenMDAO)'
+    )
+
+    args = parser.parse_args()
+    repo_name = args.repo
+
+    # Cache file location based on repo name
+    cache_file = Path(f'{repo_name.split("/")[-1]}_pulls.json')
+
+    print(f"Working with repository: {repo_name}")
+
     g = Github(PERSONAL_ACCESS_TOKEN)
-    repo = g.get_repo(REPO)
+    repo = g.get_repo(repo_name)
 
     # Check if cache exists
-    if not CACHE_FILE.exists():
+    if not cache_file.exists():
         print(f"Cache file not found. Creating initial cache from past {INITIAL_LOOKBACK_DAYS} days...\n")
         cache = fetch_initial_pulls(repo, lookback_days=INITIAL_LOOKBACK_DAYS)
     else:
-        print(f"Loading existing cache from {CACHE_FILE}\n")
-        cache = PullRequestCache.load(CACHE_FILE)
+        print(f"Loading existing cache from {cache_file}\n")
+        cache = PullRequestCache.load(cache_file)
         # Fetch new PRs since last update
         fetch_and_update_pulls(repo, cache)
 
     # Save updated cache
-    cache.save(CACHE_FILE)
-    print(f"\nCache saved to {CACHE_FILE}")
+    cache.save(cache_file)
+    print(f"\nCache saved to {cache_file}")
     print(f"Total PRs in cache: {len(cache.pulls)}")
     print(f"Last updated: {cache.last_updated.isoformat()}")
 
-    # Display PRs merged since SINCE date
-    print(f"\nPull requests merged since {SINCE.isoformat()}:\n")
-    matching_prs = [pr for pr in cache.pulls if pr.merged_at >= SINCE]
+    # Get latest release date
+    print("\nChecking for latest release...")
+    cutoff_date = get_latest_release_date(repo)
 
-    if matching_prs:
-        for pr in matching_prs:
-            print(f'- {pr.title} [#{pr.number}]({pr.url})')
+    # Display PRs since last release
+    if cutoff_date:
+        print("\nPull requests merged since last release:\n")
+        matching_prs = [pr for pr in cache.pulls if pr.merged_at > cutoff_date]
+
+        if matching_prs:
+            for pr in matching_prs:
+                print(f'- {pr.title} [#{pr.number}]({pr.url})')
+        else:
+            print("No pull requests found since the last release.")
     else:
-        print("No pull requests found in the specified date range.")
+        print("\nCould not determine latest release date. Showing all cached PRs:\n")
+        for pr in cache.pulls:
+            print(f'- {pr.title} [#{pr.number}]({pr.url})')
+
+
+if __name__ == '__main__':
+    main()
