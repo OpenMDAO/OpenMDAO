@@ -6,6 +6,7 @@ import inspect
 import textwrap
 from collections.abc import Iterable
 import re
+from pathlib import Path
 
 try:
     from numpydoc.docscrape import NumpyDocString
@@ -525,8 +526,14 @@ class LintTestCase(unittest.TestCase):
                    and not os.path.isdir(file_name):
 
                     # To construct module name, remove part of abs path that
-                    # precedes 'openmdao', and then replace '/' with '.' in the remainder.
-                    mod1 = re.sub(r'.*openmdao', 'openmdao', dirpath).replace('/', '.')
+                    # precedes 'openmdao', and then replace path separator with '.' in the remainder.
+                    path_parts = Path(dirpath).parts
+                    if 'openmdao' in path_parts:
+                        openmdao_idx = path_parts.index('openmdao')
+                        mod1 = '.'.join(path_parts[openmdao_idx:])
+                    else:
+                        # Fallback if 'openmdao' not found in path
+                        mod1 = re.sub(r'.*openmdao', 'openmdao', dirpath).replace(os.sep, '.')
 
                     # Then, get rid of the '.py' to get final part of module name.
                     mod2 = file_name[:-3]
