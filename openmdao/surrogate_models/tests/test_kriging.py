@@ -1,6 +1,7 @@
 
 # pylint: disable-msg=C0111,C0103
 
+import importlib.metadata as ilmd
 import unittest
 import itertools
 import numpy as np
@@ -9,6 +10,9 @@ import sys
 
 from openmdao.api import KrigingSurrogate
 from openmdao.utils.assert_utils import assert_near_equal
+
+
+scipy_version = tuple([int(s) for s in ilmd.version('scipy').split('.')])
 
 
 def branin(x):
