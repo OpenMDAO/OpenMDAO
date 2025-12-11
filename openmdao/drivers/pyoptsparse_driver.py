@@ -645,7 +645,13 @@ class pyOptSparseDriver(Driver):
         self.pyopt_solution = sol
 
         try:
-            exit_status = sol.optInform['value']
+            if sol.optInform is not None:
+                exit_status = sol.optInform['value']
+            else:
+                # For optimimizers that don't provide inform
+                # in newer versions of pyoptsparse.
+                exit_status = ''
+
             self.fail = False
 
             # These are various failed statuses.

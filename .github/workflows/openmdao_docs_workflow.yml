@@ -67,12 +67,14 @@ jobs:
             NUMPY: '2.2'
             SCIPY: '1.16'
             PETSc: '3.21'
-            PYOPTSPARSE: '2.13.1'
+            PYOPTSPARSE: '2.14.4'
             PYOPTSPARSE_FROM: 'build_pyoptsparse'
             SNOPT: '7.7'
             OPTIONAL: '[all,numba]'
-            PEP517: true
             PUBLISH: true
+            USE_PYPI: false
+            OPENMPI: ''
+            MPI4PY: ''
 
     runs-on: ${{ matrix.OS }}
 
@@ -80,7 +82,7 @@ jobs:
 
     defaults:
       run:
-        # Note this isn't passed to the composite action setup_openmdao_ci
+        # Note this isn't passed to the composite action
         shell: bash -l {0}
 
     steps:
@@ -88,23 +90,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: 'Setup OpenMDAO CI'
-        id: setup_openmdao_ci
-        uses: ./.github/actions/setup_openmdao_ci
+      - name: 'Setup Conda Environment'
+        id: setup_conda_environment
+        uses: ./.github/actions/setup_openmdao_conda
         with:
-          matrix_name: ${{ matrix.NAME }}
           os_version: ${{ matrix.OS }}
+          matrix_name: ${{ matrix.NAME }}
           python_version: ${{ matrix.PY }}
           numpy_version: ${{ matrix.NUMPY }}
           scipy_version: ${{ matrix.SCIPY }}
-          use_pypi: ${{ inputs.use_pypi }}
-          pep517: ${{ matrix.PEP517 }}
-          optional: ${{ matrix.OPTIONAL }}
-
-      - name: 'Install pyOptSparse'
-        id: install_pyoptsparse
-        uses: ./.github/actions/install_pyoptsparse
-        with:
+          #
+          openmpi_version: ${{ matrix.OPENMPI }}
+          petsc_version: ${{ matrix.PETSc }}
+          mpi4py_version: ${{ matrix.MPI4PY }}
+          #
           pyoptsparse_version: ${{ matrix.PYOPTSPARSE }}
           pyoptsparse_from: ${{ matrix.PYOPTSPARSE_FROM }}
           snopt_version: ${{ matrix.SNOPT }}
@@ -113,21 +112,9 @@ jobs:
           SECRET_snopt_location: ${{ secrets.SNOPT_LOCATION }}
           SECRET_snopt_location_72: ${{ secrets.SNOPT_LOCATION_72 }}
           SECRET_snopt_location_77: ${{ secrets.SNOPT_LOCATION_77 }}
-
-      - name: 'Install PETSc and mpi4py'
-        id: install_petsc
-        uses: ./.github/actions/install_petsc
-        with:
-          openmpi_version: ${{ matrix.OPENMPI }}
-          petsc_version: ${{ matrix.PETSc }}
-          mpi4py_version: ${{ matrix.MPI4PY }}
-
-      - name: 'Install optional dependencies'
-        id: install_optional_dependendies
-        uses: ./.github/actions/install_optional_dependencies
-        with:
-          os_version: ${{ matrix.OS }}
-          optional: ${{ matrix.OPTIONAL }}
+          #
+          openmdao_install_from: 'wheel'
+          openmdao_optional: ${{ matrix.OPTIONAL }}
 
       - name: 'Display environment info'
         id: display_env_info
@@ -144,7 +131,7 @@ jobs:
         uses: ./.github/actions/build_docs
         with:
           matrix_name: ${{ matrix.NAME }}
-          use_snopt: ${{ format('{0}', matrix.SNOPT_LOCATION != '' || matrix.SNOPT_LOCATION_77 != '') }}
+          use_snopt: ${{ format('{0}', matrix.SNOPT != '') }}
           SECRET_docs_location: ${{ secrets.DOCS_LOCATION }}
           SECRET_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           publish: ${{ matrix.PUBLISH }}
