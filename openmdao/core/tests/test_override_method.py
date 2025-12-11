@@ -32,8 +32,8 @@ def compute_jacvec_product_func(self, inputs, d_inputs, d_outputs, mode):
 class TestExplicitComp(om.ExplicitComponent):
     def initialize(self):
         self.options.declare('add_compute_jacvec_product', types=bool, desc="add compute_jacvec_product method if `True`, add `compute_partials` method otherwise")
-        self.options.declare('pass_MethodType', types=bool, desc="pass a `MethodType` to `self.add_method` instead of a plain function")
-        self.options.declare('attempt_buggy_method_name', types=bool, default=False, desc="pass an `name` arg to `add_method` for testing purposes")
+        self.options.declare('pass_MethodType', types=bool, desc="pass a `MethodType` to `self.override_method` instead of a plain function")
+        self.options.declare('attempt_buggy_method_name', types=bool, default=False, desc="pass an `name` arg to `override_method` for testing purposes")
 
     def setup(self):
         self.add_input('length', val=1.0)
@@ -44,20 +44,20 @@ class TestExplicitComp(om.ExplicitComponent):
 
         if self.options['add_compute_jacvec_product']:
             if self.options['pass_MethodType']:
-                self.add_method("compute_jacvec_product", MethodType(compute_jacvec_product_func, self))
+                self.override_method("compute_jacvec_product", MethodType(compute_jacvec_product_func, self))
             else:
-                self.add_method("compute_jacvec_product", compute_jacvec_product_func)
+                self.override_method("compute_jacvec_product", compute_jacvec_product_func)
         else:
             if self.options['pass_MethodType']:
-                self.add_method("compute_partials", MethodType(compute_partials_func, self))
+                self.override_method("compute_partials", MethodType(compute_partials_func, self))
             else:
-                self.add_method("compute_partials", compute_partials_func)
+                self.override_method("compute_partials", compute_partials_func)
 
         if self.options['attempt_buggy_method_name']:
             if self.options['pass_MethodType']:
-                self.add_method("compute_foo", MethodType(compute_partials_func, self))
+                self.override_method("compute_foo", MethodType(compute_partials_func, self))
             else:
-                self.add_method("compute_foo", compute_partials_func)
+                self.override_method("compute_foo", compute_partials_func)
 
     def compute(self, inputs, outputs):
         outputs['area'] = inputs['length'] * inputs['width']
@@ -65,7 +65,7 @@ class TestExplicitComp(om.ExplicitComponent):
 
 class TestAddMethodExplicitComp(unittest.TestCase):
 
-    def test_add_method(self):
+    def test_override_method(self):
         for add_compute_jacvec_product in [True, False]:
             for pass_MethodType in [True, False]:
                 prob = om.Problem()
@@ -170,8 +170,8 @@ class QuadraticComp(om.ImplicitComponent):
         self.options.declare('add_apply_linear', types=bool, default=False)
         self.options.declare('add_solve_linear', types=bool, default=False)
         self.options.declare('add_guess_nonlinear', types=bool, default=False)
-        self.options.declare('pass_MethodType', types=bool, desc="pass a `MethodType` to `self.add_method` instead of a plain function")
-        self.options.declare('attempt_buggy_method_name', types=bool, default=False, desc="pass an `name` arg to `add_method` for testing purposes")
+        self.options.declare('pass_MethodType', types=bool, desc="pass a `MethodType` to `self.override_method` instead of a plain function")
+        self.options.declare('attempt_buggy_method_name', types=bool, default=False, desc="pass an `name` arg to `override_method` for testing purposes")
 
     def setup(self):
         self.add_input('a', val=1., tags=['tag_a'])
@@ -184,21 +184,21 @@ class QuadraticComp(om.ImplicitComponent):
         pass_MethodType = self.options["pass_MethodType"]
         if self.options["add_linearize"]:
             if pass_MethodType:
-                self.add_method("linearize", MethodType(linearize_func, self))
+                self.override_method("linearize", MethodType(linearize_func, self))
             else:
-                self.add_method("linearize", linearize_func)
+                self.override_method("linearize", linearize_func)
 
         if self.options["add_apply_linear"]:
             if pass_MethodType:
-                self.add_method("apply_linear", MethodType(apply_linear_func, self))
+                self.override_method("apply_linear", MethodType(apply_linear_func, self))
             else:
-                self.add_method("apply_linear", apply_linear_func)
+                self.override_method("apply_linear", apply_linear_func)
 
         if self.options["add_solve_nonlinear"]:
             if pass_MethodType:
-                self.add_method("solve_nonlinear", MethodType(solve_nonlinear_func, self))
+                self.override_method("solve_nonlinear", MethodType(solve_nonlinear_func, self))
             else:
-                self.add_method("solve_nonlinear", solve_nonlinear_func)
+                self.override_method("solve_nonlinear", solve_nonlinear_func)
         else:
             self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
             self.nonlinear_solver.options['iprint'] = 0
@@ -207,23 +207,23 @@ class QuadraticComp(om.ImplicitComponent):
 
         if self.options["add_solve_linear"]:
             if pass_MethodType:
-                self.add_method("solve_linear", MethodType(solve_linear_func, self))
+                self.override_method("solve_linear", MethodType(solve_linear_func, self))
             else:
-                self.add_method("solve_linear", solve_linear_func)
+                self.override_method("solve_linear", solve_linear_func)
         else:
             self.linear_solver = om.DirectSolver(assemble_jac=False)
 
         if self.options["add_guess_nonlinear"]:
             if pass_MethodType:
-                self.add_method("guess_nonlinear", MethodType(guess_nonlinear_func, self))
+                self.override_method("guess_nonlinear", MethodType(guess_nonlinear_func, self))
             else:
-                self.add_method("guess_nonlinear", guess_nonlinear_func)
+                self.override_method("guess_nonlinear", guess_nonlinear_func)
 
         if self.options['attempt_buggy_method_name']:
             if self.options['pass_MethodType']:
-                self.add_method("compute_foo", MethodType(linearize_func, self))
+                self.override_method("compute_foo", MethodType(linearize_func, self))
             else:
-                self.add_method("compute_foo", linearize_func)
+                self.override_method("compute_foo", linearize_func)
 
     def apply_nonlinear(self, inputs, outputs, residuals):
         a = inputs['a']
@@ -235,7 +235,7 @@ class QuadraticComp(om.ImplicitComponent):
 
 class TestAddMethodImplicitComp(unittest.TestCase):
 
-    def test_add_method(self):
+    def test_override_method(self):
         for add_linearize in [True, False]:
             add_apply_linear = not add_linearize
             for add_solve_nonlinear in [True, False]:

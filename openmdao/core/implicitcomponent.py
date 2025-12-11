@@ -110,9 +110,16 @@ class ImplicitComponent(Component):
         if is_undefined(self.matrix_free):
             self.matrix_free = overrides_method('apply_linear', self, ImplicitComponent)
 
-    def add_method(self, name, method):
+    def override_method(self, name, method):
         """
         Dynamically add a method to this component instance.
+
+        This allows users to create an `ImplicitComponent` that uses optional
+        methods like `linearize`, `guess_nonlinear`, etc. that aren't defined
+        statically, but instead is dynamically created during `setup`. The
+        motivating use case is the `omjlcomps` library, where the optional
+        methods are implemented in the Julia programming language (see
+        `omjlcomps.JuliaImplicitComp` in byuflowlab/OpenMDAO.jl).
 
         Parameters
         ----------

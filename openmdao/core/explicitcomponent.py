@@ -82,9 +82,17 @@ class ExplicitComponent(Component):
         if is_undefined(self.matrix_free):
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
 
-    def add_method(self, name, method):
+    def override_method(self, name, method):
         """
         Dynamically add a method to this component instance.
+
+        This allows users to create an `ExplicitComponent` that has a
+        `compute_partials` or `compute_jacvec_product` that isn't defined
+        statically, but instead is dynamically created during `setup`. The
+        motivating use case is the `omjlcomps` library, where the
+        `compute_partials` or `compute_jacvec_product` methods are implemented
+        in the Julia programming language (see `omjlcomps.JuliaExplicitComp` in
+        byuflowlab/OpenMDAO.jl).
 
         Parameters
         ----------
