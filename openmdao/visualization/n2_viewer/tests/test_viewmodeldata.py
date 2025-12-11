@@ -20,7 +20,8 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.mpi import MPI
 from openmdao.utils.shell_proc import check_call
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars_context
-from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
+from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import \
+    MultipointBeamGroup
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector

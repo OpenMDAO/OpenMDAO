@@ -337,6 +337,7 @@ class tracedfunc(object):
     show_ptrs : bool
         If True, show addresses of printed objects.
     """
+
     def __init__(self, methods=None, verbose=False, memory=False, leaks=False, filters=None,
                  show_ptrs=False):
         self.options = _Options(methods=methods, verbose=verbose, memory=memory, leaks=leaks,

@@ -12,7 +12,6 @@ def main():
     Optionally writes the value of the environment variable "TEST_ENV_VAR"
     to the file.
     """
-
     parser = argparse.ArgumentParser()
     parser.add_argument("output_filename")
     parser.add_argument("-e", "--write_test_env_var",

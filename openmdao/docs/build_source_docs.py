@@ -30,7 +30,9 @@ index_top = """
 """
 
 def header(filename, path):
-
+    """
+    Return the rst header for the source docs.
+    """
     header = """# %s
 
 ```{eval-rst}
@@ -46,6 +48,9 @@ def header(filename, path):
 
 
 def _header_cell():
+    """
+    Generate the header cell for the source file documentation.
+    """
     template = """{
  "cells": [
   {
@@ -82,8 +87,9 @@ def _header_cell():
 
 
 def build_src_docs(top, src_dir, project_name='openmdao'):
-    # docs_dir = os.path.dirname(src_dir)
-
+    """
+    Generate the source documenation notebook files.
+    """
     doc_dir = os.path.join(top, "_srcdocs")
     if os.path.isdir(doc_dir):
         import shutil
