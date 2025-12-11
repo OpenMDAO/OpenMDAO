@@ -86,7 +86,7 @@ class TestAddMethodExplicitComp(unittest.TestCase):
                 prob = om.Problem()
                 comp = TestExplicitComp(add_compute_jacvec_product=add_compute_jacvec_product, pass_MethodType=pass_MethodType, attempt_buggy_method_name=True)
                 prob.model.add_subsystem('comp', comp, promotes=["*"])
-                with self.assertRaises(ValueError) as cm:
+                with self.assertRaises(ValueError):
                     prob.setup()
 
 
@@ -288,7 +288,7 @@ class TestAddMethodImplicitComp(unittest.TestCase):
 
                             prob.model.add_subsystem('comp', comp, promotes=["*"])
 
-                            with self.assertRaises(ValueError) as cm:
+                            with self.assertRaises(ValueError):
                                 prob.setup()
 
 
