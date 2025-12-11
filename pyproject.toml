@@ -199,11 +199,14 @@ select = [
 ]
 ignore = [
     'D100',  # Don't require docstring in public module
+    'D101',  # Don't require docstring in public module
+    'D102',  # Don't require docstring in public method
     'D200',  # One-line docstring should fit on one line
     'D203',  # 1 blank required before class docstrings
     'D210',  # Trim whitespace surrounding one-line docstrings.
     'D212',  # Multi-line doc strings start on second line (see: D213)
     'D200',  # One-line docstring should fit on one line with quotes
+    'D400',  # Sometimes you just don't need a period.
     'D413',  # Blank line required after last section of docstrings
 ]
 exclude = [
@@ -237,4 +240,5 @@ convention = "numpy"
 "**/extcode_resistor.py" = ["E741"]
 "**/circuit_analysis_examples.ipynb" = ["E741"]
 # Ignore some import related conventions in docs
-"**/openmdao_book/**" = ["E402","F811"]
+"**/openmdao_book/**" = ["E402","F811", "E501", "D103"]
+"circle_opt.py" = ["E501"]

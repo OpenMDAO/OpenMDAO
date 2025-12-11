@@ -1,5 +1,9 @@
-""" Definition of the Paraboloid component, which evaluates the equation
-(x-3)^2 + xy + (y+4)^2 = 3
+""" Definition of the Paraboloid component.
+
+Evaluates the equation:
+
+  (x-3)^2 + xy + (y+4)^2 = 3
+
 """
 import openmdao.api as om
 
