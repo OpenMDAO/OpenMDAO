@@ -8,6 +8,7 @@ import argparse
 import importlib.metadata as ilmd
 
 import re
+
 from openmdao import __version__ as version
 
 try:
@@ -31,6 +32,8 @@ from openmdao.visualization.scaling_viewer.scaling_report import _scaling_setup_
 from openmdao.visualization.timing_viewer.timing_viewer import _timing_setup_parser, _timing_cmd
 from openmdao.visualization.dyn_shape_plot import _view_dyn_shapes_setup_parser, \
     _view_dyn_shapes_cmd
+from openmdao.visualization.dyn_units_plot import _view_dyn_units_setup_parser, \
+    _view_dyn_units_cmd
 try:
     import bokeh
     from openmdao.visualization.meta_model_viewer.meta_model_visualization import view_metamodel
@@ -65,6 +68,8 @@ from openmdao.utils.entry_points import _list_installed_setup_parser, _list_inst
 from openmdao.utils.reports_system import _list_reports_setup_parser, _list_reports_cmd, \
     _view_reports_setup_parser, _view_reports_cmd
 from openmdao.visualization.graph_viewer import _graph_setup_parser, _graph_cmd
+from openmdao.visualization.realtime_plot.realtime_plot import \
+    _realtime_plot_setup_parser, _realtime_plot_cmd, _rtplot_cmd, _rtplot_setup_parser
 from openmdao.recorders.view_cases import _view_cases_setup_parser, _view_cases_cmd
 
 
@@ -108,22 +113,15 @@ def _view_connections_cmd(options, user_args):
         view_connections(prob, outfile=options.outfile, show_browser=not options.no_browser,
                          show_values=options.show_values, title=title)
 
-    # register the hook
-    if options.show_values:
-        funcname = 'final_setup'
-    else:
-        funcname = 'setup'
-
     def _view_model_w_errors(prob):
         if prob._metadata['saved_errors']:
-            # run the viewer here if we've had setup errors. Normally we'd wait until
-            # after setup or final_setup.
             _viewconns(prob)
             # errors will result in exit at the end of the _check_collected_errors method
 
+    # register the hooks
     hooks._register_hook('_check_collected_errors', 'Problem', pre=_view_model_w_errors)
-    hooks._register_hook(funcname, class_name='Problem', inst_id=options.problem, post=_viewconns,
-                         exit=True)
+    hooks._register_hook('final_setup', 'Problem', inst_id=options.problem,
+                         post=_viewconns, exit=True)
 
     _load_and_exec(options.file[0], user_args)
 
@@ -310,7 +308,7 @@ def _clean_setup_parser(parser):
 
 def _clean_cmd(options, user_args):
     """
-    Return the post_setup hook function for 'openmdao summary'.
+    Return the post_setup hook function for 'openmdao clean'.
 
     Parameters
     ----------
@@ -440,7 +438,7 @@ def _cite_cmd(options, user_args):
         if not MPI or MPI.COMM_WORLD.rank == 0:
             print_citations(prob, classes=options.classes, out_stream=out)
 
-    hooks._register_hook('setup', 'Problem', post=_cite, exit=True)
+    hooks._register_hook('final_setup', 'Problem', post=_cite, exit=True)
     _load_and_exec(options.file[0], user_args)
 
 
@@ -651,6 +649,16 @@ _command_map = {
         _partial_coloring_cmd,
         "Compute coloring(s) for specified partial jacobians.",
     ),
+    'rtplot': (
+        _rtplot_setup_parser,
+        _rtplot_cmd,
+        "Run the realtime optimization progress plot tool once the driver recorder file is started"
+    ),
+    'realtime_plot': (
+        _realtime_plot_setup_parser,
+        _realtime_plot_cmd,
+        "Run the realtime optimization progress plot tool"
+    ),
     "scaffold": (
         _scaffold_setup_parser,
         _scaffold_exec,
@@ -699,6 +707,11 @@ _command_map = {
         _view_dyn_shapes_setup_parser,
         _view_dyn_shapes_cmd,
         "View the dynamic shape dependency graph.",
+    ),
+    "view_dyn_units": (
+        _view_dyn_units_setup_parser,
+        _view_dyn_units_cmd,
+        "View the dynamic units dependency graph.",
     ),
     "view_mm": (_meta_model_parser, _meta_model_cmd, "View a metamodel."),
     "view_reports": (

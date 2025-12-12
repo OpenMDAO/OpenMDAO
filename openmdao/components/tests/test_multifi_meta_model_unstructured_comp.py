@@ -1,8 +1,15 @@
+from packaging.version import Version
+
+from scipy import __version__ as scipy_version
+
 import numpy as np
 import unittest
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
+
+
+ScipyVersion = Version(scipy_version)
 
 
 class MockSurrogate(om.MultiFiSurrogateModel):
@@ -267,7 +274,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         mm.add_input('x', np.zeros((1, 2)))
         mm.add_output('y', np.zeros((1, )))
 
-        mm.options['default_surrogate'] = om.MultiFiCoKrigingSurrogate(normalize=False)
+        mm.options['default_surrogate'] = om.MultiFiCoKrigingSurrogate(normalize=False, tolerance=1.0E-12)
 
         prob = om.Problem()
         prob.model.add_subsystem('mm', mm)
@@ -390,6 +397,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.model.add_subsystem('indep', om.IndepVarComp('x', arr))
         prob.model.connect('indep.x', 'mm.x', src_indices=om.slicer[:, 1])
         prob.setup()
+        prob.model._setup_part2()
 
         assert_near_equal(prob['mm.x'], np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]]))
 

@@ -9,7 +9,7 @@ from io import TextIOBase
 import numpy as np
 
 from openmdao.core.constants import _DEFAULT_OUT_STREAM
-from openmdao.utils.notebook_utils import notebook, display, HTML
+from openmdao.utils.notebook_utils import notebook
 from openmdao.visualization.tables.table_builder import generate_table
 
 # string to display when an attribute is not available
@@ -93,13 +93,13 @@ def write_var_table(pathname, var_list, var_type, var_dict,
     #  so that we do the column output in the correct order
     if var_type == 'input':
         out_types = ('val', 'units', 'shape', 'global_shape', 'prom_name', 'desc', 'min', 'max',
-                     'tags')
+                     'mean', 'tags')
     elif var_type == 'all':
         out_types = ('val', 'io', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
-                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max', 'tags')
+                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max', 'mean', 'tags')
     else:
         out_types = ('val', 'resids', 'units', 'shape', 'global_shape', 'lower', 'upper',
-                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max', 'tags')
+                     'ref', 'ref0', 'res_ref', 'prom_name', 'desc', 'min', 'max', 'mean', 'tags')
 
     # Figure out which columns will be displayed.
     for var_meta in var_dict.values():
@@ -117,6 +117,7 @@ def write_var_table(pathname, var_list, var_type, var_dict,
             meta['tags'] = list(meta['tags'])
 
     if use_html and var_list:
+        from IPython.display import display, HTML
         rows = []
         for name in var_list:
             rows.append([name] + [var_dict[name][field] for field in column_names])
@@ -225,6 +226,9 @@ def write_source_table(source_dicts, out_stream):
     # use table_builder if we are in a notebook and are using the default out_stream
     use_html = notebook and out_stream is _DEFAULT_OUT_STREAM
 
+    if use_html:
+        from IPython.display import display, HTML
+
     if out_stream is _DEFAULT_OUT_STREAM:
         out_stream = sys.stdout
     elif not isinstance(out_stream, TextIOBase):
@@ -259,7 +263,7 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
         Set to None to suppress.
     row : str
         The string containing the contents of the beginning of this row output.
-        Contains the name of the System or varname, possibley indented to show hierarchy.
+        Contains the name of the System or varname, possibly indented to show hierarchy.
 
     column_names : list of str
         Indicates which columns will be written in this row.
@@ -308,3 +312,124 @@ def _write_variable(out_stream, row, column_names, var_dict, print_arrays):
             indented_lines = [(left_column_width + indent_inc) * ' ' +
                               s for s in out_str.splitlines()]
             out_stream.write('\n'.join(indented_lines) + '\n')
+
+
+def write_options_table(pathname, opt_list, out_stream=_DEFAULT_OUT_STREAM):
+    """
+    Write table of options and values for a model.
+
+    For non-serializable datatypes, only the type is printed.
+
+    Parameters
+    ----------
+    pathname : str
+        Pathname to be printed. If None, defaults to 'model'.
+    opt_list : list
+        List of systems options dictionaries.
+    out_stream : file-like object
+        Where to send human readable output.
+    """
+    if out_stream is None:
+        return
+
+    if out_stream is _DEFAULT_OUT_STREAM:
+        out_stream = sys.stdout
+    elif not isinstance(out_stream, TextIOBase):
+        raise TypeError("Invalid output stream specified for 'out_stream'.")
+
+    count = len(opt_list)
+
+    # Write header
+    pathname = pathname if pathname else 'model'
+
+    header = f"Options for {count} components in '{pathname}"
+
+    out_stream.write(header + '\n')
+
+    if not count:
+        out_stream.write('\n\n')
+        return
+
+    column_names = ['option name', 'option value']
+
+    # Find with width of the first column in the table
+    #    Need to look through all the possible varnames to find the max width
+    max_varname_len = len(column_names[0])
+    for sys_name, opt_dict, nl_dict, ln_dict in opt_list:
+        stem_size = indent_inc * len(sys_name.split('.'))
+        max_varname_len = max(max_varname_len, stem_size)
+        for opt_name in opt_dict:
+            total_len = stem_size + len(opt_name)
+            max_varname_len = max(max_varname_len, total_len)
+
+        if nl_dict is not None:
+            for opt_name in nl_dict:
+                total_len = stem_size + len(opt_name) + 2
+                max_varname_len = max(max_varname_len, total_len)
+        if ln_dict is not None:
+            for opt_name in ln_dict:
+                total_len = stem_size + len(opt_name) + 2
+                max_varname_len = max(max_varname_len, total_len)
+
+    # Write out the column headers
+    opt_val_width = 30
+    column_header = column_names[0] + (max_varname_len - len(column_names[0])) * ' '
+    column_dashes = max_varname_len * '-'
+
+    column_header += column_spacing * ' ' + column_names[1]
+    column_dashes += column_spacing * ' ' + opt_val_width * '-'
+
+    out_stream.write('\n')
+    out_stream.write(column_header + '\n')
+    out_stream.write(column_dashes + '\n')
+
+    core_types = (int, float, tuple, list, np.ndarray, str, bool)
+
+    for sys_path, opt_dict, nl_dict, ln_dict in opt_list:
+        sys_path_list = sys_path.split('.')
+        stem_size = indent_inc * len(sys_path_list)
+        out_stream.write(stem_size * ' ' + sys_path_list[-1] + '\n')
+        stem_size += 2
+
+        for opt_name, opt_val in opt_dict.items():
+
+            if not isinstance(opt_val, core_types):
+                opt_val = type(opt_val)
+
+            row = stem_size * ' ' + opt_name
+
+            remaining = max_varname_len - len(row) + column_spacing + 2
+            row += remaining * ' ' + str(opt_val)
+            out_stream.write(row + '\n')
+
+        if nl_dict is not None:
+
+            out_stream.write(stem_size * ' ' + 'nonlinear_solver' + '\n')
+
+            for opt_name, opt_val in nl_dict.items():
+
+                if not isinstance(opt_val, core_types):
+                    opt_val = type(opt_val)
+
+                row = (stem_size + 2) * ' ' + opt_name
+
+                remaining = max_varname_len - len(row) + column_spacing + 2
+                row += remaining * ' ' + str(opt_val)
+                out_stream.write(row + '\n')
+
+        if ln_dict is not None:
+
+            out_stream.write(stem_size * ' ' + 'linear_solver' + '\n')
+
+            for opt_name, opt_val in ln_dict.items():
+
+                if not isinstance(opt_val, core_types):
+                    opt_val = type(opt_val)
+
+                row = (stem_size + 2) * ' ' + opt_name
+
+                remaining = max_varname_len - len(row) + column_spacing + 2
+                row += remaining * ' ' + str(opt_val)
+                out_stream.write(row + '\n')
+
+    out_stream.write('\n\n')

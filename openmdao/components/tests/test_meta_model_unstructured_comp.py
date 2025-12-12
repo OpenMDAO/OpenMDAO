@@ -758,6 +758,7 @@ class MetaModelTestCase(unittest.TestCase):
         prob.model.add_objective('trig.sin_x')
 
         prob.setup(check=True)
+        prob.final_setup()
 
         self.assertEqual(prob['trig.x'], [5.])
         assert_near_equal(prob['trig.sin_x'], [.0], 1e-6)

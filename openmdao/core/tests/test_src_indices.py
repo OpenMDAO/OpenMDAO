@@ -106,14 +106,11 @@ class SrcIndicesTestCase(unittest.TestCase):
         assert_near_equal(p.model.get_val('a'), 99.)
         assert_near_equal(p.model.get_val('b'), 2.)
         assert_near_equal(p['g1.y'], 101.)
-        assert_near_equal(p['g1.a'], 99.)
         assert_near_equal(p.model.g1.get_val('y'), 101.)
         assert_near_equal(p.model.g1.get_val('a'), 99.)
         assert_near_equal(p['g1.c1.a0'], 99.)
         assert_near_equal(p['g1.c1.b'], 2.)
-        assert_near_equal(p['g1.g2.y'], [101.] * 4)
         assert_near_equal(p.model.g1.g2.get_val('y'), [101.] * 4)
-        assert_near_equal(p['g1.g2.a'], [99.] * 4)
         assert_near_equal(p.model.g1.g2.get_val('a'), [99.] * 4)
         assert_near_equal(p['g1.g2.c2.a'], [99.] * 4)
         assert_near_equal(p['g1.g2.c2.y'], [101.] * 4)
@@ -316,6 +313,7 @@ class SrcIndicesTestCase(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'src_shape_mismatch':"
@@ -347,6 +345,7 @@ class SrcIndicesTestCase(unittest.TestCase):
         p.model.set_input_defaults('x', src_shape=src_shape)
         with self.assertRaises(Exception) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(cm.exception.args[0],
             "\nCollected errors for problem 'src_indices_on_promotes':"
@@ -433,7 +432,7 @@ class SrcIndicesFeatureTestCase(unittest.TestCase):
         p.run_model()
 
         assert_near_equal(p['x'], inp)
-        assert_near_equal(p['G.x'], inp[:, :-1])
+        assert_near_equal(p.model.G.get_val('x'), inp[:, :-1])
         assert_near_equal(p['G.g1.C1.y'], inp[:, :-1][:, 1]*3.)
         assert_near_equal(p['G.g2.C2.y'], inp[:, :-1].flatten()[[1,5]]*2.)
 

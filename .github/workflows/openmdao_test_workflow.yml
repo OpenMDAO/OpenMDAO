@@ -1,4 +1,3 @@
-# Run OpenMDAO Tests
 name: OpenMDAO Tests
 
 on:
@@ -9,7 +8,7 @@ on:
     branches: [ master ]
 
   # Allow running the workflow manually from the Actions tab
-  # All jobs are excluded by default, desired jobs must be selected
+  # All jobs are included by default and may be deselected if desired
   workflow_dispatch:
 
     inputs:
@@ -24,49 +23,49 @@ on:
         type: boolean
         description: 'Include Ubuntu Baseline in test matrix'
         required: false
-        default: false
+        default: true
 
       MacOS_Baseline:
         type: boolean
         description: 'Include MacOS Baseline in test matrix'
         required: false
-        default: false
-
-      MacOS_ARM:
-        type: boolean
-        description: 'Include MacOS ARM in test matrix'
-        required: false
-        default: false
+        default: true
 
       Windows_Baseline:
         type: boolean
         description: 'Include Windows Baseline in test matrix'
         required: false
-        default: false
+        default: true
 
       Ubuntu_Minimal:
         type: boolean
         description: 'Include Ubuntu Minimal in test matrix'
         required: false
-        default: false
+        default: true
 
       Ubuntu_Oldest:
         type: boolean
         description: 'Include Ubuntu Oldest in test matrix'
         required: false
-        default: false
-
-      Build_Docs:
-        type: boolean
-        description: 'Build docs'
-        required: false
-        default: false
+        default: true
 
       debug_enabled:
         type: boolean
         description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
         required: false
         default: false
+
+      use_pypi:
+        type: boolean
+        description: 'Run tests against the published PyPi version of OpenMDAO'
+        required: false
+        default: false
+
+
+concurrency:
+  # Cancel any existing CI runs if we push to this branch
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 run-name:  ${{ inputs.run_name }}
 
@@ -84,85 +83,54 @@ jobs:
         include:
           # test baseline versions on Ubuntu
           - NAME: Ubuntu Baseline
-            OS: ubuntu-22.04
-            PY: '3.12'
-            NUMPY: '1.26'
-            SCIPY: '1.14'
-            PETSc: '3.20'
-            PYOPTSPARSE: 'v2.11.0'
-            # PAROPT: true
+            OS: ubuntu-24.04
+            PY: '3.13'
+            NUMPY: '2.2'
+            SCIPY: '1.16'
+            PETSc: '3.21'
+            PYOPTSPARSE_FROM: 'conda-forge'
+            PYOPTSPARSE: '2.13.1'
             SNOPT: '7.7'
-            OPTIONAL: '[all]'
+            OPTIONAL: '[all,numba]'
             BANDIT: true
             PEP517: true
-            TESTS: true
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Baseline }}
 
           # test baseline versions on MacOS
           - NAME: MacOS Baseline
-            OS: macos-13
-            PY: '3.12'
-            NUMPY: '1.26'
-            SCIPY: '1.13'
-            PETSc: '3.20'
-            PYOPTSPARSE: 'v2.11.0'
-            # PAROPT: true
+            OS: macos-15
+            PY: '3.13'
+            NUMPY: '2.2'
+            SCIPY: '1.15'
+            PETSc: '3.21'
+            PYOPTSPARSE_FROM: 'build_pyoptsparse'
+            PYOPTSPARSE: '2.13.1'
             SNOPT: '7.7'
-            OPTIONAL: '[docs,doe,jax,notebooks,test]'
-            TESTS: true
+            OPTIONAL: '[all]'
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_Baseline }}
 
-          # test baseline versions on MacOS/ARM
-          - NAME: MacOS ARM
-            OS: macos-14
-            PY: '3.12'
-            NUMPY: '1.26'
-            SCIPY: '1.14'
-            PETSc: '3.20'
-            # PYOPTSPARSE: 'v2.11.0'
-            # PAROPT: true
-            # SNOPT: '7.7'
-            OPTIONAL: '[all]'
-            TESTS: true
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_ARM }}
+          # # test minimal install
+          # - NAME: Ubuntu Minimal
+          #   OS: ubuntu-24.04
+          #   PY: '3.13'
+          #   NUMPY: '2.2'
+          #   SCIPY: '1.15'
+          #   OPTIONAL: '[test]'
+          #   EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
 
-          # test minimal install
-          - NAME: Ubuntu Minimal
-            OS: ubuntu-latest
-            PY: '3.12'
-            NUMPY: '1.26'
-            SCIPY: '1.14'
-            OPTIONAL: '[test]'
-            TESTS: true
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
-
-          # test oldest supported versions
-          - NAME: Ubuntu Oldest
-            OS: ubuntu-22.04
-            PY: '3.9'
-            NUMPY: '1.24'
-            SCIPY: '1.9'
-            OPENMPI: '4.0'
-            MPI4PY: '3.0'
-            PETSc: '3.13'
-            PYOPTSPARSE: 'v2.10.2'
-            SNOPT: '7.2'
-            OPTIONAL: '[all]'
-            TESTS: true
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Oldest }}
-
-          # build docs (baseline versions)
-          - NAME: Build Docs
-            OS: ubuntu-latest
-            PY: '3.11'
-            NUMPY: '1.26'
-            SCIPY: '1.13'
-            PETSc: '3.19'
-            PYOPTSPARSE: 'v2.11.0'
-            SNOPT: '7.7'
-            OPTIONAL: '[all]'
-            BUILD_DOCS: true
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Build_Docs }}
+          # # test oldest supported versions
+          # - NAME: Ubuntu Oldest
+          #   OS: ubuntu-22.04
+          #   PY: '3.10'
+          #   NUMPY: '1.26'
+          #   SCIPY: '1.12'
+          #   PETSc: '3.20'
+          #   OPENMPI: '4.1'
+          #   PYOPTSPARSE_FROM: 'build_pyoptsparse'
+          #   PYOPTSPARSE: '2.10.2'
+          #   SNOPT: '7.7'
+          #   OPTIONAL: '[all]'
+          #   EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Oldest }}
 
     runs-on: ${{ matrix.OS }}
 
@@ -185,12 +153,12 @@ jobs:
 
       - name: Exit if this job was excluded
         if: matrix.EXCLUDE
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
 
       - name: Create SSH key
-        if: (matrix.SNOPT || matrix.BUILD_DOCS)
+        if: matrix.SNOPT
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
@@ -219,7 +187,12 @@ jobs:
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
-          if [[ "${{ matrix.PEP517 }}" == "true" ]]; then
+          if [[  "${{ inputs.use_pypi }}" == "true" ]]; then
+            echo "-----------------------------------------------------------"
+            echo "Installing from PyPi"
+            echo "-----------------------------------------------------------"
+            python -m pip install openmdao${{ matrix.OPTIONAL }}
+          elif [[ "${{ matrix.PEP517 }}" == "true" ]]; then
             pip wheel --no-deps --use-pep517 .
             WHEEL=`find openmdao-*.whl`
             echo "-----------------------------------------------------------"
@@ -230,41 +203,42 @@ jobs:
             python -m pip install .${{ matrix.OPTIONAL }}
           fi
 
-      - name: Install MacOS-specific dependencies
-        if: matrix.OS == 'macos-13'
+      - name: Install compilers
+        if: matrix.PYOPTSPARSE
         run: |
-          conda install swig
+          echo "============================================================="
+          echo "Install compilers"
+          echo "============================================================="
+          if [[  "${{ matrix.OS }}" != "macos-15" ]]; then
+            conda install cython swig compilers cmake meson openmp -q -y
+          else
+            conda install cython swig compilers cmake meson -q -y
+          fi
 
       - name: Install PETSc
         if: matrix.PETSc
         run: |
           echo "============================================================="
-          echo "Install compilers for PETSc"
-          echo "============================================================="
-          if [[ "${{ matrix.OPENMPI }}" ]]; then
-            COMPILERS="cython compilers openmpi-mpicc=${{ matrix.OPENMPI }}"
-          else
-            COMPILERS="cython compilers openmpi-mpicc"
-          fi
-          conda install $COMPILERS -q -y
-
-          echo "============================================================="
           echo "Install PETSc"
           echo "============================================================="
-          if [[ "${{ matrix.PETSc }}" == "3" ]]; then
-            python -m pip install git+https://github.com/mpi4py/mpi4py
-            python -m pip install petsc petsc4py
+          if [[ "${{ matrix.MPICH }}" ]]; then
+            conda install mpich-mpicc=${{ matrix.MPICH }} -q -y
+          elif [[ "${{ matrix.OPENMPI }}" ]]; then
+            conda install openmpi-mpicc=${{ matrix.OPENMPI }} -q -y
           else
-            if [[ "${{ matrix.MPI4PY }}" ]]; then
-              conda install mpi4py=${{ matrix.MPI4PY }} petsc4py=${{ matrix.PETSc }} -q -y
-            else
-              conda install mpi4py petsc4py=${{ matrix.PETSc }} -q -y
-            fi
+            conda install openmpi-mpicc -q -y
+          fi
+
+          if [[ "${{ matrix.MPI4PY }}" ]]; then
+            conda install mpi4py=${{ matrix.MPI4PY }} petsc4py=${{ matrix.PETSc }} -q -y
+          else
+            conda install mpi4py petsc4py=${{ matrix.PETSc }} -q -y
           fi
 
           echo "============================================================="
           echo "Check MPI and PETSc installation"
           echo "============================================================="
+          export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
           export OMPI_MCA_rmaps_base_oversubscribe=1
           export OMPI_MCA_btl=^openib
           echo "-----------------------"
@@ -278,68 +252,140 @@ jobs:
                                  print(x.getArray())"
           echo "-----------------------"
 
+          echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> $GITHUB_ENV
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
           echo "OMPI_MCA_btl=^openib" >> $GITHUB_ENV
 
           echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
           echo "TMPDIR=/tmp" >> $GITHUB_ENV
 
-      - name: Install pyOptSparse
-        if: matrix.PYOPTSPARSE
+      - name: Build SNOPT
+        if: matrix.PYOPTSPARSE_FROM != 'build_pyoptsparse' && matrix.SNOPT
+        continue-on-error: false
+        env:
+          SNOPT_LOCATION: ${{ secrets.SNOPT_LOCATION }}
+          SNOPT_VERSION: ${{ matrix.SNOPT }}
         run: |
           echo "============================================================="
-          echo "Install pyoptsparse"
+          echo "Build SNOPT library"
           echo "============================================================="
-
-          if [[ "${{ matrix.PYOPTSPARSE }}" == "conda-forge" ]]; then
-            if [[ "${{ matrix.SNOPT }}" ]]; then
-              echo "SNOPT ${{ matrix.SNOPT }} was requested but is not available on conda-forge"
-            fi
-
-            conda install -c conda-forge pyoptsparse
-          else
-            python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
-
-            if [[ "${{ matrix.PYOPTSPARSE }}" == "latest" ]]; then
-              function latest_version() {
-                local REPO_URL=$1/releases/latest
-                local LATEST_URL=`curl -fsSLI -o /dev/null -w %{url_effective} $REPO_URL`
-                local LATEST_VER=`echo $LATEST_URL | awk '{split($0,a,"/tag/"); print a[2]}'`
-                echo $LATEST_VER
-              }
-              BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
-            else
-              BRANCH="-b ${{ matrix.PYOPTSPARSE }}"
-            fi
-
-            if [[ "${{ matrix.PAROPT }}" ]]; then
-              PAROPT="-a"
-            fi
-
-            if [[ "${{ matrix.SNOPT }}" == "7.7" && "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
-              echo "  > Secure copying SNOPT 7.7 over SSH"
-              mkdir SNOPT
-              scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
-              SNOPT="-s SNOPT/src"
-            elif [[ "${{ matrix.SNOPT }}" == "7.2" && "${{ secrets.SNOPT_LOCATION_72 }}" ]]; then
-              echo "  > Secure copying SNOPT 7.2 over SSH"
-              mkdir SNOPT
-              scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT
-              SNOPT="-s SNOPT/source"
-            elif [[ "${{ matrix.SNOPT }}" ]]; then
-              echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
-            fi
-
-            build_pyoptsparse -v $BRANCH $PAROPT $SNOPT
+          if [[ "${{ secrets.SNOPT_LOCATION }}" && "${{ matrix.SNOPT }}" == "7.7" ]]; then
+            echo "-------------------------------------------------------------"
+            echo "Getting SNOPT source"
+            echo "-------------------------------------------------------------"
+            .github/actions/install_pyoptsparse/download_snopt.sh
           fi
 
+          if [ -d "SNOPT" ] ; then
+            echo "-------------------------------------------------------------"
+            echo "Building SNOPT"
+            echo "-------------------------------------------------------------"
+            cd SNOPT
+            ./configure
+            make
+            make check
+
+            echo "-------------------------------------------------------------"
+            echo "Building Python bindings"
+            echo "-------------------------------------------------------------"
+            echo "  > Copying required files from pySNOPT.."
+
+            git clone https://github.com/mdolab/pyoptsparse $HOME/pyoptsparse
+
+            PYSNOPT_SOURCE=$HOME/pyoptsparse/pyoptsparse/pySNOPT/source/
+            cp -v $PYSNOPT_SOURCE/*.f src/
+            cp -v $PYSNOPT_SOURCE/f2py/snopt.pyf .
+
+            echo "  > Removing problematic files..."
+            rm -f src/snopth.f
+            rm -f src/sn27lu77.f
+            rm -f src/sn27lu90.f
+
+            echo "  > Building Python bindings..."
+            python -m numpy.f2py -m snopt -c snopt.pyf src/*.f -L`pwd`/lib -L/lib -lsnopt7
+
+            echo "-------------------------------------------------------------"
+            echo "Try to import SNOPT"
+            echo "-------------------------------------------------------------"
+            python -c "import snopt; print(snopt)"
+
+            echo "-------------------------------------------------------------"
+            echo "Set PYOPTSPARSE_IMPORT_SNOPT_FROM for subsequent steps"
+            echo "-------------------------------------------------------------"
+            export PYOPTSPARSE_IMPORT_SNOPT_FROM=`pwd`
+            echo "PYOPTSPARSE_IMPORT_SNOPT_FROM=$PYOPTSPARSE_IMPORT_SNOPT_FROM" >> $GITHUB_ENV
+
+            cd ../..
+          fi
+
+      - name: Install pyOptSparse from GitHub
+        if: matrix.PYOPTSPARSE && matrix.PYOPTSPARSE_FROM == 'github'
+        run: |
+          echo "Installing pyOptSparse from GitHub, IPOPT will not be available"
+          pip install git+https://github.com/mdolab/pyoptsparse@v${{ matrix.PYOPTSPARSE }}
+
+      - name: Install pyOptSparse from conda-forge
+        if: matrix.PYOPTSPARSE && matrix.PYOPTSPARSE_FROM == 'conda-forge'
+        run: |
+          echo "Installing pyOptSparse from conda-forge, IPOPT will be available"
+          conda install -c conda-forge pyoptsparse=${{ matrix.PYOPTSPARSE }} -q -y
+
+      - name: Install pyOptSparse using build_pyoptsparse
+        if: matrix.PYOPTSPARSE && matrix.PYOPTSPARSE_FROM == 'build_pyoptsparse'
+        continue-on-error: false
+        env:
+          SNOPT_LOCATION: ${{ secrets.SNOPT_LOCATION }}
+          SNOPT_VERSION: ${{ matrix.SNOPT }}
+        run: |
+          conda install -c conda-forge swig -q -y
+
+          python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
+
+          if [[ "${{ matrix.PYOPTSPARSE }}" == "latest" ]]; then
+            function latest_version() {
+              local REPO_URL=$1/releases/latest
+              local LATEST_URL=`curl -fsSLI -o /dev/null -w %{url_effective} $REPO_URL`
+              local LATEST_VER=`echo $LATEST_URL | awk '{split($0,a,"/tag/"); print a[2]}'`
+              echo $LATEST_VER
+            }
+            BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
+          else
+            BRANCH="-b v${{ matrix.PYOPTSPARSE }}"
+          fi
+
+          if [[ "${{ matrix.PAROPT }}" ]]; then
+            PAROPT="-a"
+          fi
+
+          if [[ "${{ matrix.SNOPT }}" == "7.7" ]]; then
+            echo "  > Secure copying SNOPT 7.7 over SSH"
+            .github/actions/install_pyoptsparse/download_snopt.sh
+            if [ -d "SNOPT" ] ; then
+              SNOPT="-s SNOPT/src"
+            fi
+          elif [[ "${{ matrix.SNOPT }}" == "7.2" ]]; then
+            echo "  > Secure copying SNOPT 7.2 over SSH"
+            .github/actions/install_pyoptsparse/download_snopt.sh
+            if [ -d "SNOPT" ] ; then
+              SNOPT="-s SNOPT/source"
+            fi
+          elif [[ "${{ matrix.SNOPT }}" ]]; then
+            echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
+          fi
+
+          build_pyoptsparse -v $BRANCH $PAROPT $SNOPT
+
       - name: Install optional dependencies
-        if: matrix.OPTIONAL == '[all]'
+        if: matrix.OPTIONAL == '[all]' || matrix.OPTIONAL == '[all,numba]'
         run: |
           echo "============================================================="
           echo "Install additional packages for testing/coverage"
           echo "============================================================="
-          conda install graphviz
+          if [[  "${{ matrix.OS }}" == "macos-15" ]]; then
+            brew install graphviz -q
+          else
+            conda install graphviz -q -y
+          fi
           python -m pip install pyparsing psutil objgraph pyxdsm pydot
 
           echo "Pre-install playwright dependencies to avoid 'Playwright Host validation warning'"
@@ -393,7 +439,6 @@ jobs:
 
       - name: Run tests
         id: run_tests
-        if: matrix.TESTS
         env:
           OPENMDAO_CHECK_ALL_PARTIALS: true
         run: |
@@ -409,7 +454,6 @@ jobs:
 
       - name: Submit coverage
         id: coveralls
-        if: matrix.TESTS
         continue-on-error: true
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -434,71 +478,6 @@ jobs:
             Uploading of coverage data to coveralls.io failed.
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - name: Build docs
-        if: matrix.BUILD_DOCS
-        id: build_docs
-        run: |
-          export OPENMDAO_REPORTS=0
-          export PYDEVD_DISABLE_FILE_VALIDATION=1
-
-          cd openmdao/docs
-          if [[ "${{ secrets.SNOPT_LOCATION_72 }}" || "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
-            echo "============================================================="
-            echo "Building docs with SNOPT examples."
-            echo "============================================================="
-          else
-            echo "============================================================="
-            echo "Disabling SNOPT cells in notebooks."
-            echo "============================================================="
-            python openmdao_book/other/disable_snopt_cells.py
-          fi
-
-          # start ipcluster to run MPI under notebooks
-          ./ipcluster_start.sh
-          sleep 12
-
-          echo "============================================================="
-          echo "Build the docs"
-          echo "============================================================="
-          python build_source_docs.py
-          jupyter-book build -W --keep-going openmdao_book
-          python copy_build_artifacts.py
-
-      - name: Display doc build reports
-        if: failure() && matrix.BUILD_DOCS && steps.build_docs.outcome == 'failure'
-        run: |
-          for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log'); do
-            echo "============================================================="
-            echo $f
-            echo "============================================================="
-            cat $f
-          done
-
-      - name: Publish docs
-        if: ${{ github.event_name != 'pull_request' && matrix.BUILD_DOCS }}
-        env:
-          DOCS_LOCATION: ${{ secrets.DOCS_LOCATION }}
-        run: |
-          if [[ "${#DOCS_LOCATION}" ]]; then
-            echo "============================================================="
-            echo "Install version of openssl compatible with hosting service"
-            echo "============================================================="
-            conda install -c conda-forge 'openssl=3.0'
-
-            echo "============================================================="
-            echo "Fetch tags to get docs version"
-            echo "============================================================="
-            git fetch --prune --unshallow --tags
-
-            echo "============================================================="
-            echo "Publish docs"
-            echo "============================================================="
-            cd openmdao/docs
-            python upload_doc_version.py openmdao_book/_build/html/ ${{ secrets.DOCS_LOCATION }}
-          else
-            echo "Docs destination not available."
-          fi
-
       - name: Scan for security issues
         if: matrix.BANDIT
         id: bandit
@@ -510,15 +489,6 @@ jobs:
           echo "============================================================="
           cd $GITHUB_WORKSPACE
           python -m bandit -c bandit.yml -ll -r openmdao
-
-      - name: Check NumPy 2.0 Compatibility
-        run: |
-          echo "============================================================="
-          echo "Check OpenMDAO code for NumPy 2.0 compatibility"
-          echo "See: https://numpy.org/devdocs/numpy_2_0_migration_guide.html"
-          echo "============================================================="
-          python -m pip install ruff
-          ruff check . --select NPY201
 
       - name: Perform linting with Ruff
         if: ${{ matrix.NAME == 'Ubuntu Baseline' }}
@@ -551,16 +521,6 @@ jobs:
             Unit testing failed on `${{ matrix.NAME }}` build.
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - name: Slack doc build failure
-        if: failure() && steps.build_docs.outcome == 'failure'
-        uses: act10ns/slack@v2.0.0
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: ${{ steps.build_docs.outcome }}
-          message: |
-            Doc build failed on `${{ matrix.NAME }}` build.
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
       - name: Slack security issue
         if: steps.bandit.outcome == 'failure'
         uses: act10ns/slack@v2.0.0
@@ -572,21 +532,15 @@ jobs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Fail the workflow if tests or doc build failed
-        if: steps.run_tests.outcome == 'failure' || steps.build_docs.outcome == 'failure'
-        uses: actions/github-script@v3
+        if: steps.run_tests.outcome == 'failure'
+        uses: actions/github-script@v8
         with:
           script: |
               let test_fail = ${{ steps.run_tests.outcome == 'failure' }};
-              let docs_fail = ${{ steps.build_docs.outcome == 'failure' }};
-              if (test_fail && docs_fail) {
-                  core.setFailed('Tests and doc build failed.');
-              }
-              else if (test_fail) {
+              if (test_fail) {
                   core.setFailed('Tests failed.');
               }
-              else if (docs_fail) {
-                  core.setFailed('Doc build failed.');
-              }
+
 
   windows_tests:
     runs-on: windows-latest
@@ -602,7 +556,7 @@ jobs:
             PY: '3.12'
             NUMPY: '1.26'
             SCIPY: '1.13'
-            PYOPTSPARSE: '2.11.0'
+            PYOPTSPARSE: '2.14.0'
             BANDIT: true
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Windows_Baseline }}
 
@@ -625,7 +579,7 @@ jobs:
 
       - name: Exit if this job was excluded
         if: matrix.EXCLUDE
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
 
@@ -639,7 +593,7 @@ jobs:
           channels: conda-forge
           conda-remove-defaults: true
 
-      - name: Install OpenDMAO
+      - name: Install OpenMDAO
         run: |
           conda install numpy=${{ matrix.NUMPY }} scipy=${{ matrix.SCIPY }} -q -y
 
@@ -653,7 +607,14 @@ jobs:
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
-          python -m pip install .[all]
+          if ( "${{ inputs.use_pypi }}" -eq "true" ) {
+            echo "-----------------------------------------------------------"
+            echo "Installing from PyPi"
+            echo "-----------------------------------------------------------"
+            python -m pip install openmdao[all]
+          } else {
+            python -m pip install .[all]
+          }
 
       - name: Install pyOptSparse
         if: matrix.PYOPTSPARSE
@@ -662,6 +623,7 @@ jobs:
           echo "Install pyoptsparse from conda-forge"
           echo "============================================================="
           conda install -c conda-forge pyoptsparse=${{ matrix.PYOPTSPARSE }} -q -y
+          conda install cyipopt
 
       - name: Install optional dependencies
         run: |
@@ -688,6 +650,7 @@ jobs:
                     f'Scipy version {scipy.__version__} is not the requested version (${{ matrix.SCIPY }})'"
 
       - name: Run tests
+        id: run_tests
         env:
           OPENMDAO_CHECK_ALL_PARTIALS: true
         run: |
@@ -697,7 +660,7 @@ jobs:
           copy .coveragerc $HOME
           cd $HOME
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
-          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
+          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20 -s
 
       - name: Slack unit test failure
         if: failure() && steps.run_tests.outcome == 'failure'

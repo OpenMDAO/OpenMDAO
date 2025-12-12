@@ -34,9 +34,9 @@ else:
         kind : str
             The kind of vector, 'input', 'output', or 'residual'.
         system : <System>
-            Pointer to the owning system.
-        root_vector : <Vector>
-            Pointer to the vector owned by the root system.
+            The owning system.
+        parent_vector : <Vector>
+            Parent vector.
         alloc_complex : bool
             Whether to allocate any imaginary storage to perform complex step. Default is False.
 
@@ -50,48 +50,58 @@ else:
         _dup_scratch : ndarray of float or None
             If the array has dups, this scratch array will be created to store the de-duped
             version.
+        _comm : MPI.Comm
+            The MPI communicator for the owning system.
+        _petsc : PETSc.Vec
+            The PETSc vector.
+        _imag_petsc : PETSc.Vec
+            The PETSc imaginary vector.
         """
 
         TRANSFER = PETScTransfer
         cite = CITATION
         distributed = True
 
-        def __init__(self, name, kind, system, root_vector=None, alloc_complex=False):
+        def __init__(self, name, kind, system, parent_vector=None, alloc_complex=False):
             """
             Initialize all attributes.
             """
-            super().__init__(name, kind, system, root_vector=root_vector,
-                             alloc_complex=alloc_complex)
-
             self._dup_inds = None
             self._dup_scratch = None
+            self._comm = system.comm
+            self._petsc = None
+            self._imag_petsc = None
 
-        def _initialize_data(self, root_vector):
+            super().__init__(name, kind, system, parent_vector, alloc_complex)
+
+        def _initialize_data(self, parent_vector, system):
             """
             Internally allocate vectors.
 
             Parameters
             ----------
-            root_vector : Vector or None
-                the root's vector instance or None, if we are at the root.
+            parent_vector : <Vector>
+                Parent vector.
+            system : <System>
+                The owning system.
             """
-            super()._initialize_data(root_vector)
+            super()._initialize_data(parent_vector, system)
 
-            self._petsc = {}
-            self._imag_petsc = {}
             data = self._data.real
 
             if self._alloc_complex:
-                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=self._system()._comm)
+                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=system.comm)
             else:
-                self._petsc = PETSc.Vec().createWithArray(data, comm=self._system()._comm)
+                self._petsc = PETSc.Vec().createWithArray(data, comm=system.comm)
 
             # Allocate imaginary for complex step
             if self._alloc_complex:
                 data = self._data.imag
-                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=self._system()._comm)
+                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=system.comm)
 
-        def _get_dup_inds(self):
+            self._init_dup_inds(system)
+
+        def _init_dup_inds(self, system):
             """
             Compute the indices into the data vector corresponding to non-distributed variables.
 
@@ -100,23 +110,21 @@ else:
             ndarray of int
                 Index array corresponding to non-distributed variables.
             """
-            if self._dup_inds is None:
-                system = self._system()
-                if system.comm.size > 1:
-                    # Here, we find the indices that are not locally owned so that we can
-                    # temporarilly zero them out for the norm calculation.
-                    dup_inds = []
-                    abs2meta = system._var_allprocs_abs2meta[self._typ]
-                    for name, idx_slice in self.get_slice_dict().items():
-                        owning_rank = system._owning_rank[name]
-                        if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
-                            dup_inds.extend(range(idx_slice.start, idx_slice.stop))
+            if system.comm.size > 1:
+                # Here, we find the indices that are not locally owned so that we can
+                # temporarilly zero them out for the norm calculation.
+                dup_inds = []
+                abs2meta = system._var_allprocs_abs2meta[self._iotype]
+                for name, start, stop in self.ranges():
+                    owning_rank = system._owning_rank[name]
+                    if not abs2meta[name]['distributed'] and owning_rank != system.comm.rank:
+                        dup_inds.extend(range(start, stop))
 
-                    self._dup_inds = np.array(dup_inds, dtype=INT_DTYPE)
-                    if len(dup_inds) > 0:
-                        self._dup_scratch = np.empty(idx_slice.stop)
-                else:
-                    self._dup_inds = np.array([], dtype=INT_DTYPE)
+                self._dup_inds = np.array(dup_inds, dtype=INT_DTYPE)
+                if len(dup_inds) > 0:
+                    self._dup_scratch = np.empty(stop)
+            else:
+                self._dup_inds = np.array([], dtype=INT_DTYPE)
 
             return self._dup_inds
 
@@ -131,11 +139,9 @@ else:
                 If all variables are owned by this process, then the data array itself is
                 returned without copying.
             """
-            dup_inds = self._get_dup_inds()
-
-            if dup_inds.size > 0:
+            if self._dup_inds.size > 0:
                 self._dup_scratch[:] = self.asarray()
-                self._dup_scratch[dup_inds] = 0.0
+                self._dup_scratch[self._dup_inds] = 0.0
                 return self._dup_scratch
 
             return self._get_data()
@@ -149,7 +155,7 @@ else:
             float
                 Norm of this vector.
             """
-            return self._system().comm.allreduce(np.sum(self._get_nodup() ** 2)) ** 0.5
+            return self._comm.allreduce(np.sum(self._get_nodup() ** 2)) ** 0.5
 
         def dot(self, vec):
             """
@@ -165,4 +171,4 @@ else:
             float
                 The computed dot product value.
             """
-            return self._system().comm.allreduce(np.dot(self._get_nodup(), vec._get_data()))
+            return self._comm.allreduce(np.dot(self._get_nodup(), vec._get_data()))

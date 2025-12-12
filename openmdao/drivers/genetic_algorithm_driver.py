@@ -20,19 +20,15 @@ Sobieszczanski-Sobieski, J., Morris, A. J., van Tooren, M. J. L. (2015)
 Multidisciplinary Design Optimization Supported by Knowledge Based Engineering.
 John Wiley & Sons, Ltd.
 """
+from importlib.util import find_spec
 import os
 import copy
 
 import numpy as np
 
-try:
-    from pyDOE3 import lhs
-except ModuleNotFoundError:
-    lhs = None
-
 from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.concurrent import concurrent_eval
+from openmdao.utils.concurrent_utils import concurrent_eval
 from openmdao.utils.mpi import MPI
 from openmdao.core.analysis_error import AnalysisError
 
@@ -69,7 +65,7 @@ class SimpleGADriver(Driver):
         """
         Initialize the SimpleGADriver driver.
         """
-        if lhs is None:
+        if find_spec('pyDOE3') is None:
             raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
@@ -339,13 +335,13 @@ class SimpleGADriver(Driver):
             x0[i:j] = desvar_vals[name]
 
         # Bits of resolution
-        abs2prom = model._var_abs2prom['output']
+        resolver = model._resolver
 
         for name, meta in desvars.items():
             i, j = self._desvar_idx[name]
 
-            if name in abs2prom:
-                prom_name = abs2prom[name]
+            if resolver.is_abs(name, 'output'):
+                prom_name = resolver.abs2prom(name, 'output')
             else:
                 prom_name = name
 
@@ -542,15 +538,28 @@ class SimpleGADriver(Driver):
                 for name, val in self.get_constraint_values().items():
                     con = self._cons[name]
                     # The not used fields will either None or a very large number
-                    if (con['lower'] is not None) and np.any(con['lower'] > -almost_inf):
-                        diff = val - con['lower']
-                        violation = np.array([0. if d >= 0 else abs(d) for d in diff])
-                    elif (con['upper'] is not None) and np.any(con['upper'] < almost_inf):
-                        diff = val - con['upper']
-                        violation = np.array([0. if d <= 0 else abs(d) for d in diff])
-                    elif (con['equals'] is not None) and np.any(np.abs(con['equals']) < almost_inf):
+                    has_lower_con = (con['lower'] is not None) and \
+                        np.any(con['lower'] > -almost_inf)
+                    has_upper_con = (con['upper'] is not None) and \
+                        np.any(con['upper'] < almost_inf)
+                    has_eq_con = (con['equals'] is not None) and \
+                        np.any(np.abs(con['equals']) < almost_inf)
+                    if has_lower_con:
+                        lb_diff = val - con['lower']
+                        lb_violation = np.array([0. if d >= 0 else abs(d) for d in lb_diff])
+                    if has_upper_con:
+                        ub_diff = val - con['upper']
+                        ub_violation = np.array([0. if d <= 0 else abs(d) for d in ub_diff])
+                    if has_lower_con and (not has_upper_con):
+                        violation = lb_violation
+                    elif has_upper_con and (not has_lower_con):
+                        violation = ub_violation
+                    elif has_upper_con and has_lower_con:
+                        violation = np.maximum(lb_violation, ub_violation)
+                    elif has_eq_con and not (has_lower_con or has_upper_con):
                         diff = val - con['equals']
                         violation = np.absolute(diff)
+
                     constraint_violations = np.hstack((constraint_violations, violation))
                 fun = obj + penalty * sum(np.power(constraint_violations, exponent))
             # Record after getting obj to assure they have
@@ -564,7 +573,7 @@ class SimpleGADriver(Driver):
         return fun, success, icase
 
 
-class GeneticAlgorithm(object):
+class GeneticAlgorithm:
     """
     Simple Genetic Algorithm.
 
@@ -605,13 +614,18 @@ class GeneticAlgorithm(object):
         Population size.
     objfun : function
         Objective function callback.
+    _lhs : function
+        A lazily imported instance of the pyDOE3 latin hypercube sampling function.
     """
 
     def __init__(self, objfun, comm=None, model_mpi=None):
         """
         Initialize genetic algorithm object.
         """
-        if lhs is None:
+        try:
+            from pyDOE3 import lhs
+            self._lhs = lhs
+        except ImportError:
             raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
@@ -694,8 +708,8 @@ class GeneticAlgorithm(object):
             Pm = (self.lchrom + 1.0) / (2.0 * pop_size * np.sum(bits))
         elite = self.elite
 
-        new_gen = np.round(lhs(self.lchrom, self.npop, criterion='center',
-                               random_state=random_state))
+        new_gen = np.round(self._lhs(self.lchrom, self.npop, criterion='center',
+                                     random_state=random_state))
         new_gen[0] = self.encode(x0, vlb, vub, bits)
 
         # Main Loop

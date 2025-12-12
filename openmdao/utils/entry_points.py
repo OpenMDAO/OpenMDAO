@@ -459,6 +459,10 @@ def _find_repos_setup_parser(parser):
     """
     parser.add_argument('topics', nargs='*', help='Find github repos with these topics. '
                         'Allowed topics are {}.'.format(sorted(_github_topics)))
+    parser.add_argument('--format', action='store', dest='tablefmt', default='tabulator',
+                        help="Format for generated table. Defaults to 'tabulator' which "
+                             "generates a sortable, filterable web-based table. "
+                             "Other options include 'html', 'text', 'rst' and 'grid'.")
 
 
 def _find_repos_exec(options, user_args):
@@ -477,4 +481,4 @@ def _find_repos_exec(options, user_args):
     function
         The hook function.
     """
-    find_repos(options.topics)
+    find_repos(options.topics, options.tablefmt)

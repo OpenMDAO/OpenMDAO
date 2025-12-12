@@ -8,6 +8,7 @@ from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.indepvarcomp import IndepVarComp
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.core.system import ValidationError
 
 
 # Components
@@ -43,6 +44,7 @@ from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.linear.linear_block_jac import LinearBlockJac
 from openmdao.solvers.linear.linear_schur import LinearSchur
 from openmdao.solvers.linear.direct import DirectSolver
+from openmdao.solvers.linear.petsc_direct_solver import PETScDirectSolver
 from openmdao.solvers.linear.petsc_ksp import PETScKrylov
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
@@ -88,6 +90,17 @@ from openmdao.drivers.doe_driver import DOEDriver
 from openmdao.drivers.doe_generators import ListGenerator, CSVGenerator, UniformGenerator, \
     FullFactorialGenerator, PlackettBurmanGenerator, BoxBehnkenGenerator, LatinHypercubeGenerator, \
     GeneralizedSubsetGenerator
+from openmdao.drivers.analysis_driver import AnalysisDriver
+from openmdao.drivers.analysis_generator import ProductGenerator, ZipGenerator, SequenceGenerator, \
+    CSVGenerator as CSVAnalysisGenerator
+from openmdao.drivers.sampling.uniform_generator import \
+    UniformGenerator as UniformAnalysisGenerator
+from openmdao.drivers.sampling.pyDOE_generators import \
+    LatinHypercubeGenerator as LatinHypercubeAnalysisGenerator, \
+    BoxBehnkenGenerator as BoxBehnkenAnalysisGenerator, \
+    PlackettBurmanGenerator as PlackettBurmanAnalysisGenerator, \
+    FullFactorialGenerator as FullFactorialAnalysisGenerator, \
+    GeneralizedSubsetGenerator as GeneralizedSubsetAnalysisGenerator
 
 # System-Building Tools
 from openmdao.utils.options_dictionary import OptionsDictionary
@@ -121,9 +134,8 @@ from openmdao.utils.om_warnings import issue_warning, reset_warnings, OpenMDAOWa
     OMInvalidCheckDerivativesOptionsWarning
 
 # Utils
-from openmdao.utils.general_utils import wing_dbg, env_truthy, om_dump, is_undefined
+from openmdao.utils.general_utils import setup_dbg, env_truthy, om_dump, is_undefined
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.jax_utils import register_jax_component
 
 # Reports System
 from openmdao.utils.reports_system import register_report, unregister_report, get_reports_dir, \
@@ -131,7 +143,7 @@ from openmdao.utils.reports_system import register_report, unregister_report, ge
 
 import os
 
-wing_dbg()
+setup_dbg()
 
 # set up tracing or memory profiling if env vars are set.
 if env_truthy('OPENMDAO_TRACE'):  # pragma: no cover

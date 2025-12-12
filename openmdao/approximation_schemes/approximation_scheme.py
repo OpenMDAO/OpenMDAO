@@ -12,18 +12,6 @@ from openmdao.utils.mpi import check_mpi_env
 from openmdao.utils.rangemapper import RangeMapper
 
 
-use_mpi = check_mpi_env()
-if use_mpi is False:
-    PETSc = None
-else:
-    try:
-        from petsc4py import PETSc
-    except ImportError:
-        if use_mpi:
-            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
-        PETSc = None
-
-
 class ApproximationScheme(object):
     """
     Base class used to define the interface for derivative approximation schemes.
@@ -63,6 +51,17 @@ class ApproximationScheme(object):
         self._jac_scatter = None
         self._totals_directions = {}
         self._totals_directional_mode = None
+
+    def __bool__(self):
+        """
+        Return True if the approximation scheme contains any approximations.
+
+        Returns
+        -------
+        bool
+            True if the approximation scheme contains any approximations, False otherwise.
+        """
+        return bool(self._wrt_meta)
 
     def __repr__(self):
         """
@@ -116,14 +115,14 @@ class ApproximationScheme(object):
 
         return self._approx_groups, self._colored_approx_groups
 
-    def add_approximation(self, abs_key, system, kwargs):
+    def add_approximation(self, wrt, system, kwargs):
         """
         Use this approximation scheme to approximate the derivative d(of)/d(wrt).
 
         Parameters
         ----------
-        abs_key : tuple(str,str)
-            Absolute name pairing of (of, wrt) for the derivative.
+        wrt : str
+            Name of wrt variable.
         system : System
             Containing System.
         kwargs : dict
@@ -132,19 +131,19 @@ class ApproximationScheme(object):
         raise NotImplementedError("add_approximation has not been implemented")
 
     def _init_colored_approximations(self, system):
+        # don't do anything if the coloring doesn't exist yet, or if there is no
+        # forward coloring
+        coloring = system._coloring_info.coloring
+        if coloring is None or coloring._fwd is None:
+            return
+
         is_total = system.pathname == ''
         is_semi = _is_group(system) and not is_total
         self._colored_approx_groups = []
         wrt_ranges = []
 
-        # don't do anything if the coloring doesn't exist yet, or if there is no
-        # forward coloring
-        coloring = system._coloring_info.coloring
-        if not isinstance(coloring, coloring_mod.Coloring) or coloring._fwd is None:
-            return
-
         wrt_matches = system._coloring_info._update_wrt_matches(system)
-        out_slices = system._outputs.get_slice_dict()
+        outvec = system._outputs
 
         # this maps column indices into colored jac into indices into full jac
         if wrt_matches is not None:
@@ -156,27 +155,27 @@ class ApproximationScheme(object):
 
         if is_total or wrt_matches is not None:
             colored_start = colored_end = 0
-            for abs_wrt, cstart, cend, _, cinds, _ in system._jac_wrt_iter():
+            for abs_wrt, cstart, cend, _, cinds, _ in system._get_jac_wrts():
                 if wrt_matches is None or abs_wrt in wrt_matches:
                     colored_end += cend - cstart
                     if wrt_matches is not None:
                         ccol2jcol[colored_start:colored_end] = range(cstart, cend)
-                    if is_total and abs_wrt in out_slices:
-                        slc = out_slices[abs_wrt]
+                    if is_total and outvec._contains_abs(abs_wrt):
+                        start, stop = outvec.get_range(abs_wrt)
                         if cinds is not None:
-                            rng = np.arange(slc.start, slc.stop)[cinds]
+                            rng = np.arange(start, stop)[cinds]
                         else:
-                            rng = range(slc.start, slc.stop)
-                        wrt_ranges.append((abs_wrt, slc.stop - slc.start))
+                            rng = range(start, stop)
+                        wrt_ranges.append((abs_wrt, stop - start))
                         ccol2outvec[colored_start:colored_end] = rng
                     colored_start = colored_end
 
         row_var_sizes = {v: sz for v, sz in zip(coloring._row_vars, coloring._row_var_sizes)}
         row_map = np.empty(coloring._shape[0], dtype=INT_DTYPE)
-        abs2prom = system._var_allprocs_abs2prom['output']
+        abs2prom = system._resolver.abs2prom
 
         if is_total:
-            it = ((of, end - start) for of, start, end, _, _ in system._jac_of_iter())
+            it = ((of, end - start) for of, start, end, _, _ in system._get_jac_ofs())
             rangemapper = RangeMapper.create(wrt_ranges)
         else:
             it = ((n, arr.size) for n, arr in system._outputs._abs_item_iter())
@@ -184,7 +183,7 @@ class ApproximationScheme(object):
         start = end = colorstart = colorend = 0
         for name, sz in it:
             end += sz
-            prom = name if is_total else abs2prom[name]
+            prom = name if is_total else abs2prom(name, 'output')
             if prom in row_var_sizes:
                 colorend += row_var_sizes[prom]
                 row_map[colorstart:colorend] = range(start, end)
@@ -225,16 +224,12 @@ class ApproximationScheme(object):
             The system having its derivs approximated.
         """
         total = system.pathname == ''
-
-        in_slices = system._inputs.get_slice_dict()
-        out_slices = system._outputs.get_slice_dict()
-
         coloring = system._get_static_coloring()
 
         self._approx_groups = []
         self._nruns_uncolored = 0
 
-        if system._during_sparsity:
+        if system._during_coloring:
             wrt_matches = system._coloring_info.wrt_matches
         else:
             wrt_matches = None
@@ -245,15 +240,11 @@ class ApproximationScheme(object):
             vec_inds_directional = defaultdict(list)
 
         # wrt here is an absolute name (source if total)
-        for wrt, start, end, vec, sinds, _ in system._jac_wrt_iter(wrt_matches):
+        for wrt, start, end, vec, sinds, _ in system._get_jac_wrts(wrt_matches):
             if wrt in self._wrt_meta:
                 meta = self._wrt_meta[wrt]
                 if coloring is not None and 'coloring' in meta:
                     continue
-                if vec is system._inputs:
-                    slices = in_slices
-                else:
-                    slices = out_slices
 
                 data = self._get_approx_data(system, wrt, meta)
                 directional = meta['directional'] or self._totals_directions
@@ -267,7 +258,7 @@ class ApproximationScheme(object):
                         # local index into var
                         vec_idx = sinds.copy()
                         # convert into index into input or output vector
-                        vec_idx += slices[wrt].start
+                        vec_idx += vec.get_range(wrt)[0]
                         # Directional derivatives for quick deriv checking.
                         # Place the indices in a list so that they are all stepped at the same time.
                         if directional:
@@ -313,6 +304,18 @@ class ApproximationScheme(object):
             # compute scatter from the results vector into a column of the total jacobian
             sinds, tinds, colsize, has_dist_data = system._get_jac_col_scatter()
             if has_dist_data:
+                use_mpi = check_mpi_env()
+                if use_mpi is False:
+                    PETSc = None
+                else:
+                    try:
+                        from petsc4py import PETSc
+                    except ImportError:
+                        if use_mpi:
+                            raise ImportError("Importing petsc4py failed and '"
+                                              "'OPENMDAO_USE_MPI is true.")
+                        PETSc = None
+
                 src_vec = PETSc.Vec().createWithArray(np.zeros(len(system._outputs), dtype=float),
                                                       comm=system._comm)
                 tgt_vec = PETSc.Vec().createWithArray(np.zeros(colsize, dtype=float),
@@ -354,7 +357,7 @@ class ApproximationScheme(object):
 
         if total:
             tot_result = np.zeros(sum([end - start for _, start, end, _, _
-                                       in system._jac_of_iter()]))
+                                       in system._get_jac_ofs()]))
             scratch = tot_result.copy()
         else:
             scratch = np.empty(len(system._outputs))
@@ -479,7 +482,7 @@ class ApproximationScheme(object):
         """
         total = system.pathname == ''
         if total:
-            for _, _, end, _, _ in system._jac_of_iter():
+            for _, _, end, _, _ in system._get_jac_ofs():
                 pass
             tot_result = np.zeros(end)
 
@@ -496,6 +499,7 @@ class ApproximationScheme(object):
         tosend = None
         fd_count = 0
         mycomm = system._full_comm if use_parallel_fd else system.comm
+        abs2prom = system._resolver.abs2prom
 
         # now do uncolored solves
         for group_i, tup in enumerate(approx_groups):
@@ -541,10 +545,7 @@ class ApproximationScheme(object):
 
                     if self._progress_out:
                         end_time = time.perf_counter()
-                        if wrt in system._var_allprocs_abs2prom['output']:
-                            prom_name = system._var_allprocs_abs2prom['output'][wrt]
-                        else:
-                            prom_name = system._var_allprocs_abs2prom['input'][wrt]
+                        prom_name = abs2prom(wrt)
                         self._progress_out.write(f"{fd_count + 1}/{len(result)}: Checking "
                                                  f"derivatives with respect to: "
                                                  f"'{prom_name} [{vecidxs}]' ... "
@@ -578,7 +579,7 @@ class ApproximationScheme(object):
                     else:
                         yield jinds, res
 
-    def compute_approximations(self, system, jac=None):
+    def compute_approximations(self, system, jac):
         """
         Execute the system to compute the approximate sub-Jacobians.
 
@@ -586,17 +587,11 @@ class ApproximationScheme(object):
         ----------
         system : System
             System on which the execution is run.
-        jac : None or dict-like
-            If None, update system with the approximated sub-Jacobians. Otherwise, store the
-            approximations in the given dict-like object.
+        jac : dict-like
+            Store the approximations in the given dict-like object.
         """
         if not self._wrt_meta:
             return
-
-        if system._tot_jac is not None:
-            jac = system._tot_jac
-        elif jac is None:
-            jac = system._jacobian
 
         for ic, col in self.compute_approx_col_iter(system,
                                                     under_cs=system._outputs._under_complex_step):

@@ -22,6 +22,7 @@ from openmdao.core.constants import _UNDEFINED
 import openmdao.core.total_jac as tot_jac_mod
 
 from openmdao.utils.mpi import MPI
+from openmdao.utils.rich_utils import strip_formatting
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -419,23 +420,23 @@ class TestProblemCheckTotals(unittest.TestCase):
         # Make sure auto-ivc sources are translated to promoted input names.
         self.assertTrue('x' in lines[4])
 
-        self.assertTrue('9.80614' in lines[5], "'9.80614' not found in '%s'" % lines[5])
-        self.assertTrue('9.80614' in lines[6], "'9.80614' not found in '%s'" % lines[6])
-        self.assertTrue('cs:None' in lines[6], "'cs:None not found in '%s'" % lines[6])
+        self.assertTrue('-9.80614' in lines[9], "'-9.80614' not found in '%s'" % lines[9])
+        self.assertTrue('-9.80614' in lines[10], "'-9.80614' not found in '%s'" % lines[10])
+        self.assertTrue('cs:None' in lines[10], "'cs:None not found in '%s'" % lines[10])
 
         assert_near_equal(totals['con2', 'x']['J_fwd'], [[0.09692762]], 1e-5)
         assert_near_equal(totals['con2', 'x']['J_fd'], [[0.09692762]], 1e-5)
 
         # Test compact_print output
         compact_stream = StringIO()
-        assert_check_totals(prob.check_totals(method='fd', out_stream=compact_stream, compact_print=True))
+        assert_check_totals(prob.check_totals(method='cs', out_stream=compact_stream, compact_print=True))
 
         compact_lines = compact_stream.getvalue().splitlines()
 
-        self.assertTrue("of '<variable>'" in compact_lines[5],
-            "of '<variable>' not found in '%s'" % compact_lines[5])
-        self.assertTrue('9.7743e+00' in compact_lines[-2],
-            "'9.7743e+00' not found in '%s'" % compact_lines[-2])
+        self.assertTrue("'of' variable" in compact_lines[5],
+            "'of' variable not found in '%s'" % compact_lines[5])
+        self.assertTrue('-9.8061' in compact_lines[7],
+            "'-9.8061' not found in '%s'" % compact_lines[7])
 
     def test_check_totals_show_progress(self):
         prob = om.Problem()
@@ -501,10 +502,9 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         lines = stream.getvalue().splitlines()
 
-        self.assertTrue('1.000' in lines[5])
-        self.assertTrue('1.000' in lines[6])
-        self.assertTrue('0.000' in lines[8])
-        self.assertTrue('0.000' in lines[10])
+        self.assertTrue('1.000' in lines[9])
+        self.assertTrue('1.000' in lines[10])
+        self.assertFalse(lines[6].strip().endswith('*'))
 
         assert_near_equal(totals['x', 'x']['J_fwd'], [[1.0]], 1e-5)
         assert_near_equal(totals['x', 'x']['J_fd'], [[1.0]], 1e-5)
@@ -637,8 +637,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         data = totals['con2', 'x']
         self.assertTrue('J_fwd' in data)
-        self.assertTrue('rel error' in data)
-        self.assertTrue('abs error' in data)
+        self.assertTrue('tol violation' in data)
         self.assertTrue('magnitude' in data)
 
     def test_two_desvar_as_con(self):
@@ -920,7 +919,7 @@ class TestProblemCheckTotals(unittest.TestCase):
 
     def test_cs_around_newton_new_method(self):
         # The old method of nudging the Newton and forcing it to reconverge could not achieve the
-        # same accuracy on this model. (1e8 vs 1e12)
+        # same accuracy on this model. (1e-8 vs 1e-12)
 
         class SellarDerivatives(om.Group):
 
@@ -962,7 +961,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         of = ['obj', 'con1', 'con2']
 
         totals = prob.check_totals(of=of, wrt=wrt, method='cs', compact_print=False)
-        assert_check_totals(totals, atol=1e-12, rtol=1e-12)
+        assert_check_totals(totals, atol=2e-9, rtol=2e-9)
 
     def test_cs_around_newton_in_comp(self):
         # CS around Newton in an ImplicitComponent.
@@ -1216,11 +1215,10 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         stream = StringIO()
         assert_check_totals(p.check_totals(out_stream=stream))
-        lines = stream.getvalue().splitlines()
+        lines = [strip_formatting(s) for s in stream.getvalue().splitlines()]
 
         self.assertTrue("Full Model: 'lcy' wrt 'x' (Linear constraint)" in lines[4])
-        self.assertTrue("Absolute Error (Jfor - Jfd)" in lines[8])
-        self.assertTrue("Relative Error (Jfor - Jfd) / Jfd" in lines[10])
+        self.assertTrue("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd)" in lines[6])
 
     def test_alias_constraints(self):
         prob = om.Problem()
@@ -1360,8 +1358,7 @@ class TestProblemCheckTotals(unittest.TestCase):
         stream = StringIO()
         prob.check_totals(out_stream=stream, show_only_incorrect=True, compact_print=True)
 
-        self.assertEqual(stream.getvalue().count('>ABS_TOL'), 2)
-        self.assertEqual(stream.getvalue().count('>REL_TOL'), 2)
+        self.assertEqual(stream.getvalue().count('>TOL'), 2)
 
     def test_directional_vectorized_matrix_free_fwd(self):
 
@@ -1375,15 +1372,14 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         stream = StringIO()
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
-        content = stream.getvalue()
+        content = strip_formatting(stream.getvalue())
 
-        self.assertEqual(content.count('Reverse Magnitude:'), 0)
-        self.assertEqual(content.count('Forward Magnitude:'), 1)
-        self.assertEqual(content.count('Fd Magnitude:'), 1)
-        self.assertEqual(content.count('Directional Derivative (Jfor)'), 1)
+        self.assertEqual(content.count('rev value @ max viol:'), 0)
+        self.assertEqual(content.count('fwd value @ max viol:'), 1)
+        self.assertEqual(content.count('fd value @ max viol:'), 1)
+        self.assertEqual(content.count('Directional Derivative (Jfwd)'), 1)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
-        self.assertTrue('Relative Error (Jfor - Jfd) / Jfd : ' in content)
-        self.assertTrue('Absolute Error (Jfor - Jfd) : ' in content)
+        self.assertTrue('Max Tolerance Violation ([fwd, fd] Dot Product Test) : ' in content)
         mhatdotm, dhatdotd =  data[(('comp.out',), 'comp.in')]['directional_fd_fwd']
         assert_near_equal(mhatdotm, dhatdotd, tolerance=2e-15)
 
@@ -1402,13 +1398,12 @@ class TestProblemCheckTotals(unittest.TestCase):
         content = stream.getvalue()
 
         self.assertEqual(content.count('comp.out (index size: 1)'), 1)
-        self.assertEqual(content.count('Reverse Magnitude:'), 1)
-        self.assertEqual(content.count('Forward Magnitude:'), 0)
-        self.assertEqual(content.count('Fd Magnitude:'), 1)
+        self.assertEqual(content.count('rev value @ max viol:'), 1)
+        self.assertEqual(content.count('fwd value @ max viol:'), 0)
+        self.assertEqual(content.count('fd value @ max viol:'), 1)
         self.assertEqual(content.count('Directional Derivative (Jrev)'), 1)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
-        self.assertTrue('Relative Error ([rev, fd] Dot Product Test) / Jfd : ' in content)
-        self.assertTrue('Absolute Error ([rev, fd] Dot Product Test) : ' in content)
+        self.assertTrue('Max Tolerance Violation ([rev, fd] Dot Product Test) : ' in content)
         dJrev, dJfd = data[('comp.out', ('comp.in',))]['directional_fd_rev']
         assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
 
@@ -1424,16 +1419,15 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         stream = StringIO()
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
-        content = stream.getvalue()
+        content = strip_formatting(stream.getvalue())
 
         self.assertEqual(content.count("'comp.out' wrt (d)('comp.in',)"), 1)
-        self.assertEqual(content.count('Reverse Magnitude:'), 1)
-        self.assertEqual(content.count('Forward Magnitude:'), 0)
-        self.assertEqual(content.count('Fd Magnitude:'), 1)
+        self.assertEqual(content.count('rev value @ max viol:'), 1)
+        self.assertEqual(content.count('fwd value @ max viol:'), 0)
+        self.assertEqual(content.count('fd value @ max viol:'), 1)
         self.assertEqual(content.count('Directional Derivative (Jrev)'), 1)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 1)
-        self.assertTrue('Relative Error ([rev, fd] Dot Product Test) / Jfd : ' in content)
-        self.assertTrue('Absolute Error ([rev, fd] Dot Product Test) : ' in content)
+        self.assertTrue('Max Tolerance Violation ([rev, fd] Dot Product Test) : ' in content)
         dJrev, dJfd =  data[('comp.out', ('comp.in',))]['directional_fd_rev']
         assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
 
@@ -1451,17 +1445,16 @@ class TestProblemCheckTotals(unittest.TestCase):
 
         stream = StringIO()
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
-        content = stream.getvalue()
+        content = strip_formatting(stream.getvalue())
 
         self.assertEqual(content.count("'comp.out1' wrt (d)('comp.in1', 'comp.in2')"), 1)
         self.assertEqual(content.count("'comp.out2' wrt (d)('comp.in1', 'comp.in2')"), 1)
-        self.assertEqual(content.count('Reverse Magnitude:'), 2)
-        self.assertEqual(content.count('Forward Magnitude:'), 0)
-        self.assertEqual(content.count('Fd Magnitude:'), 2)
+        self.assertEqual(content.count('rev value @ max viol:'), 2)
+        self.assertEqual(content.count('fwd value @ max viol:'), 0)
+        self.assertEqual(content.count('fd value @ max viol:'), 2)
         self.assertEqual(content.count('Directional Derivative (Jrev)'), 2)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 2)
-        self.assertTrue(content.count('Relative Error ([rev, fd] Dot Product Test) / Jfd :'), 2)
-        self.assertTrue(content.count('Absolute Error ([rev, fd] Dot Product Test) :'), 2)
+        self.assertTrue(content.count('Max Tolerance Violation ([rev, fd] Dot Product Test) :'), 2)
         dJrev, dJfd = data[('comp.out1', ('comp.in1', 'comp.in2'))]['directional_fd_rev']
         assert_near_equal(dJrev - dJfd, 0., tolerance=2e-15)
         dJrev, dJfd = data[('comp.out2', ('comp.in1', 'comp.in2'))]['directional_fd_rev']
@@ -1503,17 +1496,17 @@ class TestProblemCheckTotals(unittest.TestCase):
         stream = StringIO()
         data = prob.check_totals(method='cs', out_stream=stream, directional=True)
         content = stream.getvalue()
+        content = strip_formatting(content)
 
         self.assertEqual(content.count("('comp.out1', 'comp.out2') wrt (d)'comp.in1'"), 1)
         self.assertEqual(content.count("('comp.out1', 'comp.out2') wrt (d)'comp.in2'"), 1)
-        self.assertEqual(content.count('Reverse Magnitude:'), 0)
-        self.assertEqual(content.count('Forward Magnitude:'), 2)
-        self.assertEqual(content.count('Fd Magnitude:'), 2)
+        self.assertEqual(content.count('rev value @ max viol:'), 0)
+        self.assertEqual(content.count('fwd value @ max viol:'), 2)
+        self.assertEqual(content.count('fd value @ max viol:'), 2)
         self.assertEqual(content.count('Directional Derivative (Jrev)'), 0)
-        self.assertEqual(content.count('Directional Derivative (Jfor)'), 2)
+        self.assertEqual(content.count('Directional Derivative (Jfwd)'), 2)
         self.assertEqual(content.count('Directional CS Derivative (Jfd)'), 2)
-        self.assertEqual(content.count('Relative Error ([rev, fd] Dot Product Test) / Jfd :'), 0)
-        self.assertEqual(content.count('Absolute Error ([rev, fd] Dot Product Test) :'), 0)
+        self.assertEqual(content.count('Max Tolerance Violation ([rev, fd] Dot Product Test) :'), 0)
         dJfwd, dJfd =  data[(('comp.out1', 'comp.out2'), 'comp.in1')]['directional_fd_fwd']
         assert_near_equal(np.linalg.norm(dJfwd - dJfd), 0., tolerance=2e-15)
         dJfwd, dJfd =  data[(('comp.out1', 'comp.out2'), 'comp.in2')]['directional_fd_fwd']
@@ -2016,13 +2009,12 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
-        self.assertEqual(contents.count("Fd Magnitude:"), nsubjacs)
-        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd), step="), 0)
-        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd)"), nsubjacs)
-        self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), nsubjacs)
+        self.assertEqual(contents.count("fd value @ max viol:"), nsubjacs)
+        self.assertEqual(contents.count("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd), step="), 0)
+        self.assertEqual(contents.count("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd)"), nsubjacs)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), 0)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd)"), nsubjacs)
 
@@ -2032,13 +2024,12 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
-        self.assertEqual(contents.count("Fd Magnitude:"), nsubjacs)
-        self.assertEqual(contents.count("Absolute Error (Jrev - Jfd), step="), 0)
-        self.assertEqual(contents.count("Absolute Error (Jrev - Jfd)"), nsubjacs)
-        self.assertEqual(contents.count("Relative Error (Jrev - Jfd) / J"), nsubjacs)
+        self.assertEqual(contents.count("fd value @ max viol:"), nsubjacs)
+        self.assertEqual(contents.count("Max Tolerance Violation (Jrev - Jfd) - (atol + rtol * Jfd), step="), 0)
+        self.assertEqual(contents.count("Max Tolerance Violation (Jrev - Jfd) - (atol + rtol * Jfd)"), nsubjacs)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), 0)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd)"), nsubjacs)
 
@@ -2054,7 +2045,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+--------------------+"), nsubjacs + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+---------------------+-------------------+------------------------+-------------------+"), nsubjacs + 1)
 
     def test_single_cs_step_compact(self):
         for mode in ('fwd', 'rev'):
@@ -2068,7 +2059,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 0)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+------------+"), nsubjacs + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+---------------------+-------------------+------------------------+------------+"), nsubjacs + 1)
 
     def test_multi_fd_steps_fwd(self):
         p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
@@ -2076,12 +2067,11 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6, 1e-7], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
-        self.assertEqual(contents.count("Fd Magnitude:"), nsubjacs * 2)
-        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd), step="), nsubjacs * 2)
-        self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), nsubjacs * 2)
+        self.assertEqual(contents.count("fd value @ max viol:"), nsubjacs * 2)
+        self.assertEqual(contents.count("Max Tolerance Violation (Jfwd - Jfd) - (atol + rtol * Jfd), step="), nsubjacs * 2)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), nsubjacs * 2)
 
     def test_multi_fd_steps_fwd_directional(self):
@@ -2090,11 +2080,10 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Full Model:"), 3)
-        self.assertEqual(contents.count("Fd Magnitude:"), 6)
-        self.assertEqual(contents.count("Absolute Error (Jfor - Jfd), step="), 6)
-        self.assertEqual(contents.count("Relative Error (Jfor - Jfd) / Jf"), 6)
+        self.assertEqual(contents.count("fd value @ max viol:"), 6)
+        self.assertEqual(contents.count("Max Tolerance Violation ([fwd, fd] Dot Product Test), step="), 6)
         self.assertEqual(contents.count("Directional FD Derivative (Jfd), step="), 6)
 
     def test_multi_fd_steps_rev(self):
@@ -2103,12 +2092,11 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6, 1e-7], out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         nsubjacs = 18
         self.assertEqual(contents.count("Full Model:"), nsubjacs)
-        self.assertEqual(contents.count("Fd Magnitude:"), nsubjacs * 2)
-        self.assertEqual(contents.count("Absolute Error (Jrev - Jfd), step="), nsubjacs * 2)
-        self.assertEqual(contents.count("Relative Error (Jrev - Jfd) / J"), nsubjacs * 2)
+        self.assertEqual(contents.count("fd value @ max viol:"), nsubjacs * 2)
+        self.assertEqual(contents.count("Max Tolerance Violation (Jrev - Jfd) - (atol + rtol * Jfd), step="), nsubjacs * 2)
         self.assertEqual(contents.count("Raw FD Derivative (Jfd), step="), nsubjacs * 2)
 
     def test_multi_fd_steps_rev_directional(self):
@@ -2117,11 +2105,10 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         p.run_model()
         stream = StringIO()
         p.check_totals(step=[1e-6, 1e-7], directional=True, out_stream=stream)
-        contents = stream.getvalue()
+        contents = strip_formatting(stream.getvalue())
         self.assertEqual(contents.count("Full Model:"), 6)
-        self.assertEqual(contents.count("Fd Magnitude:"), 12)
-        self.assertEqual(contents.count("Absolute Error ([rev, fd] Dot Product Test), step="), 12)
-        self.assertEqual(contents.count("Relative Error ([rev, fd] Dot Product Test) / Jfd, step="), 12)
+        self.assertEqual(contents.count("fd value @ max viol:"), 12)
+        self.assertEqual(contents.count("Max Tolerance Violation ([rev, fd] Dot Product Test), step="), 12)
         self.assertEqual(contents.count("Directional FD Derivative (Jfd) Dot Product, step="), 12)
 
     def test_multi_fd_steps_compact(self):
@@ -2131,12 +2118,12 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 p.setup(mode=mode)
                 p.run_model()
                 stream = StringIO()
-                p.check_totals(step=[1e-6, 1e-7], compact_print=True, out_stream=stream)
-                contents = stream.getvalue()
+                p.check_totals(step=[1e-6, 1e-7], compact_print=True, out_stream=stream, abs_err_tol=2e-6, rel_err_tol=3e-6)
+                contents = strip_formatting(stream.getvalue())
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+--------------------+"), (nsubjacs*2) + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+---------------+---------------------+-------------------+------------------------+------------+"), (nsubjacs*2) + 1)
 
     def test_multi_cs_steps_compact(self):
         for mode in ('fwd', 'rev'):
@@ -2150,7 +2137,7 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
                 nsubjacs = 18
                 self.assertEqual(contents.count("step"), 1)
                 # check number of rows/cols
-                self.assertEqual(contents.count("+-------------------------------+------------------+-------------+-------------+-------------+-------------+-------------+------------+"), (nsubjacs*2) + 1)
+                self.assertEqual(contents.count("+-----------------------------+----------------+---------------+---------------------+-------------------+------------------------+------------+"), (nsubjacs*2)+1)
 
     def test_multi_fd_steps_compact_directional(self):
         expected_divs = {
@@ -2175,6 +2162,114 @@ class TestCheckTotalsMultipleSteps(unittest.TestCase):
         finally:
             tot_jac_mod._directional_rng = rand_save
 
+    def test_check_fdvsrev_matfree_values(self):
+        class Comp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input("in1", val=1.)
+                self.add_output("out1", val=1.)
+            def compute(self, inputs, outputs):
+                outputs['out1'] = inputs['in1']**2.
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                if mode=='rev':
+                    if 'out1' in d_outputs:
+                        d_inputs['in1'] += 2*inputs['in1']*d_outputs['out1']
+
+        class Top(om.Group):
+            def setup(self):
+                self.add_subsystem("ivc", om.IndepVarComp(), promotes=["*"])
+                self.ivc.add_output("in1", [1.])
+                self.add_subsystem("comp1", Comp(), promotes=['*'])
+
+        prob = om.Problem()
+        prob.model = Top()
+        prob.setup(mode='rev')
+        prob.run_model()
+        stream = StringIO()
+        res = prob.check_totals(of=['out1'], wrt=['in1'], step=[1e-6, 1e-4, 1e-2, 1e0],
+                                compact_print=True, directional=True, out_stream=stream)
+        vals_at_max =  res['out1', ('in1', )]['vals_at_max_error']
+        revs = [v.reverse[0] for v in vals_at_max]
+        fds = [v.reverse[1] for v in vals_at_max]
+
+        # verify that the analytic 'rev' value is the same at all steps
+        self.assertEqual(len(set(revs)), 1)
+
+        # verify that fd values differ across steps
+        self.assertNotEqual(len(set(fds)), 1)
+        output = stream.getvalue()
+
+        fdouts = []
+        anouts = []
+        for line in output.split('\n'):
+            if line.startswith('| ') and not line.startswith("| '"):
+                parts = line.strip().split('|')
+                anouts.append(float(parts[4]))
+                fdouts.append(float(parts[5]))
+
+        assert_near_equal(fds, fdouts, tolerance=1e-6)
+        assert_near_equal(revs, anouts, tolerance=1e-6)
+
+    def check_fd_values(self, mode):
+        class Comp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input("in1", val=1.)
+                self.add_output("out1", val=1.)
+                self.declare_partials("out1", "in1")
+
+            def compute(self, inputs, outputs):
+                outputs['out1'] = inputs['in1']**2.
+
+            def compute_partials(self, inputs, partials):
+                partials['out1', 'in1'] = 2*inputs['in1']
+
+        class Top(om.Group):
+            def setup(self):
+                self.add_subsystem("ivc", om.IndepVarComp(), promotes=["*"])
+                self.ivc.add_output("in1", [1.])
+                self.add_subsystem("comp1", Comp(), promotes=['*'])
+
+        prob = om.Problem()
+        prob.model = Top()
+        prob.setup(mode=mode)
+        prob.run_model()
+        stream = StringIO()
+        res = prob.check_totals(of=['out1'], wrt=['in1'], step=[1e-6, 1e-4, 1e-2, 1e0],
+                                compact_print=True, directional=True, out_stream=stream)
+
+        if mode == 'rev':
+            key =  ('out1', ('in1', ))
+            vals_at_max =  res[key]['vals_at_max_error']
+            analytic = [v.reverse[0] for v in vals_at_max]
+            fds = [v.reverse[1] for v in vals_at_max]
+        else:
+            key = (('out1', ), 'in1')
+            vals_at_max =  res[key]['vals_at_max_error']
+            analytic = [v.forward[0] for v in vals_at_max]
+            fds = [v.forward[1] for v in vals_at_max]
+
+        # verify that the analytic 'rev' value is the same at all steps
+        self.assertEqual(len(set(analytic)), 1)
+
+        # verify that fd values differ across steps
+        self.assertNotEqual(len(set(fds)), 1)
+        output = stream.getvalue()
+
+        fdouts = []
+        anouts = []
+        for line in output.split('\n'):
+            if line.startswith('| ') and not line.startswith("| '"):
+                parts = line.strip().split('|')
+                anouts.append(float(parts[4]))
+                fdouts.append(float(parts[5]))
+
+        assert_near_equal(fds, fdouts, tolerance=1e-6)
+        assert_near_equal(analytic, anouts, tolerance=1e-6)
+
+    def test_check_fd_values_fwd(self):
+        self.check_fd_values('fwd')
+
+    def test_check_fd_values_rev(self):
+        self.check_fd_values('rev')
 
 
 if __name__ == "__main__":

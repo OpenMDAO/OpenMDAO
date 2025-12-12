@@ -394,8 +394,8 @@ class MyParaboloid(Paraboloid):
     def compute_jacvec_product(self, inputs, dinputs, doutputs, mode):
         self._comp_jvp_count += 1
 
-        x = inputs['x'][0]
-        y = inputs['y'][0]
+        x = inputs['x']
+        y = inputs['y']
 
         if mode == 'fwd':
             if 'x' in dinputs:

@@ -4,10 +4,8 @@ import unittest
 from io import StringIO
 import sqlite3
 
-from packaging.version import Version
 
 import numpy as np
-from scipy import __version__ as scipy_version
 
 import openmdao.api as om
 
@@ -446,7 +444,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
-        self.assertTrue(cr._system_options['root']['component_options']['assembled_jac_type'], 'csc')
+        self.assertEqual(cr._system_options['root']['component_options']['assembled_jac_type'], None)
 
         # New option and re-run of run_driver
         prob.model.options['assembled_jac_type'] = 'dense'
@@ -454,7 +452,7 @@ class TestSqliteRecorder(unittest.TestCase):
         prob.run_driver()
 
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename,)
-        self.assertTrue(cr._system_options['root!1']['component_options']['assembled_jac_type'], 'dense')
+        self.assertEqual(cr._system_options['root!1']['component_options']['assembled_jac_type'], 'dense')
 
         stream = StringIO()
 
@@ -465,7 +463,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected = [
             "Run Number: 0",
             "    Subsystem : root",
-            "        assembled_jac_type: csc",
+            "        assembled_jac_type: None",
             "        derivs_method: None",
             "        auto_order: False",
             "    Subsystem : p1",
@@ -474,9 +472,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
-            "        shape: None",
+            "        shape: ()",
             "        units: None",
             "        res_units: None",
             "        desc: None",
@@ -492,9 +491,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
-            "        shape: None",
+            "        shape: ()",
             "        units: None",
             "        res_units: None",
             "        desc: None",
@@ -510,11 +510,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
+            "        default_shape: ()",
             "    Subsystem : con",
             "        derivs_method: None",
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
+            "        default_shape: ()",
             "        has_diag_partials: False",
             "        units: None",
             "        shape: None",
@@ -557,7 +559,7 @@ class TestSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
 
-        self.assertTrue(cr._system_options['root']['component_options']['assembled_jac_type'], 'csc')
+        self.assertEqual(cr._system_options['root']['component_options']['assembled_jac_type'], None)
 
         # New option and re-run of run_driver
         prob.model.options['assembled_jac_type'] = 'dense'
@@ -576,7 +578,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected = [
             "Run Number: 0",
             "    Subsystem : root",
-            "        assembled_jac_type: csc",
+            "        assembled_jac_type: None",
             "        derivs_method: None",
             "        auto_order: False",
             "    Subsystem : p1",
@@ -585,9 +587,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
-            "        shape: None",
+            "        shape: ()",
             "        units: None",
             "        res_units: None",
             "        desc: None",
@@ -603,9 +606,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
+            "        default_shape: (1,)",
             "        name: UNDEFINED",
             "        val: 1.0",
-            "        shape: None",
+            "        shape: ()",
             "        units: None",
             "        res_units: None",
             "        desc: None",
@@ -621,11 +625,13 @@ class TestSqliteRecorder(unittest.TestCase):
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
+            "        default_shape: ()",
             "    Subsystem : con",
             "        derivs_method: None",
             "        run_root_only: False",
             "        always_opt: False",
             "        use_jit: True",
+            "        default_shape: ()",
             "        has_diag_partials: False",
             "        units: None",
             "        shape: None",
@@ -733,9 +739,9 @@ class TestSqliteRecorder(unittest.TestCase):
 
         coordinate = [0, 'ScipyOptimize_SLSQP', (3, )]
 
-        expected_desvars = {"p1.x": [7.16706813, ], "p2.y": [-7.83293187]}
-        expected_objectives = {"comp.f_xy": [-27.0833]}
-        expected_constraints = {"con.c": [-15.0]}
+        expected_desvars = {"p1.x": 7.16706813, "p2.y": -7.83293187}
+        expected_objectives = {"comp.f_xy": -27.0833}
+        expected_constraints = {"con.c": -15.0}
 
         expected_inputs = {
             "con.x": 7.1666667,
@@ -866,7 +872,7 @@ class TestSqliteRecorder(unittest.TestCase):
             self.assertTrue(key in cr._system_options.keys())
 
         value = cr._system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+        self.assertEqual(value, None)  # quick check only. Too much to check exhaustively
 
     def test_record_system_options(self):
         # Regardless what object the case recorder is attached to, system options
@@ -889,7 +895,7 @@ class TestSqliteRecorder(unittest.TestCase):
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
         value = cr._system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual('csc', value)  # quick check only. Too much to check exhaustively
+        self.assertEqual(None, value)  # quick check only. Too much to check exhaustively
 
         # Recorder on Problem
         prob = om.Problem(SellarDerivatives(nonlinear_solver=om.NonlinearBlockGS,
@@ -905,7 +911,7 @@ class TestSqliteRecorder(unittest.TestCase):
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
         value = cr._system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+        self.assertEqual(value, None)  # quick check only. Too much to check exhaustively
 
         # Recorder on a subsystem
         prob = om.Problem(SellarDerivatives(nonlinear_solver=om.NonlinearBlockGS,
@@ -921,7 +927,7 @@ class TestSqliteRecorder(unittest.TestCase):
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
         value = cr._system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+        self.assertEqual(value, None)  # quick check only. Too much to check exhaustively
 
         # Recorder on a solver
         prob = om.Problem(SellarDerivatives(nonlinear_solver=om.NonlinearBlockGS,
@@ -937,7 +943,7 @@ class TestSqliteRecorder(unittest.TestCase):
         for key in expected_system_options_keys:
             self.assertTrue(key in cr._system_options.keys())
         value = cr._system_options['root']['component_options']['assembled_jac_type']
-        self.assertEqual(value, 'csc')  # quick check only. Too much to check exhaustively
+        self.assertEqual(value, None)  # quick check only. Too much to check exhaustively
 
     def test_warning_system_options_overwriting(self):
 
@@ -2331,7 +2337,7 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('case2')
         self.assertEqual(set(final_case.inputs.keys()), {'comp.y', 'con.x', 'con.y', 'comp.x'})
-        self.assertAlmostEqual(final_case.inputs['comp.y'][0], -7.833333333333334)
+        self.assertAlmostEqual(final_case.inputs['comp.y'], -7.833333333333334)
 
         # Default is includes = ['*'] and excludes = []
 
@@ -2383,7 +2389,7 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('final')
         self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
-        self.assertAlmostEqual(final_case.residuals['f_xy'][0], 0.0)
+        self.assertAlmostEqual(final_case.residuals['f_xy'], 0.0)
 
         # run again with includes and excludes
         prob.recording_options['excludes'] = ['f*']
@@ -2424,7 +2430,7 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         final_case = cr.get_case('final')
         self.assertEqual(set(final_case.residuals.keys()), {'f_xy', 'y', 'x', 'c'})
-        self.assertAlmostEqual(final_case.residuals['f_xy'][0], 0.0)
+        self.assertAlmostEqual(final_case.residuals['f_xy'], 0.0)
 
         # run again with includes and excludes
         prob.recording_options['excludes'] = ['f*']
@@ -2810,17 +2816,13 @@ class TestSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
         case = cr.get_case(-1)
 
-        dvs = case.get_design_vars()
-        con = case.get_constraints()
-        obj = case.get_objectives()
+        x = case.get_val('x')
+        y = case.get_val('y')
+        obj = case.get_val('f_xy')
 
-        assert_near_equal(obj, {'f_xy': -27.33333333}, tolerance=1e-8)
-        assert_near_equal(dvs, {'x': 6.66666669, 'y': -7.33333338}, tolerance=8.1e-8, tol_type='abs')
-
-        if Version(scipy_version) < Version("1.11"):
-            assert_near_equal(con, {'x': 6.66666669, 'y': -7.33333338}, tolerance=8.1e-8, tol_type='abs')
-        else:
-            self.assertEqual(con, {})
+        assert_near_equal(obj, -27.33333333, tolerance=1e-6)
+        assert_near_equal(x, 6.6666666666, tolerance=1e-6, tol_type='abs')
+        assert_near_equal(y, -7.333333333, tolerance=1e-6, tol_type='abs')
 
     @require_pyoptsparse('IPOPT')
     def test_total_coloring_record_case_prefix(self):
@@ -3007,7 +3009,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         metadata = cr.problem_metadata['driver']
-        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings'})
+        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings', 'supports'})
         self.assertEqual(metadata['name'], 'DOEDriver')
         self.assertEqual(metadata['type'], 'doe')
         self.assertEqual(metadata['options'], {'debug_print': [], 'generator': 'UniformGenerator',
@@ -3026,7 +3028,7 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
 
         cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
         metadata = cr.problem_metadata['driver']
-        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings'})
+        self.assertEqual(set(metadata.keys()), {'name', 'type', 'options', 'opt_settings', 'supports'})
         self.assertEqual(metadata['name'], 'ScipyOptimizeDriver')
         self.assertEqual(metadata['type'], 'optimization')
         self.assertEqual(metadata['options'], {"debug_print": [], "optimizer": "SLSQP",

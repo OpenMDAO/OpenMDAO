@@ -44,6 +44,7 @@ def ks_max(x, rho=100.0):
     float
         A conservative approximation to the minimum value in x.
     """
+    x = jnp.asarray(x)
     x_max = jnp.max(x)
     x_diff = x - x_max
     exponents = jnp.exp(rho * x_diff)
@@ -71,6 +72,7 @@ def ks_min(x, rho=100.0):
     float
         A conservative approximation to the minimum value in x.
     """
+    x = jnp.asarray(x)
     x_min = jnp.min(x)
     x_diff = x_min - x
     exponents = jnp.exp(rho * x_diff)

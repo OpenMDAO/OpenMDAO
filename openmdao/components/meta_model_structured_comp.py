@@ -162,11 +162,9 @@ class MetaModelStructuredComp(ExplicitComponent):
         Metamodel needs to declare its partials after inputs and outputs are known.
         """
         super()._setup_partials()
-        arange = np.arange(self.options['vec_size'])
         pnames = tuple(self.pnames)
         pattern_meta = {
-            'rows': arange,
-            'cols': arange,
+            'diagonal': True,
             'dependent': True,
         }
 
@@ -211,8 +209,7 @@ class MetaModelStructuredComp(ExplicitComponent):
                 errmsg = (f"{self.msginfo}: Error interpolating output '{out_name}' "
                           f"because input '{varname_causing_error}' was out of bounds "
                           f"('{err.lower}', '{err.upper}') with value '{err.value}'")
-                raise AnalysisError(errmsg, inspect.getframeinfo(inspect.currentframe()),
-                                    self.msginfo)
+                raise AnalysisError(errmsg, inspect.currentframe(), self.msginfo)
 
             except ValueError as err:
                 raise ValueError(f"{self.msginfo}: Error interpolating output '{out_name}':\n"

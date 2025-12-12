@@ -7,6 +7,7 @@ import numpy as np
 from numbers import Integral
 from itertools import zip_longest
 
+from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import shape2tuple
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.om_warnings import issue_warning
@@ -109,7 +110,7 @@ def ranges2indexer(ranges, src_shape=None):
     elif len(ranges) == 0:
         idx = slice(0, 0)
     else:
-        idx = np.concatenate([np.arange(start, end) for start, end in ranges])
+        idx = np.concatenate([range(start, end) for start, end in ranges])
 
     if src_shape is None:
         src_shape = (ranges[-1][1] - ranges[0][0],)
@@ -499,10 +500,10 @@ class ShapedIntIndexer(Indexer):
         """
         Check that indices are within the bounds of the source shape.
         """
-        if self._src_shape is not None and (self._idx >= self._dist_shape[0] or
-                                            self._idx < -self._dist_shape[0]):
-            raise IndexError(f"index {self._idx} is out of bounds of the source shape "
-                             f"{self._dist_shape}.")
+        if self._src_shape is not None and self._dist_shape:
+            if self._idx >= self._dist_shape[0] or self._idx < -self._dist_shape[0]:
+                raise IndexError(f"index {self._idx} is out of bounds of the source shape "
+                                 f"{self._dist_shape}.")
 
     def to_json(self):
         """
@@ -655,7 +656,7 @@ class ShapedSliceIndexer(Indexer):
                 return np.arange(*slc.indices(sys.maxsize), dtype=int)
         else:
             src_size = shape_to_len(self._src_shape)
-            arr = np.arange(src_size, dtype=int).reshape(self._src_shape)[self._slice].ravel()
+            arr = np.arange(src_size, dtype=INT_DTYPE).reshape(self._src_shape)[self._slice].ravel()
             if flat:
                 # Case 2: Requested flattened indices of multidimensional array
                 # Return indices into a flattened src.
@@ -1134,7 +1135,8 @@ class ShapedMultiIndexer(Indexer):
         if self._src_shape is None:
             raise ValueError("Can't determine extent of array because source shape is not known.")
 
-        idxs = np.arange(shape_to_len(self._src_shape), dtype=np.int32).reshape(self._src_shape)
+        size = shape_to_len(self._src_shape)
+        idxs = np.arange(size, dtype=INT_DTYPE).reshape(self._src_shape)
 
         if flat:
             return idxs[self()].ravel()
@@ -1646,3 +1648,8 @@ class Slicer(object):
 
 # instance of the Slicer class to be used by users
 slicer = Slicer()
+
+
+_full_slice = slice(None)
+_flat_full_indexer = indexer(_full_slice, flat_src=True)
+_full_indexer = indexer(_full_slice, flat_src=False)

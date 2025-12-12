@@ -5,6 +5,8 @@ pyoptsparse is based on pyOpt, which is an object-oriented framework for
 formulating and solving nonlinear constrained optimization problems, with
 additional MPI capability.
 """
+from importlib.util import find_spec
+import importlib.metadata as ilmd
 import sys
 import json
 import signal
@@ -12,14 +14,6 @@ from packaging.version import Version
 
 import numpy as np
 from scipy.sparse import coo_matrix
-
-try:
-    import pyoptsparse
-    Optimization = pyoptsparse.Optimization
-except ImportError:
-    pyoptsparse = None
-except Exception as err:
-    pyoptsparse = err
 
 from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.analysis_error import AnalysisError
@@ -30,8 +24,8 @@ from openmdao.utils.mpi import FakeComm, MPI
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation
 
 # what version of pyoptspare are we working with
-if pyoptsparse and hasattr(pyoptsparse, '__version__'):
-    pyoptsparse_version = Version(pyoptsparse.__version__)
+if find_spec('pyoptsparse') is not None:
+    pyoptsparse_version = Version(ilmd.version('pyoptsparse'))
 else:
     pyoptsparse_version = None
 
@@ -167,9 +161,6 @@ class pyOptSparseDriver(Driver):
         Used internally to control when to return NANs for a bad evaluation.
     _check_jac : bool
         Used internally to control when to perform singular checks on computed total derivs.
-    _exc_info : 3 item tuple
-        Storage for exception and traceback information for exception that was raised in the
-        _objfunc or _gradfunc callbacks.
     _in_user_function :bool
         This is set to True at the start of a pyoptsparse callback to _objfunc and _gradfunc, and
         restored to False at the finish of each callback.
@@ -184,15 +175,25 @@ class pyOptSparseDriver(Driver):
         This is set to True when the user sends a signal to terminate the job.
     _model_ran : bool
         This is set to True after the full model has been run at least once.
+    _Optimization: class
+        The pyoptsparse Optimization class, lazily imported.
     """
 
     def __init__(self, **kwargs):
         """
         Initialize pyopt.
         """
+        try:
+            import pyoptsparse
+            self._Optimization = pyoptsparse.Optimization
+        except ImportError:
+            pyoptsparse = None
+        except Exception as err:
+            pyoptsparse = err
+
         if pyoptsparse is None:
             # pyoptsparse is not installed
-            raise RuntimeError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
+            raise ImportError('pyOptSparseDriver is not available, pyOptsparse is not installed.')
 
         if isinstance(pyoptsparse, Exception):
             # there is some other issue with the pyoptsparse installation
@@ -233,7 +234,6 @@ class pyOptSparseDriver(Driver):
         self._user_termination_flag = False
         self._in_user_function = False
         self._check_jac = False
-        self._exc_info = None
         self._total_jac_format = 'dict'
         self._total_jac_sparsity = None
         self._model_ran = False
@@ -387,8 +387,8 @@ class pyOptSparseDriver(Driver):
         self._coloring_info.run_model = not model_ran
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm
-        opt_prob = Optimization(self.options['title'], WeakMethodWrapper(self, '_objfunc'),
-                                comm=comm)
+        opt_prob = self._Optimization(self.options['title'], WeakMethodWrapper(self, '_objfunc'),
+                                      comm=comm)
 
         input_vals = self.get_design_var_values()
 
@@ -412,7 +412,7 @@ class pyOptSparseDriver(Driver):
         # Add all objectives
         objs = self.get_objective_values()
         for name in objs:
-            opt_prob.addObj(model._get_prom_name(name))
+            opt_prob.addObj(name)
             self._nl_responses.append(name)
 
         lin_dvs = self._get_lin_dvs()
@@ -534,7 +534,7 @@ class pyOptSparseDriver(Driver):
 
         # Need to tell optimizer where to put its .out files
         if self.options['output_dir'] in (None, _DEFAULT_REPORTS_DIR):
-            output_dir = str(self._problem().get_outputs_dir())
+            output_dir = str(self._problem().get_outputs_dir(mkdir=True))
         else:
             output_dir = str(self.options['output_dir'])
 
@@ -630,7 +630,7 @@ class pyOptSparseDriver(Driver):
         # framework is left in the right final state
         dv_dict = sol.getDVs()
         for name in self._designvars:
-            self.set_design_var(name, dv_dict[model._get_prom_name(name)])
+            self.set_design_var(name, dv_dict[name])
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
@@ -646,7 +646,13 @@ class pyOptSparseDriver(Driver):
         self.pyopt_solution = sol
 
         try:
-            exit_status = sol.optInform['value']
+            if sol.optInform is not None:
+                exit_status = sol.optInform['value']
+            else:
+                # For optimimizers that don't provide inform
+                # in newer versions of pyoptsparse.
+                exit_status = ''
+
             self.fail = False
 
             # These are various failed statuses.
@@ -661,8 +667,9 @@ class pyOptSparseDriver(Driver):
                 if exit_status and exit_status > 2:
                     self.fail = True
 
-        except KeyError:
+        except (TypeError, KeyError):
             # optimizers other than pySNOPT may not populate this dict
+            # for some optimizers, sol is None and not subscriptable.
             pass
 
         # revert signal handler to cached version
@@ -706,7 +713,7 @@ class pyOptSparseDriver(Driver):
 
         try:
             for name in self._designvars:
-                self.set_design_var(name, dv_dict[model._get_prom_name(name)])
+                self.set_design_var(name, dv_dict[name])
 
             # print("Setting DV")
             # print(dv_dict)
@@ -858,18 +865,15 @@ class pyOptSparseDriver(Driver):
             for okey in self._nl_responses:
                 if okey not in sens_dict:
                     sens_dict[okey] = {}
-                oval = func_dict[model._get_prom_name(okey)]
+                oval = func_dict[okey]
                 osize = len(oval)
                 for ikey in nl_dvs.keys():
-                    ival = dv_dict[model._get_prom_name(ikey)]
+                    ival = dv_dict[ikey]
                     isize = len(ival)
                     if ikey not in sens_dict[okey] or self._fill_NANs:
                         sens_dict[okey][ikey] = np.zeros((osize, isize))
                         if self._fill_NANs:
                             sens_dict[okey][ikey].fill(np.nan)
-
-        # convert sens_dict to use promoted names
-        # sens_dict = model._prom_names_jac(sens_dict)
 
         # print("Derivatives calculated")
         # print(dv_dict)

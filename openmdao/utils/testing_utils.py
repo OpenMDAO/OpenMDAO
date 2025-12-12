@@ -1,13 +1,13 @@
 """Define utils for use in testing."""
 import json
 import functools
-import builtins
 import os
 import shutil
 import re
 from itertools import zip_longest
 from contextlib import contextmanager
 from pathlib import Path
+import tempfile
 
 import numpy as np
 
@@ -41,21 +41,33 @@ def _cleanup_workdir(self):
                 pass
 
 
+def get_tempdir():
+    """
+    Return the same tempdir across all MPI processes.
+
+    Returns
+    -------
+    str
+        The tempdir.
+    """
+    if MPI is None:
+        return tempfile.mkdtemp()
+    elif MPI.COMM_WORLD.rank == 0:
+        tempdir = tempfile.mkdtemp()
+        MPI.COMM_WORLD.bcast(tempdir, root=0)
+        return tempdir
+    else:
+        return MPI.COMM_WORLD.bcast(None, root=0)
+
+
 def _new_setup(self):
     import os
-    import tempfile
 
     from openmdao.utils.mpi import MPI, multi_proc_exception_check
     self.startdir = os.getcwd()
     self.old_workdir = os.environ.get('OPENMDAO_WORKDIR', '')
 
-    if MPI is None:
-        self.tempdir = tempfile.mkdtemp()
-    elif MPI.COMM_WORLD.rank == 0:
-        self.tempdir = tempfile.mkdtemp()
-        MPI.COMM_WORLD.bcast(self.tempdir, root=0)
-    else:
-        self.tempdir = MPI.COMM_WORLD.bcast(None, root=0)
+    self.tempdir = get_tempdir()
 
     os.chdir(self.tempdir)
     # on mac tempdir is a symlink which messes some things up, so
@@ -308,8 +320,8 @@ def _fix_comp_check_data(data):
     data : dict
         Dictionary containing derivative information keyed by subjac.
     """
-    names = ['J_fd', 'abs error', 'rel error', 'magnitude', 'directional_fd_fwd',
-             'directional_fd_rev']
+    names = ['J_fd', 'tol violation', 'magnitude', 'directional_fd_fwd', 'directional_fd_rev',
+             'vals_at_max_error', 'abs error', 'rel error']
 
     for name in names:
         if name in data:
@@ -367,8 +379,13 @@ def compare_prob_vs_comp_check_partials(probdata, compdata, comp):
             probval2 = probval[key2]
             compval2 = compval[key2]
 
-            if key2 == 'J_fd' or key2 == 'J_fwd':
+            if key2 in ('J_fd', 'J_fwd', 'denom_idx'):
                 assert_near_equal(probval2, compval2, 1e-6, 1e-6)
+            elif key2 in ('rows', 'cols'):
+                if probval2 is None:
+                    assert probval2 is compval2
+                else:
+                    assert np.all(probval2 == compval2)
             else:
                 for i in range(3):
                     p = probval2[i]
@@ -390,77 +407,6 @@ class _ModelViewerDataTreeEncoder(json.JSONEncoder):
         elif isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
-
-
-class MissingImports(object):
-    """
-    ContextManager that emulates missing python packages or modules.
-
-    Each import is checked to see if it starts with a missing import.
-
-    For instance:
-
-    >>> with MissingImports('matplotlib'):
-    >>>    from matplotlib.pyplot import plt
-
-    will fail because 'matplotlib.pyplot'.startswith('matplotlib') is True.
-
-    This implementation modifies builtins.__import__ which is allowed but highly
-    discouraged according to the documentation, but implementing a MetaPathFinder
-    seemed like overkill.  Use at your own risk.
-
-    Parameters
-    ----------
-    missing_imports : str or Sequence of str
-        A string or sequence of strings that denotes modules that should appear to be absent
-        for testing purposes.
-
-    Attributes
-    ----------
-    missing_imports : str or Sequence of str
-        A string or sequence of strings that denotes modules that should appear to be absent
-        for testing purposes.
-    _cached_import : None or builtin
-        A cached import to emulate the missing import
-    """
-
-    def __init__(self, missing_imports):
-        """
-        Initialize attributes.
-        """
-        if isinstance(missing_imports, str):
-            self.missing_imports = set([missing_imports])
-        else:
-            self.missing_imports = set(missing_imports)
-        self._cached_import = None
-
-    def __enter__(self):
-        """
-        Set cached import.
-        """
-        self._cached_import = builtins.__import__
-        builtins.__import__ = self._emulate_missing_import
-
-    def _emulate_missing_import(self, name, globals=None, locals=None, fromlist=(), level=0):
-        for mi in self.missing_imports:
-            if name.startswith(mi):
-                raise ImportError(f'No module named {name} due to missing import {mi}.')
-        return self._cached_import(name, globals, locals, fromlist, level)
-
-    def __exit__(self, type, value, traceback):
-        """
-        Exit the runtime context related to this object.
-
-        Parameters
-        ----------
-        type : Exception class
-            The type of the exception.
-        value : Exception instance
-            The exception instance raised.
-        traceback : regex pattern
-            Traceback object.
-        """
-        builtins.__import__ = self._cached_import
 
 
 # this recognizes ints and floats with or without scientific notation.

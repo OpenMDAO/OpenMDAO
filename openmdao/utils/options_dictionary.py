@@ -328,6 +328,11 @@ class OptionsDictionary(object):
         **kwargs
             Keyword arguments where the option names in the OptionsDictionary are the keywords
             and the associated values are the temporary values for those options.
+
+        Yields
+        ------
+        None
+            Yields None after entering a temporary context.
         """
         for option, val in kwargs.items():
             if option not in self._context_cache:

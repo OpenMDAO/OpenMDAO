@@ -157,7 +157,7 @@ class TestNotInstalled(unittest.TestCase):
         from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
         # but we get a RuntimeError if we try to instantiate
-        with self.assertRaises(RuntimeError) as ctx:
+        with self.assertRaises(ImportError) as ctx:
             pyOptSparseDriver()
 
         self.assertEqual(str(ctx.exception),
@@ -193,7 +193,9 @@ class TestMPIScatter(unittest.TestCase):
         prob.run_driver()
 
         proc_vals = prob.comm.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
-        np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
+        # f_xy is a scalar, so compare it separately
+        self.assertAlmostEqual(proc_vals[0][3], proc_vals[1][3])
+        np.testing.assert_array_almost_equal(proc_vals[0][:3], proc_vals[1][:3])
 
     @require_pyoptsparse(OPTIMIZER)
     def test_opt_distcomp(self):
@@ -2202,7 +2204,8 @@ class TestPyoptSparse(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).')
+                         'Constraints or objectives [parab.z] cannot be impacted by the design variables'
+                         ' of the problem because no partials were defined for them in their parent component(s).')
 
     def test_singular_jac_error_desvars(self):
         prob = om.Problem()
@@ -2236,7 +2239,7 @@ class TestPyoptSparse(unittest.TestCase):
             prob.run_driver()
 
         self.assertEqual(str(msg.exception),
-                         "Design variables [('z', inds=[0])] have no impact on the constraints or objective.")
+                         "The following design variables have no impact on the constraints or objective at the current design point:\n  z, inds=[0]\n")
 
     def test_singular_jac_ignore(self):
         prob = om.Problem()
@@ -2289,7 +2292,8 @@ class TestPyoptSparse(unittest.TestCase):
 
         prob.setup()
 
-        msg = 'Constraints or objectives [parab.z] cannot be impacted by the design variables of the problem because no partials were defined for them in their parent component(s).'
+        msg = ('Constraints or objectives [parab.z] cannot be impacted by the design variables of'
+               ' the problem because no partials were defined for them in their parent component(s).')
 
         with assert_warning(UserWarning, msg):
             prob.run_driver()
@@ -3481,6 +3485,7 @@ class TestLinearOnlyDVs(unittest.TestCase):
 
         return prob
 
+    @require_pyoptsparse('IPOPT')
     def test_lin_only_dvs(self):
         shape = (2, 5)
         # do first opt without coloring

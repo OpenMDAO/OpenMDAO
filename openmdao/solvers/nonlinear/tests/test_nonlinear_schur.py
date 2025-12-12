@@ -37,7 +37,7 @@ class TestSchurSolvers(unittest.TestCase):
                     with self.subTest(f'{case=} {solver=} {mode=}'):
                         _run_test_problem(case=case, solver=solver, mode=mode,
                                         solution=case_solutions[case])
-            
+
 
 def _run_test_problem(case, solver, mode, solution):
 
@@ -280,7 +280,7 @@ def _run_test_problem(case, solver, mode, solution):
         assert_near_equal([p.get_val('comp1.x1')[0], p.get_val('comp2.x2')[0]],
                           solution,
                           tolerance=1.0E-12)
-  
+
         p.cleanup()
 
         # --- Load the recorded data ---

@@ -371,6 +371,7 @@ class TestDOEDriver(unittest.TestCase):
         model.add_design_var('p2.y', lower=0.0, upper=1.0)
 
         prob.setup()
+        prob.final_setup()
 
         # create a list of DOE cases
         case_gen = om.FullFactorialGenerator(levels=2)
@@ -737,7 +738,7 @@ class TestDOEDriver(unittest.TestCase):
 
         model.set_input_defaults('x', 0.0)
         model.set_input_defaults('y', 0.0)
-        model.add_subsystem('comp', Paraboloid(), promotes=['x', 'y', 'f_xy'])
+        model.add_subsystem('comp', Paraboloid(default_shape=()), promotes=['x', 'y', 'f_xy'])
 
         model.add_design_var('x', lower=0.0, upper=1.0)
         model.add_design_var('y', lower=0.0, upper=1.0)
@@ -751,15 +752,15 @@ class TestDOEDriver(unittest.TestCase):
         prob.cleanup()
 
         expected = [
-            {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': np.array([22.])},
-            {'x': np.array([0.]), 'y': np.array([0.4]), 'f_xy': np.array([25.36])},
-            {'x': np.array([0.]), 'y': np.array([0.8]), 'f_xy': np.array([29.04])},
-            {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': np.array([17.])},
-            {'x': np.array([1.]), 'y': np.array([0.4]), 'f_xy': np.array([20.76])},
-            {'x': np.array([1.]), 'y': np.array([0.8]), 'f_xy': np.array([24.84])},
-            {'x': np.array([0.5]), 'y': np.array([0.2]), 'f_xy': np.array([20.99])},
-            {'x': np.array([0.5]), 'y': np.array([0.6]), 'f_xy': np.array([24.71])},
-            {'x': np.array([0.5]), 'y': np.array([1.]), 'f_xy': np.array([28.75])},
+            {'x': np.array([0.]), 'y': np.array([0.]), 'f_xy': 22.},
+            {'x': np.array([0.]), 'y': np.array([0.4]), 'f_xy': 25.36},
+            {'x': np.array([0.]), 'y': np.array([0.8]), 'f_xy': 29.04},
+            {'x': np.array([1.]), 'y': np.array([0.]), 'f_xy': 17.},
+            {'x': np.array([1.]), 'y': np.array([0.4]), 'f_xy': 20.76},
+            {'x': np.array([1.]), 'y': np.array([0.8]), 'f_xy': 24.84},
+            {'x': np.array([0.5]), 'y': np.array([0.2]), 'f_xy': 20.99},
+            {'x': np.array([0.5]), 'y': np.array([0.6]), 'f_xy': 24.71},
+            {'x': np.array([0.5]), 'y': np.array([1.]), 'f_xy': 28.75},
         ]
 
         cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
@@ -769,8 +770,9 @@ class TestDOEDriver(unittest.TestCase):
 
         for case, expected_case in zip(cases, expected):
             outputs = cr.get_case(case).outputs
-            for name in ('x', 'y', 'f_xy'):
+            for name in ('x', 'y'):
                 self.assertAlmostEqual(outputs[name][0], expected_case[name][0])
+            self.assertAlmostEqual(outputs['f_xy'], expected_case['f_xy'])
 
     @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
     def test_generalized_subset_array(self):

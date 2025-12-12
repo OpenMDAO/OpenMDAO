@@ -1004,13 +1004,11 @@ class ImplicitCompGuessTestCase(unittest.TestCase):
         prob.set_solver_print(level=0)
         prob.setup()
 
-        with self.assertRaises(NotImplementedError) as cm:
+        with self.assertRaises(ValueError) as cm:
             prob.run_model()
 
         self.assertEqual(str(cm.exception),
-                         "'comp1' <class ImpWithInitial>: Error calling apply_nonlinear(), "
-                         "ImplicitComponent.apply_nonlinear() must be overridden by the "
-                         "child class.")
+                         "'comp1' <class ImpWithInitial>: Attempt to set value of 'x' in input vector when it is read only.")
 
 class ImplicitCompReadOnlyTestCase(unittest.TestCase):
 
@@ -1561,6 +1559,117 @@ class CacheLinSolutionTestCase(unittest.TestCase):
             p.run_model()
             p.driver._total_jac = old_tot_jac
             p.driver._compute_totals(of=['C1.y'], wrt=['indeps.x'])
+
+
+class LinearSystemCompPrimal(om.ImplicitComponent):
+    def __init__(self, input_prefix, output_prefix, domap, **kwargs):
+        super().__init__(**kwargs)
+        self.Aname = input_prefix + 'A'
+        self.bname = input_prefix + 'b'
+        self.xname = output_prefix + 'x'
+        self.domap = domap
+
+    def initialize(self):
+        self.options.declare('size', default=1, types=int)
+
+    def setup(self):
+        size = self.options['size']
+
+        shape = (size, )
+
+        if ':' in self.Aname and self.domap:
+            self.add_input(self.Aname, primal_name=self.Aname.rpartition(':')[-1], val=np.eye(size))
+        else:
+            self.add_input(self.Aname, val=np.eye(size))
+        if ':' in self.bname and self.domap:
+            self.add_input(self.bname, primal_name=self.bname.rpartition(':')[-1], val=np.ones(shape))
+        else:
+            self.add_input(self.bname, val=np.ones(shape))
+        if ':' in self.xname and self.domap:
+            self.add_output(self.xname, primal_name=self.xname.rpartition(':')[-1], shape=shape)
+        else:
+            self.add_output(self.xname, shape=shape)
+
+    def setup_partials(self):
+        size = self.options['size']
+        mat_size = size * size
+        full_size = size
+
+        row_col = np.arange(full_size, dtype="int")
+
+        self.declare_partials(self.xname, self.bname, val=np.full(full_size, -1.0), rows=row_col, cols=row_col)
+
+        rows = np.repeat(np.arange(full_size), size)
+
+        cols = np.arange(mat_size)
+
+        self.declare_partials(self.xname, self.Aname, rows=rows, cols=cols)
+
+        cols = np.tile(np.arange(size), size)
+        cols += np.repeat(np.arange(1), mat_size) * size
+
+        self.declare_partials(of=self.xname, wrt=self.xname, rows=rows, cols=cols)
+
+        if self.matrix_free:
+            self.linear_solver = om.ScipyKrylov()
+        else:
+            self.linear_solver = om.DirectSolver()
+        self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
+    def compute_primal(self, A, b, x):
+        return A.dot(x) - b
+
+
+class TestMappedNames(unittest.TestCase):
+    def test_implicit_comp_primal_mapped_names(self):
+        p = om.Problem()
+        p.model.add_subsystem('comp', LinearSystemCompPrimal('my:', 'my:', domap=True, size=3,
+                                                             derivs_method='cs'))
+
+        p.setup()
+
+        x = np.array([1, 2, -3])
+        A = np.array([[5.0, -3.0, 2.0], [1.0, 7.0, -4.0], [1.0, 0.0, 8.0]])
+        b = A.dot(x)
+
+        p.set_val('comp.my:A', A)
+        p.set_val('comp.my:b', b)
+        p.set_val('comp.my:x', x)
+        p.final_setup()
+        p.run_model()
+
+        assert_near_equal(p['comp.my:x'], x, .0001)
+
+    def test_implicit_comp_primal_bad_inputs_no_mapping(self):
+        p = om.Problem()
+        p.model.add_subsystem('comp', LinearSystemCompPrimal('my:', '', domap=False))
+
+        with self.assertRaises(RuntimeError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception),
+                         "'comp' <class LinearSystemCompPrimal>: compute_primal method args ['A', 'b', 'x'] "
+                         "don't match the args ['my:A', 'my:b', 'x'] mapped from this component's inputs. To "
+                         "map inputs to the compute_primal method, set the name used in compute_primal to the "
+                         "'primal_name' arg when calling add_input/add_discrete_input. This is only necessary "
+                         "if the declared component input name is not a valid Python name.")
+
+
+
+    def test_implicit_comp_primal_bad_outputs_no_mapping(self):
+        p = om.Problem()
+        p.model.add_subsystem('comp', LinearSystemCompPrimal('', 'my:', domap=False))
+
+        with self.assertRaises(RuntimeError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception),
+                         "'comp' <class LinearSystemCompPrimal>: compute_primal method args ['A', 'b', 'x'] "
+                         "don't match the args ['A', 'b', 'my:x'] mapped from this component's inputs. To map "
+                         "inputs to the compute_primal method, set the name used in compute_primal to the 'primal_name' "
+                         "arg when calling add_input/add_discrete_input. This is only necessary if the declared "
+                         "component input name is not a valid Python name.")
+
 
 
 if __name__ == '__main__':

@@ -30,11 +30,11 @@ def index_to_varname(system, loc):
         String containing variable absolute name (and promoted name if there is one) and index.
     """
     start = end = 0
-    varsizes = np.sum(system._owned_sizes, axis=0)
-    for i, name in enumerate(system._var_allprocs_abs2meta['output']):
+    varsizes = np.sum(system._owned_output_sizes, axis=0)
+    for i, name in enumerate(system._resolver.abs_iter('output')):
         end += varsizes[i]
         if loc < end:
-            varname = system._var_allprocs_abs2prom['output'][name]
+            varname = system._resolver.abs2prom(name, 'output')
             break
         start = end
 
@@ -154,17 +154,17 @@ def format_nan_error(system, matrix):
     """
     # Because of how we built the matrix, a NaN in a comp causes the whole row to be NaN, so we
     # need to associate each index with a variable.
-    varsizes = np.sum(system._owned_sizes, axis=0)
+    varsizes = np.sum(system._owned_output_sizes, axis=0)
 
     nanrows = np.zeros(matrix.shape[0], dtype=bool)
     nanrows[np.where(np.isnan(matrix))[0]] = True
 
     varnames = []
     start = end = 0
-    for i, name in enumerate(system._var_allprocs_abs2meta['output']):
+    for i, name in enumerate(system._resolver.abs_iter('output')):
         end += varsizes[i]
         if np.any(nanrows[start:end]):
-            varnames.append("'%s'" % system._var_allprocs_abs2prom['output'][name])
+            varnames.append("'%s'" % system._resolver.abs2prom(name, 'output'))
         start = end
 
     msg = "NaN entries found in {} for rows associated with states/residuals [{}]."
@@ -223,6 +223,26 @@ class DirectSolver(LinearSolver):
 
         self.supports['implicit_components'] = True
 
+    def check_config(self, logger):
+        """
+        Perform optional error checks.
+
+        Parameters
+        ----------
+        logger : object
+            The object that manages logging output.
+        """
+        if self.options['rhs_checking'] is False:
+            system = self._system()
+            redundant_adj = system.pathname in system._relevance.get_redundant_adjoint_systems()
+            if redundant_adj:
+                logger.info(
+                    f"\n'rhs_checking' is disabled for '{system.linear_solver.msginfo}'"
+                    ", but that solver has redundant adjoint solves. If it is "
+                    "expensive to compute derivatives for this solver, turning on "
+                    "'rhs_checking' may improve performance.\n"
+                )
+
     def _setup_solvers(self, system, depth):
         """
         Assign system instance, set depth, and optionally perform setup.
@@ -236,8 +256,7 @@ class DirectSolver(LinearSolver):
         """
         super()._setup_solvers(system, depth)
         self._disallow_distrib_solve()
-        self._lin_rhs_checker = LinearRHSChecker.create(self._system(),
-                                                        self.options['rhs_checking'])
+        self._lin_rhs_checker = LinearRHSChecker.create(system, self.options['rhs_checking'])
 
     def _linearize_children(self):
         """
@@ -302,7 +321,7 @@ class DirectSolver(LinearSolver):
                 xvec.set_val(seed)
 
                 # apply linear
-                system._apply_linear(self._assembled_jac, 'fwd', scope_out, scope_in)
+                system._apply_linear('fwd', scope_out, scope_in)
 
                 # put new value in out_vec
                 mtx[:, i] = bvec.asarray()
@@ -320,8 +339,8 @@ class DirectSolver(LinearSolver):
         system = self._system()
         nproc = system.comm.size
 
-        if self._assembled_jac is not None:
-            matrix = self._assembled_jac._int_mtx._matrix
+        if system._get_assembled_jac() is not None:
+            matrix = system._assembled_jac.get_dr_do_matrix()
 
             if matrix is None:
                 # this happens if we're not rank 0 when using owned_sizes
@@ -352,8 +371,7 @@ class DirectSolver(LinearSolver):
             # the matrix during conversion to csc prior to LU decomp, so we can't use COO.
             else:
                 raise RuntimeError("Direct solver not implemented for matrix type %s"
-                                   " in %s." % (type(self._assembled_jac._int_mtx),
-                                                system.msginfo))
+                                   " in %s." % (type(matrix), system.msginfo))
         else:
             if nproc > 1:
                 raise RuntimeError("DirectSolvers without an assembled jacobian are not supported "
@@ -395,13 +413,12 @@ class DirectSolver(LinearSolver):
         system = self._system()
         nproc = system.comm.size
 
-        if self._assembled_jac is not None:
-
-            matrix = self._assembled_jac._int_mtx._matrix
+        if system._get_assembled_jac() is not None:
+            matrix = system._assembled_jac.get_dr_do_matrix()
 
             if matrix is None:
                 # This happens if we're not rank 0 and owned_sizes are being used
-                sz = np.sum(system._owned_sizes)
+                sz = np.sum(system._owned_output_sizes)
                 inv_jac = np.zeros((sz, sz))
 
             # Dense and Sparse matrices have their own inverse method.
@@ -495,11 +512,11 @@ class DirectSolver(LinearSolver):
                     return
 
         # AssembledJacobians are unscaled.
-        if self._assembled_jac is not None:
+        if system._get_assembled_jac() is not None:
             full_b = b_vec
 
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                if isinstance(self._assembled_jac._int_mtx, DenseMatrix):
+                if isinstance(system._assembled_jac._dr_do_mtx, DenseMatrix):
                     sol_array = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
                 else:
                     sol_array = self._lu.solve(full_b, trans_splu)
@@ -511,4 +528,15 @@ class DirectSolver(LinearSolver):
             x_vec[:] = sol_array = scipy.linalg.lu_solve(self._lup, b_vec, trans=trans_lu)
 
         if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
-            self._lin_rhs_checker.add_solution(b_vec, sol_array, copy=True)
+            self._lin_rhs_checker.add_solution(b_vec, sol_array, system, copy=True)
+
+    def preferred_sparse_format(self):
+        """
+        Return the preferred sparse format for the dr/do matrix of a split jacobian.
+
+        Returns
+        -------
+        str
+            The preferred sparse format for the dr/do matrix of a split jacobian.
+        """
+        return 'csc'

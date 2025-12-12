@@ -11,6 +11,7 @@ import sys
 import tempfile
 import traceback
 import webbrowser
+from importlib.util import find_spec
 import inspect
 from itertools import combinations, groupby
 from contextlib import contextmanager
@@ -29,28 +30,18 @@ from openmdao.utils.om_warnings import issue_warning, OMDeprecationWarning, Deri
 from openmdao.utils.reports_system import register_report
 from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.devtools.memory import mem_usage
-from openmdao.utils.name_maps import rel_name2abs_name
 
 try:
-    import matplotlib as mpl
-    from matplotlib import pyplot
-
-    if Version(mpl.__version__) < Version("3.6"):
-        from matplotlib import cm
+    import jax
+    jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
+    import jax.numpy as jnp
+    from jax.experimental.sparse import BCOO
 except ImportError:
-    mpl = None
+    jax = None
+    jnp = np
 
-try:
-    from bokeh.models import CategoricalColorMapper, ColumnDataSource, CustomJSHover, \
-        Div, HoverTool, PreText
-    from bokeh.layouts import column
-    from bokeh.palettes import Blues256, Reds256, gray, interp_palette
-    from bokeh.plotting import figure
-    import bokeh.resources as bokeh_resources
-    from bokeh.transform import transform
-    import bokeh.io
-except ImportError:
-    bokeh_resources = None
+
+bokeh_available = find_spec('bokeh') is not None
 
 
 CITATIONS = """
@@ -78,15 +69,26 @@ _use_total_sparsity = True
 # new partial/semi-total coloring.
 _use_partial_sparsity = True
 
-# If True, ignore use_fixed_coloring if the coloring passed to it is _STD_COLORING_FNAME.
+# If True, ignore use_fixed_coloring if the coloring passed to it is STD_COLORING_FNAME.
 # This is used when the 'openmdao partial_coloring' or 'openmdao total_coloring' commands
 # are running, because the intent there is to generate new coloring files regardless of
 # whether use_fixed_coloring was called.
 _force_dyn_coloring = False
 
 # used as an indicator that we should automatically name coloring file based on class module
-# path or system pathname
-_STD_COLORING_FNAME = object()
+# path or system pathname. U
+
+
+class STD_COLORING_FNAME():
+    """
+    Used to indicate that coloring file should have a standard name.
+
+    The standard name is based on the class module path or system pathname.
+    Use isinstance to check values to avoid any weirdness with using 'is a' across processes.
+    """
+
+    pass
+
 
 _default_coloring_imagefile = 'coloring.png'
 
@@ -248,17 +250,26 @@ class ColoringMeta(object):
             if name in self._meta_names:
                 setattr(self, name, val)
 
-    def display(self):
+    def display(self, show_summary=None, show_sparsity=None):
         """
         Display information about the coloring.
+
+        Parameters
+        ----------
+        show_summary : bool or None
+            If True, show a summary of the coloring, else use the value of show_summary from this
+            object.
+        show_sparsity : bool or None
+            If True, show a plot of the sparsity, else use the value of show_sparsity from this
+            object.
         """
         if self.coloring is None:
-            if self.show_summary or self.show_sparsity:
+            if self.show_summary or self.show_sparsity or show_summary or show_sparsity:
                 print("No coloring was computed successfully.")
         else:
-            if self.show_summary:
+            if self.show_summary or show_summary:
                 self.coloring.summary()
-            if self.show_sparsity:
+            if self.show_sparsity or show_sparsity:
                 self.coloring.display_bokeh(show=True)
 
     def __iter__(self):
@@ -365,8 +376,7 @@ class ColoringMeta(object):
             Prefix for warning/error messages.
         """
         if coloring is None:
-            self._coloring = None
-            self._failed = False
+            self.reset_coloring()
         elif self._pct_improvement_good(coloring, msginfo):
             self._coloring = coloring
             self._failed = False
@@ -381,6 +391,14 @@ class ColoringMeta(object):
         """
         self._coloring = None
         self._failed = False
+
+    def deactivate(self):
+        """
+        Deactivate the coloring.
+        """
+        self._coloring = None
+        self.static = None
+        self._failed = True
 
     def _pct_improvement_good(self, coloring, msginfo=''):
         """
@@ -420,6 +438,32 @@ class ColoringMeta(object):
             Copy of the metadata.
         """
         return type(self)(**dict(self))
+
+    def use_coloring(self):
+        """
+        Return True if coloring should be used.
+
+        It may not have been computed yet.
+
+        Returns
+        -------
+        bool
+            True if coloring should be used.
+        """
+        return not self._failed and _use_total_sparsity and (self.coloring is not None or
+                                                             self.dynamic or
+                                                             self.has_static_coloring())
+
+    def has_static_coloring(self):
+        """
+        Return True if a static coloring is available.
+
+        Returns
+        -------
+        bool
+            True if a static coloring is available.
+        """
+        return isinstance(self.static, (str, STD_COLORING_FNAME, Coloring))
 
 
 class Partial_ColoringMeta(ColoringMeta):
@@ -545,6 +589,21 @@ class Partial_ColoringMeta(ColoringMeta):
                                        f"{pattern} instead.")
             self._wrt_patterns = tuple(newpats)
 
+    def use_coloring(self):
+        """
+        Return True if coloring should be used.
+
+        It may not have been computed yet.
+
+        Returns
+        -------
+        bool
+            True if coloring should be used.
+        """
+        return not self._failed and _use_partial_sparsity and (self.coloring is not None or
+                                                               self.dynamic or
+                                                               self.has_static_coloring())
+
     def _update_wrt_matches(self, system):
         """
         Determine the list of wrt variables that match the wildcard(s) given in declare_coloring.
@@ -563,8 +622,9 @@ class Partial_ColoringMeta(ColoringMeta):
             self.wrt_matches = None  # None means match everything
             return
 
-        self.wrt_matches = set(rel_name2abs_name(system, n) for n in
-                               pattern_filter(self.wrt_patterns, system._promoted_wrt_iter()))
+        prefix = system.pathname + '.' if system.pathname else ''
+        self.wrt_matches = frozenset(prefix + n for n in
+                                     pattern_filter(self.wrt_patterns, system._promoted_wrt_iter()))
 
         # error if nothing matched
         if not self.wrt_matches:
@@ -572,14 +632,6 @@ class Partial_ColoringMeta(ColoringMeta):
                              "options: {}.".format(self.msginfo, self.wrt_patterns))
 
         return self.wrt_matches
-
-    def reset_coloring(self):
-        """
-        Reset coloring and fname metadata.
-        """
-        super().reset_coloring()
-        if not self.per_instance:
-            _CLASS_COLORINGS[self.get_coloring_fname()] = None
 
     def update(self, dct):
         """
@@ -611,6 +663,8 @@ class Coloring(object):
         Names of variables corresponding to columns.
     col_var_sizes : ndarray or None
         Sizes of column variables.
+    resolver : NameResolver or None
+        NameResolver for the system corresponding to the coloring.
 
     Attributes
     ----------
@@ -640,14 +694,16 @@ class Coloring(object):
         Names of total jacobian rows or columns.
     _local_array : ndarray or None:
         Indices of total jacobian rows or columns.
-    _abs2prom : {'input': dict, 'output': dict}
-        Dictionary mapping absolute names to promoted names.
+    _resolver : NameResolver
+        NameResolver for the system corresponding to the coloring.
     _subtractions : list
         List of subtraction tuples. Only used for the substitution method of bidirectional coloring.
+    _color_arrays : dict
+        Dictionary of color arrays for each direction.
     """
 
     def __init__(self, sparsity, row_vars=None, row_var_sizes=None, col_vars=None,
-                 col_var_sizes=None):
+                 col_var_sizes=None, resolver=None):
         """
         Initialize data structures.
         """
@@ -678,8 +734,9 @@ class Coloring(object):
         self._names_array = {'fwd': None, 'rev': None}
         self._local_array = {'fwd': None, 'rev': None}
 
-        self._abs2prom = None
+        self._resolver = resolver
         self._subtractions = None
+        self._color_arrays = {}
 
     def get_renamed_copy(self, row_translate, col_translate):
         """
@@ -699,13 +756,13 @@ class Coloring(object):
         """
         row_vars = [row_translate[v] for v in self._row_vars]
         col_vars = [col_translate[v] for v in self._col_vars]
-        c = Coloring(self.sparsity, row_vars, self._row_var_sizes, col_vars, self._col_var_sizes)
+        c = Coloring(self.sparsity, row_vars, self._row_var_sizes, col_vars, self._col_var_sizes,
+                     resolver=self._resolver)
         c._fwd = self._fwd
         c._rev = self._rev
         c._meta = self._meta.copy()
         c._names_array = self._names_array
         c._local_array = self._local_array
-        c._abs2prom = self._abs2prom
 
         return c
 
@@ -732,9 +789,45 @@ class Coloring(object):
 
         yield from colors
 
+    def _get_color_array(self, direction):
+        """
+        Return the color array for the given direction.
+
+        The size of the array is the number of nonzero values in the sparsity matrix.
+
+        Parameters
+        ----------
+        direction : str
+            Derivative direction ('fwd' or 'rev').
+
+        Returns
+        -------
+        ndarray
+            Color array for the given direction.
+        """
+        if direction not in self._color_arrays:
+            if direction == 'fwd':
+                color_array = np.zeros(self._shape[1], dtype=int)
+                for i, color_list in enumerate(self._fwd[0]):
+                    color_array[color_list] = i
+                colors_nz = color_array[self._nzcols]
+            elif direction == 'rev':
+                color_array = np.zeros(self._shape[0], dtype=int)
+                for i, color_list in enumerate(self._rev[0]):
+                    color_array[color_list] = i
+                colors_nz = color_array[self._nzrows]
+            else:
+                raise RuntimeError(f"Invalid direction '{direction}' in _get_color_array.")
+
+            self._color_arrays[direction] = colors_nz
+
+        return self._color_arrays[direction]
+
     def color_nonzero_iter(self, direction):
         """
         Given a direction, yield an iterator over (columns, nz_rows) or (rows, nz_columns).
+
+        nz_rows and nz_cols are lists of nonzero rows/columns for each column/row.
 
         Parameters
         ----------
@@ -784,9 +877,9 @@ class Coloring(object):
                 for jac_irow, nzpart in zip(nzs, nzparts):
                     yield compressed_j[i, nzpart], nzpart, jac_irow
 
-    def expand_jac(self, compressed_j, direction):
+    def _expand_jac(self, compressed_j, direction):
         """
-        Expand the given compressed jacobian into a full jacobian.
+        Expand the given compressed dense jacobian into a full CSC jacobian.
 
         Parameters
         ----------
@@ -797,19 +890,16 @@ class Coloring(object):
 
         Returns
         -------
-        ndarray
+        csc_matrix
             The full jacobian.
         """
+        colors_coo = self._get_color_array(direction)
         if direction == 'fwd':
-            J = np.zeros(self._shape)
-            for col, nzpart, icol in self.colored_jac_iter(compressed_j, direction):
-                J[nzpart, icol] = col
-            return J
-        else:  # rev
-            J = np.zeros(self._shape)
-            for row, nzpart, irow in self.colored_jac_iter(compressed_j, direction):
-                J[irow, nzpart] = row
-            return J
+            data = compressed_j[self._nzrows, colors_coo]
+        elif direction == 'rev':
+            data = compressed_j[colors_coo, self._nzcols]
+
+        return csc_matrix((data, (self._nzrows, self._nzcols)), shape=self._shape)
 
     def get_row_col_map(self, direction):
         """
@@ -1042,12 +1132,15 @@ class Coloring(object):
         info._update_wrt_matches(system)
         if system.pathname:
             # for partial and semi-total derivs, convert to promoted names
-            ordered_of_info = system._jac_var_info_abs2prom(system._jac_of_iter())
-            ordered_wrt_info = \
-                system._jac_var_info_abs2prom(system._jac_wrt_iter(info.wrt_matches))
+            abs2prom = system._resolver.abs2prom
+            ordered_of_info = [(abs2prom(name), offset, end, idxs, dsizes)
+                               for name, offset, end, idxs, dsizes in system._get_jac_ofs()]
+            ordered_wrt_info = [(abs2prom(name), offset, end, vec, idxs, dsizes)
+                                for name, offset, end, vec, idxs, dsizes in
+                                system._get_jac_wrts(info.wrt_matches)]
         else:
-            ordered_of_info = list(system._jac_of_iter())
-            ordered_wrt_info = list(system._jac_wrt_iter(info.wrt_matches))
+            ordered_of_info = system._get_jac_ofs()
+            ordered_wrt_info = system._get_jac_wrts(info.wrt_matches)
 
         of_names = [t[0] for t in ordered_of_info]
         wrt_names = [t[0] for t in ordered_wrt_info]
@@ -1280,19 +1373,16 @@ class Coloring(object):
         else:
             # we have var name/size info, so mark rows/cols with their respective variable names
             rowstart = rowend = 0
-            for rv, rvsize in zip(self._row_vars, self._row_var_sizes):
+            for row_var_name, rvsize in zip(self.get_row_var_names(use_prom_names),
+                                            self._row_var_sizes):
                 rowend += rvsize
                 for r in range(rowstart, rowend):
                     colstart = colend = 0
-                    for _, cvsize in zip(self._col_vars, self._col_var_sizes):
+                    for cvsize in self._col_var_sizes:
                         colend += cvsize
                         for c in range(colstart, colend):
                             print(charr[r, c], end='', file=out_stream)
                         colstart = colend
-                    if use_prom_names and self._abs2prom:
-                        row_var_name = self._get_prom_name(rv)
-                    else:
-                        row_var_name = rv
                     # include row variable with row
                     print(' %d  %s' % (r, row_var_name), file=out_stream)
                 rowstart = rowend
@@ -1301,12 +1391,9 @@ class Coloring(object):
             # with the appropriate starting column of the matrix ('|' marks the start of each var)
             start = 0
 
-            for name, size in zip(self._col_vars, self._col_var_sizes):
+            for col_var_name, size in zip(self.get_col_var_names(use_prom_names),
+                                          self._col_var_sizes):
                 tab = ' ' * start
-                if use_prom_names and self._abs2prom:
-                    col_var_name = self._get_prom_name(name)
-                else:
-                    col_var_name = name
                 print('%s|%s' % (tab, col_var_name), file=out_stream)
                 start += size
 
@@ -1342,7 +1429,13 @@ class Coloring(object):
         issue_warning('display is deprecated. Use display_bokeh for rich html displays of coloring'
                       'or display_txt for a text-based display.', category=OMDeprecationWarning)
 
-        if mpl is None:
+        try:
+            import matplotlib as mpl
+            from matplotlib import pyplot
+
+            if Version(mpl.__version__) < Version("3.6"):
+                from matplotlib import cm
+        except ImportError:
             print("matplotlib is not installed so the coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
                   "object or by using 'openmdao view_coloring --textview <your_coloring_file>' "
@@ -1533,7 +1626,16 @@ class Coloring(object):
         use_prom_names : bool
             If True, display promoted names rather than absolute path names for variables.
         """
-        if bokeh_resources is None:
+        try:
+            from bokeh.models import CategoricalColorMapper, ColumnDataSource, CustomJSHover, \
+                Div, HoverTool, PreText
+            from bokeh.layouts import column
+            from bokeh.palettes import Blues256, Reds256, gray, interp_palette
+            from bokeh.plotting import figure
+            import bokeh.resources
+            from bokeh.transform import transform
+            import bokeh.io
+        except ImportError:
             print("bokeh is not installed so this coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
                   "object or by using 'openmdao view_coloring --textview <your_coloring_file>' "
@@ -1680,7 +1782,7 @@ class Coloring(object):
                     desvar_name = coloring._col_vars[np.digitize(col_idx, desvar_idx_bins)]
                     desvar_col_map[desvar_name].add(col_idx)
 
-                if use_prom_names and coloring._abs2prom:
+                if use_prom_names and coloring._resolver:
                     desvar_col_map = {coloring._get_prom_name(k): v
                                       for k, v in desvar_col_map.items()}
 
@@ -1689,7 +1791,7 @@ class Coloring(object):
                     resvar_name = coloring._row_vars[np.digitize(row_idx, response_idx_bins)]
                     resvar_col_map[resvar_name].add(row_idx)
 
-                if use_prom_names and coloring._abs2prom:
+                if use_prom_names and coloring._resolver:
                     resvar_col_map = {coloring._get_prom_name(k): v
                                       for k, v in resvar_col_map.items()}
 
@@ -1745,7 +1847,7 @@ class Coloring(object):
         if output_file is not None:
             bokeh.io.save(report_layout, filename=output_file,
                           title=f'total coloring report for {source_name}',
-                          resources=bokeh_resources.INLINE)
+                          resources=bokeh.resources.INLINE)
 
         if show:
             bokeh.io.show(report_layout)
@@ -1753,7 +1855,7 @@ class Coloring(object):
     @property
     def sparsity(self):
         """
-        Return the sparsity matrix as a COO sparse matrix.
+        Return the sparsity matrix as a COO sparse matrix of type np.uint8.
 
         Returns
         -------
@@ -1762,6 +1864,36 @@ class Coloring(object):
         """
         return coo_matrix((np.ones(len(self._nzrows), dtype=np.uint8),
                            (self._nzrows, self._nzcols)), shape=self._shape)
+
+    def get_sparsity_of_type(self, dtype):
+        """
+        Return the sparsity matrix as a COO sparse matrix of a given dtype.
+
+        Parameters
+        ----------
+        dtype : object
+            Data type of returned numpy array.
+
+        Returns
+        -------
+        coo_matrix
+            The sparsity matrix.
+        """
+        return coo_matrix((np.ones(len(self._nzrows), dtype=dtype),
+                           (self._nzrows, self._nzcols)), shape=self._shape)
+
+    def get_jax_sparsity(self):
+        """
+        Return the sparsity matrix as a jax array.
+
+        Returns
+        -------
+        BCOO
+            The sparsity matrix in jax BCOO format.
+        """
+        data = jnp.ones(len(self._nzrows))
+        indices = jnp.array(zip(self._nzrows, self._nzcols))
+        return BCOO((data, indices), shape=self._shape)
 
     def get_dense_sparsity(self, dtype=np.uint8):
         """
@@ -1926,12 +2058,8 @@ class Coloring(object):
         ndarray
             tangent array for inputs (fwd) or outputs (rev)
         """
-        if direction == 'fwd':
-            size = self._shape[1]
-            fwd = True
-        else:
-            size = self._shape[0]
-            fwd = False
+        fwd = direction == 'fwd'
+        size = self._shape[1] if fwd else self._shape[0]
 
         if arr is None:
             arr = np.empty(size)
@@ -1979,23 +2107,54 @@ class Coloring(object):
 
         return tangent
 
-    def _get_prom_name(self, abs_name):
+    def _get_prom_name(self, name):
         """
         Get promoted name for specified variable.
         """
-        abs2prom = self._abs2prom
+        if self._resolver:
+            return self._resolver.any2prom(name, default=name)
 
-        # if we don't have prom names, just return abs name
-        if not abs2prom:
-            return abs_name
+        return name
 
-        # if we can't find a prom name, just return abs name
-        if abs_name in abs2prom['input']:
-            return abs2prom['input'][abs_name]
-        elif abs_name in abs2prom['output']:
-            return abs2prom['output'][abs_name]
+    def get_row_var_names(self, use_prom_names=True):
+        """
+        Yield the row variable names.
+
+        Parameters
+        ----------
+        use_prom_names : bool
+            If True, use promoted names.
+
+        Yields
+        ------
+        name : str
+            Name of the row variable.
+        """
+        if self._resolver is None or not use_prom_names:
+            yield from self._row_vars
         else:
-            return abs_name
+            for name in self._row_vars:
+                yield self._resolver.any2prom(name, default=name)
+
+    def get_col_var_names(self, use_prom_names=True):
+        """
+        Yield the column variable names.
+
+        Parameters
+        ----------
+        use_prom_names : bool
+            If True, use promoted names.
+
+        Yields
+        ------
+        name : str
+            Name of the column variable.
+        """
+        if self._resolver is None or not use_prom_names:
+            yield from self._col_vars
+        else:
+            for name in self._col_vars:
+                yield self._resolver.any2prom(name, default=name)
 
     def _apply_subtractions(self, J):
         for pos, subs in self._subtractions:
@@ -2161,7 +2320,7 @@ def _order_by_ID(col_adj_matrix):
     colored_degrees = np.zeros(ncols, dtype=INT_DTYPE)
     colored_degrees[col_adj_matrix.indices] = 1  # make sure zero cols aren't considered
 
-    for i in range(np.nonzero(colored_degrees)[0].size):
+    for _ in range(np.nonzero(colored_degrees)[0].size):
         col = colored_degrees.argmax()
         colnzrows = col_adj_matrix.getcol(col).indices
         colored_degrees[colnzrows] += 1
@@ -2425,7 +2584,8 @@ def _color_partition(J, Jprows, Jpcols, direct=True, overlap=None):
     Jpcols : ndarray
         Nonzero columns of a partition of the matrix being colored.
     direct : bool
-        If True, use the direct method to compute the column adjacency matrix.
+        If True, use the direct method to compute the column adjacency matrix. Otherwise, use the
+        substitution method.
     overlap : set or None
         Nonzero entries indicate overlapping columns.
 
@@ -2822,16 +2982,18 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
         fullJ = None
         for _ in range(num_full_jacs):
             if needs_scaling:
-                Jabs = driver._compute_totals(of=of, wrt=wrt, return_format='array')
+                J = driver._compute_totals(of=of, wrt=wrt, return_format='array')
             else:
-                Jabs = prob.compute_totals(of=of, wrt=wrt, return_format='array',
-                                           coloring_info=False)
+                J = prob.compute_totals(of=of, wrt=wrt, return_format='array', coloring_info=False)
             if fullJ is None:
-                fullJ = np.abs(Jabs)
+                fullJ = np.abs(J)
             else:
-                fullJ += np.abs(Jabs)
+                fullJ += np.abs(J)
 
-        Jabs = None
+        if driver:
+            driver._total_jac = None
+
+        J = None
 
     if driver:
         # force driver to recreate total jacobian using coloring
@@ -2924,15 +3086,11 @@ def _compute_coloring(J, mode, direct=True):
 
     col2rows = [None] * ncols  # will contain list of nonzero rows for each column
 
-    for r, c in zip(nzrows, nzcols):
+    for r, c in sorted(zip(nzrows, nzcols)):
         if col2rows[c] is None:
             col2rows[c] = [r]
         else:
             col2rows[c].append(r)
-
-    for c, rows in enumerate(col2rows):
-        if rows is not None:
-            col2rows[c] = sorted(rows)
 
     if rev:
         coloring._rev = (col_groups, col2rows)
@@ -3041,11 +3199,8 @@ def compute_total_coloring(problem, mode=None, of=None, wrt=None,
                         (model._full_comm is None and model.comm.rank == 0)):
                     coloring.save(fname)
 
-    # save a copy of the abs2prom dict on the coloring object
-    # so promoted names can be used when displaying coloring data
-    # (also map auto_ivc names to the prom name of their connected input)
     if coloring is not None:
-        coloring._abs2prom = model._var_allprocs_abs2prom.copy()
+        coloring._resolver = model._resolver
 
     # if we're running under MPI, make sure the coloring object is identical on all ranks
     # by broadcasting rank 0's coloring to the other ranks.
@@ -3119,7 +3274,7 @@ def _run_total_coloring_report(driver):
     htmlpath = reports_dir / 'total_coloring.html'
 
     display_coloring(source=driver, output_file=htmlpath,
-                     as_text=bokeh_resources is None, show=False)
+                     as_text=not bokeh_available, show=False)
 
 
 # entry point for coloring report
@@ -3422,7 +3577,7 @@ def _view_coloring_exec(options, user_args):
         coloring.display_txt()
 
     if options.show_sparsity:
-        if bokeh_resources is not None:
+        if bokeh_available:
             Coloring.display_bokeh(source=options.file[0], show=True)
         else:
             Coloring.display_txt(source=options.file[0], html=False)
@@ -3468,16 +3623,19 @@ class _ColSparsityJac(object):
     def __init__(self, system):
         self._coloring_info = system._coloring_info
 
-        nrows = sum([end - start for _, start, end, _, _ in system._jac_of_iter()])
-        end = 0
-        for _, _, end, _, _, _ in system._jac_wrt_iter(self._coloring_info.wrt_matches):
-            pass
+        nrows = sum([end - start for _, start, end, _, _ in system._get_jac_ofs()])
+        jac_wrts = system._get_jac_wrts(self._coloring_info.wrt_matches)
+        if jac_wrts:
+            end = jac_wrts[-1][2]
+        else:
+            end = 0
 
         self._nrows = nrows
         self._randgen = None
         self._ncols = end
         self.shape = (nrows, end)
         self._col_list = [None] * self._ncols
+        self._scratch = np.zeros(nrows)
 
     def set_col(self, system, i, column):
         # record only the nonzero part of the column.
@@ -3488,14 +3646,11 @@ class _ColSparsityJac(object):
                 self._col_list[i] = [nzs, np.abs(column[nzs])]
             else:
                 oldnzs, olddata = self._col_list[i]
-                if oldnzs.size == nzs.size and np.all(nzs == oldnzs):
-                    olddata += np.abs(column[nzs])
-                else:  # nonzeros don't match
-                    scratch = np.zeros(column.size)
-                    scratch[oldnzs] = olddata
-                    scratch[nzs] += np.abs(column[nzs])
-                    newnzs = np.nonzero(scratch)[0]
-                    self._col_list[i] = [newnzs, scratch[newnzs]]
+                self._scratch[:] = 0.0
+                self._scratch[oldnzs] = olddata
+                self._scratch[nzs] += np.abs(column[nzs])
+                newnzs = np.nonzero(self._scratch)[0]
+                self._col_list[i] = [newnzs, self._scratch[newnzs]]
 
     def set_dense_jac(self, system, jac):
         """
@@ -3513,6 +3668,29 @@ class _ColSparsityJac(object):
 
     def __setitem__(self, key, value):
         # ignore any setting of subjacs based on analytic derivs
+        pass
+
+    def _update(self, system):
+        """
+        Update the sparsity matrix.
+        """
+        pass
+
+    def _pre_update(self, dtype):
+        """
+        Pre-update the sparsity matrix.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The dtype of the jacobian.
+        """
+        pass
+
+    def _post_update(self):
+        """
+        Post-update the sparsity matrix.
+        """
         pass
 
     def get_sparsity(self):
@@ -3539,9 +3717,9 @@ class _ColSparsityJac(object):
             data.append(d)
 
         if rows:
-            rows = np.hstack(rows)
-            cols = np.hstack(cols)
-            data = np.hstack(data)
+            rows = np.concatenate(rows)
+            cols = np.concatenate(cols)
+            data = np.concatenate(data)
 
             # scale the data
             data *= (1. / np.max(data))
@@ -3609,8 +3787,8 @@ def display_coloring(source, output_file='total_coloring.html', as_text=False, s
     if coloring is None:
         return
 
-    if as_text or bokeh_resources is None:
-        if bokeh_resources is None and not as_text:
+    if as_text or not bokeh_available:
+        if not bokeh_available and not as_text:
             issue_warning("bokeh is not installed.\n"
                           "display_coloring will render output in plain text.")
 

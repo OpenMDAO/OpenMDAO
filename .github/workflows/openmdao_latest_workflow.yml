@@ -21,10 +21,8 @@ on:
         type: choice
         options:
           - ''
-          - 'Ubuntu Latest, NumPy<2'
-          - 'Ubuntu Latest, NumPy 2 (No PETSc/pyOptSparse)'
-          - 'MacOS Latest, NumPy<2'
-          - 'MacOS Latest, NumPy 2 (No PETSc/pyOptSparse)'
+          - 'Ubuntu Latest'
+          - 'MacOS Latest'
         required: false
         default: ''
       debug_enabled:
@@ -48,42 +46,19 @@ jobs:
       matrix:
         include:
           # test latest versions on ubuntu
-          # Include pyOptSparse, which requires NumPy<2
-          - NAME: Ubuntu Latest, NumPy<2
-            OS: ubuntu-22.04
-            PY: '3.12'
-            NUMPY: '<2'
-            PETSc: true
-            PYOPTSPARSE: true
-            SNOPT: true
-            BANDIT: true
-            BUILD_DOCS: true
-
-          # test latest versions on ubuntu
-          # Exclude pyOptSparse, which requires NumPy<2
-          # NumPy>=2.1 is required with Python 3.13
-          - NAME: Ubuntu Latest, NumPy 2 (No pyOptSparse)
-            OS: ubuntu-22.04
-            PY: '3.13'
-            NUMPY: '>=2.1'
+          - NAME: Ubuntu Latest
+            OS: ubuntu-latest
+            PY: 3
+            NUMPY: 2
+            SNOPT: 7.7
             PETSc: true
 
           # test latest versions on macos
-          # Include pyOptSparse, which requires NumPy<2
-          - NAME: MacOS Latest, NumPy<2
-            OS: macos-13
-            PY: '3.12'
-            NUMPY: '<2'
-            PETSc: true
-            PYOPTSPARSE: true
-
-          # test latest versions on macos
-          # Exclude pyOptSparse, which require NumPy<2
-          # NumPy>=2.1 is required with Python 3.13
-          - NAME: MacOS Latest, NumPy 2 (No pyOptSparse)
-            OS: macos-13
-            PY: '3.13'
-            NUMPY: '>=2.1'
+          - NAME: MacOS Latest
+            OS: macos-latest
+            PY: 3
+            NUMPY: 2
+            SNOPT: 7.7
             PETSc: true
 
     runs-on: ${{ matrix.OS }}
@@ -108,7 +83,7 @@ jobs:
 
       - name: Exit if this job was not selected
         if: github.event_name == 'workflow_dispatch' &&  inputs.job_name != '' &&  inputs.job_name != matrix.NAME
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: core.setFailed('The ${{ matrix.NAME }} job was not included in the run, exiting...');
 
@@ -124,7 +99,7 @@ jobs:
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup conda
         uses: conda-incubator/setup-miniconda@v3
@@ -144,7 +119,7 @@ jobs:
           echo "============================================================="
           echo "Install latest versions of NumPy/SciPy"
           echo "============================================================="
-          python -m pip install --upgrade --pre "numpy${{ matrix.NUMPY }}"
+          python -m pip install --upgrade --pre "numpy>=${{ matrix.NUMPY }}"
           python -m pip install --upgrade --pre scipy
 
           # remember versions so we can check them later
@@ -159,18 +134,16 @@ jobs:
           echo "============================================================="
           echo "Install latest PETSc"
           echo "============================================================="
-          if [[ "${{ matrix.NUMPY }}" == "<2" ]]; then
-            conda install mpich mpi4py petsc4py=3.21.2 -q -y
-          else
-            conda install mpich mpi4py petsc4py -q -y
-          fi
+          conda install mpich mpi4py petsc4py=3.22.2 -q -y
 
           echo "============================================================="
           echo "Check MPI and PETSc installation"
           echo "============================================================="
+          export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
           export OMPI_MCA_rmaps_base_oversubscribe=1
           export OMPI_MCA_btl=^openib
 
+          echo "export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> $GITHUB_ENV
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> $GITHUB_ENV
           echo "OMPI_MCA_btl=^openib" >> $GITHUB_ENV
 
@@ -191,6 +164,9 @@ jobs:
 
       - name: Install pyOptSparse
         if: ${{ matrix.PYOPTSPARSE }}
+        env:
+          SNOPT_LOCATION: ${{ secrets.SNOPT_LOCATION }}
+          SNOPT_VERSION: ${{ matrix.SNOPT }}
         run: |
           echo "============================================================="
           echo "Define useful functions"
@@ -212,11 +188,10 @@ jobs:
           python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
           BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
           if [[ "${{ matrix.SNOPT }}" ]]; then
-            if [[ "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
-              echo "  > Secure copying SNOPT 7.7 over SSH"
-              mkdir SNOPT
-              scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
-              SNOPT="-s SNOPT/src"
+              .github/actions/install_pyoptsparse/download_snopt.sh
+              if [ -d "SNOPT" ] ; then
+                SNOPT="-s SNOPT/src"
+              fi
             else
               echo "SNOPT source is not available"
             fi
@@ -228,10 +203,6 @@ jobs:
           echo "============================================================="
           echo "Install OpenMDAO"
           echo "============================================================="
-          if [[ "${{ matrix.NUMPY }}" == "" ]]; then
-            sed -i.bak 's/numpy<2/numpy/g' pyproject.toml
-            grep numpy pyproject.toml
-          fi
           python -m pip install .
 
       - name: Display environment info
@@ -302,7 +273,7 @@ jobs:
           export PYDEVD_DISABLE_FILE_VALIDATION=1
 
           cd openmdao/docs
-          if [[ "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
+          if [[ "${{ matrix.SNOPT }}" ]]; then
             echo "============================================================="
             echo "Building docs with SNOPT examples."
             echo "============================================================="
@@ -377,16 +348,6 @@ jobs:
             Security issue found on `${{ matrix.NAME }}` build.
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - name: Check NumPy 2.0 Compatibility
-        run: |
-          echo "============================================================="
-          echo "Check OpenMDAO code for NumPy 2.0 compatibility"
-          echo "See: https://numpy.org/devdocs/numpy_2_0_migration_guide.html"
-          echo "============================================================="
-          python -m pip install ruff
-          cd ${{ github.workspace }}
-          ruff check . --select NPY201
-
       - name: Slack env change
         if: steps.env_info.outputs.errors != ''
         uses: act10ns/slack@v2.0.0
@@ -432,7 +393,7 @@ jobs:
 
       - name: Fail the workflow if tests or doc build failed
         if: steps.run_tests.outcome == 'failure' || steps.build_docs.outcome == 'failure'
-        uses: actions/github-script@v3
+        uses: actions/github-script@v8
         with:
           script: |
               let test_fail = ${{ steps.run_tests.outcome == 'failure' }};

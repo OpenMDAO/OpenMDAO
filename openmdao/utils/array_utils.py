@@ -282,11 +282,18 @@ def sparsity_diff_viz(arr1, arr2, val_map=None, stream=sys.stdout):
         Mapping of array values to characters.
     stream : file-like
         Stream where output will be written.
+
+    Returns
+    -------
+    bool
+        True if they agree, False otherwise.
     """
     if val_map is None:
         val_map = {0: '.', 1: '1', 3: '2', 4: 'x'}
     spdiff = get_sparsity_diff_array(arr1, arr2)
     csr_array_viz(spdiff, val_map=val_map, stream=stream)
+
+    return 1 not in spdiff.data and 3 not in spdiff.data
 
 
 def array_viz(arr, prob=None, of=None, wrt=None, stream=sys.stdout):
@@ -542,8 +549,7 @@ def _flatten_src_indices(src_indices, shape_in, shape_out, size_out):
     if len(shape_out) == 1 or shape_in == src_indices.shape:
         return convert_neg(src_indices.ravel(), size_out)
 
-    entries = [list(range(x)) for x in shape_in]
-    cols = np.vstack([src_indices[i] for i in product(*entries)])
+    cols = np.vstack([src_indices[i] for i in product(*[list(range(x)) for x in shape_in])])
     dimidxs = [convert_neg(cols[:, i], shape_out[i]) for i in range(cols.shape[1])]
     return np.ravel_multi_index(dimidxs, shape_out)
 
@@ -622,7 +628,7 @@ def dv_abs_complex(x, x_deriv):
     return x, x_deriv
 
 
-def rand_sparsity(shape, density_ratio, dtype=bool):
+def rand_sparsity(shape, density_ratio, dtype=bool, rng=None):
     """
     Return a random COO matrix of the given shape with given percent density.
 
@@ -637,6 +643,8 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
         Approximate ratio of nonzero to zero entries in the desired matrix.
     dtype : type
         Specifies type of the values in the returned matrix.
+    rng : np.random.Generator or None
+        Random number generator.
 
     Returns
     -------
@@ -645,13 +653,16 @@ def rand_sparsity(shape, density_ratio, dtype=bool):
     """
     assert len(shape) == 2, f"shape must be a size 2 tuple but {shape} was given"
 
+    if rng is None:
+        rng = np.random.default_rng()
+
     nrows, ncols = shape
 
     nnz = int(nrows * ncols * density_ratio)
 
     data = np.ones(nnz, dtype=dtype)
-    rows = np.random.randint(0, nrows, nnz)
-    cols = np.random.randint(0, ncols, nnz)
+    rows = rng.integers(0, nrows, nnz)
+    cols = rng.integers(0, ncols, nnz)
 
     coo = coo_matrix((data, (rows, cols)), shape=shape)
 
@@ -902,9 +913,7 @@ def convert_ndarray_to_support_nans_in_json(val):
     val = np.asarray(val)
 
     # do a quick check for any nans or infs and if not we can avoid the slow check
-    nans = np.where(np.isnan(val))
-    infs = np.where(np.isinf(val))
-    if nans[0].size == 0 and infs[0].size == 0:
+    if not (np.any(np.isnan(val)) or np.any(np.isinf(val))):
         return val.tolist()
 
     val_as_list = val.tolist()
@@ -936,9 +945,12 @@ else:
     @numba.jit(nopython=True, nogil=True)
     def allclose(a, b, rtol=3e-16, atol=3e-16):
         """
-        Return True if all elements of a and b are close within the given absolute tolerance.
+        Return True if all elements of a and b pass a tolerance check.
 
-        Returns when the first non-close element is found.  a and b must have the same size.
+        The tolerance check is:
+            abs(a - b) <= atol + rtol * abs(b)
+
+        Returns when the first non-close element is found.
 
         Parameters
         ----------
@@ -957,28 +969,22 @@ else:
             True if all elements of a and b are close within the given absolute and
             relative tolerance.
         """
-        for i in range(len(a)):
-            aval = a[i]
-            bval = b[i]
+        if a.size != b.size:
+            return False
 
-            absdiff = aval - bval
-            if absdiff < 0.:
-                absdiff = -absdiff
+        for aval, bval in zip(a, b):
+            abs_err = aval - bval
 
-            if aval < 0.:
-                aval = -aval
+            if abs_err < 0.:
+                abs_err = -abs_err
+
+            if abs_err > atol:
+                return False
+
             if bval < 0.:
                 bval = -bval
 
-            if aval < bval:
-                vmax = rtol * bval
-            else:
-                vmax = rtol * aval
-
-            if atol > vmax:
-                vmax = atol
-
-            if absdiff > vmax:
+            if abs_err > atol + rtol * bval:
                 return False
 
         return True
@@ -1051,44 +1057,6 @@ def submat_sparsity_iter(row_var_size_iter, col_var_size_iter, nzrows, nzcols, s
             yield (of, wrt, submat.row, submat.col, submat.shape)
 
 
-def idxs2minmax_tuples(idxs):
-    """
-    Convert a flat array of indices into a list of contiguous (min, max) tuples.
-
-    Note that to convert these tuples to slices or ranges, you would use slice(min, max+1)
-    or range(min, max+1).
-
-    Parameters
-    ----------
-    idxs : ndarray
-        Array of indices.
-
-    Returns
-    -------
-    list
-        List of contiguous ranges.
-    """
-    # TODO: make a fast version of this using numba or cython
-    ranges = []
-    if idxs.size > 0:
-        # handle negative indices
-        if np.min(idxs) < 0:
-            idxs = idxs.copy()
-            idxs[idxs < 0] += idxs.size
-        idxs = np.sort(idxs)
-        diff = np.empty(idxs.size, dtype=int)
-        diff[0] = 1
-        diff[1:] = np.diff(idxs)
-        range_bounds = np.nonzero(diff > 1)[0]
-        start = 0
-        for end in range_bounds:
-            ranges.append((idxs[start], idxs[end - 1]))
-            start = end
-        ranges.append((idxs[start], idxs[-1]))
-
-    return ranges
-
-
 def safe_norm(arr):
     """
     Return the norm of the given array, or 0 if the array is None or empty.
@@ -1104,3 +1072,76 @@ def safe_norm(arr):
         Norm of the array or 0 if the array is None or empty.
     """
     return 0. if arr is None or arr.size == 0 else np.linalg.norm(arr)
+
+
+def get_tol_violation(x, ref, atol=0.0, rtol=1e-5):
+    """
+    Compute the max tolerance violation of the difference between x and ref.
+
+    tolerance violation is defined as:
+
+        abs(x - ref) - (atol + rtol * abs(ref))
+
+    If the result is positive, then the tolerance is violated.
+
+    Parameters
+    ----------
+    x : ndarray
+        The test array.
+    ref : ndarray
+        The reference array.
+    atol : float
+        The absolute tolerance.
+    rtol : float
+        The relative tolerance.
+
+    Returns
+    -------
+    tuple
+        Max_error, (max_x_location, max_ref_location), above_tolerance.
+    """
+    abs_error = np.abs(x - ref)
+    if abs_error.size == 0:
+        return 0.0, (0, 0), False, 0.0, 0.0
+
+    mixed_atol_rtol = atol + rtol * np.abs(ref)
+    diff = abs_error - mixed_atol_rtol  # any values > 0 violate tolerance check
+
+    max_error_idx = np.argmax(diff)
+    max_error = diff.flat[max_error_idx]
+    max_error_x = x.flat[max_error_idx]
+    max_error_ref = ref.flat[max_error_idx]
+    abs_at_max = abs_error.flat[max_error_idx]
+    if max_error_ref:
+        rel_at_max = abs_at_max / np.abs(max_error_ref)
+    else:
+        rel_at_max = np.inf
+
+    return max_error, (max_error_x, max_error_ref), np.any(diff > 0.), abs_at_max, rel_at_max
+
+
+_unsigned = (np.uint8, np.uint16, np.uint32, np.uint64)
+_signed = (np.int8, np.int16, np.int32, np.int64)
+
+
+def get_index_dtype(size, allow_negative=False):
+    """
+    Return the dtype of the index array for the given size.
+
+    Parameters
+    ----------
+    size : int
+        The size of the array.
+    allow_negative : bool
+        If True, allow negative indices.
+
+    Returns
+    -------
+    dtype
+        The dtype of the index array.
+    """
+    dtypes = _signed if allow_negative else _unsigned
+    for dtype in dtypes:
+        if size <= np.iinfo(dtype).max + 1:
+            return dtype
+    raise ValueError(f"size {size} is too large to be represented as an index")

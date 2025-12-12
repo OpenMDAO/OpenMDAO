@@ -1,22 +1,13 @@
 """LinearSolver that uses PetSC KSP to solve for a system's derivatives."""
 
+from importlib.util import find_spec
+import importlib.metadata as ilmd
 import numpy as np
 
 from openmdao.solvers.solver import LinearSolver
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 from openmdao.utils.mpi import check_mpi_env
 
-use_mpi = check_mpi_env()
-if use_mpi is not False:
-    try:
-        import petsc4py
-        from petsc4py import PETSc
-    except ImportError:
-        PETSc = None
-        if use_mpi is True:
-            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
-else:
-    PETSc = None
 
 KSP_TYPES = [
     "richardson",
@@ -100,17 +91,14 @@ def _get_petsc_vec_array_old(vec):
     return vec.getArray()
 
 
-if PETSc:
-    try:
-        petsc_version = petsc4py.__version__
-    except AttributeError:  # hack to fix doc-tests
-        petsc_version = "3.5"
-
-
-if PETSc and int((petsc_version).split('.')[1]) >= 6:
-    _get_petsc_vec_array = _get_petsc_vec_array_new
+if find_spec('petsc4py') is not None:
+    petsc_version = ilmd.version('petsc4py')
+    if int(petsc_version.split('.')[1]) >= 6:
+        _get_petsc_vec_array = _get_petsc_vec_array_new
+    else:
+        _get_petsc_vec_array = _get_petsc_vec_array_old
 else:
-    _get_petsc_vec_array = _get_petsc_vec_array_old
+    petsc_version = '3.5'
 
 
 class Monitor(object):
@@ -180,6 +168,8 @@ class PETScKrylov(LinearSolver):
         Dictionary of KSP instances (keyed on vector name).
     _lin_rhs_checker : LinearRHSChecker or None
         Object for checking the right-hand side of the linear solve.
+    _PETSc : <petsc4py.PETSc>
+        Lazily imported petsc4py.PETSc module.
     """
 
     SOLVER = 'LN: PETScKrylov'
@@ -190,7 +180,19 @@ class PETScKrylov(LinearSolver):
         """
         super().__init__(**kwargs)
 
-        if PETSc is None:
+        use_mpi = check_mpi_env()
+        if use_mpi is not False:
+            try:
+                from petsc4py import PETSc
+                self._PETSc = PETSc
+            except ImportError:
+                self._PETSc = None
+                if use_mpi is True:
+                    raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
+        else:
+            self._PETSc = None
+
+        if self._PETSc is None:
             raise RuntimeError(f"{self.msginfo}: PETSc is not available. "
                                "Set shell variable OPENMDAO_USE_MPI=1 to detect earlier.")
 
@@ -231,10 +233,10 @@ class PETScKrylov(LinearSolver):
         Return a generator of linear solvers using assembled jacs.
         """
         if self.options['assemble_jac']:
-            yield self
+            yield self, self.preferred_sparse_format()
         if self.precon is not None:
-            for s in self.precon._assembled_jac_solver_iter():
-                yield s
+            for tup in self.precon._assembled_jac_solver_iter():
+                yield tup
 
     def use_relevance(self):
         """
@@ -246,6 +248,26 @@ class PETScKrylov(LinearSolver):
             True if relevance should be active.
         """
         return False
+
+    def check_config(self, logger):
+        """
+        Perform optional error checks.
+
+        Parameters
+        ----------
+        logger : object
+            The object that manages logging output.
+        """
+        if self.options['rhs_checking'] is False:
+            system = self._system()
+            redundant_adj = system.pathname in system._relevance.get_redundant_adjoint_systems()
+            if redundant_adj:
+                logger.info(
+                    f"\n'rhs_checking' is disabled for '{system.linear_solver.msginfo}'"
+                    ", but that solver has redundant adjoint solves. If it is "
+                    "expensive to compute derivatives for this solver, turning on "
+                    "'rhs_checking' may improve performance.\n"
+                )
 
     def _setup_solvers(self, system, depth):
         """
@@ -322,7 +344,7 @@ class PETScKrylov(LinearSolver):
 
         # apply linear
         scope_out, scope_in = system._get_matvec_scope()
-        system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
+        system._apply_linear(self._mode, scope_out, scope_in)
 
         # stuff resulting value of b vector into result for KSP
         result.array[:] = b_vec.asarray()
@@ -395,8 +417,8 @@ class PETScKrylov(LinearSolver):
         sol_array = x_vec.asarray(copy=True)
 
         # create PETSc vectors from numpy arrays
-        sol_petsc_vec = PETSc.Vec().createWithArray(sol_array, comm=system._comm)
-        rhs_petsc_vec = PETSc.Vec().createWithArray(rhs_array, comm=system._comm)
+        sol_petsc_vec = self._PETSc.Vec().createWithArray(sol_array, comm=system._comm)
+        rhs_petsc_vec = self._PETSc.Vec().createWithArray(rhs_array, comm=system._comm)
 
         # run PETSc solver
         self._iter_count = 0
@@ -417,7 +439,7 @@ class PETScKrylov(LinearSolver):
         sol_petsc_vec = rhs_petsc_vec = None
 
         if not system.under_complex_step and self._lin_rhs_checker is not None and mode == 'rev':
-            self._lin_rhs_checker.add_solution(rhs_array, sol_array, copy=False)
+            self._lin_rhs_checker.add_solution(rhs_array, sol_array, system, copy=False)
 
     def apply(self, mat, in_vec, result):
         """
@@ -485,20 +507,20 @@ class PETScKrylov(LinearSolver):
         lsize = np.sum(system._var_sizes['output'][iproc, :])
         size = np.sum(system._var_sizes['output'])
 
-        jac_mat = PETSc.Mat().createPython([(lsize, size), (lsize, size)],
-                                           comm=system.comm)
+        jac_mat = self._PETSc.Mat().createPython([(lsize, size), (lsize, size)],
+                                                 comm=system.comm)
         jac_mat.setPythonContext(self)
         jac_mat.setUp()
 
-        ksp = self._ksp = PETSc.KSP().create(comm=system.comm)
+        ksp = self._ksp = self._PETSc.KSP().create(comm=system.comm)
 
         ksp.setOperators(jac_mat)
         ksp.setType(self.options['ksp_type'])
         ksp.setGMRESRestart(self.options['restart'])
         if self.options['precon_side'] == 'left':
-            ksp.setPCSide(PETSc.PC.Side.LEFT)
+            ksp.setPCSide(self._PETSc.PC.Side.LEFT)
         else:
-            ksp.setPCSide(PETSc.PC.Side.RIGHT)
+            ksp.setPCSide(self._PETSc.PC.Side.RIGHT)
         ksp.setMonitor(Monitor(self))
         ksp.setInitialGuessNonzero(True)
 
@@ -507,3 +529,14 @@ class PETScKrylov(LinearSolver):
         pc_mat.setPythonContext(self)
 
         return ksp
+
+    def preferred_sparse_format(self):
+        """
+        Return the preferred sparse format for the dr/do matrix of a split jacobian.
+
+        Returns
+        -------
+        str
+            The preferred sparse format for the dr/do matrix of a split jacobian.
+        """
+        return 'csr'

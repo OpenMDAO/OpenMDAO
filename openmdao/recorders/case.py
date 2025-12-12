@@ -174,7 +174,10 @@ class Case(object):
 
         if 'jacobian' in data.keys():
             if data_format >= 2:
-                jacobian = blob_to_array(data['jacobian'])
+                if isinstance(data['jacobian'], dict):
+                    jacobian = data['jacobian']
+                else:
+                    jacobian = blob_to_array(data['jacobian'])
                 if type(jacobian) is np.ndarray and not jacobian.shape:
                     jacobian = None
             else:
@@ -308,6 +311,10 @@ class Case(object):
         elif name in prom2abs['input']:
             abs_name = prom2abs['input'][name][0]
             return meta[self._conns[abs_name]]['units']
+
+        elif name in self._var_info:
+            # This can happen if name is an alias.
+            return self._var_info[name]['units']
 
         raise KeyError('Variable name "{}" not found.'.format(name))
 
@@ -547,6 +554,7 @@ class Case(object):
                   out_stream=_DEFAULT_OUT_STREAM,
                   print_min=False,
                   print_max=False,
+                  print_mean=False,
                   return_format='list'):
         """
         Write a list of inputs and outputs sorted by component in execution order.
@@ -608,6 +616,8 @@ class Case(object):
             When true, if the output value is an array, print its smallest value.
         print_max : bool
             When true, if the output value is an array, print its largest value.
+        print_mean : bool
+            When true, if the output value is an array, print its mean value.
         return_format : str
             Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
             If 'list', the return value is a list of (name, metadata) tuples.
@@ -657,6 +667,9 @@ class Case(object):
                         if print_max:
                             meta['max'] = np.round(np.max(meta['val']), np_precision)
 
+                        if print_mean:
+                            meta['mean'] = np.round(np.mean(meta['val']), np_precision)
+
                 if residuals or residuals_tol:
                     if self.residuals is None:
                         meta['resids'] = 'Not Recorded'
@@ -696,6 +709,9 @@ class Case(object):
 
                     if print_max:
                         meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+                    if print_mean:
+                        meta['mean'] = np.round(np.mean(meta['val']), np_precision)
 
         # combine inputs and outputs create return value
         var_dict = inputs
@@ -747,6 +763,7 @@ class Case(object):
                     out_stream=_DEFAULT_OUT_STREAM,
                     print_min=False,
                     print_max=False,
+                    print_mean=False,
                     return_format='list'):
         """
         Return and optionally log a list of input names and other optional information.
@@ -801,6 +818,8 @@ class Case(object):
             When true, if the input value is an array, print its smallest value.
         print_max : bool, optional
             When true, if the input value is an array, print its largest value.
+        print_mean : bool, optional
+            When true, if the input value is an array, print its mean value.
         return_format : str
             Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
             If 'list', the return value is a list of (name, metadata) tuples.
@@ -837,6 +856,8 @@ class Case(object):
                         meta['min'] = np.round(np.min(var_val), np_precision)
                     if print_max:
                         meta['max'] = np.round(np.max(var_val), np_precision)
+                    if print_mean:
+                        meta['mean'] = np.round(np.mean(var_val), np_precision)
 
         if out_stream:
             if self.inputs:
@@ -885,6 +906,7 @@ class Case(object):
                      out_stream=_DEFAULT_OUT_STREAM,
                      print_min=False,
                      print_max=False,
+                     print_mean=False,
                      return_format='list'):
         """
         Return and optionally log a list of output names and other optional information.
@@ -955,6 +977,8 @@ class Case(object):
             When true, if the output value is an array, print its smallest value.
         print_max : bool, optional
             When true, if the output value is an array, print its largest value.
+        print_mean : bool, optional
+            When true, if the output value is an array, print its mean value.
         return_format : str
             Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
             If 'list', the return value is a list of (name, metadata) tuples.
@@ -1006,6 +1030,9 @@ class Case(object):
 
                         if print_max:
                             meta['max'] = np.round(np.max(meta['val']), np_precision)
+
+                        if print_mean:
+                            meta['mean'] = np.round(np.mean(meta['val']), np_precision)
 
                 if residuals or residuals_tol:
                     if self.residuals is None:
@@ -1156,12 +1183,14 @@ class Case(object):
 
             if var_type in abs2meta[src]['type']:
                 try:
-                    val = self.outputs[src].copy()
+                    val = self.outputs[src]
                 except KeyError:
                     # not recorded
                     continue
+                if isinstance(val, np.ndarray):
+                    val = val.copy()
                 if use_indices and meta['indices'] is not None:
-                    val = val[meta['indices']]
+                    val = val.ravel()[meta['indices']]
                 if scaled:
                     if meta['total_adder'] is not None:
                         val += meta['total_adder']

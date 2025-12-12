@@ -1,3 +1,4 @@
+from importlib.util import find_spec
 import unittest
 import numpy as np
 
@@ -7,12 +8,14 @@ from openmdao.test_suite.components.exec_comp_for_test import ExecComp4Test
 from openmdao.test_suite.components.sellar import SellarDis1withDerivatives, SellarDis2withDerivatives
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
-from openmdao.drivers.pyoptsparse_driver import pyoptsparse
 
 try:
     from openmdao.parallel_api import PETScVector
 except ImportError:
     PETScVector = None
+
+
+has_pyoptsparse = find_spec('pyoptsparse') is not None
 
 
 class MissingPartialsComp(om.ExplicitComponent):
@@ -564,10 +567,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 16)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 16)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 16)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 13)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 13)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 13)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 13)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -600,10 +603,10 @@ class TestPrePostIter(unittest.TestCase):
         self.assertEqual(prob.model.pre1.num_nl_solves, 1)
         self.assertEqual(prob.model.pre2.num_nl_solves, 1)
 
-        self.assertEqual(prob.model.iter1.num_nl_solves, 16)
-        self.assertEqual(prob.model.iter2.num_nl_solves, 16)
-        self.assertEqual(prob.model.iter3.num_nl_solves, 16)
-        self.assertEqual(prob.model.iter4.num_nl_solves, 16)
+        self.assertEqual(prob.model.iter1.num_nl_solves, 13)
+        self.assertEqual(prob.model.iter2.num_nl_solves, 13)
+        self.assertEqual(prob.model.iter3.num_nl_solves, 13)
+        self.assertEqual(prob.model.iter4.num_nl_solves, 13)
 
         self.assertEqual(prob.model.post1.num_nl_solves, 1)
         self.assertEqual(prob.model.post2.num_nl_solves, 1)
@@ -771,7 +774,7 @@ class TestPrePostIter(unittest.TestCase):
 
 
 @use_tempdirs
-@unittest.skipUnless(pyoptsparse, "pyoptsparse is required.")
+@unittest.skipUnless(has_pyoptsparse, "pyoptsparse is required.")
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class PrePostMPITestCase(unittest.TestCase):
     N_PROCS = 2

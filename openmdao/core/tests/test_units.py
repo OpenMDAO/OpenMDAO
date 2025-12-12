@@ -3,7 +3,7 @@
 import unittest
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_partials
 from openmdao.test_suite.components.unit_conv import UnitConvGroup, SrcComp, TgtCompC, TgtCompF, \
     TgtCompK, SrcCompFD, TgtCompCFD, TgtCompFFD, TgtCompKFD, TgtCompFMulti
 
@@ -115,12 +115,7 @@ class TestUnitConversion(unittest.TestCase):
         assert_near_equal(J['tgtK.x3', 'px1.x1'][0][0], 1.0, 1e-6)
 
         # Make sure check partials handles conversion
-        data = prob.check_partials(out_stream=None)
-
-        for key1, val1 in data.items():
-            for key2, val2 in val1.items():
-                assert_near_equal(val2['abs error'][0], 0.0, 1e-6)
-                assert_near_equal(val2['rel error'][0], 0.0, 1e-6)
+        assert_check_partials(prob.check_partials(out_stream=None))
 
     def test_basic_apply(self):
         """Test that output values and total derivatives are correct."""
@@ -241,13 +236,8 @@ class TestUnitConversion(unittest.TestCase):
         assert_near_equal(J['tgtK.x3']['x1'][0][0], 1.0, 1e-6)
 
         # Make sure check partials handles conversion
-        data = prob.check_partials(out_stream=None, step=1.1e-6) # Need to make step different
+        assert_check_partials(prob.check_partials(out_stream=None, step=1.1e-6)) # Need to make step different
         #  than for compute, otherwise get error
-
-        for key1, val1 in data.items():
-            for key2, val2 in val1.items():
-                assert_near_equal(val2['abs error'][0], 0.0, 1e-6)
-                assert_near_equal(val2['rel error'][0], 0.0, 1e-6)
 
     def test_bad_units(self):
         """Test error handling when invalid units are declared."""
@@ -285,6 +275,7 @@ class TestUnitConversion(unittest.TestCase):
 
         with assert_warning(UserWarning, msg):
             prob.setup()
+            prob.final_setup()
 
     def test_basic_implicit_conn(self):
         """Test units with all implicit connections."""
@@ -574,6 +565,7 @@ class TestUnitConversion(unittest.TestCase):
         prob.model.connect('src.x2', 'dest.x2')
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'incompatible_connections':"
@@ -586,6 +578,7 @@ class TestUnitConversion(unittest.TestCase):
         prob.model.add_subsystem('dest', BadComp(),promotes=['x2'])
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'incompatible_connections2':"
@@ -919,12 +912,13 @@ class TestUnitConversion(unittest.TestCase):
         # trying to convert J/s/s to m/s**2 should cause Incompatible units TypeError exception
         with self.assertRaises(Exception) as e:
             p.setup()
+            p.final_setup()
+
         self.assertEqual(str(e.exception),
            "\nCollected errors for problem 'promotes_non_equivalent_units':"
            "\n   <model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted "
            "to 'x', are connected but their metadata entries ['units', 'val'] differ. "
-           "Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the Group "
-           "named 'G1' to remove the ambiguity."
+           "Call model.set_input_defaults('x', units=?, val=?) to remove the ambiguity."
            "\n   <model> <class Group>: Output units of 'J/s**2' for '_auto_ivc.v0' are "
            "incompatible with input units of 'm/s**2' for 'G1.C2.x'.")
 

@@ -1,0 +1,162 @@
+name: Install Optional Dependencies
+description: 'Install optional dependencies for testing/coverage'
+inputs:
+  matrix_name:
+    description: 'Name of the matrix job'
+    required: true
+  use_snopt:
+    description: '"true" or "false" depending on whether SNOPT is being used.'
+    required: false
+  SECRET_docs_location:
+    description: 'Location to which the docs should be published'
+    required: false
+  SECRET_slack_webhook_url:
+    description: 'URL for posting version build failure to slack'
+    required: false
+  publish:
+    description: '"true" if docs should be uploaded.'
+    required: false
+  use_pixi:
+    description: '"true" if the pixi environment should be used, otherwise use conda.'
+    required: false
+    default: 'false'
+  pixi_env:
+    description: 'The name of the pixi environment to use.'
+    required: false
+    default: 'dev'
+runs:
+  using: 'composite'
+  steps:
+
+    - name: Log inputs
+      shell: bash -l {0}
+      run: |
+        echo "===== Composite Action Inputs ====="
+        echo "matrix_name: ${{ inputs.matrix_name }}"
+        echo "use_snopt: ${{ inputs.use_snopt }}"
+        echo "publish: ${{ inputs.publish }}"
+        echo "=================================="
+
+    - name: Build docs
+      id: build_docs
+      continue-on-error: true
+      env:
+        PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
+        OMPI_MCA_rmaps_base_oversubscribe: "1"
+      shell: bash -l {0}
+      run: |
+        eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
+
+        set +e           # Don't exit on error
+        set -o pipefail  # But catch pipeline failures
+
+        export OPENMDAO_REPORTS=0
+        export PYDEVD_DISABLE_FILE_VALIDATION=1
+
+        BUILD_FAILED=0
+
+        # Cleanup function
+        cleanup() {
+          echo "Stopping ipcluster..."
+          pkill -f ipcluster || true
+        }
+        trap cleanup EXIT
+
+        # Helper function to track failures
+        run_and_track() {
+          echo "Running: $*"
+          "$@"
+          local exit_code=$?
+          if [ $exit_code -ne 0 ]; then
+            echo "❌ Command failed with exit code $exit_code"
+            BUILD_FAILED=1
+          fi
+          return $exit_code
+        }
+
+        cd openmdao/docs
+
+        run_and_track python openmdao_book/other/disable_snopt_cells.py
+
+        # Start ipcluster and wait for it to be ready
+        run_and_track ./ipcluster_start.sh
+        echo "Waiting for ipcluster to be ready..."
+        sleep 12
+
+        echo "============================================================="
+        echo "Build the docs"
+        echo "============================================================="
+        run_and_track python build_source_docs.py
+        run_and_track jupyter-book build -W --keep-going openmdao_book
+        run_and_track python copy_build_artifacts.py
+
+        # Exit with failure if any command failed
+        exit $BUILD_FAILED
+
+    - name: Display doc build reports
+      if: steps.build_docs.outcome == 'failure'
+      shell: bash -l {0}
+      run: |
+        echo ""
+        echo "============================================================="
+        echo "Log files from reports directory"
+        echo "============================================================="
+        if [ -d /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports ]; then
+          for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log' 2>/dev/null); do
+            echo "============================================================="
+            echo $f
+            echo "============================================================="
+            cat $f
+          done
+        else
+          echo "No jupyter-book reports directory found"
+        fi
+        exit 1
+
+    - name: Archive built docs
+      if: steps.build_docs.outcome == 'success'
+      uses: actions/upload-artifact@v4
+      with:
+        name: built-docs-artifact
+        path: openmdao/docs/openmdao_book/_build/html
+        retention-days: 1
+
+    - name: Publish docs
+      if: github.event_name != 'pull_request' && inputs.publish == 'true' && inputs.SECRET_docs_location != ''
+      shell: bash -l {0}
+      run: |
+        if [[ "${#DOCS_LOCATION}" ]]; then
+          echo "============================================================="
+          echo "Create env with openssl compatible with hosting service"
+          echo "============================================================="
+          conda create -n upload python=3.11 packaging openssl=3
+          conda activate upload
+
+          echo "============================================================="
+          echo "Publish docs"
+          echo "============================================================="
+          cd openmdao/docs
+          python upload_doc_version.py openmdao_book/_build/html/ ${{ inputs.SECRET_docs_location }}
+        else
+          echo "Docs destination not available."
+        fi
+
+    - name: Slack doc build failure
+      if: steps.build_docs.outcome == 'failure'
+      uses: act10ns/slack@v2.0.0
+      with:
+        webhook-url: ${{ inputs.SECRET_slack_webhook_url }}
+        status: ${{ steps.build_docs.outcome }}
+        message: |
+          Doc build failed on `${{ inputs.matrix_name }}` build.
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Fail the workflow if doc build failed
+      if: steps.build_docs.outcome == 'failure'
+      uses: actions/github-script@v8
+      with:
+        script: |
+            let docs_fail = ${{ steps.build_docs.outcome == 'failure' }};
+            if (docs_fail) {
+                core.setFailed('Doc build failed.');
+            }

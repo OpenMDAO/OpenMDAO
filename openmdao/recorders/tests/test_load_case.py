@@ -519,7 +519,7 @@ class TestLoadCase(unittest.TestCase):
 
         # check 'use_indices' option, default is to use indices
         dvs = case.get_design_vars()
-        assert_near_equal(dvs['x'], x_vals[[0, 3]], 1e-12)
+        assert_near_equal(dvs['x'], x_vals.ravel()[[0, 3]], 1e-12)
 
         dvs = case.get_design_vars(use_indices=False)
         assert_near_equal(dvs['x'], x_vals, 1e-12)

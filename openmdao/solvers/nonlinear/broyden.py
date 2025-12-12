@@ -168,28 +168,29 @@ class BroydenSolver(NonlinearSolver):
         # self._disallow_distrib_solve()
 
         states = self.options['state_vars']
-        prom2abs = system._var_allprocs_prom2abs_list['output']
+        is_prom = system._resolver.is_prom
 
         # Check names of states.
-        bad_names = [name for name in states if name not in prom2abs]
+        bad_names = [name for name in states if not is_prom(name, 'output')]
         if len(bad_names) > 0:
             msg = "{}: The following variable names were not found: {}"
             raise ValueError(msg.format(self.msginfo, ', '.join(bad_names)))
 
         # Size linear system
         if len(states) > 0:
+            prom2abs = system._resolver.prom2abs
             # User has specified states, so we must size them.
             n = 0
             meta = system._var_allprocs_abs2meta['output']
 
-            for i, name in enumerate(states):
-                size = meta[prom2abs[name][0]]['global_size']
+            for name in states:
+                size = meta[prom2abs(name, 'output')]['global_size']
                 self._idx[name] = (n, n + size)
                 n += size
         else:
             # Full system size.
             self._full_inverse = True
-            n = np.sum(system._owned_sizes)
+            n = np.sum(system._owned_output_sizes)
 
         self.size = n
         self.Gm = np.empty((n, n))
@@ -229,7 +230,9 @@ class BroydenSolver(NonlinearSolver):
 
         all_states = []
         sys_recurse(system, all_states)
-        all_states = [system._var_abs2prom['output'][name] for name in all_states]
+        abs2prom = system._resolver.abs2prom
+        is_local = system._resolver.is_local
+        all_states = [abs2prom(name, 'output') for name in all_states if is_local(name, 'output')]
 
         missing = set(all_states).difference(states)
         if len(missing) > 0:
@@ -243,10 +246,10 @@ class BroydenSolver(NonlinearSolver):
         Return a generator of linear solvers using assembled jacs.
         """
         if self.linear_solver is not None:
-            for s in self.linear_solver._assembled_jac_solver_iter():
-                yield s
+            for tup in self.linear_solver._assembled_jac_solver_iter():
+                yield tup
 
-    def _set_solver_print(self, level=2, type_='all'):
+    def _set_solver_print(self, level=2, type_='all', debug_print=None):
         """
         Control printing for solvers and subsolvers in the model.
 
@@ -258,14 +261,17 @@ class BroydenSolver(NonlinearSolver):
             except for failures, and set to -1 to disable all printing including failures.
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        debug_print : bool or None
+            If None, leave solver debug printing unchanged, otherwise turn if on or off
+            depending on whether debug_print is True or False.
         """
-        super()._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_, debug_print=debug_print)
 
         if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
 
         if self.linesearch is not None:
-            self.linesearch._set_solver_print(level=level, type_=type_)
+            self.linesearch._set_solver_print(level=level, type_=type_, debug_print=debug_print)
 
     def _linearize(self):
         """
@@ -290,8 +296,8 @@ class BroydenSolver(NonlinearSolver):
         """
         system = self._system()
         if self.options['debug_print']:
-            self._err_cache['inputs'] = system._inputs._copy_views()
-            self._err_cache['outputs'] = system._outputs._copy_views()
+            self._err_cache['inputs'] = system._inputs._copy_vars()
+            self._err_cache['outputs'] = system._outputs._copy_vars()
 
         # Convert local storage if we are under complex step.
         if system.under_complex_step:
@@ -299,9 +305,9 @@ class BroydenSolver(NonlinearSolver):
             self.xm = self.xm.astype(complex)
             self.fxm = self.fxm.astype(complex)
         elif np.iscomplexobj(self.xm):
-            self.Gm = self.Gm.real
-            self.xm = self.xm.real
-            self.fxm = self.fxm.real
+            self.Gm = np.ascontiguousarray(self.Gm.real)
+            self.xm = np.ascontiguousarray(self.xm.real)
+            self.fxm = np.ascontiguousarray(self.fxm.real)
 
         self._converge_failures = 0
         self._computed_jacobians = 0
@@ -567,10 +573,7 @@ class BroydenSolver(NonlinearSolver):
         try:
             # Linearize model.
             ln_solver = self.linear_solver
-            my_asm_jac = ln_solver._assembled_jac
-            system._linearize(my_asm_jac, sub_do_ln=ln_solver._linearize_children())
-            if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
-                my_asm_jac._update(system)
+            system._linearize(sub_do_ln=ln_solver._linearize_children())
             self._linearize()
 
             for wrt_name in states:
@@ -578,11 +581,16 @@ class BroydenSolver(NonlinearSolver):
                 if wrt_name in d_res:
                     d_wrt = d_res[wrt_name]
 
+                is_scalar = d_wrt.shape == ()
+
                 for j in range(j_wrt - i_wrt):
 
                     # Increment each variable.
                     if wrt_name in d_res:
-                        d_wrt[j] = 1.0
+                        if is_scalar:
+                            d_res[wrt_name] = 1.0
+                        else:
+                            d_wrt[j] = 1.0
 
                     # Solve for total derivatives.
                     ln_solver.solve('fwd')
@@ -593,7 +601,10 @@ class BroydenSolver(NonlinearSolver):
                         inv_jac[i_of:j_of, i_wrt + j] = d_out[of_name]
 
                     if wrt_name in d_res:
-                        d_wrt[j] = 0.0
+                        if is_scalar:
+                            d_res[wrt_name] = 0.0
+                        else:
+                            d_wrt[j] = 0.0
         finally:
             # Enable local fd
             system._owns_approx_jac = approx_status
@@ -621,10 +632,7 @@ class BroydenSolver(NonlinearSolver):
             # Linearize model.
             ln_solver = self.linear_solver
             do_sub_ln = ln_solver._linearize_children()
-            my_asm_jac = ln_solver._assembled_jac
-            system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
-            if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
-                my_asm_jac._update(system)
+            system._linearize(sub_do_ln=do_sub_ln)
 
             inv_jac = self.linear_solver._inverse()
         finally:

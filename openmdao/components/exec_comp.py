@@ -9,7 +9,6 @@ from numpy import ndarray, imag
 
 from openmdao.core.system import _DEFAULT_COLORING_META
 from openmdao.utils.coloring import _ColSparsityJac, _compute_coloring
-from openmdao.core.constants import INT_DTYPE
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.units import valid_units
 from openmdao.utils import cs_safe
@@ -24,11 +23,13 @@ VAR_RGX = re.compile(r'([.]*[_a-zA-Z]\w*[ ]*\(?)')
 _allowed_meta = {'value', 'val', 'shape', 'units', 'res_units', 'desc',
                  'ref', 'ref0', 'res_ref', 'lower', 'upper', 'src_indices',
                  'flat_src_indices', 'tags', 'shape_by_conn', 'copy_shape', 'compute_shape',
+                 'units_by_conn', 'copy_units', 'compute_units',
                  'constant'}
 
 # Names that are not allowed for input or output variables (keywords for options)
-_disallowed_names = {'has_diag_partials', 'units', 'shape', 'shape_by_conn', 'run_root_only',
-                     'constant', 'do_coloring'}
+_option_names = {'has_diag_partials', 'units', 'shape', 'default_shape', 'shape_by_conn',
+                 'run_root_only', 'constant', 'do_coloring', 'assembled_jac_type', 'derivs_method',
+                 'distributed', 'always_opt', 'use_jit'}
 
 
 def check_option(option, value):
@@ -212,7 +213,7 @@ class ExecComp(ExplicitComponent):
                                  'units': 'ft'})
         """
         options = {}
-        for name in _disallowed_names:
+        for name in _option_names:
             if name in kwargs:
                 options[name] = kwargs.pop(name)
 
@@ -295,7 +296,7 @@ class ExecComp(ExplicitComponent):
         if name in _expr_dict:
             raise NameError(f"{cls.__name__}: '{name}' has already been registered.")
 
-        if name in _disallowed_names:
+        if name in _option_names:
             raise NameError(f"{cls.__name__}: cannot register name '{name}' because "
                             "it's a reserved keyword.")
 
@@ -433,12 +434,14 @@ class ExecComp(ExplicitComponent):
                                            "variable '%s', but shape of %s has been "
                                            "specified for the entire component." %
                                            (self.msginfo, vshape, varname, shape))
-                    elif vval is not None and np.atleast_1d(vval).shape != shape:
-                        raise RuntimeError("%s: value of shape %s has been specified for "
-                                           "variable '%s', but shape of %s has been "
-                                           "specified for the entire component." %
-                                           (self.msginfo, np.atleast_1d(vval).shape,
-                                            varname, shape))
+                    elif vval is not None:
+                        if (shape and np.atleast_1d(vval).shape != shape) or \
+                           (not shape and np.asarray(vval).shape != shape):
+                            raise RuntimeError("%s: value of shape %s has been specified for "
+                                               "variable '%s', but shape of %s has been "
+                                               "specified for the entire component." %
+                                               (self.msginfo, np.atleast_1d(vval).shape,
+                                                varname, shape))
                     else:
                         init_vals[varname] = np.ones(shape)
 
@@ -455,12 +458,14 @@ class ExecComp(ExplicitComponent):
                 if vshape is not None:
                     if varname not in init_vals:
                         init_vals[varname] = np.ones(vshape)
-                    elif np.atleast_1d(init_vals[varname]).shape != vshape:
+                    elif (vshape and np.atleast_1d(init_vals[varname]).shape != vshape) or \
+                         (vshape == () and np.asarray(init_vals[varname]).shape != vshape):
                         raise RuntimeError("%s: shape of %s has been specified for variable "
                                            "'%s', but a value of shape %s has been provided." %
                                            (self.msginfo, str(vshape), varname,
                                             str(np.atleast_1d(init_vals[varname]).shape)))
-                    del kwargs2[varname]['shape']
+                    if shape is not None:
+                        del kwargs2[varname]['shape']
             else:
                 init_vals[varname] = val
 
@@ -583,7 +588,7 @@ class ExecComp(ExplicitComponent):
         fnames = [n[:-1] for n in names if n[-1] == '(']
         to_remove = []
         for v in vnames:
-            if v in _disallowed_names:
+            if v in _option_names:
                 raise NameError("%s: cannot use variable name '%s' because "
                                 "it's a reserved keyword." % (self.msginfo, v))
             if v in _expr_dict:
@@ -704,10 +709,9 @@ class ExecComp(ExplicitComponent):
                                         "is not square (shape=(%d, %d))." %
                                         (self.msginfo, out, inp, oval.size, ival.size))
                                 # partial will be declared as diagonal
-                                inds = np.arange(oval.size, dtype=INT_DTYPE)
+                                decl_partials(of=out, wrt=inp, diagonal=True)
                             else:
-                                inds = None
-                            decl_partials(of=out, wrt=inp, rows=inds, cols=inds)
+                                decl_partials(of=out, wrt=inp)
                         else:
                             decl_partials(of=out, wrt=inp)
 
@@ -731,7 +735,7 @@ class ExecComp(ExplicitComponent):
                               f"declared so they are assumed to be zero: [{undeclared}].",
                               prefix=self.msginfo, category=DerivativesWarning)
 
-    def _setup_vectors(self, root_vectors):
+    def _setup_vectors(self, parent_vectors=None):
         """
         Compute all vectors for all vec names.
 
@@ -739,8 +743,10 @@ class ExecComp(ExplicitComponent):
         ----------
         root_vectors : dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
+        parent_vectors : dict or None
+            Parent vectors.  Same structure as root_vectors.
         """
-        super()._setup_vectors(root_vectors)
+        super()._setup_vectors(parent_vectors)
 
         if not self._use_derivatives:
             self._manual_decl_partials = True  # prevents attempts to use _viewdict in compute
@@ -779,7 +785,8 @@ class ExecComp(ExplicitComponent):
             # combine lookup dicts for faster exec calls
             viewdict = self._indict.copy()
             viewdict.update(outdict)
-            viewdict.update(self._constants)
+            viewdict.update({n: (np.atleast_1d(v), np.isscalar(v))
+                             for n, v in self._constants.items()})
             self._viewdict = _ViewDict(viewdict)
 
     def compute(self, inputs, outputs):
@@ -799,7 +806,7 @@ class ExecComp(ExplicitComponent):
                 self._inarray[:] = self._inputs.asarray(copy=False)
                 self._exec()
                 outs = outputs.asarray(copy=False)
-                if outs.dtype == self._outarray.dtype:
+                if outs.dtype.kind == self._outarray.dtype.kind:
                     outs[:] = self._outarray
                 else:
                     outs[:] = self._outarray.real
@@ -820,17 +827,18 @@ class ExecComp(ExplicitComponent):
                 raise RuntimeError(f"{self.msginfo}: Error occurred evaluating '{self._exprs[i]}':"
                                    f"\n{err}")
 
-    def _linearize(self, jac=None, sub_do_ln=False):
+    def _linearize(self, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            Ignored.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
+        super()._linearize(sub_do_ln)
+
+        # perform complex safe check
         if self._requires_fd:
             if 'fd' in self._approx_schemes:
                 fdins = {wrt.rsplit('.', 1)[1] for wrt in self._approx_schemes['fd']._wrt_meta}
@@ -845,8 +853,6 @@ class ExecComp(ExplicitComponent):
                                        f"call declare_partials('*', {sorted(diff)}, method='fd') "
                                        f"on this component prior to setup.")
             self._requires_fd = False  # only need to do this check the first time around
-
-        super()._linearize(jac, sub_do_ln)
 
     def declare_coloring(self,
                          wrt=_DEFAULT_COLORING_META['wrt_patterns'],
@@ -985,6 +991,7 @@ class ExecComp(ExplicitComponent):
 
         sparsity, sp_info = jac.get_sparsity()
         sparsity_time = time.perf_counter() - sparsity_start_time
+        self._update_subjac_sparsity(self.subjac_sparsity_iter(sparsity=sparsity))
 
         coloring = _compute_coloring(sparsity, 'fwd')
 
@@ -994,14 +1001,16 @@ class ExecComp(ExplicitComponent):
         # compute mapping of col index to wrt varname
         self._col_idx2name = idxnames = [None] * len(self._inputs)
         plen = len(self.pathname) + 1
-        for name, slc in self._inputs.get_slice_dict().items():
+        for name, start, stop in self._inputs.ranges():
             name = name[plen:]
-            for i in range(slc.start, slc.stop):
+            for i in range(start, stop):
                 idxnames[i] = name
 
         # get slice dicts using relative name keys
-        self._out_slices = {n[plen:]: slc for n, slc in self._outputs.get_slice_dict().items()}
-        self._in_slices = {n[plen:]: slc for n, slc in self._inputs.get_slice_dict().items()}
+        self._out_slices = {
+            n[plen:]: slice(start, stop) for n, start, stop in self._outputs.ranges()
+        }
+        self._in_slices = {n[plen:]: slice(start, stop) for n, start, stop in self._inputs.ranges()}
 
         return [coloring]
 
@@ -1021,7 +1030,7 @@ class ExecComp(ExplicitComponent):
         out_names = self._var_rel_names['output']
 
         inarr[:] = self._inputs.asarray(copy=False)
-        scratch = np.zeros(oarr.size)
+        scratch = np.empty(oarr.size)
         idx2name = self._col_idx2name
         out_slices = self._out_slices
         in_slices = self._in_slices
@@ -1034,16 +1043,17 @@ class ExecComp(ExplicitComponent):
             self._exec()
 
             imag_oar = imag(oarr * inv_stepsize)
+            scratch[:] = 0.
 
             for icol, rows in zip(icols, nzrowlists):
                 scratch[rows] = imag_oar[rows]
-                input_name = idx2name[icol]
-                loc_i = icol - in_slices[input_name].start
-                for u in out_names:
-                    key = (u, input_name)
+                in_name = idx2name[icol]
+                loc_i = icol - in_slices[in_name].start
+                for out_name in out_names:
+                    key = (out_name, in_name)
                     if key in partials:
                         # set the column in the Jacobian entry
-                        part = scratch[out_slices[u]]
+                        part = scratch[out_slices[out_name]]
                         partials[key][:, loc_i] = part
                         part[:] = 0.
 
@@ -1078,12 +1088,11 @@ class ExecComp(ExplicitComponent):
         inv_stepsize = 1.0 / self.complex_stepsize
         has_diag_partials = self.options['has_diag_partials']
         inarr = self._inarray
-        indict = self._indict
-        vdict = self._viewdict
+        vdict = self._viewdict.dct
 
         inarr[:] = self._inputs.asarray(copy=False)
 
-        for inp, ival in indict.items():
+        for inp, (ival, _) in self._indict.items():
             psize = ival.size
 
             if has_diag_partials or psize == 1:
@@ -1095,7 +1104,11 @@ class ExecComp(ExplicitComponent):
 
                 for u in out_names:
                     if (u, inp) in partials:
-                        partials[u, inp] = imag(vdict[u] * inv_stepsize).flat
+                        subval, subval_is_scalar = vdict[u]
+                        if subval_is_scalar:
+                            partials[u, inp] = imag(subval * inv_stepsize)
+                        else:
+                            partials[u, inp] = imag(subval * inv_stepsize).ravel()
 
                 # restore old input value
                 ival -= step
@@ -1110,7 +1123,11 @@ class ExecComp(ExplicitComponent):
                     for u in out_names:
                         if (u, inp) in partials:
                             # set the column in the Jacobian entry
-                            partials[u, inp][:, i] = imag(vdict[u] * inv_stepsize).flat
+                            subval, subval_is_scalar = vdict[u]
+                            if subval_is_scalar:
+                                partials[u, inp][:, i] = imag(subval * inv_stepsize)
+                            else:
+                                partials[u, inp][:, i] = imag(subval * inv_stepsize).flat
 
                     # restore old input value
                     ival[idx] -= step
@@ -1121,16 +1138,18 @@ class _ViewDict(object):
         self.dct = dct
 
     def __getitem__(self, name):
-        return self.dct[name]
+        val, is_scalar = self.dct[name]
+        return val.item() if is_scalar else val
 
     def __setitem__(self, name, value):
+        val, _ = self.dct[name]
         try:
-            self.dct[name][:] = value
+            val[:] = value
         except ValueError:
             # see if value fits if size 1 dimensions are removed
             sqz = np.squeeze(value)
-            if np.squeeze(self.dct[name]).shape == sqz.shape:
-                self.dct[name][:] = sqz
+            if np.squeeze(val).shape == sqz.shape:
+                val[:] = sqz
             else:
                 raise
 
@@ -1188,15 +1207,19 @@ class _IODict(object):
                 return self._constants[name]
 
     def __setitem__(self, name, value):
-        try:
-            self._outputs[name][:] = value
-        except ValueError:
-            # see if value fits if size 1 dimensions are removed
-            sqz = np.squeeze(value)
-            if np.squeeze(self._outputs[name]).shape == sqz.shape:
-                self._outputs[name][:] = sqz
-            else:
-                raise
+        oval = self._outputs[name]
+        if oval.shape == ():
+            self._outputs[name] = np.squeeze(value)
+        else:
+            try:
+                oval[:] = value
+            except ValueError:
+                # see if value fits if size 1 dimensions are removed
+                sqz = np.squeeze(value)
+                if np.squeeze(oval).shape == sqz.shape:
+                    oval[:] = sqz
+                else:
+                    raise
 
     def __contains__(self, name):
         return name in self._inputs or name in self._outputs or name in self._constants

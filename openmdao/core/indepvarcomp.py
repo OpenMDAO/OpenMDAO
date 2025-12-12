@@ -213,31 +213,6 @@ class IndepVarComp(ExplicitComponent):
         kwargs = {'desc': desc, 'tags': tags}
         return super().add_discrete_output(name, val, **kwargs)
 
-    def _linearize(self, jac=None, sub_do_ln=False):
-        """
-        Compute jacobian / factorization. The model is assumed to be in a scaled state.
-
-        Parameters
-        ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
-        sub_do_ln : bool
-            Flag indicating if the children should call linearize on their linear solvers.
-        """
-        # define this for IndepVarComp to avoid overhead of ExplicitComponent._linearize.
-        pass
-
-    def compute_primal(self):
-        """
-        Compute the outputs.
-
-        Returns
-        -------
-        tuple
-            A tuple containing the output values.
-        """
-        return tuple(self._outputs.values())
-
     def _apply_nonlinear(self):
         """
         Compute residuals. The model is assumed to be in a scaled state.
@@ -324,7 +299,8 @@ class _AutoIndepVarComp(IndepVarComp):
         # Add the output quickly.
         # We don't need to check for errors because we get the value straight from a
         # source, and ivc metadata is minimal.
-        value, shape = ensure_compatible(name, val, None)
+        value, shape = ensure_compatible(name, val, None,
+                                         default_shape=self.options['default_shape'])
         metadata = {
             'val': value,
             'shape': shape,
@@ -342,6 +318,9 @@ class _AutoIndepVarComp(IndepVarComp):
             'shape_by_conn': False,
             'compute_shape': None,
             'copy_shape': None,
+            'units_by_conn': False,
+            'compute_units': None,
+            'copy_units': None,
         }
 
         self._static_var_rel2meta[name] = metadata

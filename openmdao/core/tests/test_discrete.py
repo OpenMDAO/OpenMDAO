@@ -497,8 +497,9 @@ class DiscreteTestCase(unittest.TestCase):
 
         model.connect('indep.x', 'comp.x')
 
+        prob.setup()
         with self.assertRaises(Exception) as ctx:
-            prob.setup()
+            prob.final_setup()
         self.assertEqual(str(ctx.exception),
             "\nCollected errors for problem 'float_to_discrete_error':"
             "\n   <model> <class Group>: Can't connect continuous output 'indep.x' to discrete "
@@ -513,9 +514,9 @@ class DiscreteTestCase(unittest.TestCase):
         model.add_subsystem('comp', om.ExecComp("y=2.0*x"))
 
         model.connect('indep.x', 'comp.x')
-
+        prob.setup()
         with self.assertRaises(Exception) as ctx:
-            prob.setup()
+            prob.final_setup()
         self.assertEqual(str(ctx.exception),
             "\nCollected errors for problem 'discrete_to_float_error':"
             "\n   <model> <class Group>: Can't connect discrete output 'indep.x' to continuous "
@@ -531,8 +532,9 @@ class DiscreteTestCase(unittest.TestCase):
 
         model.connect('indep.x', 'comp.x')
 
+        prob.setup()
         with self.assertRaises(Exception) as ctx:
-            prob.setup()
+            prob.final_setup()
         self.assertEqual(str(ctx.exception),
             "\nCollected errors for problem 'discrete_mismatch_error':"
             "\n   <model> <class Group>: Type 'str' of output 'indep.x' is incompatible with "
@@ -674,6 +676,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         msg = ("\nCollected errors for problem 'connection_to_output':"
                "\n   <model> <class Group>: Attempted to connect from 'C1.y' to 'C2.y', "
@@ -691,6 +694,7 @@ class DiscreteTestCase(unittest.TestCase):
 
         with self.assertRaises(Exception) as cm:
             prob.setup()
+            prob.final_setup()
 
         msg = ("\nCollected errors for problem 'connection_from_input':"
                "\n   <model> <class Group>: Attempted to connect from 'C1.x' to 'C2.x', "
@@ -775,8 +779,10 @@ class DiscreteTestCase(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob.model.get_io_metadata(includes='comp.*'), {
-                          'comp.a': {'copy_shape': None,
-                                     'compute_shape': None,
+                          'comp.a': {'compute_shape': None,
+                                     'compute_units': None,
+                                     'copy_shape': None,
+                                     'copy_units': None,
                                      'desc': '',
                                      'discrete': False,
                                      'distributed': False,
@@ -789,9 +795,12 @@ class DiscreteTestCase(unittest.TestCase):
                                      'shape_by_conn': False,
                                      'size': 1,
                                      'tags': set(),
-                                     'units': None},
-                          'comp.b': {'copy_shape': None,
-                                     'compute_shape': None,
+                                     'units': None,
+                                     'units_by_conn': False},
+                          'comp.b': {'compute_shape': None,
+                                     'compute_units': None,
+                                     'copy_shape': None,
+                                     'copy_units': None,
                                      'desc': '',
                                      'discrete': False,
                                      'distributed': False,
@@ -807,6 +816,7 @@ class DiscreteTestCase(unittest.TestCase):
                                      'size': 1,
                                      'tags': set(),
                                      'units': None,
+                                     'units_by_conn': False,
                                      'upper': None},
                           'comp.x': {'desc': '',
                                      'discrete': True,

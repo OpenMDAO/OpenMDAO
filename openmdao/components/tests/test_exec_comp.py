@@ -302,6 +302,21 @@ class TestExecComp(unittest.TestCase):
                          "'C1' <class ExecComp>: arg 'xx' in call to ExecComp() does not refer to any variable "
                          "in the expressions ['y=x+1.']")
 
+    def test_super_kwargs(self):
+        prob = om.Problem()
+        # Instantiate ExecComp with additional arguments that should be passed to
+        # the super class.
+        prob.model.add_subsystem('C1', om.ExecComp('y=x+1.',
+                                                   y={'copy_shape': 'x'}, x={'shape': (10,)},
+                                                   has_diag_partials=True,
+                                                   always_opt=True,
+                                                   use_jit=False))
+        prob.setup()
+        prob.set_val('C1.x', np.linspace(0, 1, 10))
+        prob.run_model()
+        assert_near_equal(prob.get_val('C1.y'), np.linspace(0, 1, 10) + 1)
+
+
     def test_bad_kwargs_meta(self):
         prob = om.Problem()
         prob.model.add_subsystem('C1', om.ExecComp('y=x+1.',
@@ -838,10 +853,8 @@ class TestExecComp(unittest.TestCase):
         p.final_setup()
 
         declared_partials = comp._declared_partials_patterns[('y','x')]
-        self.assertTrue('rows' in declared_partials )
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y','x')]['rows']))
-        self.assertTrue('cols' in declared_partials )
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y','x')]['cols']))
+        self.assertTrue(declared_partials['diagonal'])
+        self.assertTrue(declared_partials['diagonal'])
 
     def test_exec_comp_deriv_sparsity(self):
         # Check to make sure that when an ExecComp has more than one
@@ -863,7 +876,7 @@ class TestExecComp(unittest.TestCase):
         p.run_model()
 
         # make sure only what is needed was computed
-        subjacs_info = comp._jacobian._subjacs_info
+        subjacs_info = comp._get_jacobian()._subjacs_info
         self.assertListEqual(sorted([('comp.y1', 'comp.x1'), ('comp.y2', 'comp.x2'),
                                      ('comp.y1', 'comp.y1'),('comp.y2', 'comp.y2')]),
                              sorted(subjacs_info.keys()))
@@ -905,14 +918,10 @@ class TestExecComp(unittest.TestCase):
         declared_partials = comp._declared_partials_patterns
         self.assertListEqual( sorted([('y1', 'x1'), ('y2', 'x2') ]),
                               sorted(declared_partials.keys()))
-        self.assertTrue('cols' in declared_partials[('y1', 'x1')] )
-        self.assertTrue('rows' in declared_partials[('y1', 'x1')] )
-        self.assertTrue('cols' in declared_partials[('y2', 'x2')] )
-        self.assertTrue('rows' in declared_partials[('y2', 'x2')] )
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y1','x1')]['rows']))
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y1','x1')]['cols']))
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y2','x2')]['rows']))
-        self.assertListEqual([0,1,2,3,4], list( comp._declared_partials_patterns[('y2','x2')]['cols']))
+        self.assertTrue(declared_partials[('y1', 'x1')]['diagonal'])
+        self.assertTrue(declared_partials[('y1', 'x1')]['diagonal'])
+        self.assertTrue(declared_partials[('y2', 'x2')]['diagonal'])
+        self.assertTrue(declared_partials[('y2', 'x2')]['diagonal'])
 
         p.run_model()
 
@@ -1674,8 +1683,7 @@ class TestFunctionRegistration(unittest.TestCase):
             assert_near_equal(J['comp.area_square', 'comp.x'], np.eye(size) * 6., 1e-11)
 
             # verify diagonal subjac
-            self.assertTrue(np.all(p.model.comp._subjacs_info['comp.area_square', 'comp.x']['rows'] == np.arange(size)))
-            self.assertTrue(np.all(p.model.comp._subjacs_info['comp.area_square', 'comp.x']['cols'] == np.arange(size)))
+            self.assertEqual(p.model.comp._subjacs_info['comp.area_square', 'comp.x']['val'].size, size)
 
     def test_register_shape_by_conn(self):
         with _temporary_expr_dict():

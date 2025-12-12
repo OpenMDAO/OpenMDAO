@@ -2,10 +2,12 @@
 
 import unittest
 import numpy as np
-from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup
+from openmdao.api import Problem, Group, ExecComp, IndepVarComp, DirectSolver, ParallelGroup, NewtonSolver
 from openmdao.utils.mpi import MPI
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.om_warnings import OpenMDAOWarning
+from openmdao.utils.testing_utils import use_tempdirs
+
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
@@ -108,36 +110,36 @@ class TestGetSetVariables(unittest.TestCase):
         """
         Tests for error-handling for invalid variable names and keys.
         """
-        g = Group(assembled_jac_type='dense')
-        g.linear_solver = DirectSolver(assemble_jac=True)
-        g.add_subsystem('c', ExecComp('y=2*x'))
-
         p = Problem()
         model = p.model
-        model.add_subsystem('g', g)
+        g = model.add_subsystem('g', Group(assembled_jac_type='dense'))
+        g.linear_solver = DirectSolver(assemble_jac=True)
+        # add a NewtonSolver so run_model will initialize Group g's jacobian.
+        g.nonlinear_solver = NewtonSolver(solve_subsystems=False)
+        g.add_subsystem('c', ExecComp('y=2*x'))
         p.setup()
 
         # -------------------------------------------------------------------
 
-        msg = '\'<model> <class Group>: Variable "{}" not found.\''
+        msg = "<model> <class Group>: Variable '{}' not found. Perhaps you meant one of the following variables: ['g.c.{}']."
 
         # inputs
         with self.assertRaises(KeyError) as ctx:
             p['x'] = 5.0
-        self.assertEqual(str(ctx.exception), msg.format('x'))
+        self.assertEqual(ctx.exception.args[0], msg.format('x', 'x'))
 
         with self.assertRaises(KeyError) as ctx:
             p['x']
-        self.assertEqual(str(ctx.exception), msg.format('x'))
+        self.assertEqual(ctx.exception.args[0], msg.format('x', 'x'))
 
         # outputs
         with self.assertRaises(KeyError) as ctx:
             p['y'] = 5.0
-        self.assertEqual(str(ctx.exception), msg.format('y'))
+        self.assertEqual(ctx.exception.args[0], msg.format('y', 'y'))
 
         with self.assertRaises(KeyError) as ctx:
             p['y']
-        self.assertEqual(str(ctx.exception), msg.format('y'))
+        self.assertEqual(ctx.exception.args[0], msg.format('y', 'y'))
 
         p.final_setup()
 
@@ -145,63 +147,69 @@ class TestGetSetVariables(unittest.TestCase):
         inputs, outputs, residuals = g.get_nonlinear_vectors()
 
         # inputs
-        for vname in ['x', 'g.c.x']:
-            with self.assertRaises(KeyError) as cm:
-               inputs[vname] = 5.0
-            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
+        with self.assertRaises(KeyError) as cm:
+           inputs['x'] = 5.0
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'x' not found.")
 
-            with self.assertRaises(KeyError) as cm:
-               inputs[vname]
-            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
+        with self.assertRaises(KeyError) as cm:
+           inputs['x']
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'x' not found. Perhaps you meant one of the following variables: ['c.x'].")
 
+        with self.assertRaises(KeyError) as cm:
+           inputs['g.c.x'] = 5.0
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c.x' not found.")
+
+        with self.assertRaises(KeyError) as cm:
+           inputs['g.c.x']
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c.x' not found. Perhaps you meant one of the following variables: ['c.x', 'c.y'].")
+
+        p.run_model()
 
         # outputs
-        for vname in ['y', 'g.c.y']:
-            with self.assertRaises(KeyError) as cm:
-               outputs[vname] = 5.0
-            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
+        with self.assertRaises(KeyError) as cm:
+           outputs['y'] = 5.0
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'y' not found.")
 
-            with self.assertRaises(KeyError) as cm:
-               outputs[vname]
-            self.assertEqual(cm.exception.args[0], f"'g' <class Group>: Variable name '{vname}' not found.")
+        with self.assertRaises(KeyError) as cm:
+           outputs['y']
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'y' not found. Perhaps you meant one of the following variables: ['c.y'].")
 
-        msg = r'Variable name pair \("{}", "{}"\) not found.'
+        with self.assertRaises(KeyError) as cm:
+           outputs['g.c.y'] = 5.0
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c.y' not found.")
+
+        with self.assertRaises(KeyError) as cm:
+           outputs['g.c.y']
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c.y' not found. Perhaps you meant one of the following variables: ['c.x', 'c.y'].")
+
+        msg = "DenseJacobian in 'g'<class Group>: Variable name pair {} not found."
         jac = g.linear_solver._assembled_jac
 
         # d(output)/d(input)
-        with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
+        with self.assertRaises(KeyError) as cm:
             jac['y', 'x'] = 5.0
-        with self.assertRaisesRegex(KeyError, msg.format('y', 'x')):
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'x') not found.")
+        with self.assertRaises(KeyError) as cm:
             jac['y', 'x']
-        # allow absolute keys now
-        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.x')):
-        #     jac['g.c.y', 'g.c.x'] = 5.0
-        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.x')):
-        #     deriv = jac['g.c.y', 'g.c.x']
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'x') not found.")
 
         # d(output)/d(output)
-        with self.assertRaisesRegex(KeyError, msg.format('y', 'y')):
+        with self.assertRaises(KeyError) as cm:
             jac['y', 'y'] = 5.0
-        with self.assertRaisesRegex(KeyError, msg.format('y', 'y')):
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'y') not found.")
+        with self.assertRaises(KeyError) as cm:
             jac['y', 'y']
-        # allow absoute keys now
-        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.y')):
-        #     jac['g.c.y', 'g.c.y'] = 5.0
-        # with self.assertRaisesRegex(KeyError, msg.format('g.c.y', 'g.c.y')):
-        #     deriv = jac['g.c.y', 'g.c.y']
+        self.assertEqual(cm.exception.args[0], "Variable name pair ('y', 'y') not found.")
+
 
     def test_with_promotion_errors(self):
         """
         Tests for error-handling for invalid variable names and keys.
         """
-        c1 = IndepVarComp('x')
-        c2 = ExecComp('y=2*x')
-        c3 = ExecComp('z=3*x')
-
         g = Group(assembled_jac_type='dense')
-        g.add_subsystem('c1', c1, promotes=['*'])
-        g.add_subsystem('c2', c2, promotes=['*'])
-        g.add_subsystem('c3', c3, promotes=['*'])
+        g.add_subsystem('c1', IndepVarComp('x'), promotes=['*'])
+        g.add_subsystem('c2', ExecComp('y=2*x'), promotes=['*'])
+        g.add_subsystem('c3', ExecComp('z=3*x'), promotes=['*'])
         g.linear_solver = DirectSolver(assemble_jac=True)
 
         model = Group()
@@ -213,10 +221,12 @@ class TestGetSetVariables(unittest.TestCase):
         # Conclude setup but don't run model.
         p.final_setup()
 
+        g._get_jacobian()
+
         # -------------------------------------------------------------------
 
         msg1 = "'g' <class Group>: Variable name '{}' not found."
-        msg2 = "The promoted name x is invalid because it refers to multiple inputs: " \
+        msg2 = "'g' <class Group>: The promoted name x is invalid because it refers to multiple inputs: " \
                "[g.c2.x ,g.c3.x]. Access the value from the connected output variable x instead."
 
         inputs, outputs, residuals = g.get_nonlinear_vectors()
@@ -235,7 +245,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         with self.assertRaises(KeyError) as cm:
             inputs['g.c2.x']
-        self.assertEqual(cm.exception.args[0], msg1.format('g.c2.x'))
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c2.x' not found. Perhaps you meant one of the following variables: ['x'].")
 
         # outputs
         with self.assertRaises(KeyError) as cm:
@@ -244,7 +254,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         with self.assertRaises(KeyError) as cm:
             outputs['g.c2.y']
-        self.assertEqual(cm.exception.args[0], msg1.format('g.c2.y'))
+        self.assertEqual(cm.exception.args[0], "'g' <class Group>: Variable name 'g.c2.y' not found. Perhaps you meant one of the following variables: ['y'].")
 
         msg1 = r'Variable name pair \("{}", "{}"\) not found.'
 
@@ -253,7 +263,7 @@ class TestGetSetVariables(unittest.TestCase):
         # d(outputs)/d(inputs)
         with self.assertRaises(Exception) as context:
             jac['y', 'x'] = 5.0
-        self.assertEqual(str(context.exception), msg2)
+        self.assertEqual(context.exception.args[0], msg2)
 
         with self.assertRaises(Exception) as context:
             self.assertEqual(jac['y', 'x'], 5.0)
@@ -357,12 +367,13 @@ class TestGetSetVariables(unittest.TestCase):
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
+            p.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'serial_multi_src_inds_units_promoted_no_src':"
            "\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x', 'C3.x'], promoted "
            "to 'x', are connected but their metadata entries ['units'] differ. Call "
-           "<group>.set_input_defaults('x', units=?), where <group> is the model to remove the ambiguity.")
+           "model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_serial_multi_src_inds_units_setval_promoted(self):
         p = Problem()
@@ -396,6 +407,7 @@ class TestGetSetVariables(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+@use_tempdirs
 class ParTestCase(unittest.TestCase):
     N_PROCS = 2
 
@@ -493,6 +505,8 @@ class ParTestCase(unittest.TestCase):
 
         p.record(case_name='case_1')
         p.cleanup()
+
+        p.comm.barrier()
 
         case_1 = om.CaseReader(p.get_outputs_dir() / 'load_case_issue.sql').get_case('case_1')
         assert_near_equal(case_1.get_val('G.a.y')[-1], case_1.get_val('G.b.y'))

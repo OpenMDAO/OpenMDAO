@@ -10,6 +10,7 @@ import openmdao.func_api as omf
 from openmdao.components.func_comp_common import _check_var_name, _copy_with_ignore, \
     jac_forward, jac_reverse, _get_tangents, _ensure_iter
 from openmdao.utils.array_utils import shape_to_len
+from openmdao.jacobians.jacobian import JacobianUpdateContext
 
 try:
     import jax
@@ -77,6 +78,8 @@ class ImplicitFuncComp(ImplicitComponent):
         self._solve_nonlinear_func = solve_nonlinear
         self._solve_linear_func = solve_linear
         self._linearize_func = linearize
+        if linearize is not None:
+            self._has_linearize = True
         self._linearize_info = None
         self._tangents = None
         self._tangent_direction = None
@@ -135,7 +138,7 @@ class ImplicitFuncComp(ImplicitComponent):
             kwargs = _copy_with_ignore(meta, omf._allowed_add_output_args, ignore=('resid',))
             self.add_output(name, **kwargs)
 
-    def _setup_jax(self, from_group=False):
+    def _setup_jax(self):
         # TODO: this is here to prevent the ImplicitComponent base class from trying to do its
         # own jax setup if derivs_method is 'jax'. We should probably refactor this...
         pass
@@ -204,14 +207,12 @@ class ImplicitFuncComp(ImplicitComponent):
         self._outputs.set_vals(_ensure_iter(
             self._solve_nonlinear_func(*self._ordered_func_invals(inputs, outputs))))
 
-    def _linearize(self, jac=None, sub_do_ln=False):
+    def _linearize(self, sub_do_ln=False):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            Ignored.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
@@ -221,11 +222,10 @@ class ImplicitFuncComp(ImplicitComponent):
                 self._first_call_to_linearize = True
                 self._tangents = None
             self._check_first_linearize()
-            self._jax_linearize()
-            if (jac is None or jac is self._assembled_jac) and self._assembled_jac is not None:
-                self._assembled_jac._update(self)
+            with JacobianUpdateContext(self):
+                self._jax_linearize()
         else:
-            super()._linearize(jac, sub_do_ln)
+            super()._linearize(sub_do_ln)
 
     def _jax_linearize(self):
         """
@@ -251,7 +251,7 @@ class ImplicitFuncComp(ImplicitComponent):
                 j = [np.asarray(a).reshape((a.shape[0], shape_to_len(a.shape[1:])))
                      for a in jac_reverse(self._apply_nonlinear_func_jax, argnums,
                                           tangents)(*invals)]
-                j = coloring.expand_jac(np.hstack(self._reorder_col_chunks(j)), 'rev')
+                j = coloring._expand_jac(np.hstack(self._reorder_col_chunks(j)), 'rev').toarray()
             else:
                 j = []
                 for a in jac_reverse(self._apply_nonlinear_func_jax, argnums, tangents)(*invals):
@@ -270,7 +270,7 @@ class ImplicitFuncComp(ImplicitComponent):
                 j = [np.asarray(a).reshape((shape_to_len(a.shape[:-1]), a.shape[-1]))
                      for a in jac_forward(self._apply_nonlinear_func_jax, argnums,
                                           tangents)(*invals)]
-                j = coloring.expand_jac(np.vstack(j), 'fwd')
+                j = coloring._expand_jac(np.vstack(j), 'fwd').toarray()
             else:
                 tangents = self._get_tangents(invals, 'fwd', coloring, argnums)
                 j = []
@@ -283,7 +283,7 @@ class ImplicitFuncComp(ImplicitComponent):
                     j.append(a)
                 j = self._reorder_cols(np.vstack(j).reshape((osize, isize)))
 
-        self._jacobian.set_dense_jac(self, j)
+        self._get_jacobian().set_dense_jac(self, j)
 
     def _user_linearize(self, inputs, outputs, jacobian):
         """

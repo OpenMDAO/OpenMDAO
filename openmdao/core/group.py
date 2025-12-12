@@ -18,20 +18,20 @@ from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.vectors.vector import _full_slice
 from openmdao.proc_allocators.default_allocator import DefaultAllocator, ProcAllocationError
-from openmdao.jacobians.jacobian import SUBJAC_META_DEFAULTS
-from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.jacobians.subjac import SUBJAC_META_DEFAULTS
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import array_connection_compatible, _flatten_src_indices, \
-    shape_to_len, ValueRepeater
-from openmdao.utils.general_utils import common_subpath, \
-    convert_src_inds, shape2tuple, get_connection_owner, ensure_compatible, \
-    meta2src_iter, get_rev_conns, is_undefined
+    shape_to_len, ValueRepeater, evenly_distrib_idxs
+from openmdao.utils.general_utils import convert_src_inds, shape2tuple, get_connection_owner, \
+    ensure_compatible, meta2src_iter, get_rev_conns, is_undefined
 from openmdao.utils.units import is_compatible, unit_conversion, _has_val_mismatch, _find_unit, \
-    _is_unitless, simplify_unit
-from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo
+    _is_unitless, simplify_unit, PhysicalUnit
+from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
+    get_unresolved_knowns, is_unresolved, get_active_edges, add_shape_node, \
+    add_units_node, are_connected
 from openmdao.utils.mpi import MPI, check_mpi_exceptions, multi_proc_exception_check
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
@@ -41,6 +41,11 @@ from openmdao.utils.om_warnings import issue_warning, UnitsWarning, UnusedOption
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.jax_utils import jax
 from openmdao.core.total_jac import _TotalJacInfo
+from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
+from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
+from openmdao.jacobians.subjac import Subjac
+from openmdao.jacobians.jacobian import GroupJacobianUpdateContext
+
 
 # regex to check for valid names.
 import re
@@ -136,6 +141,15 @@ class _PromotesInfo(object):
         return mismatches
 
 
+def _chk_scale_factor(factor):
+    try:
+        if factor == (0.0, 1.0):
+            return None
+    except ValueError:
+        pass
+    return factor
+
+
 class Group(System):
     """
     Class used to group systems together; instantiate or inherit.
@@ -202,14 +216,19 @@ class Group(System):
         within this group, keyed by active response.  These determine if contributions
         from all ranks will be added together to get the correct input values when derivatives
         in the larger model are being solved using reverse mode.
+    _auto_ivc_recorders : list
+        List of recorders that were added to _auto_ivc before it existed so they can be added
+        after _auto_ivc is created.
     _is_explicit : bool or None
         True if neither this Group nor any of its descendants contains implicit systems or cycles.
-    _ivcs : dict
-        Dict containing metadata for each independent variable.
     _bad_conn_vars : set
         Set of variables involved in invalid connections.
     _sys_graph_cache : dict
         Cache for the system graph.
+    _key_owner : dict
+        The owning rank keyed by absolute jacobian key.
+    _var_existence : dict or None
+        Keeps track of which ranks each variable exists on.
     """
 
     def __init__(self, **kwargs):
@@ -239,10 +258,12 @@ class Group(System):
         self._post_components = None
         self._iterated_components = None
         self._fd_rev_xfer_correction_dist = {}
+        self._auto_ivc_recorders = []
         self._is_explicit = None
-        self._ivcs = {}
         self._bad_conn_vars = None
         self._sys_graph_cache = None
+        self._key_owner = None
+        self._var_existence = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -383,18 +404,19 @@ class Group(System):
             # A value of None will be interpreted as 'all outputs'.
             scope_out = None
 
-            # All inputs connected to an output in this system
+            # All inputs that are connected to outputs within this group.  Use only local inputs
+            # because only local inputs exist in our input vector.
             scope_in = frozenset(self._conn_global_abs_in2out).intersection(
-                self._var_allprocs_abs2meta['input'])
+                self._var_abs2meta['input'])
 
         else:
             # Empty for the excl_sub
             scope_out = frozenset()
 
-            # All inputs connected to an output in this system but not in excl_sub
+            # All inputs connected to an output in this Group but not in excl_sub.
             # allins is used to filter out discrete variables that might be found in
             # self._conn_global_abs_in2out.
-            allins = self._var_allprocs_abs2meta['input']
+            allins = self._var_abs2meta['input']
             exvars = excl_sub._var_allprocs_abs2idx
             scope_in = frozenset(abs_in for abs_in, abs_out in self._conn_global_abs_in2out.items()
                                  if abs_out not in exvars and abs_in in allins)
@@ -414,60 +436,88 @@ class Group(System):
         dict
             Mapping of each absolute var name to its corresponding scaling factor tuple.
         """
-        # make this a defaultdict to handle the case of access using unconnected inputs
-        scale_factors = defaultdict(lambda: {
-            'input': (0.0, 1.0),
-        })
+        scale_factors = {}
 
-        for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
-            ref0 = meta['ref0']
-            res_ref = meta['res_ref']
-            a0 = ref0
-            a1 = meta['ref'] - ref0
-            scale_factors[abs_name] = {
-                'output': (a0, a1),
-                'residual': (0.0, 1.0 if res_ref is None else res_ref),
-            }
+        if self._has_output_scaling or self._has_resid_scaling:
+            for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
+                ref0 = meta['ref0']
+                a0 = ref0
+                a1 = meta['ref'] - ref0
+                if _chk_scale_factor((a0, a1)) is not None:
+                    scale_factors[abs_name] = {'output': (a0, a1, None, None)}
+
+                res_ref = meta['res_ref']
+                try:
+                    if res_ref == 1.0:
+                        res_ref = None
+                except ValueError:
+                    pass
+
+                if res_ref is not None:
+                    if abs_name not in scale_factors:
+                        scale_factors[abs_name] = {'residual': (0.0, res_ref, None, None)}
+                    else:
+                        scale_factors[abs_name]['residual'] = (0.0, res_ref, None, None)
 
         # Input scaling for connected inputs is added here.
         # This is a combined scale factor that includes the scaling of the connected source
         # and the unit conversion between the source output and each target input.
         if self._has_input_scaling:
-            abs2meta_in = self._var_abs2meta['input']
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
-            for abs_in, abs_out in self._conn_global_abs_in2out.items():
-                if abs_in not in abs2meta_in:
-                    # we only perform scaling on local, non-discrete arrays, so skip
+            for abs_in, meta_in in self._var_abs2meta['input'].items():
+                src = self._conn_global_abs_in2out[abs_in]
+
+                src_meta = allprocs_meta_out[src]
+                ref = src_meta['ref']
+                ref0 = src_meta['ref0']
+
+                scalar_ref = np.ndim(ref) == 0
+                scalar_ref0 = np.ndim(ref0) == 0
+
+                has_scaling = not scalar_ref or not scalar_ref0 or ref != 1.0 or ref0 != 0.0
+
+                units_in = meta_in['units']
+                units_out = src_meta['units']
+
+                has_unit_conv = \
+                    units_in is not None and units_out is not None and units_in != units_out
+
+                if has_unit_conv:
+                    factor, offset = unit_conversion(units_out, units_in)
+                    if factor == 1.0 and offset == 0.0:
+                        has_unit_conv = False
+                else:
+                    factor = 1.0
+                    offset = 0.0
+
+                if not has_scaling and not has_unit_conv:
                     continue
 
-                meta_in = abs2meta_in[abs_in]
-
-                meta_out = allprocs_meta_out[abs_out]
-                ref = meta_out['ref']
-                ref0 = meta_out['ref0']
+                units_in = meta_in['units']
+                units_out = src_meta['units']
 
                 src_indices = meta_in['src_indices']
 
                 if src_indices is not None:
-                    if not (np.ndim(ref) == 0 and np.ndim(ref0) == 0):
+                    if not (scalar_ref and scalar_ref0):
                         # TODO: if either ref or ref0 are not scalar and the output is
                         # distributed, we need to do a scatter
                         # to obtain the values needed due to global src_indices
-                        if meta_out['distributed']:
+                        if src_meta['distributed']:
                             raise RuntimeError("{}: vector scalers with distrib vars "
                                                "not supported yet.".format(self.msginfo))
 
                         if not src_indices._flat_src:
                             src_indices = _flatten_src_indices(src_indices.as_array(),
                                                                meta_in['shape'],
-                                                               meta_out['global_shape'],
-                                                               meta_out['global_size'])
+                                                               src_meta['global_shape'],
+                                                               src_meta['global_size'])
 
-                        if np.ndim(ref) > 0:
+                        if not scalar_ref:
                             ref = ref[src_indices]
                         else:  # ref is scalar so ref0 must be an array
                             ref = np.full(ref0.shape, ref)
-                        if np.ndim(ref0) > 0:
+                        if not scalar_ref0:
                             ref0 = ref0[src_indices]
                         else:  # ref0 is scalar so ref must be an array
                             ref0 = np.full(ref.shape, ref0)
@@ -485,35 +535,26 @@ class Group(System):
                 #   b1 = d0 + d1 a1 - d0
                 #   b1 = g(a1) - g(0)
 
-                units_in = meta_in['units']
-                units_out = meta_out['units']
+                a0 = ref0
+                a1 = ref - ref0
 
                 if units_in is None or units_out is None or units_in == units_out:
-                    a0 = ref0
-                    a1 = ref - ref0
-
+                    if _chk_scale_factor((a0, a1)) is None:
+                        continue
                     # No unit conversion, only scaling. Just send the scale factors.
-                    scale_factors[abs_in] = {
-                        'input': (a0, a1),
-                    }
-
+                    scale_factors[abs_in] = {'input': (a0, a1, None, None)}
                 else:
                     factor, offset = unit_conversion(units_out, units_in)
-                    a0 = ref0
-                    a1 = ref - ref0
 
                     # Send both unit scaling and solver scaling. Linear input vectors need to
                     # treat them differently in reverse mode.
-                    scale_factors[abs_in] = {
-                        'input': (a0, a1, factor, offset),
-                    }
+                    scale_factors[abs_in] = {'input': (a0, a1, factor, offset)}
 
                     # For adder allocation check.
                     a0 = (ref0 + offset) * factor
 
                 # Check whether we need to allocate an adder for the input vector.
-                if np.any(np.asarray(a0)):
-                    self._has_input_adder = True
+                self._has_input_adder |= np.any(np.asarray(a0))
 
         return scale_factors
 
@@ -653,6 +694,7 @@ class Group(System):
         # need to set pathname correctly even for non-local subsystems
         for s, _ in self._subsystems_allprocs.values():
             s.pathname = '.'.join((self.pathname, s.name)) if self.pathname else s.name
+            s._problem_meta = prob_meta
 
         # Perform recursion
         for subsys in self._subsystems_myproc:
@@ -681,19 +723,28 @@ class Group(System):
 
         self._setup_procs_finished = True
 
-    def is_explicit(self):
+    def is_explicit(self, is_comp=True):
         """
         Return True if this Group contains only explicit systems and has no cycles.
+
+        Parameters
+        ----------
+        is_comp : bool
+            If True, return True if this is an explicit component.
+            If False, return True if this is an explicit component or group.
 
         Returns
         -------
         bool
             True if this is an explicit component.
         """
+        if is_comp:
+            return False
+
         if self._is_explicit is None:
             self._is_explicit = True
             for subsys in self._subsystems_myproc:
-                if not subsys.is_explicit():
+                if not subsys.is_explicit(is_comp=False):
                     self._is_explicit = False
                     break
 
@@ -761,7 +812,9 @@ class Group(System):
         # save a ref to the problem level options.
         self._problem_meta = prob_meta
         self._initial_condition_cache = {}
+        self._auto_ivc_recorders = []
         self._sys_graph_cache = None
+        self._remote_sets = []
 
         # reset any coloring if a Coloring object was not set explicitly
         if self._coloring_info.dynamic or self._coloring_info.static is not None:
@@ -774,7 +827,7 @@ class Group(System):
         self._post_components = None
 
         # Besides setting up the processors, this method also builds the model hierarchy.
-        self._setup_procs(self.pathname, comm, self._problem_meta)
+        self._setup_procs(self.pathname, comm, prob_meta)
 
         prob_meta['config_info'] = _ConfigInfo()
 
@@ -795,44 +848,45 @@ class Group(System):
         self._has_resid_scaling = False
         self._has_bounds = False
 
-        for subsys in self.system_iter(include_self=True, recurse=True):
-            subsys._apply_output_solver_options()
+        _has_applied_options = set()
+        for grp in self.system_iter(include_self=True, recurse=True, depth_first=True, typ=Group):
+            for subsys in grp.system_iter(include_self=True, recurse=False):
+                if subsys.pathname not in _has_applied_options:
+                    subsys._apply_output_solver_options()
+                    _has_applied_options.add(subsys.pathname)
 
-            self._has_output_scaling |= subsys._has_output_scaling
-            self._has_output_adder |= subsys._has_output_adder
-            self._has_resid_scaling |= subsys._has_resid_scaling
-            self._has_bounds |= subsys._has_bounds
+                grp._has_output_scaling |= subsys._has_output_scaling
+                grp._has_output_adder |= subsys._has_output_adder
+                grp._has_resid_scaling |= subsys._has_resid_scaling
+                grp._has_bounds |= subsys._has_bounds
 
         # promoted names must be known to determine implicit connections so this must be
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
         # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
         # the connections.
         self._setup_global_connections()
-        self._setup_dynamic_shapes()
-        self._setup_jax()
 
-        self._top_level_post_connections()
-
-        self._setup_var_sizes()
-
-        self._top_level_post_sizes()
-
-        # determine which connections are managed by which group, and check validity of connections
-        self._setup_connections()
+    def _get_var_existence(self):
+        if self._var_existence is None:
+            self._setup_var_existence()
+        return self._var_existence
 
     def _check_required_connections(self):
         conns = self._conn_global_abs_in2out
-        abs2prom = self._var_allprocs_abs2prom['input']
         abs2meta_in = self._var_allprocs_abs2meta['input']
         discrete_in = self._var_allprocs_discrete['input']
         desvar = self.get_design_vars()
+        resolver = self._resolver
 
         for abs_tgt, src in conns.items():
             if src.startswith('_auto_ivc.'):
-                prom_tgt = abs2prom[abs_tgt]
+                if abs_tgt in discrete_in:
+                    continue
+
+                prom_tgt = resolver.abs2prom(abs_tgt, 'input')
 
                 # Ignore inputs that are declared as design vars.
-                if abs_tgt in discrete_in or (desvar and prom_tgt in desvar):
+                if prom_tgt in desvar:
                     continue
 
                 if abs2meta_in[abs_tgt]['require_connection']:
@@ -862,38 +916,32 @@ class Group(System):
         assert self.pathname == '', "call _get_dataflow_graph on the top level Group only."
 
         graph = nx.DiGraph()
-        comp_seen = set()
+        empty_comps = set()
 
         # locate any components that don't have any inputs or outputs and add them to the graph
         for subsys in self.system_iter(recurse=True, typ=Component):
-            if not subsys._var_abs2meta['input'] and not subsys._var_abs2meta['output']:
+            if subsys._resolver.num_abs(local=True) == 0:
                 graph.add_node(subsys.pathname, local=True)
-                comp_seen.add(subsys.pathname)
+                empty_comps.add(subsys.pathname)
 
         if self.comm.size > 1:
-            allemptycomps = self.comm.allgather(comp_seen)
+            allemptycomps = self.comm.allgather(empty_comps)
             for compset in allemptycomps:
                 for comp in compset:
-                    if comp not in comp_seen:
+                    if comp not in empty_comps:
                         graph.add_node(comp, local=False)
-                        comp_seen.add(comp)
+                        empty_comps.add(comp)
 
+        resolver = self._resolver
         for direction in ('input', 'output'):
             isout = direction == 'output'
-            allvmeta = self._var_allprocs_abs2meta[direction]
-            vmeta = self._var_abs2meta[direction]
-            for vname in self._var_allprocs_abs2prom[direction]:
-                if vname in allvmeta:
-                    local = vname in vmeta
-                else:  # var is discrete
-                    local = vname in self._var_discrete[direction]
-
-                graph.add_node(vname, type_=direction, local=local)
+            for vname, flags in resolver.flags_iter(direction):
+                graph.add_node(vname, type_=direction, local=bool(flags & LOCAL))
 
                 comp = vname.rpartition('.')[0]
-                if comp not in comp_seen:
-                    graph.add_node(comp, local=local)
-                    comp_seen.add(comp)
+                if comp not in empty_comps:
+                    graph.add_node(comp, local=bool(flags & LOCAL))
+                    empty_comps.add(comp)
 
                 if isout:
                     graph.add_edge(comp, vname)
@@ -973,6 +1021,9 @@ class Group(System):
         """
         Compute global offsets for variables.
 
+        These are the offsets into the global arrays that combine all variables of a certain
+        iotype across all ranks.
+
         Returns
         -------
         dict
@@ -980,15 +1031,15 @@ class Group(System):
         """
         if self._var_offsets is None:
             offsets = self._var_offsets = {}
-            for type_ in ['input', 'output']:
-                vsizes = self._var_sizes[type_]
+            for io in ['input', 'output']:
+                vsizes = self._var_sizes[io]
                 if vsizes.size > 0:
                     csum = np.empty(vsizes.size, dtype=INT_DTYPE)
                     csum[0] = 0
                     csum[1:] = np.cumsum(vsizes)[:-1]
-                    offsets[type_] = csum.reshape(vsizes.shape)
+                    offsets[io] = csum.reshape(vsizes.shape)
                 else:
-                    offsets[type_] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
+                    offsets[io] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
 
         return self._var_offsets
 
@@ -1019,7 +1070,7 @@ class Group(System):
         abs2meta = self._var_abs2meta['output']
         sizes = self._var_sizes['output']
         global_offsets = self._get_var_offsets()['output']
-        oflist = list(self._jac_of_iter())
+        oflist = self._get_jac_ofs()
         tsize = oflist[-1][2]
         toffset = myrank * tsize
         has_dist_data = False
@@ -1083,25 +1134,64 @@ class Group(System):
 
         return sarr, tarr, tsize, has_dist_data
 
+    def _setup_dynamic_properties(self):
+        self._setup_dynamic_property('shape')
+        self._setup_dynamic_property('units')
+
+    def _setup_part2(self):
+        """
+        Complete setup of connections, sizes, and residuals.
+
+        This part of setup is called automatically at the start of run_model or run_driver.
+        This method is called only on the top level Group.
+        """
+        self._setup_dynamic_properties()
+
+        self._resolve_group_input_defaults()
+        self._setup_auto_ivcs()
+        self._check_order()
+        self._resolver._check_dup_prom_outs()
+
+        self._setup_var_sizes()
+
+        self._top_level_post_sizes()
+
+        # determine which connections are managed by which group, and check validity of connections
+        self._setup_connections()
+
+        self._check_required_connections()
+
+        # setup of residuals must occur before setup of vectors and partials
+        self._setup_residuals()
+
+        for recorder in self._auto_ivc_recorders:
+            self._auto_ivc.add_recorder(recorder)
+        self._auto_ivc_recorders = []
+
+        self._problem_meta['setup_status'] = _SetupStatus.POST_SETUP2
+
     def _final_setup(self):
         """
         Perform final setup for this system and its descendant systems.
 
         This part of setup is called automatically at the start of run_model or run_driver.
+        This method is called only on the top level Group.
         """
-        self._setup_residuals()
-
         if self._use_derivatives:
             self._setup_partials()
 
-        self._setup_vectors(self._get_root_vectors())
+        self._setup_vectors(None)
+
+        self._setup_jax()
 
         self._fd_rev_xfer_correction_dist = {}
 
         desvars = self.get_design_vars(get_sizes=False)
-        responses = self._check_alias_overlaps(self.get_responses(get_sizes=False))
+        responses = self._check_alias_overlaps(self.get_responses(get_sizes=False,
+                                                                  use_prom_ivc=True))
 
         self._dataflow_graph = self._get_dataflow_graph()
+        self._problem_meta['dataflow_graph'] = self._dataflow_graph
 
         # figure out if we can remove any edges based on zero partials we find
         # in components.  By default all component connected outputs
@@ -1114,19 +1204,30 @@ class Group(System):
 
         self._problem_meta['relevance'] = get_relevance(self, responses, desvars)
 
-        # Transfers do not require recursion, but they have to be set up after the vector setup.
+        # Transfers have to be set up after the vector setup.
         self._setup_transfers()
 
-        # Same situation with solvers, partials, and Jacobians.
-        # If we're updating, we just need to re-run setup on these, but no recursion necessary.
         self._setup_solvers()
         self._setup_solver_print()
-        if self._use_derivatives:
-            self._setup_jacobians()
 
         self._setup_recording()
 
         self.set_initial_values()
+
+    def _setup_vectors(self, parent_vectors):
+        """
+        Compute all vectors for all vec names and assign excluded variables lists.
+
+        Parameters
+        ----------
+        parent_vectors : dict or None
+            Parent vectors.  Same structure as root_vectors.
+        """
+        super()._setup_vectors(parent_vectors)
+
+        for subsys in self._sorted_sys_iter():
+            subsys._scale_factors = self._scale_factors
+            subsys._setup_vectors(self._vectors)
 
     def _update_dataflow_graph(self, responses):
         """
@@ -1184,10 +1285,6 @@ class Group(System):
         dict of dict of Vector
             Root vectors: first key is 'input', 'output', or 'residual'; second key is vec_name.
         """
-        # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
-        # linear root vec
-        self._root_vecs = root_vectors = {'input': {}, 'output': {}, 'residual': {}}
-
         force_alloc_complex = self._problem_meta['force_alloc_complex']
 
         # Check for complex step to set vectors up appropriately.
@@ -1206,6 +1303,14 @@ class Group(System):
         else:
             ln_alloc_complex = False
 
+        # If any proc's local systems need a complex vector, then all procs need it.
+        if self.comm.size > 1:
+            need_alloc_complex = np.array([nl_alloc_complex, ln_alloc_complex], dtype=int)
+            result = np.zeros(2, dtype=int)
+            self.comm.Allreduce(need_alloc_complex, result)
+            nl_alloc_complex = bool(result[0])
+            ln_alloc_complex = bool(result[1])
+
         if self._has_input_scaling or self._has_output_scaling or self._has_resid_scaling:
             self._scale_factors = self._compute_root_scale_factors()
         else:
@@ -1214,127 +1319,36 @@ class Group(System):
         if self._vector_class is None:
             self._vector_class = self._local_vector_class
 
-        vectypes = ('nonlinear', 'linear') if self._use_derivatives else ('nonlinear',)
+        do_scaling = {
+            'input': self._has_input_scaling,
+            'output': self._has_output_scaling,
+            'residual': self._has_resid_scaling
+        }
+        do_adder = {
+            'input': self._has_input_adder,
+            'output': self._has_output_adder,
+            'residual': self._has_resid_scaling
+        }
 
-        # If any proc's local systems need a complex vector, then all procs need it.
-        if self.comm.size > 1:
-            all_nl_alloc_complex = self.comm.allgather(nl_alloc_complex)
-            if np.any(all_nl_alloc_complex):
-                nl_alloc_complex = True
+        # save root vecs as an attribute so that we can reuse the nonlinear scaling vecs in the
+        # linear root vec
+        root_vectors = {'input': {}, 'output': {}, 'residual': {}}
 
-            all_ln_alloc_complex = self.comm.allgather(ln_alloc_complex)
-            if np.any(all_ln_alloc_complex):
-                ln_alloc_complex = True
+        for kind in ['input', 'output', 'residual']:
+            rvec = root_vectors[kind]
+            rvec['nonlinear'] = nlvec = self._vector_class('nonlinear', kind, self, None,
+                                                           alloc_complex=nl_alloc_complex)
 
-        for vec_name in vectypes:
-            if vec_name == 'nonlinear':
-                alloc_complex = nl_alloc_complex
-            else:
-                alloc_complex = ln_alloc_complex
+            if self._use_derivatives:
+                rvec['linear'] = self._vector_class('linear', kind, self, None,
+                                                    alloc_complex=ln_alloc_complex)
 
-            for key in ['input', 'output', 'residual']:
-                root_vectors[key][vec_name] = self._vector_class(vec_name, key, self,
-                                                                 alloc_complex=alloc_complex)
-
-        if self._use_derivatives:
-            root_vectors['input']['linear']._scaling_nl_vec = \
-                root_vectors['input']['nonlinear']._scaling
+            if do_scaling[kind] or do_adder[kind]:
+                nlvec._set_scaling(self, do_adder[kind])
+                if self._use_derivatives:
+                    rvec['linear']._set_scaling(self, do_adder[kind], nlvec)
 
         return root_vectors
-
-    def _get_all_promotes(self):
-        """
-        Create the top level mapping of all promoted names to absolute names for all local systems.
-
-        This includes all buried promoted names.
-
-        Returns
-        -------
-        dict
-            Mapping of all promoted names to absolute names.
-        """
-        iotypes = ('input', 'output')
-        if self.comm.size > 1:
-            prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
-            rem_prom2abs = {'input': defaultdict(set), 'output': defaultdict(set)}
-            myrank = self.comm.rank
-            vars_to_gather = self._vars_to_gather
-
-            for s in self.system_iter(recurse=True, include_self=True):
-                prefix = s.pathname + '.' if s.pathname else ''
-                for typ in iotypes:
-                    # use abs2prom to determine locality since prom2abs is for allprocs
-                    sys_abs2prom = s._var_abs2prom[typ]
-                    t_remprom2abs = rem_prom2abs[typ]
-                    t_prom2abs = prom2abs[typ]
-                    for prom, alist in s._var_allprocs_prom2abs_list[typ].items():
-                        abs_names = [n for n in alist if n in sys_abs2prom]
-                        t_prom2abs[prefix + prom].update(abs_names)
-                        t_remprom2abs[prefix + prom].update(n for n in abs_names
-                                                            if n in vars_to_gather
-                                                            and vars_to_gather[n] == myrank)
-
-            all_proms = self.comm.gather(rem_prom2abs, root=0)
-            if myrank == 0:
-                for typ in iotypes:
-                    t_prom2abs = prom2abs[typ]
-                    for rankproms in all_proms:
-                        for prom, absnames in rankproms[typ].items():
-                            t_prom2abs[prom].update(absnames)
-
-                    for prom, absnames in t_prom2abs.items():
-                        t_prom2abs[prom] = sorted(absnames)  # sort to keep order same on all procs
-
-                self.comm.bcast(prom2abs, root=0)
-            else:
-                prom2abs = self.comm.bcast(None, root=0)
-        else:  # serial
-            prom2abs = {'input': defaultdict(list), 'output': defaultdict(list)}
-            for s in self.system_iter(recurse=True, include_self=True):
-                prefix = s.pathname + '.' if s.pathname else ''
-                for typ in iotypes:
-                    t_prom2abs = prom2abs[typ]
-                    for prom, abslist in s._var_allprocs_prom2abs_list[typ].items():
-                        t_prom2abs[prefix + prom] = abslist
-
-        return prom2abs
-
-    def _top_level_post_connections(self):
-        # this is called on the top level group after all connections are known
-        self._problem_meta['vars_to_gather'] = self._vars_to_gather
-
-        self._resolve_group_input_defaults()
-        self._setup_auto_ivcs()
-        self._problem_meta['prom2abs'] = self._get_all_promotes()
-        self._check_prom_masking()
-        self._check_order()
-
-    def _check_prom_masking(self):
-        """
-        Raise exception if any promoted variable name masks an absolute variable name.
-
-        Only called on the top level group.
-        """
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
-        prom2abs_out = self._var_allprocs_prom2abs_list['output']
-        abs2meta = self._var_allprocs_abs2meta
-
-        for absname in chain(abs2meta['input'], abs2meta['output']):
-            if absname in prom2abs_in:
-                for name in prom2abs_in[absname]:
-                    if name != absname:
-                        raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}'"
-                                           " is masked by a matching promoted name. Try"
-                                           " promoting to a different name. This can be caused"
-                                           " by promoting '*' at group level or promoting using"
-                                           " dotted names.")
-            elif absname in prom2abs_out:
-                if absname != prom2abs_out[absname][0]:
-                    raise RuntimeError(f"{self.msginfo}: Absolute variable name '{absname}' is"
-                                       " masked by a matching promoted name. Try"
-                                       " promoting to a different name. This can be caused"
-                                       " by promoting '*' at group level or promoting using"
-                                       " dotted names.")
 
     def _check_order(self, reorder=True, recurse=True, out_of_order=None):
         """
@@ -1411,6 +1425,8 @@ class Group(System):
         if self._problem_meta['allow_post_setup_reorder']:
             self.set_order(new_order)
         else:
+            if '_auto_ivc' in new_order:
+                new_order.remove('_auto_ivc')
             issue_warning(f"{self.msginfo}: A new execution order {new_order} is recommended, but "
                           "auto ordering has been disabled because the Problem option "
                           "'allow_post_setup_reorder' is False. It is recommended to either set "
@@ -1422,20 +1438,19 @@ class Group(System):
         abs2idx = self._var_allprocs_abs2idx
         for io in ('input', 'output'):
             sizes = self._var_sizes[io]
-            for abs_name, meta in self._var_allprocs_abs2meta[io].items():
-                if not meta['distributed']:
-                    vsizes = sizes[:, abs2idx[abs_name]]
-                    unique = set(vsizes)
-                    unique.discard(0)
-                    if len(unique) > 1:
-                        # sizes differ, now find which procs don't agree
-                        rnklist = []
-                        for sz in unique:
-                            rnklist.append((sz, [i for i, s in enumerate(vsizes) if s == sz]))
-                        msg = ', '.join([f"rank(s) {r} have size {s}" for s, r in rnklist])
-                        self._collect_error(f"{self.msginfo}: Size of {io} '{abs_name}' "
-                                            f"differs between processes ({msg}).",
-                                            ident=('size', abs_name))
+            for abs_name in self._resolver.abs_iter(io, continuous=True, distributed=False):
+                vsizes = sizes[:, abs2idx[abs_name]]
+                unique = set(vsizes)
+                unique.discard(0)
+                if len(unique) > 1:
+                    # sizes differ, now find which procs don't agree
+                    rnklist = []
+                    for sz in unique:
+                        rnklist.append((sz, [i for i, s in enumerate(vsizes) if s == sz]))
+                    msg = ', '.join([f"rank(s) {r} have size {s}" for s, r in rnklist])
+                    self._collect_error(f"{self.msginfo}: Size of {io} '{abs_name}' "
+                                        f"differs between processes ({msg}).",
+                                        ident=('size', abs_name))
 
     def _top_level_post_sizes(self):
         # this runs after the variable sizes are known
@@ -1464,6 +1479,7 @@ class Group(System):
             dcomp_names = set(d.rpartition('.')[0] for d in dist_ins)
             if dcomp_names:
                 added_src_inds = []
+
                 for comp in self.system_iter(recurse=True, typ=Component):
                     if comp.pathname in dcomp_names:
                         added_src_inds.extend(
@@ -1548,6 +1564,7 @@ class Group(System):
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
         conns = self._conn_global_abs_in2out
+        resolver = self._resolver
 
         for tgt, plist in self._problem_meta['abs_in2prom_info'].items():
             src = conns[tgt]
@@ -1555,7 +1572,7 @@ class Group(System):
             tmeta = all_abs2meta_in[tgt]
 
             if not smeta['distributed'] and tmeta['distributed']:
-                root_shape = self._get_full_dist_shape(src, smeta['shape'])
+                root_shape = self._get_full_dist_shape(src, smeta['shape'], 'output')
             else:
                 root_shape = smeta['global_shape']
 
@@ -1569,7 +1586,7 @@ class Group(System):
 
             # use a _PromotesInfo for the top level even though there really isn't a promote there
             current_pinfo = _PromotesInfo(src_shape=root_shape,
-                                          prom=self._var_allprocs_abs2prom['input'][tgt])
+                                          prom=resolver.abs2prom(tgt, 'input'))
             if plist[0] is None:  # no top level pinfo
                 plist[0] = current_pinfo
 
@@ -1604,7 +1621,7 @@ class Group(System):
                     try:
                         if pinfo.src_shape is None:
                             pinfo.set_src_shape(current_pinfo.src_indices.indexed_src_shape)
-                        sinds = convert_src_inds(current_pinfo.src_indices, current_pinfo.src_shape,
+                        sinds = convert_src_inds(current_pinfo.src_indices,
                                                  pinfo.src_indices, pinfo.src_shape)
                     except Exception:
                         type_exc, exc, tb = sys.exc_info()
@@ -1633,16 +1650,12 @@ class Group(System):
             self._resolve_src_inds()
 
     def _resolve_src_inds(self):
-        abs2prom = self._var_abs2prom['input']
         tree_level = self.pathname.count('.') + 1 if self.pathname else 0
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         seen = set()
 
-        for tgt in self._var_abs2meta['input']:
-            if tgt in abs_in2prom_info:
-                prom = abs2prom[tgt]
-                if prom in seen:
-                    continue
+        for tgt, prom in self._resolver.abs2prom_iter('input', local=True):
+            if tgt in abs_in2prom_info and prom not in seen:
                 seen.add(prom)
 
                 plist = abs_in2prom_info[tgt]
@@ -1659,23 +1672,24 @@ class Group(System):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
-        if self._var_allprocs_prom2abs_list is None:
-            old_prom2abs = {}
+        if self._resolver is None:
+            old_proms = set()
         else:
-            old_prom2abs = self._var_allprocs_prom2abs_list['input']
+            old_proms = set(self._resolver.prom_iter('input'))
+
+        self._var_existence = None
 
         super()._setup_var_data()
+
+        resolver = self._resolver
+        self._cross_keys = set()
 
         var_discrete = self._var_discrete
         allprocs_discrete = self._var_allprocs_discrete
 
         abs2meta = self._var_abs2meta
-        abs2prom = self._var_abs2prom
 
         allprocs_abs2meta = {'input': {}, 'output': {}}
-        self._ivcs = {}
-
-        allprocs_prom2abs_list = self._var_allprocs_prom2abs_list
 
         for n, lst in self._group_inputs.items():
             lst[0]['path'] = self.pathname  # used for error reporting
@@ -1684,6 +1698,7 @@ class Group(System):
         self._has_distrib_vars = False
         self._has_fd_group = self._owns_approx_jac
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
+        rank = self.comm.rank
 
         # sort the subsystems alphabetically in order to make the ordering
         # of vars in vectors and other data structures independent of the
@@ -1709,8 +1724,7 @@ class Group(System):
                 var_discrete[io].update({sub_prefix + k: v for k, v in
                                          subsys._var_discrete[io].items()})
 
-                sub_loc_proms = subsys._var_abs2prom[io]
-                for sub_prom, sub_abs in subsys._var_allprocs_prom2abs_list[io].items():
+                for sub_prom, sub_abs in subsys._resolver.prom2abs_iter(io):
                     if sub_prom in subprom2prom:
                         prom_name, _, pinfo, _ = subprom2prom[sub_prom]
                         if pinfo is not None and io == 'input':
@@ -1726,12 +1740,13 @@ class Group(System):
                                 abs_in2prom_info[abs_in][tree_level] = pinfo
                     else:
                         prom_name = sub_prefix + sub_prom
-                    if prom_name not in allprocs_prom2abs_list[io]:
-                        allprocs_prom2abs_list[io][prom_name] = []
-                    allprocs_prom2abs_list[io][prom_name].extend(sub_abs)
+
                     for abs_name in sub_abs:
-                        if abs_name in sub_loc_proms:
-                            abs2prom[io][abs_name] = prom_name
+                        flags = subsys._resolver.flags(abs_name, io)
+                        resolver.add_mapping(abs_name, prom_name, io,
+                                             local=flags & LOCAL,
+                                             continuous=flags & CONTINUOUS,
+                                             distributed=flags & DISTRIBUTED)
 
             if isinstance(subsys, Group):
                 # propagate any subsystem 'set_input_defaults' info up to this Group
@@ -1748,15 +1763,17 @@ class Group(System):
 
         # If running in parallel, allgather
         if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
+            proc_resolvers = [None] * self.comm.size
+            resolver.reset_prom_maps()  # no use sending prom2abs to other procs
             if self._gather_full_data():
-                raw = (allprocs_discrete, allprocs_prom2abs_list, allprocs_abs2meta,
+                raw = (allprocs_discrete, resolver, allprocs_abs2meta,
                        self._has_output_scaling, self._has_output_adder,
                        self._has_resid_scaling, self._group_inputs, self._has_distrib_vars,
                        self._has_fd_group)
             else:
                 raw = (
                     {'input': {}, 'output': {}},
-                    {'input': {}, 'output': {}},
+                    None,
                     {'input': {}, 'output': {}},
                     False,
                     False,
@@ -1772,11 +1789,8 @@ class Group(System):
             old_abs2meta = allprocs_abs2meta
             allprocs_abs2meta = {'input': {}, 'output': {}}
 
-            for io in ['input', 'output']:
-                allprocs_prom2abs_list[io] = {}
-
             myrank = self.comm.rank
-            for rank, (proc_discrete, proc_prom2abs_list, proc_abs2meta,
+            for rank, (proc_discrete, proc_resolver, proc_abs2meta,
                        oscale, oadd, rscale, ginputs, has_dist_vars,
                        has_fd_group) in enumerate(gathered):
                 self._has_output_scaling |= oscale
@@ -1791,14 +1805,13 @@ class Group(System):
                             self._group_inputs[p] = []
                         self._group_inputs[p].extend(mlist)
 
+                proc_resolvers[rank] = proc_resolver
+
                 for io in ['input', 'output']:
                     allprocs_abs2meta[io].update(proc_abs2meta[io])
                     allprocs_discrete[io].update(proc_discrete[io])
 
-                    for prom_name, abs_names_list in proc_prom2abs_list[io].items():
-                        if prom_name not in allprocs_prom2abs_list[io]:
-                            allprocs_prom2abs_list[io][prom_name] = []
-                        allprocs_prom2abs_list[io][prom_name].extend(abs_names_list)
+            self._resolver.update_from_ranks(myrank, proc_resolvers)
 
             for io in ('input', 'output'):
                 if allprocs_abs2meta[io]:
@@ -1809,27 +1822,14 @@ class Group(System):
 
         self._var_allprocs_abs2meta = allprocs_abs2meta
 
-        for prom_name, abs_list in allprocs_prom2abs_list['output'].items():
-            if len(abs_list) > 1:
-                self._collect_error("{}: Output name '{}' refers to "
-                                    "multiple outputs: {}.".format(self.msginfo, prom_name,
-                                                                   sorted(abs_list)))
-
-        for io in ('input', 'output'):
-            a2p = self._var_allprocs_abs2prom[io]
-            for prom, abslist in self._var_allprocs_prom2abs_list[io].items():
-                for abs_name in abslist:
-                    a2p[abs_name] = prom
-
         if self._group_inputs:
-            p2abs_in = self._var_allprocs_prom2abs_list['input']
-            extra = [gin for gin in self._group_inputs if gin not in p2abs_in]
+            extra = [gin for gin in self._group_inputs if not resolver.is_prom(gin, 'input')]
             if extra:
                 # make sure that we don't have a leftover group input default entry from a previous
                 # execution of _setup_var_data before promoted names were updated.
                 ex = set()
                 for e in extra:
-                    if e in old_prom2abs:
+                    if e in old_proms:
                         del self._group_inputs[e]  # clean up old key using old promoted name
                     else:
                         ex.add(e)
@@ -1844,9 +1844,8 @@ class Group(System):
             self._discrete_inputs = self._discrete_outputs = {}
 
         self._vars_to_gather = self._find_vars_to_gather()
-
-        # create mapping of indep var names to their metadata
-        self._ivcs = self.get_indep_vars(local=False)
+        if self.pathname == '':
+            self._problem_meta['vars_to_gather'] = self._vars_to_gather
 
     def _resolve_group_input_defaults(self, show_warnings=False):
         """
@@ -1859,21 +1858,22 @@ class Group(System):
         show_warnings : bool
             Bool to show or hide the auto_ivc warnings.
         """
-        skip = set(('path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'))
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+        skip = {'path', 'use_tgt', 'prom', 'src_shape', 'src_indices', 'auto'}
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
         abs2meta_in = self._var_allprocs_abs2meta['input']
+        resolver = self._resolver
 
         self._auto_ivc_warnings = []
 
         for prom, metalist in self._group_inputs.items():
-            if prom not in prom2abs_in:
+            if not resolver.is_prom(prom, 'input'):
                 # this error was already collected in setup_var_data, so just continue here
                 continue
             try:
                 paths = [(i, m['path']) for i, m in enumerate(metalist) if not m['auto']]
-                top_origin = paths[0][1]
-                top_prom = metalist[paths[0][0]]['prom']
+                if paths:
+                    top_origin = paths[0][1]
+                    top_prom = metalist[paths[0][0]]['prom']
             except KeyError:
                 issue_warning("No auto IVCs found", prefix=self.msginfo, category=PromotionWarning)
             allmeta = set()
@@ -1920,23 +1920,13 @@ class Group(System):
                                         prm = f"('{origin_prom}' / '{submeta['prom']}')"
                                     else:
                                         prm = f"'{origin_prom}'"
-                                    common = common_subpath((origin, submeta['path']))
-                                    if common:
-                                        sub = self._get_subsystem(common)
-                                        if sub is not None:
-                                            for a in prom2abs_in[prom]:
-                                                if a in sub._var_abs2prom['input']:
-                                                    prom = sub._var_abs2prom['input'][a]
-                                                    break
-
-                                    gname = f"Group named '{common}'" if common else 'model'
                                     self._collect_error(f"{self.msginfo}: The subsystems {origin} "
                                                         f"and {submeta['path']} called "
                                                         f"set_input_defaults for promoted input "
                                                         f"{prm} with conflicting values for "
-                                                        f"'{key}'. Call <group>.set_input_defaults("
-                                                        f"'{prom}', {key}=?), where <group> is the "
-                                                        f"{gname} to remove the ambiguity.")
+                                                        f"'{key}'. Call model.set_input_defaults("
+                                                        f"'{prom}', {key}=?) to remove the "
+                                                        "ambiguity.")
 
             # update all metadata dicts with any missing metadata that was filled in elsewhere
             # and update src_shape and use_tgt in abs_in2prom_info
@@ -1945,7 +1935,7 @@ class Group(System):
                 prefix = meta['path'] + '.' if meta['path'] else ''
                 src_shape = None
                 if 'val' in meta:
-                    abs_in = prom2abs_in[prom][0]
+                    abs_in = resolver.absnames(prom, 'input')[0]
                     if abs_in in abs2meta_in:  # it's a continuous variable
                         src_shape = np.asarray(meta['val']).shape
                 elif 'src_shape' in meta:
@@ -1953,7 +1943,7 @@ class Group(System):
 
                 if src_shape is not None:
                     # Now update the global promotes info dict
-                    for tgt in prom2abs_in[prom]:
+                    for tgt in resolver.absnames(prom, 'input'):
                         if tgt in abs_in2prom_info and tgt.startswith(prefix):
                             pinfo = abs_in2prom_info[tgt][tree_level]
                             if pinfo is not None:
@@ -1976,7 +1966,7 @@ class Group(System):
                                                   promoted_from=self.pathname)
                 else:
                     # check for discrete targets
-                    for tgt in prom2abs_in[prom]:
+                    for tgt in resolver.absnames(prom, 'input'):
                         if tgt in self._discrete_inputs:
                             for key, val in meta.items():
                                 # for discretes we can only set the value (not units/src_shape)
@@ -1993,12 +1983,12 @@ class Group(System):
         Return a mapping of var pathname to owning rank.
 
         The mapping will contain ONLY systems that are remote on at least one proc.
-        Distributed systems are not included.
+        Distributed variables are not included. Discrete variables ARE included.
 
         Returns
         -------
         dict
-            The mapping of variable pathname to owning rank.
+            The mapping of variable pathname to the lowest rank where it's local.
         """
         remote_vars = {}
 
@@ -2006,15 +1996,14 @@ class Group(System):
             myproc = self.comm.rank
             nprocs = self.comm.size
 
+            resflags = self._resolver.flags
             for io in ('input', 'output'):
-                abs2prom = self._var_abs2prom[io]
-                abs2meta = self._var_allprocs_abs2meta[io]
 
                 # var order must be same on all procs
-                sorted_names = sorted(self._var_allprocs_abs2prom[io])
+                sorted_names = sorted(self._resolver.abs_iter(io, distributed=False))
                 locality = np.zeros((nprocs, len(sorted_names)), dtype=bool)
                 for i, name in enumerate(sorted_names):
-                    if name in abs2prom:
+                    if resflags(name, io) & LOCAL:
                         locality[myproc, i] = True
 
                 my_loc = locality[myproc, :].copy()
@@ -2022,12 +2011,33 @@ class Group(System):
 
                 for i, name in enumerate(sorted_names):
                     nzs = np.nonzero(locality[:, i])[0]
-                    if name in abs2meta and abs2meta[name]['distributed']:
-                        pass
-                    elif 0 < nzs.size < nprocs:
+                    if 0 < nzs.size < nprocs:
                         remote_vars[name] = nzs[0]
 
         return remote_vars
+
+    def _setup_var_existence(self):
+        """
+        Compute the arrays of variable existence for all variables/procs on this system.
+        """
+        abs2idx = self._var_allprocs_abs2idx = {}
+        all_abs2meta = self._var_allprocs_abs2meta
+        self._var_existence = {
+            'input': np.zeros((self.comm.size, len(all_abs2meta['input'])), dtype=bool),
+            'output': np.zeros((self.comm.size, len(all_abs2meta['output'])), dtype=bool),
+        }
+
+        iproc = self.comm.rank
+        for io, existence in self._var_existence.items():
+            abs2meta = self._var_abs2meta[io]
+            for i, name in enumerate(self._var_allprocs_abs2meta[io]):
+                abs2idx[name] = i
+                if name in abs2meta:
+                    existence[iproc, i] = True
+
+            if self.comm.size > 1:
+                row = existence[iproc, :].copy()
+                self.comm.Allgather(row, existence)
 
     @collect_errors
     def _setup_var_sizes(self):
@@ -2079,7 +2089,7 @@ class Group(System):
 
         if self.comm.size > 1:
             owns = self._owning_rank
-            self._owned_sizes = self._var_sizes['output'].copy()
+            self._owned_output_sizes = self._var_sizes['output'].copy()
             abs2idx = self._var_allprocs_abs2idx
             for io in ('input', 'output'):
                 sizes = self._var_sizes[io]
@@ -2090,7 +2100,7 @@ class Group(System):
                         if sizes[rank, i] > 0:
                             owns[name] = rank
                             if not dist and io == 'output':
-                                self._owned_sizes[rank + 1:, i] = 0  # zero out all dups
+                                self._owned_output_sizes[rank + 1:, i] = 0  # zero out all dups
                             break
 
                 if abs2discrete[io]:
@@ -2103,7 +2113,7 @@ class Group(System):
                         for n in toadd:
                             owns[n] = rank
         else:
-            self._owned_sizes = self._var_sizes['output']
+            self._owned_output_sizes = self._var_sizes['output']
 
     def _owned_size(self, abs_name):
         """
@@ -2119,7 +2129,7 @@ class Group(System):
         int
             The size of the variable on this rank, 0 if this is not the owning rank.
         """
-        return self._owned_sizes[self.comm.rank, self._var_allprocs_abs2idx[abs_name]]
+        return self._owned_output_sizes[self.comm.rank, self._var_allprocs_abs2idx[abs_name]]
 
     def _setup_global_connections(self, parent_conns=None):
         """
@@ -2132,11 +2142,11 @@ class Group(System):
         """
         global_abs_in2out = defaultdict(set)
 
-        allprocs_prom2abs_list_in = self._var_allprocs_prom2abs_list['input']
-        allprocs_prom2abs_list_out = self._var_allprocs_prom2abs_list['output']
-
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
+
+        resolver = self._resolver
+        is_prom = self._resolver.is_prom
 
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
 
@@ -2165,11 +2175,11 @@ class Group(System):
                             new_conns[in_subsys][abs_in] = abs_out
 
         # Add implicit connections (only ones owned by this group)
-        for prom_name, out_list in allprocs_prom2abs_list_out.items():
-            if prom_name in allprocs_prom2abs_list_in:  # names match ==> a connection
+        for prom_name, out_list in resolver.prom2abs_iter('output'):
+            if is_prom(prom_name, 'input'):  # names match ==> a connection
                 abs_out = out_list[0]
                 out_subsys, _, _ = abs_out[path_len:].partition('.')
-                for abs_in in allprocs_prom2abs_list_in[prom_name]:
+                for abs_in in resolver.absnames(prom_name, 'input'):
                     in_subsys, _, _ = abs_in[path_len:].partition('.')
                     global_abs_in2out[abs_in].add(abs_out)
                     if out_subsys == in_subsys:
@@ -2196,13 +2206,13 @@ class Group(System):
 
             # throw an exception if either output or input doesn't exist
             # (not traceable to a connect statement, so provide context)
-            if not (prom_out in allprocs_prom2abs_list_out or prom_out in allprocs_discrete_out):
-                if (prom_out in allprocs_prom2abs_list_in or prom_out in allprocs_discrete_in):
+            if not (is_prom(prom_out, 'output') or prom_out in allprocs_discrete_out):
+                if (is_prom(prom_out, 'input') or prom_out in allprocs_discrete_in):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' is an input. " + \
                           "All connections must be from an output to an input."
                 else:
-                    guesses = get_close_matches(prom_out, list(allprocs_prom2abs_list_out.keys()) +
+                    guesses = get_close_matches(prom_out, list(resolver.prom_iter('output')) +
                                                 list(allprocs_discrete_out.keys()))
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_out}' doesn't exist. Perhaps you meant " + \
@@ -2212,13 +2222,13 @@ class Group(System):
                 self._collect_error(msg)
                 continue
 
-            if not (prom_in in allprocs_prom2abs_list_in or prom_in in allprocs_discrete_in):
-                if (prom_in in allprocs_prom2abs_list_out or prom_in in allprocs_discrete_out):
+            if not (is_prom(prom_in, 'input') or prom_in in allprocs_discrete_in):
+                if (is_prom(prom_in, 'output') or prom_in in allprocs_discrete_out):
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' is an output. " + \
                           "All connections must be from an output to an input."
                 else:
-                    guesses = get_close_matches(prom_in, list(allprocs_prom2abs_list_in.keys()) +
+                    guesses = get_close_matches(prom_in, list(resolver.prom_iter('input')) +
                                                 list(allprocs_discrete_in.keys()))
                     msg = f"{self.msginfo}: Attempted to connect from '{prom_out}' to " + \
                           f"'{prom_in}', but '{prom_in}' doesn't exist. Perhaps you meant " + \
@@ -2231,11 +2241,11 @@ class Group(System):
             # Throw an exception if output and input are in the same system
             # (not traceable to a connect statement, so provide context)
             # and check if src_indices is defined in both connect and add_input.
-            abs_out = allprocs_prom2abs_list_out[prom_out][0]
+            abs_out = resolver.prom2abs(prom_out, 'output')
             out_comp, _, _ = abs_out.rpartition('.')
             out_subsys, _, _ = abs_out[path_len:].partition('.')
 
-            for abs_in in allprocs_prom2abs_list_in[prom_in]:
+            for abs_in in resolver.absnames(prom_in, 'input'):
                 in_comp, _, _ = abs_in.rpartition('.')
                 if out_comp == in_comp:
                     self._collect_error(
@@ -2245,15 +2255,6 @@ class Group(System):
                     continue
 
                 if src_indices is not None:
-                    a2m = allprocs_abs2meta_in[abs_in]
-                    if (a2m['shape_by_conn'] or a2m['compute_shape']):
-                        self._collect_error(
-                            f"{self.msginfo}: Setting of 'src_indices' along with 'shape_by_conn', "
-                            f"'copy_shape', or 'compute_shape' for variable '{abs_in}' "
-                            "is unsupported.")
-                        self._bad_conn_vars.update((prom_in, prom_out))
-                        continue
-
                     if abs_in in abs2meta:
                         if abs_in not in abs_in2prom_info:
                             abs_in2prom_info[abs_in] = [None] * (abs_in.count('.') + 1)
@@ -2335,7 +2336,7 @@ class Group(System):
         self._conn_global_abs_in2out = {name: srcs.pop()
                                         for name, srcs in global_abs_in2out.items()}
 
-    def get_indep_vars(self, local):
+    def get_indep_vars(self, local, include_discrete=False):
         """
         Return a dict of independant variables contained in this group or any of its subgroups.
 
@@ -2343,6 +2344,8 @@ class Group(System):
         ----------
         local : bool
             If True, return only the variables local to the current process.
+        include_discrete : bool
+            If True, include discrete variables in the returned dict.
 
         Returns
         -------
@@ -2350,31 +2353,19 @@ class Group(System):
             Dict of all independant variables in this group and their corresponding metadata.
         """
         abs2meta = self._var_abs2meta['output'] if local else self._var_allprocs_abs2meta['output']
-        return {n: meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
+        ivcs = {n: meta for n, meta in abs2meta.items() if 'openmdao:indep_var' in meta['tags']}
+        if include_discrete:
+            if local:
+                # local discrete vars use relative names
+                prefix = self.pathname + '.' if self.pathname else ''
+                ivcs.update({prefix + n: meta for n, meta in self._var_discrete['output'].items()
+                             if 'openmdao:indep_var' in meta['tags']})
+            else:
+                ivcs.update({n: meta for n, meta in self._var_allprocs_discrete['output'].items()
+                             if 'openmdao:indep_var' in meta['tags']})
+        return ivcs
 
-    def get_boundary_vars(self, io, local):
-        """
-        Return a set of inputs or outputs connected to variables outside of this Group.
-
-        Parameters
-        ----------
-        io : str
-            Either 'input' or 'output'.
-        local : bool
-            If True, return only the variables local to the current process.
-
-        Returns
-        -------
-        set
-            Set of absolute inputs or outputs connected to variables outside of this Group.
-        """
-        assert io in ('input', 'output'), \
-            f"io must be either 'input' or 'output', but '{io}' was given."
-        # _var_*_abs2prom contains both continuous and discrete variables
-        vnames = self._var_abs2prom[io] if local else self._var_allprocs_abs2prom[io]
-        return set(vnames).difference(self._conn_global_abs_in2out)
-
-    def _setup_jax(self, from_group=False):
+    def _setup_jax(self):
         if jax is None:
             return
 
@@ -2382,16 +2373,21 @@ class Group(System):
         # jax anywhere below where it's active, then return.
         for subsys in self._subsystems_myproc:
             if isinstance(subsys, Group) or subsys.options['derivs_method'] == 'jax':
-                subsys._setup_jax(from_group)
+                subsys._setup_jax()
 
-    def _setup_dynamic_shapes(self):
+    def _setup_dynamic_property(self, prop):
         """
-        Dynamically add shape/size metadata for variables.
+        Dynamically add property metadata for variables.
 
-        This only happens if the user has set shape_by_conn, copy_shape, or compute_shape
-        for a variable.
+        This only happens if the user has set shape_by_conn, units_by_conn, copy_shape, copy_units,
+        compute_shape, or compute_units for a variable.
+
+        Parameters
+        ----------
+        prop : str
+            Name of the property to compute.
         """
-        def get_group_input_shape(prom, gshapes):
+        def get_group_input_property(prom, gdict, prop):
             """
             Get the shape of the given promoted group input.
 
@@ -2399,64 +2395,66 @@ class Group(System):
             ----------
             prom : str
                 Promoted name of the group input.
-            gshapes : dict
-                Mapping of group input name to shape.
+            gdict : dict
+                Mapping of group input name to property.
+            prop : str
+                Name of the property to get.
 
             Returns
             -------
             tuple or None
-                If the shape of the variable is known, return the shape.
+                If the property of the variable is known, return the property.
                 Otherwise, return None.
             """
-            if prom in gshapes:
-                return gshapes[prom]
+            if prom in gdict:
+                return gdict[prom]
 
             if prom in self._group_inputs:
                 for d in self._group_inputs[prom]:
-                    if 'src_shape' in d:
-                        return d['src_shape']
-                    elif 'val' in d:
-                        return np.asarray(d['val']).shape
+                    if prop == 'shape':
+                        if 'src_shape' in d:
+                            return d['src_shape']
+                        elif 'val' in d:
+                            return np.asarray(d['val']).shape
+                    elif prop == 'units':
+                        if 'units' in d:
+                            return d['units']
 
-        def compute_var_meta(graph, to_var, shapes, func):
+        def compute_var_property(to_var, prop_dict, func, prop):
             """
             Compute shape info for the given variable using the given function.
 
             Parameters
             ----------
-            graph : nx.DiGraph
-                Graph containing all variables with shape info.
             to_var : str
-                Name of variable to compute shape info for.
-            shapes : dict
-                Mapping of variable name to shape.
+                Name of variable to compute property for.
+            prop_dict : dict
+                Mapping of variable name to property.
             func : function
-                Function to use to compute the shape.
+                Function to use to compute the property.
+            prop : str
+                Name of the property to compute.
 
             Returns
             -------
             tuple or None
-                If the shape of the variable is known, return the shape.
+                If the property of the variable is known, return it.
                 Otherwise, return None.
             """
-            compname = to_var.rpartition('.')[0]
             try:
-                from_shape = func(shapes)
-            except KeyError as err:
-                abs_name = f"{compname}.{err.args[0]}"
-                self._collect_error(f"{self.msginfo}: Can't compute shape of variable '{to_var}': "
-                                    f"variable '{abs_name}' doesn't exist.")
+                from_prop = func(prop_dict)
+            except KeyError:
+                self._collect_error(f"{self.msginfo}: Can't compute {prop} of variable "
+                                    f"'{to_var}': variable '{to_var}' doesn't exist.")
                 return
             except Exception as err:
-                self._collect_error(f"{self.msginfo}: Error occurred while computing the shape "
-                                    f"of variable '{to_var}': {err}")
+                self._collect_error(f"{self.msginfo}: Error occurred while computing the "
+                                    f"{prop} of variable '{to_var}': {err}")
                 return
-            else:
-                graph.nodes[to_var]['shape'] = from_shape
 
-            return from_shape
+            return from_prop
 
-        def copy_var_meta(graph, from_var, to_var, distrib_sizes):
+        def copy_var_shape(graph, from_var, to_var, dist_shapes, dist_sizes):
             """
             Copy shape info from from_var's metadata to to_var's metadata in the graph.
 
@@ -2468,7 +2466,9 @@ class Group(System):
                 Name of variable to copy shape info from.
             to_var : str
                 Name of variable to copy shape info to.
-            distrib_sizes : dict
+            dist_shapes : dict
+                Mapping of distributed variable name to shapes in each rank.
+            dist_sizes : dict
                 Mapping of distributed variable name to sizes in each rank.
 
             Returns
@@ -2480,308 +2480,487 @@ class Group(System):
             if to_var.startswith('#'):
                 return
 
-            nprocs = self.comm.size
-
             from_meta = graph.nodes[from_var]
-            from_dist = nprocs > 1 and from_meta['distributed']
             from_shape = from_meta['shape']
+            if from_shape is None:
+                return
             from_io = from_meta['io']
-
             to_meta = graph.nodes[to_var]
-            to_dist = nprocs > 1 and to_meta['distributed']
-            to_io = to_meta['io']
 
-            # known dist output to/from non-distributed input.  We don't allow this case because
-            # non-distributed variables must have the same value on all procs and the only way
-            # this is possible is if the src_indices on each proc are identical, but that's not
-            # possible if we assume 'always local' transfer (see POEM 46).
-            if from_dist and not to_dist:
-                if from_io == 'output':
-                    self._collect_error(
-                        f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
-                        f"from distributed {from_io} '{from_var}' is not supported.")
+            # is this a connection internal to a component?
+            internal = to_var.rpartition('.')[0] == from_var.rpartition('.')[0]
+            if internal:  # if internal to a component, src_indices isn't used
+                fwd = from_io == 'input'
+                src_indices = None
+            else:
+                fwd = from_io == 'output'
+                if fwd:
+                    src_indices = to_meta['src_indices']
+                else:  # rev
+                    src_indices = from_meta.get('src_indices')
+
+            is_full_slice = False
+            if src_indices is not None:
+                ind = src_indices()
+                if isinstance(ind, slice):
+                    slc = src_indices._slice
+                    is_full_slice = ((slc.start is None or slc.start == 0) and slc.stop is None and
+                                     (slc.step is None or slc.step == 0))
+
+            if self.comm.size > 1:
+                dist_from = from_meta['distributed']
+                dist_to = to_meta['distributed']
+            else:
+                dist_from = dist_to = False
+
+            if fwd:
+                if dist_to:
+                    if dist_from:
+                        shpfunc = dist2distfwd
+                    else:
+                        shpfunc = serial2distfwd
+                else:
+                    if dist_from:
+                        shpfunc = dist2serialfwd
+                    else:
+                        shpfunc = serial2serialfwd
+            else:  # rev
+                if dist_to:
+                    if dist_from:
+                        shpfunc = dist2distrev
+                    else:
+                        shpfunc = dist2serialrev
+                else:
+                    if dist_from:
+                        shpfunc = serial2distrev
+                    else:
+                        shpfunc = serial2serialrev
+
+            return shpfunc(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
+                           is_full_slice)
+
+        def get_global_dist_shape(name, dist_shapes):
+            dshapelists = [list(dshape) for dshape in dist_shapes if dshape is not None]
+            first_dim_size = dshapelists[0][0] if len(dshapelists[0]) > 0 else 1
+            # verify that all dshapes have equal higher dimensions (besides the first)
+            for dshape in dshapelists[1:]:
+                if dshape != dshapelists[0]:
+                    self._collect_error(f"Can't get global shape of distributed variable '{name}' "
+                                        "because the shapes on each rank do not match in their "
+                                        "upper dimensions.")
                     return
-                else:  # serial_out <- dist_in
-                    # all input rank sizes must be the same
-                    if not np.all(distrib_sizes[from_var] == distrib_sizes[from_var][0]):
-                        if from_io == 'output':
-                            ident = (from_var, to_var)
-                        else:
-                            ident = (to_var, from_var)
+
+                first_dim_size += dshape[0] if dshape else 1
+
+            return (first_dim_size,) + tuple(dshapelists[0][1:])
+
+        def serial2serialfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
+                             is_full_slice):
+            if src_indices is None:
+                shp = graph.nodes[from_var]['shape']
+            else:
+                src_indices.set_src_shape(graph.nodes[from_var]['shape'])
+                shp = src_indices.indexed_src_shape
+
+            graph.nodes[to_var]['shape'] = shp
+            return shp
+
+        def serial2serialrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
+                             is_full_slice):
+            if src_indices is None or is_full_slice:
+                shp = graph.nodes[from_var]['shape']
+            else:
+                self._collect_error(f"Input '{from_var}' has src_indices so the shape "
+                                    f"of connected output '{to_var}' cannot be "
+                                    "determined.")
+                return
+
+            graph.nodes[to_var]['shape'] = shp
+            return shp
+
+        def serial2distfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
+                           is_full_slice):
+            from_shape = graph.nodes[from_var]['shape']
+            existence = self._get_var_existence()
+            exist_outs = existence['output'][:, self._var_allprocs_abs2idx[from_var]]
+            exist_ins = existence['input'][:, self._var_allprocs_abs2idx[to_var]]
+            if src_indices is None:
+                shape = from_shape
+            else:
+                to_meta = graph.nodes[to_var]
+                num_exist = np.count_nonzero(exist_outs)
+
+                if to_meta.get('flat_src_indices') or len(from_shape) < 2:
+                    global_src_shape = (num_exist * shape_to_len(from_shape),)
+                else:
+                    shapelst = list(from_shape)
+                    # stack the shapes across procs
+                    first_dim = shapelst[0] * num_exist
+                    shapelst[0] = first_dim
+                    global_src_shape = tuple(shapelst)
+
+                src_indices.set_src_shape(global_src_shape)
+
+                shape = to_meta['shape'] = src_indices.indexed_src_shape
+
+            size = shape_to_len(shape)
+            sizes = np.zeros(self.comm.size, dtype=int)
+            sizes[exist_ins] = size
+            dist_sizes[to_var] = sizes
+            dist_shapes[to_var] = [shape if exist_ins[i] else None for i in range(self.comm.size)]
+            graph.nodes[to_var]['shape'] = shape
+            return shape
+
+        def serial2distrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
+                           is_full_slice):
+            # serial_out <-- dist_in
+            dshapes = dist_shapes[from_var]
+            if len(dshapes) >= 1:
+                shape0 = dshapes[0]
+                for ds in dshapes:
+                    if ds != shape0:
+                        to_io = graph.nodes[to_var]['io']
+                        from_io = graph.nodes[from_var]['io']
                         self._collect_error(
                             f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
                             f"from distributed {from_io} '{from_var}' is not supported because not "
-                            f"all {from_var} ranks are the same size "
-                            f"(sizes={distrib_sizes[from_var]}).", ident=ident)
+                            f"all {from_var} ranks are the same shape "
+                            f"(shapes={dshapes}).", ident=(from_var, to_var))
                         return
 
-            to_meta['shape'] = from_shape
+                graph.nodes[to_var]['shape'] = shape0
+                return shape0
 
-            if from_var in distrib_sizes:
-                distrib_sizes[to_var] = distrib_sizes[from_var]
+        def dist2serialfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
+                           is_full_slice):
+            # dist_out --> serial_in
+            if src_indices is None:
+                # We don't allow this case because
+                # serial variables must have the same value on all procs and the only way
+                # this is possible is if the src_indices on each proc are identical, but that's not
+                # possible if we assume 'always local' transfer (see POEM 46).
+                to_io = graph.nodes[to_var]['io']
+                from_io = graph.nodes[from_var]['io']
+                self._collect_error(
+                    f"{self.msginfo}: dynamic sizing of non-distributed {to_io} '{to_var}' "
+                    f"from distributed {from_io} '{from_var}' without src_indices is not "
+                    "supported.")
+            else:
+                if graph.nodes[to_var].get('flat_src_indices'):
+                    global_size = np.sum(dist_sizes[from_var])
+                    src_indices.set_src_shape((global_size,))
+                    shp = src_indices.indexed_src_shape
+                else:
+                    global_shape = get_global_dist_shape(from_var, dist_shapes[from_var])
+                    src_indices.set_src_shape(global_shape)
+                    shp = src_indices.indexed_src_shape
 
-            return from_shape
+                graph.nodes[to_var]['shape'] = shp
+                return shp
 
-        def get_unresolved_knowns(graph, nodes=None):
+        def dist2serialrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
+                           is_full_slice):
+            # dist_out <-- serial_in
+            if is_full_slice:
+                abs2idx = self._var_allprocs_abs2idx
+                # serial input is using full slice here, so contains the full
+                # distributed value of the distributed output (and serial input will
+                # have the same value on all procs).
+
+                # dist input may not exist on all procs, so distribute the serial
+                # entries across only the procs where the dist output exists.
+                exist_procs = self._get_var_existence()['output'][:, abs2idx[to_var]]
+                split_num = np.count_nonzero(exist_procs)
+
+                from_shape = graph.nodes[from_var]['shape']
+                sz, _ = evenly_distrib_idxs(split_num, shape_to_len(from_shape))
+                sizes = np.zeros(self.comm.size, dtype=int)
+                sizes[exist_procs] = sz
+                dist_sizes[to_var] = sizes.copy()
+                to_meta = graph.nodes[to_var]
+                if len(from_shape) > 1:
+                    if from_shape[0] != self.comm.size:
+                        self._collect_error(f"Serial input '{from_var}' has shape "
+                                            f"{from_shape} but output '{to_var}' "
+                                            f"is distributed over {self.comm.size} "
+                                            f"procs and {from_shape[0]} != "
+                                            f"{self.comm.size}.")
+                        return
+                    else:
+                        dist_shapes[to_var] = [from_shape[1:]] * self.comm.size
+                        shp = to_meta['shape'] = from_shape[1:]
+                else:
+                    dist_shapes[to_var] = [(s,) for s in sizes]
+                    shp = to_meta['shape'] = (sizes[sizes != 0][0],)
+
+                return shp
+
+            else:
+                self._collect_error(f"Input '{from_var}' has src_indices so the shape "
+                                    f"of connected output '{to_var}' cannot be "
+                                    "determined.")
+
+        def dist2distfwd(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
+                         is_full_slice):
+            if is_full_slice:
+                self._collect_error(f"Using a full slice [:] as src_indices between"
+                                    f" distributed variables '{from_var}' and "
+                                    f"'{to_var}' is invalid.")
+                return
+
+            if src_indices is None:
+                shp = graph.nodes[to_var]['shape'] = graph.nodes[from_var]['shape']
+                dist_shapes[to_var] = dist_shapes[from_var].copy()
+                dist_sizes[to_var] = dist_sizes[from_var].copy()
+            else:
+                flat = graph.nodes[to_var].get('flat_src_indices')
+                if flat:
+                    src_indices.set_src_shape(np.sum(dist_sizes[from_var]))
+                else:
+                    global_shape = get_global_dist_shape(from_var, dist_shapes[from_var])
+                    src_indices.set_src_shape(global_shape)
+                dsizes = np.zeros_like(dist_sizes[from_var])
+                dsizes[self.comm.rank] = src_indices.indexed_src_size
+                self.comm.Allreduce(dsizes, dist_sizes[to_var], op=MPI.SUM)
+                shp = graph.nodes[to_var]['shape'] = src_indices.indexed_src_shape
+                if flat:
+                    dist_shapes[to_var] = [(s,) for s in dist_sizes[to_var]]
+                else:
+                    dist_shapes[to_var] = self.comm.allgather(shp)
+
+            return shp
+
+        def dist2distrev(graph, from_var, to_var, dist_shapes, dist_sizes, src_indices,
+                         is_full_slice):
+            if is_full_slice:
+                self._collect_error(f"Using a full slice [:] as src_indices between"
+                                    f" distributed variables '{from_var}' and "
+                                    f"'{to_var}' is invalid.")
+            elif src_indices is None:
+                shp = graph.nodes[to_var]['shape'] = graph.nodes[from_var]['shape']
+                dist_shapes[to_var] = dist_shapes[from_var].copy()
+                dist_sizes[to_var] = dist_sizes[from_var].copy()
+                return shp
+            else:
+                self._collect_error(f"Input '{from_var}' has src_indices so the shape "
+                                    f"of connected output '{to_var}' cannot be "
+                                    "determined.")
+
+        def copy_var_units(graph, from_var, to_var, ignored, ignored2):
             """
-            Return all unresolved nodes with known shape.
-
-            Unresolved means that the node has known shape and at least one successor
-            with unknown shape.
+            Copy units info from from_var's metadata to to_var's metadata in the graph.
 
             Parameters
             ----------
             graph : nx.DiGraph
-                Graph containing all variables with shape info.
-            nodes : list of str or None
-                List of nodes to check.  If None, check all nodes in the graph.
+                Graph containing all variables with units info.
+            from_var : str
+                Name of variable to copy units info from.
+            to_var : str
+                Name of variable to copy units info to.
+            ignored : dict
+                Ignored argument.
+            ignored2 : dict
+                Ignored argument.
 
             Returns
             -------
-            set of str
-                Set of nodes with known shape but at least one successor with unknown shape.
+            tuple or None
+                If the units of the variable are known, return the units.
+                Otherwise, return None.
             """
-            gnodes = graph.nodes
-            if nodes is None:
-                nodes = graph.nodes()
+            if to_var.startswith('#'):
+                return
 
-            unresolved = set()
-            for node in nodes:
-                if gnodes[node]['shape'] is not None:  # node has known shape
-                    for succ in graph.successors(node):
-                        if gnodes[succ]['shape'] is None:
-                            unresolved.add(node)
-                            break
+            from_meta = graph.nodes[from_var]
+            to_meta = graph.nodes[to_var]
 
-            return unresolved
+            from_units = from_meta['units']
+            to_meta['units'] = from_units
 
-        def get_actives(graph, knowns):
-            """
-            Return all active single edges and active multi nodes.
+            return from_units
 
-            Active edges are those that are connected on one end to a known shape variable
-            and on the other end to an unknown shape variable.  Active nodes are those that
-            have unknown shape but are connected to a known shape variable.
-
-            Single edges correspond to 'shape_by_conn' and 'copy_shape' connections.
-            Multi nodes are variables that have 'compute_shape' set to True so they
-            connect to multiple nodes of the opposite io type in a component. For example
-            a 'compute_shape' output variable will connect to all inputs in the component and
-            each of those edges will be labeled as 'multi'. So a multi node is a node that
-            has 'multi' incoming edges.
-
-            Parameters
-            ----------
-            graph : nx.DiGraph
-                Graph containing all variables with shape info.
-            knowns : list of str
-                List of nodes with known shape.
-
-            Returns
-            -------
-            active_single_edges : set of (str, str)
-                Set of active 'single' edges (for copy_shape and shape_by_conn).
-            active_multi_nodes : set of str
-                Set of active nodes with 'multi' edges (for compute_shape).
-            """
-            active_single_edges = set()
-            active_multi_nodes = set()
-
-            for known in knowns:
-                for succ in graph.successors(known):
-                    if nodes[succ]['shape'] is None:
-                        if edges[known, succ]['multi']:
-                            active_multi_nodes.add(succ)
-                        else:
-                            active_single_edges.add((known, succ))
-
-            return active_single_edges, active_multi_nodes
-
-        def is_unresolved(graph, node):
-            """
-            Return True if the given node is unresolved.
-
-            Unresolved means that the node has at least one successor with unknown shape.
-
-            Parameters
-            ----------
-            graph : nx.DiGraph
-                Graph containing all variables with shape info.
-            node : str
-                Node to check.
-
-            Returns
-            -------
-            bool
-                True if the node is unresolved.
-            """
-            for s in graph.successors(node):
-                if graph.nodes[s]['shape'] is None:
-                    return True
-            return False
-
-        def meta2node_data(meta):
-            """
-            Return a dict containing select metadata for the given variable.
-
-            Parameters
-            ----------
-            meta : dict
-                Metadata for the variable.
-
-            Returns
-            -------
-            dict
-                Dict containing select metadata for the variable.
-            """
-            return {
-                'distributed': meta['distributed'],
-                'shape': meta['shape'],
-                'compute_shape': meta['compute_shape'],
-                'shape_by_conn': meta['shape_by_conn'],
-                'copy_shape': meta['copy_shape'],
-            }
-
-        all_abs2prom_in = self._var_allprocs_abs2prom['input']
         nprocs = self.comm.size
         conn = self._conn_global_abs_in2out
         rev_conn = None
 
-        self._shapes_graph = graph = nx.DiGraph()
         knowns = set()
-        dist_sz = {}  # local distrib sizes
         my_abs2meta_out = self._var_abs2meta['output']
         my_abs2meta_in = self._var_abs2meta['input']
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
-        grp_shapes = {}
-        compute_shape_functs = {}
+        compute_prop_functs = {}
         component_io = defaultdict(list)
+        resolver = self._resolver
+        group_props = {}
 
-        # find all variables that have an unknown shape (across all procs) and connect them
-        # to other unknown and known shape variables to form a directed graph.
+        if prop == 'shape':
+            dist_shp = {}  # local distrib sizes
+            self._shapes_graph = graph = nx.DiGraph()
+            add_node = add_shape_node
+            copy_var_property = copy_var_shape
+        elif prop == 'units':
+            self._units_graph = graph = nx.DiGraph()
+            add_node = add_units_node
+            copy_var_property = copy_var_units
+        else:
+            raise ValueError(f"Invalid property name: {prop}")
+
+        prop_by_conn = f"{prop}_by_conn"
+        copy_prop = f"copy_{prop}"
+        compute_prop = f"compute_{prop}"
+
+        # find all variables that have an unknown property (across all procs) and connect them
+        # to other unknown and known property variables to form a directed graph.
         for io in ('input', 'output'):
+            abs2meta_loc = self._var_abs2meta[io]
             for name, meta in self._var_allprocs_abs2meta[io].items():
+                if name in abs2meta_loc:
+                    meta = abs2meta_loc[name]  # use local metadata if we have it
                 compname = name.rpartition('.')[0]
                 component_io[compname, io].append(name)
 
-                if meta['shape_by_conn']:
-                    graph.add_node(name, io=io, **meta2node_data(meta))
-                    if name in conn:  # it's a connected input
-                        abs_from = conn[name]
-                        if abs_from not in graph:
-                            from_meta = all_abs2meta_out[abs_from]
-                            graph.add_node(abs_from, io='output', **meta2node_data(from_meta))
-                        graph.add_edge(abs_from, name, multi=False)
-                    else:
+                has_prop_by_conn = meta.get(prop_by_conn)
+                has_copy_prop = meta.get(copy_prop)
+                has_compute_prop = meta.get(compute_prop)
+
+                if has_prop_by_conn:
+                    add_node(graph, name, io, meta)
+                    fail = False
+                    if io == 'input':
+                        if name in conn:  # it's a connected input
+                            abs_from = conn[name]
+                            if abs_from not in graph:
+                                from_meta = all_abs2meta_out[abs_from]
+                                add_node(graph, abs_from, 'output', from_meta)
+                            graph.add_edge(abs_from, name, multi=False)
+                        elif not has_compute_prop and not has_copy_prop:
+                            # check to see if we can get shape from _group_inputs
+                            fail = meta[prop] is None
+                            if fail:
+                                prom = resolver.abs2prom(name, 'input')
+                                grp_prop = get_group_input_property(prom, group_props, prop)
+                                if grp_prop is not None:
+                                    # use '#' to designate this as an entry that's not a variable
+                                    gnode = f"#{prom}"
+                                    if prop == 'shape':
+                                        graph.add_node(gnode, io='input', shape=grp_prop,
+                                                       distributed=False, shape_by_conn=None,
+                                                       compute_shape=None)
+                                    elif prop == 'units':
+                                        graph.add_node(gnode, io='input', units=grp_prop,
+                                                       units_by_conn=None, compute_units=None)
+                                    graph.add_edge(gnode, name, multi=False)
+                                    group_props[prom] = grp_prop
+                                    fail = False
+                                else:  # see if there are any connected inputs with known property
+                                    for n in resolver.absnames(prom, 'input'):
+                                        if n != name:
+                                            m = all_abs2meta_in[n]
+                                            if prop == 'shape':
+                                                fail = (m['distributed'] or m['has_src_indices']
+                                                        or m[prop_by_conn] or m[compute_prop]
+                                                        or m[copy_prop])
+                                            elif prop == 'units':
+                                                fail = m[prop_by_conn] or m[compute_prop] or \
+                                                    m[copy_prop]
+                                            if not fail:
+                                                add_node(graph, n, 'input', all_abs2meta_in[n])
+                                                graph.add_edge(n, name, multi=False)
+                                                break
+                    else:  # output
                         if rev_conn is None:
                             rev_conn = get_rev_conns(self._conn_global_abs_in2out)
                         if name in rev_conn:  # connected output
                             for inp in rev_conn[name]:
-                                inmeta = all_abs2meta_in[inp]
-                                graph.add_node(inp, io='input', **meta2node_data(inmeta))
+                                if inp not in graph:
+                                    if inp in my_abs2meta_in:
+                                        inmeta = my_abs2meta_in[inp]
+                                    else:
+                                        inmeta = all_abs2meta_in[inp]
+                                    add_node(graph, inp, 'input', inmeta)
                                 graph.add_edge(inp, name, multi=False)
-                        elif not meta['compute_shape'] and not meta['copy_shape']:
-                            # check to see if we can get shape from _group_inputs
+                        else:
                             fail = True
-                            if io == 'input':
-                                prom = all_abs2prom_in[name]
-                                grp_shape = get_group_input_shape(prom, grp_shapes)
-                                if grp_shape is not None:
-                                    # use '#' to designate this as an entry that's not a variable
-                                    gnode = f"#{prom}"
-                                    graph.add_node(gnode, io='input', shape=grp_shape,
-                                                   distributed=False, shape_by_conn=None,
-                                                   compute_shape=None)
-                                    graph.add_edge(gnode, name, multi=False)
-                                    grp_shapes[prom] = grp_shape
-                                    fail = False
-                                else:  # see if there are any connected inputs with known shape
-                                    for n in self._var_allprocs_prom2abs_list['input'][prom]:
-                                        if n != name:
-                                            m = all_abs2meta_in[n]
-                                            if not (m['distributed'] or m['has_src_indices']
-                                                    or m['shape_by_conn'] or m['compute_shape']
-                                                    or m['copy_shape']):
-                                                fail = False
-                                                graph.add_node(n, io='input', known_count=0,
-                                                               **meta2node_data(all_abs2meta_in[n]))
-                                                graph.add_edge(n, name, multi=False)
-                                                break
-                            if fail and name not in self._bad_conn_vars:
-                                self._collect_error(
-                                    f"{self.msginfo}: 'shape_by_conn' was set for "
-                                    f"unconnected variable '{name}'.")
 
-                if meta['copy_shape']:
+                    if fail and name not in self._bad_conn_vars:
+                        # make this a warning because property may get resolved another way, and
+                        # if not, there will be an error raised later.
+                        issue_warning(f"{self.msginfo}: '{prop}_by_conn' was set for "
+                                      f"unconnected variable '{name}'.")
+
+                if has_copy_prop:
                     # variable whose shape is being copied must be on the same component, and
-                    # name stored in 'copy_shape' entry must be the relative name.
-                    abs_from = name.rpartition('.')[0] + '.' + meta['copy_shape']
+                    # name stored in copy_prop entry must be the relative name.
+                    abs_from = name.rpartition('.')[0] + '.' + meta[copy_prop]
                     if abs_from in all_abs2meta_in or abs_from in all_abs2meta_out:
                         a2m = all_abs2meta_in if abs_from in all_abs2meta_in else all_abs2meta_out
                         if name not in graph:
-                            graph.add_node(name, io=io, **meta2node_data(meta))
+                            add_node(graph, name, io, meta)
                         if abs_from not in graph:
                             from_io = 'input' if abs_from in all_abs2meta_in else 'output'
                             from_meta = a2m[abs_from]
-                            graph.add_node(abs_from, io=from_io, **meta2node_data(from_meta))
+                            add_node(graph, abs_from, from_io, from_meta)
 
                         graph.add_edge(abs_from, name, multi=False)
                     else:
-                        self._collect_error(f"{self.msginfo}: Can't copy shape of variable "
-                                            f"'{abs_from}'. Variable doesn't exist or is not "
-                                            "continuous.")
-                elif meta['compute_shape']:
-                    compute_shape_functs[name] = meta['compute_shape']
+                        issue_warning(f"{self.msginfo}: Can't copy {prop} of variable "
+                                      f"'{abs_from}'. Variable doesn't exist or is not continuous.")
+                elif has_compute_prop:
+                    compute_prop_functs[name] = meta[compute_prop]
                     if name not in graph:
-                        graph.add_node(name, shape=meta['shape'], io=io,
-                                       compute_shape=meta['compute_shape'],
-                                       distributed=meta['distributed'])
+                        add_node(graph, name, io, meta)
 
-                # store known distributed size info needed for computing shapes
-                if nprocs > 1:
-                    my_abs2meta = my_abs2meta_in if name in my_abs2meta_in else my_abs2meta_out
-                    if name in my_abs2meta:
-                        sz = my_abs2meta[name]['size']
-                        if sz is not None:
-                            dist_sz[name] = sz
-                    else:
-                        dist_sz[name] = 0
+                if prop == 'shape':
+                    # store known distributed size info needed for computing shapes
+                    if nprocs > 1:
+                        my_abs2meta = my_abs2meta_in if name in my_abs2meta_in else my_abs2meta_out
+                        if name in my_abs2meta and my_abs2meta[name]['distributed']:
+                            dist_shp[name] = my_abs2meta[name]['shape']
 
-        # loop over any 'compute_shape' variables and add edges to the graph
-        for name in compute_shape_functs:
+        # loop over any 'compute_property' variables and add edges to the graph
+        # This is done separately from the loop above because we need the component_io dict
+        # to tell us what variables are attached to each component.
+        for name in compute_prop_functs:
             comp_name = name.rpartition('.')[0]
 
-            # get 'opposite' io variables to use as inputs to compute_shape function
-            io = 'input' if name in all_abs2meta_out else 'output'
+            if name in all_abs2meta_out:
+                io = 'input'
+            else:
+                io = 'output'
+            abs2meta = self._var_allprocs_abs2meta[io]
 
             for abs_name in component_io[comp_name, io]:
-                meta = self._var_allprocs_abs2meta[io][abs_name]
                 if abs_name not in graph:
-                    graph.add_node(abs_name, io=io, **meta2node_data(meta))
+                    add_node(graph, abs_name, io, abs2meta[abs_name])
 
                 graph.add_edge(abs_name, name, multi=True)
 
         if graph.order() == 0:
-            # we don't have any shape_by_conn or copy_shape variables, so we're done
+            # we don't have any {prop}_by_conn or copy_{prop} or compute_{prop} variables,
+            # so we're done
             return
 
-        if nprocs > 1:
-            distrib_sizes = defaultdict(lambda: np.zeros(nprocs, dtype=INT_DTYPE))
-            for rank, dsz in enumerate(self.comm.allgather(dist_sz)):
-                for n, sz in dsz.items():
-                    distrib_sizes[n][rank] = sz
+        if nprocs > 1 and prop == 'shape' and dist_shp:
+            dist_shapes = defaultdict(lambda: [None] * nprocs)
+            for rank, dshp in enumerate(self.comm.allgather(dist_shp)):
+                for n, shp in dshp.items():
+                    dist_shapes[n][rank] = shp
         else:
-            distrib_sizes = {}
+            dist_shapes = {}
 
-        knowns = {n for n, d in graph.nodes(data=True) if d['shape'] is not None}
+        dist_sizes = {}
+        for n, shapes in dist_shapes.items():
+            dist_sizes[n] = np.array([0 if s is None else shape_to_len(s) for s in shapes])
+
+        knowns = {n for n, d in graph.nodes(data=True) if d[prop] is not None}
         all_knowns = knowns.copy()
 
         nodes = graph.nodes
-        edges = graph.edges
+        do_sort = self.comm.size > 1
 
-        # connected_components needs an undirected graph, so create a temporary one here
-        for comps in nx.connected_components(nx.Graph(graph)):
+        # connected_components needs an undirected graph
+        for comps in nx.weakly_connected_components(graph):
 
             # treat all knowns initially as unresolved
             unresolved_knowns = all_knowns.intersection(comps)
@@ -2789,88 +2968,98 @@ class Group(System):
                 # no knowns in this component, so we fail.
                 continue
 
-            progress = 1
+            progress = True
             while progress:
-                progress = 0
-                unresolved_knowns = get_unresolved_knowns(graph, unresolved_knowns)
+                progress = False
+                unresolved_knowns = get_unresolved_knowns(graph, prop, unresolved_knowns)
 
-                active_single_edges, active_multi_nodes = get_actives(graph, unresolved_knowns)
+                active_single_edges, computed_nodes = get_active_edges(graph, unresolved_knowns,
+                                                                       prop)
+                if do_sort:
+                    active_single_edges = sorted(active_single_edges)
+
                 for k, u in active_single_edges:
-                    shp = copy_var_meta(graph, k, u, distrib_sizes)
+                    shp = copy_var_property(graph, k, u, dist_shapes, dist_sizes)
                     if shp is not None:
-                        if is_unresolved(graph, u):
+                        if is_unresolved(graph, u, prop):
                             unresolved_knowns.add(u)
 
                         all_knowns.add(u)
-                        progress += 1
+                        progress = True
 
-                for mnode in active_multi_nodes:
+                for mnode in computed_nodes:
                     for k, _, data in graph.in_edges(mnode, data=True):
-                        if nodes[k]['shape'] is None and data['multi']:
+                        if nodes[k][prop] is None and data['multi']:
+                            # if any preds are unknown, we can't compute the property yet
                             break
                     else:
-                        # all 'compute_shape' preds are known so compute shape
-                        shapes = {
-                            n.rpartition('.')[-1]: nodes[n]['shape']
-                            for n in graph.predecessors(mnode)
-                        }
-                        shp = compute_var_meta(graph, mnode, shapes, nodes[mnode]['compute_shape'])
+                        # all compute_prop preds are known so compute the property
+                        if prop == 'shape':
+                            props = {}
+                            for n in graph.predecessors(mnode):
+                                pred_meta = nodes[n]
+                                props[n.rpartition('.')[-1]] = pred_meta[prop]
+                        else:
+                            props = {
+                                n.rpartition('.')[-1]: nodes[n][prop]
+                                for n in graph.predecessors(mnode)
+                            }
+
+                        shp = compute_var_property(mnode, props, nodes[mnode][compute_prop], prop)
                         if shp is not None:
-                            if is_unresolved(graph, mnode):
+                            graph.nodes[mnode][prop] = shp
+                            if is_unresolved(graph, mnode, prop):
                                 unresolved_knowns.add(mnode)
                             all_knowns.add(mnode)
-                            progress += 1
-
-        # now perform a consistency check on all computed/copied shapes
-        mismatches = set()
-        for u, v, data in graph.edges(data=True):
-            if not data['multi']:
-                ushape = nodes[u]['shape']
-                vshape = nodes[v]['shape']
-                if ushape != vshape and ushape is not None and vshape is not None:
-                    udist = nodes[u]['distributed']
-                    vdist = nodes[v]['distributed']
-                    if not (udist ^ vdist):
-                        mismatches.add(tuple(sorted((u, v))))
-
-        if mismatches:
-            for u, v in mismatches:
-                self._collect_error(f"{self.msginfo}: Shape mismatch, {nodes[u]['shape']} vs. "
-                                    f"{nodes[v]['shape']} for variables '{u}' and '{v}' during "
-                                    "dynamic shape determination.")
+                            progress = True
 
         # update variable metadata based on graph shapes
         for node, data in graph.nodes(data=True):
-            if node.startswith('#'):
+            if node.startswith('#'):  # not a real variable node
                 continue
             io = data['io']
             allmeta = self._var_allprocs_abs2meta[io][node]
 
-            shape = data['shape']
-            size = shape_to_len(shape)
-            allmeta['shape'] = shape
-            allmeta['size'] = size
+            propval = data[prop]
+
+            if prop == 'shape':
+                size = shape_to_len(propval)
+                allmeta['size'] = size
+            elif isinstance(propval, PhysicalUnit):
+                propval = propval.name()
+
+            allmeta[prop] = propval
 
             try:
                 meta = self._var_abs2meta[io][node]
             except KeyError:
                 pass  # node is not local, so no need to update local metadata
             else:
-                meta['shape'] = shape
-                meta['size'] = size
-                # Passing None into shape arguments as an alias for () is deprecated (Numpy 1.20)
-                shape = shape if shape is not None else ()
-                meta['val'] = np.full(shape, meta['val'], dtype=float)
-
-        # save graph info for possible later plotting
-        self._shapes_graph = graph
+                meta[prop] = propval
+                if prop == 'shape':
+                    meta['size'] = size
+                    # Passing None into shape arguments as alias for () is deprecated (Numpy 1.20)
+                    shape = propval if propval is not None else ()
+                    meta['val'] = np.full(shape, meta['val'], dtype=float)
 
         unresolved = set(graph.nodes()) - all_knowns
         if unresolved:
-            unresolved = sorted(unresolved)
-            self._collect_error(f"{self.msginfo}: Failed to resolve shapes for {unresolved}. "
-                                "To see the dynamic shape dependency graph, "
-                                "do 'openmdao view_dyn_shapes <your_py_file>'.")
+            if prop == 'units':
+                to_check = ('units_by_conn', 'copy_units', 'compute_units')
+                # throw out any that have units of None but are not dynamic
+                dyn = set()
+                for name in unresolved:
+                    gmeta = graph.nodes[name]
+                    for metaname in to_check:
+                        if gmeta[metaname]:
+                            dyn.add(name)
+                unresolved = dyn
+            if unresolved:
+                unresolved = sorted(unresolved)
+                propstr = 'shapes' if prop == 'shape' else 'units'
+                self._collect_error(f"{self.msginfo}: Failed to resolve {propstr} for {unresolved}."
+                                    f" To see the dynamic {propstr} dependency graph, "
+                                    f"do 'openmdao view_dyn_{propstr} <your_py_file>'.")
 
     @collect_errors
     @check_mpi_exceptions
@@ -2886,6 +3075,7 @@ class Group(System):
         pathname = self.pathname
         allprocs_discrete_in = self._var_allprocs_discrete['input']
         allprocs_discrete_out = self._var_allprocs_discrete['output']
+        self._resolver._conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
 
         for subsys in self._sorted_sys_iter():
             subsys._setup_connections()
@@ -2934,7 +3124,7 @@ class Group(System):
 
                 # if units are defined and different, or if a connected output has any scaling,
                 # we need input scaling.
-                self._has_input_scaling = self._has_output_scaling or self._has_resid_scaling or \
+                self._has_input_scaling = self._has_output_scaling or \
                     (in_units and out_units and in_units != out_units)
 
         # check compatability for any discrete connections
@@ -2997,9 +3187,9 @@ class Group(System):
                 if meta_in['distributed']:
                     # if output is non-distributed and input is distributed, make output shape the
                     # full distributed shape, i.e., treat it in this regard as a distributed output
-                    out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'])
+                    out_shape = self._get_full_dist_shape(abs_out, all_meta_out['shape'], 'output')
 
-                in_shape = meta_in['shape']
+                in_shape = meta_in['global_shape']
                 src_indices = meta_in['src_indices']
 
                 if src_indices is None and out_shape != in_shape:
@@ -3019,6 +3209,8 @@ class Group(System):
                     try:
                         shp = (out_shape if all_meta_out['distributed'] else
                                all_meta_out['global_shape'])
+                        if shp is None:  # a collected error has already happened, so continue
+                            continue
                         src_indices.set_src_shape(shp, dist_shape=out_shape)
                         src_indices = src_indices.shaped_instance()
                     except Exception:
@@ -3033,7 +3225,7 @@ class Group(System):
                     if src_indices.indexed_src_size == 0:
                         continue
 
-                    if src_indices.indexed_src_size != shape_to_len(in_shape):
+                    if src_indices.indexed_src_size != meta_in['size']:
                         # initial dimensions of indices shape must be same shape as target
                         for idx_d, inp_d in zip(src_indices.indexed_src_shape, in_shape):
                             if idx_d != inp_d:
@@ -3087,18 +3279,19 @@ class Group(System):
 
         if mode == 'fwd':
             if xfer is not None:
-                if self._has_input_scaling:
+                if xfer._has_input_scaling:
                     vec_inputs.scale_to_norm()
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
                     vec_inputs.scale_to_phys()
                 else:
                     xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
+
             if self._conn_discrete_in2out and vec_name == 'nonlinear':
                 self._discrete_transfer(sub)
 
         else:  # rev
             if xfer is not None:
-                if self._has_input_scaling:
+                if xfer._has_input_scaling:
                     vec_inputs.scale_to_norm(mode='rev')
 
                 xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
@@ -3109,7 +3302,7 @@ class Group(System):
                         xfer = self._transfers['rev'][key]
                         xfer._transfer(vec_inputs, self._vectors['output'][vec_name], mode)
 
-                if self._has_input_scaling:
+                if xfer._has_input_scaling:
                     vec_inputs.scale_to_phys(mode='rev')
 
     def _discrete_transfer(self, sub):
@@ -3217,6 +3410,11 @@ class Group(System):
         src_shape : int or tuple
             Assumed shape of any connected source or higher level promoted input.
         """
+        try:
+            subsys = getattr(self, subsys_name)
+        except AttributeError:
+            raise AttributeError(f"{self.msginfo}: subsystem '{subsys_name}' does not exist.")
+
         if isinstance(any, str):
             self._collect_error(f"{self.msginfo}: Trying to promote any='{any}', "
                                 "but an iterator of strings and/or tuples is required.")
@@ -3255,7 +3453,8 @@ class Group(System):
                 return
 
             try:
-                prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
+                prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape,
+                                         promoted_from=subsys.pathname)
             except Exception as err:
                 lst = []
                 if any is not None:
@@ -3265,11 +3464,6 @@ class Group(System):
                 self._collect_error(f"{self.msginfo}: When promoting {sorted(lst)}: {err}",
                                     ident=(self.pathname, tuple(lst)))
                 return
-
-        try:
-            subsys = getattr(self, subsys_name)
-        except AttributeError:
-            raise AttributeError(f"{self.msginfo}: subsystem '{subsys_name}' does not exist.")
 
         if any:
             subsys._var_promotes['any'].extend((a, prominfo) for a in any)
@@ -3381,21 +3575,19 @@ class Group(System):
             raise RuntimeError(f"{self.msginfo}: promotes must be an iterator of strings and/or "
                                "tuples.")
 
-        prominfo = None
-
         # Note, the declared order in any of these promotes arguments shouldn't matter. However,
         # the order does matter when using system.promotes during configure. There, you are
         # permitted to promote '*' then promote_to an alias afterwards, but not in the reverse.
         # To make this work, we sort the promotes lists for this subsystem to put the wild card
         # entries at the beginning.
         if promotes:
-            subsys._var_promotes['any'] = [(p, prominfo) for p in
+            subsys._var_promotes['any'] = [(p, None) for p in
                                            sorted(promotes, key=lambda x: '*' not in x)]
         if promotes_inputs:
-            subsys._var_promotes['input'] = [(p, prominfo) for p in
+            subsys._var_promotes['input'] = [(p, None) for p in
                                              sorted(promotes_inputs, key=lambda x: '*' not in x)]
         if promotes_outputs:
-            subsys._var_promotes['output'] = [(p, prominfo) for p in
+            subsys._var_promotes['output'] = [(p, None) for p in
                                               sorted(promotes_outputs, key=lambda x: '*' not in x)]
 
         if self._static_mode:
@@ -3420,6 +3612,33 @@ class Group(System):
         setattr(self, name, subsys)
 
         return subsys
+
+    def add_recorder(self, recorder, recurse=False):
+        """
+        Add a recorder to the system.
+
+        Parameters
+        ----------
+        recorder : <CaseRecorder>
+           A recorder instance.
+        recurse : bool
+            Flag indicating if the recorder should be added to all the subsystems.
+        """
+        if MPI:
+            raise RuntimeError(self.msginfo + ": Recording of Systems when running parallel "
+                                              "code is not supported yet")
+
+        self._rec_mgr.append(recorder)
+
+        if recurse:
+            for s in self.system_iter(include_self=False, recurse=recurse):
+                s._rec_mgr.append(recorder)
+
+            if self.pathname == '':  # top level group
+                # too early in setup for _auto_ivc to exist, so we'll add recorder to it later
+                if '_auto_ivc' not in self._subsystems_allprocs:
+                    if recorder not in self._auto_ivc_recorders:
+                        self._auto_ivc_recorders.append(recorder)
 
     def connect(self, src_name, tgt_name, src_indices=None, flat_src_indices=None):
         """
@@ -3471,12 +3690,6 @@ class Group(System):
                 self._collect_error(f"{self.msginfo}: Input '{tgt_name}' is already connected to "
                                     f"'{srcname}'.")
                 return
-
-        # source and target should not be in the same system
-        if src_name.rsplit('.', 1)[0] == tgt_name.rsplit('.', 1)[0]:
-            self._collect_error(f"{self.msginfo}: Output and input are in the same System for "
-                                f"connection from '{src_name}' to '{tgt_name}'.")
-            return
 
         if self._static_mode:
             manual_connections = self._static_manual_connections
@@ -3546,6 +3759,19 @@ class Group(System):
         if self._problem_meta is not None and not self._problem_meta['allow_post_setup_reorder']:
             # order has been changed so we need a new full setup
             self._problem_meta['setup_status'] = _SetupStatus.PRE_SETUP
+
+    def _resolve_remote_sets(self):
+        assert self.pathname == ''  # only call this on the top level model
+
+        if self.comm.allreduce(len(self._remote_sets), op=MPI.SUM) > 0:
+            abs2meta_out = self._var_abs2meta['output']
+            abs2meta_in = self._var_abs2meta['input']
+            for setinfo in self.comm.allgather(self._remote_sets):
+                for abs_in, src, val in setinfo:
+                    if src in abs2meta_out and abs_in not in abs2meta_in:
+                        self.set_val(src, val)
+
+        self._remote_sets = []
 
     def _get_subsystem(self, name):
         """
@@ -3626,14 +3852,6 @@ class Group(System):
         """
         # let any lower level systems do their guessing first
         if self._has_guess:
-            for sname, sinfo in self._subsystems_allprocs.items():
-                sub = sinfo.system
-                # TODO: could gather 'has_guess' information during setup and be able to
-                # skip transfer for subs that don't have guesses...
-                self._transfer('nonlinear', 'fwd', sname)
-                if sub._is_local and sub._has_guess:
-                    sub._guess_nonlinear()
-
             # call our own guess_nonlinear method, after the recursion is done to
             # all the lower level systems and the data transfers have happened
             complex_step = self._inputs._under_complex_step
@@ -3644,6 +3862,14 @@ class Group(System):
                 self._outputs.set_complex_step_mode(False)
 
             try:
+                for sname, sinfo in self._subsystems_allprocs.items():
+                    sub = sinfo.system
+                    # TODO: could gather 'has_guess' information during setup and be able to
+                    # skip transfer for subs that don't have guesses...
+                    self._transfer('nonlinear', 'fwd', sname)
+                    if sub._is_local and sub._has_guess:
+                        sub._guess_nonlinear()
+
                 if self._discrete_inputs or self._discrete_outputs:
                     self.guess_nonlinear(self._inputs, self._outputs, self._residuals,
                                          self._discrete_inputs, self._discrete_outputs)
@@ -3696,14 +3922,12 @@ class Group(System):
         return (self._owns_approx_jac and self._jacobian is not None) or \
             self._assembled_jac is not None or not self._linear_solver.does_recursive_applies()
 
-    def _apply_linear(self, jac, mode, scope_out=None, scope_in=None):
+    def _apply_linear(self, mode, scope_out=None, scope_in=None):
         """
         Compute jac-vec product. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         mode : str
             'fwd' or 'rev'.
         scope_out : set or None
@@ -3713,52 +3937,16 @@ class Group(System):
             Set of absolute input names in the scope of this mat-vec product.
             If None, all are in the scope.
         """
-        if self._owns_approx_jac:
-            jac = self._jacobian
-        elif jac is None and self._assembled_jac is not None:
-            jac = self._assembled_jac
+        jac = self._get_jacobian()
 
-        if jac is not None:
+        if jac is not None and jac is not self._tot_jac:
             with self._matvec_context(scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
                 jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
-                # _fd_rev_xfer_correction_dist is used to correct for the fact that we don't
-                # do reverse transfers internal to an FD group.  Reverse transfers
-                # are constructed such that derivative values are correct when transferred into
-                # system doutput variables, taking into account distributed inputs.
-                # Since the transfers are not correcting for those issues, we need to do it here.
-
-                # If we have a distributed constraint/obj within the FD group and that con/obj is,
-                # active, we perform essentially an allreduce on the d_inputs vars that connect to
-                # outside systems so they'll include the contribution from all procs.
                 if self._fd_rev_xfer_correction_dist and mode == 'rev':
-                    seed_vars = self._problem_meta['seed_vars']
-                    if seed_vars is not None:
-                        seed_vars = [n for n in seed_vars if n in self._fd_rev_xfer_correction_dist]
-                        slices = self._dinputs.get_slice_dict()
-                        inarr = self._dinputs.asarray()
-                        data = {}
-                        for seed_var in seed_vars:
-                            for inp in self._fd_rev_xfer_correction_dist[seed_var]:
-                                if inp not in data:
-                                    if inp in slices:  # inp is a local input
-                                        arr = inarr[slices[inp]]
-                                        if np.any(arr):
-                                            data[inp] = arr
-                                        else:
-                                            data[inp] = None  # don't send an array of zeros
-                                    else:
-                                        data[inp] = None  # prevent possible MPI hangs
-
-                        if data:
-                            myrank = self.comm.rank
-                            for rank, d in enumerate(self.comm.allgather(data)):
-                                if rank != myrank:
-                                    for n, val in d.items():
-                                        if val is not None and n in slices:
-                                            inarr[slices[n]] += val
+                    self._apply_fd_rev_xfer_correction()
 
         # Apply recursion
         else:
@@ -3769,13 +3957,55 @@ class Group(System):
                     s._dresiduals.set_val(0.0)
 
             for s in self._relevance.filter(self._subsystems_myproc, relevant=True):
-                s._apply_linear(jac, mode, scope_out, scope_in)
+                s._apply_linear(mode, scope_out, scope_in)
 
             if mode == 'rev':
                 self._transfer('linear', mode)
                 for s in self._relevance.filter(self._subsystems_myproc, relevant=False):
                     # zero out dvecs of irrelevant subsystems
                     s._doutputs.set_val(0.0)
+
+    def _apply_fd_rev_xfer_correction(self):
+        """
+        Apply the fd reverse transfer correction.
+
+        FD reverse transfer correction is used to correct for the fact that we don't
+        do reverse transfers internal to an FD group.  Reverse transfers
+        are constructed such that derivative values are correct when transferred into
+        system doutput variables, taking into account distributed inputs.
+        Since the transfers are not correcting for those issues, we need to do it here.
+
+        If we have a distributed constraint/obj within the FD group and that con/obj is
+        active, we perform essentially an allreduce on the d_inputs vars that connect to
+        outside systems so they'll include the contribution from all procs.
+        """
+        seed_vars = self._problem_meta['seed_vars']
+        if seed_vars is not None:
+            seed_vars = [n for n in seed_vars if n in self._fd_rev_xfer_correction_dist]
+            dinvec = self._dinputs
+            inarr = dinvec.asarray()
+            data = {}
+            for seed_var in seed_vars:
+                for inp in self._fd_rev_xfer_correction_dist[seed_var]:
+                    if inp not in data:
+                        if dinvec._contains_abs(inp):  # inp is a local input
+                            start, stop = dinvec.get_range(inp)
+                            arr = inarr[start:stop]
+                            if np.any(arr):
+                                data[inp] = arr
+                            else:
+                                data[inp] = None  # don't send an array of zeros
+                        else:
+                            data[inp] = None  # prevent possible MPI hangs
+
+            if data:
+                myrank = self.comm.rank
+                for rank, d in enumerate(self.comm.allgather(data)):
+                    if rank != myrank:
+                        for n, val in d.items():
+                            if val is not None and dinvec._contains_abs(n):
+                                start, stop = dinvec.get_range(n)
+                                inarr[start:stop] += val
 
     def _solve_linear(self, mode, scope_out=_UNDEFINED, scope_in=_UNDEFINED):
         """
@@ -3820,60 +4050,44 @@ class Group(System):
             with self._relevance.active(self._linear_solver.use_relevance()):
                 self._linear_solver.solve(mode, None)
 
-    def _linearize(self, jac, sub_do_ln=True):
+    def _linearize(self, sub_do_ln=True):
         """
         Compute jacobian / factorization. The model is assumed to be in a scaled state.
 
         Parameters
         ----------
-        jac : Jacobian or None
-            If None, use local jacobian, else use assembled jacobian jac.
         sub_do_ln : bool
             Flag indicating if the children should call linearize on their linear solvers.
         """
-        if (self._tot_jac is not None and self._owns_approx_jac and
-                not isinstance(self._jacobian, coloring_mod._ColSparsityJac)):
-            self._jacobian = self._tot_jac
-        elif self._jacobian is None:
-            self._jacobian = DictionaryJacobian(self)
-
         self._check_first_linearize()
 
         # Group finite difference
         if self._owns_approx_jac:
 
-            jac = self._jacobian
-            if self.pathname == "":
-                for approximation in self._approx_schemes.values():
-                    approximation.compute_approximations(self, jac=jac)
-            else:
-                # When an approximation exists in a submodel (instead of in root), the model is
-                # in a scaled state.
-                with self._unscaled_context(outputs=[self._outputs]):
+            with GroupJacobianUpdateContext(self) as jac:
+                if self.pathname == "":
                     for approximation in self._approx_schemes.values():
                         approximation.compute_approximations(self, jac=jac)
+                else:
+                    # When an approximation exists in a submodel (instead of in root), the model is
+                    # in a scaled state.
+                    with self._unscaled_context(outputs=[self._outputs]):
+                        for approximation in self._approx_schemes.values():
+                            approximation.compute_approximations(self, jac=jac)
 
         else:
-            if self._assembled_jac is not None:
-                jac = self._assembled_jac
 
             relevance = self._relevance
             with relevance.active(self._linear_solver.use_relevance()):
                 subs = list(relevance.filter(self._subsystems_myproc))
 
-                # Only linearize subsystems if we aren't approximating the derivs at this level.
-                for subsys in subs:
-                    do_ln = sub_do_ln and (subsys._linear_solver is not None and
-                                           subsys._linear_solver._linearize_children())
-                    subsys._linearize(jac, sub_do_ln=do_ln)
-
-                # Update jacobian
-                if self._assembled_jac is not None:
-                    self._assembled_jac._update(self)
-
-                if sub_do_ln:
+                with GroupJacobianUpdateContext(self) as jac:
+                    # Only linearize subsystems if we aren't approximating the derivs at this level.
                     for subsys in subs:
-                        if subsys._linear_solver is not None:
+                        do_ln = sub_do_ln and (subsys._linear_solver is not None and
+                                               subsys._linear_solver._linearize_children())
+                        subsys._linearize(sub_do_ln=do_ln)
+                        if sub_do_ln and subsys._linear_solver is not None:
                             subsys._linear_solver._linearize()
 
     def _check_first_linearize(self):
@@ -3881,14 +4095,14 @@ class Group(System):
             self._first_call_to_linearize = False  # only do this once
             coloring = self._get_coloring() if coloring_mod._use_partial_sparsity else None
 
-            if coloring is not None:
+            if coloring is None:
+                if self._approx_schemes:
+                    # TODO: for top level FD, call below is unnecessary, but we need this
+                    # for some tests that just call run_linearize directly without calling
+                    # compute_totals.
+                    self._setup_approx_derivs()
+            else:
                 self._setup_approx_coloring()
-
-            # TODO: for top level FD, call below is unnecessary, but we need this
-            # for some tests that just call run_linearize directly without calling
-            # compute_totals.
-            elif self._approx_schemes:
-                self._setup_approx_derivs()
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
@@ -3985,66 +4199,93 @@ class Group(System):
         for subsys in self._subsystems_myproc:
             subsys._get_missing_partials(missing)
 
+    def _get_jacobian(self):
+        """
+        Initialize the jacobian if it is not already initialized.
+
+        Override this in a subclass to use a different jacobian type.
+
+        Returns
+        -------
+        Jacobian
+            The initialized jacobian.
+        """
+        if self._relevance_changed():
+            self._jacobian = None
+
+        if self._jacobian is None:
+            if self._owns_approx_jac:
+                # Group needs a jacobian if it's approximating derivatives.
+                self._jacobian = DictionaryJacobian(system=self)
+                self._get_static_wrt_matches()
+
+            if self._jacobian is None:
+                self._jacobian = self._get_assembled_jac()
+
+        return self._jacobian
+
     def _approx_subjac_keys_iter(self):
-        yield from self._subjac_keys_iter()
+        """
+        Iterate over all approx subjacobian keys needed for this Group.
 
-    def _subjac_keys_iter(self):
-        # yields absolute keys (no aliases)
-        totals = self.pathname == ''
+        These keys include all declared at the Component level below this group, plus any added
+        at this group level for approximations, etc.
 
-        wrt = set()
-        ivc = set(self.get_indep_vars(local=False))
-        pro2abs = self._var_allprocs_prom2abs_list
+        Relevance is not considered for these, but will be used later when using these to
+        construct a Jacobian.
 
-        if totals:
-            # When computing totals, weed out inputs connected to anything inside our system unless
-            # the source is an indepvarcomp.
-            if self._owns_approx_wrt:
-                wrt = {m['source'] for m in self._owns_approx_wrt.values()}
-                diff = wrt.difference(ivc)
-                if diff:
-                    bad = [n for n, m in self._owns_approx_wrt.items() if m['source'] in diff]
-                    raise RuntimeError("When computing total derivatives for the model, the "
-                                       "following wrt variables are not independent variables or "
-                                       "do not have an independant variable as a source: "
-                                       f"{sorted(bad)}")
-                wrt = wrt.intersection(ivc)
+        Yields
+        ------
+        tuple
+            A tuple of the form (of_name, wrt_name).  Names are absolute (no aliases).
+        """
+        if self.pathname == '':  # totals
+            yield from self._approx_total_subjac_keys_iter()
+        else:
+            yield from self._approx_semitotal_subjac_keys_iter()
+
+    def _approx_total_subjac_keys_iter(self):
+        """
+        Iterate over all approx total subjacobian keys needed for this Group.
+        """
+        if self._owns_approx_of is None:
+            return
+
+        ivc = self.get_indep_vars(local=False)
+
+        # When computing totals, weed out inputs connected to anything inside our system unless
+        # the source is an indepvarcomp.
+        wrt = []
+        for name, m in self._owns_approx_wrt.items():
+            src = m['source']
+            if src in ivc:
+                wrt.append(src)
             else:
-                wrt = ivc
+                raise RuntimeError("When computing total derivatives for the model, the "
+                                   f"wrt variable '{name}' is not an independent variable "
+                                   "or does not have an independant variable as a source.")
 
-        else:
-            for abs_inps in pro2abs['input'].values():
-                if abs_inps[0] not in self._conn_abs_in2out:
-                    # If connection is inside of this Group, perturbation of all implicitly
-                    # connected inputs will be handled properly via internal transfers.
-                    # Otherwise, we need to add all implicitly connected inputs separately.
-                    wrt.update(abs_inps)
+        of = [m['source'] for m in self._owns_approx_of.values()]
 
-            # get rid of any old stuff in here
-            self._owns_approx_of = self._owns_approx_wrt = None
+        yield from product(of, wrt)
 
-        if self._owns_approx_of:  # can only be total at this point
-            of = set(m['source'] for m in self._owns_approx_of.values())
-        else:
-            of = set(self._var_allprocs_abs2meta['output'])
-            # Skip indepvarcomp res wrt other srcs
-            of -= ivc
+    def _approx_semitotal_subjac_keys_iter(self):
+        wrt = []
 
-        if totals:
-            yield from product(of, wrt.union(of))
-        else:
-            for key in product(of, wrt.union(of)):
-                # Create approximations for the ones we need.
+        for _, abs_inps in self._resolver.prom2abs_iter('input'):
+            if abs_inps[0] not in self._conn_abs_in2out:
+                # If connection is inside of this Group, perturbation of all implicitly
+                # connected inputs will be handled properly via internal transfers.
+                # Otherwise, we need to add all implicitly connected inputs separately.
+                wrt.extend(abs_inps)
 
-                _of, _wrt = key
-                # Skip res wrt outputs
-                if _wrt in of and _wrt not in ivc:
+        # get rid of any old stuff in here
+        self._owns_approx_of = self._owns_approx_wrt = None
 
-                    # Support for specifying a desvar as an obj/con.
-                    if _wrt not in wrt or _of == _wrt:
-                        continue
+        ivcs = self.get_indep_vars(local=False)
+        of = [name for name in self._var_allprocs_abs2meta['output'] if name not in ivcs]
 
-                yield key
+        yield from product(of, wrt)
 
     def _jac_of_iter(self):
         """
@@ -4083,6 +4324,7 @@ class Group(System):
                 else:
                     src = name
 
+                # for semi-totals, only include outputs that are local
                 if not total and src not in self._var_abs2meta['output']:
                     continue
 
@@ -4126,7 +4368,8 @@ class Group(System):
         Vector
             Either the _outputs or _inputs vector.
         slice or ndarray
-            A full slice or indices for the 'wrt' variable.
+            A full slice or indices for the corresponding design variable when computing total
+            derivatives.
         ndarray or None
             Distributed sizes if var is distributed else None
         """
@@ -4143,19 +4386,11 @@ class Group(System):
 
             seen = set()
             start = end = 0
-            if self.pathname:  # doing semitotals, so include output columns
-                for of, _start, _end, _, dist_sizes in self._jac_of_iter():
-                    if wrt_matches is None or of in wrt_matches:
-                        seen.add(of)
-                        end += (_end - _start)
-                        vec = self._outputs if of in local_outs else None
-                        yield of, start, end, vec, _full_slice, dist_sizes
-                        start = end
 
-            for wrt, wrtmeta in self._owns_approx_wrt.items():
+            for wrt, approx_meta in self._owns_approx_wrt.items():
                 if total:
-                    wrt = wrtmeta['source']
-                    if wrtmeta['remote']:
+                    wrt = approx_meta['source']
+                    if approx_meta['remote']:
                         vec = None
                     else:
                         vec = self._outputs
@@ -4170,10 +4405,9 @@ class Group(System):
                 if (wrt_matches is None or wrt in wrt_matches) and wrt not in seen:
                     io = 'input' if wrt in abs2meta['input'] else 'output'
                     meta = abs2meta[io][wrt]
-                    if total and wrtmeta['indices'] is not None:
-                        sub_wrt_idx = wrtmeta['indices'].as_array()
+                    if total and approx_meta['indices'] is not None:
+                        sub_wrt_idx = approx_meta['indices'].as_array()
                         size = sub_wrt_idx.size
-                        sub_wrt_idx = sub_wrt_idx
                     else:
                         sub_wrt_idx = _full_slice
                         size = abs2meta[io][wrt][szname]
@@ -4184,33 +4418,29 @@ class Group(System):
                     yield wrt, start, end, vec, sub_wrt_idx, dist_sizes
                     start = end
         else:
-            yield from super()._jac_wrt_iter(wrt_matches)
+            yield from super()._get_jac_wrts(wrt_matches)
 
     def _promoted_wrt_iter(self):
         if not (self._owns_approx_of or self.pathname):
             return
 
-        abs2prom = self._var_allprocs_abs2prom
+        resolver = self._resolver
         seen = set()
         for _, wrt in self._get_approx_subjac_keys():
             if wrt not in seen:
                 seen.add(wrt)
-
-                if wrt in abs2prom['output']:
-                    yield abs2prom['output'][wrt]
-                else:
-                    yield abs2prom['input'][wrt]
+                prom = resolver.abs2prom(wrt)
+                if prom not in seen:
+                    seen.add(prom)
+                    yield prom
 
     def _setup_approx_derivs(self):
         """
         Add approximations for all approx derivs.
         """
-        if self._jacobian is None:
-            self._jacobian = DictionaryJacobian(system=self)
-
-        abs2meta = self._var_allprocs_abs2meta
         total = self.pathname == ''
-        nprocs = self.comm.size
+        abs2meta_out = self._var_allprocs_abs2meta['output']
+        abs2meta_in = self._var_allprocs_abs2meta['input']
 
         if self._coloring_info.coloring is not None and (self._owns_approx_of is None or
                                                          self._owns_approx_wrt is None):
@@ -4229,81 +4459,75 @@ class Group(System):
         sizes_in = self._var_sizes['input']
         abs2idx = self._var_allprocs_abs2idx
 
-        self._cross_keys = set()
-        approx_keys = self._get_approx_subjac_keys()
+        approx_keys = self._get_approx_subjac_keys(initialize=True)
+        wrt_seen = set()
+        compute_cross_keys = not total and self.comm.size > 1 and self._has_fd_group
+        graph = self._problem_meta['dataflow_graph']
+
         for key in approx_keys:
-            left, right = key
-            if not total and nprocs > 1 and self._has_fd_group:
-                sout = sizes_out[:, abs2idx[left]]
-                sin = sizes_in[:, abs2idx[right]]
-                if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
-                    # we have of and wrt that exist on different procs. Now see if they're relevant
-                    # to each other
-                    for _, _, rel in self._relevance.iter_seed_pair_relevance(inputs=True,
-                                                                              outputs=True):
-                        if left in rel and right in rel:
-                            self._cross_keys.add(key)
-                            break
+            of, wrt = key
 
             if key in self._subjacs_info:
                 meta = self._subjacs_info[key]
             else:
-                meta = SUBJAC_META_DEFAULTS.copy()
+                # check connection between of and wrt before creating a subjac
+                if not are_connected(graph, wrt, of):
+                    continue
 
-                if left == right:
-                    size = abs2meta['output'][left]['size']
-                    meta['rows'] = meta['cols'] = np.arange(size)
+                meta = SUBJAC_META_DEFAULTS.copy()
+                osize = abs2meta_out[of]['size']
+                if wrt in abs2meta_in:
+                    isize = abs2meta_in[wrt]['size']
+                else:
+                    isize = abs2meta_out[wrt]['size']
+
+                if of == wrt:
+                    meta['diagonal'] = True
                     # All group approximations are treated as explicit components, so we
                     # have a -1 on the diagonal.
-                    meta['val'] = np.full(size, -1.0)
-                self._subjacs_info[key] = meta
+                    meta['val'] = np.full(osize, -1.0)
+
+                self._subjacs_info[key] = meta = Subjac.get_instance_metadata(meta, None,
+                                                                              (osize, isize),
+                                                                              self, key)
+
+            if compute_cross_keys:
+                sout = sizes_out[:, abs2idx[of]]
+                sin = sizes_in[:, abs2idx[wrt]]
+                if np.count_nonzero(sout[sin == 0]) > 0 and np.count_nonzero(sin[sout == 0]) > 0:
+                    self._cross_keys.add(key)
 
             meta['method'] = method
 
             meta.update(self._owns_approx_jac_meta)
 
-            if wrt_matches is None or right in wrt_matches:
+            if wrt_matches is None or wrt in wrt_matches:
                 self._update_approx_coloring_meta(meta)
 
-            if meta['val'] is None:
-                if not total and right in abs2meta['input']:
-                    sz = abs2meta['input'][right]['size']
-                else:
-                    sz = abs2meta['output'][right]['size']
-                shape = (abs2meta['output'][left]['size'], sz)
-                meta['shape'] = shape
-                if meta['rows'] is not None:  # subjac is sparse
-                    meta['val'] = np.zeros(len(meta['rows']))
-                else:
-                    meta['val'] = np.zeros(shape)
-
-            approx.add_approximation(key, self, meta)
+            if wrt not in wrt_seen:
+                wrt_seen.add(wrt)
+                approx.add_approximation(wrt, self, meta)
 
         if not total:
             # we're taking semi-total derivs for this group. Update _owns_approx_of
             # and _owns_approx_wrt so we can use the same approx code for totals and
             # semi-totals.  Also, the order must match order of vars in the output and
             # input vectors.
-            abs_outs = self._var_allprocs_abs2meta['output']
-            abs_ins = self._var_allprocs_abs2meta['input']
-            abs2prom_out = self._var_allprocs_abs2prom['output']
-            abs2prom_in = self._var_allprocs_abs2prom['input']
+            resolver = self._resolver
 
             self._owns_approx_of = {}
-            for n, m in abs_outs.items():
+            for n, m in self._var_allprocs_abs2meta['output'].items():
                 self._owns_approx_of[n] = dct = m.copy()
-                dct['name'] = abs2prom_out[n]
+                dct['name'] = resolver.abs2prom(n, 'output')
                 dct['source'] = n
                 dct['indices'] = None
 
-            wrtset = set([k[1] for k in approx_keys])
+            wrtset = set([wrt for _, wrt in approx_keys])
+
             self._owns_approx_wrt = {}
-            for n, m in abs_ins.items():
+            for n, m in self._var_allprocs_abs2meta['input'].items():
                 if n in wrtset:
-                    self._owns_approx_wrt[n] = dct = m.copy()
-                    dct['name'] = abs2prom_in[n]
-                    dct['source'] = n
-                    dct['indices'] = None
+                    self._owns_approx_wrt[n] = {'distributed': m['distributed']}
 
             self._owns_approx_jac = True
 
@@ -4367,8 +4591,7 @@ class Group(System):
 
         if comps_only:
             # add all components as nodes in the graph so they'll be there even if unconnected.
-            comps = set(v.rpartition('.')[0] for v in chain(self._var_allprocs_abs2prom['output'],
-                                                            self._var_allprocs_abs2prom['input']))
+            comps = set(v.rpartition('.')[0] for v in self._resolver.abs_iter())
             graph.add_nodes_from(comps)
 
             if add_edge_info:
@@ -4411,6 +4634,7 @@ class Group(System):
         found_dup = False
         abs2meta_in = self._var_abs2meta['input']
         abs_in2prom_info = self._problem_meta['abs_in2prom_info']
+        abs2prom = self._resolver.abs2prom
         start_val = val = None
         val_shape = None
         chosen_tgt = None
@@ -4482,7 +4706,7 @@ class Group(System):
                             if src_indices is None:
                                 src_indices = inds
                             else:
-                                sinds = convert_src_inds(src_indices, newshape, inds, shape)
+                                sinds = convert_src_inds(src_indices, inds, shape)
                                 # final src_indices are wrt original full sized source and are flat,
                                 # so use val_shape and flat_src=True
                                 src_indices = indexer(sinds, src_shape=val_shape, flat_src=True)
@@ -4556,11 +4780,13 @@ class Group(System):
             info = (tgt, val, False)
 
         if src_idx_found:  # auto_ivc connected to local vars with src_indices
+            prom = abs2prom(src_idx_found[0], 'input')
             self._collect_error("Attaching src_indices to inputs requires that the shape of the "
-                                "source variable is known, but the source shape for inputs "
-                                f"{src_idx_found} is unknown. You can specify the src shape for "
-                                "these inputs by setting 'val' or 'src_shape' in a call to "
-                                "set_input_defaults, or by adding an IndepVarComp as the source.",
+                                "source variable is known, but the source shape for input "
+                                f"{prom} is unknown. You can specify the src shape "
+                                "for this input by setting 'val' or 'src_shape' in a call to "
+                                "set_input_defaults. For example: model.set_input_defaults"
+                                f"('{prom}', src_shape=?)",
                                 ident=(self.pathname, tuple(src_idx_found)))
             return None
 
@@ -4581,10 +4807,10 @@ class Group(System):
         prom2auto = {}
         count = 0
         auto2tgt = {}
-        abs2prom = self._var_allprocs_abs2prom['input']
         all_abs2meta = self._var_allprocs_abs2meta['input']
         conns = self._conn_global_abs_in2out
         auto_conns = {}
+        resolver = self._resolver
 
         for tgt in all_abs2meta:
             if tgt in conns or tgt in self._bad_conn_vars:
@@ -4595,12 +4821,12 @@ class Group(System):
                 # OpenMDAO currently can't create an automatic IndepVarComp for inputs on
                 # distributed components.
                 if tgt not in self._bad_conn_vars:
-                    prom_name = abs2prom[tgt]
+                    prom_name = resolver.abs2prom(tgt, 'input')
                     promoted_as = f', promoted as "{prom_name}",' if prom_name != tgt else ''
                     raise RuntimeError(f'Distributed component input "{tgt}"'
                                        f'{promoted_as} is not connected.')
 
-            prom = abs2prom[tgt]
+            prom = resolver.abs2prom(tgt, 'input')
             if prom in prom2auto:
                 # multiple connected inputs w/o a src. Connect them to the same IVC
                 src = prom2auto[prom][0]
@@ -4619,15 +4845,15 @@ class Group(System):
         conns.update(auto_conns)
         auto_ivc.auto2tgt = auto2tgt
 
-        vars2gather = self._vars_to_gather
+        vars_to_gather = self._vars_to_gather
 
         for src, tgts in auto2tgt.items():
-            prom = self._var_allprocs_abs2prom['input'][tgts[0]]
-            ret = self._get_auto_ivc_out_val(tgts, vars2gather)
+            prom = resolver.abs2prom(tgts[0], 'input')
+            ret = self._get_auto_ivc_out_val(tgts, vars_to_gather)
             if ret is None:  # setup error occurred. Try to continue
                 continue
             tgt, val, remote = ret
-            prom = abs2prom[tgt]
+            prom = resolver.abs2prom(tgt, 'input')
             if prom not in self._group_inputs:
                 self._group_inputs[prom] = [{'use_tgt': tgt, 'auto': True, 'path': self.pathname,
                                              'prom': prom}]
@@ -4645,18 +4871,17 @@ class Group(System):
 
             if self.comm.size > 1:
                 tgt_local_procs = set()
-                # do a preliminary check to avoid the allgather if we can
                 for t in tgts:
-                    if t in vars2gather:
-                        tgt_local_procs.add(vars2gather[t])
+                    if t in vars_to_gather:
+                        tgt_local_procs.add(vars_to_gather[t])
                     else:   # t is duplicated in all procs
                         break
                 else:
                     if len(tgt_local_procs) < self.comm.size:  # don't have a local var in each proc
                         tgt_local_procs = set()
                         for t in self.comm.allgather(tgt):
-                            if t in vars2gather:
-                                tgt_local_procs.add(vars2gather[t])
+                            if t in vars_to_gather:
+                                tgt_local_procs.add(vars_to_gather[t])
                         if len(tgt_local_procs) > 1:
                             # the 'local' val can only exist on 1 proc (distrib auto_ivcs not
                             # allowed), so must consolidate onto one proc
@@ -4673,7 +4898,7 @@ class Group(System):
         # have to sort to keep vars in sync because we may be doing bcasts
         for abs_in in sorted(self._var_allprocs_discrete['input']):
             if abs_in not in conns:  # unconnected, so connect the input to an _auto_ivc output
-                prom = abs2prom[abs_in]
+                prom = resolver.abs2prom(abs_in, 'input')
                 val = _UNDEFINED
 
                 if prom in prom2auto:
@@ -4688,15 +4913,15 @@ class Group(System):
                     prom2auto[prom] = (ivc_name, abs_in)
                     conns[abs_in] = ivc_name
 
-                    if abs_in in self._var_abs2prom['input']:  # var is local
+                    if resolver.is_local(abs_in, 'input'):  # var is local
                         val = self._var_discrete['input'][abs_in]['val']
                     else:
                         val = None
-                    if abs_in in vars2gather:
-                        if vars2gather[abs_in] == self.comm.rank:
-                            self.comm.bcast(val, root=vars2gather[abs_in])
+                    if abs_in in vars_to_gather:
+                        if vars_to_gather[abs_in] == self.comm.rank:
+                            self.comm.bcast(val, root=vars_to_gather[abs_in])
                         else:
-                            val = self.comm.bcast(None, root=vars2gather[abs_in])
+                            val = self.comm.bcast(None, root=vars_to_gather[abs_in])
                     auto_ivc.add_discrete_output(loc_out_name, val=val)
 
                 src = conns[abs_in]
@@ -4723,41 +4948,22 @@ class Group(System):
 
         self._subsystems_myproc = [auto_ivc] + self._subsystems_myproc
 
+        self._resolver._auto_ivc_update(auto_ivc._resolver, auto2tgt)
+
         io = 'output'  # auto_ivc has only output vars
-        old = self._var_allprocs_prom2abs_list[io]
-        p2abs = {}
-        for name in auto_ivc._var_allprocs_abs2meta[io]:
-            p2abs[name] = [name]
-        p2abs.update(old)
-        self._var_allprocs_prom2abs_list[io] = p2abs
-
-        # set up auto_ivc abs2prom such that promoted name of the auto_ivc output is the same
-        # as the promoted name of the input that it is connected to
-        abs2prom = self._var_abs2prom[io]
-        abs2prom_in = self._var_allprocs_abs2prom['input']
-        for n in auto_ivc._var_abs2prom[io]:
-            abs2prom[n] = abs2prom_in[auto2tgt[n][0]]
-
-        all_abs2prom = self._var_allprocs_abs2prom[io]
-        for n in auto_ivc._var_allprocs_abs2prom[io]:
-            all_abs2prom[n] = abs2prom_in[auto2tgt[n][0]]
-
         self._var_discrete[io].update({'_auto_ivc.' + k: v for k, v in
                                        auto_ivc._var_discrete[io].items()})
         self._var_allprocs_discrete[io].update(auto_ivc._var_allprocs_discrete[io])
 
-        old = self._var_abs2meta[io]
         self._var_abs2meta[io] = {}
-        self._var_abs2meta[io].update(auto_ivc._var_abs2meta[io])
-        self._var_abs2meta[io].update(old)
+        # rebuild _var_abs2meta in the correct order
+        for s in self._sorted_sys_iter():
+            self._var_abs2meta[io].update(s._var_abs2meta[io])
 
-        old = self._var_allprocs_abs2meta[io]
         self._var_allprocs_abs2meta[io] = {}
-        self._var_allprocs_abs2meta[io].update(auto_ivc._var_allprocs_abs2meta[io])
-        self._var_allprocs_abs2meta[io].update(old)
-
-        # add all auto_ivc vars to our _loc_ivcs
-        self._ivcs.update(auto_ivc._var_abs2meta[io])
+        for sysname in self._sorted_sys_iter_all_procs():
+            self._var_allprocs_abs2meta[io].update(
+                self._subsystems_allprocs[sysname].system._var_allprocs_abs2meta[io])
 
         self._approx_subjac_keys = None  # this will force re-initialization
         self._setup_procs_finished = True
@@ -4774,26 +4980,27 @@ class Group(System):
         all_abs2meta_in = self._var_allprocs_abs2meta['input']
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
 
-        abs2prom = self._var_allprocs_abs2prom['input']
         abs2meta_in = self._var_abs2meta['input']
         all_discrete_outs = self._var_allprocs_discrete['output']
         all_discrete_ins = self._var_allprocs_discrete['input']
+        resolver = self._resolver
 
         for src, tgts in self._auto_ivc.auto2tgt.items():
             if len(tgts) < 2:
                 continue
+
+            prom = resolver.abs2prom(tgts[0], 'input')
+            if prom in self._group_inputs:
+                gmeta = self._group_inputs[prom][0]
+            else:
+                gmeta = {'path': self.pathname, 'prom': prom, 'auto': True}
+
             if src not in all_discrete_outs:
                 smeta = all_abs2meta_out[src]
                 sunits = smeta['units'] if 'units' in smeta else None
 
             sval = self.get_val(src, kind='output', get_remote=True, from_src=False)
             errs = set()
-
-            prom = abs2prom[tgts[0]]
-            if prom in self._group_inputs:
-                gmeta = self._group_inputs[prom][0]
-            else:
-                gmeta = {'path': self.pathname, 'prom': prom, 'auto': True}
 
             for tgt in tgts:
                 tval = self.get_val(tgt, kind='input', get_remote=True, from_src=False)
@@ -4814,7 +5021,9 @@ class Group(System):
                             errs.add('units')
 
                     if 'val' not in gmeta:
-                        if tval.shape == sval.shape:
+                        tval_shape = () if np.isscalar(tval) else tval.shape
+                        sval_shape = () if np.isscalar(sval) else sval.shape
+                        if tval_shape == sval_shape:
                             if _has_val_mismatch(tunits, tval, sunits, sval):
                                 errs.add('val')
                         else:
@@ -4838,35 +5047,15 @@ class Group(System):
         else:
             meta = sorted(metadata)
         inputs = sorted(tgts)
-        gpath = common_subpath(tgts)
-        if gpath == self.pathname:
-            g = self
-        else:
-            g = self._get_subsystem(gpath)
-        gprom = None
 
-        # get promoted name relative to g
-        if MPI and self.comm.size > 1:
-            if g is not None and not g._is_local:
-                g = None
-            if self.comm.allreduce(int(g is not None)) < self.comm.size:
-                # some procs have remote g
-                if g is not None:
-                    gprom = g._var_allprocs_abs2prom['input'][inputs[0]]
-                proms = self.comm.allgather(gprom)
-                for p in proms:
-                    if p is not None:
-                        gprom = p
-                        break
-        if gprom is None:
-            gprom = g._var_allprocs_abs2prom['input'][inputs[0]]
+        model = self._problem_meta['model_ref']()
+        gprom = model._resolver.abs2prom(tgts[0], 'input')
 
-        gname = f"Group named '{gpath}'" if gpath else 'model'
         args = ', '.join([f'{n}=?' for n in errs])
         self._collect_error(f"{self.msginfo}: The following inputs, {inputs}, promoted "
-                            f"to '{prom}', are connected but their metadata entries {meta}"
-                            f" differ. Call <group>.set_input_defaults('{gprom}', {args}), "
-                            f"where <group> is the {gname} to remove the ambiguity.")
+                            f"to '{gprom}', are connected but their metadata entries {meta}"
+                            f" differ. Call model.set_input_defaults('{gprom}', {args}) "
+                            "to remove the ambiguity.")
 
     def _ordered_comp_name_iter(self):
         """
@@ -4986,42 +5175,6 @@ class Group(System):
 
         return False
 
-    def _get_prom_name(self, abs_name):
-        """
-        Get promoted name for specified variable.
-        """
-        abs2prom = self._var_allprocs_abs2prom
-        if abs_name in abs2prom['input']:
-            return abs2prom['input'][abs_name]
-        elif abs_name in abs2prom['output']:
-            return abs2prom['output'][abs_name]
-        else:
-            return abs_name
-
-    def _prom_names_list(self, lst):
-        """
-        Convert a list of variable names to promoted names.
-        """
-        return [self._get_prom_name(n) for n in lst]
-
-    def _prom_names_dict(self, dct):
-        """
-        Convert a dictionary keyed on variable names to be keyed on promoted names.
-        """
-        return {self._get_prom_name(k): v for k, v in dct.items()}
-
-    def _prom_names_jac(self, jac):
-        """
-        Convert a nested dict jacobian keyed on variable names to be keyed on promoted names.
-        """
-        new_jac = {}
-        for of in jac:
-            new_jac[self._get_prom_name(of)] = of_dict = {}
-            for wrt in jac[of]:
-                of_dict[self._get_prom_name(wrt)] = jac[of][wrt]
-
-        return new_jac
-
     def get_design_vars(self, recurse=True, get_sizes=True, use_prom_ivc=True):
         """
         Get the DesignVariable settings from this system.
@@ -5048,8 +5201,7 @@ class Group(System):
         out = super().get_design_vars(recurse=recurse, get_sizes=get_sizes,
                                       use_prom_ivc=use_prom_ivc)
         if recurse:
-            abs2prom_in = self._var_allprocs_abs2prom['input']
-            abs2prom_out = self._var_allprocs_abs2prom['output']
+            resolver = self._resolver
             if (self.comm.size > 1 and self._mpi_proc_allocator.parallel):
 
                 # For parallel groups, we need to make sure that the design variable dictionary is
@@ -5062,16 +5214,15 @@ class Group(System):
                     dvs = subsys.get_design_vars(recurse=recurse, get_sizes=get_sizes,
                                                  use_prom_ivc=use_prom_ivc)
                     if use_prom_ivc:
-                        # have to promote subsystem prom name to this level
-                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
+                        # have to promote subsystem prom name to this level's prom name
+                        subres = subsys._resolver
                         for dv, meta in dvs.items():
-                            if dv in sub_pro2abs_in:
-                                abs_dv = sub_pro2abs_in[dv][0]
-                                sub_out[abs2prom_in[abs_dv]] = meta
-                            elif dv in sub_pro2abs_out:
-                                abs_dv = sub_pro2abs_out[dv][0]
-                                sub_out[abs2prom_out[abs_dv]] = meta
+                            if subres.is_prom(dv, 'input'):
+                                abs_dv = subres.absnames(dv, 'input')[0]
+                                sub_out[resolver.abs2prom(abs_dv, 'input')] = meta
+                            elif subres.is_prom(dv, 'output'):
+                                abs_dv = subres.absnames(dv, 'output')[0]
+                                sub_out[resolver.abs2prom(abs_dv, 'output')] = meta
                             else:
                                 sub_out[dv] = meta
                     else:
@@ -5097,23 +5248,19 @@ class Group(System):
                                                  use_prom_ivc=use_prom_ivc)
                     if use_prom_ivc:
                         # have to promote subsystem prom name to this level
-                        sub_pro2abs_in = subsys._var_allprocs_prom2abs_list['input']
-                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
+                        subres = subsys._resolver
                         for dv, meta in dvs.items():
-                            if dv in sub_pro2abs_in:
-                                abs_dv = sub_pro2abs_in[dv][0]
-                                out[abs2prom_in[abs_dv]] = meta
-                            elif dv in sub_pro2abs_out:
-                                abs_dv = sub_pro2abs_out[dv][0]
-                                out[abs2prom_out[abs_dv]] = meta
+                            if subres.is_prom(dv, 'input'):
+                                out[resolver.prom2prom(dv, subsys._resolver, 'input')] = meta
+                            elif subres.is_prom(dv, 'output'):
+                                out[resolver.prom2prom(dv, subsys._resolver, 'output')] = meta
                             else:
                                 out[dv] = meta
                     else:
                         out.update(dvs)
 
-        model = self._problem_meta['model_ref']()
-        if self is model:
-            abs2meta_out = model._var_allprocs_abs2meta['output']
+        if self.pathname == '':  # do this at the top level only
+            abs2meta_out = self._var_allprocs_abs2meta['output']
             for outmeta in out.values():
                 src = outmeta['source']
                 if src in abs2meta_out and "openmdao:allow_desvar" not in abs2meta_out[src]['tags']:
@@ -5155,7 +5302,7 @@ class Group(System):
         """
         out = super().get_responses(recurse=recurse, get_sizes=get_sizes, use_prom_ivc=use_prom_ivc)
         if recurse:
-            abs2prom_out = self._var_allprocs_abs2prom['output']
+            prom2prom = self._resolver.prom2prom
             if self.comm.size > 1 and self._mpi_proc_allocator.parallel:
                 # For parallel groups, we need to make sure that the response dictionary is
                 # assembled in the same order under mpi as for serial runs.
@@ -5165,19 +5312,15 @@ class Group(System):
                     name = subsys.name
                     sub_out = {}
 
-                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
-                                                 use_prom_ivc=use_prom_ivc)
+                    subresps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                    use_prom_ivc=use_prom_ivc)
                     if use_prom_ivc:
+                        subresolver = subsys._resolver
                         # have to promote subsystem prom name to this level
-                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
-                        for res, meta in resps.items():
-                            if res in sub_pro2abs_out:
-                                abs_resp = sub_pro2abs_out[res][0]
-                                sub_out[abs2prom_out[abs_resp]] = meta
-                            else:
-                                sub_out[res] = meta
+                        for res, meta in subresps.items():
+                            sub_out[prom2prom(res, subresolver, 'output')] = meta
                     else:
-                        for rkey, rmeta in resps.items():
+                        for rkey, rmeta in subresps.items():
                             if rkey in out:
                                 tdict = {'con': 'constraint', 'obj': 'objective'}
                                 rpath = rmeta['parent']
@@ -5205,18 +5348,15 @@ class Group(System):
 
             else:
                 for subsys in self._sorted_sys_iter():
-                    resps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
-                                                 use_prom_ivc=use_prom_ivc)
+                    subresps = subsys.get_responses(recurse=recurse, get_sizes=get_sizes,
+                                                    use_prom_ivc=use_prom_ivc)
                     if use_prom_ivc:
+                        subresolver = subsys._resolver
                         # have to promote subsystem prom name to this level
-                        sub_pro2abs_out = subsys._var_allprocs_prom2abs_list['output']
-                        for res, meta in resps.items():
-                            if res in sub_pro2abs_out:
-                                out[abs2prom_out[sub_pro2abs_out[res][0]]] = meta
-                            else:
-                                out[res] = meta
+                        for res, meta in subresps.items():
+                            out[prom2prom(res, subresolver, 'output')] = meta
                     else:
-                        for rkey, rmeta in resps.items():
+                        for rkey, rmeta in subresps.items():
                             if rkey in out:
                                 tdict = {'con': 'constraint', 'obj': 'objective'}
                                 rpath = rmeta['parent']
@@ -5322,7 +5462,8 @@ class Group(System):
                 elif meta['source'] in active_dvs:
                     active_dvs[meta['source']] = meta.copy()
 
-        prom2abs_in = self._var_allprocs_prom2abs_list['input']
+        is_prom = self._resolver.is_prom
+        is_local = self._resolver.is_local
 
         for name, meta in active_dvs.items():
             if meta is None:
@@ -5334,14 +5475,14 @@ class Group(System):
                 }
                 self._update_dv_meta(meta, get_size=True)
 
-                if name in prom2abs_in:
+                if is_prom(name, 'input'):
                     meta['ivc_print_name'] = name
                 else:
                     meta['ivc_print_name'] = None
 
                 active_dvs[name] = meta
 
-            meta['remote'] = meta['source'] not in self._var_abs2meta['output']
+            meta['remote'] = not is_local(meta['source'], 'output')
 
         return active_dvs
 
@@ -5377,6 +5518,8 @@ class Group(System):
                 if name in active_resps:
                     active_resps[name] = meta.copy()
 
+        is_local = self._resolver.is_local
+
         for name, meta in active_resps.items():
             if meta is None:
                 # no response exists for this name, so create metadata with default values and
@@ -5392,7 +5535,7 @@ class Group(System):
                 self._update_response_meta(meta, get_size=True)
                 active_resps[name] = meta
 
-            meta['remote'] = meta['source'] not in self._var_abs2meta['output']
+            meta['remote'] = not is_local(meta['source'], 'output')
 
         return active_resps
 
@@ -5410,6 +5553,72 @@ class Group(System):
         # inside of the group or its children.
         meta['base'] = 'Group'
         return meta
+
+    def _column_iotypes(self):
+        """
+        Return a tuple of the iotypes that make up columns of the jacobian.
+
+        Returns
+        -------
+        tuple of the form ('input',)
+            The iotypes that make up columns of the jacobian.
+        """
+        return ('input',)
+
+    def _get_subjac_owners(self):
+        """
+        Return a dictionary of owning rank keyed by subjac key.
+
+        This only applies to groups approximating a jacobian using FD or CS, and is empty unless
+        there are of or wrt variables that are not local in at least one rank.
+
+        It is also empty in the top level group, because when computing total jacobians, the
+        subjacobians exist locally on each process.
+
+        The return value is cached in self._key_owner.
+
+        Returns
+        -------
+        dict
+            Dictionary of owning rank keyed by subjac key.
+        """
+        if self._key_owner is None:
+            if self.pathname and self.comm.size > 1 and self._owns_approx_jac:
+                allouts = self._var_allprocs_abs2meta['output']
+                local_out = self._var_abs2meta['output']
+                local_in = self._var_abs2meta['input']
+                remote_keys = []
+                for key in self._jacobian._get_ordered_subjac_keys(self):
+                    of, wrt = key
+                    if of not in local_out or (wrt not in local_in and wrt not in local_out):
+                        remote_keys.append(key)
+
+                abs2idx = self._var_allprocs_abs2idx
+                sizes_out = self._var_sizes['output']
+                sizes_in = self._var_sizes['input']
+                owner_dict = {}
+                for keys in self.comm.allgather(remote_keys):
+                    for key in keys:
+                        if key not in owner_dict:
+                            of, wrt = key
+                            ofsizes = sizes_out[:, abs2idx[of]]
+                            if wrt in allouts:
+                                wrtsizes = sizes_out[:, abs2idx[wrt]]
+                            else:
+                                wrtsizes = sizes_in[:, abs2idx[wrt]]
+                            for rank, (ofsz, wrtsz) in enumerate(zip(ofsizes, wrtsizes)):
+                                # find first rank where both of and wrt are local
+                                if ofsz and wrtsz:
+                                    owner_dict[key] = rank
+                                    break
+                            else:  # no rank was found where both were local. Use 'of' local rank
+                                owner_dict[key] = np.min(np.nonzero(ofsizes)[0])
+
+                self._key_owner = owner_dict
+            else:
+                self._key_owner = {}
+
+        return self._key_owner
 
 
 def iter_solver_info(system):

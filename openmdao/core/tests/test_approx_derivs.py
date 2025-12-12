@@ -1,6 +1,7 @@
 """ Testing for group finite differencing."""
 import time
 import unittest
+from io import StringIO
 
 from packaging.version import Version
 
@@ -21,6 +22,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
     assert_check_totals, assert_warnings
 from openmdao.utils.general_utils import set_pyoptsparse_opt
 from openmdao.utils.mpi import MPI
+from openmdao.utils.rich_utils import strip_formatting
 from openmdao.utils.testing_utils import use_tempdirs
 
 try:
@@ -1760,6 +1762,7 @@ class TestComponentComplexStep(unittest.TestCase):
 
         prob.setup()
         prob.run_model()
+
         model.run_linearize()
 
         Jfd = comp._jacobian
@@ -1940,6 +1943,7 @@ class TestComponentComplexStep(unittest.TestCase):
                      [0, 1, 0, 1, 1, 0, 1]], dtype=int)
 
                 self.add_input('x0', val=np.ones(4))
+
                 self.add_input('x1', val=np.ones(2))
                 self.add_input('x2', val=np.ones(1))
 
@@ -1971,19 +1975,124 @@ class TestComponentComplexStep(unittest.TestCase):
                     outputs[outname] = prod[start:end]
                     start = end
 
+        for compact_print in [True, False]:
+            with self.subTest(f'{compact_print=}'):
+                prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('comp', BadSparsityComp())
+
+                prob.setup(check=False, mode='fwd')
+                prob.set_solver_print(level=0)
+                prob.run_model()
+
+                ss = StringIO()
+                prob.check_partials(includes=['comp'], compact_print=compact_print, out_stream=ss)
+                lines = ss.getvalue().splitlines()
+                for i in range(len(lines)):
+                    lines[i] = strip_formatting(lines[i])
+
+                if compact_print:
+                    self.assertIn('<BAD SPARSITY>', lines[13])
+                    self.assertIn("| y1            | x0             |", lines[13])
+                else:
+                    self.assertIn("comp: 'y1' wrt 'x0'", lines[58])
+                    self.assertIn("Sparsity excludes 1 entries which appear to be non-zero. (Magnitudes exceed 1e-16) *", lines[66])
+                    self.assertIn("Rows: [1]", lines[67])
+                    self.assertIn("Cols: [3]", lines[68])
+
+
+class TestComponentRelevance(unittest.TestCase):
+
+    def get_fd_relevance_prob(self, star_partials=False):
+        class CompOne(om.ExplicitComponent):
+
+            def setup(self):
+                self.n_execs = 0
+                self.add_input('a', val=0.0)
+                self.add_input('b', val=0.0)
+                self.add_output('x', val=0.0)
+                self.add_output('y', val=0.0)
+                if star_partials:
+                    self.declare_partials('*', '*', method='fd')
+                else:
+                    self.declare_partials('x', 'a', method='fd')
+                    self.declare_partials('y', 'b', method='fd')
+
+            def compute(self, inputs, outputs):
+                outputs['x'] = inputs['a'] ** 2
+                outputs['y'] = inputs['b'] ** 2
+                self.n_execs += 1
+
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('comp', BadSparsityComp())
 
-        prob.setup(check=False, mode='fwd')
-        prob.set_solver_print(level=0)
+        indep = model.add_subsystem('indep', om.IndepVarComp('a', val=0.0))
+        indep.add_output('b', val=0.0)
+        model.add_subsystem('comp1', CompOne())
+        model.add_subsystem('sink1', om.ExecComp('x=a'))
+        model.add_subsystem('sink2', om.ExecComp('y=a'))
+
+        model.connect('indep.a', 'comp1.a')
+        model.connect('indep.b', 'comp1.b')
+        model.connect('comp1.x', 'sink1.a')
+        model.connect('comp1.y', 'sink2.a')
+
+        model.add_design_var('indep.a', lower=-100, upper=100)
+        model.add_design_var('indep.b', lower=-100, upper=100)
+        model.add_constraint('sink1.x', lower=0.0)
+        model.add_objective('sink2.y')
+
+        prob.setup()
         prob.run_model()
 
-        with self.assertRaises(Exception) as cm:
-            prob.check_partials(includes=['comp'])
+        return prob
 
-        self.assertEqual(cm.exception.args[0], "'comp' <class BadSparsityComp>: User specified sparsity (rows/cols) for subjac 'comp.y1' wrt 'comp.x0' is incorrect. There are non-covered nonzeros in column 3 at row(s) [1].")
+    def test_fd_relevance_star_partials(self):
 
+        prob = self.get_fd_relevance_prob(star_partials=True)
+        comp = prob.model.comp1
+
+        count = comp.n_execs
+        J = prob.compute_totals(of=['sink1.x', 'sink2.y'], wrt=['indep.a', 'indep.b'])
+
+        assert_near_equal(J['sink1.x', 'indep.a'], [2.0 * prob['indep.a']], 1e-6)
+        assert_near_equal(J['sink1.x', 'indep.b'], [[0.]], 1e-6)
+        assert_near_equal(J['sink2.y', 'indep.a'], [[0.]], 1e-6)
+        assert_near_equal(J['sink2.y', 'indep.b'], [2.0 * prob['indep.b']], 1e-6)
+
+        self.assertEqual(comp.n_execs - count, 2)
+        count = comp.n_execs
+        J = prob.compute_totals(of=['sink1.x', 'sink2.y'], wrt=['indep.a'])
+        self.assertEqual(comp.n_execs - count, 1)
+
+        count = comp.n_execs
+        # Because comp1 has declared *, * partials, the relevance graph thinks that all comp1
+        # inputs are relevant to all comp1 outputs, so it executes the component once even though
+        # internally there is no connection between comp1.b and comp1.x.
+        J = prob.compute_totals(of=['sink1.x'], wrt=['indep.b'])
+        self.assertEqual(comp.n_execs - count, 1)
+
+    def test_fd_relevance(self):
+
+        prob = self.get_fd_relevance_prob(star_partials=False)
+        comp = prob.model.comp1
+
+        count = comp.n_execs
+        J = prob.compute_totals(of=['sink1.x', 'sink2.y'], wrt=['indep.a', 'indep.b'])
+
+        assert_near_equal(J['sink1.x', 'indep.a'], [2.0 * prob['indep.a']], 1e-6)
+        assert_near_equal(J['sink1.x', 'indep.b'], [[0.]], 1e-6)
+        assert_near_equal(J['sink2.y', 'indep.a'], [[0.]], 1e-6)
+        assert_near_equal(J['sink2.y', 'indep.b'], [2.0 * prob['indep.b']], 1e-6)
+
+        self.assertEqual(comp.n_execs - count, 2)
+        count = comp.n_execs
+        J = prob.compute_totals(of=['sink1.x', 'sink2.y'], wrt=['indep.a'])
+        self.assertEqual(comp.n_execs - count, 1)
+
+        count = comp.n_execs
+        J = prob.compute_totals(of=['sink1.x'], wrt=['indep.b'])
+        self.assertEqual(comp.n_execs - count, 0)
 
 
 class ApproxTotalsFeature(unittest.TestCase):
@@ -2336,9 +2445,10 @@ class TestFDRelative(unittest.TestCase):
         model.add_subsystem('comp', FDComp(vec_size=3))
 
         prob.setup()
+        prob.run_model()
 
         with self.assertRaises(ValueError) as cm:
-            prob.run_model()
+            prob.model.run_linearize()
 
         msg = "'comp' <class FDComp>: 'junk' is not a valid setting for step_calc; must be one of ['abs', 'rel', 'rel_legacy', 'rel_avg', 'rel_element']."
         self.assertEqual(cm.exception.args[0], msg)

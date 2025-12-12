@@ -45,9 +45,9 @@ def _view_dyn_shapes_cmd(options, user_args):
     def _set_dyn_hook(prob):
         # we can't wait until the end of Problem.setup because we'll die in _setup_sizes
         # if there were any unresolved dynamic shapes, so put the hook immediately after
-        # _setup_dynamic_shapes.  inst_id is None here because no system's pathname will
+        # _setup_dynamic_properties.  inst_id is None here because no system's pathname will
         # have been set at the time this hook is triggered.
-        hooks._register_hook('_setup_dynamic_shapes', class_name='Group', inst_id=None,
+        hooks._register_hook('_setup_dynamic_properties', class_name='Group', inst_id=None,
                              post=_view_shape_graph, exit=True)
         hooks._setup_hooks(prob.model)
 
@@ -123,8 +123,11 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
     node_colors = []
     node_labels = {}
     for n in graph:
-        meta = abs2meta['input'][n] if n in abs2meta['input'] else abs2meta['output'][n]
-        shape = meta['shape']
+        try:
+            meta = abs2meta['input'][n] if n in abs2meta['input'] else abs2meta['output'][n]
+            shape = meta['shape']
+        except KeyError:
+            shape = None
         if shape is None:
             shape = '?'
             node_colors.append('red')

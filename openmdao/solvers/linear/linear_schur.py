@@ -124,14 +124,17 @@ class LinearSchur(LinearSolver):
         # initialize the schur complement jacobian for these variables
         # TODO better way to get the dtype?
         schur_jac = np.zeros((n_vars, n_vars),
-                             dtype=system._vectors['residual']['linear'].asarray(copy=True).dtype)
+                             dtype=system._vectors['residual']['linear'].asarray(copy=False).dtype)
         schur_rhs = np.zeros((n_vars),
-                             dtype=system._vectors['residual']['linear'].asarray(copy=True).dtype)
+                             dtype=system._vectors['residual']['linear'].asarray(copy=False).dtype)
 
         # backup the vectors we are working with
         rvec = system._vectors['residual']['linear']
         ovec = system._vectors['output']['linear']
         ivec = system._vectors['input']['linear']
+
+        # Cache a copy the linear residual of subsys2
+        subsys2_linear_resid_array = subsys2._vectors['residual']['linear'].asarray(copy=True)
 
         if mode == 'fwd':
             parent_offset = system._dresiduals._root_offset
@@ -152,9 +155,9 @@ class LinearSchur(LinearSolver):
             # Schur_Jac = D - C A^-1 B ##
 
             # put back the vectors
-            rvec.set_val(np.zeros(len(rvec)))
-            ovec.set_val(np.zeros(len(ovec)))
-            ivec.set_val(np.zeros(len(ivec)))
+            rvec.set_val(0.0)
+            ovec.set_val(0.0)
+            ivec.set_val(0.0)
 
             for ii, var in enumerate(vars_to_solve):
                 # set the linear seed of the variable we want to solve for in subsys 2
@@ -198,14 +201,14 @@ class LinearSchur(LinearSolver):
                 system._apply_linear(None, mode, scope_out, scope_in)
 
                 # put this value into the jacobian.
-                schur_jac[:, ii] = subsys2._vectors['residual']['linear'].asarray(copy=True)
+                schur_jac[:, ii] = subsys2_linear_resid_array
 
                 # set back the seed to zero for the next vector
                 ovec[f'{subsys2.name}.{var}'] = 0.0
                 # put back the vectors
-                rvec.set_val(np.zeros(len(rvec)))
-                ovec.set_val(np.zeros(len(ovec)))
-                ivec.set_val(np.zeros(len(ivec)))
+                rvec.set_val(0.0)
+                ovec.set_val(0.0)
+                ivec.set_val(0.0)
 
             # schur_jacobian
             subsys1._vectors['residual']['linear'].set_val(subsys1_rhs)
@@ -222,13 +225,13 @@ class LinearSchur(LinearSolver):
             scope_in = self._vars_union(self._scope_in, scope_in)
             subsys2._apply_linear(None, mode, scope_out, scope_in)
 
-            schur_rhs = subsys2._vectors['residual']['linear'].asarray(copy=True)
+            schur_rhs = subsys2_linear_resid_array
 
             # Beg solve for subsys 2
 
             schur_rhs = subsys2_rhs - schur_rhs
             iD_schur = np.eye(n_vars,
-                              dtype=system._vectors['residual']['linear'].asarray(copy=True).dtype)
+                              dtype=system._vectors['residual']['linear'].asarray(copy=False).dtype)
             iD_schur *= 1e-16
             schur_jac = schur_jac + iD_schur
             d_subsys2 = scipy.linalg.solve(schur_jac, schur_rhs)

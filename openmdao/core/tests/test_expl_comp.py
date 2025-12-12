@@ -2,7 +2,7 @@
 
 from io import StringIO
 import unittest
-
+import itertools
 import numpy as np
 
 import openmdao.api as om
@@ -16,6 +16,12 @@ from openmdao.test_suite.components.rectangle import RectangleGroup, \
 from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.general_utils import printoptions, remove_whitespace
 from openmdao.utils.mpi import MPI
+from openmdao.utils.testing_utils import parameterized_name
+
+try:
+    from parameterized import parameterized
+except ImportError:
+    from openmdao.utils.assert_utils import SkipParameterized as parameterized
 
 
 class ExplCompTestCase(unittest.TestCase):
@@ -159,19 +165,21 @@ class ExplCompTestCase(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('p1', om.IndepVarComp('x', 12.0,
+                                                  shape=(),
                                                   lower=1.0, upper=100.0,
                                                   ref=1.1, ref0=2.1,
                                                   units='inch',
                                                   desc='indep x'))
         model.add_subsystem('p2', om.IndepVarComp('y', 1.0,
+                                                  shape=(),
                                                   lower=2.0, upper=200.0,
                                                   ref=1.2, res_ref=2.2,
                                                   units='ft',
                                                   desc='indep y'))
         model.add_subsystem('comp', om.ExecComp('z=x+y',
-                                                x={'val': 0.0, 'units': 'inch'},
-                                                y={'val': 0.0, 'units': 'inch'},
-                                                z={'val': 0.0, 'units': 'inch'}))
+                                                x={'val': 0.0, 'shape': (), 'units': 'inch'},
+                                                y={'val': 0.0, 'shape': (), 'units': 'inch'},
+                                                z={'val': 0.0, 'shape': (), 'units': 'inch'}))
         model.connect('p1.x', 'comp.x')
         model.connect('p2.y', 'comp.y')
 
@@ -221,7 +229,7 @@ class ExplCompTestCase(unittest.TestCase):
             "",
             "varname  val  ",
             "-------  -----",
-            "x        [12.]",
+            "x        12.0",
             "",
             "",
             "0 Implicit Output(s) in 'p1'",
@@ -256,8 +264,8 @@ class ExplCompTestCase(unittest.TestCase):
         inputs = prob.model.list_inputs(units=True, shape=True, prom_name=False, out_stream=stream)
         tol = 1e-7
         for actual, expected in zip(sorted(inputs), [
-            ('comp.x', {'val': [12.], 'shape': (1,), 'units': 'inch'}),
-            ('comp.y', {'val': [12.], 'shape': (1,), 'units': 'inch'})
+            ('comp.x', {'val': 12., 'shape': (), 'units': 'inch'}),
+            ('comp.y', {'val': 12., 'shape': (), 'units': 'inch'})
         ]):
             self.assertEqual(expected[0], actual[0])
             self.assertEqual(expected[1]['units'], actual[1]['units'])
@@ -267,13 +275,15 @@ class ExplCompTestCase(unittest.TestCase):
         text = stream.getvalue().split('\n')
         expected_text = [
             "2 Input(s) in 'model'",
-            "",
-            "varname  val    units  shape",
-            "-------  -----  -----  -----",
-            "comp",
-            "  x    [12.]  inch   (1,)",
-            "  y    [12.]  inch   (1,)"
-        ]
+            '', 'varname  val                 units  shape',
+            '-------  ------------------  -----  -----',
+            'comp',
+            '  x      12.0                inch   ()   ',
+            '  y      12.000000000000002  inch   ()   ',
+            '',
+            '',
+            '']
+
         for i, line in enumerate(expected_text):
             if line and not line.startswith('-'):
                 self.assertEqual(remove_whitespace(text[i]).replace('1L', ''), remove_whitespace(line))
@@ -298,30 +308,31 @@ class ExplCompTestCase(unittest.TestCase):
                                           out_stream=stream)
 
         self.assertEqual([
-            ('comp.z', {'val': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': '',
+            ('comp.z', {'val': 24., 'resids': 0., 'units': 'inch', 'shape': (), 'desc': '',
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
-            ('p1.x', {'val': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,), 'desc': 'indep x',
-                      'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
-            ('p2.y', {'val': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,), 'desc': 'indep y',
-                      'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
+            ('p1.x', {'val': 12., 'resids': 0., 'units': 'inch', 'shape': (), 'desc': 'indep x',
+                      'lower': 1., 'upper': 100., 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
+            ('p2.y', {'val': 1., 'resids': 0., 'units': 'ft', 'shape': (), 'desc': 'indep y',
+                      'lower': 2., 'upper': 200., 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
         ], sorted(outputs))
 
         text = stream.getvalue().split('\n')
         expected_text = [
             "3 Explicit Output(s) in 'model'",
-            "",
-            "varname  val   resids  units  shape  lower  upper   ref  ref0  res_ref  desc",
-            "-------  ----  ------  -----  -----  -----  ------  ---  ----  -------  -------",
-            "p1",
-            "  x    [12.]  [0.]    inch   (1,)   [1.]   [100.]  1.1  2.1   1.1      indep x",
-            "p2",
-            "  y    [1.]   [0.]    ft     (1,)   [2.]   [200.]  1.2  0.0   2.2      indep y",
-            "comp",
-            "  z    [24.]  [0.]    inch   (1,)   None   None    1.0  0.0   1.0",
-            "",
-            "",
+            '',
+            'varname  val   resids  units  shape  lower  upper  ref  ref0  res_ref  desc   ',
+            '-------  ----  ------  -----  -----  -----  -----  ---  ----  -------  -------',
+            'p1', '  x      12.0  0.0     inch   ()     1.0    100.0  1.1  2.1   1.1      indep x',
+            'p2', '  y      1.0   0.0     ft     ()     2.0    200.0  1.2  0.0   2.2      indep y',
+            'comp',
+            '  z      24.0  0.0     inch   ()     None   None   1.0  0.0   1.0             ',
+            '',
+            '',
             "0 Implicit Output(s) in 'model'",
-        ]
+            '',
+            '',
+            '']
+
         for i, line in enumerate(expected_text):
             if line and not line.startswith('-'):
                 self.assertEqual(remove_whitespace(text[i]).replace('1L', ''), remove_whitespace(line))
@@ -367,11 +378,11 @@ class ExplCompTestCase(unittest.TestCase):
                                           print_arrays=False)
 
         self.assertEqual(sorted(outputs), [
-            ('comp.z', {'val': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+            ('comp.z', {'val': [24.], 'resids': [0.], 'units': 'inch', 'shape': (1, ),
                         'lower': None, 'upper': None, 'ref': 1.0, 'ref0': 0.0, 'res_ref': 1.0}),
-            ('p1.x', {'val': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1,),
+            ('p1.x', {'val': [12.], 'resids': [0.], 'units': 'inch', 'shape': (1, ),
                       'lower': [1.], 'upper': [100.], 'ref': 1.1, 'ref0': 2.1, 'res_ref': 1.1}),
-            ('p2.y', {'val': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1,),
+            ('p2.y', {'val': [1.], 'resids': [0.], 'units': 'ft', 'shape': (1, ),
                       'lower': [2.], 'upper': [200.], 'ref': 1.2, 'ref0': 0.0, 'res_ref': 2.2}),
         ])
 
@@ -760,8 +771,8 @@ class ExplCompTestCase(unittest.TestCase):
 
 
         p = om.Problem()
-        p.model.add_subsystem('ec', EComp(), promotes=['*'])
-        p.model.add_subsystem('ic', IComp(), promotes=['*'])
+        p.model.add_subsystem('ec', EComp(default_shape=()), promotes=['*'])
+        p.model.add_subsystem('ic', IComp(default_shape=()), promotes=['*'])
 
         p.setup()
 
@@ -772,27 +783,27 @@ class ExplCompTestCase(unittest.TestCase):
         stream = StringIO()
         p.model.list_outputs(residuals=True, prom_name=False, out_stream=stream)
 
-        expected_text = [
-            "1 Explicit Output(s) in 'model'",
-            "",
-            "varname  val   resids",
-            "-------  ----  ------",
-            "ec",
-            "  y      [2.]  [0.]  ",
-            "",
-            "",
-            "3 Implicit Output(s) in 'model'",
-            "",
-            "varname  val   resids",
-            "-------  ----  ------",
-            "ic",
-            "  z1     [4.]  [0.]  ",
-            "  z2     [1.]  [-3.] ",
-            "  z3     [1.]  [3.]  ",
-            "",
-            "",
-            "",
-        ]
+        expected_text = \
+"""1 Explicit Output(s) in 'model'
+
+varname  val  resids
+-------  ---  ------
+ec
+  y      2.0  0.0
+
+
+3 Implicit Output(s) in 'model'
+
+varname  val  resids
+-------  ---  ------
+ic
+  z1     4.0  0.0
+  z2     1.0  -3.0
+  z3     1.0  3.0
+
+
+
+""".split('\n')
 
         captured_output = stream.getvalue()
         for i, line in enumerate(captured_output.split('\n')):
@@ -805,21 +816,21 @@ class ExplCompTestCase(unittest.TestCase):
         # Note: Explicit output has 0 residual, so it should not be included.
         # Note: Implicit outputs Z2 and Z3 should both be shown, because the
         #       tolerance check uses the norm, which is always gives positive.
-        expected_text = [
-            "0 Explicit Output(s) in 'model'",
-            "",
-            "",
-            "2 Implicit Output(s) in 'model'",
-            "",
-            "varname  val   resids",
-            "-------  ----  ------",
-            "ic",
-              "z2     [1.]  [-3.]",
-              "z3     [1.]  [3.]",
-            "",
-            "",
-            "",
-        ]
+        expected_text = \
+"""0 Explicit Output(s) in 'model'
+
+
+2 Implicit Output(s) in 'model'
+
+varname  val  resids
+-------  ---  ------
+ic
+  z2     1.0  -3.0
+  z3     1.0  3.0
+
+
+
+""".split('\n')
 
         captured_output = stream.getvalue()
         for i, line in enumerate(captured_output.split('\n')):
@@ -1153,6 +1164,193 @@ class TestMPIExplComp(unittest.TestCase):
             for i, line in enumerate(expected_text):
                 if line and not line.startswith('-'):
                     self.assertEqual(remove_whitespace(text[i]), remove_whitespace(line))
+
+class DotProductMultDiscretePrimalBadNamesBase(om.ExplicitComponent):
+
+    def compute_primal(self, x, y, disc_in):
+        disc_out = -disc_in
+        if disc_in >= 0:
+            z = np.dot(x, y)
+            zz = y * 3.0
+        else:
+            z = -np.dot(x, y)
+            zz = y * 2.5
+
+        self._discrete_outputs.set_vals((disc_out,))
+        return (z, zz, disc_out)
+
+
+class DotProductMultDiscretePrimalBadNamesCorrect(DotProductMultDiscretePrimalBadNamesBase):
+    def setup(self):
+        super().setup()
+        self.add_input('my:x', primal_name='x', shape_by_conn=True)
+        self.add_input('my:y', primal_name='y', shape_by_conn=True)
+        self.add_discrete_input('my:disc_in', primal_name='disc_in', val=2)
+        self.add_output('my:z', primal_name='z', compute_shape=lambda shapes: (shapes['my:x'][0], shapes['my:y'][1]))
+        self.add_output('my:zz', primal_name='zz', copy_shape='my:y')
+        self.add_discrete_output('my:disc_out', primal_name='disc_out', val=3)
+        self.declare_partials(of=['my:z', 'my:zz'], wrt=['my:x', 'my:y'])
+
+
+class DotProductMultDiscretePrimalBadInsWrongOrder(DotProductMultDiscretePrimalBadNamesBase):
+    def setup(self):
+        super().setup()
+        self.add_input('my:x', primal_name='y', shape_by_conn=True)
+        self.add_input('my:y', primal_name='x', shape_by_conn=True)
+        self.add_discrete_input('my:disc_in', primal_name='disc_in', val=2)
+        self.add_output('z', compute_shape=lambda shapes: (shapes['my:x'][0], shapes['my:y'][1]))
+        self.add_output('zz', copy_shape='my:y')
+        self.add_discrete_output('disc_out', val=3)
+        self.declare_partials(of=['z', 'zz'], wrt=['my:x', 'my:y'])
+
+
+class DotProductMultDiscretePrimalBadInsNoMapping(DotProductMultDiscretePrimalBadNamesBase):
+    def setup(self):
+        super().setup()
+        self.add_input('my:x', shape_by_conn=True)
+        self.add_input('my:y', shape_by_conn=True)
+        self.add_discrete_input('my:disc_in', val=2)
+        self.add_output('z', compute_shape=lambda shapes: (shapes['my:x'][0], shapes['my:y'][1]))
+        self.add_output('zz', copy_shape='my:y')
+        self.add_discrete_output('disc_out', val=3)
+        self.declare_partials(of=['z', 'zz'], wrt=['my:x', 'my:y'])
+
+
+class DotProductMultDiscretePrimalBadOutsWrongOrder(DotProductMultDiscretePrimalBadNamesBase):
+    def setup(self):
+        super().setup()
+        self.add_input('x', shape_by_conn=True)
+        self.add_input('y', shape_by_conn=True)
+        self.add_discrete_input('disc_in', primal_name='disc_in', val=2)
+        self.add_output('my:z', primal_name='zz', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
+        self.add_output('my:zz', primal_name='z', copy_shape='my:y')
+        self.add_discrete_output('my:disc_out', primal_name='disc_out', val=3)
+        self.declare_partials(of=['my:z', 'my:zz'], wrt=['x', 'y'])
+
+
+class DotProductMultDiscretePrimalBadOutsNoMapping(DotProductMultDiscretePrimalBadNamesBase):
+    def setup(self):
+        super().setup()
+        self.add_input('x', shape_by_conn=True)
+        self.add_input('y', shape_by_conn=True)
+        self.add_discrete_input('disc_in', primal_name='disc_in', val=2)
+        self.add_output('my:z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
+        self.add_output('my:zz', copy_shape='y')
+        self.add_discrete_output('my:disc_out', val=3)
+        self.declare_partials(of=['my:z', 'my:zz'], wrt=['x', 'y'])
+
+
+x_shape = (2, 3)
+y_shape = (3, 4)
+
+
+class TestMappedNames(unittest.TestCase):
+    @parameterized.expand(itertools.product(['fwd', 'rev'], [True, False]), name_func=parameterized_name)
+    def test_explicit_comp_with_discrete_primal_mapped_names(self, mode, matrix_free):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        ivc.add_discrete_output('disc_out', val=3)
+        comp = p.model.add_subsystem('comp', DotProductMultDiscretePrimalBadNamesCorrect())
+        comp.matrix_free = matrix_free
+
+        p.model.connect('ivc.x', 'comp.my:x')
+        p.model.connect('ivc.y', 'comp.my:y')
+        p.model.connect('ivc.disc_out', 'comp.my:disc_in')
+
+        p.setup(mode=mode)
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        p.final_setup()
+        p.run_model()
+
+        assert_near_equal(p.get_val('comp.my:z'), np.dot(x, y))
+        assert_near_equal(p.get_val('comp.my:zz'), y * 3.0)
+
+    def test_explicit_comp_with_discrete_primal_bad_inputs_wrong_order(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        ivc.add_discrete_output('disc_out', val=3)
+        p.model.add_subsystem('comp', DotProductMultDiscretePrimalBadInsWrongOrder())
+
+        p.model.connect('ivc.x', 'comp.my:x')
+        p.model.connect('ivc.y', 'comp.my:y')
+        p.model.connect('ivc.disc_out', 'comp.my:disc_in')
+
+        with self.assertRaises(RuntimeError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception),
+                         "'comp' <class DotProductMultDiscretePrimalBadInsWrongOrder>: compute_primal method args ['x', 'y', 'disc_in'] "
+                         "don't match the args ['y', 'x', 'disc_in'] mapped from this component's inputs. To map inputs to the compute_primal "
+                         "method, set the name used in compute_primal to the 'primal_name' arg when calling add_input/add_discrete_input. "
+                         "This is only necessary if the declared component input name is not a valid Python name.")
+
+    def test_explicit_comp_with_discrete_primal_bad_outputs_wrong_order(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        ivc.add_discrete_output('disc_out', val=3)
+        p.model.add_subsystem('comp', DotProductMultDiscretePrimalBadOutsWrongOrder())
+
+        p.model.connect('ivc.x', 'comp.x')
+        p.model.connect('ivc.y', 'comp.y')
+        p.model.connect('ivc.disc_out', 'comp.disc_in')
+
+        with self.assertRaises(RuntimeError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception),
+                         "'comp' <class DotProductMultDiscretePrimalBadOutsWrongOrder>: compute_primal method returns z for return value 0 "
+                         "but the name of the output that was mapped for this component is zz. To map outputs to the compute_primal method, "
+                         "set the name used in compute_primal to the 'primal_name' arg when calling add_output/add_discrete_output. "
+                         "This is only necessary if the declared component output name is not a valid Python name.")
+
+
+    def test_explicit_comp_with_discrete_primal_bad_inputs_no_mapping(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        ivc.add_discrete_output('disc_out', val=3)
+        p.model.add_subsystem('comp', DotProductMultDiscretePrimalBadInsNoMapping())
+
+        p.model.connect('ivc.x', 'comp.my:x')
+        p.model.connect('ivc.y', 'comp.my:y')
+        p.model.connect('ivc.disc_out', 'comp.my:disc_in')
+
+        with self.assertRaises(RuntimeError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception),
+                         "'comp' <class DotProductMultDiscretePrimalBadInsNoMapping>: compute_primal method args ['x', 'y', 'disc_in'] "
+                         "don't match the args ['my:x', 'my:y', 'my:disc_in'] mapped from this component's inputs. To map inputs to the "
+                         "compute_primal method, set the name used in compute_primal to the 'primal_name' arg when calling add_input/add_discrete_input. "
+                         "This is only necessary if the declared component input name is not a valid Python name.")
+
+    def test_explicit_comp_with_discrete_primal_bad_outputs_no_mapping(self):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        ivc.add_discrete_output('disc_out', val=3)
+        p.model.add_subsystem('comp', DotProductMultDiscretePrimalBadOutsNoMapping())
+
+        p.model.connect('ivc.x', 'comp.x')
+        p.model.connect('ivc.y', 'comp.y')
+        p.model.connect('ivc.disc_out', 'comp.disc_in')
+
+        with self.assertRaises(RuntimeError) as ctx:
+            p.setup()
+
+        self.assertEqual(str(ctx.exception),
+                         "'comp' <class DotProductMultDiscretePrimalBadOutsNoMapping>: compute_primal method returns z for return value 0 "
+                         "but the name of the output that was mapped for this component is my:z. To map outputs to the compute_primal method, "
+                         "set the name used in compute_primal to the 'primal_name' arg when calling add_output/add_discrete_output. "
+                         "This is only necessary if the declared component output name is not a valid Python name.")
+
 
 if __name__ == '__main__':
     unittest.main()

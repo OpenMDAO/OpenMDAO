@@ -1,5 +1,5 @@
 """ Unit tests for AnalysisError with Pyoptsparse Driver."""
-
+import inspect
 import unittest
 
 from collections import defaultdict
@@ -336,6 +336,29 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
 
             # check that the optimizer output shows the optimizer was unable to handle the errors
             self.check_history(prob, optimizer, err_count=len(comp.raised_grad_errors), func='grad')
+
+
+class TestAnalysisErrorLocation(unittest.TestCase):
+
+    def _test_func(self, loc_type):
+        if loc_type == 'currentframe':
+            raise om.AnalysisError('error', location=inspect.currentframe())
+        else:
+            raise om.AnalysisError('error', location=inspect.getframeinfo(inspect.currentframe()))
+
+    def test_raise_with_frame(self):
+        with self.assertRaises(om.AnalysisError):
+            with self.assertWarns(expected_warning=UserWarning) as ctx:
+                self._test_func(loc_type='currentframe')
+        pattern = (r'Analysis Error: None Line \d+ of file .*test_analysis_errors.py')
+        self.assertRegex(str(ctx.warnings[0].message), pattern)
+
+    def test_raise_with_frameinfo(self):
+        with self.assertRaises(om.AnalysisError):
+            with self.assertWarns(expected_warning=UserWarning) as ctx:
+                self._test_func(loc_type='frameinfo')
+        pattern = (r'Analysis Error: None Line \d+ of file .*test_analysis_errors.py')
+        self.assertRegex(str(ctx.warnings[0].message), pattern)
 
 
 if __name__ == "__main__":

@@ -155,7 +155,7 @@ def tree(top, show_solvers=True, show_jacs=True, show_colors=True, show_approx=T
                 lnjac = s._assembled_jac
                 jacs.append(lnjac)
             if s.nonlinear_solver is not None:
-                jacsolvers = list(s.nonlinear_solver._assembled_jac_solver_iter())
+                jacsolvers = [tup[0] for tup in s.nonlinear_solver._assembled_jac_solver_iter()]
                 if jacsolvers:
                     nljac = jacsolvers[0]._assembled_jac
                     if nljac is not lnjac:
@@ -365,6 +365,18 @@ def _summary_report(prob):
 
 def _summary_report_register():
     register_report('summary', _summary_report, 'Model summary', 'Problem', 'final_setup', 'post')
+
+
+class DebugDict(dict):
+    """
+    A drop-in replacement for a dict that allows breakpoints to be set in __setitem__.
+
+    This is useful when debugging and a dict's value is being changed and you want to know
+    where that is happening.
+    """
+
+    def __setitem__(self, key, value):
+        return super().__setitem__(key, value)
 
 
 @contextmanager

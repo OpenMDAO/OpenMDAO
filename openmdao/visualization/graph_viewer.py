@@ -43,6 +43,27 @@ _base_display_map = {
 }
 
 
+def escape_dot_label(label_string):
+    """
+    Escapes special characters in a string to be used as a label in a DOT graph.
+
+    Graphviz/DOT requires certain characters to be escaped when they appear
+    within string literals (labels, node names, etc.) to avoid syntax errors.
+
+    Parameters
+    ----------
+    label_string : str
+        The string to escape.
+
+    Returns
+    -------
+    str
+        The escaped string suitable for a DOT label.
+    """
+    escaped_string = label_string.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+    return escaped_string.replace("\r", "\\r").replace("<", "\\<").replace(">", "\\>")
+
+
 class GraphViewer(object):
     """
     A class for viewing the model hierarchy and connections in a group.
@@ -148,7 +169,7 @@ class GraphViewer(object):
                             G.nodes[the_in]['label'] = label
 
                         sysout = prefix + abs_out[lenpre:].partition('.')[0]
-                        prom_out = group._var_allprocs_abs2prom['output'][abs_out]
+                        prom_out = group._resolver.abs2prom(abs_out, 'output')
 
                         if sysout not in G:
                             G.add_node(sysout, **_base_display_map['Group'])
@@ -251,13 +272,12 @@ class GraphViewer(object):
             Dictionary of promoted connections.
         """
         group = self._group
-        abs2prom_in = group._var_allprocs_abs2prom['input']
-        prom2abs_in = group._var_allprocs_prom2abs_list['input']
+        resolver = group._resolver
         prefix = group.pathname + '.' if group.pathname else ''
         prom_conns = {}
         for inp, out in conns.items():
-            prom = abs2prom_in[inp]
-            prom_conns[prom] = (out, [i for i in prom2abs_in[prom] if i.startswith(prefix)])
+            prom = resolver.abs2prom(inp, 'input')
+            prom_conns[prom] = (out, [i for i in resolver.absnames(prom) if i.startswith(prefix)])
         return prom_conns
 
     def _get_graph_display_info(self, display_map=None):
@@ -296,10 +316,7 @@ class GraphViewer(object):
             node_info[s.pathname] = meta.copy()
 
         if group.comm.size > 1:
-            abs2prom = group._var_abs2prom
-            all_abs2prom = group._var_allprocs_abs2prom
-            if (len(all_abs2prom['input']) != len(abs2prom['input']) or
-                    len(all_abs2prom['output']) != len(abs2prom['output'])):
+            if group._resolver.has_remote:
                 # not all systems exist in all procs, so must gather info from all procs
                 if group._gather_full_data():
                     all_node_info = group.comm.allgather(node_info)
@@ -339,8 +356,8 @@ class GraphViewer(object):
                                        tooltip=node_info['']['tooltip'])
             pydot_graph.add_subgraph(groups[''])
 
-        for varpath in chain(group._var_allprocs_abs2prom['input'],
-                             group._var_allprocs_abs2prom['output']):
+        for varpath in chain(group._resolver.abs_iter('input'),
+                             group._resolver.abs_iter('output')):
             group = varpath.rpartition('.')[0].rpartition('.')[0]
             if group not in groups:
                 # reverse the list so parents will exist before children
@@ -392,8 +409,8 @@ class GraphViewer(object):
         pydot_graph.add_node(top_node)
         systems[group.pathname] = top_node
 
-        for varpath in chain(group._var_allprocs_abs2prom['input'],
-                             group._var_allprocs_abs2prom['output']):
+        for varpath in chain(group._resolver.abs_iter('input'),
+                             group._resolver.abs_iter('output')):
             system = varpath.rpartition('.')[0]
             if system not in systems and system not in exclude:
                 # reverse the list so parents will exist before children
@@ -864,8 +881,11 @@ def _graph_cmd(options, user_args):
     user_args : list of str
         Args to be passed to the user script.
     """
-    def _view_graph(problem):
-        group = problem.model._get_subsystem(options.group) if options.group else problem.model
+    def _view_graph(model):
+        group = model._get_subsystem(options.group) if options.group else model
+        if group is None:
+            raise ValueError(f"Group '{options.group}' not found in model.")
+
         if not options.auto_ivc:
             exclude = {'_auto_ivc'}
         else:
@@ -876,5 +896,11 @@ def _graph_cmd(options, user_args):
                                        outfile=options.outfile)
 
     # register the hooks
-    hooks._register_hook('final_setup', 'Problem', post=_view_graph, exit=True)
+    def _set_dyn_hook(prob):
+        hooks._register_hook('_setup_part2', class_name='Group', inst_id=None,
+                             post=_view_graph, exit=True)
+        hooks._setup_hooks(prob.model)
+
+    # register the hooks
+    hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook, ncalls=1)
     _load_and_exec(options.file[0], user_args)

@@ -160,7 +160,7 @@ class NonlinearSchurSolver(NonlinearSolver):
             and self._iter_count <= self.options['max_sub_solves']
         )
 
-    def _set_solver_print(self, level=2, type_='all'):
+    def _set_solver_print(self, level=2, type_='all', debug_print=None):
         """
         Control printing for solvers and subsolvers in the model.
 
@@ -172,14 +172,17 @@ class NonlinearSchurSolver(NonlinearSolver):
             except for failures, and set to -1 to disable all printing including failures.
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        debug_print : bool or None
+            If None, leave solver debug printing unchanged, otherwise turn if on or off
+            depending on whether debug_print is True or False.
         """
-        super()._set_solver_print(level=level, type_=type_)
+        super()._set_solver_print(level=level, type_=type_, debug_print=debug_print)
 
         if self.linear_solver is not None and type_ != 'NL':
             self.linear_solver._set_solver_print(level=level, type_=type_)
 
         if self.linesearch is not None:
-            self.linesearch._set_solver_print(level=level, type_=type_)
+            self.linesearch._set_solver_print(level=level, type_=type_, debug_print=debug_print)
 
     def _run_apply(self):
         """
@@ -271,7 +274,12 @@ class NonlinearSchurSolver(NonlinearSolver):
         system._vectors['residual']['linear'] *= -1.0
         my_asm_jac = self.linear_solver._assembled_jac
 
-        system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
+        # my_asm_jac should not be passed to _linearize?
+        # system._linearize(my_asm_jac, sub_do_ln=do_sub_ln)
+        # if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
+        #     my_asm_jac._update(system)
+
+        system._linearize(sub_do_ln=do_sub_ln)
         if my_asm_jac is not None and system.linear_solver._assembled_jac is not my_asm_jac:
             my_asm_jac._update(system)
 
@@ -332,7 +340,7 @@ class NonlinearSchurSolver(NonlinearSolver):
                 # this ll give us the B[:,{ii}] vector
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
 
-                subsys1._apply_linear(None, mode, scope_out, scope_in)
+                subsys1._apply_linear(mode, scope_out, scope_in)
 
                 # amd then, by performing solve_linear we get A^-1 B[:,{ii}]
                 subsys1._solve_linear(mode, scope_out, scope_in)
@@ -356,7 +364,7 @@ class NonlinearSchurSolver(NonlinearSolver):
                 # the result is the final jacobian for this using the
                 # schur complement method D[:,{ii}] - C A^-1 B[:,{ii}]
                 scope_out, scope_in = system._get_matvec_scope()
-                system._apply_linear(None, mode, scope_out, scope_in)
+                system._apply_linear(mode, scope_out, scope_in)
 
                 # put this value into the jacobian.
                 schur_jac[:, ii] = subsys2._vectors['residual']['linear'].asarray()
@@ -375,7 +383,7 @@ class NonlinearSchurSolver(NonlinearSolver):
 
                 # we get the C[{ii},:] vector by apply_linear on the system
                 scope_out, scope_in = system._get_matvec_scope()
-                system._apply_linear(None, mode, scope_out, scope_in)
+                system._apply_linear(mode, scope_out, scope_in)
 
                 # do a solve_linear to find C[{ii},:] A^-1
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
@@ -386,7 +394,7 @@ class NonlinearSchurSolver(NonlinearSolver):
 
                 # do a apply_linear on the subsys1 to find the D[{ii},:] - C[{ii},:] A^-1 B
                 scope_out, scope_in = system._get_matvec_scope(subsys1)
-                subsys1._apply_linear(None, mode, scope_out, scope_in)
+                subsys1._apply_linear(mode, scope_out, scope_in)
 
                 system._transfer('linear', mode, subsys2.name)
 

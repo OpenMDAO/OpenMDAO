@@ -269,6 +269,9 @@ class Solver(object, metaclass=SolverMetaclass):
         # Raise AnalysisError if requested.
         if self.options['err_on_non_converge']:
             raise AnalysisError(msg)
+        elif 'debug_print' in self.options and self.options['debug_print']:
+            # Do a debug print even if we're not raising an exception.
+            self._print_exc_debug_info()
 
     @property
     def _recording_iter(self):
@@ -384,14 +387,16 @@ class Solver(object, metaclass=SolverMetaclass):
 
         Parameters
         ----------
-        level : int
+        level : int or None
             iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
+            A level of None will leave solver printing unchanged.
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
         """
-        self.options['iprint'] = level
+        if level is not None:
+            self.options['iprint'] = level
 
     def _mpi_print(self, iteration, abs_res, rel_res):
         """
@@ -575,7 +580,7 @@ class Solver(object, metaclass=SolverMetaclass):
         """
         return True
 
-    def get_outputs_dir(self, *subdirs, mkdir=True):
+    def get_outputs_dir(self, *subdirs, mkdir=False):
         """
         Get the path under which all output files of this solver are to be placed.
 
@@ -593,6 +598,17 @@ class Solver(object, metaclass=SolverMetaclass):
            The path of the outputs directory for the problem.
         """
         return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
+
+    def check_config(self, logger):
+        """
+        Perform optional error checks.
+
+        Parameters
+        ----------
+        logger : object
+            The object that manages logging output.
+        """
+        pass
 
 
 class NonlinearSolver(Solver):
@@ -631,9 +647,10 @@ class NonlinearSolver(Solver):
         Declare options before kwargs are processed in the init method.
         """
         self.options.declare('debug_print', types=bool, default=False,
-                             desc='If true, the values of input and output variables at '
+                             desc='If True, the values of input and output variables at '
                                   'the start of iteration are printed and written to a file '
-                                  'after a failure to converge.')
+                                  'after a failure to converge or when encountering an'
+                                  'invalid value in the residual.')
         self.options.declare('stall_limit', default=0,
                              desc='Number of iterations after which, if the residual norms are '
                                   'identical within the stall_tol, then terminate as if max '
@@ -692,6 +709,26 @@ class NonlinearSolver(Solver):
                 # reset to False so we won't waste memory allocating a cache array
                 self.options['restart_from_successful'] = False
 
+    def _set_solver_print(self, level=2, type_='all', debug_print=None):
+        """
+        Control printing for solvers and subsolvers in the model.
+
+        Parameters
+        ----------
+        level : int
+            iprint level. Set to 2 to print residuals each iteration; set to 1
+            to print just the iteration totals; set to 0 to disable all printing
+            except for failures, and set to -1 to disable all printing including failures.
+        type_ : str
+            Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        debug_print : bool or None
+            If None, leave solver debug printing unchanged, otherwise turn if on or off
+            depending on whether debug_print is True or False.
+        """
+        super()._set_solver_print(level=level, type_=type)
+        if debug_print is not None:
+            self.options['debug_print'] = debug_print
+
     def solve(self):
         """
         Run the solver.
@@ -716,8 +753,8 @@ class NonlinearSolver(Solver):
         """
         system = self._system()
         if self.options['debug_print']:
-            self._err_cache['inputs'] = system._inputs._copy_views()
-            self._err_cache['outputs'] = system._outputs._copy_views()
+            self._err_cache['inputs'] = system._inputs._copy_vars()
+            self._err_cache['outputs'] = system._outputs._copy_vars()
 
         if self.options['maxiter'] > 0:
             self._run_apply()
@@ -912,8 +949,8 @@ class NonlinearSolver(Solver):
         """
         system = self._system()
 
-        if (self.options['restart_from_successful'] and self.options['maxiter'] > 1 and
-                not system.under_approx):
+        if (not system.under_approx and self.options['restart_from_successful'] and
+                self.options['maxiter'] > 1):
             try:
                 # If we have a previous solver failure, we want to replace
                 # the outputs using the cache.
@@ -992,7 +1029,7 @@ class LinearSolver(Solver):
         Return a generator of linear solvers using assembled jacs.
         """
         if self.options['assemble_jac']:
-            yield self
+            yield self, self.preferred_sparse_format()
 
     def add_recorder(self, recorder):
         """
@@ -1026,6 +1063,7 @@ class LinearSolver(Solver):
             depth of the current system (already incremented).
         """
         super()._setup_solvers(system, depth)
+        self._assembled_jac = None
         if self.options['assemble_jac'] and not self.supports['assembled_jac']:
             raise RuntimeError("Linear solver %s doesn't support assembled "
                                "jacobians." % self.msginfo)
@@ -1110,7 +1148,7 @@ class LinearSolver(Solver):
         scope_out, scope_in = system._get_matvec_scope()
 
         try:
-            system._apply_linear(self._assembled_jac, self._mode, scope_out, scope_in)
+            system._apply_linear(self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.pop()
 
@@ -1140,6 +1178,17 @@ class LinearSolver(Solver):
         if slv_vars == _UNDEFINED:
             return sys_vars
         return sys_vars.union(slv_vars)
+
+    def preferred_sparse_format(self):
+        """
+        Return the preferred sparse format for the dr/do matrix of a split jacobian.
+
+        Returns
+        -------
+        str or None
+            The preferred sparse format for the dr/do matrix of a split jacobian.
+        """
+        return None
 
 
 class BlockLinearSolver(LinearSolver):
@@ -1232,9 +1281,9 @@ class BlockLinearSolver(LinearSolver):
         if active:
             self._rhs_vec = self._rhs_vec.astype(complex)
         else:
-            self._rhs_vec = self._rhs_vec.real
+            self._rhs_vec = np.ascontiguousarray(self._rhs_vec.real, dtype=float)
 
-    def _vars_union(self, slv_vars, sys_vars):
+    def _union_matvec_scope(self, slv_vars, sys_vars):
         """
         Return the union of the two 'set's of variables.
 
@@ -1249,7 +1298,7 @@ class BlockLinearSolver(LinearSolver):
         slv_vars : set, None, or _UNDEFINED
             First variable set, from the current solver.
         sys_vars : set, None, or _UNDEFINED
-            Second variable set, from above.
+            Second variable set, from the parent solver.
 
         Returns
         -------
@@ -1273,9 +1322,9 @@ class BlockLinearSolver(LinearSolver):
         self._recording_iter.push(('_run_apply', 0))
         try:
             scope_out, scope_in = system._get_matvec_scope()
-            system._apply_linear(self._assembled_jac, self._mode,
-                                 self._vars_union(self._scope_out, scope_out),
-                                 self._vars_union(self._scope_in, scope_in))
+            system._apply_linear(self._mode,
+                                 self._union_matvec_scope(self._scope_out, scope_out),
+                                 self._union_matvec_scope(self._scope_in, scope_in))
         finally:
             self._recording_iter.pop()
 

@@ -201,15 +201,15 @@ class SerialTests(unittest.TestCase):
         par.add_subsystem('C1', PathCompEx('foo'), promotes=['x'])
         par.add_subsystem('C2', PathCompEx('bar'), promotes=['x'])
 
+        p.setup()
         try:
-            p.setup()
+            p.final_setup()
         except Exception as err:
             self.assertTrue(
               "\nCollected errors for problem 'discrete_fan_out2':"
               "\n   <model> <class Group>: The following inputs, ['par.C1.x', 'par.C2.x'], promoted "
               "to 'x', are connected but their metadata entries ['val'] differ. Call "
-              "<group>.set_input_defaults('x', val=?), where <group> is the Group named 'par' to "
-              "remove the ambiguity." in str(err))
+              "model.set_input_defaults('x', val=?) to remove the ambiguity." in str(err))
         else:
             self.fail("Exception expected.")
 

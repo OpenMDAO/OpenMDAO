@@ -94,8 +94,8 @@ class TestSubmodelComp(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             p.set_val('r', 1)
 
-        msg = '\'<model> <class Group>: Variable "r" not found.\''
-        self.assertTrue(str(ctx.exception).startswith(msg))
+        msg = "<model> <class Group>: Variable 'r' not found."
+        self.assertTrue(ctx.exception.args[0].startswith(msg))
 
     def test_variable_alias(self):
         p = om.Problem()
@@ -409,7 +409,7 @@ class TestSubmodelComp(unittest.TestCase):
 
         p.model.add_subsystem('submodel', submodel, promotes=['*'])
 
-        self.assertTrue((3, 20, 'NL') in p.model.submodel._subprob.model._solver_print_cache)
+        self.assertTrue((3, 20, 'NL', None) in p.model.submodel._subprob.model._solver_print_cache)
 
     def test_complex_step_across_submodel(self):
         p = om.Problem()

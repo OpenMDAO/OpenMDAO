@@ -79,6 +79,9 @@
                 "run_root_only": false,
                 "always_opt": false,
                 "use_jit": true,
+                "default_shape": [
+                    1
+                ],
                 "name": "UNDEFINED",
                 "val": 1.0,
                 "shape": null,
@@ -100,7 +103,8 @@
             "expressions": null,
             "nonlinear_solver": "NL: RUNONCE",
             "nonlinear_solver_options": {
-                "iprint": 1
+                "iprint": 1,
+                "debug_print": false
             },
             "linear_solver": "LN: SCIPY",
             "linear_solver_options": {
@@ -125,7 +129,8 @@
                     "expressions": null,
                     "nonlinear_solver": "NL: RUNONCE",
                     "nonlinear_solver_options": {
-                        "iprint": 1
+                        "iprint": 1,
+                        "debug_print": false
                     },
                     "linear_solver": "LN: SCIPY",
                     "linear_solver_options": {
@@ -179,17 +184,20 @@
                                 }
                             ],
                             "options": {
-                                "assembled_jac_type": "csc",
+                                "assembled_jac_type": null,
                                 "derivs_method": null,
                                 "distributed": false,
                                 "run_root_only": false,
                                 "always_opt": false,
-                                "use_jit": true
+                                "use_jit": true,
+                                "default_shape": [
+                                    1
+                                ]
                             }
                         }
                     ],
                     "options": {
-                        "assembled_jac_type": "csc",
+                        "assembled_jac_type": null,
                         "derivs_method": null,
                         "auto_order": false
                     }
@@ -254,7 +262,10 @@
                         "distributed": false,
                         "run_root_only": false,
                         "always_opt": false,
-                        "use_jit": true
+                        "use_jit": true,
+                        "default_shape": [
+                            1
+                        ]
                     }
                 },
                 {
@@ -307,12 +318,15 @@
                         "distributed": false,
                         "run_root_only": false,
                         "always_opt": false,
-                        "use_jit": true
+                        "use_jit": true,
+                        "default_shape": [
+                            1
+                        ]
                     }
                 }
             ],
             "options": {
-                "assembled_jac_type": "csc",
+                "assembled_jac_type": null,
                 "derivs_method": null,
                 "auto_order": false
             }
@@ -389,6 +403,9 @@
                 "run_root_only": false,
                 "always_opt": false,
                 "use_jit": true,
+                "default_shape": [
+                    1
+                ],
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -438,6 +455,9 @@
                 "run_root_only": false,
                 "always_opt": false,
                 "use_jit": true,
+                "default_shape": [
+                    1
+                ],
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -487,6 +507,9 @@
                 "run_root_only": false,
                 "always_opt": false,
                 "use_jit": true,
+                "default_shape": [
+                    1
+                ],
                 "has_diag_partials": false,
                 "units": null,
                 "shape": null,
@@ -496,7 +519,7 @@
         }
     ],
     "options": {
-        "assembled_jac_type": "csc",
+        "assembled_jac_type": null,
         "derivs_method": null,
         "nonlinear_solver": "NL: Newton",
         "nl_atol": null,

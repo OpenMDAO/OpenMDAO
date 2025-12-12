@@ -11,10 +11,10 @@ class ParaboloidProblem(om.Problem):
         super().__init__(**kwargs)
 
         model = self.model
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0, shape=()), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0, shape=()), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(default_shape=()), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y', default_shape=()), promotes=['*'])
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)

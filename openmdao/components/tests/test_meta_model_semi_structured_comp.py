@@ -1,6 +1,8 @@
 """
 Unit tests for the semi-structured metamodel component.
 """
+from contextlib import redirect_stdout
+import io
 import itertools
 import unittest
 
@@ -205,6 +207,67 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         partials = force_check_partials(prob, method='cs', out_stream=None)
         assert_check_partials(partials, rtol=1e-10)
+
+    def test_model_validate_extrapolation(self):
+        # Test using the model we used for the Structured metamodel.
+        prob = om.Problem()
+        model = prob.model
+        ivc = om.IndepVarComp()
+
+        mapdata = SampleMap()
+
+        params = mapdata.param_data
+        x, y, _ = params
+        outs = mapdata.output_data
+        z = outs[0]
+        ivc.add_output('x', np.array([x['default'], x['default'], x['default']]),
+                       units=x['units'])
+        ivc.add_output('y', np.array([y['default'], y['default'], y['default']]),
+                       units=x['units'])
+        ivc.add_output('z', np.array([z['default'], z['default'], z['default']]),
+                       units=x['units'])
+
+        model.add_subsystem('des_vars', ivc, promotes=["*"])
+
+        comp = om.MetaModelSemiStructuredComp(method='slinear', extrapolate=True,
+                                              training_data_gradients=True, vec_size=3)
+
+        # Convert to the flat table format.
+        grid = np.array(list(itertools.product(*[params[0]['values'],
+                                                 params[1]['values'],
+                                                 params[2]['values']])))
+
+        j = 0
+        for param in params:
+            comp.add_input(param['name'], grid[:, j])
+            j += 1
+
+        for out in outs:
+            comp.add_output(out['name'], training_data=outs[0]['values'].flatten())
+
+        model.add_subsystem('comp', comp, promotes=["*"])
+
+        prob.setup()
+        prob['x'] = np.array([1.0, 10.0, 90.0])
+        prob['y'] = np.array([0.75, 0.81, 0.5])
+        prob['z'] = np.array([-8.7, 1.1, 2.1])
+
+        prob.run_model()
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            prob.model.run_validation()
+        validation_print = buffer.getvalue()
+        expected_validation_print =(
+            "\nThe following warnings were collected during validation:"
+            "\n-----------------------------------------------------------------\n"
+            "\nUserWarning: 'comp' <class MetaModelSemiStructuredComp>: Error calling validate(), Interpolation of 'f' in 'comp' encountered extrapolation for the following points:\n"
+            "  x: 1.0; y: 0.75; z: -8.7; \n"
+            "  x: 10.0; y: 0.81; z: 1.1; \n"
+            "  x: 90.0; y: 0.5; z: 2.1; \n  \n"
+            "\n-----------------------------------------------------------------\n"
+        )
+        self.assertEqual(validation_print, expected_validation_print)
 
     def test_vectorized_lagrange2(self):
         # Test using the model we used for the Structured metamodel.
@@ -442,6 +505,37 @@ class TestMetaModelSemiStructured(unittest.TestCase):
 
         assert_near_equal(prob.get_val('interp.f'), 3.39415716, 1e-7)
         assert_near_equal(prob.get_val('interp.g'), 2.0 * 3.39415716, 1e-7)
+
+    def test_simple_initial_input_and_output(self):
+
+        prob = om.Problem()
+        model = prob.model
+
+        interp = om.MetaModelSemiStructuredComp(method='lagrange2', training_data_gradients=True)
+        interp.add_input('x', data_x, 10.0)
+        interp.add_input('y', data_y)
+        interp.add_output('f', training_data=data_values, val=5.0)
+
+        model.add_subsystem('interp', interp)
+
+        prob.setup(force_alloc_complex=True)
+
+        assert_near_equal(prob.get_val('interp.x'), 10.0)
+        assert_near_equal(prob.get_val('interp.f'), 5.0)
+
+    def test_simple_invalid_initial_input_and_output(self):
+
+        interp = om.MetaModelSemiStructuredComp(method='lagrange2', training_data_gradients=True)
+
+        msg = ('<class MetaModelSemiStructuredComp>: Input x must either be '
+               'scalar, or of length equal to vec_size.')
+        with self.assertRaisesRegex(ValueError, msg):
+            interp.add_input('x', data_x, np.array([10.0, 3.0]))
+
+        msg = ('<class MetaModelSemiStructuredComp>: Output f must either be '
+               'scalar, or of length equal to vec_size.')
+        with self.assertRaisesRegex(ValueError, msg):
+            interp.add_output('f', training_data=data_values, val=np.array([5.0, 1.0]))
 
     def test_simple_training_inputs(self):
         prob = om.Problem()

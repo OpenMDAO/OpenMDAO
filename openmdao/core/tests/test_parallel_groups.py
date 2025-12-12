@@ -687,6 +687,7 @@ class TestDesvarResponseOrdering(unittest.TestCase):
         model.add_subsystem('phases', MyPhases())
 
         prob.setup()
+        prob.final_setup()
 
         dvs = prob.model.get_design_vars(recurse=True, get_sizes=True, use_prom_ivc=True)
         cons = prob.model.get_constraints(recurse=True, get_sizes=True, use_prom_ivc=False)

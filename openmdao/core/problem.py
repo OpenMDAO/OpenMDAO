@@ -6,6 +6,7 @@ import shutil
 import sys
 import pprint
 import os
+from copy import deepcopy
 import weakref
 import pathlib
 import textwrap
@@ -23,7 +24,7 @@ from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
-from openmdao.core.system import System, _print_deriv_table, _iter_derivs
+from openmdao.core.system import System, _iter_derivs
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
@@ -37,8 +38,8 @@ from openmdao.error_checking.check_config import _default_checks, _all_checks, \
 from openmdao.recorders.recording_iteration_stack import _RecIteration
 from openmdao.recorders.recording_manager import RecordingManager, record_viewer_data, \
     record_model_options
+from openmdao.utils.deriv_display import _print_deriv_table, _deriv_display, _deriv_display_compact
 from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
-from openmdao.utils.name_maps import name2abs_names
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.units import simplify_unit
 from openmdao.utils.logger_utils import get_logger, TestLogger
@@ -53,7 +54,9 @@ from openmdao.utils.general_utils import pad_name, _find_dict_meta, env_truthy, 
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, warn_deprecation, \
     OMInvalidCheckDerivativesOptionsWarning
 import openmdao.utils.coloring as coloring_mod
-from openmdao.utils.file_utils import _get_outputs_dir, text2html, get_work_dir
+from openmdao.utils.file_utils import _get_outputs_dir, text2html, _get_work_dir
+from openmdao.utils.testing_utils import _fix_comp_check_data
+from openmdao.utils.name_maps import DISTRIBUTED
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
@@ -95,7 +98,11 @@ def _get_top_script():
         The absolute path, or None if it can't be resolved.
     """
     try:
-        return pathlib.Path(__main__.__file__).resolve()
+        script_name = os.environ.get('OPENMDAO_SCRIPT_NAME')
+        if script_name is not None:
+            return pathlib.Path(script_name).resolve()
+        else:
+            return pathlib.Path(__main__.__file__).resolve()
     except Exception:
         # this will error out in some cases, e.g. inside of a jupyter notebook, so just
         # return None in that case.
@@ -195,8 +202,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         Problem level metadata.
     _run_counter : int
         The number of times run_driver or run_model has been called.
-    _warned : bool
-        Bool to check if `value` deprecation warning has occured yet
     _computing_coloring : bool
         When True, we are computing coloring.
     """
@@ -215,7 +220,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         self._reports = get_reports_to_activate(reports)
 
         self.cite = CITATION
-        self._warned = False
         self._computing_coloring = False
 
         if comm is None:
@@ -262,11 +266,14 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         # General options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
+        default_workdir = options['work_dir'] if 'work_dir' in options else _get_work_dir()
+        self.options.declare('work_dir', default=default_workdir,
+                             desc='Working directory for the problem.')
         self.options.declare('coloring_dir', types=str,
-                             default=os.path.join(get_work_dir(), 'coloring_files'),
+                             default=os.path.join(default_workdir, 'coloring_files'),
                              desc='Directory containing coloring files (if any) for this Problem.')
         self.options.declare('group_by_pre_opt_post', types=bool,
-                             default=False,
+                             default=True,
                              desc="If True, group subsystems of the top level model into "
                              "pre-optimization, optimization, and post-optimization, and only "
                              "iterate over the optimization subsystems during optimization.  This "
@@ -378,22 +385,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return name in self._reports
 
-    def _get_var_abs_name(self, name):
-        if name in self.model._var_allprocs_abs2meta:
-            return name
-        elif name in self.model._var_allprocs_prom2abs_list['output']:
-            return self.model._var_allprocs_prom2abs_list['output'][name][0]
-        elif name in self.model._var_allprocs_prom2abs_list['input']:
-            abs_names = self.model._var_allprocs_prom2abs_list['input'][name]
-            if len(abs_names) == 1:
-                return abs_names[0]
-            else:
-                raise KeyError(f"{self.msginfo}: Using promoted name `{name}' is ambiguous and "
-                               f"matches unconnected inputs {sorted(abs_names)}. Use absolute name "
-                               "to disambiguate.")
-
-        raise KeyError(f'{self.msginfo}: Variable "{name}" not found.')
-
     @property
     def driver(self):
         """
@@ -471,15 +462,12 @@ class Problem(object, metaclass=ProblemMetaclass):
             raise RuntimeError(f"{self.msginfo}: is_local('{name}') was called before setup() "
                                "completed.")
 
-        try:
-            abs_name = self._get_var_abs_name(name)
-        except KeyError:
+        abs_name = self.model._resolver.any2abs(name)
+        if abs_name is None:  # no variable found
             sub = self.model._get_subsystem(name)
             return sub is not None and sub._is_local
 
-        # variable exists, but may be remote
-        return abs_name in self.model._var_abs2meta['input'] or \
-            abs_name in self.model._var_abs2meta['output']
+        return self.model._resolver.is_local(abs_name)
 
     @property
     def _recording_iter(self):
@@ -501,7 +489,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return self.get_val(name, get_remote=None)
 
-    def get_val(self, name, units=None, indices=None, get_remote=False):
+    def get_val(self, name, units=None, indices=None, get_remote=False, copy=False):
         """
         Get an output/input variable.
 
@@ -522,23 +510,22 @@ class Problem(object, metaclass=ProblemMetaclass):
             If False, only retrieve the value if it is on the current process, or only the part
             of the value that's on the current process for a distributed variable.
             If None and the variable is remote or distributed, a RuntimeError will be raised.
+        copy : bool, optional
+            If True, return a copy of the value.  If False, return a reference to the value.
 
         Returns
         -------
         object
             The value of the requested output/input variable.
         """
-        if self._metadata['setup_status'] == _SetupStatus.POST_SETUP:
-            abs_names = name2abs_names(self.model, name)
-            if abs_names:
-                val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
-                if not is_undefined(val):
-                    if indices is not None:
-                        val = val[indices]
-                    if units is not None:
-                        val = self.model.convert2units(name, val, simplify_unit(units))
-            else:
-                raise KeyError(f'{self.model.msginfo}: Variable "{name}" not found.')
+        if self._metadata['setup_status'] <= _SetupStatus.POST_SETUP2:
+            abs_names = self.model._resolver.absnames(name)
+            val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
+            if not is_undefined(val):
+                if indices is not None:
+                    val = val[indices]
+                if units is not None:
+                    val = self.model.convert2units(name, val, simplify_unit(units))
         else:
             val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
                                      from_src=True)
@@ -551,7 +538,10 @@ class Problem(object, metaclass=ProblemMetaclass):
                                    f"rank {self.comm.rank}. You can retrieve values from "
                                    "other processes using `get_val(<name>, get_remote=True)`.")
 
-        return val
+        if copy:
+            return deepcopy(val)
+        else:
+            return val
 
     def __setitem__(self, name, value):
         """
@@ -595,8 +585,8 @@ class Problem(object, metaclass=ProblemMetaclass):
         for value, set_units, pathname, name in self.model._initial_condition_cache.values():
             if pathname:
                 system = self.model._get_subsystem(pathname)
-                if system is None:
-                    self.model.set_val(pathname + '.' + name, value, units=set_units)
+                if system is None or not system._is_local:
+                    pass
                 else:
                     system.set_val(name, value, units=set_units)
             else:
@@ -689,7 +679,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         case_prefix : str or None
             Prefix to prepend to coordinates when recording.  None means keep the preexisting
             prefix.
-
         reset_iter_counts : bool
             If True and model has been run previously, reset all iteration counters.
 
@@ -740,7 +729,133 @@ class Problem(object, metaclass=ProblemMetaclass):
         finally:
             self._recording_iter.prefix = old_prefix
 
-    def compute_jacvec_product(self, of, wrt, mode, seed):
+    def find_feasible(self, case_prefix=None, reset_iter_counts=True,
+                      driver_scaling=True, exclude_desvars=None,
+                      method='trf', ftol=1e-08, xtol=1e-08, gtol=1e-08,
+                      x_scale=1., loss='linear', loss_tol=1.0E-8, f_scale=1.0,
+                      max_nfev=None, tr_solver=None, tr_options=None, iprint=1):
+        """
+        Attempt to find design variable values which minimize the constraint violation.
+
+        If the problem is feasible, this method should find the solution for which the
+        violation of each constraint is zero.
+
+        This approach uses a least-squares minimization of the constraint violation.  If
+        the problem has a feasible solution, this should find the feasible solution
+        closest to the current design variable values.
+
+        Arguments method, ftol, xtol, gtol, x_scale, loss, f_scale, diff_step,
+        tr_solver, tr_options, and verbose are passed to `scipy.optimize.least_squares`, see
+        the documentation of that function for more information:
+        https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.least_squares.html
+
+        Parameters
+        ----------
+        case_prefix : str or None
+            Prefix to prepend to coordinates when recording.  None means keep the preexisting
+            prefix.
+        reset_iter_counts : bool
+            If True and model has been run previously, reset all iteration counters.
+        driver_scaling : bool
+            If True, consider the constraint violation in driver-scaled units. Otherwise, it
+            will be computed in the model's units.
+        exclude_desvars : str or Sequence[str] or None
+            If given, a pattern of one or more design variables to be excluded from
+            the least-squares search.  The allows for finding a feasible (or least infeasible)
+            solution when holding one or more design variables to their current values.
+        method : {'trf', 'dogbox', or 'lm'}
+            The method used by scipy.optimize.least_squares. One or 'trf', 'dogbox', or 'lm'.
+        ftol : float or None
+            The change in the cost function from one iteration to the next which triggers
+            a termination of the minimization.
+        xtol : float or None
+            The change in the design variable vector norm from one iteration to the next
+            which triggers a termination of the minimization.
+        gtol : float or None
+            The change in the gradient norm from one iteration to the next which triggers
+            a termination of the minimization.
+        x_scale : {float, array-like, or 'jac'}
+            Additional scaling applied by the least-squares algorithm. Behavior is method-dependent.
+            For additional details, see the scipy documentation.
+        loss : {'linear', 'soft_l1', 'huber', 'cauchy', or 'arctan'}
+            The loss aggregation method. Options of interest are:
+            - 'linear' gives the standard "sum-of-squares".
+            - 'soft_l1' gives a smooth approximation for the L1-norm of constraint violation.
+            For other options, see the scipy documentation.
+        loss_tol : float
+            The tolerance on the loss value above which the algorithm is considered to have
+            failed to find a feasible solution. This will result in the `DriverResult.success`
+            attribute being False, and this method will return as _failed_.
+        f_scale : float or None
+            Value of margin between inlier and outlier residuals when loss is not 'linear'.
+            For more information, see the scipy documentation.
+        max_nfev : int or None
+            The maximum allowable number of model evaluations.  If not provided scipy will
+            determine it automatically based on the size of the design variable vector.
+        tr_solver : {None, 'exact', or 'lsmr'}
+            The solver used by trust region (trf) method.
+            For more details, see the scipy documentation.
+        tr_options : dict or None
+            Additional options for the trust region (trf) method.
+            For more details, see the scipy documentation.
+        iprint : int
+            Verbosity of the output. Use 2 for the full verbose least_squares output.
+            Use 1 for a convergence summary, and 0 to suppress output.
+
+        Returns
+        -------
+        bool
+            Failure flag; True if failed to converge, False is successful.
+        """
+        model = self.model
+        driver = self.driver
+
+        if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
+            raise RuntimeError(self.msginfo +
+                               ": The `setup` method must be called before `run_driver`.")
+
+        if not model._have_output_solver_options_been_applied():
+            raise RuntimeError(self.msginfo +
+                               ": Before calling `run_driver`, the `setup` method must be called "
+                               "if set_output_solver_options has been called.")
+
+        if 'singular_jac_behavior' in driver.options:
+            self._metadata['singular_jac_behavior'] = driver.options['singular_jac_behavior']
+
+        old_prefix = self._recording_iter.prefix
+
+        if case_prefix is not None:
+            if not isinstance(case_prefix, str):
+                raise TypeError(self.msginfo + ": The 'case_prefix' argument should be a string.")
+            self._recording_iter.prefix = case_prefix
+
+        try:
+            if model.iter_count > 0 and reset_iter_counts:
+                driver.iter_count = 0
+                model._reset_iter_counts()
+
+            self.final_setup()
+
+            # for optimizing drivers, check that constraints are affected by design vars
+            if driver.supports['optimization'] and self._metadata['use_derivatives']:
+                driver.check_relevance()
+
+            self._run_counter += 1
+            record_model_options(self, self._run_counter)
+
+            model._clear_iprint()
+
+            return driver._find_feasible(driver_scaling=driver_scaling,
+                                         exclude_desvars=exclude_desvars,
+                                         method=method, ftol=ftol, xtol=xtol,
+                                         gtol=gtol, x_scale=x_scale,
+                                         loss=loss, loss_tol=loss_tol, f_scale=f_scale,
+                                         max_nfev=max_nfev, tr_solver=tr_solver,
+                                         tr_options=tr_options, iprint=iprint)
+        finally:
+            self._recording_iter.prefix = old_prefix
+
+    def compute_jacvec_product(self, of, wrt, mode, seed, linearize=False):
         """
         Given a seed and 'of' and 'wrt' variables, compute the total jacobian vector product.
 
@@ -756,6 +871,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             Either a dict keyed by 'wrt' varnames (fwd) or 'of' varnames (rev), containing
             dresidual (fwd) or doutput (rev) values, OR a list of dresidual or doutput
             values that matches the corresponding 'wrt' (fwd) or 'of' (rev) varname list.
+        linearize : bool
+            If False, assume the model is already in a linearized state, which it must be
+            in order to produce correct results for the jvp/vjp. If True, this method
+            will linearize the model before computing the jvp/vjp.
 
         Returns
         -------
@@ -775,29 +894,28 @@ class Problem(object, metaclass=ProblemMetaclass):
             lnames, rnames = wrt, of
             lkind, rkind = 'residual', 'output'
 
+        if linearize:
+            self.model.run_linearize()
+
+        resolver = self.model._resolver
         rvec = self.model._vectors[rkind]['linear']
         lvec = self.model._vectors[lkind]['linear']
 
         rvec.set_val(0.)
-
-        conns = self.model._conn_global_abs_in2out
 
         # set seed values into dresids (fwd) or doutputs (rev)
         # seed may have keys that are inputs and must be converted into auto_ivcs
         try:
             seed[rnames[0]]
         except (IndexError, TypeError):
+            # Seeds are given as a Sequence
             for i, name in enumerate(rnames):
-                if name in conns:
-                    rvec[conns[name]] = seed[i]
-                else:
-                    rvec[name] = seed[i]
+                rvec[resolver.source(name)] = seed[i]
         else:
+            # Seeds are given as a map
             for name in rnames:
-                if name in conns:
-                    rvec[conns[name]] = seed[name]
-                else:
-                    rvec[name] = seed[name]
+                # rnames are abs_path
+                rvec[resolver.source(name)] = seed[name]
 
         # We apply a -1 here because the derivative of the output is minus the derivative of
         # the residual in openmdao.
@@ -806,11 +924,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         self.model.run_solve_linear(mode)
 
-        if mode == 'fwd':
-            return {n: lvec[n].copy() for n in lnames}
-        else:
-            # may need to convert some lnames to auto_ivc names
-            return {n: lvec[conns[n] if n in conns else n].copy() for n in lnames}
+        return {n: lvec[resolver.source(n)].copy() for n in lnames}
 
     def _setup_recording(self):
         """
@@ -956,10 +1070,11 @@ class Problem(object, metaclass=ProblemMetaclass):
         self._orig_mode = mode
 
         # this metadata will be shared by all Systems/Solvers in the system tree
-        self._metadata = {
+        self._metadata.update({
             'name': self._name,  # the name of this Problem
             'pathname': None,  # the pathname of this Problem in the current tree of Problems
             'comm': comm,
+            'work_dir': pathlib.Path(self.options['work_dir']),
             'coloring_dir': _DEFAULT_COLORING_DIR,  # directory for input coloring files
             'recording_iter': _RecIteration(comm.rank),  # manager of recorder iterations
             'local_vector_class': local_vector_class,
@@ -968,7 +1083,6 @@ class Problem(object, metaclass=ProblemMetaclass):
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,  # forces allocation of complex vectors
             'vars_to_gather': {},  # vars that are remote somewhere. does not include distrib vars
-            'prom2abs': {'input': {}, 'output': {}},  # includes ALL promotes including buried ones
             'static_mode': False,  # used to determine where various 'static'
                                    # and 'dynamic' data structures are stored.
                                    # Dynamic ones are added during System
@@ -1012,7 +1126,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             'rel_array_cache': {},  # cache of relevance arrays
             'ncompute_totals': 0,  # number of times compute_totals has been called
             'jax_group': None,  # not None if a Group is currently performing a jax operation
-        }
+        })
 
         model_comm = self.driver._setup_comm(comm)
 
@@ -1035,7 +1149,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         # from a previous run.
         # Start setup by deleting any existing reports so that the files
         # that are in that directory are all from this run and not a previous run
-        reports_dirpath = self.get_reports_dir(force=False)
+        reports_dirpath = self.get_reports_dir()
         if not MPI or (self.comm is not None and self.comm.rank == 0):
             if os.path.isdir(reports_dirpath):
                 try:
@@ -1043,7 +1157,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                 except FileNotFoundError:
                     # Folder already removed by another proccess
                     pass
-        self._metadata['reports_dir'] = self.get_reports_dir(force=False)
+        self._metadata['reports_dir'] = self.get_reports_dir()
 
         try:
             model._setup(model_comm, self._metadata)
@@ -1057,8 +1171,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         self._logger = logger
 
         self._metadata['setup_status'] = _SetupStatus.POST_SETUP
-
-        self._check_collected_errors()
 
         return self
 
@@ -1075,50 +1187,64 @@ class Problem(object, metaclass=ProblemMetaclass):
         driver = self.driver
         model = self.model
 
-        responses = model.get_responses(recurse=True, use_prom_ivc=True)
-        designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
-
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            model._final_setup()
+            first = True
+            self._metadata['static_mode'] = False
+            try:
+                if self._metadata['setup_status'] < _SetupStatus.POST_SETUP2:
+                    model._setup_part2()
+                    self._check_collected_errors()
 
-        model._check_required_connections()
+                responses = model.get_responses(recurse=True, use_prom_ivc=True)
+                designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
+                response_size, desvar_size = driver._update_voi_meta(model, responses,
+                                                                     designvars)
 
-        response_size, desvar_size = driver._update_voi_meta(model, responses, designvars)
+                model._final_setup()
+            finally:
+                self._metadata['static_mode'] = True
 
-        # update mode if it's been set to 'auto'
-        if self._orig_mode == 'auto':
-            mode = 'rev' if response_size < desvar_size else 'fwd'
+            # update mode if it's been set to 'auto'
+            if self._orig_mode == 'auto':
+                mode = 'rev' if response_size < desvar_size else 'fwd'
+            else:
+                mode = self._orig_mode
+
+            self._metadata['mode'] = mode
         else:
-            mode = self._orig_mode
+            first = False
+            mode = self._metadata['mode']
 
-        self._metadata['mode'] = mode
+            responses = model.get_responses(recurse=True, use_prom_ivc=True)
+            designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
+            response_size, desvar_size = driver._update_voi_meta(model, responses, designvars)
 
-        # If set_solver_print is called after an initial run, in a multi-run scenario,
-        #  this part of _final_setup still needs to happen so that change takes effect
-        #  in subsequent runs
-        if self._metadata['setup_status'] >= _SetupStatus.POST_FINAL_SETUP:
+            # If set_solver_print is called after an initial run, in a multi-run scenario,
+            #  this part of _final_setup still needs to happen so that change takes effect
+            #  in subsequent runs
             model._setup_solver_print()
 
         driver._setup_driver(self)
 
-        if coloring_mod._use_total_sparsity:
-            coloring = driver._coloring_info.coloring
-            if coloring is not None:
-                # if we're using simultaneous total derivatives then our effective size is less
-                # than the full size
-                if coloring._fwd and coloring._rev:
-                    pass  # we're doing both!
-                elif mode == 'fwd' and coloring._fwd:
-                    desvar_size = coloring.total_solves()
-                elif mode == 'rev' and coloring._rev:
-                    response_size = coloring.total_solves()
+        if first:
+            if coloring_mod._use_total_sparsity:
+                coloring = driver._coloring_info.coloring
+                if coloring is not None:
+                    # if we're using simultaneous total derivatives then our effective size is less
+                    # than the full size
+                    if coloring._fwd and coloring._rev:
+                        pass  # we're doing both!
+                    elif mode == 'fwd' and coloring._fwd:
+                        desvar_size = coloring.total_solves()
+                    elif mode == 'rev' and coloring._rev:
+                        response_size = coloring.total_solves()
 
-        if ((mode == 'fwd' and desvar_size > response_size) or
-                (mode == 'rev' and response_size > desvar_size)):
-            issue_warning(f"Inefficient choice of derivative mode.  You chose '{mode}' for a "
-                          f"problem with {desvar_size} design variables and {response_size} "
-                          "response variables (objectives and nonlinear constraints).",
-                          category=DerivativesWarning)
+            if ((mode == 'fwd' and desvar_size > response_size) or
+                    (mode == 'rev' and response_size > desvar_size)):
+                issue_warning(f"Inefficient choice of derivative mode.  You chose '{mode}' for a "
+                              f"problem with {desvar_size} design variables and {response_size} "
+                              "response variables (objectives and nonlinear constraints).",
+                              category=DerivativesWarning)
 
         if (not self._metadata['allow_post_setup_reorder'] and
                 self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
@@ -1136,6 +1262,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP
             self._set_initial_conditions()
 
+        if self.model.comm.size > 1:
+            # this updates any source values that are attached to remote inputs
+            self.model._resolve_remote_sets()
+
         if self._check and 'checks' not in self._reports:
             if self._check is True:
                 checks = _default_checks
@@ -1147,10 +1277,43 @@ class Problem(object, metaclass=ProblemMetaclass):
                 logger = TestLogger()
             self.check_config(logger, checks=checks)
 
+    def set_setup_status(self, status, **setup_kwargs):
+        """
+        Set the setup status of the problem, running any setup steps that haven't been run yet.
+
+        If the status is already at or beyond the requested status, this method does nothing,
+        i.e., it won't reset the status to an earlier step.
+
+        Parameters
+        ----------
+        status : _SetupStatus
+            The status to set the problem to.
+        **setup_kwargs : dict
+            Keyword arguments to pass to the setup method if it hasn't already been called.
+        """
+        if self._metadata['setup_status'] >= status:
+            return
+
+        if status >= _SetupStatus.POST_SETUP:
+            if self._metadata['setup_status'] < _SetupStatus.POST_SETUP:
+                self.setup(**setup_kwargs)
+                self._metadata['setup_status'] = _SetupStatus.POST_SETUP
+
+        if status >= _SetupStatus.POST_SETUP2:
+            if self._metadata['setup_status'] < _SetupStatus.POST_SETUP2:
+                self.model._setup_part2()
+                self._metadata['setup_status'] = _SetupStatus.POST_SETUP2
+
+        if status >= _SetupStatus.POST_FINAL_SETUP:
+            if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
+                self.final_setup()
+                self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP
+
     def check_partials(self, out_stream=_DEFAULT_OUT_STREAM, includes=None, excludes=None,
-                       compact_print=False, abs_err_tol=1e-6, rel_err_tol=1e-6,
+                       compact_print=False, abs_err_tol=0.0, rel_err_tol=1e-6,
                        method='fd', step=None, form='forward', step_calc='abs',
-                       minimum_step=1e-12, force_dense=True, show_only_incorrect=False):
+                       minimum_step=1e-12, force_dense=True, show_only_incorrect=False,
+                       rich_print=True):
         """
         Check partial derivatives comprehensively for all components in your model.
 
@@ -1195,30 +1358,25 @@ class Problem(object, metaclass=ProblemMetaclass):
             If True, analytic derivatives will be coerced into arrays. Default is True.
         show_only_incorrect : bool, optional
             Set to True if output should print only the subjacs found to be incorrect.
+        rich_print : bool, optional
+            If True, print using rich if available.
 
         Returns
         -------
         dict of dicts of dicts
             First key is the component name.
             Second key is the (output, input) tuple of strings.
-            Third key is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev',
-            'rank_inconsistent'].
-            For 'rel error', 'abs error', and 'magnitude' the value is a tuple containing norms for
-            forward - fd, adjoint - fd, forward - adjoint.
-            For 'J_fd', 'J_fwd', 'J_rev' the value is a numpy array representing the computed
-            Jacobian for the three different methods of computation.
+            The third key is one of:
+            'tol violation', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_error',
+            and 'rank_inconsistent'.
+            For 'tol violation' and 'vals_at_max_error' the value is a tuple containing values for
+            forward - fd, adjoint - fd, forward - adjoint. For
+            'magnitude' the value is a tuple indicating the maximum magnitude of values found in
+            Jfwd, Jrev, and Jfd.
             The boolean 'rank_inconsistent' indicates if the derivative wrt a serial variable is
             inconsistent across MPI ranks.
         """
         model = self.model
-
-        # on master, we were doing this:
-        # if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-        #     self.final_setup()
-
-        # model.run_apply_nonlinear()
-
-        # but it seems more correct to run the model first if it hasn't been run yet, correct?
         if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP or model.iter_count == 0:
             self.run_model()
 
@@ -1268,7 +1426,8 @@ class Problem(object, metaclass=ProblemMetaclass):
                                                  minimum_step=minimum_step,
                                                  force_dense=force_dense,
                                                  show_only_incorrect=show_only_incorrect,
-                                                 show_worst=False)
+                                                 show_worst=False,
+                                                 rich_print=rich_print)
 
             if out_stream is not None:
                 comp_content = comp_stream.getvalue()
@@ -1287,11 +1446,11 @@ class Problem(object, metaclass=ProblemMetaclass):
                     worst = wrst + (type(comp).__name__, comp.pathname)
 
         if worst is not None:
-            _, table_data, headers, ctype, cpath = worst
+            _, table_data, headers, col_meta, ctype, cpath = worst
             print(file=out_stream)
-            print(add_border(f"Sub Jacobian with Largest Relative Error: {ctype} '{cpath}'", '#'),
-                  file=out_stream)
-            _print_deriv_table([table_data[:-1]], headers[:-1], out_stream)
+            print(add_border(f"Sub Jacobian with Largest Tolerance Violation: {ctype} '{cpath}'",
+                             '#'), file=out_stream)
+            _print_deriv_table([table_data], headers, out_stream, col_meta=col_meta)
 
         if step is None or isinstance(step, (float, int)):
             _fix_check_data(partials_data)
@@ -1299,9 +1458,9 @@ class Problem(object, metaclass=ProblemMetaclass):
         return partials_data
 
     def check_totals(self, of=None, wrt=None, out_stream=_DEFAULT_OUT_STREAM, compact_print=False,
-                     driver_scaling=False, abs_err_tol=1e-6, rel_err_tol=1e-6, method='fd',
+                     driver_scaling=False, abs_err_tol=0.0, rel_err_tol=1e-6, method='fd',
                      step=None, form=None, step_calc='abs', show_progress=False,
-                     show_only_incorrect=False, directional=False, sort=True):
+                     show_only_incorrect=False, directional=False, sort=True, rich_print=True):
         """
         Check total derivatives for the model vs. finite difference.
 
@@ -1353,18 +1512,21 @@ class Problem(object, metaclass=ProblemMetaclass):
             'wrt' in fwd mode.
         sort : bool
             If True, sort the subjacobian keys alphabetically.
+        rich_print : bool, optional
+            If True, print using rich if available.
 
         Returns
         -------
         Dict of Dicts of Tuples of Floats
-
             First key:
                 is the (output, input) tuple of strings;
             Second key:
-                is one of ['rel error', 'abs error', 'magnitude', 'fdstep'];
+                'tol violation', 'magnitude', 'J_fd', 'J_fwd', 'J_rev', 'vals_at_max_error',
+                and 'rank_inconsistent'.
 
-            For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
-                forward - fd, adjoint - fd, forward - adjoint.
+            For 'tol violation' and 'vals_at_max_error' the value is a tuple containing values for
+            forward - fd, reverse - fd, forward - reverse. For 'magnitude' the value is a tuple
+            indicating the maximum magnitude of values found in Jfwd, Jrev, and Jfd.
         """
         if out_stream == _DEFAULT_OUT_STREAM:
             out_stream = sys.stdout
@@ -1547,7 +1709,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                         # check directional fwd against fd (one must have negative seed)
                         meta['J_fwd'] = total_info.J[:, Jcalc_slices['wrt'][wrt].start]
                         meta['J_fd'].append(Jfd[:, Jcalc_slices['wrt'][wrt].start])
-                        meta['directional_fd_fwd'].append((meta['J_fwd'], meta['J_fd'][-1]))
+                        meta['directional_fd_fwd'].append((meta['J_fd'][-1], meta['J_fwd']))
                     else:  # rev
                         if 'directional_fd_rev' not in meta:
                             meta['directional_fd_rev'] = []
@@ -1583,12 +1745,13 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         if out_stream is not None:
             if compact_print:
-                model._deriv_display_compact(err_iter, data[''], out_stream,
-                                             totals=True, show_only_incorrect=show_only_incorrect)
+                _deriv_display_compact(model, err_iter, data[''], out_stream,
+                                       totals=True, show_only_incorrect=show_only_incorrect,
+                                       rich_print=rich_print)
             else:
-                model._deriv_display(err_iter, data[''], rel_err_tol, abs_err_tol, out_stream,
-                                     fd_args, totals=True, lcons=lcons,
-                                     show_only_incorrect=show_only_incorrect)
+                _deriv_display(model, err_iter, data[''], rel_err_tol, abs_err_tol,
+                               out_stream, fd_args, totals=True, lcons=lcons,
+                               show_only_incorrect=show_only_incorrect, rich_print=rich_print)
 
         if not do_steps:
             _fix_check_data(data)
@@ -1652,24 +1815,30 @@ class Problem(object, metaclass=ProblemMetaclass):
                                    debug_print=debug_print, coloring_info=coloring_info)
         return total_info.compute_totals()
 
-    def set_solver_print(self, level=2, depth=1e99, type_='all'):
+    def set_solver_print(self, level=2, depth=1e99, type_='all', debug_print=None):
         """
         Control printing for solvers and subsolvers in the model.
 
         Parameters
         ----------
-        level : int
+        level : int or None
             Iprint level. Set to 2 to print residuals each iteration; set to 1
             to print just the iteration totals; set to 0 to disable all printing
             except for failures, and set to -1 to disable all printing including failures.
+            A value of None will leave solving printing unchanged, which is useful
+            when using this method to enable or disable debug printing only.
         depth : int
             How deep to recurse. For example, you can set this to 0 if you only want
             to print the top level linear and nonlinear solver messages. Default
             prints everything.
         type_ : str
             Type of solver to set: 'LN' for linear, 'NL' for nonlinear, or 'all' for all.
+        debug_print : bool or None
+            If None, leave solver debug printing unchanged, otherwise turn it on or off
+            depending on whether debug_print is True or False. Note debug_print only
+            affects nonlinear solvers.
         """
-        self.model.set_solver_print(level=level, depth=depth, type_=type_)
+        self.model.set_solver_print(level=level, depth=depth, type_=type_, debug_print=debug_print)
 
     def list_problem_vars(self,
                           show_promoted_name=True,
@@ -1736,10 +1905,11 @@ class Problem(object, metaclass=ProblemMetaclass):
                          show_promoted_name=True,
                          print_arrays=False,
                          driver_scaling=True,
-                         desvar_opts=[],
-                         cons_opts=[],
-                         objs_opts=[],
-                         out_stream=_DEFAULT_OUT_STREAM
+                         desvar_opts=None,
+                         cons_opts=None,
+                         objs_opts=None,
+                         out_stream=_DEFAULT_OUT_STREAM,
+                         return_format='list'
                          ):
         """
         Print all design variables and responses (objectives and constraints).
@@ -1759,23 +1929,30 @@ class Problem(object, metaclass=ProblemMetaclass):
             the ref and ref0 values that were specified when add_design_var, add_objective, and
             add_constraint were called on the model. Default is True.
         desvar_opts : list of str
-            List of optional columns to be displayed in the desvars table.
+            List of optional columns to be displayed in the desvars table. All are displayed by
+            defualt.
             Allowed values are:
             ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler', 'parallel_deriv_color',
             'cache_linear_solution', 'units', 'min', 'max'].
         cons_opts : list of str
-            List of optional columns to be displayed in the cons table.
+            List of optional columns to be displayed in the cons table. All are displayed by
+            defualt.
             Allowed values are:
             ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'adder', 'scaler',
             'linear', 'parallel_deriv_color', 'cache_linear_solution', 'units', 'min', 'max'].
         objs_opts : list of str
-            List of optional columns to be displayed in the objs table.
+            List of optional columns to be displayed in the objs table. All are displayed by
+            defualt.
             Allowed values are:
             ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
             'parallel_deriv_color', 'cache_linear_solution'].
         out_stream : file-like object
             Where to send human readable output. Default is sys.stdout.
             Set to None to suppress.
+        return_format : str
+            Indicates the desired format of the return value. Can have value of 'list' or 'dict'.
+            If 'dict', the return value is a dictionary mapping {kind: {name: metadata}}.
+            If 'list', the return value is a dictionary mapping {kind: [(name, metadata), ...]}.
 
         Returns
         -------
@@ -1794,7 +1971,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         desvars = self.driver._designvars
         vals = self.driver.get_design_var_values(get_remote=True, driver_scaling=driver_scaling)
         if not driver_scaling:
-            desvars = desvars.copy()
+            desvars = deepcopy(desvars)
             for meta in desvars.values():
                 scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
                 adder = meta['adder'] if meta.get('adder') is not None else 0.
@@ -1803,8 +1980,12 @@ class Problem(object, metaclass=ProblemMetaclass):
                 if 'upper' in meta:
                     meta['upper'] = meta['upper'] / scaler - adder
         header = "Design Variables"
+        if desvar_opts is None:
+            desvar_opts = ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler',
+                           'parallel_deriv_color', 'cache_linear_solution', 'units', 'min', 'max']
         def_desvar_opts = [opt for opt in ('indices',) if opt not in desvar_opts and
                            _find_dict_meta(desvars, opt)]
+        desvar_opts = [opt for opt in desvar_opts if _find_dict_meta(desvars, opt)]
         col_names = default_col_names + def_desvar_opts + desvar_opts
         if out_stream:
             self._write_var_info_table(header, col_names, desvars, vals,
@@ -1822,7 +2003,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         cons = self.driver._cons
         vals = self.driver.get_constraint_values(driver_scaling=driver_scaling)
         if not driver_scaling:
-            cons = cons.copy()
+            cons = deepcopy(cons)
             for meta in cons.values():
                 scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
                 adder = meta['adder'] if meta.get('adder') is not None else 0.
@@ -1831,9 +2012,14 @@ class Problem(object, metaclass=ProblemMetaclass):
                 if 'upper' in meta:
                     meta['upper'] = meta['upper'] / scaler - adder
         header = "Constraints"
+        if cons_opts is None:
+            cons_opts = ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'adder', 'scaler',
+                         'linear', 'parallel_deriv_color', 'cache_linear_solution', 'units', 'min',
+                         'max']
         # detect any cons that use aliases
         def_cons_opts = [opt for opt in ('indices', 'alias') if opt not in cons_opts and
                          _find_dict_meta(cons, opt)]
+        cons_opts = [opt for opt in cons_opts if _find_dict_meta(cons, opt)]
         col_names = default_col_names + def_cons_opts + cons_opts
         if out_stream:
             self._write_var_info_table(header, col_names, cons, vals,
@@ -1850,8 +2036,12 @@ class Problem(object, metaclass=ProblemMetaclass):
         objs = self.driver._objs
         vals = self.driver.get_objective_values(driver_scaling=driver_scaling)
         header = "Objectives"
+        if objs_opts is None:
+            objs_opts = ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
+                         'parallel_deriv_color', 'cache_linear_solution']
         def_obj_opts = [opt for opt in ('indices',) if opt not in objs_opts and
                         _find_dict_meta(objs, opt)]
+        objs_opts = [opt for opt in objs_opts if _find_dict_meta(objs, opt)]
         col_names = default_col_names + def_obj_opts + objs_opts
         if out_stream:
             self._write_var_info_table(header, col_names, objs, vals,
@@ -1865,9 +2055,14 @@ class Problem(object, metaclass=ProblemMetaclass):
             o[1]['val'] = vals[o[0]]
         obj_vars = [tuple(o) for o in obj_vars]
 
-        prob_vars = {'design_vars': des_vars,
-                     'constraints': cons_vars,
-                     'objectives': obj_vars}
+        if return_format == 'dict':
+            prob_vars = {'design_vars': {k: v for k, v in des_vars},
+                         'constraints': {k: v for k, v in cons_vars},
+                         'objectives': {k: v for k, v in obj_vars}}
+        else:
+            prob_vars = {'design_vars': des_vars,
+                         'constraints': cons_vars,
+                         'objectives': obj_vars}
 
         return prob_vars
 
@@ -1908,7 +2103,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         elif not isinstance(out_stream, TextIOBase):
             raise TypeError("Invalid output stream specified for 'out_stream'")
 
-        abs2prom = self.model._var_abs2prom
+        resolver = self.model._resolver
 
         # Gets the current numpy print options for consistent decimal place
         #   printing between arrays and floats
@@ -1925,10 +2120,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             for col_name in col_names:
                 if col_name == 'name':
                     if show_promoted_name:
-                        if vname in abs2prom['input']:
-                            row[col_name] = abs2prom['input'][vname]
-                        elif vname in abs2prom['output']:
-                            row[col_name] = abs2prom['output'][vname]
+                        if resolver.is_local(vname, 'input'):
+                            row[col_name] = resolver.abs2prom(vname, 'input')
+                        elif resolver.is_local(vname, 'output'):
+                            row[col_name] = resolver.abs2prom(vname, 'output')
                         else:
                             # Promoted auto_ivc name. Keep it promoted
                             row[col_name] = vname
@@ -2031,7 +2226,9 @@ class Problem(object, metaclass=ProblemMetaclass):
                     return True
             return False
 
-        if isinstance(case, dict):
+        case_is_dict = isinstance(case, dict)
+
+        if case_is_dict:
             # case data comes from list_inputs/list_outputs, keyed on absolute pathname
             # we need it to be keyed on promoted name
             if 'inputs' in case:
@@ -2047,37 +2244,26 @@ class Problem(object, metaclass=ProblemMetaclass):
             outputs = case.outputs
 
         abs2idx = model._var_allprocs_abs2idx
-        prom2abs_in = model._var_allprocs_prom2abs_list['input']
-        prom2abs_out = model._var_allprocs_prom2abs_list['output']
-        abs2meta_in = model._var_allprocs_abs2meta['input']
-        abs2meta_out = model._var_allprocs_abs2meta['output']
-        abs2meta_disc_in = model._var_allprocs_discrete['input']
-        abs2meta_disc_out = model._var_allprocs_discrete['output']
+        resolver = self.model._resolver
 
         if inputs:
-            for name in inputs:
-                if set_later(name):
+            for abs_name in inputs:
+                if set_later(abs_name):
                     continue
 
-                if name in abs2meta_in or name in abs2meta_disc_in:
-                    abs_name = name
-
-                    if isinstance(case, dict):
-                        val = inputs[name]['val']
+                if resolver.is_abs(abs_name, 'input'):
+                    if case_is_dict:
+                        val = inputs[abs_name]['val']
                     else:
                         val = case.inputs[abs_name]
-                    try:
-                        varmeta = abs2meta_in[abs_name]
-                    except KeyError:
-                        # Var may be discrete
-                        varmeta = abs2meta_disc_in[abs_name]
-                    if varmeta.get('distributed') and model.comm.size > 1:
+
+                    if model.comm.size > 1 and resolver.flags(abs_name, 'input') & DISTRIBUTED:
                         sizes = model._var_sizes['input'][:, abs2idx[abs_name]]
                         model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                     else:
                         model.set_val(abs_name, val)
                 else:
-                    issue_warning(f"{model.msginfo}: Input variable, '{name}', recorded "
+                    issue_warning(f"{model.msginfo}: Input variable, '{abs_name}', recorded "
                                   "in the case is not found in the model.")
 
         if outputs:
@@ -2085,35 +2271,17 @@ class Problem(object, metaclass=ProblemMetaclass):
                 if set_later(name):
                     continue
 
-                # auto_ivc output may point to a promoted input name
-                if name in prom2abs_out:
-                    prom2abs = prom2abs_out
-                    is_output = True
-                else:
-                    prom2abs = prom2abs_in
-                    is_output = False
-
-                if name in prom2abs:
-                    if isinstance(case, dict):
+                if resolver.is_prom(name):
+                    if case_is_dict:
                         val = outputs[name]['val']
                     else:
                         val = outputs[name]
 
-                    for abs_name in prom2abs[name]:
+                    for abs_name in resolver.absnames(name):
                         if set_later(abs_name):
                             continue
 
-                        if is_output:
-                            try:
-                                varmeta = abs2meta_out[abs_name]
-                            except KeyError:
-                                varmeta = abs2meta_disc_out[abs_name]
-                        else:
-                            try:
-                                varmeta = abs2meta_in[abs_name]
-                            except KeyError:
-                                varmeta = abs2meta_disc_in[abs_name]
-                        if varmeta.get('distributed') and model.comm.size > 1:
+                        if model.comm.size > 1 and resolver.flags(abs_name) & DISTRIBUTED:
                             sizes = model._var_sizes['output'][:, abs2idx[abs_name]]
                             model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                         else:
@@ -2162,7 +2330,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             checks = sorted(_all_non_redundant_checks)
 
         if logger is None and checks:
-            check_file_path = None if out_file is None else str(self.get_outputs_dir() / out_file)
+            if out_file is None:
+                check_file_path = None
+            else:
+                check_file_path = str(self.get_outputs_dir(mkdir=True) / out_file)
             logger = get_logger('check_config', out_file=check_file_path, use_format=True)
 
         for c in checks:
@@ -2227,7 +2398,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return self.get_outputs_dir('reports', mkdir=force or len(self._reports) > 0)
 
-    def get_outputs_dir(self, *subdirs, mkdir=True):
+    def get_outputs_dir(self, *subdirs, mkdir=False):
         """
         Get the path under which all output files of this problem are to be placed.
 
@@ -2319,9 +2490,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             raise RuntimeError("list_indep_vars requires that final_setup has been "
                                "run for the Problem.")
 
-        design_vars = model.get_design_vars(recurse=True,
-                                            use_prom_ivc=True,
-                                            get_sizes=False)
+        design_vars = model.get_design_vars(recurse=True, use_prom_ivc=True, get_sizes=False)
 
         problem_indep_vars = []
 
@@ -2330,13 +2499,13 @@ class Problem(object, metaclass=ProblemMetaclass):
             col_names.extend(options)
 
         abs2meta = model._var_allprocs_abs2meta['output']
-        abs2prom = model._var_allprocs_abs2prom['output']
         abs2disc = model._var_allprocs_discrete['output']
+        abs2prom = model._resolver.abs2prom
 
         seen = set()
         for absname, meta in chain(abs2meta.items(), abs2disc.items()):
             if 'openmdao:indep_var' in meta['tags']:
-                name = abs2prom[absname]
+                name = abs2prom(absname, 'output')
                 if (include_design_vars or name not in design_vars) and name not in seen:
                     meta = {key: meta[key] for key in col_names if key in meta}
                     meta['val'] = self.get_val(name)
@@ -2359,47 +2528,6 @@ class Problem(object, metaclass=ProblemMetaclass):
                 print('None found', file=out_stream)
 
         return problem_indep_vars
-
-    def iter_count_iter(self, include_driver=True, include_solvers=True, include_systems=False):
-        """
-        Yield iteration counts for driver, solvers and/or systems.
-
-        Parameters
-        ----------
-        include_driver : bool
-            If True, include the driver in the iteration counts.
-        include_solvers : bool
-            If True, include solvers in the iteration counts.
-        include_systems : bool
-            If True, include systems in the iteration counts.
-
-        Yields
-        ------
-        str
-            Name of the object.
-        str
-            Name of the counter.
-        int
-            Value of the counter.
-        """
-        if include_driver:
-            yield ('Driver', 'iter_count', self.driver.iter_count)
-        if include_solvers or include_systems:
-            for s in self.model.system_iter(include_self=True, recurse=True):
-                if include_systems:
-                    for it in ('iter_count', 'iter_count_apply'):
-                        val = getattr(s, it)
-                        if val > 0:
-                            yield (s.pathname, it, val)
-
-                if include_solvers:
-                    prefix = s.pathname + '.' if s.pathname else ''
-                    if s.nonlinear_solver is not None and s.nonlinear_solver._iter_count > 0:
-                        yield (prefix + 'nonlinear_solver', '_iter_count',
-                               s.nonlinear_solver._iter_count)
-                    if s.linear_solver is not None and s.linear_solver._iter_count > 0:
-                        yield (prefix + 'linear_solver', '_iter_count',
-                               s.linear_solver._iter_count)
 
     def list_pre_post(self, outfile=None):
         """
@@ -2522,7 +2650,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                     coloring = \
                         coloring_mod.dynamic_total_coloring(
                             self.driver, run_model=do_run,
-                            fname=self.driver._get_total_coloring_fname(mode='output'),
+                            fname=self.model.get_coloring_fname(mode='output'),
                             of=of, wrt=wrt)
             else:
                 return coloring_info.coloring
@@ -2539,13 +2667,6 @@ def _fix_check_data(data):
     data : dict
         Dictionary containing derivative information keyed by system name.
     """
-    names = ['J_fd', 'abs error', 'rel error', 'magnitude', 'directional_fd_fwd',
-             'directional_fd_rev']
-
     for sdata in data.values():
         for dct in sdata.values():
-            for name in names:
-                if name in dct:
-                    dct[name] = dct[name][0]
-            if 'steps' in dct:
-                del dct['steps']
+            _fix_comp_check_data(dct)

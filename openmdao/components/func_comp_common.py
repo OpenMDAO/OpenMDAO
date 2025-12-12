@@ -6,7 +6,6 @@ import sys
 import traceback
 import re
 from functools import partial
-from collections.abc import Iterable
 
 import numpy as np
 try:
@@ -19,7 +18,7 @@ try:
     except ImportError:
         from jax import linear_util
     from jax.api_util import argnums_partial
-    from jax._src.api import _jvp, _vjp
+    from jax._src.api import _jvp, _vjp, api_util
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
 except Exception:
     _, err, tb = sys.exc_info()
@@ -92,7 +91,13 @@ def jac_forward(fun, argnums, tangents):
         rows of J and the second would contain the next 4 rows of J.  If there is only 1 output
         variable, the values returned are grouped by input variable.
     """
-    f = linear_util.wrap_init(fun)
+    try:
+        # Newer JAX versions (>= 0.4.x)
+        f = linear_util.wrap_init(fun, debug_info=api_util.debug_info('jac_forward', fun, (), {}))
+    except TypeError:
+        # Older JAX versions
+        f = linear_util.wrap_init(fun)
+
     if argnums is None:
         def jacfunf(*args):
             return vmap(partial(_jvp, f, args), out_axes=(None, -1))(tangents)[1]
@@ -128,7 +133,13 @@ def jac_reverse(fun, argnums, tangents):
         implicit systems, the function inputs will contain both inputs and outputs in the context
         of OpenMDAO.
     """
-    f = linear_util.wrap_init(fun)
+    try:
+        # Newer JAX versions (>= 0.4.x)
+        f = linear_util.wrap_init(fun, debug_info=api_util.debug_info('jac_reverse', fun, (), {}))
+    except TypeError:
+        # Older JAX versions
+        f = linear_util.wrap_init(fun)
+
     if argnums is None:
         def jacfunr(*args):
             return vmap(_vjp(f, *args)[1])(tangents)
@@ -162,7 +173,13 @@ def jacvec_prod(fun, argnums, invals, tangent):
     function
         A function to compute the jacobian vector product.
     """
-    f = linear_util.wrap_init(fun)
+    try:
+        # Newer JAX versions (>= 0.4.x)
+        f = linear_util.wrap_init(fun, debug_info=api_util.debug_info('jacvec_prod', fun, (), {}))
+    except TypeError:
+        # Older JAX versions
+        f = linear_util.wrap_init(fun)
+
     if argnums is not None:
         invals = list(argnums_partial(f, argnums, invals)[1])
 
@@ -241,6 +258,6 @@ def _ensure_iter(val):
     -------
     tuple or iterable
     """
-    if isinstance(val, Iterable):
+    if isinstance(val, tuple):
         return val
     return val,

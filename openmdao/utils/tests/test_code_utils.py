@@ -7,7 +7,7 @@ import pickle
 import numpy as np
 
 from openmdao.utils.code_utils import get_nested_calls, LambdaPickleWrapper, get_return_names, \
-    get_func_graph, get_partials_deps
+    get_func_graph, get_function_deps
 from openmdao.core.group import Group
 
 
@@ -132,7 +132,7 @@ class TestGraphFunction(unittest.TestCase):
 
         graph = get_func_graph(func)
         self.assertEqual(0, len(graph.edges()))
-        partials = sorted(get_partials_deps(func))
+        partials = sorted(get_function_deps(func))
         self.assertEqual(sorted(partials), [])
 
     def test_unconected_output(self):
@@ -144,7 +144,7 @@ class TestGraphFunction(unittest.TestCase):
         self.assertIn(('a', 'c'), graph.edges())
         self.assertIn(('b', 'c'), graph.edges())
         self.assertEqual(0, len(graph.edges('out1')))
-        partials = sorted(get_partials_deps(func))
+        partials = sorted(get_function_deps(func))
         self.assertEqual(sorted(partials), [('c', 'a'), ('c', 'b')])
 
     def test_complicated(self):
@@ -166,7 +166,7 @@ class TestGraphFunction(unittest.TestCase):
         self.assertEqual(sorted(graph.edges()), sorted(expected))
         self.assertEqual(sorted(graph.nodes()), sorted(['a', 'b', 'c', 'd', 'e', 'f', 'x']))
 
-        partials = sorted(get_partials_deps(func))
+        partials = sorted(get_function_deps(func))
         self.assertEqual(sorted(partials), [('e', 'a'), ('e', 'b'), ('f', 'a'), ('f', 'b')])
 
     def test_multiple_returns(self):
@@ -176,7 +176,7 @@ class TestGraphFunction(unittest.TestCase):
         graph = get_func_graph(func)
         self.assertIn(('a', 'out0'), graph.edges())
         self.assertIn(('b', 'out1'), graph.edges())
-        partials = sorted(get_partials_deps(func))
+        partials = sorted(get_function_deps(func))
         self.assertEqual(sorted(partials), [('out0', 'a'), ('out1', 'b')])
 
     def test_conditional_return(self):
@@ -188,7 +188,7 @@ class TestGraphFunction(unittest.TestCase):
 
         graph = get_func_graph(func)
         self.assertIn(('a', 'out0'), graph.edges())
-        partials = sorted(get_partials_deps(func))
+        partials = sorted(get_function_deps(func))
         self.assertEqual(sorted(partials), [('out0', 'a')])
 
     def test_no_return(self):
@@ -197,7 +197,7 @@ class TestGraphFunction(unittest.TestCase):
 
         graph = get_func_graph(func)
         self.assertIn(('a', 'b'), graph.edges())
-        partials = sorted(get_partials_deps(func))
+        partials = sorted(get_function_deps(func))
         self.assertEqual(sorted(partials), [])
 
     def test_function_with_args(self):
@@ -208,7 +208,7 @@ class TestGraphFunction(unittest.TestCase):
         graph = get_func_graph(func)
         self.assertIn(('a', 'c'), graph.edges())
         self.assertIn(('b', 'c'), graph.edges())
-        partials = sorted(get_partials_deps(func))
+        partials = sorted(get_function_deps(func))
         self.assertEqual(sorted(partials), [('c', 'a'), ('c', 'b')])
 
     def test_nested_function(self):
@@ -217,9 +217,10 @@ class TestGraphFunction(unittest.TestCase):
                 return b + 1
             return nested(a)
 
-        with self.assertRaises(RuntimeError) as cm:
+        msg = "Function contains nested functions, which are not supported yet."
+        with self.assertRaises(Exception) as cm:
             get_func_graph(func)
-        self.assertEqual(str(cm.exception), "Function contains nested functions, which are not supported.")
+        self.assertEqual(cm.exception.args[0], msg)
 
     def test_function_with_tuple_return(self):
         def func(a, b):
@@ -228,7 +229,7 @@ class TestGraphFunction(unittest.TestCase):
         graph = get_func_graph(func)
         self.assertIn(('a', 'out0'), graph.edges())
         self.assertIn(('b', 'out1'), graph.edges())
-        partials = sorted(get_partials_deps(func))
+        partials = sorted(get_function_deps(func))
         self.assertEqual(sorted(partials), [('out0', 'a'), ('out1', 'b')])
 
     def test_function_with_mixed_return(self):
@@ -240,7 +241,7 @@ class TestGraphFunction(unittest.TestCase):
 
         graph = get_func_graph(func)
         self.assertIn(('a', 'out0'), graph.edges())
-        partials = sorted(get_partials_deps(func))
+        partials = sorted(get_function_deps(func))
         self.assertEqual(sorted(partials), [('out0', 'a')])
 
 

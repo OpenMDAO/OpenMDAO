@@ -92,7 +92,8 @@ class DynPartialsComp(om.ExplicitComponent):
 
 def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True,
             recorder=None, has_lin_constraint=True, has_diag_partials=True, partial_coloring=False,
-            use_vois=True, auto_ivc=False, con_alias=False, check=False, **options):
+            use_vois=True, auto_ivc=False, con_alias=False, check=False, show_sparsity=False,
+            **options):
 
     p = om.Problem(model=CounterGroup())
 
@@ -122,7 +123,8 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
 
     if partial_coloring:
         arctan_yox = om.ExecComp('g=arctan(y/x)', shape=SIZE)
-        arctan_yox.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2, tol=1e-20)
+        arctan_yox.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=2,
+                                    tol=1e-20, show_sparsity=show_sparsity)
     else:
         arctan_yox = om.ExecComp('g=arctan(y/x)', shape=SIZE, has_diag_partials=has_diag_partials)
 
@@ -172,7 +174,8 @@ def run_opt(driver_class, mode, assemble_type=None, color_info=None, derivs=True
 
     if 'dynamic_total_coloring' in options:
         if options['dynamic_total_coloring']:
-            p.driver.declare_coloring(tol=1e-15, min_improve_pct=min_improve_pct)
+            p.driver.declare_coloring(tol=1e-15, min_improve_pct=min_improve_pct,
+                                      show_sparsity=show_sparsity)
         del options['dynamic_total_coloring']
 
     p.driver.options.update(options)
@@ -357,7 +360,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
             "self.declare_partials(of='g', wrt='x', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
             "self.declare_partials(of='g', wrt='y', rows=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9], cols=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])",
         ]
-        decl_partials_calls = partial_coloring.get_declare_partials_calls().strip()
+        with printoptions(legacy="1.13"):
+            decl_partials_calls = partial_coloring.get_declare_partials_calls().strip()
         for i, d in enumerate(decl_partials_calls.split('\n')):
             self.assertEqual(d.strip(), expected[i])
 
@@ -485,7 +489,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.run_driver()
         self.assertEqual(str(context.exception),
-                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.g' is an array of size 0")
+                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.g' is an array of size 0.")
 
     def test_size_zero_array_declare_partials(self):
         class DynamicPartialsComp(om.ExplicitComponent):
@@ -526,7 +530,7 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             p.run_driver()
         self.assertEqual(str(context.exception),
-                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.y' is an array of size 0")
+                         "'arctan_yox' <class DynamicPartialsComp>: 'arctan_yox.y' is an array of size 0.")
 
 
     def test_dynamic_total_coloring_pyoptsparse_slsqp_auto(self):
@@ -569,7 +573,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p_color = run_opt(pyOptSparseDriver, 'fwd', optimizer='SNOPT', print_results=False,
                           dynamic_total_coloring=True, debug_print=['totals'])
 
-        failed, output = run_driver(p_color)
+        with printoptions(legacy="1.13"):
+            failed, output = run_driver(p_color)
 
         self.assertFalse(failed, "Optimization failed.")
 
@@ -587,7 +592,8 @@ class SimulColoringPyoptSparseTestCase(unittest.TestCase):
         p_color = run_opt(pyOptSparseDriver, 'rev', optimizer='SNOPT', print_results=False,
                           dynamic_total_coloring=True, debug_print=['totals'])
 
-        failed, output = run_driver(p_color)
+        with printoptions(legacy="1.13"):
+            failed, output = run_driver(p_color)
 
         self.assertFalse(failed, "Optimization failed.")
 

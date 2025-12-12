@@ -38,6 +38,12 @@ if Version(scipy_version) >= Version("1.4"):
     _constraint_optimizers.add('differential_evolution')
     _constraint_grad_optimizers.add('differential_evolution')
 
+if Version(scipy_version) >= Version("1.14"):
+    # COBYLA supports bounds starting with SciPy Version 1.14
+    _optimizers.add('COBYQA')
+    _bounds_optimizers |= {'COBYQA'}
+    _constraint_optimizers |= {'COBYQA'}
+
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
 _global_optimizers = {'differential_evolution', 'basinhopping'}
 if Version(scipy_version) >= Version("1.2"):  # Only available in newer versions
@@ -58,6 +64,8 @@ _unsupported_optimizers = {'dogleg', 'trust-ncg'}
 _supports_new_style = {'trust-constr'}
 if Version(scipy_version) >= Version("1.4"):
     _supports_new_style.add('differential_evolution')
+if Version(scipy_version) >= Version("1.14"):
+    _supports_new_style.add('COBYQA')
 _use_new_style = True  # Recommended to set to True
 
 CITATIONS = """
@@ -114,8 +122,6 @@ class ScipyOptimizeDriver(Driver):
     _grad_cache : {}
         Cached result of nonlinear constraint derivatives because scipy asks for them in a separate
         function.
-    _exc_info : 3 item tuple
-        Storage for exception and traceback information.
     _obj_and_nlcons : list
         List of objective + nonlinear constraints. Used to compute total derivatives
         for all except linear constraints.
@@ -162,7 +168,6 @@ class ScipyOptimizeDriver(Driver):
         self.fail = False
         self.iter_count = 0
         self._check_jac = False
-        self._exc_info = None
         self._total_jac_format = 'array'
 
         self.cite = CITATIONS
@@ -178,8 +183,9 @@ class ScipyOptimizeDriver(Driver):
                              'control, use solver-specific options.')
         self.options.declare('maxiter', 200, lower=0,
                              desc='Maximum number of iterations.')
-        self.options.declare('disp', True, types=bool,
-                             desc='Set to False to prevent printing of Scipy convergence messages')
+        self.options.declare('disp', default=True, types=(int, bool),
+                             desc='Value of "disp" argument provided to scipy.optimize.minimize '
+                             'which controls the verbosity of the optimization.')
         self.options.declare('singular_jac_behavior', default='warn',
                              values=['error', 'warn', 'ignore'],
                              desc='Defines behavior of a zero row/col check after first call to'
@@ -284,6 +290,9 @@ class ScipyOptimizeDriver(Driver):
             ndesvar += size
         x_init = np.empty(ndesvar)
 
+        if ndesvar == 0:
+            raise RuntimeError('Problem has no design variables.')
+
         # Initial Design Vars
         i = 0
         use_bounds = (opt in _bounds_optimizers)
@@ -312,6 +321,12 @@ class ScipyOptimizeDriver(Driver):
                         p_high = meta_high[j]
                     else:
                         p_high = meta_high
+
+                    # Use 1.E16 here in case we've scaled the bounds
+                    if p_low <= -1.0E16:
+                        p_low = None
+                    if p_high >= 1.0E16:
+                        p_high = None
 
                     bounds.append((p_low, p_high))
 
@@ -580,21 +595,6 @@ class ScipyOptimizeDriver(Driver):
 
         return self.fail
 
-    def _update_design_vars(self, x_new):
-        """
-        Update the design variables in the model.
-
-        Parameters
-        ----------
-        x_new : ndarray
-            Array containing input values at new design point.
-        """
-        i = 0
-        for name, meta in self._designvars.items():
-            size = meta['size']
-            self.set_design_var(name, x_new[i:i + size])
-            i += size
-
     def _objfunc(self, x_new):
         """
         Evaluate and return the objective function.
@@ -624,7 +624,7 @@ class ScipyOptimizeDriver(Driver):
 
             self._desvar_array_cache[:] = x_new
 
-            self._update_design_vars(x_new)
+            self._scipy_update_design_vars(x_new)
 
             with RecordingDebugging(self._get_name(), self.iter_count, self):
                 self.iter_count += 1
@@ -673,7 +673,7 @@ class ScipyOptimizeDriver(Driver):
         float
             Value of the constraint function.
         """
-        if self.options['optimizer'] == 'differential_evolution':
+        if self.options['optimizer'] in ['differential_evolution', 'COBYQA']:
             # the DE opt will not have called this, so we do it here to update DV/resp values
             self._objfunc(x_new)
 
@@ -833,14 +833,6 @@ class ScipyOptimizeDriver(Driver):
             return -grad[grad_idx, :]
         else:
             return grad[grad_idx, :]
-
-    def _reraise(self):
-        """
-        Reraise any exception encountered when scipy calls back into our method.
-        """
-        exc_info = self._exc_info
-        self._exc_info = None  # clear since we're done with it
-        raise exc_info[1].with_traceback(exc_info[2])
 
 
 def signature_extender(fcn, extra_args):

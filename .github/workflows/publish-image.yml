@@ -1,0 +1,76 @@
+name: Publish Images
+
+on:
+  release:
+    types: [published]
+
+  # Run the workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+
+  build_image:
+
+    strategy:
+
+      fail-fast: false
+
+      matrix:
+        include:
+          - NAME: ubuntu
+            OS: ubuntu-24.04
+            FILE: Dockerfile
+            IMAGE_NAME: ${{ github.repository }}
+            REGISTRY: ghcr.io
+
+          - NAME: ubuntu-arm
+            OS: ubuntu-24.04-arm
+            FILE: Dockerfile.arm
+            IMAGE_NAME: ${{ github.repository }}-arm
+            REGISTRY: ghcr.io
+
+    runs-on: ${{ matrix.OS }}
+
+    permissions:
+      contents: read
+      packages: write
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get tags
+        run: |
+          git fetch --unshallow --tags
+          git describe --tags > tag.txt
+          echo "TAG=$(cat tag.txt)" >> $GITHUB_ENV
+
+      # Login to container registry
+      - name: Log into registry ${{ matrix.REGISTRY }}
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ matrix.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Extract metadata (tags, labels)
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ matrix.REGISTRY }}/${{ matrix.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ env.TAG }}
+
+      # Build and push image with Buildx
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          file: ${{ matrix.FILE }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

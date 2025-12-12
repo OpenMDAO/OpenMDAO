@@ -19,17 +19,6 @@ from openmdao.utils.relevance import get_relevance
 from openmdao.utils.array_utils import get_random_arr
 
 
-use_mpi = check_mpi_env()
-if use_mpi is not False:
-    try:
-        from petsc4py import PETSc
-    except ImportError:
-        PETSc = None
-        if use_mpi is True:
-            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
-elif use_mpi is False:
-    PETSc = None
-
 _directional_rng = np.random.default_rng(99)
 
 
@@ -133,7 +122,11 @@ class _TotalJacInfo(object):
             driver = problem.driver
         self.model = model = problem.model
 
-        self.comm = problem.comm
+        # reset the of and wrt caches just in case we've previously built a total jac with
+        # linear constraints (which will have different ofs and wrts than the nl total jac).
+        model._clear_jac_caches()
+
+        self.comm = model.comm
         self._orig_mode = problem._orig_mode
         self.has_scaling = driver and driver._has_scaling and driver_scaling
         self.return_format = return_format
@@ -407,6 +400,17 @@ class _TotalJacInfo(object):
         """
         Compute scatter between a given local jacobian row/col to others in other procs.
         """
+        use_mpi = check_mpi_env()
+        if use_mpi is not False:
+            try:
+                from petsc4py import PETSc
+            except ImportError:
+                PETSc = None
+                if use_mpi is True:
+                    raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
+        elif use_mpi is False:
+            PETSc = None
+
         model = self.model
         nproc = self.comm.size
 
@@ -802,7 +806,7 @@ class _TotalJacInfo(object):
         inds = []
         jac_inds = []
         sizes = model._var_sizes['output']
-        slices = model._doutputs.get_slice_dict()
+        doutvec = model._doutputs
         abs2idx = model._var_allprocs_abs2idx
         jstart = jend = 0
 
@@ -813,24 +817,25 @@ class _TotalJacInfo(object):
             meta = allprocs_abs2meta_out[src]
             sz = vmeta['global_size'] if self.get_remote else vmeta['size']
 
-            if (src in abs2idx and src in slices and (self.get_remote or not vmeta['remote'])):
+            if (src in abs2idx and doutvec._contains_abs(src) and
+                    (self.get_remote or not vmeta['remote'])):
                 var_idx = abs2idx[src]
-                slc = slices[src]
-                slcsize = slc.stop - slc.start
+                start, stop = doutvec.get_range(src)
+                slcsize = stop - start
 
                 if MPI and meta['distributed'] and self.get_remote:
                     if indices is not None:
                         local_idx, sizes_idx, _ = self._dist_driver_vars[name]
 
                         dist_offset = np.sum(sizes_idx[:myproc])
-                        full_inds = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
+                        full_inds = np.arange(start, stop, dtype=INT_DTYPE)
                         inds.append(full_inds[local_idx.as_array()])
                         jac_inds.append(jstart + dist_offset +
                                         np.arange(local_idx.indexed_src_size, dtype=INT_DTYPE))
                         name2jinds.append((src, jac_inds[-1]))
                     else:
                         dist_offset = np.sum(sizes[:myproc, var_idx])
-                        inds.append(range(slc.start, slc.stop) if slcsize > 0
+                        inds.append(range(start, stop) if slcsize > 0
                                     else np.zeros(0, dtype=INT_DTYPE))
                         jac_inds.append(np.arange(jstart + dist_offset,
                                         jstart + dist_offset + sizes[myproc, var_idx],
@@ -838,10 +843,10 @@ class _TotalJacInfo(object):
                         name2jinds.append((src, jac_inds[-1]))
                 else:
                     if indices is None:
-                        sol_inds = range(slc.start, slc.stop) if slcsize > 0 \
+                        sol_inds = range(start, stop) if slcsize > 0 \
                             else np.zeros(0, dtype=INT_DTYPE)
                     else:
-                        sol_inds = np.arange(slc.start, slc.stop, dtype=INT_DTYPE)
+                        sol_inds = np.arange(start, stop, dtype=INT_DTYPE)
                         sol_inds = sol_inds[indices.flat()]
                     inds.append(sol_inds)
                     jac_inds.append(np.arange(jstart, jstart + sz, dtype=INT_DTYPE))
@@ -1379,12 +1384,8 @@ class _TotalJacInfo(object):
 
         if self.approx:
             try:
-                return self._compute_totals_approx(progress_out_stream=progress_out_stream)
-            finally:
-                self.model._recording_iter.pop()
-        elif self.model.options['derivs_method'] == 'jax':
-            try:
-                return self._compute_totals_jax(progress_out_stream=progress_out_stream)
+                with self.relevance.all_seeds_active():
+                    return self._compute_totals_approx(progress_out_stream=progress_out_stream)
             finally:
                 self.model._recording_iter.pop()
 
@@ -1410,11 +1411,7 @@ class _TotalJacInfo(object):
                         try:
                             ln_solver = model._linear_solver
                             with model._scaled_context_all():
-                                model._linearize(model._assembled_jac,
-                                                 sub_do_ln=ln_solver._linearize_children())
-                            if ln_solver._assembled_jac is not None and \
-                                    ln_solver._assembled_jac._under_complex_step:
-                                model.linear_solver._assembled_jac._update(model)
+                                model._linearize(sub_do_ln=ln_solver._linearize_children())
                             ln_solver._linearize()
                         finally:
                             model._tot_jac = None
@@ -1487,7 +1484,8 @@ class _TotalJacInfo(object):
 
                 # if some of the wrt vars are distributed in fwd mode, we bcast from the rank
                 # where each part of the distrib var exists
-                if self.get_remote and mode == 'fwd' and self.has_wrt_dist:
+                if self.get_remote and mode == 'fwd' and self.has_wrt_dist and \
+                        self.dist_input_range_map:
                     for start, stop, rank in self.dist_input_range_map[mode]:
                         contig = self.J[:, start:stop].copy()
                         model.comm.Bcast(contig, root=rank)
@@ -1556,7 +1554,6 @@ class _TotalJacInfo(object):
                         if progress_out_stream is not None:
                             model._approx_schemes['fd']._progress_out = progress_out_stream
 
-                    model._setup_jacobians(recurse=False)
                     model._setup_approx_derivs()
                     if model._coloring_info.coloring is not None:
                         model._coloring_info._update_wrt_matches(model)
@@ -1572,66 +1569,7 @@ class _TotalJacInfo(object):
                         scheme._totals_directional_mode = None
 
                 # Linearize Model
-                model._linearize(model._assembled_jac,
-                                 sub_do_ln=model._linear_solver._linearize_children())
-
-            finally:
-                model._tot_jac = None
-
-            totals = self.J_dict
-            if debug_print:
-                print(f'Elapsed time to approx totals: {time.perf_counter() - t0} secs\n',
-                      flush=True)
-
-            # Driver scaling.
-            if self.has_scaling:
-                self._do_driver_scaling(totals)
-
-            if return_format == 'array':
-                totals = self.J  # change back to array version
-
-            if debug_print:
-                # Debug outputs scaled derivatives.
-                self._print_derivatives()
-
-        return totals
-
-    def _compute_totals_jax(self, progress_out_stream=None):
-        """
-        Compute derivatives of desired quantities with respect to desired inputs.
-
-        Uses jax to calculate the derivatives.
-
-        Parameters
-        ----------
-        progress_out_stream : None or file-like object
-            Where to send human readable output. None by default which suppresses the output.
-
-        Returns
-        -------
-        derivs : object
-            Derivatives in form requested by 'return_format'.
-        """
-        model = self.model
-        return_format = self.return_format
-        debug_print = self.debug_print
-
-        # Prepare model for calculation by cleaning out the derivatives vectors.
-        model._dinputs.set_val(0.0)
-        model._doutputs.set_val(0.0)
-        model._dresiduals.set_val(0.0)
-
-        # Solve for derivs using jax
-        # This cuts out the middleman by grabbing the Jacobian directly after linearization.
-
-        t0 = time.perf_counter()
-
-        with self._totjac_context():
-            model._tot_jac = self
-            try:
-                # Linearize Model
-                model._linearize(model._assembled_jac,
-                                 sub_do_ln=model._linear_solver._linearize_children())
+                model._linearize(sub_do_ln=model._linear_solver._linearize_children())
 
             finally:
                 model._tot_jac = None
@@ -1720,9 +1658,12 @@ class _TotalJacInfo(object):
                         zero_rows.append((n, list(zip(*zero_idxs))))
 
             if zero_rows:
-                zero_rows = [f"('{n}', inds={idxs})" for n, idxs in zero_rows]
-                msg = (f"Constraints or objectives [{', '.join(zero_rows)}] cannot be impacted by "
-                       "the design variables of the problem.")
+                # zero_rows = [f"('{n}', inds={idxs})" for n, idxs in zero_rows]
+                msg = ('The following constraints or objectives cannot be impacted by '
+                       'the design variables of the problem at the current design point:\n')
+                for name, idxs in zero_rows:
+                    with np.printoptions(legacy='1.21'):
+                        msg += f'  {name}, inds={idxs}\n'
                 if raise_error:
                     raise RuntimeError(msg)
                 else:
@@ -1746,9 +1687,11 @@ class _TotalJacInfo(object):
                         zero_cols.append((n, list(zip(*zero_idxs))))
 
             if zero_cols:
-                zero_cols = [f"('{n}', inds={idxs})" for n, idxs in zero_cols]
-                msg = (f"Design variables [{', '.join(zero_cols)}] have no impact on the "
-                       "constraints or objective.")
+                msg = ('The following design variables have no impact on the '
+                       'constraints or objective at the current design point:\n')
+                for name, idxs in zero_cols:
+                    with np.printoptions(legacy='1.21'):
+                        msg += f'  {name}, inds={idxs}\n'
                 if raise_error:
                     raise RuntimeError(msg)
                 else:
@@ -1873,6 +1816,53 @@ class _TotalJacInfo(object):
 
         finally:
             self.model._recording_iter.pop()
+
+    def _setup(self, system):
+        """
+        Set up the total jacobian.
+
+        Parameters
+        ----------
+        system : System
+            System that is setting up the total jacobian.
+        """
+        # This is called when this is a system ._jacobian.  Eventually, once we unify the
+        # interfaces between partial and total jacobians, this will actually do something.
+        pass
+
+    def todense(self):
+        """
+        Return the total jacobian as a dense array.
+
+        Returns
+        -------
+        ndarray
+            Dense array representation of the total jacobian.
+        """
+        return self.J
+
+    def _update(self, system):
+        """
+        Update the total jacobian.
+        """
+        pass
+
+    def _pre_update(self, dtype):
+        """
+        Pre-update the total jacobian.
+
+        Parameters
+        ----------
+        dtype : dtype
+            The dtype of the jacobian.
+        """
+        pass
+
+    def _post_update(self):
+        """
+        Post-update the total jacobian.
+        """
+        pass
 
     def set_col(self, system, icol, column):
         """

@@ -1,17 +1,79 @@
 """ Unit tests for the system interface."""
 
 import unittest
-
+import pathlib
+import io
+from contextlib import redirect_stdout
 import numpy as np
+import warnings
 
+import openmdao.api as om
 from openmdao.api import Problem, Group, IndepVarComp, ExecComp, ExplicitComponent
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_warnings
 from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.utils.file_utils import get_work_dir
+from openmdao.utils.file_utils import _get_work_dir
+from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
+from openmdao.test_suite.scripts.circuit_analysis import Circuit
+from openmdao.test_suite.components.sellar_feature import SellarMDA
+from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
+from openmdao.test_suite.components.sellar import SellarProblem
+from openmdao.test_suite.components.paraboloid import Paraboloid
+from openmdao.test_suite.components.sellar import SellarDis1, SellarDis2
+from openmdao.test_suite.components.sellar import SellarNoDerivatives
 
 
 @use_tempdirs
 class TestSystem(unittest.TestCase):
+
+    def test_get_val(self):
+
+        class TestComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('foo', shape=(3,))
+                self.add_discrete_input('mul', val=1)
+
+                self.add_output('bar', shape=(3,))
+                # add a mutable NumPy array as an output
+                self.add_discrete_output('obj', val=np.array([1, 'm', [2, 3, 4]], dtype=object))
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                outputs['bar'] = discrete_inputs['mul']*inputs['foo']
+
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', TestComp(), promotes=['*'])
+        p.setup()
+
+        p.set_val('foo', np.array([5., 5., 5.]))
+        p.set_val('mul', 100)
+        p.run_model()
+
+        foo = comp.get_val('foo')
+        mul = comp.get_val('mul')
+        bar = comp.get_val('bar')
+        obj = comp.get_val('obj')
+
+        self.assertTrue(np.array_equal(foo, np.array([5., 5., 5.])))
+        self.assertEqual(mul, 100)
+        self.assertTrue(np.array_equal(bar, np.array([500., 500., 500.])))
+
+        foo_copy = comp.get_val('foo', copy=True)
+        mul_copy = comp.get_val('mul', copy=True)
+        bar_copy = comp.get_val('bar', copy=True)
+        obj_copy = comp.get_val('obj', copy=True)
+
+        self.assertTrue(np.array_equal(foo_copy, np.array([5., 5., 5.])))
+        self.assertEqual(mul_copy, 100)
+        self.assertTrue(np.array_equal(bar_copy, np.array([500., 500., 500.])))
+
+        self.assertTrue(id(foo) != id(foo_copy), f"'foo' is not a copy, {id(foo)=} {id(foo_copy)=}")
+        self.assertTrue(id(mul) == id(mul_copy), f"'mul' is a copy, {id(foo)=} {id(foo_copy)=}")  # mul is a scalar
+        self.assertTrue(id(bar) != id(bar_copy), f"'bar' is not a copy, {id(bar)=} {id(bar_copy)=}")
+        self.assertTrue(id(obj) != id(obj_copy), f"'obj' is not a copy, {id(obj)=} {id(obj_copy)=}")
+
+        obj[2][0] = 10
+        self.assertEqual(obj[2][0], 10)
+        self.assertEqual(comp.get_val('obj')[2][0], 10)  # the value in the system was modified
+        self.assertEqual(obj_copy[2][0], 2)              # the value in the copy was not modified
 
     def test_vector_context_managers(self):
         g1 = Group()
@@ -202,7 +264,6 @@ class TestSystem(unittest.TestCase):
             residuals['C2.y'] = bad_val.tolist()
 
     def test_list_inputs_outputs_invalid_return_format(self):
-        from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
         prob = ParaboloidProblem()
         prob.setup()
         prob.final_setup()
@@ -224,8 +285,6 @@ class TestSystem(unittest.TestCase):
         self.assertEqual(str(cm.exception), msg)
 
     def test_list_inputs_output_with_includes_excludes(self):
-        from openmdao.test_suite.scripts.circuit_analysis import Circuit
-
         p = Problem()
         model = p.model
 
@@ -277,8 +336,6 @@ class TestSystem(unittest.TestCase):
         self.assertEqual(len(outputs), 2)
 
     def test_list_inputs_outputs_is_indep_is_des_var(self):
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
         model = SellarMDA()
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
@@ -327,6 +384,33 @@ class TestSystem(unittest.TestCase):
         nonDV_indeps = model.list_outputs(is_indep_var=True, is_design_var=False, list_autoivcs=True, out_stream=None)
         self.assertEqual(sorted([name for name, _ in nonDV_indeps]),
                          ['_auto_ivc.v1'])
+
+    def test_list_options(self):
+        model = SellarMDA()
+
+        prob = Problem(model)
+        prob.setup()
+        prob.final_setup()
+
+        opt_list = prob.model.list_options(out_stream=None)
+
+        self.assertEqual(len(opt_list), 9)
+        self.assertTrue(opt_list[1][0] == 'cycle')
+        self.assertTrue(opt_list[1][2]['maxiter'] == 10)
+        self.assertTrue(opt_list[3][1]['use_jit'] is True)
+
+        opt_dict = prob.model.list_options(out_stream=None, return_format='dict')
+        self.assertTrue(opt_dict['cycle']['nonlinear_solver']['maxiter'] == 10)
+        self.assertTrue(opt_dict['cycle']['linear_solver']['use_aitken'] is False)
+        self.assertTrue(opt_dict['cycle']['options']['auto_order'] is False)
+
+        opt_list = prob.model.list_options(out_stream=None, include_solvers=False)
+        opt_list = prob.model.list_options(out_stream=None, include_solvers=False)
+        self.assertTrue(opt_list[1][2] is None)
+        self.assertTrue(opt_list[1][3] is None)
+
+        opt_list = prob.model.list_options(out_stream=None, include_solvers=False, include_default=False)
+        self.assertEqual(len(opt_list[1][1]), 0)
 
     def test_setup_check_group(self):
 
@@ -385,10 +469,10 @@ class TestSystem(unittest.TestCase):
 
         prob.setup()
 
-        with self.assertRaises(KeyError) as cm:
-            root.get_source('f')
+        with self.assertRaises(Exception) as cm:
+            root._resolver.source('f')
 
-        self.assertEqual(cm.exception.args[0], "<model> <class Group>: source for 'f' not found.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: Can't find source for 'f' because connections are not yet known.")
 
     def test_list_inputs_before_final_setup(self):
         class SpeedComp(ExplicitComponent):
@@ -415,8 +499,6 @@ class TestSystem(unittest.TestCase):
             prob.model.list_inputs(units=True, prom_name=True, out_stream=None)
 
     def test_get_io_metadata(self):
-        from openmdao.test_suite.components.sellar_feature import SellarMDA
-
         prob = Problem()
         prob.model = SellarMDA()
 
@@ -426,40 +508,45 @@ class TestSystem(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob.model.get_io_metadata(includes='x'), {
-                          'cycle.d1.x': {'copy_shape': None,
-                                         'compute_shape': None,
-                                         'desc': '',
-                                         'discrete': False,
-                                         'distributed': False,
-                                         'global_shape': (1,),
-                                         'global_size': 1,
-                                         'has_src_indices': False,
-                                         'prom_name': 'x',
-                                         'require_connection': False,
-                                         'shape': (1,),
-                                         'shape_by_conn': False,
-                                         'size': 1,
-                                         'tags': set(),
-                                         'units': None},
-                          'obj_cmp.x':  {'copy_shape': None,
-                                         'compute_shape': None,
-                                         'desc': '',
-                                         'discrete': False,
-                                         'distributed': False,
-                                         'global_shape': (1,),
-                                         'global_size': 1,
-                                         'has_src_indices': False,
-                                         'prom_name': 'x',
-                                         'require_connection': False,
-                                         'shape': (1,),
-                                         'shape_by_conn': False,
-                                         'size': 1,
-                                         'tags': set(),
-                                         'units': None}
-                            })
+        'cycle.d1.x': {'compute_shape': None,
+                        'compute_units': None,
+                        'copy_shape': None,
+                        'copy_units': None,
+                        'desc': '',
+                        'discrete': False,
+                        'distributed': False,
+                        'global_shape': (1,),
+                        'global_size': 1,
+                        'has_src_indices': False,
+                        'prom_name': 'x',
+                        'require_connection': False,
+                        'shape': (1,),
+                        'shape_by_conn': False,
+                        'size': 1,
+                        'tags': set(),
+                        'units': None,
+                        'units_by_conn': False},
+         'obj_cmp.x': {'compute_shape': None,
+                       'compute_units': None,
+                       'copy_shape': None,
+                       'copy_units': None,
+                       'desc': '',
+                       'discrete': False,
+                       'distributed': False,
+                       'global_shape': (1,),
+                       'global_size': 1,
+                       'has_src_indices': False,
+                       'prom_name': 'x',
+                       'require_connection': False,
+                       'shape': (1,),
+                       'shape_by_conn': False,
+                       'size': 1,
+                       'tags': set(),
+                       'units': None,
+                       'units_by_conn': False}
+        })
 
     def test_model_options_set_all(self):
-        import openmdao.api as om
 
         def declare_options(system):
             system.options.declare('foo', types=(int,))
@@ -492,7 +579,6 @@ class TestSystem(unittest.TestCase):
             self.assertEqual(system.options['baz'], 'fizz')
 
     def test_model_options_with_filter(self):
-        import openmdao.api as om
 
         def declare_options(system):
             system.options.declare('foo', types=(int,))
@@ -531,7 +617,6 @@ class TestSystem(unittest.TestCase):
                 self.assertEqual(system.options['baz'], 'im_a_component')
 
     def test_model_options_override(self):
-        import openmdao.api as om
 
         def declare_options(system):
             system.options.declare('foo', types=(int,), default=0)
@@ -578,8 +663,6 @@ class TestSystem(unittest.TestCase):
                     self.assertEqual(system.options['baz'], 'im_C1_or_C2')
 
     def test_group_modifies_model_options(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.options_feature_lincomb import LinearCombinationComp
 
         class MyGroup(om.Group):
 
@@ -609,7 +692,6 @@ class TestSystem(unittest.TestCase):
 
     @use_tempdirs
     def test_recording_options_includes_excludes(self):
-        import openmdao.api as om
 
         prob = om.Problem()
 
@@ -645,9 +727,6 @@ class TestSystem(unittest.TestCase):
 
     @use_tempdirs
     def test_record_residuals_includes_excludes(self):
-        import openmdao.api as om
-        from openmdao.test_suite.components.sellar import SellarProblem
-
         prob = SellarProblem()
 
         model = prob.model
@@ -673,10 +752,6 @@ class TestSystem(unittest.TestCase):
             prob.final_setup()
 
     def test_get_outputs_dir(self):
-        import pathlib
-        import openmdao.api as om
-        from openmdao.test_suite.components.paraboloid import Paraboloid
-
         prob = om.Problem(name='test_prob_name')
         model = prob.model
 
@@ -694,7 +769,170 @@ class TestSystem(unittest.TestCase):
         prob.setup()
 
         d = prob.get_outputs_dir('subdir')
-        self.assertEqual(str(pathlib.Path(get_work_dir(), 'test_prob_name_out', 'subdir')), str(d))
+        self.assertEqual(str(pathlib.Path(_get_work_dir(), 'test_prob_name_out', 'subdir')), str(d))
+
+    def test_validate_protected(self):
+
+        class MySellar1(SellarDis1):
+            def validate(self, inputs, outputs):
+                outputs['y1'] = 20.0
+
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('sellar', MySellar1())
+        prob.setup()
+        prob.run_model()
+
+        msg = "Attempt to set value of 'y1' in output vector when it is read only."
+        with self.assertRaises(ValueError, msg=msg):
+            prob.model.run_validation()
+
+    def test_premature_validate(self):
+        prob = Problem(name='test_prob_name')
+        model = prob.model
+        model.add_subsystem('comp', Paraboloid())
+        prob.setup()
+        prob.final_setup()
+
+        msg = ("Either 'run_model' or 'run_driver' must be called before "
+               "'run_validation' can be called.")
+        with self.assertRaises(RuntimeError, msg=msg):
+            prob.model.run_validation()
+
+    def test_validate_wrapper(self):
+        class MyComp1(ExplicitComponent):
+            def setup(self):
+                self.add_discrete_input('my_input', val=1)
+
+            def validate(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                pass
+
+        class MyComp2(ExplicitComponent):
+            def setup(self):
+                self.add_input('my_input', val=1.0)
+                self.add_output('my_output', val=1.0)
+
+            def validate(self, inputs, outputs):
+                pass
+
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('my_comp_1', MyComp1())
+        prob.model.add_subsystem('my_comp_2', MyComp2())
+        prob.setup()
+        prob.run_model()
+        prob.model.my_comp_1._validate_wrapper()
+        prob.model.my_comp_2._validate_wrapper()
+
+    def test_run_validation_empty(self):
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('cycle', SellarNoDerivatives())
+        prob.setup()
+        prob.run_model()
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            prob.model.run_validation()
+        validation_print = buffer.getvalue()
+        expected_validation_print = (
+            '\nNo errors / warnings were collected during validation.\n'
+        )
+        self.assertEqual(validation_print, expected_validation_print)
+
+    def test_run_validation_all_warnings(self):
+
+        class MySellar1(SellarDis1):
+            def validate(self, inputs, outputs):
+                if outputs['y1'] > 20.0:
+                    warnings.warn('warning message 1')
+
+        class MySellar2(SellarDis2):
+            def validate(self, inputs, outputs):
+                if inputs['y1'] < 25.0:
+                    warnings.warn('warning message 2')
+
+        class SellarMDA(Group):
+            def setup(self):
+                cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
+                cycle.add_subsystem('d1', MySellar1(), promotes_inputs=['x', 'z', 'y2'],
+                                    promotes_outputs=['y1'])
+                cycle.add_subsystem('d2', MySellar2(), promotes_inputs=['z', 'y1'],
+                                    promotes_outputs=['y2'])
+
+                cycle.set_input_defaults('x', 1.0)
+                cycle.set_input_defaults('z', np.array([5.0, 2.0]))
+
+                # Nonlinear Block Gauss Seidel is a gradient free solver
+                cycle.nonlinear_solver = om.NonlinearBlockGS()
+
+            def validate(self, inputs, outputs):
+                if outputs['y1'] > 10.0:
+                    warnings.warn('warning message 3')
+
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('cycle', SellarMDA())
+        prob.setup()
+        prob.run_model()
+
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            prob.model.run_validation()
+        validation_print = buffer.getvalue()
+        expected_validation_print =(
+            "\nThe following warnings were collected during validation:"
+            "\n-----------------------------------------------------------------\n"
+            "\nUserWarning: 'cycle' <class SellarMDA>: Error calling validate(), warning message 3\n"
+            "\nUserWarning: 'cycle.cycle.d1' <class MySellar1>: Error calling validate(), warning message 1\n"
+            "\n-----------------------------------------------------------------\n"
+        )
+        self.assertEqual(validation_print, expected_validation_print)
+
+    def test_run_validation_mixed(self):
+
+        class MySellar1(SellarDis1):
+            def validate(self, inputs, outputs):
+                if outputs['y1'] > 20.0:
+                    raise ValueError('error message')
+
+        class MySellar2(SellarDis2):
+            def validate(self, inputs, outputs):
+                if inputs['y1'] < 25.0:
+                    warnings.warn('warning_message')
+
+        class SellarMDA(Group):
+            def setup(self):
+                cycle = self.add_subsystem('cycle', Group(), promotes=['*'])
+                cycle.add_subsystem('d1', MySellar1(), promotes_inputs=['x', 'z', 'y2'],
+                                    promotes_outputs=['y1'])
+                cycle.add_subsystem('d2', MySellar2(), promotes_inputs=['z', 'y1'],
+                                    promotes_outputs=['y2'])
+
+                cycle.set_input_defaults('x', 1.0)
+                cycle.set_input_defaults('z', np.array([5.0, 2.0]))
+
+                # Nonlinear Block Gauss Seidel is a gradient free solver
+                cycle.nonlinear_solver = om.NonlinearBlockGS()
+
+            def validate(self, inputs, outputs):
+                if outputs['y1'] > 10.0:
+                    warnings.warn('warning_message')
+
+        prob = Problem(model=Group())
+        prob.model.add_subsystem('cycle', SellarMDA())
+        prob.setup()
+        prob.run_model()
+
+        expected_validation_print = """
+
+            The following errors / warnings were collected during validation:
+            -----------------------------------------------------------------
+
+            ValueError: 'cycle' <class SellarMDA>: Error calling validate(), warning message
+
+            UserWarning: 'cycle.cycle.d1' <class MySellar1>: Error calling validate(), error message
+
+            -----------------------------------------------------------------
+        """
+        with self.assertRaises(om.ValidationError, msg=expected_validation_print):
+            prob.model.run_validation()
 
 
 if __name__ == "__main__":

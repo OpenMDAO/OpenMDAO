@@ -11,13 +11,12 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDens
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
-from openmdao.utils.assert_utils import assert_warning
 
 from openmdao.utils.mpi import MPI
-from openmdao.utils.om_warnings import DriverWarning
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
 from openmdao.utils.tests.test_hooks import hooks_active
 
+from openmdao.utils.reports_system import clear_reports
 from openmdao.visualization.opt_report.opt_report import opt_report, \
     _default_optimizer_report_filename
 
@@ -164,10 +163,7 @@ class TestOptimizationReport(unittest.TestCase):
 
         self.check_opt_result(expected=expect)
 
-        expected_warning_msg = "The optimizer report is not applicable for Driver type 'Driver', " \
-                               "which does not support optimization"
-        with assert_warning(DriverWarning, expected_warning_msg):
-            opt_report(self.prob)
+        opt_report(self.prob)
 
         outfilepath = self.prob.get_reports_dir() / _default_optimizer_report_filename
         self.assertFalse(os.path.exists(outfilepath))
@@ -251,10 +247,7 @@ class TestOptimizationReport(unittest.TestCase):
 
         self.check_opt_result(prob.driver.result, expected={'model_evals': 5, 'deriv_evals': 0})
 
-        expected_warning_msg = "The optimizer report is not applicable for Driver type 'DOEDriver', " \
-                               "which does not support optimization"
-        with assert_warning(DriverWarning, expected_warning_msg):
-            opt_report(prob)
+        opt_report(prob)
         outfilepath = prob.get_reports_dir() / _default_optimizer_report_filename
         self.assertFalse(os.path.exists(outfilepath))
 
@@ -564,6 +557,7 @@ class TestOptimizationReport(unittest.TestCase):
     @hooks_active
     def test_opt_report_hook(self):
         testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
+        clear_reports()
 
         try:
             self.setup_problem_and_run_driver(om.ScipyOptimizeDriver,
@@ -598,7 +592,7 @@ class TestMPIScatter(unittest.TestCase):
 
         prob.set_solver_print(level=0)
 
-        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-6, disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-5, disp=False)
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)

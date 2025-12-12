@@ -2,6 +2,10 @@
 import os
 import re
 import sys
+import textwrap
+import json
+import functools
+import atexit
 from types import TracebackType
 import unittest
 from contextlib import contextmanager
@@ -16,12 +20,13 @@ import numpy as np
 
 from openmdao.core.constants import INF_BOUND, _UNDEFINED
 from openmdao.utils.array_utils import shape_to_len
+from openmdao.utils.mpi import MPI
 
 
 _float_inf = float('inf')
 
 
-def ensure_compatible(name, value, shape=None, indices=None):
+def ensure_compatible(name, value, shape=None, indices=None, default_shape=(1,)):
     """
     Make value compatible with the specified shape or the shape of indices.
 
@@ -35,6 +40,8 @@ def ensure_compatible(name, value, shape=None, indices=None):
         The expected or desired shape of the value.
     indices : Indexer or None
         The indices into a source variable.
+    default_shape : tuple
+        The default shape to use if shape is not provided.
 
     Returns
     -------
@@ -78,12 +85,18 @@ def ensure_compatible(name, value, shape=None, indices=None):
 
     if shape is None:
         # shape is not determined, assume the shape of value was intended
-        value = np.atleast_1d(value)
+        if np.isscalar(value):
+            value = np.full(default_shape, value)
+        else:
+            value = np.asarray(value).reshape(default_shape)
         shape = value.shape
     else:
         # shape is determined, if value is scalar assign it to array of shape
         # otherwise make sure value is an array of the determined shape
-        if np.ndim(value) == 0 or value.shape == (1,):
+        if np.ndim(value) == 0:
+            if shape != ():
+                value = np.full(shape, value)
+        elif value.shape == (1,):
             value = np.full(shape, value)
         else:
             value = np.atleast_1d(value).astype(np.float64)
@@ -115,8 +128,19 @@ def _subjac_meta2value(meta):
     val = meta['val'] if 'val' in meta else None
     rows = meta['rows'] if 'rows' in meta else None
     cols = meta['cols'] if 'cols' in meta else None
+    diagonal = meta['diagonal'] if 'diagonal' in meta else False
+    shape = meta['shape'] if 'shape' in meta else None
 
-    if rows is not None:
+    if diagonal:
+        if shape is None:
+            raise ValueError("Shape is required for diagonal subjacobian.")
+        rows = np.arange(shape_to_len(shape))
+        cols = rows
+        if val is not None:
+            val = np.full(shape_to_len(shape), val)
+        else:
+            val = None
+    elif rows is not None:
         if val is not None and np.isscalar(val):
             val = np.full(len(rows), val)
     elif np.isscalar(val):
@@ -398,7 +422,7 @@ def pattern_filter(patterns, var_iter, name_index=None):
     Yields
     ------
     str
-        Variable name that matches a pattern.
+        Variable name or corresponding tuple where the name matches a pattern.
     """
     if '*' in patterns:
         yield from var_iter
@@ -432,10 +456,10 @@ def _find_dict_meta(dct, key):
     Returns
     -------
     bool
-        True if non-None metadata at the given key was found.
+        True if metadata at the given key was found.
     """
     for meta in dct.values():
-        if key in meta and meta[key] is not None:
+        if key in meta:
             return True
     return False
 
@@ -648,6 +672,48 @@ def printoptions(*args, **kwds):
         yield np.get_printoptions()
     finally:
         np.set_printoptions(**opts)
+
+
+@contextmanager
+def indent_context(stream, indent='   '):
+    """
+    Context manager for indenting all std output.
+
+    Parameters
+    ----------
+    stream : stream
+        The stream to write indented output to.
+    indent : str
+        The string to use for indentation.
+
+    Yields
+    ------
+    str
+        The current stdout.
+    """
+    save_stdout = sys.stdout
+    save_stderr = sys.stderr
+
+    # buffer all of stdout so we can indent it all
+    sys.stdout = StringIO()
+    sys.stderr = sys.stdout
+
+    try:
+        yield sys.stdout
+    except Exception:
+        # not sure what happened, so just print the whole thing without indentation
+        print(sys.stdout.getvalue(), file=save_stdout)
+        errs = sys.stderr.getvalue()
+        if errs:
+            print(errs, file=save_stderr)
+        raise
+    else:
+        # nothing went wrong so do indentation
+        if stream is not None:
+            stream.write(textwrap.indent(sys.stdout.getvalue(), indent))
+    finally:
+        sys.stderr = save_stderr
+        sys.stdout = save_stdout
 
 
 def _nothing():
@@ -1090,24 +1156,7 @@ def _src_or_alias_item_iter(proms):
             yield name, meta
 
 
-def _src_or_alias_dict(prom_dict):
-    """
-    Convert a dict with promoted input names into one with source or alias names.
-
-    Parameters
-    ----------
-    prom_dict : dict
-        Original dict with some promoted paths.
-
-    Returns
-    -------
-    dict
-        New dict with source pathnames or alias names.
-    """
-    return {name: meta for name, meta in _src_or_alias_item_iter(prom_dict)}
-
-
-def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shape):
+def convert_src_inds(parent_src_inds, my_src_inds, my_src_shape):
     """
     Compute lower level src_indices based on parent src_indices.
 
@@ -1115,8 +1164,6 @@ def convert_src_inds(parent_src_inds, parent_src_shape, my_src_inds, my_src_shap
     ----------
     parent_src_inds : ndarray
         Parent src_indices.
-    parent_src_shape : tuple
-        Shape of source expected by parent.
     my_src_inds : ndarray or fancy index
         Src_indices at the current system level, before conversion.
     my_src_shape : tuple
@@ -1212,29 +1259,204 @@ def get_connection_owner(system, tgt):
 
     model = system._problem_meta['model_ref']()
     src = model._conn_global_abs_in2out[tgt]
-    abs2prom = model._var_allprocs_abs2prom
+    resolver = model._resolver
 
-    if src in abs2prom['output'] and tgt in abs2prom['input'][tgt]:
-        if abs2prom['input'][tgt] != abs2prom['output'][src]:
+    if resolver.is_abs(src, 'output') and resolver.is_abs(tgt, 'input'):
+        if resolver.abs2prom(tgt, 'input') != resolver.abs2prom(src, 'output'):
             # connection is explicit
             for g in model.system_iter(include_self=True, recurse=True, typ=Group):
                 if g._manual_connections:
-                    tprom = g._var_allprocs_abs2prom['input'][tgt]
+                    tprom = g._resolver.abs2prom(tgt, 'input')
                     if tprom in g._manual_connections:
-                        return g, g._var_allprocs_abs2prom['output'][src], tprom
+                        return g, g._resolver.abs2prom(src, 'output'), tprom
 
     return system, src, tgt
 
 
-def wing_dbg():
-    """
-    Make import of wingdbstub contingent on value of WING_DBG environment variable.
+def _remove_old_configs(vscode_dir):
+    launch_path = os.path.join(vscode_dir, 'launch.json')
 
-    Also will import wingdbstub from the WINGHOME directory.
+    # Read existing launch.json if it exists
+    if os.path.exists(launch_path):
+        with open(launch_path, 'r') as f:
+            config_top = json.load(f)
+        configs = config_top.get('configurations', [])
+        compounds = config_top.get('compounds', [])
+
+        # remove any old auto-added configs from configurations and compounds
+        configs = [c for c in configs
+                   if not (c['name'].startswith('_rank_') and c['name'].endswith('_config'))]
+
+        compounds = [c for c in compounds if c['name'] != 'MPI Debug']
+
+        if configs:
+            config_top['configurations'] = configs
+        elif 'configurations' in config_top:
+            del config_top['configurations']
+
+        if compounds:
+            config_top['compounds'] = compounds
+        elif 'compounds' in config_top:
+            del config_top['compounds']
+
+        with open(os.path.join(vscode_dir, "launch.json"), "w") as f:
+            json.dump(config_top, f, indent=2)
+
+
+def generate_launch_json_file(vscode_dir, base_port, ranks):
     """
-    if env_truthy('WING_DBG'):
-        import sys
-        import os
+    Generate a launch.json file for the VSCode debugger.
+
+    Parameters
+    ----------
+    vscode_dir : str
+        The full path of the .vscode directory.
+    base_port : int
+        The base port number for the debugger.
+    ranks : int
+        The specific ranks to debug.
+    """
+    _remove_old_configs(vscode_dir)
+
+    launch_path = os.path.join(vscode_dir, 'launch.json')
+
+    # Read existing launch.json if it exists
+    if os.path.exists(launch_path):
+        with open(launch_path, 'r') as f:
+            config_top = json.load(f)
+    else:
+        config_top = {"version": "0.2.0", "configurations": [], "compounds": []}
+
+    configs = config_top.get('configurations', [])
+    compounds = config_top.get('compounds', [])
+
+    new_configs = []
+    new_compound_configs = []
+
+    # Add a configuration for each MPI rank
+    for rank in ranks:
+        config_name = f"_rank_{rank}_config"
+        config = {
+            "name": config_name,
+            "type": "python",
+            "request": "attach",
+            "port": base_port + rank,
+            "host": "localhost",
+            "justMyCode": True,
+            "presentation": {
+                "order": rank + 2
+            }
+        }
+        new_configs.append(config)
+        new_compound_configs.append(config_name)
+
+    configs.extend(new_configs)
+    compounds.append(
+        {
+            "name": "MPI Debug",
+            "configurations": new_compound_configs,
+            "presentation": {
+                "order": 1
+            }
+        }
+    )
+
+    config_top['configurations'] = configs
+    config_top['compounds'] = compounds
+
+    with open(os.path.join(vscode_dir, "launch.json"), "w") as f:
+        json.dump(config_top, f, indent=2)
+
+    if MPI is None or MPI.COMM_WORLD.rank == 0:
+        atexit.register(functools.partial(_remove_old_configs, vscode_dir))
+
+
+def _vscode_env_error(env_var):
+    print("Invalid VSCODE_DBG environment variable. Expected ':<port>' or "
+          f"'<rank1,rank2,...>:<port>' but got '{env_var}'. Debugging aborted.", flush=True)
+    sys.exit(1)
+
+
+def setup_dbg():
+    """
+    If WING_DBG or VSCODE_DBG is truthy in the environment, set up their debuggers.
+    """
+    # Get the base port from the VSCODE_DBG environment variable if set
+    vscode_dbg = os.environ.get("VSCODE_DBG")
+
+    use_def_ranks = True
+    if vscode_dbg is not None:
+        if MPI is None:
+            myrank = 0
+            ranks = [0]
+        else:
+            myrank = MPI.COMM_WORLD.rank
+            ranks = range(MPI.COMM_WORLD.size)  # by default, debug all ranks
+
+        default_base_port = 51111
+
+        if vscode_dbg == '1':  # use default port and all ranks
+            portstr = str(default_base_port)
+        else:
+            if ':' in vscode_dbg:
+                ranks_str, _, portstr = vscode_dbg.partition(':')
+            else:
+                ranks_str = vscode_dbg
+                portstr = str(default_base_port)
+
+            if ',' in ranks_str:
+                use_def_ranks = False
+                try:
+                    ranks = [int(r) for r in ranks_str.split(',') if r.strip()]
+                except (ValueError, TypeError):
+                    _vscode_env_error(vscode_dbg)
+            elif ranks_str.strip() == '':
+                use_def_ranks = True
+            else:  # single rank
+                use_def_ranks = False
+                try:
+                    ranks = [int(ranks_str)]
+                except (ValueError, TypeError):
+                    _vscode_env_error(vscode_dbg)
+
+        try:
+            base_port = int(portstr)
+        except (ValueError, TypeError):
+            _vscode_env_error(vscode_dbg)
+
+        # verify ranks are valid
+        if MPI is not None and not use_def_ranks:
+            badranks = []
+            for r in ranks:
+                if not 0 <= r < MPI.COMM_WORLD.size:
+                    badranks.append(r)
+            if badranks:
+                print("The following ranks are outside of the valid range of "
+                      f"(0-{MPI.COMM_WORLD.size - 1}): {badranks}. Debugging aborted.", flush=True)
+                sys.exit(1)
+
+        debug_port = base_port + myrank
+
+        if myrank == min(ranks):
+            omdir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            vscode_dir = os.path.join(omdir, ".vscode")
+            if not os.path.exists(vscode_dir):
+                os.makedirs(vscode_dir)
+            generate_launch_json_file(vscode_dir, base_port, ranks)
+
+        if MPI is not None:
+            MPI.COMM_WORLD.barrier()
+
+        if myrank in ranks:
+            # disable annoying debugger warning message
+            os.environ['PYDEVD_DISABLE_FILE_VALIDATION'] = '1'
+            import debugpy
+            print(f"Rank {myrank}: Debugger listening on port {debug_port}", flush=True)
+            # only listen for connections from localhost for security reasons
+            debugpy.listen(('127.0.0.1', debug_port))
+            debugpy.wait_for_client()  # This will block until a debugger connects
+
+    elif env_truthy('WING_DBG'):
         save = sys.path
         new = sys.path[:] + [os.environ['WINGHOME']]
         sys.path = new
@@ -1291,12 +1513,12 @@ class LocalRangeIterable(object):
         all_abs2meta = system._var_allprocs_abs2meta['output']
         if vname in all_abs2meta:
             sizes = system._var_sizes['output']
-            slices = system._outputs.get_slice_dict()
+            vec = system._outputs
             abs2meta = system._var_abs2meta['output']
         else:
             all_abs2meta = system._var_allprocs_abs2meta['input']
             sizes = system._var_sizes['input']
-            slices = system._inputs.get_slice_dict()
+            vec = system._inputs
             abs2meta = system._var_abs2meta['input']
 
         if all_abs2meta[vname]['distributed']:
@@ -1313,10 +1535,11 @@ class LocalRangeIterable(object):
             self._var_size = all_abs2meta[vname]['global_size']
         else:
             self._iter = self._serial_iter
+            start, stop = vec.get_range(vname)
             if use_vec_offset:
-                self._inds = range(slices[vname].start, slices[vname].stop)
+                self._inds = range(start, stop)
             else:
-                self._inds = range(slices[vname].stop - slices[vname].start)
+                self._inds = range(stop - start)
             self._var_size = all_abs2meta[vname]['global_size']
 
     def __repr__(self):
@@ -1400,34 +1623,6 @@ def make_traceback():
     """
     finfo = getouterframes(currentframe())[2]
     return TracebackType(None, finfo.frame, finfo.frame.f_lasti, finfo.frame.f_lineno)
-
-
-if env_truthy('OM_DBG'):
-    def dprint(*args, **kwargs):
-        """
-        Print only if OM_DBG is truthy in the environment.
-
-        Parameters
-        ----------
-        args : list
-            Positional args.
-        kwargs : dict
-            Named args.
-        """
-        print(*args, **kwargs)
-else:
-    def dprint(*args, **kwargs):
-        """
-        Print only if OM_DBG is truthy in the environment.
-
-        Parameters
-        ----------
-        args : list
-            Positional args.
-        kwargs : dict
-            Named args.
-        """
-        pass
 
 
 def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):
@@ -1603,6 +1798,9 @@ def om_dump(*args, **kwargs):
     pass
 
 
+om_dump_indent = om_dump
+
+
 def dbg(funct):
     """
     Do nothing.
@@ -1643,21 +1841,51 @@ _om_dump = env_truthy('OPENMDAO_DUMP')
 if _om_dump:
     parts = [s.strip() for s in os.environ['OPENMDAO_DUMP'].split(',')]
     trace = 'trace' in parts
+    use_rank = 'rank' in parts
 
     if 'stdout' in parts:
         _dump_stream = sys.stdout
     elif 'stderr' in parts:
         _dump_stream = sys.stderr
     else:
+        dirname = None
+
+        for p in parts:
+            if p.startswith('dir='):
+                dirname = p.partition('=')[2]
+                break
+        else:
+            dirname = os.path.join(os.getcwd(), 'dump_dir')
+
+        if not os.path.exists(dirname):
+            try:
+                os.makedirs(dirname)
+            except Exception:
+                dirname = os.getcwd()
+
+        for p in parts:
+            if p.startswith('file='):
+                fname = p.partition('=')[2]
+                break
+        else:
+            testspec = os.environ.get('TESTFLO_SPEC')
+            if testspec:
+                tpath, ident = testspec.split(':')
+                tfile = os.path.basename(tpath)
+                fname = f'om_dump_{tfile}:{ident}'
+                use_rank = True  # always use rank for testflo tests
+            else:
+                fname = 'om_dump'
+
         rankstr = pidstr = ''
-        if 'rank' in parts:
+        if use_rank:
             from openmdao.utils.mpi import MPI
             rankstr = f"_{MPI.COMM_WORLD.rank if MPI else 0}"
 
         if 'pid' in parts:
             pidstr = f"_{os.getpid()}"
 
-        _dump_stream = open(f'om_dump{rankstr}{pidstr}.out', 'w')
+        _dump_stream = open(os.path.join(dirname, f'{fname}{rankstr}{pidstr}.out'), 'w')
 
     _show_args = 'args' in parts
 
@@ -1674,6 +1902,39 @@ if _om_dump:
         kwargs : dict
             Named args.
         """
+        kwargs['file'] = _dump_stream
+        kwargs['flush'] = True
+        print(*args, **kwargs)
+
+    def om_dump_indent(pathobj, *args, **kwargs):
+        """
+        Dump to a stream with indent if OPENMDAO_DUMP is truthy in the environment.
+
+        Depending on the value of OPENMDAO_DUMP, output will go to file(s), stdout, or stderr.
+
+        Parameters
+        ----------
+        pathobj : object
+            The object to get the pathname from.
+        args : list
+            Positional args.
+        kwargs : dict
+            Named args.
+        """
+        pathname = pathobj.pathname
+        if pathname:
+            indent = ' ' * (len(pathname.split('.')) * 3)
+            newargs = []
+            for arg in args:
+                if isinstance(arg, str):
+                    newargs.append(arg)
+                else:
+                    newargs.append(str(arg))
+
+            args = ' '.join(newargs)
+            args = textwrap.indent(args, indent)
+            args = (args,)
+
         kwargs['file'] = _dump_stream
         kwargs['flush'] = True
         print(*args, **kwargs)
@@ -1801,6 +2062,13 @@ if _om_dump:
                 return comm._comm
             return comm
 
+# if OPENMDAO_DUMP is set to anything, even a falsey value, make om_dump and om_dump_indent
+# available as builtins so we don't have to import them anywhere
+if os.environ.get('OPENMDAO_DUMP') is not None:
+    import builtins
+    builtins.om_dump = om_dump
+    builtins.om_dump_indent = om_dump_indent
+
 
 def call_depth2indent(tabsize=2, offset=-1):
     """
@@ -1819,3 +2087,18 @@ def call_depth2indent(tabsize=2, offset=-1):
         A string of spaces.
     """
     return ' ' * ((len(stack()) + offset) * tabsize)
+
+
+def print_with_line_numbers(text, **kwargs):
+    """
+    Print a string with each line preceded by its line number.
+
+    Parameters
+    ----------
+    text : str
+        The text to print with line numbers.
+    **kwargs : dict
+        Keyword arguments to pass to print.
+    """
+    for i, line in enumerate(text.splitlines(), 1):
+        print(f"{i:5d} | {line}", **kwargs)

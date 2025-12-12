@@ -21,9 +21,9 @@ def partial_deriv_plot(of, wrt, check_partials_data, title=None, jac_method='J_f
         Second key:
             is the (output, input) tuple of strings;
         Third key:
-            is one of ['rel error', 'abs error', 'magnitude', 'J_fd', 'J_fwd', 'J_rev'];
-        For 'rel error', 'abs error', 'magnitude' the value is: A tuple containing norms for
-            forward - fd, adjoint - fd, forward - adjoint.
+            is one of ['tol violation', 'magnitude', 'J_fd', 'J_fwd', 'J_rev'];
+        For 'tol violation', 'magnitude' the value is: A tuple containing tolerance violations or
+            magnitudes for forward - fd, rev - fd, forward - rev.
         For 'J_fd', 'J_fwd', 'J_rev' the value is: A numpy array representing the computed
             Jacobian for the three different methods of computation.
     title : str (Optional)

@@ -1,59 +1,7 @@
 import unittest
 import re
 
-from openmdao.utils.testing_utils import use_tempdirs, MissingImports, snum_equal, \
-    rel_num_diff, num_rgx, snum_iter
-
-
-@use_tempdirs
-@unittest.skip("Turns out messing with builtins.__import__ really is a bad idea.")
-class TestMissingImports(unittest.TestCase):
-
-    def test_missing_imports_cm(self):
-        with self.assertRaises(ImportError) as e:
-            with MissingImports('pyoptsparse'):
-                import pyoptsparse  # noqa
-
-        msg = "No module named pyoptsparse due to missing import pyoptsparse."
-
-        self.assertEqual(msg, str(e.exception))
-
-    def test_missing_imports(self):
-
-        with MissingImports('pyoptsparse'):
-            import openmdao.api as om  # noqa
-
-    def test_missing_imports_docs(self):
-
-        with MissingImports('IPython'):
-            import openmdao.api as om  # noqa
-
-        with MissingImports('matplotlib'):
-            import openmdao.api as om  # noqa
-
-        with MissingImports('numpydoc'):
-            import openmdao.api as om  # noqa
-
-    def test_missing_imports_notebooks(self):
-
-        with MissingImports('notebook'):
-            import openmdao.api as om  # noqa
-
-    def test_missing_imports_visualization(self):
-
-        with MissingImports('bokeh'):
-            import openmdao.api as om  # noqa
-
-    def test_missing_imports_testing(self):
-
-        with MissingImports('parameterized'):
-            import openmdao.api as om  # noqa
-
-        with MissingImports('pycodestyle'):
-            import openmdao.api as om  # noqa
-
-        with MissingImports('testflo'):
-            import openmdao.api as om  # noqa
+from openmdao.utils.testing_utils import snum_equal, rel_num_diff, num_rgx, snum_iter
 
 
 class TestPrimitives(unittest.TestCase):

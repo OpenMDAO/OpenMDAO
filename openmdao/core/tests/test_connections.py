@@ -305,8 +305,9 @@ class TestConnectionsIndices(unittest.TestCase):
         expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: The source and target shapes do not match or are " + \
                    "ambiguous for the connection 'idvp.blammo' to 'arraycomp.inp'. " + \
                    "The source shape is (1,) but the target shape is (2,)."
+        self.prob.setup()
         try:
-            self.prob.setup()
+            self.prob.final_setup()
         except Exception as err:
             self.assertEqual(str(err), expected)
         else:
@@ -322,8 +323,9 @@ class TestConnectionsIndices(unittest.TestCase):
                    "for the connection 'idvp.blammo' to 'arraycomp.inp'. The target shape is " + \
                    "(2,) but indices are shape (3,)."
 
+        self.prob.setup()
         try:
-            self.prob.setup()
+            self.prob.final_setup()
         except Exception as err:
             self.assertEqual(str(err), expected)
         else:
@@ -335,8 +337,9 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_value')
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp1', src_indices=[100000])
 
+        self.prob.setup()
         try:
-            self.prob.setup()
+            self.prob.final_setup()
         except Exception as err:
             self.assertEqual(str(err),
                "\nCollected errors for problem 'bad_value':"
@@ -351,8 +354,9 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_value_bug')
         self.prob.model.connect('idvp.arrout', 'arraycomp.inp', src_indices=[0, 100000])
 
+        self.prob.setup()
         try:
-            self.prob.setup()
+            self.prob.final_setup()
         except Exception as err:
             self.assertEqual(str(err),
                "\nCollected errors for problem 'bad_value_bug':"
@@ -449,8 +453,9 @@ class TestShapes(unittest.TestCase):
                    "ambiguous for the connection 'indep.x' to 'C1.x'. The source shape is " + \
                    "(1, 10, 1, 1) but the target shape is (5, 2)."
 
+        p.setup()
         with self.assertRaises(Exception) as context:
-            p.setup()
+            p.final_setup()
 
         self.assertEqual(str(context.exception), expected)
 
@@ -478,6 +483,7 @@ class TestMultiConns(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             prob.setup()
+            prob.final_setup()
 
         self.assertEqual(str(context.exception),
            "\nCollected errors for problem 'mult_conns':"
@@ -623,6 +629,7 @@ class TestConnectionsDistrib(unittest.TestCase):
 
         try:
             prob.setup()
+            prob.final_setup()
         except Exception as err:
             self.assertTrue(
                              "\nCollected errors for problem 'serial_mpi_error':" \
@@ -654,6 +661,7 @@ class TestConnectionsDistrib(unittest.TestCase):
 
         try:
             prob.setup()
+            prob.final_setup()
         except Exception as err:
             self.assertTrue(
                              "\nCollected errors for problem 'serial_mpi_error_flat':" \
@@ -709,6 +717,7 @@ class TestConnectionsError(unittest.TestCase):
 
         with self.assertRaises(Exception) as context:
             prob.setup(check=False, mode='fwd')
+            prob.final_setup()
 
         self.assertTrue(
             "\nCollected errors for problem 'incompatible_src_indices':"

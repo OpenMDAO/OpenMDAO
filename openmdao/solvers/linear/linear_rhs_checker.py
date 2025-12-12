@@ -13,6 +13,7 @@ from math import isclose
 from openmdao.utils.array_utils import allclose, allzero
 from openmdao.utils.om_warnings import issue_warning, SolverWarning
 from openmdao.visualization.tables.table_builder import generate_table
+from openmdao.utils.mpi import MPI
 
 
 _cache_stats = {}
@@ -147,6 +148,10 @@ class LinearRHSChecker(object):
         LinearRHSChecker or None
             A LinearRHSChecker instance if it was created, None otherwise.
         """
+        if opts is False:
+            # User did not request RHS checking.
+            return None
+
         redundant_adj = system.pathname in system._relevance.get_redundant_adjoint_systems()
         if isinstance(opts, dict):
             LinearRHSChecker.check_options(system, opts)
@@ -159,13 +164,6 @@ class LinearRHSChecker(object):
                           "'rhs_checking' options.")
                 else:
                     return None
-        elif not opts:
-            if redundant_adj:
-                print(f"\n'rhs_checking' is disabled for '{system.linear_solver.msginfo}'"
-                      " but that solver has redundant adjoint solves. If it is "
-                      "expensive to compute derivatives for this solver, turning on "
-                      "'rhs_checking' may improve performance.\n")
-            return None
         else:
             opts = dict(max_cache_entries=3, check_zero=False, rtol=3e-16, atol=3e-16,
                         collect_stats=False, verbose=False)
@@ -187,7 +185,7 @@ class LinearRHSChecker(object):
         """
         self._caches.clear()
 
-    def add_solution(self, rhs, solution, copy):
+    def add_solution(self, rhs, solution, system, copy):
         """
         Add a solution to the cache.
 
@@ -197,6 +195,8 @@ class LinearRHSChecker(object):
             The RHS vector.
         solution : ndarray
             The solution vector.
+        system : System
+            The system that owns the solver that owns this LinearRHSChecker.
         copy : bool
             If True, make a copy of the RHS and solution vectors before storing them.
         """
@@ -204,7 +204,11 @@ class LinearRHSChecker(object):
             if copy:
                 rhs = rhs.copy()
                 solution = solution.copy()
-            self._caches.append((rhs, solution))
+            rhs_norm = np.sum(rhs**2)
+            if system.comm.size > 1:
+                rhs_norm = system.comm.allreduce(rhs_norm)
+            rhs_norm = np.sqrt(rhs_norm)
+            self._caches.append((rhs, solution, rhs_norm))
 
     def get_solution(self, rhs_arr, system):
         """
@@ -229,21 +233,16 @@ class LinearRHSChecker(object):
         """
         if system.under_complex_step:
             return None, False
-
+        is_parallel = system.comm.size > 1
         if self._check_zero:
-            if system.comm.size > 1:
-                # check if the whole distributed array is zero
-                if system.comm.allreduce(int(allzero(rhs_arr))) == system.comm.size:
-                    if self._stats is not None:
-                        self._stats['zerohits'] += 1
-                    if self._verbose:
-                        print(f"{self._solver_msginfo}: Skipping linear solve. RHS is zero.")
-                    return None, True
-            elif allzero(rhs_arr):
+            rhs_is_zero = allzero(rhs_arr)
+            if is_parallel:
+                rhs_is_zero = system.comm.allreduce(rhs_is_zero, op=MPI.LAND)
+            if rhs_is_zero:
                 if self._stats is not None:
                     self._stats['zerohits'] += 1
-                    if self._verbose:
-                        print(f"{self._solver_msginfo}: Skipping linear solve. RHS is zero.")
+                if self._verbose:
+                    print(f"{self._solver_msginfo}: Skipping linear solve. RHS is zero.")
                 return None, True
 
         if self._caches.maxlen == 0:
@@ -267,13 +266,19 @@ class LinearRHSChecker(object):
             self.clear()
             self._ncompute_totals = system._problem_meta['ncompute_totals']
             if self._stats is not None:
-                self._stats['resets'] += 1
+                self._stats["resets"] += 1
+            # Since we just reset the cache, we know we won't find a match, so we can return early.
+            return None, False
 
+        rhs_norm = None
         for i in range(len(self._caches) - 1, -1, -1):
-            rhs_cache, sol_cache = self._caches[i]
+            rhs_cache, sol_cache, rhs_cache_norm = self._caches[i]
             # Check if the RHS vector is the same as a cached vector. This part is not necessary,
             # but is less expensive than checking if two vectors are parallel.
-            if allclose(rhs_arr, rhs_cache, rtol=self._rtol, atol=self._atol):
+            rhs_are_equal = allclose(rhs_arr, rhs_cache, rtol=self._rtol, atol=self._atol)
+            if is_parallel:
+                rhs_are_equal = system.comm.allreduce(rhs_are_equal, op=MPI.LAND)
+            if rhs_are_equal:
                 sol_array = sol_cache
                 if self._stats is not None:
                     self._stats['eqhits'] += 1
@@ -283,7 +288,10 @@ class LinearRHSChecker(object):
                 break
 
             # Check if the RHS vector is equal to -1 * cached vector.
-            if allclose(rhs_arr, -rhs_cache, rtol=self._rtol, atol=self._atol):
+            rhs_are_equal_neg = allclose(rhs_arr, -rhs_cache, rtol=self._rtol, atol=self._atol)
+            if is_parallel:
+                rhs_are_equal_neg = system.comm.allreduce(rhs_are_equal_neg, op=MPI.LAND)
+            if rhs_are_equal_neg:
                 sol_array = -sol_cache
                 if self._stats is not None:
                     self._stats['neghits'] += 1
@@ -294,10 +302,23 @@ class LinearRHSChecker(object):
 
             # Check if the RHS vector and a cached vector are parallel
             dot_product = np.dot(rhs_arr, rhs_cache)
-            rhs_norm = np.linalg.norm(rhs_arr)
-            rhs_cache_norm = np.linalg.norm(rhs_cache)
-            if isclose(abs(dot_product), rhs_norm * rhs_cache_norm,
-                       rel_tol=self._rtol, abs_tol=self._atol):
+            # If this is a distributed vector, we need to compute the dot product and norms for the
+            # full vector to avoid running into issues when the chunk of an otherwise non-zero
+            # vector stored on a given proc is zero
+            if is_parallel:
+                dot_product = system.comm.allreduce(dot_product)
+                if rhs_norm is None:
+                    rhs_norm = np.sqrt(system.comm.allreduce(np.sum(rhs_arr**2)))
+            else:
+                if rhs_norm is None:
+                    rhs_norm = np.linalg.norm(rhs_arr)
+
+            rhs_are_parallel = isclose(
+                abs(dot_product), rhs_norm * rhs_cache_norm, rel_tol=self._rtol, abs_tol=self._atol
+            )
+            if is_parallel:
+                rhs_are_parallel = system.comm.allreduce(rhs_are_parallel, op=MPI.LAND)
+            if rhs_are_parallel:
                 # two vectors are parallel, thus we can use the cache.
                 if rhs_cache_norm > 0.0:
                     scaler = dot_product / rhs_cache_norm**2
@@ -309,12 +330,9 @@ class LinearRHSChecker(object):
                               f"previous solution. (scaler={scaler})")
                     break
 
-        matched_cache = int(sol_array is not None)
-
-        if system.comm.size > 1:
-            # only match if the entire distributed array matches the cache
-            if system.comm.allreduce(matched_cache) != system.comm.size:
-                matched_cache = 0
+        matched_cache = sol_array is not None
+        if is_parallel:
+            matched_cache = system.comm.allreduce(matched_cache, op=MPI.LAND)
 
         if not matched_cache and self._stats is not None:
             self._stats['misses'] += 1

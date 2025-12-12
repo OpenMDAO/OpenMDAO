@@ -12,6 +12,7 @@ import importlib
 from types import LambdaType
 from collections import defaultdict, OrderedDict
 from tokenize import NAME, tokenize, untokenize
+from openmdao.utils.om_warnings import issue_warning
 
 import networkx as nx
 
@@ -349,7 +350,7 @@ def get_class_attributes(fname, class_dict=None):
     if class_dict is None:
         class_dict = {}
 
-    with open(fname, 'r') as f:
+    with open(fname, 'r', encoding='utf-8') as f:
         source = f.read()
         node = ast.parse(source, mode='exec')
         visitor = _AttrCollector(class_dict)
@@ -427,6 +428,7 @@ def get_return_names(func):
         def __init__(self, func):
             super().__init__()
             self._ret_infos = []
+            self.fstack = []
             self.visit(ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec'))
 
         def get_return_names(self):
@@ -462,12 +464,31 @@ def get_return_names(func):
             else:
                 self._ret_infos[-1].append(_get_return_name(node.value))
 
+        def visit_FunctionDef(self, node):
+            """
+            Visit a FunctionDef node.
+
+            Parameters
+            ----------
+            node : ASTnode
+                The function definition node being visited.
+            """
+            if self.fstack:
+                return  # skip nested functions
+            self.fstack.append(node)
+            for stmt in node.body:
+                self.visit(stmt)
+            self.fstack.pop()
+
     return _FuncRetNameCollector(func).get_return_names()
 
 
 class _FuncGrapher(ast.NodeVisitor):
     """
     An ast.NodeVisitor that builds a graph between a function's inputs and outputs.
+
+    Note that this class assumes that all outputs of a called function are dependent on all inputs
+    to that function, which may introduce dependencies that don't actually exist.
     """
 
     def __init__(self, node):
@@ -489,7 +510,14 @@ class _FuncGrapher(ast.NodeVisitor):
 
     def visit_FunctionDef(self, node):
         if self.fstack:
-            raise RuntimeError("Function contains nested functions, which are not supported.")
+            # TODO: support nested functions
+            raise RuntimeError("Function contains nested functions, which are not supported yet.")
+
+        # add all input args to the graph
+        for arg in node.args.args:
+            if arg.arg != 'self':
+                self.graph.add_node(arg.arg)
+
         self.fstack.append(node)
         for stmt in node.body:
             self.visit(stmt)
@@ -505,11 +533,11 @@ class _FuncGrapher(ast.NodeVisitor):
         self._update_graph()
 
     def visit_Attribute(self, node):
-        pass  # skip any Name nodes that are part of an Attribute node
-
-    def visit_Call(self, node):
-        for arg in node.args:
-            self.visit(arg)
+        name = _get_long_name(node.value)
+        if name is not None:
+            base = name.partition('.')[0]
+            if base in self.graph:
+                self.names.append(base)
 
     def visit_Name(self, node):
         if self.names is not None:
@@ -550,11 +578,13 @@ def get_func_graph(func, outnames=None, display=False):
 
     Returns
     -------
-    networkx.DiGraph
-        A graph containing edges from inputs to outputs.
+    networkx.DiGraph or None
+        A graph containing edges from inputs to outputs.  Returns None if the function graph
+        couldn't be determined.
     """
     node = ast.parse(textwrap.dedent(inspect.getsource(func)), mode='exec')
     visitor = _FuncGrapher(node)
+
     retnames = _get_return_names(visitor.outs)
     inputs = set(inspect.signature(func).parameters)
 
@@ -569,7 +599,7 @@ def get_func_graph(func, outnames=None, display=False):
                                    f"expected name '{ret}.")
     else:
         outnames = []
-        for i, ret in enumerate(retnames):
+        for ret in retnames:
             if ret is None or ret in inputs:
                 outnames.append(f'out{len(outnames)}')
             else:
@@ -587,37 +617,58 @@ def get_func_graph(func, outnames=None, display=False):
     if display:
         # show the function graph visually
         from openmdao.visualization.graph_viewer import write_graph, _to_pydot_graph
-        write_graph(_to_pydot_graph(visitor.graph))
+        write_graph(_to_pydot_graph(visitor.graph), display=True)
 
     return visitor.graph
 
 
-def get_partials_deps(func, outputs=None):
+def get_function_deps(func, outputs=None, display=False):
     """
     Generate tuples of the form (output, input) for the given function.
 
-    Only tuples where the output depends on the input are yielded. This can be used to
-    determine which partials need to be declared.
+    Only tuples where the output depends on the input are yielded.
 
     Note that currently the function grapher doesn't recurse into functions and assumes that all
-    outputs of a sub-function are dependent on all inputs to that function. This may lead to
-    a conservative estimate of partials that need to be declared.
+    outputs of a called function are dependent on all inputs to that function. This may lead to
+    some dependencies being reported that don't actually exist.
 
     Parameters
     ----------
-    func : Callable
+    func : function or method with source available
         The function to be analyzed.
-    outputs : list or None
+    outputs : list of str or None
         The list of output variable names.
+    display : bool
+        If True, display the function graph using pydot.
 
     Yields
     ------
     tuple
         A tuple of the form (output, input).
     """
-    graph = get_func_graph(func, outputs)
+    try:
+        graph = get_func_graph(func, outputs, display)
+        if graph is None:
+            if outputs is None:
+                return
+    except Exception as err:
+        # assume full dependency
+        issue_warning(f"Can't determine function graph for function '{func.__name__}' "
+                      f"so assuming all outputs depend on all inputs.  Error was: {err}")
+        if outputs is None:
+            yield '*', '*'
+        else:
+            for inp in inspect.signature(func).parameters:
+                for out in outputs:
+                    yield out, inp
+        return
+
     outs = graph.graph['outputs']
     successors = graph.successors
+
+    implicit = set(graph.graph['inputs']).intersection(graph.graph['outputs'])
+    for imp in implicit:
+        yield imp, imp
 
     for start in graph.graph['inputs']:
         visited = set([start])

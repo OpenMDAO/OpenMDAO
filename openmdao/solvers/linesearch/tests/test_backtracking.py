@@ -842,6 +842,51 @@ class TestFeatureLineSearch(unittest.TestCase):
         for ind in range(3):
             assert_near_equal(top['comp.z'][ind], [1.5], 1e-8)
 
+    def test_boundsenforce_configure(self):
+
+        class _TestGroup(om.Group):
+
+            def setup(self):
+                self.add_subsystem('exec_comp', om.ExecComp(), promotes=['*'])
+                self.add_subsystem('implicit_comp', om.InputResidsComp(), promotes=['*'])
+
+            def configure(self):
+                ec = self._get_subsystem('exec_comp')
+                ic = self._get_subsystem('implicit_comp')
+
+                ec.add_expr('resid_y = y - x - 2.0 * z',
+                            x = {'shape': (3, 1)},
+                            y = {'shape': (3, 1)},
+                            z = {'shape': (3, 1)},
+                            resid_y = {'shape': (3, 1)})
+                ec.add_expr('resid_z = x * z + z - 4.0',
+                            resid_z = {'shape': (3, 1)})
+                
+                ic.add_input('resid_y', shape=(3, 1))
+                ic.add_input('resid_z', shape=(3, 1))
+                ic.add_output('z', shape=(3, 1), lower=1.5,
+                              upper=np.array([2.6, 2.5, 2.65]).reshape((3,1)))
+                ic.add_output('y', shape=(3, 1))
+        
+        p = om.Problem()
+        G_outer = p.model.add_subsystem('G_outer', om.Group())
+        G_outer.add_subsystem('G_inner', _TestGroup())
+        G_outer.nonlinear_solver = om.NewtonSolver(solve_subsystems=True)
+        G_outer.nonlinear_solver.options['maxiter'] = 10
+        G_outer.linear_solver = om.ScipyKrylov()
+        G_outer.nonlinear_solver.linesearch = om.BoundsEnforceLS()
+
+        p.setup()
+
+        # # Test lower bounds: should go to the lower bound and stall
+        p['G_outer.G_inner.x'] = 2.0
+        p['G_outer.G_inner.y'] = 0.
+        p['G_outer.G_inner.z'] = 1.6
+        p.run_model()
+
+        for ind in range(3):
+            assert_near_equal(p['G_outer.G_inner.z'][ind], [1.5], 1e-8)
+
     def test_feature_armijogoldsteinls_basic(self):
 
         top = om.Problem()

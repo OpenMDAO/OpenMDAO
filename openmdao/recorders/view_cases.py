@@ -244,6 +244,7 @@ def view_cases(case_recorder_file, show=True):
     cases = cr.get_cases()
     df = pd.DataFrame(
         columns=[
+            "Counter",
             "Name",
             "Source",
             "Num Inputs",
@@ -252,10 +253,14 @@ def view_cases(case_recorder_file, show=True):
             "Derivatives",
             "Abs Err",
             "Rel Err",
+            "Message",
+            "Success",
+            "Timestamp",
         ]
     )
     for i, case in enumerate(cases):
         df.loc[i] = [
+            case.counter,
             case.name,
             case.source,
             len(case.inputs) if case.inputs else 0,
@@ -264,7 +269,11 @@ def view_cases(case_recorder_file, show=True):
             "Yes" if case.derivatives else "No",
             case.abs_err,
             case.rel_err,
+            case.msg,
+            case.success,
+            case.timestamp,
         ]
+
     cases_table_pane = pn.widgets.Tabulator(
         df,
         show_index=False,

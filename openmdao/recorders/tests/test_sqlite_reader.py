@@ -2072,8 +2072,8 @@ class TestSqliteCaseReader(unittest.TestCase):
 
         model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
         model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(default_shape=()), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x - y', default_shape=()), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -2107,12 +2107,12 @@ class TestSqliteCaseReader(unittest.TestCase):
         last_case = cr.get_case(driver_cases[-1])
 
         dvs = last_case.get_design_vars(scaled=False)
-        unscaled_x = dvs['x'][0]
-        unscaled_y = dvs['y'][0]
+        unscaled_x = dvs['x']
+        unscaled_y = dvs['y']
 
         dvs = last_case.get_design_vars(scaled=True)
-        scaled_x = dvs['x'][0]
-        scaled_y = dvs['y'][0]
+        scaled_x = dvs['x']
+        scaled_y = dvs['y']
 
         adder, scaler = determine_adder_scaler(ref0, ref, None, None)
         self.assertAlmostEqual((unscaled_x + adder) * scaler, scaled_x, places=12)
@@ -2831,6 +2831,34 @@ class TestSqliteCaseReader(unittest.TestCase):
         for i, line in enumerate(expected_cases):
             self.assertEqual(text[i], line)
 
+    def test_alias_units(self):
+        prob = SellarProblem()
+
+        if prob.model._static_mode and prob.model._static_responses:
+            responses = prob.model._static_responses
+        else:
+            responses = prob.model._responses
+
+        responses.clear()
+
+        prob.model.add_objective('obj', alias='objective_alias')
+        prob.setup()
+
+        prob.add_recorder(self.recorder)
+        prob.driver.add_recorder(self.recorder)
+
+        prob.run_driver()
+
+        prob.cleanup()
+
+        cr = om.CaseReader(prob.get_outputs_dir() / self.filename)
+        cr.list_cases()
+        c = cr.get_case(0)
+
+        units = c._get_units('obj')
+        units_alias = c._get_units('objective_alias')
+        self.assertEqual(units, units_alias)
+
     def test_list_sources_format(self):
         prob = SellarProblem()
         prob.setup()
@@ -3125,7 +3153,7 @@ class DummyClass(object):
         parab_component_options = cr._system_options['parab_with_dummy_metadata']['component_options']
         component_options_names = [name for name in parab_component_options]
         from openmdao.recorders.sqlite_reader import UnknownType
-        self.assertEqual(['always_opt', 'derivs_method', 'distributed', 'dummy', 'run_root_only', 'use_jit'],
+        self.assertEqual(['always_opt', 'default_shape', 'derivs_method', 'distributed', 'dummy', 'run_root_only', 'use_jit'],
                          sorted(component_options_names))
         self.assertTrue(isinstance(parab_component_options['dummy'], UnknownType))
 
@@ -4653,6 +4681,39 @@ class TestSqliteCaseReaderLegacy(unittest.TestCase):
         prob.load_case(seventh_slsqp_iteration_case)
 
         assert_model_matches_case(seventh_slsqp_iteration_case, prob.model)
+
+
+class TestCaseReaderConstraints(unittest.TestCase):
+    
+    def test_casereader_nd_array_constraint(self):
+        prob = ParaboloidProblem()
+
+        ivc = prob.model.add_subsystem("ivc", om.IndepVarComp())
+        ivc.add_output("array_output", np.arange(30).reshape((10, 3)))
+        prob.model.add_constraint("ivc.array_output", lower=0.0, indices=om.slicer[:, 1])
+
+        recorder = om.SqliteRecorder("cases.sqlite", record_viewer_data=False)
+
+        prob.add_recorder(recorder)
+        prob.recording_options['includes'] = ['*']
+        prob.recording_options['record_desvars'] = True
+        prob.recording_options['record_constraints'] = True
+        prob.recording_options['record_derivatives'] = True
+        prob.recording_options['record_objectives'] = True
+
+        prob.setup()
+        prob.final_setup()  # Conclude setup but don't run model.
+        prob.run_model()
+        prob.record("case")
+        prob.cleanup()
+
+        cr = om.CaseReader(prob.get_outputs_dir() / "cases.sqlite")
+        case = cr.get_case(cr.list_cases(out_stream=None)[-1])
+
+        # test that sliced constraints are read correctly
+        cons = case.get_constraints(use_indices=True)
+
+        assert_near_equal(cons['ivc.array_output'], prob.get_val('ivc.array_output')[:, 1])
 
 
 @use_tempdirs

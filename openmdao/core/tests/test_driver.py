@@ -1,6 +1,6 @@
 """ Unit tests for the Driver base class."""
 
-
+from importlib.util import find_spec
 from packaging.version import Version
 from io import StringIO
 import sys
@@ -19,12 +19,15 @@ from openmdao.test_suite.components.sellar import SellarDerivatives
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp, NonSquareArrayComp
 from openmdao.utils.om_warnings import OpenMDAOWarning
 from openmdao.utils.mpi import MPI
-from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver, pyoptsparse
+from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector
 except ImportError:
     PETScVector = None
+
+
+has_pyoptsparse = find_spec('pyoptsparse') is not None
 
 
 @use_tempdirs
@@ -191,6 +194,7 @@ class TestDriver(unittest.TestCase):
         model.add_constraint('comp.y2', ref=np.array([.2, 2e-6]))
 
         prob.setup()
+        prob.final_setup()
 
         desvars = model.get_design_vars()
 
@@ -869,6 +873,30 @@ class TestDriver(unittest.TestCase):
         with assert_warnings(expected_warnings):
             prob.final_setup()
 
+    def test_no_desvars(self):
+        prob = om.Problem()
+
+        c1 = om.ExecComp()
+        c1.add_expr('y = x1**2 - x2**2')
+        c1.add_expr('g1 = 2 * x1 + 5')
+        c1.add_expr('g2 = -2 * x1 - 5')
+        c1.add_expr('g3 = x2 - 5')
+
+        c1.add_objective('y')
+        c1.add_constraint('g1', lower=0)
+        c1.add_constraint('g2', lower=0)
+        c1.add_constraint('g3', lower=0)
+
+        prob.model.add_subsystem('c1', c1, promotes=['*'])
+        prob.setup()
+        prob.driver = om.ScipyOptimizeDriver()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_driver()
+
+        self.assertEqual(str(cm.exception), 'Problem has no design variables.')
+
+
 @use_tempdirs
 class TestCheckRelevance(unittest.TestCase):
     def setup_problem(self, driver=None):
@@ -1144,7 +1172,7 @@ class TestLinearOnlyDVs(unittest.TestCase):
 
         return prob
 
-    @unittest.skipIf(pyoptsparse is None, "pyoptsparse is required.")
+    @unittest.skipIf(not has_pyoptsparse, "pyoptsparse is required.")
     def test_pyoptsparse(self):
         OPTIMIZER = set_pyoptsparse_opt('SLSQP')[1]
 

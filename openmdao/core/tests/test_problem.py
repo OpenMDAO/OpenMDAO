@@ -1,12 +1,15 @@
 """ Unit tests for the problem interface."""
 
+from packaging.version import Version
 import pathlib
 import sys
 import unittest
 import itertools
+import tempfile
 
 from io import StringIO
 import numpy as np
+from scipy import __version__ as scipy_version
 
 import openmdao.api as om
 from openmdao.core.problem import _default_prob_name
@@ -19,7 +22,7 @@ import openmdao.utils.hooks as hooks
 from openmdao.utils.units import convert_units
 from openmdao.utils.om_warnings import DerivativesWarning, OMDeprecationWarning, OpenMDAOWarning
 from openmdao.utils.testing_utils import use_tempdirs, set_env_vars
-from openmdao.utils.file_utils import get_work_dir
+from openmdao.utils.file_utils import _get_work_dir
 from openmdao.utils.tests.test_hooks import hooks_active
 
 try:
@@ -30,6 +33,56 @@ except ImportError:
 
 @use_tempdirs
 class TestProblem(unittest.TestCase):
+
+    def test_get_val(self):
+        class TestComp(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('foo', shape=(3,))
+                self.add_discrete_input('mul', val=1)
+
+                self.add_output('bar', shape=(3,))
+                # add a mutable NumPy array as an output
+                self.add_discrete_output('obj', val=np.array([1, 'm', [2, 3, 4]], dtype=object))
+
+            def compute(self, inputs, outputs, discrete_inputs, discrete_outputs):
+                outputs['bar'] = discrete_inputs['mul']*inputs['foo']
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', TestComp(), promotes=['*'])
+        p.setup()
+
+        p.set_val('foo', np.array([5., 5., 5.]))
+        p.set_val('mul', 100)
+        p.run_model()
+
+        foo = p.get_val('foo')
+        mul = p.get_val('mul')
+        bar = p.get_val('bar')
+        obj = p.get_val('obj')
+
+        self.assertTrue(np.array_equal(foo, np.array([5., 5., 5.])))
+        self.assertEqual(mul, 100)
+        self.assertTrue(np.array_equal(bar, np.array([500., 500., 500.])))
+
+        foo_copy = p.get_val('foo', copy=True)
+        mul_copy = p.get_val('mul', copy=True)
+        bar_copy = p.get_val('bar', copy=True)
+        obj_copy = p.get_val('obj', copy=True)
+
+        self.assertTrue(np.array_equal(foo_copy, np.array([5., 5., 5.])))
+        self.assertEqual(mul_copy, 100)
+        self.assertTrue(np.array_equal(bar_copy, np.array([500., 500., 500.])))
+
+        self.assertTrue(id(foo) != id(foo_copy), f"'foo' is not a copy, {id(foo)=} {id(foo_copy)=}")
+        self.assertTrue(id(mul) == id(mul_copy), f"'mul' is a copy, {id(foo)=} {id(foo_copy)=}")  # mul is a scalar
+        self.assertTrue(id(bar) != id(bar_copy), f"'bar' is not a copy, {id(bar)=} {id(bar_copy)=}")
+        self.assertTrue(id(obj) != id(obj_copy), f"'obj' is not a copy, {id(obj)=} {id(obj_copy)=}")
+
+        obj[2][0] = 10
+        self.assertEqual(obj[2][0], 10)
+        self.assertEqual(p.get_val('obj')[2][0], 10)  # the value in the problem was modified
+        self.assertEqual(obj_copy[2][0], 2)           # the value in the copy was not modified
+
     def test_simple_component_model_with_units(self):
         class TestComp(om.ExplicitComponent):
             def setup(self):
@@ -181,9 +234,9 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        with self.assertRaises(KeyError) as cm:
+        with self.assertRaises(Exception) as cm:
             prob.compute_totals(of='comp.f_xy', wrt="p1.x, p2.y")
-        self.assertEqual(str(cm.exception), "'p1.x, p2.y'")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: Output not found for design variable 'p1.x, p2.y'.")
 
     def test_compute_totals_cleanup(self):
         p = om.Problem()
@@ -912,15 +965,15 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
         assert_near_equal(prob.get_val('acomp.x', 'degC', indices=[0]), 25.0, 1e-6)
         assert_near_equal(prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
-        assert_near_equal(prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
-        assert_near_equal(prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y', 'degF'), 32.0, 1e-6)
 
         assert_near_equal(prob.get_val('axx', indices=0), 77.0, 1e-6)
         assert_near_equal(prob.get_val('axx', indices=1), 95.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=0), 25.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
-        assert_near_equal(prob.get_val('ayy', indices=0), 0.0, 1e-6)
-        assert_near_equal(prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy', 'degF'), 32.0, 1e-6)
 
         # Sets
 
@@ -960,15 +1013,15 @@ class TestProblem(unittest.TestCase):
         assert_near_equal(prob.get_val('acomp.x', indices=[1]), 95.0, 1e-6)
         assert_near_equal(prob.get_val('acomp.x', 'degC', indices=[0]), 30.0, 1e-6)
         assert_near_equal(prob.get_val('acomp.x', 'degC', indices=1), 35.0, 1e-6)
-        assert_near_equal(prob.get_val('acomp.y', indices=0), 0.0, 1e-6)
-        assert_near_equal(prob.get_val('acomp.y', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('acomp.y', 'degF'), 32.0, 1e-6)
 
         assert_near_equal(prob.get_val('axx', indices=0), 86.0, 1e-6)
         assert_near_equal(prob.get_val('axx', indices=1), 95.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=0), 30.0, 1e-6)
         assert_near_equal(prob.get_val('axx', 'degC', indices=np.array([1])), 35.0, 1e-6)
-        assert_near_equal(prob.get_val('ayy', indices=0), 0.0, 1e-6)
-        assert_near_equal(prob.get_val('ayy', 'degF', indices=0), 32.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy'), 0.0, 1e-6)
+        assert_near_equal(prob.get_val('ayy', 'degF'), 32.0, 1e-6)
 
         # Sets
 
@@ -1000,15 +1053,15 @@ class TestProblem(unittest.TestCase):
                                                      y={'val': 0.0, 'units': 'inch'}),
                                  promotes=['x'])
 
+        prob.setup()
         try:
-            prob.setup()
+            prob.final_setup()
         except Exception as err:
             self.assertEqual(str(err),
                "\nCollected errors for problem 'get_set_with_units_diff_err':"
                "\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x'], promoted to "
                "'x', are connected but their metadata entries ['units', 'val'] differ. "
-               "Call <group>.set_input_defaults('x', units=?, val=?), where <group> is the model "
-               "to remove the ambiguity.")
+               "Call model.set_input_defaults('x', units=?, val=?) to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -1121,7 +1174,7 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(RuntimeError) as cm:
             prob['G1.x']
 
-        msg = "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call <group>.set_input_defaults('x', units=?), where <group> is the Group named 'G1' to remove the ambiguity."
+        msg = "<model> <class Group>: The following inputs, ['G1.C1.x', 'G1.C2.x'], promoted to 'G1.x', are connected but their metadata entries ['units'] differ. Call model.set_input_defaults('G1.x', units=?) to remove the ambiguity."
         self.assertEqual(cm.exception.args[0], msg)
 
     def test_get_set_with_units_error_messages(self):
@@ -1135,7 +1188,7 @@ class TestProblem(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        msg = "Can't express variable 'comp.x' with units of 'cm' in units of 'degK'."
+        msg = "<model> <class Group>: Can't express variable 'comp.x' with units of 'cm' in units of 'degK'."
         with self.assertRaisesRegex(TypeError, msg):
             prob.get_val('comp.x', 'degK')
 
@@ -1212,6 +1265,7 @@ class TestProblem(unittest.TestCase):
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
 
         prob.setup()
+        prob.final_setup()
 
         # default value from the class definition
         assert_near_equal(prob.get_val('x'), 1.0, 1e-6)
@@ -1747,6 +1801,23 @@ class TestProblem(unittest.TestCase):
         self.assertEqual(output[17], r'Objectives')
         self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
+        # General make sure that the default settings print all columns.
+        self.assertTrue('parallel_deriv_color' in output[3])
+        self.assertTrue('units' in output[3])
+        self.assertTrue('upper' in output[3])
+        self.assertTrue('lower' in output[3])
+        self.assertTrue('ref0' in output[3])
+        self.assertTrue('parallel_deriv_color' in output[11])
+        self.assertTrue('units' in output[11])
+        self.assertTrue('upper' in output[11])
+        self.assertTrue('lower' in output[11])
+        self.assertTrue('ref0' in output[11])
+        self.assertTrue('units' in output[19])
+        self.assertTrue('ref' in output[19])
+        self.assertTrue('adder' in output[19])
+        self.assertTrue('parallel_deriv_color' in output[19])
+        self.assertTrue('cache_linear_solution' in output[19])
+
         # With show_promoted_name=False
         stdout = sys.stdout
         strout = StringIO()
@@ -1877,6 +1948,49 @@ class TestProblem(unittest.TestCase):
 
         # make sure the deprecated function still returns tha data
         self.assertEqual(set(prob_vars.keys()), {'constraints', 'design_vars', 'objectives'})
+
+    def test_list_driver_vars_bounds_bug(self):
+
+        model = SellarDerivatives()
+        model.nonlinear_solver = om.NonlinearBlockGS()
+
+        prob = om.Problem(model)
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+        prob.driver.options['tol'] = 1e-9
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]), scaler=2.0)
+        model.add_objective('obj', scaler=0.1)
+        model.add_constraint('con1', upper=1.0, scaler=7.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        info =  prob.list_driver_vars(
+            driver_scaling=False,
+            desvar_opts=['lower', 'upper', 'scaler', 'adder'],
+            cons_opts=['lower', 'upper', 'scaler', 'adder'],
+            objs_opts=['scaler', 'adder'],
+        )
+
+        upper = info['design_vars'][0][1]['upper']
+        assert_near_equal(upper, np.array([10., 10.]))
+
+        upper = info['constraints'][0][1]['upper']
+        assert_near_equal(upper, 1.0)
+
+        info =  prob.list_driver_vars(
+            driver_scaling=False,
+            desvar_opts=['lower', 'upper', 'scaler', 'adder'],
+            cons_opts=['lower', 'upper', 'scaler', 'adder'],
+            objs_opts=['scaler', 'adder'],
+        )
+
+        upper = info['design_vars'][0][1]['upper']
+        assert_near_equal(upper, np.array([10., 10.]))
+
+        upper = info['constraints'][0][1]['upper']
+        assert_near_equal(upper, 1.0)
 
     def test_list_driver_vars_before_final_setup(self):
         prob = om.Problem()
@@ -2187,8 +2301,8 @@ class TestProblem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             prob.final_setup()
 
-        msg = "<model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', " + \
-              "but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
+        msg = "\nCollected errors for problem 'output_as_input_err':\n" + \
+              "   <model> <class Group>: Design variable 'x' is connected to 'initial_comp.x', but 'initial_comp.x' is not an IndepVarComp or ImplicitComp output."
         self.assertEqual(str(cm.exception), msg)
 
     def test_design_var_connected_to_output(self):
@@ -2231,6 +2345,28 @@ class TestProblem(unittest.TestCase):
         except RuntimeError:
             self.fail("'setup raised RuntimeError unexpectedly")
 
+    def test_set_work_dir(self):
+
+        with tempfile.TemporaryDirectory() as temp_dir_name:
+            prob = om.Problem(name='prob_name', work_dir=temp_dir_name)
+            model = prob.model
+
+            model.add_subsystem('comp', Paraboloid())
+
+            model.set_input_defaults('comp.x', 3.0)
+            model.set_input_defaults('comp.y', -4.0)
+
+            with self.assertRaises(RuntimeError) as e:
+                prob.get_outputs_dir()
+
+            self.assertEqual('The output directory cannot be accessed before setup.',
+                            str(e.exception))
+
+            prob.setup()
+
+            d = prob.get_outputs_dir('subdir')
+            self.assertEqual(str(pathlib.Path(temp_dir_name, 'prob_name_out', 'subdir')), str(d))
+
     def test_get_outputs_dir(self):
 
         prob = om.Problem(name='prob_name')
@@ -2250,7 +2386,7 @@ class TestProblem(unittest.TestCase):
         prob.setup()
 
         d = prob.get_outputs_dir('subdir')
-        self.assertEqual(str(pathlib.Path(get_work_dir(), 'prob_name_out', 'subdir')), str(d))
+        self.assertEqual(str(pathlib.Path(_get_work_dir(), 'prob_name_out', 'subdir')), str(d))
 
     def test_duplicate_prob_name(self):
 
@@ -2260,6 +2396,171 @@ class TestProblem(unittest.TestCase):
 
         with assert_warning(OpenMDAOWarning, msg):
             om.Problem(name='prob_name2')
+
+    def test_find_feasible(self):
+        # Define a simple model
+        prob = om.Problem()
+        model = prob.model
+
+        # Design Vars
+        model.add_design_var('x', lower=0.0, upper=10.0, ref=10)
+
+        # Constraints
+        con = model.add_subsystem('comp', om.ExecComp('y = (x)**2'), promotes=['*'])
+        con.add_constraint('y', lower=1.25, upper=4.0, ref=10.)
+
+        con2 = model.add_subsystem('comp2', om.ExecComp('y2 = x+0.5'), promotes=['*'])
+        con2.add_constraint('y2', equals=2, ref=0.2)
+
+        # Objective
+        model.add_subsystem('obj_comp', om.ExecComp('obj = (x-1)**2'), promotes=['*'])
+        model.add_objective('obj')
+
+        # Setup the problem and run the optimization
+        prob.setup()
+
+        for method in ['trf', 'dogbox', 'lm']:
+            for loss in ['linear', 'soft_l1', 'huber', 'cauchy', 'arctan']:
+                for term_tol in [{}, {'xtol': 1.0}, {'ftol': 1.0}, {'gtol': 1.0}]:
+                    for max_nfev in [None, 1]:
+                        for driver_scaling in [True, False]:
+                            # Combinations to ignore
+                            if method == 'lm':
+                                if loss != 'linear':
+                                    # 'lm' only supports linear.
+                                    continue
+                                if max_nfev == 1:
+                                    # 'lm' doesn't fail with max func eval message
+                                    continue
+                                if term_tol:
+                                    # 'lm' doesn't fail with expected tolerance trigger
+                                    continue
+                                if Version(scipy_version) < Version('1.16'):
+                                    # 'lm' is not reliable in older version of scipy
+                                    continue
+                            if max_nfev == 1 and 'gtol' in term_tol:
+                                # With gtol at 1.0 termination is triggered before max_nfev is hit.
+                                continue
+                            with self.subTest(f'{method=} {loss=} {term_tol=} {max_nfev=} {driver_scaling=}'):
+                                model.set_val('x', 5.0)
+                                if method == 'lm':
+                                    with assert_warning(OpenMDAOWarning, "find_feasible method is 'lm' which "
+                                                        "ignores bounds but one or more design variables have bounds."):
+                                        failed = prob.find_feasible(method=method, loss=loss,
+                                                                iprint=0, max_nfev=max_nfev, **term_tol)
+                                else:
+                                    failed = prob.find_feasible(method=method, loss=loss,
+                                                                iprint=0, max_nfev=max_nfev, **term_tol)
+                                if max_nfev == 1:
+                                    self.assertTrue(failed)
+                                    expected = 'The maximum number of function evaluations is exceeded.'
+                                    self.assertEqual(prob.driver.result.exit_status, expected)
+                                elif term_tol and method != 'lm':
+                                    # Skip use of term_tol options with lm
+                                    self.assertIn(list(term_tol.keys())[0], prob.driver.result.exit_status)
+                                else:
+                                    self.assertFalse(failed)
+                                    self.assertTrue(prob.driver.result.success)
+                                    assert_near_equal(prob.get_val('x'), 1.5, tolerance=1.0E-8)
+
+    def test_find_feasible_no_feasible_solution(self):
+            prob = om.Problem()
+
+            c1 = om.ExecComp()
+            c1.add_expr('y = x[0]**2 - x[1]**2', x={'shape': (2,)})
+            c1.add_expr('g1 = 2 * x[0] - 5')
+            c1.add_expr('g2 = -2 * x[0] - 5')
+            c1.add_expr('g3 = x[1] - 5')
+
+            c1.add_design_var('x')
+            c1.add_objective('y')
+            c1.add_constraint('g1', lower=0)
+            c1.add_constraint('g2', lower=0)
+            c1.add_constraint('g3', lower=0)
+
+            prob.model.add_subsystem('c1', c1, promotes=['*'])
+            prob.setup()
+
+            stdout = sys.stdout
+            strout = StringIO()
+            sys.stdout = strout
+            try:
+                failed = prob.find_feasible(iprint=1)
+            finally:
+                sys.stdout = stdout
+
+            output = strout.getvalue()
+            lines = [line for line in output.split('\n') if len(line) > 0]
+            self.assertIn('loss(linear)', lines[-6])
+            self.assertIn('Infeasibilities minimized', output)
+            self.assertIn('max violation: g1[0]', lines[-1])
+            self.assertTrue(failed)
+
+    def test_find_feasible_pinched_bounds(self):
+            prob = om.Problem()
+
+            c1 = om.ExecComp()
+            c1.add_expr('y = x[0]**2 - x[1]**2', x={'shape': (2,)})
+            c1.add_expr('g1 = 2 * x[0] - 5')
+            c1.add_expr('g2 = x[1] - 5')
+
+            c1.add_design_var('x', lower=(-10, 0), upper=(10, 0))
+            c1.add_objective('y')
+            c1.add_constraint('g1', lower=0)
+            c1.add_constraint('g2', lower=0)
+
+            prob.model.add_subsystem('c1', c1, promotes=['*'])
+            prob.setup()
+
+            prob.set_val('x', [0.0, 0.0])
+
+            stdout = sys.stdout
+            strout = StringIO()
+            sys.stdout = strout
+            try:
+                failed = prob.find_feasible(iprint=2)
+            finally:
+                sys.stdout = stdout
+
+            output = strout.getvalue()
+            self.assertIn('Infeasibilities minimized', output)
+            self.assertIn('max violation: g2[0]', output)
+            self.assertTrue(failed)
+
+    def test_find_feasible_exclude_desvars(self):
+        prob = om.Problem()
+
+        c1 = om.ExecComp()
+        c1.add_expr('y = x0**2 - x1**2')
+        c1.add_expr('g1 = 2 * x0 - 5')
+        c1.add_expr('g2 = -2 * x0 - 5')
+        c1.add_expr('g3 = x1 - 5')
+
+        c1.add_design_var('x0')
+        c1.add_design_var('x1')
+        c1.add_objective('y')
+        c1.add_constraint('g1', lower=0)
+        c1.add_constraint('g2', lower=0)
+        c1.add_constraint('g3', lower=0)
+
+        prob.model.add_subsystem('c1', c1, promotes=['*'])
+        prob.setup()
+
+        stdout = sys.stdout
+        strout = StringIO()
+        sys.stdout = strout
+        try:
+            failed = prob.find_feasible(exclude_desvars='x1', iprint=1)
+        finally:
+            sys.stdout = stdout
+
+        output = strout.getvalue()
+        lines = [line for line in output.split('\n') if len(line) > 0]
+        assert_near_equal(prob.get_val('x1'), 1.0)
+        self.assertIn('loss(linear)', lines[-6])
+        self.assertIn('Infeasibilities minimized', output)
+        self.assertIn('max violation: g1[0]', lines[-1])
+        self.assertTrue(failed)
 
 
 @use_tempdirs

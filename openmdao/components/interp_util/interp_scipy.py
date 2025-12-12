@@ -1,14 +1,5 @@
 """Grid interpolation using scipy splines."""
 
-from scipy import __version__ as scipy_version
-try:
-    from scipy.interpolate._bsplines import make_interp_spline as _make_interp_spline
-except ImportError:
-    def _make_interp_spline(*args, **kwargs):
-        msg = "'MetaModelStructuredComp' requires scipy>=0.19, but the currently" \
-              " installed version is %s." % scipy_version
-        raise RuntimeError(msg)
-
 import numpy as np
 
 from openmdao.components.interp_util.interp_algorithm import InterpAlgorithm
@@ -49,12 +40,21 @@ class InterpScipy(InterpAlgorithm):
         Interpolation order to be used in each dimension.
     _supports_d_dvalues : bool
         If True, this algorithm can compute the derivatives with respect to table values.
+    _make_interp_spline : function
+        Lazily imported scipy.interpolate._bsplines.make_interp_spline function.
     """
 
     def __init__(self, grid, values, interp=None, **kwargs):
         """
         Initialize table and subtables.
         """
+        try:
+            from scipy.interpolate._bsplines import make_interp_spline
+            self._make_interp_spline = make_interp_spline
+        except ImportError as e:
+            raise ImportError('scipy.interpolate._bsplines.make_interp_spline '
+                              'is not available.') from e
+
         self.options = OptionsDictionary(parent_name=type(self).__name__)
         self.initialize()
         self.options.update(kwargs)
@@ -284,7 +284,7 @@ class InterpScipy(InterpAlgorithm):
         None or array_like, optional
             Value of gradient of interpolant at point of interest.
         """
-        local_interp = _make_interp_spline(x, y, k=k, axis=0)
+        local_interp = self._make_interp_spline(x, y, k=k, axis=0)
         values = local_interp(pt)
         local_derivs = None
         if compute_gradients:
@@ -307,7 +307,7 @@ class InterpScipy(InterpAlgorithm):
         """
         for i, axis in enumerate(self.grid):
             e_i = np.eye(axis.size)
-            interp = _make_interp_spline(axis, e_i, k=self._ki[i], axis=0)
+            interp = self._make_interp_spline(axis, e_i, k=self._ki[i], axis=0)
             if i == 0:
                 val = interp(pt[i])
             else:

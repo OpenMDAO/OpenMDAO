@@ -25,9 +25,12 @@ class TestJaxUtils(unittest.TestCase):
     def test_jit_with_jax(self):
         """Make sure the jit stub test case also works with jax."""
         try:
-            import jax.numpy as np
+            import jax.numpy as jnp
             from jax import jit
-            import jaxlib
+            try:
+                from jax import Array as JaxArray
+            except ImportError:
+                from jaxlib.xla_extension import ArrayImpl as JaxArray
         except ImportError:
             self.skipTest('jax is not available but required for this test.')
 
@@ -35,12 +38,12 @@ class TestJaxUtils(unittest.TestCase):
 
             @partial(jit, static_argnums=(0,))
             def f(self, x):
-                return np.sqrt(x)
+                return jnp.sqrt(x)
 
-        x = np.linspace(0, 10, 11)
+        x = jnp.linspace(0, 10, 11)
         result = TestClass().f(x)
         assert_near_equal(result**2, x)
-        self.assertIsInstance(result, jaxlib.xla_extension.ArrayImpl)
+        self.assertIsInstance(result, JaxArray)
 
     def test_jax_component_option(self):
         """Test that the registration of jax-compatible components works."""

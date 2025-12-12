@@ -63,7 +63,7 @@ def _setup_index_views(tot_size, in_xfers, out_xfers):
     return full_in, full_out
 
 
-def _setup_index_arrays(tot_size, in_xfers, out_xfers, vectors):
+def _setup_index_arrays(tot_size, in_xfers, out_xfers, vectors, scaled_in_set):
     """
     Create index arrays for all subsystems.
 
@@ -77,6 +77,8 @@ def _setup_index_arrays(tot_size, in_xfers, out_xfers, vectors):
         Mapping of subsystem name to output index arrays.
     vectors : dict
         Dictionary of input and output vectors.
+    scaled_in_set : set
+        Set of subsystems that have input scaling or connect to an input scaled subsystem.
 
     Returns
     -------
@@ -88,7 +90,8 @@ def _setup_index_arrays(tot_size, in_xfers, out_xfers, vectors):
 
     if tot_size > 0:
         xfer_all = DefaultTransfer(vectors['input']['nonlinear'],
-                                   vectors['output']['nonlinear'], xfer_in, xfer_out)
+                                   vectors['output']['nonlinear'], xfer_in, xfer_out,
+                                   len(scaled_in_set) > 0)
     else:
         xfer_all = None
 
@@ -98,7 +101,8 @@ def _setup_index_arrays(tot_size, in_xfers, out_xfers, vectors):
         if inds.size > 0:
             xfer_dict[sname] = DefaultTransfer(vectors['input']['nonlinear'],
                                                vectors['output']['nonlinear'],
-                                               inds, out_xfers[sname])
+                                               inds, out_xfers[sname],
+                                               sname in scaled_in_set)
         else:
             xfer_dict[sname] = None
 
@@ -119,6 +123,8 @@ class DefaultTransfer(Transfer):
         Input indices for the transfer.
     out_inds : int ndarray
         Output indices for the transfer.
+    has_input_scaling : bool
+        Whether any of the inputs has scaling.
     """
 
     @staticmethod
@@ -160,6 +166,9 @@ class DefaultTransfer(Transfer):
 
         tot_size = 0
 
+        scaled_in_set = set()
+        scale_factors = group._problem_meta['model_ref']()._scale_factors
+
         # Loop through all connections owned by this group
         for abs_in, abs_out in group._conn_abs_in2out.items():
             # This weeds out discrete vars (all vars are local if using this Transfer)
@@ -188,18 +197,29 @@ class DefaultTransfer(Transfer):
                 input_inds = range(offsets_in[idx_in], offsets_in[idx_in] + sizes_in[idx_in])
                 tot_size += sizes_in[idx_in]
 
-                # Now the indices are ready - input_inds, output_inds
                 sub_in = abs_in[mypathlen:].split('.', 1)[0]
+
+                if scale_factors is not None and abs_in in scale_factors:
+                    factors = scale_factors[abs_in]
+                    if 'input' in factors:
+                        scaled_in_set.add(sub_in)
+
+                # Now the indices are ready - input_inds, output_inds
                 fwd_xfer_in[sub_in].append(input_inds)
                 fwd_xfer_out[sub_in].append(output_inds)
+
                 if rev and abs_out in abs2meta['output']:
                     sub_out = abs_out[mypathlen:].split('.', 1)[0]
+                    if sub_in in scaled_in_set:
+                        scaled_in_set.add(sub_out)
                     rev_xfer_in[sub_out].append(input_inds)
                     rev_xfer_out[sub_out].append(output_inds)
 
-        transfers['fwd'] = _setup_index_arrays(tot_size, fwd_xfer_in, fwd_xfer_out, vectors)
+        transfers['fwd'] = _setup_index_arrays(tot_size, fwd_xfer_in, fwd_xfer_out, vectors,
+                                               scaled_in_set)
         if rev:
-            transfers['rev'] = _setup_index_arrays(tot_size, rev_xfer_in, rev_xfer_out, vectors)
+            transfers['rev'] = _setup_index_arrays(tot_size, rev_xfer_in, rev_xfer_out, vectors,
+                                                   scaled_in_set)
 
     @staticmethod
     def _setup_discrete_transfers(group):

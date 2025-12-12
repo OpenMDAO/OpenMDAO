@@ -71,6 +71,7 @@ class TestEQConstraintComp(unittest.TestCase):
         model.add_objective('f.y')
 
         prob.setup(mode='fwd')
+        prob.final_setup()
 
         # verify that the output variable has been initialized
         self.assertEqual(prob['equal.y'], 11.)
@@ -115,6 +116,7 @@ class TestEQConstraintComp(unittest.TestCase):
         model.add_objective('f.y')
 
         prob.setup(mode='fwd')
+        prob.final_setup()
 
         # verify that the constraint has been added as requested
         self.assertTrue('equal.y' in model.get_constraints())
@@ -154,6 +156,7 @@ class TestEQConstraintComp(unittest.TestCase):
         model.add_objective('f.y')
 
         prob.setup(mode='fwd')
+        prob.final_setup()
 
         # verify that the constraint has been added as requested
         self.assertTrue('eq_constraint' in model.get_constraints())

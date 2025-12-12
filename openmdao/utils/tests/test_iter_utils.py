@@ -1,6 +1,7 @@
 import unittest
 
-from openmdao.utils.iter_utils import size2range_iter, meta2item_iter, meta2items_iter
+from openmdao.utils.iter_utils import size2range_iter, meta2item_iter, meta2items_iter, \
+    meta2range_iter
 
 
 class TestSizeIter2RangeIter(unittest.TestCase):
@@ -103,6 +104,67 @@ class TestMeta2ItemsIter(unittest.TestCase):
         items = ['item1', 'item3']
         result = list(meta2items_iter(meta_iter, items))
         self.assertEqual(result, [['var1', 5, 15], ['var2', 3, 9], ['var3', 7, 21]])
+
+
+class TestMeta2RangeIter(unittest.TestCase):
+    def test_meta2range_iter_empty(self):
+        # Test with an empty iterator
+        meta_iter = iter([])
+        result = list(meta2range_iter(meta_iter))
+        self.assertEqual(result, [])
+
+    def test_meta2range_iter_single(self):
+        # Test with a single element iterator
+        meta_iter = iter([('var1', {'size': 5})])
+        result = list(meta2range_iter(meta_iter))
+        self.assertEqual(result, [('var1', 0, 5)])
+
+    def test_meta2range_iter_multiple(self):
+        # Test with multiple elements
+        meta_iter = iter([('var1', {'size': 5}), ('var2', {'size': 3}), ('var3', {'size': 7})])
+        result = list(meta2range_iter(meta_iter))
+        self.assertEqual(result, [('var1', 0, 5), ('var2', 5, 8), ('var3', 8, 15)])
+
+    def test_meta2range_iter_missing_size(self):
+        # Test with missing size in metadata
+        meta_iter = iter([('var1', {'size': 5}), ('var2', {'other': 3}), ('var3', {'size': 7})])
+        with self.assertRaises(KeyError):
+            list(meta2range_iter(meta_iter))
+
+    def test_meta2range_iter_zero_sizes(self):
+        # Test with sizes of zero
+        meta_iter = iter([('var1', {'size': 0}), ('var2', {'size': 0}), ('var3', {'size': 0})])
+        result = list(meta2range_iter(meta_iter))
+        self.assertEqual(result, [('var1', 0, 0), ('var2', 0, 0), ('var3', 0, 0)])
+
+    def test_meta2range_iter_mixed_sizes(self):
+        # Test with mixed sizes of zero and nonzero
+        meta_iter = iter([('var1', {'size': 0}), ('var2', {'size': 5}), ('var3', {'size': 0})])
+        result = list(meta2range_iter(meta_iter))
+        self.assertEqual(result, [('var1', 0, 0), ('var2', 0, 5), ('var3', 5, 5)])
+
+    def test_meta2range_iter_with_subset(self):
+        # Test with subset of variables
+        meta_iter = iter([('var1', {'size': 5}), ('var2', {'size': 3}), ('var3', {'size': 7})])
+        subset = ['var1', 'var3']
+        result = list(meta2range_iter(meta_iter, subset=subset))
+        self.assertEqual(result, [('var1', 0, 5), ('var3', 8, 15)])
+
+    def test_meta2range_iter_subset_missing_var(self):
+        # Test with subset containing non-existent variable
+        meta_iter = iter([('var1', {'size': 5}), ('var2', {'size': 3})])
+        subset = ['var1', 'var3']
+        with self.assertRaises(KeyError) as ctx:
+            list(meta2range_iter(meta_iter, subset=subset))
+
+        self.assertEqual(ctx.exception.args[0], "In meta2range_iter, subset members ['var3'] not found.")
+
+    def test_meta2range_iter_empty_subset(self):
+        # Test with empty subset
+        meta_iter = iter([('var1', {'size': 5}), ('var2', {'size': 3}), ('var3', {'size': 7})])
+        subset = []
+        result = list(meta2range_iter(meta_iter, subset=subset))
+        self.assertEqual(result, [])
 
 
 if __name__ == '__main__':

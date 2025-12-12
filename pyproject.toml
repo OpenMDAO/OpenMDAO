@@ -8,7 +8,7 @@ dynamic = ["version"]
 description = "OpenMDAO framework infrastructure"
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
     { name = "OpenMDAO Team", email = "openmdao@openmdao.org" },
 ]
@@ -36,7 +36,7 @@ dependencies = [
     "numpy",
     "packaging",
     "requests",
-    "scipy",
+    "scipy>=1.12",
 ]
 
 [project.optional-dependencies]
@@ -45,7 +45,7 @@ all = [
 ]
 docs = [
     "ipyparallel",
-    "jupyter-book==0.14",
+    "jupyter-book>=1.0.3,<2",
     "matplotlib",
     "numpydoc>=1.1",
     "sphinx-sitemap",
@@ -59,6 +59,9 @@ doe = [
 jax = [
     "jax>=0.4.0",
     "jaxlib>=0.4.0",
+]
+numba = [
+    "numba",
 ]
 notebooks = [
     "ipympl",
@@ -79,9 +82,10 @@ test = [
 ]
 visualization = [
     "panel",
-    "bokeh>=2.4.0",
+    "bokeh>=3.4.0",
     "colorama",
     "matplotlib",
+    "rich"
 ]
 
 [project.scripts]
@@ -125,6 +129,7 @@ jaxexplicitcomponent = "openmdao.components.jax_explicit_comp:JaxExplicitCompone
 jaximplicitcomponent = "openmdao.components.jax_implicit_comp:JaxImplicitComponent"
 
 [project.entry-points.openmdao_driver]
+analysisdriver = "openmdao.drivers.analysis_driver:AnalysisDriver"
 differentialevolutiondriver = "openmdao.drivers.differential_evolution_driver:DifferentialEvolutionDriver"
 doedriver = "openmdao.drivers.doe_driver:DOEDriver"
 driver = "openmdao.core.driver:Driver"
@@ -145,6 +150,7 @@ linearschur = "openmdao.solvers.linear.linear_schur:LinearSchur"
 petsckrylov = "openmdao.solvers.linear.petsc_ksp:PETScKrylov"
 scipykrylov = "openmdao.solvers.linear.scipy_iter_solver:ScipyKrylov"
 userdefined = "openmdao.solvers.linear.user_defined:LinearUserDefined"
+petscdirectsolver = "openmdao.solvers.linear.petsc_direct_solver:PETScDirectSolver"
 
 [project.entry-points.openmdao_nl_solver]
 armijogoldsteinls = "openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS"

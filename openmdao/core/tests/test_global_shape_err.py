@@ -47,8 +47,10 @@ class GlobalShapeErr(unittest.TestCase):
         if expect_error:
             with self.assertRaises(RuntimeError):
                 prob.setup()
+                prob.final_setup()
         else:
             prob.setup()
+            prob.final_setup()
 
     def test_global_shape_success(self):
         self.check_global_shape(1, False)

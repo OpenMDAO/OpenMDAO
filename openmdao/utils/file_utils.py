@@ -1,6 +1,7 @@
 """
 Utilities for working with files.
 """
+import mimetypes
 import sys
 import os
 import importlib
@@ -12,6 +13,7 @@ import pathlib
 import shutil
 
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.testing_utils import set_env_vars_context, env_truthy, get_tempdir
 
 
 def get_module_path(fpath):
@@ -197,7 +199,8 @@ def _load_and_exec(script_name, user_args):
         '__cached__': None,
     }
 
-    exec(code, globals_dict)  # nosec: private, internal use only
+    with set_env_vars_context(OPENMDAO_SCRIPT_NAME=script_name):
+        exec(code, globals_dict)  # nosec: private, internal use only
 
 
 def fname2mod_name(fname):
@@ -433,7 +436,13 @@ def image2html(imagefile, title='', alt=''):
 """
 
 
-def get_work_dir():
+if env_truthy('TESTFLO_RUNNING'):
+    TESTFLO_WORKDIR = get_tempdir()
+else:
+    TESTFLO_WORKDIR = ''
+
+
+def _get_work_dir():
     """
     Return either os.getcwd() or the value of the OPENMDAO_WORKDIR environment variable.
 
@@ -443,14 +452,17 @@ def get_work_dir():
         The working directory.
     """
     workdir = os.environ.get('OPENMDAO_WORKDIR', '')
+    if not workdir and env_truthy('TESTFLO_RUNNING'):
+        # use testflo's temp dir for all of the test related files to avoid polluting the user's
+        # current directory
+        workdir = TESTFLO_WORKDIR
+        if workdir:
+            os.environ['OPENMDAO_WORKDIR'] = workdir
 
-    if workdir:
-        return workdir
-
-    return os.getcwd()
+    return workdir if workdir else os.getcwd()
 
 
-def _get_outputs_dir(obj, *subdirs, mkdir=True):
+def _get_outputs_dir(obj, *subdirs, mkdir=False):
     """
     Return a pathlib.Path for the outputs directory related to the given problem or system.
 
@@ -494,7 +506,7 @@ def _get_outputs_dir(obj, *subdirs, mkdir=True):
 
     prob_pathname = prob_meta['pathname']
 
-    work_dir = pathlib.Path(get_work_dir())
+    work_dir = prob_meta['work_dir']
     if mkdir and not work_dir.exists():
         work_dir.mkdir(exist_ok=True)
 
@@ -629,7 +641,7 @@ def clean_outputs(obj='.', recurse=False, prompt=True, pattern='*_out', dryrun=F
         # Multiple paths given
         output_dirs.extend(_find_openmdao_output_dirs(obj, pattern, recurse))
     elif hasattr(obj, 'get_outputs_dir'):
-        output_dir = obj.get_outputs_dir(mkdir=False)
+        output_dir = obj.get_outputs_dir()
         prompt = False
         if output_dir and _is_openmdao_output_dir(output_dir):
             output_dirs.append(pathlib.Path(output_dir))
@@ -656,3 +668,32 @@ def clean_outputs(obj='.', recurse=False, prompt=True, pattern='*_out', dryrun=F
             removed_count += 1
 
     print(f'Removed {removed_count} OpenMDAO output directories.')
+
+
+def is_python_file(file_path):
+    """
+    Check if file is a Python source file using multiple methods.
+
+    Parameters
+    ----------
+    file_path : str
+        The path to a file.
+
+    Returns
+    -------
+    bool
+        True if file is a python file. False, if not.
+    """
+    # Method 1: Check file extension
+    if pathlib.Path(file_path).suffix.lower() in [".py", ".pyw", ".pyi"]:
+        return True
+
+    # Method 2: Check MIME type
+    try:
+        mime_type, _ = mimetypes.guess_type(str(file_path))
+        if mime_type in ["text/x-python", "application/x-python-code"]:
+            return True
+    except (TypeError, ValueError, OSError):
+        pass
+
+    return False
