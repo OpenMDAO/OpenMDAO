@@ -322,23 +322,6 @@ class Indexer(object):
             raise ValueError(f"Can't get shaped array of {self} because it has no source shape.")
         return s.as_array(copy=copy, flat=flat)
 
-    def sub_array_index(self, subidxer):
-        """
-        Apply a sub-Indexer to this Indexer and return the resulting index array.
-
-        Parameters
-        ----------
-        subidxer : Indexer
-            The Indexer to be applied to this one.
-
-        Returns
-        -------
-        ndarray
-            The resulting indices (always flat).
-        """
-        arr = self.shaped_array().ravel()
-        return arr[subidxer.flat()]
-
     def set_src_shape(self, shape, dist_shape=None):
         """
         Set the shape of the 'source' array .
@@ -395,6 +378,9 @@ class Indexer(object):
             dist_shape = (shape_to_len(dist_shape),)
 
         return shape, dist_shape
+
+    def is_contiguous(self):
+        return False
 
 
 class ShapedIntIndexer(Indexer):
@@ -547,6 +533,9 @@ class ShapedIntIndexer(Indexer):
         """
         return self._idx
 
+    def is_contiguous(self):
+        return True
+
 
 class IntIndexer(ShapedIntIndexer):
     """
@@ -645,8 +634,13 @@ class ShapedSliceIndexer(Indexer):
         return ":"
 
     def is_full_slice(self):
-        return self._slice.stop is None and self._slice.start is None and \
-            self._slice.step in (None, 1)
+        if self._slice.stop is None and self._slice.start is None and \
+                self._slice.step in (None, 1):
+            return True
+        if self._src_shape is None:
+            return False
+        inds = self._slice.indices(self._src_shape[0])
+        return inds[0] == 0 and inds[1] == self._src_shape[0] and inds[2] == 1
 
     def apply_offset(self, offset, flat=True):
         """
@@ -770,6 +764,10 @@ class ShapedSliceIndexer(Indexer):
         """
         return self.as_array().tolist()
 
+    def is_contiguous(self):
+        if self._slice.step == 1 or self._slice.step is None:
+            return True
+        return False
 
 class SliceIndexer(ShapedSliceIndexer):
     """
@@ -1261,6 +1259,36 @@ class ShapedMultiIndexer(Indexer):
         """
         return self.as_array().tolist()
 
+    def is_contiguous(self):
+        """
+        Check if this multi-indexer is contiguous.
+
+        A multi-indexer is contiguous if:
+        1. All sub-indexers are individually contiguous (int or slice with step=1)
+        2. If any dimension uses a full slice (:), all subsequent dimensions must
+           also use full slices. Otherwise, there will be gaps in the flattened array.
+
+        Returns
+        -------
+        bool
+            True if the multi-indexer is contiguous, False otherwise.
+        """
+        # Check if any dimension uses a full slice
+        # If so, all subsequent dimensions must also use full slices
+        found_full_slice = False
+        for idxer in self._idx_list:
+            # all sub-indexers must be contiguous
+            if not idxer.is_contiguous():
+                return False
+            if idxer.is_full_slice():
+                found_full_slice = True
+            elif found_full_slice:
+                # We found a full slice earlier, but this dimension is not a full slice
+                # This creates gaps, so it's not contiguous
+                return False
+
+        return True
+
 
 class MultiIndexer(ShapedMultiIndexer):
     """
@@ -1538,6 +1566,7 @@ class IndexMaker(object):
         else:
             arr = np.atleast_1d(idx)
             if arr.ndim == 1:
+                # TODO: check for contiguous indices here, and if contiguous, replace with slice
                 idxer = ArrayIndexer(arr, flat_src=flat_src)
             else:
                 issue_warning("Using a non-tuple sequence for multidimensional indexing is "
@@ -1735,6 +1764,40 @@ def idx_list_to_shape(idx_list, src_shape):
         return shp
 
 
+def idx_list_to_extent(shape, idx_list):
+    """
+    Find the min and max indices after applying a sequential list of indexers to an array.
+
+    Parameters
+    ----------
+    shape : tuple
+        The shape of the array.
+    idx_list : list of indexers
+        The list of indexers to apply.
+
+    Returns
+    -------
+    tuple
+        The min and max indices after applying the indexers.
+    """
+    # using ContiguousRange here allows us (in some cases) to avoid instantiating the full array
+    # using arange and applying all of the indexers to it.  We proceed as long as our indexers
+    # are contiguous.  If we encounter a non-contiguous indexer, we instantiate an array of the
+    # current shape and apply the indexers to that.
+    crange = ContiguousRange(shape)
+    for i, idxer in enumerate(idx_list):
+        if idxer.is_contiguous():
+            crange = crange.apply(idxer)
+            shape = crange.shape
+        else:
+            arr = apply_idx_list(crange.asarray(), idx_list[i:])
+            return (arr.min(), arr.max())
+
+        return crange.extent()
+
+    return (0, 0)
+
+
 # Since this is already user facing we'll leave it as is, and just use the output of
 # __getitem__ to initialize our Indexer object that will be used internally.
 class Slicer(object):
@@ -1766,3 +1829,175 @@ slicer = Slicer()
 _full_slice = slice(None)
 _flat_full_indexer = indexer(_full_slice, flat_src=True)
 _full_indexer = indexer(_full_slice, flat_src=False)
+
+
+class ContiguousRange(object):
+    def __init__(self, shape, offset=0):
+        self.shape = shape
+        length = shape_to_len(shape)
+        self.rng = range(offset, offset + length)
+
+    def apply(self, idxer):
+        """
+        Apply a contiguous indexer to this ContiguousRange.
+
+        Parameters
+        ----------
+        idxer : Indexer
+            A contiguous indexer (int, slice with step=1, or multidimensional with all contiguous)
+
+        Returns
+        -------
+        ContiguousRange
+            A new ContiguousRange representing the result of applying the indexer.
+        """
+        assert idxer.is_contiguous()
+
+        # Set the source shape for the indexer if not already set
+        if idxer._src_shape is None:
+            idxer.set_src_shape(self.shape)
+
+        # Get the shaped instance (resolves negative indices, etc.)
+        shaped = idxer.shaped_instance()
+        if shaped is None:
+            raise ValueError("Cannot get shaped instance of indexer")
+
+        idx = shaped()
+
+        # Handle different indexer types
+        if isinstance(idx, int):
+            # Single integer indexer - reduces dimensionality
+            return self._apply_int(idx)
+        elif isinstance(idx, slice):
+            # Single slice indexer
+            return self._apply_slice(idx)
+        elif isinstance(idx, tuple):
+            # Multi-dimensional indexer
+            return self._apply_multi(idx)
+        else:
+            # This shouldn't happen with contiguous indexers
+            raise TypeError(f"Unexpected index type: {type(idx)}")
+
+    def _apply_int(self, idx):
+        """
+        Apply an integer index to the first dimension.
+
+        Parameters
+        ----------
+        idx : int
+            The index into the first dimension.
+
+        Returns
+        -------
+        ContiguousRange
+            New range with reduced dimensionality.
+        """
+        if len(self.shape) == 1:
+            return ContiguousRange((1,), offset=self.rng.start + idx)
+        else:
+            # Indexing into first dimension of multidimensional array
+            dim_size = shape_to_len(self.shape[1:])
+            return ContiguousRange(self.shape[1:], offset=self.rng.start + idx * dim_size)
+
+    def _apply_slice(self, slc):
+        """
+        Apply a slice with step=1 to the first dimension.
+
+        Parameters
+        ----------
+        slc : slice
+            The slice to apply (must have step=1 or None).
+
+        Returns
+        -------
+        ContiguousRange
+            New contiguous range after slicing.
+        """
+        # Ensure step is 1
+        step = slc.step if slc.step is not None else 1
+        if step != 1:
+            raise ValueError(f"Only slices with step=1 are supported, got step={step}")
+
+        start = slc.start if slc.start is not None else 0
+        stop = slc.stop if slc.stop is not None else self.shape[0]
+
+        # Clamp stop to array bounds to match numpy behavior
+        stop = min(stop, self.shape[0])
+
+        if len(self.shape) == 1:
+            return ContiguousRange((stop - start,), offset= self.rng.start + start)
+        else:
+            # Slicing first dimension of multidimensional array
+            dim_size = shape_to_len(self.shape[1:])
+            new_length = stop - start
+            new_shape = (new_length,) + self.shape[1:]
+            return ContiguousRange(new_shape, offset=self.rng.start + start * dim_size)
+
+    def _apply_multi(self, idx_tuple):
+        """
+        Apply a multidimensional index tuple.
+
+        Parameters
+        ----------
+        idx_tuple : tuple
+            Tuple of indices/slices for each dimension.
+
+        Returns
+        -------
+        ContiguousRange
+            New contiguous range after indexing.
+        """
+        # We need to compute the new shape and the offset into the flattened array
+        # For a contiguous multidimensional index, we can compute this incrementally
+
+        # Build full shape list to handle unindexed trailing dimensions
+        new_shape_list = []
+        current_offset = self.rng.start
+
+        # Track consumed dimensions from self.shape
+        shape_idx = 0
+
+        # Process each dimension in the index tuple
+        for dim_idx, idx in enumerate(idx_tuple):
+            if shape_idx >= len(self.shape):
+                raise IndexError(f"Too many indices for array with shape {self.shape}")
+
+            dim_size = self.shape[shape_idx]
+            # Calculate the size of all dimensions after the current one
+            remaining_size = shape_to_len(self.shape[shape_idx + 1:]) if shape_idx + 1 < len(self.shape) else 1
+
+            if isinstance(idx, int):
+                # Integer index - removes this dimension from result shape
+                current_offset += idx * remaining_size
+                shape_idx += 1  # Move to next shape dimension
+            elif isinstance(idx, slice):
+                # Slice with step=1 - keeps this dimension in result shape
+                step = idx.step if idx.step is not None else 1
+                if step != 1:
+                    raise ValueError(f"Only slices with step=1 are supported, got step={step}")
+
+                start = idx.start if idx.start is not None else 0
+                stop = idx.stop if idx.stop is not None else dim_size
+                # Clamp stop to array bounds to match numpy behavior
+                stop = min(stop, dim_size)
+
+                current_offset += start * remaining_size
+                new_dim_size = stop - start
+                new_shape_list.append(new_dim_size)
+                shape_idx += 1  # Move to next shape dimension
+            else:
+                raise TypeError(f"Unexpected index type in tuple: {type(idx)}")
+
+        # Any remaining unindexed dimensions from self.shape are kept as-is
+        while shape_idx < len(self.shape):
+            new_shape_list.append(self.shape[shape_idx])
+            shape_idx += 1
+
+        return ContiguousRange(tuple(new_shape_list), offset=current_offset)
+
+    def asarray(self):
+        return np.arange(self.rng.start, self.rng.stop).reshape(self.shape)
+
+    def extent(self):
+        """Return the minimum and maximum indices in this contiguous range."""
+        return self.rng.start, self.rng.stop - 1

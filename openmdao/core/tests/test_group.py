@@ -1505,7 +1505,7 @@ class TestGroup(unittest.TestCase):
                          "\n   c1.x   "
                          "\n   c2.x  s"
                          "\n  "
-                         "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
+                         "\n   Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_double_set_input_defaults(self):
         problem = om.Problem()
@@ -2932,7 +2932,7 @@ class TestGroupAddInput(unittest.TestCase):
                          "\n   par.C1.x  ft  "
                          "\n   par.C2.x  inch"
                          "\n  "
-                         "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
+                         "\n   Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_missing_diff_vals(self):
         p = om.Problem(name="missing_diff_vals")
@@ -2953,7 +2953,7 @@ class TestGroupAddInput(unittest.TestCase):
                          "\n   par.C1.x    [1.] "
                          "\n   par.C2.x    [1.1]"
                          "\n    "
-                         "\n   Call model.set_input_defaults('x', val=?)' to remove the ambiguity.")
+                         "\n   Call model.set_input_defaults('x', val=?) to remove the ambiguity.")
 
     def test_conflicting_units(self):
         # multiple Group.set_input_defaults calls at same tree level with conflicting units args
@@ -2983,7 +2983,7 @@ class TestGroupAddInput(unittest.TestCase):
             "\n   par.G4.x  inch"
             "\n   par.G5.x  ft  "
             "\n  "
-            "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
+            "\n   Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_conflicting_units_multi_level(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -3015,7 +3015,7 @@ class TestGroupAddInput(unittest.TestCase):
            "\n   G1.x   inch"
            "\n   par.x  ft  "
            "\n  "
-           "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
+           "\n   Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_override_units(self):
         # multiple Group.set_input_defaults calls at different tree levels with conflicting units args
@@ -3039,7 +3039,7 @@ class TestGroupAddInput(unittest.TestCase):
                          "\n   G1.x   inch"
                          "\n   par.x  ft  "
                          "\n  "
-                         "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
+                         "\n   Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_units_checking(self):
         p = om.Problem()
@@ -3132,7 +3132,7 @@ class TestGroupAddInput(unittest.TestCase):
                          "\n   G1.x   ft  "
                          "\n   par.x  inch"
                          "\n  "
-                         "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
+                         "\n   Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_group_input_not_found(self):
         p = self._make_tree_model(diff_units=True, name='group_input_not_found')
@@ -3163,7 +3163,7 @@ class TestGroupAddInput(unittest.TestCase):
                          "\n   G1.G3.x     ft  "
                          "\n   par.x       ft  "
                          "\n  "
-                         "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
+                         "\n   Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_conflicting_val(self):
         p = self._make_tree_model(diff_vals=True, name='conflicting_val')
@@ -3194,7 +3194,7 @@ class TestGroupAddInput(unittest.TestCase):
            "\n   G1.x   ft  [4.]"
            "\n   par.x  ft  [3.]"
            "\n    "
-           "\n   Call model.set_input_defaults('x', val=?)' to remove the ambiguity.")
+           "\n   Call model.set_input_defaults('x', val=?) to remove the ambiguity.")
 
     def test_set_input_defaults_discrete(self):
         import math

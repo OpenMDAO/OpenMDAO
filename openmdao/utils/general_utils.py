@@ -1924,6 +1924,8 @@ if _om_dump:
     parts = [s.strip() for s in os.environ['OPENMDAO_DUMP'].split(',')]
     trace = 'trace' in parts
     use_rank = 'rank' in parts
+    if use_rank:
+        from openmdao.utils.mpi import MPI
 
     if 'stdout' in parts:
         _dump_stream = sys.stdout
@@ -1939,11 +1941,20 @@ if _om_dump:
         else:
             dirname = os.path.join(os.getcwd(), 'dump_dir')
 
-        if not os.path.exists(dirname):
-            try:
-                os.makedirs(dirname)
-            except Exception:
-                dirname = os.getcwd()
+        if use_rank:
+            rank = MPI.COMM_WORLD.rank
+        else:
+            rank = 0
+
+        if rank == 0:
+            if not os.path.exists(dirname):
+                try:
+                    os.makedirs(dirname)
+                except Exception:
+                    dirname = os.getcwd()
+
+        if use_rank:
+            MPI.COMM_WORLD.barrier()
 
         for p in parts:
             if p.startswith('file='):
@@ -1961,7 +1972,6 @@ if _om_dump:
 
         rankstr = pidstr = ''
         if use_rank:
-            from openmdao.utils.mpi import MPI
             rankstr = f"_{MPI.COMM_WORLD.rank if MPI else 0}"
 
         if 'pid' in parts:
@@ -2149,6 +2159,7 @@ if _om_dump:
             if isinstance(comm, _DebugComm):
                 return comm._comm
             return comm
+
 
 # if OPENMDAO_DUMP is set to anything, even a falsey value, make om_dump and om_dump_indent
 # available as builtins so we don't have to import them anywhere

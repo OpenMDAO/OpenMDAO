@@ -776,7 +776,10 @@ def array_hash(arr, alg=hashlib.sha1):
     str
         The computed hash.
     """
-    return alg(arr.view(np.uint8)).hexdigest()
+    if arr.dtype.kind in ('f', 'c', 'i', 'u', 'b'):
+        return alg(arr.view(np.uint8)).hexdigest()
+    raise ValueError("array_hash only works for numerical arrays, but called with array of dtype "
+                     f"{arr.dtype}.")
 
 
 _randgen = np.random.default_rng()

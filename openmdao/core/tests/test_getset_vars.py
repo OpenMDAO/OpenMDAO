@@ -379,7 +379,7 @@ class TestGetSetVariables(unittest.TestCase):
                          "\n   C2.x  inch"
                          "\n   C3.x  mm  "
                          "\n  "
-                         "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
+                         "\n   Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_serial_multi_src_inds_units_setval_promoted(self):
         p = Problem()

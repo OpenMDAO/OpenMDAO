@@ -917,7 +917,7 @@ class TestUnitConversion(unittest.TestCase):
                          "\n   G1.C1.z  W  "
                          "\n   G1.C2.z  J/s"
                          "\n  "
-                         "\n   Call model.set_input_defaults('G1.z', units=?)' to remove the ambiguity."
+                         "\n   Call model.set_input_defaults('G1.z', units=?) to remove the ambiguity."
                          "\n   <model> <class Group>: The following inputs promoted to 'G1.x' have different units:"
                          "\n  "
                          "\n   G1.C1.x  J/s**2"

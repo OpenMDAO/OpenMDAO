@@ -18,11 +18,11 @@ from openmdao.visualization.graph_viewer import write_graph
 from openmdao.utils.general_utils import common_subpath, is_undefined, truncate_str, \
     all_ancestors, collect_error
 from openmdao.utils.array_utils import array_connection_compatible, shape_to_len, \
-    get_global_dist_shape, evenly_distrib_idxs
+    get_global_dist_shape, evenly_distrib_idxs, array_hash
 from openmdao.utils.graph_utils import dump_nodes, dump_edges
 from openmdao.utils.units import is_compatible
 from openmdao.utils.units import unit_conversion
-from openmdao.utils.indexer import indexer, Indexer
+from openmdao.utils.indexer import indexer, Indexer, idx_list_to_extent
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.units import _is_unitless, has_val_mismatch
 from openmdao.visualization.tables.table_builder import generate_table
@@ -714,11 +714,32 @@ class AllConnGraph(nx.DiGraph):
             src_node = self.get_root(node)
             src_meta = self.nodes[src_node]
 
-        if not get_remote and self.comm.size > 1 and src_meta.distributed and not node_meta.distributed:
-            raise RuntimeError(f"{self.msginfo}: Non-distributed variable '{node[1]}' has "
-                                f"a distributed source, '{src_node[1]}', so you must retrieve its "
-                                "value using 'get_remote=True'.")
+        if not get_remote and self.comm.size > 1:
+            if src_meta.distributed and not node_meta.distributed:
+                raise RuntimeError(f"{self.msginfo}: Non-distributed variable '{node[1]}' has "
+                                   f"a distributed source, '{src_node[1]}', so you must retrieve "
+                                   "its value using 'get_remote=True'.")
+            elif node_meta.distributed:
+                if src_meta.distributed or src_meta.remote:
+                    if src_meta.distributed:
+                        src_inds_list = node_meta.src_inds_list
+                        min_idx, max_idx = idx_list_to_extent(src_meta.global_shape, src_inds_list)
+                        var_idx = self._var_allprocs_abs2idx[src_node[1]]
+                        sizes = self._var_sizes['output'][:, var_idx]
+                        # sizes for src var in each proc
+                        start = np.sum(sizes[:self.comm.rank])  # start index of src var on this proc
+                        end = start + sizes[self.comm.rank]
+                        err = min_idx != max_idx and (not (start <= min_idx < end) or
+                                                      not (start <= max_idx < end))
+                    elif src_meta.remote:
+                        err = True
 
+                    if self.comm.allreduce(err, op=MPI.LOR):
+                        raise RuntimeError(f"{self.msginfo}: Can't retrieve distributed variable "
+                                           f"'{node[1]}' because its src_indices reference "
+                                           "entries from other processes. You can retrieve values "
+                                           "from all processes using "
+                                           "`get_val(<name>, get_remote=True)`.")
         if use_vec:
             val = system._abs_get_val(src_node[1], get_remote, rank, vec_name, kind, flat,
                                       from_root=True)
@@ -743,7 +764,6 @@ class AllConnGraph(nx.DiGraph):
             offsets = np.zeros(sizes.size, dtype=INT_DTYPE)
             offsets[1:] = np.cumsum(sizes[:-1])
             self.comm.Allgatherv(val.ravel(), [full_val, sizes, offsets, MPI.DOUBLE])
-            # self.comm.Allgather(val.ravel(), full_val)
             val = np.reshape(full_val, node_meta.global_shape)
 
         if flat and not node_meta.discrete:
@@ -1164,8 +1184,11 @@ class AllConnGraph(nx.DiGraph):
                 dshapes = self.get_dist_shapes()
                 self._dist_sizes = dsizes = {}
                 for n, shapes in dshapes.items():
-                    dsizes[n] = [shape_to_len(shape) if shape is not None else 0
+                    sizes = [shape_to_len(shape) if shape is not None else 0
                                  for shape in shapes]
+                    # if total size is 0, dshapes haven't been set yet
+                    if np.sum(sizes) > 0:
+                        dsizes[n] = sizes
             else:
                 self._dist_sizes = {}
 
@@ -1493,7 +1516,7 @@ class AllConnGraph(nx.DiGraph):
             msg += "\n   These units are incompatible."
         else:
             msg += ("\n   Call model.set_input_defaults('"
-                    f"{self.top_name(node)}', units=?)' to remove the ambiguity.")
+                    f"{self.top_name(node)}', units=?) to remove the ambiguity.")
         return msg
 
     def ambig_shapes_msg(self, node, children_meta):
@@ -1520,7 +1543,7 @@ class AllConnGraph(nx.DiGraph):
         return (f"The following inputs promoted to '{node[1]}' have different "
                 f"values, so the value of '{node[1]}' is ambiguous:\n{table}\n   Call "
                 f"model.set_input_defaults('"
-                f"{self.top_name(node)}', val=?)' to remove the ambiguity.")
+                f"{self.top_name(node)}', val=?) to remove the ambiguity.")
 
     def find_ambiguous_causes(self, node, causes, data_name):
         """
@@ -2125,6 +2148,50 @@ class AllConnGraph(nx.DiGraph):
 
         # resolve auto_ivc node  (these are never promoted so there is always only one output node)
         if auto:
+            # if under MPI, check for ambiguity of value in root input node
+            if model.comm.size > 1:
+                leaves = list(self.leaf_input_iter(src_node))
+                if len(leaves) > 1:
+                    for src_node, tgt_node in dfs_edges(self, src_node):
+                        if tgt_node[0] == 'i':
+                            # root input
+                            inp_meta = nodes[tgt_node]
+                            if inp_meta.ambiguous_units:
+                                break
+                            if inp_meta.remote:
+                                val = None
+                            elif inp_meta.discrete:
+                                val = inp_meta.val
+                            else:  # local and numerical
+                                if isinstance(inp_meta.val, np.ndarray):
+                                    val = array_hash(inp_meta.val)
+                                else:
+                                    val = inp_meta.val
+
+                            ambig = False
+                            vals = model.comm.gather(val, root=0)
+                            if model.comm.rank == 0:
+                                start = None
+                                for v in vals:
+                                    if start is None:
+                                        start = v
+                                    else:
+                                        if start != v:
+                                            ambig = True
+                                            break
+                                model.comm.bcast(ambig, root=0)
+                            else:
+                                ambig = model.comm.bcast(None, root=0)
+
+                            if ambig:
+                                model._collect_error(
+                                    f"The following inputs promoted to '{tgt_node[1]}' have "
+                                    f"different values, so the value of '{tgt_node[1]}' is "
+                                    "ambiguous. Call model.set_input_defaults('"
+                                    f"{self.top_name(tgt_node)}', val=?) to remove the ambiguity.")
+
+                            break
+
             self.resolve_from_children(model, src_node, src_node, auto=auto)
 
             if src_meta.val is None:
@@ -2144,7 +2211,6 @@ class AllConnGraph(nx.DiGraph):
                     # dist-serial, or serial-dist, then we need to check the compatibility of the
                     # connection taking distributed shapes into account.
                     continue
-                    # self.check_dist_connection(model, edge)
                 else:
                     self.resolve_down(model, u, v, auto)
 
@@ -2506,7 +2572,11 @@ class AllConnGraph(nx.DiGraph):
             return src_inds_list[0].shaped_array()
         else:
             root = self.get_root(node)
-            root_shape = self.nodes[root].shape
+            root_meta = self.nodes[root]
+            if root_meta.distributed:
+                root_shape = root_meta.global_shape
+            else:
+                root_shape = root_meta.shape
             arr = np.arange(shape_to_len(root_shape)).reshape(root_shape)
             for inds in src_inds_list:
                 arr = inds.indexed_val(arr)
@@ -2944,33 +3014,6 @@ class AllConnGraph(nx.DiGraph):
 
     def dump_edges(self):
         dump_edges(self)
-
-    # def resolve_conn_shape(self, src_node, tgt_node):
-    #     # this applies to ONLY continuous connections between abs variable nodes (not promoted nodes)
-    #     # nodes are assumed to be connected (this is not checked here)
-    #     src_meta = self.nodes[src_node]
-    #     tgt_meta = self.nodes[tgt_node]
-    #     src_shape = src_meta.shape
-    #     tgt_shape = tgt_meta.shape
-    #     src_distributed = src_meta.distributed
-    #     tgt_distributed = tgt_meta.distributed
-
-    #     if src_shape is not None:
-    #         if tgt_shape is None:  # must resolve tgt_shape  (dyn fwd)
-    #             if not tgt_meta.dyn_shape:
-    #                 raise ValueError(f"{tgt_node[1]} shape is None but it isn't dynamically shaped.")
-    #             pass
-    #         # now tgt_shape is resolved, check compatibility
-    #         pass
-    #     elif tgt_shape is not None:
-    #         if src_shape is None:  # must resolve src_shape  (dyn rev)
-    #             if not src_meta.dyn_shape:
-    #                 raise ValueError(f"{src_node[1]} shape is None but it isn't dynamically shaped.")
-    #             pass
-    #         # now src_shape is resolved, check compatibility
-    #         pass
-    #     else:
-    #         raise ValueError("Both src_shape and tgt_shape are None")
 
     def copy_var_shape(self, from_node, to_node):
         """

@@ -1071,7 +1071,7 @@ class TestProblem(unittest.TestCase):
                              "\n   C1.x  ft  "
                              "\n   C2.x  inch"
                              "\n  "
-                             "\n   Call model.set_input_defaults('x', units=?)' to remove the ambiguity.")
+                             "\n   Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
         else:
             self.fail("Exception expected.")
 
@@ -1193,7 +1193,7 @@ class TestProblem(unittest.TestCase):
                           "   G1.C1.x  cm\n"
                           "   G1.C2.x  mm\n"
                           "  \n"
-                          "   Call model.set_input_defaults('G1.x', units=?)' to remove the ambiguity."))
+                          "   Call model.set_input_defaults('G1.x', units=?) to remove the ambiguity."))
 
     def test_get_set_with_units_error_messages(self):
 

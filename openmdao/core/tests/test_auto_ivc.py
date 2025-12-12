@@ -205,14 +205,8 @@ class SerialTests(unittest.TestCase):
             p.setup()
             p.final_setup()
         except Exception as err:
-            self.assertEqual(str(err),
-                             "\nCollected errors for problem 'discrete_fan_out2':"
-                             "\n   <model> <class Group>: The following inputs promoted to 'x' have different values, so the value of 'x' is ambiguous:"
-                             "\n    "
-                             "\n   par.C1.x    foo"
-                             "\n   par.C2.x    bar"
-                             "\n    "
-                             "\n   Call model.set_input_defaults('x', val=?)' to remove the ambiguity.")
+            msg = ("\nCollected errors for problem 'discrete_fan_out2':\n   <model> <class Group>: The following inputs promoted to 'x' have different values, so the value of 'x' is ambiguous:\n    \n   par.C1.x    foo\n   par.C2.x    bar\n    \n   Call model.set_input_defaults('x', val=?) to remove the ambiguity.")
+            self.assertTrue(msg in err.args[0])
         else:
             self.fail("Exception expected.")
 
@@ -264,7 +258,7 @@ class SerialTests(unittest.TestCase):
             p.set_val('exec.b', np.linspace(10, 20, 15))
 
         # can not broadcast input array from shape (15,) into shape (100,) for exec.b
-        self.assertEqual(str(cm.exception), 
+        self.assertEqual(str(cm.exception),
                         "Failed to set value of 'exec.b': cannot reshape array of size 15 into shape (100,).")
 
 
@@ -272,3 +266,20 @@ class SerialTests(unittest.TestCase):
 class MPITests(SerialTests):
 
     N_PROCS = 2
+
+    def test_discrete_fan_out2(self):
+        p = om.Problem(name='discrete_fan_out2')
+        model = p.model
+        par = model.add_subsystem('par', om.ParallelGroup(), promotes=['x'])
+        par.add_subsystem('C1', PathCompEx('foo'), promotes=['x'])
+        par.add_subsystem('C2', PathCompEx('bar'), promotes=['x'])
+
+        try:
+            p.setup()
+            p.final_setup()
+        except Exception as err:
+            msg = ("\nCollected errors for problem \'discrete_fan_out2\':"
+                             "\n   <model> <class Group>: The following inputs promoted to \'x\' have different values, so the value of \'x\' is ambiguous. Call model.set_input_defaults(\'x\', val=?) to remove the ambiguity.")
+            self.assertTrue(msg in err.args[0])
+        else:
+            self.fail("Exception expected.")

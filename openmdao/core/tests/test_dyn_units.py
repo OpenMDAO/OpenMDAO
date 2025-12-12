@@ -504,7 +504,7 @@ class TestDynUnitsWithInputConns(unittest.TestCase):
            "\n   sub.comp1.x  km  [1.]"
            "\n   sub.comp2.x  ft  [1.]"
            "\n    "
-           "\n   Call model.set_input_defaults('sub.x', val=?)' to remove the ambiguity.")
+           "\n   Call model.set_input_defaults('sub.x', val=?) to remove the ambiguity.")
 
 
 if __name__ == "__main__":
