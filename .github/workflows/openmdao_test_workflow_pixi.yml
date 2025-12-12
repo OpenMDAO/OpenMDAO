@@ -45,7 +45,7 @@ jobs:
     timeout-minutes: 100
 
     strategy:
-      fail-fast: false
+      fail-fast: true  # Temporary
       matrix:
         OS: [ubuntu-24.04, macos-latest]
         PIXI_ENVIRONMENT: [minimal, py311, py312, py313, default, dev, oldest]

@@ -194,13 +194,13 @@ runs:
 
         if [[ "$SNOPT_VERSION" == "7.7" ]]; then
           echo "  > Secure copying SNOPT 7.7 over SSH"
-          .github/actions/install_pyoptsparse/download_snopt.sh
+          .github/actions/install_pyoptsparse_pixi/download_snopt.sh
           if [ -d "SNOPT" ] ; then
             SNOPT="-s SNOPT/src"
           fi
         elif [[ "$SNOPT_VERSION" == "7.2" ]]; then
           echo "  > Secure copying SNOPT 7.2 over SSH"
-          .github/actions/install_pyoptsparse/download_snopt.sh
+          .github/actions/install_pyoptsparse_pixi/download_snopt.sh
           if [ -d "SNOPT" ] ; then
             SNOPT="-s SNOPT/source"
           fi
