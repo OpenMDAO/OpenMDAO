@@ -29,7 +29,7 @@ class TestSchurSolvers(unittest.TestCase):
     def test_result(self):
         # for case in ('liu', 'simple1', 'simple2', 'simple3', 'simple4',
         #              'center1', 'center2', 'center3', 'center4'):
-        for case in ('liu',):# 'center1',):
+        for case in ('liu', 'center1',):
             # for solver in ('nlbgs', 'hierarchical_newton', 'schur', 'newton_schur',
             #                'schur_BGS', 'newton_BGS', 'schur_schur', 'NLrun_schur'):
             for solver in ('schur_schur',):# 'schur_BGS', 'newton_schur', 'schur_schur',):
