@@ -47,7 +47,7 @@ jobs:
         run: |
           git fetch --unshallow --tags
           git describe --tags > tag.txt
-          echo "TAG=$(cat tag.txt)" >> $GITHUB_ENV
+          echo "TAG=$(cat tag.txt)" >> "$GITHUB_ENV"
 
       # Login to container registry
       - name: Log into registry ${{ matrix.REGISTRY }}

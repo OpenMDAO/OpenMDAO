@@ -10,6 +10,9 @@ inputs:
   snopt_version:
     description: 'The version of SNOPT to test against, if avaiable.'
     required: false
+  pixi_env:
+    description: 'The name of the pixi environment to use.'
+    required: true
   SECRET_ssh_private_key:
     description: 'ssh private key when being run by OpenMDAO org'
     required: false
@@ -92,6 +95,7 @@ runs:
         SNOPT_LOCATION_72: ${{ inputs.SECRET_snopt_location_72 }}
         SNOPT_VERSION: ${{ inputs.snopt_version }}
       run: |
+        eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
         echo "============================================================="
         echo "Build SNOPT library"
         echo "============================================================="
@@ -99,7 +103,7 @@ runs:
           echo "-------------------------------------------------------------"
           echo "Getting SNOPT source"
           echo "-------------------------------------------------------------"
-          .github/actions/install_pyoptsparse/download_snopt.sh
+          .github/actions/install_pyoptsparse_pixi/download_snopt.sh
         elif [[ "${{ inputs.snopt_version }}" ]]; then
           echo "SNOPT version ${{ inputs.snopt_version }} was requested but source is not available"
         fi
@@ -150,6 +154,7 @@ runs:
       if: inputs.pyoptsparse_version != '' && inputs.pyoptsparse_from == 'github'
       shell: bash -l {0}
       run: |
+        eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
         echo "Installing pyOptSparse from GitHub, IPOPT will not be available"
         pip install git+https://github.com/mdolab/pyoptsparse@v${{ inputs.pyoptsparse_version }}
 
@@ -170,8 +175,8 @@ runs:
         SNOPT_LOCATION_77: ${{ inputs.SECRET_snopt_location_77 }}
         SNOPT_VERSION: ${{ inputs.snopt_version }}
       run: |
+        eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
         echo "Installing pyOptSparse from build_pyoptsparse"
-        # conda install -c conda-forge swig -q -y
 
         python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
 
@@ -203,17 +208,11 @@ runs:
           echo "SNOPT version $SNOPT_VERSION was requested but source is not available"
         fi
 
-        export CC="${CONDA_PREFIX}/bin/gcc"
-        export CXX="${CONDA_PREFIX}/bin/g++"
-        export FC="${CONDA_PREFIX}/bin/gfortran"
-        export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}"
-        export LDFLAGS="-L${CONDA_PREFIX}/lib"
-        export CFLAGS="-I${CONDA_PREFIX}/include"
-
-        build_pyoptsparse -v $BRANCH $SNOPT
+        build_pyoptsparse --ignore-conda --ignore-mamba -v $BRANCH $SNOPT
 
     - name: Test pyoptsparse installation
       if: inputs.pyoptsparse_version != ''
       shell: bash -l {0}
       run: |
+        eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
         python -c "import pyoptsparse; from pyoptsparse import SLSQP; SLSQP()" && echo "pyOptSparse OK" || echo "pyOptSparse FAILED"

@@ -42,16 +42,21 @@ jobs:
 
   tests:
 
-    timeout-minutes: 120
+    timeout-minutes: 100
 
     strategy:
       fail-fast: false
       matrix:
         OS: [ubuntu-24.04, macos-latest]
         PIXI_ENVIRONMENT: [minimal, py311, py312, py313, default, dev, oldest]
+        # Defaults for all matrix entries
         BANDIT: [false]
         RUFF: [false]
-        SNOPT: [false]
+        PYOPTSPARSE: ['']
+        PYOPTSPARSE_FROM: ['']
+        SNOPT_VERSION: ['']
+
+        # Specific combinations to be added with RUFF/BANDIT/SNOPT
         include:
           # Windows - only minimal
           - OS: windows-latest
@@ -59,28 +64,26 @@ jobs:
             BANDIT: false
             RUFF: false
 
-          # Bandit only on Ubuntu py312
-          - OS: ubuntu-24.04
-            PIXI_ENVIRONMENT: py312
-            BANDIT: true
-            RUFF: false
-
-          # Ruff only on Ubuntu dev
+          # Ruff and bandit only on Ubuntu dev
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: dev
-            BANDIT: false
+            BANDIT: true
             RUFF: true
 
-        exclude:
-          # Exclude the duplicate ubuntu-24.04 + py312 with BANDIT: false
+          # Test SNOPT on Ubuntu and MacOS with dev-local-pyoptsparse
           - OS: ubuntu-24.04
-            PIXI_ENVIRONMENT: py312
-            BANDIT: false
+            PIXI_ENVIRONMENT: dev-local-pyoptsparse
+            PYOPTSPARSE_FROM: 'build_pyoptsparse'
+            PYOPTSPARSE: '2.14.2'
+            SNOPT: '7.7'
 
-          # Exclude the duplicate ubuntu-24.04 + dev with RUFF: false
+        exclude:
+
+          # Exclude the duplicate ubuntu-24.04 + dev with RUFF: false and BANDIT: false
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: dev
             RUFF: false
+            BANDIT: false
 
     runs-on: ${{ matrix.OS }}
 
@@ -111,31 +114,31 @@ jobs:
           echo "Initiated by: ${GITHUB_ACTOR}"
           echo "============================================================="
 
-      - name: Create SSH key
-        if: matrix.SNOPT && runner.os != 'Windows'
+      # - name: Create SSH key
+      #   if: matrix.SNOPT && runner.os != 'Windows'
 
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-        run: |
-          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
-          mkdir -p ~/.ssh/
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          sudo chmod 600 ~/.ssh/id_rsa
-          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      #   env:
+      #     SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+      #   run: |
+      #     eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+      #     mkdir -p ~/.ssh/
+      #     echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+      #     sudo chmod 600 ~/.ssh/id_rsa
+      #     echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
-      - name: Install compilers
-        if: matrix.SNOPT && runner.os != 'Windows'
-        run: |
-          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
-          echo "============================================================="
-          echo "Install compilers"
-          echo "============================================================="
-          if [[  "${{ matrix.OS }}" != "macos-15" ]]; then
-            pixi add cython swig compilers cmake meson
-          else
-            pixi add cython swig compilers cmake meson
-          fi
+      # - name: Install compilers
+      #   if: matrix.SNOPT_VERSION && runner.os != 'Windows'
+      #   run: |
+      #     eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+      #     echo "============================================================="
+      #     echo "Install compilers"
+      #     echo "============================================================="
+      #     if [[  "${{ matrix.OS }}" != "macos-15" ]]; then
+      #       pixi add cython swig compilers cmake meson
+      #     else
+      #       pixi add cython swig compilers cmake meson
+      #     fi
 
       - name: Check MPI and PETSc
         continue-on-error: true
@@ -170,81 +173,38 @@ jobs:
             echo "mpi4py or petsc4py not installed in this environment, skipping MPI checks"
           fi
 
-      # - name: Build SNOPT
-      #   if: matrix.SNOPT && runner.os != 'Windows'
-      #   continue-on-error: false
-      #   env:
-      #     SNOPT_LOCATION: ${{ secrets.SNOPT_LOCATION }}
-      #     SNOPT_VERSION: ${{ matrix.SNOPT }}
-      #   run: |
-      #     eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
-      #     echo "============================================================="
-      #     echo "Build SNOPT library"
-      #     echo "============================================================="
-      #     if [[ -n "${{ secrets.SNOPT_LOCATION }}" && "${{ matrix.SNOPT }}" == "7.7" ]]; then
-      #       echo "-------------------------------------------------------------"
-      #       echo "Getting SNOPT source"
-      #       echo "-------------------------------------------------------------"
-      #       .github/actions/install_pyoptsparse/download_snopt.sh
-      #     fi
+      - name: 'Install pyOptSparse'
+        id: install_pyoptsparse
+        if: matrix.PIXI_ENVIRONMENT == 'dev-local-pyoptsparse'
+        uses: ./.github/actions/install_pyoptsparse_pixi
+        with:
+          pyoptsparse_version: ${{ matrix.PYOPTSPARSE }}
+          pyoptsparse_from: ${{ matrix.PYOPTSPARSE_FROM }}
+          snopt_version: ${{ matrix.SNOPT }}
+          pixi_env: ${{ matrix.PIXI_ENVIRONMENT}}
+          SECRET_ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY}}
+          SECRET_ssh_known_hosts: ${{ secrets.SSH_KNOWN_HOSTS}}
+          SECRET_snopt_location: ${{ secrets.SNOPT_LOCATION }}
+          SECRET_snopt_location_72: ${{ secrets.SNOPT_LOCATION_72 }}
+          SECRET_snopt_location_77: ${{ secrets.SNOPT_LOCATION_77 }}
 
-      #     if [[ -d "SNOPT" ]]; then
-      #       echo "-------------------------------------------------------------"
-      #       echo "Building SNOPT"
-      #       echo "-------------------------------------------------------------"
-      #       cd SNOPT
-      #       ./configure
-      #       make
-      #       make check
+      - name: Install full dev dependencies
+        if: matrix.PIXI_ENVIRONMENT == 'dev'
+        run: |
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          echo "============================================================="
+          echo "Install additional packages for testing/coverage"
+          echo "============================================================="
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            sudo apt-get update
+            sudo apt-get install -y graphviz
+          elif [ "${{ runner.os }}" == "macOS" ]; then
+            brew install graphviz
+          fi
+          python -m pip install graphviz pyparsing psutil objgraph pyxdsm pydot
 
-      #       echo "-------------------------------------------------------------"
-      #       echo "Building Python bindings"
-      #       echo "-------------------------------------------------------------"
-      #       echo "  > Copying required files from pySNOPT.."
-
-      #       git clone https://github.com/mdolab/pyoptsparse "$HOME/pyoptsparse"
-
-      #       PYSNOPT_SOURCE="$HOME/pyoptsparse/pyoptsparse/pySNOPT/source/"
-      #       cp -v "$PYSNOPT_SOURCE"/*.f src/
-      #       cp -v "$PYSNOPT_SOURCE/f2py/snopt.pyf" .
-
-      #       echo "  > Removing problematic files..."
-      #       rm -f src/snopth.f
-      #       rm -f src/sn27lu77.f
-      #       rm -f src/sn27lu90.f
-
-      #       echo "  > Building Python bindings..."
-      #       python -m numpy.f2py -m snopt -c snopt.pyf src/*.f -L"$(pwd)/lib" -L/lib -lsnopt7
-
-      #       echo "-------------------------------------------------------------"
-      #       echo "Try to import SNOPT"
-      #       echo "-------------------------------------------------------------"
-      #       python -c "import snopt; print(snopt)"
-
-      #       echo "-------------------------------------------------------------"
-      #       echo "Set PYOPTSPARSE_IMPORT_SNOPT_FROM for subsequent steps"
-      #       echo "-------------------------------------------------------------"
-      #       echo "PYOPTSPARSE_IMPORT_SNOPT_FROM=$(pwd)" >> $GITHUB_ENV
-
-      #       cd ../..
-      #     fi
-
-      # - name: Install optional dependencies
-      #   if: matrix.OPTIONAL == '[all]' || matrix.OPTIONAL == '[all,numba]'
-      #   run: |
-      #     eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
-      #     echo "============================================================="
-      #     echo "Install additional packages for testing/coverage"
-      #     echo "============================================================="
-      #     if [[  "${{ matrix.OS }}" == "macos-15" ]]; then
-      #       brew install graphviz -q
-      #     else
-      #       pixi add graphviz
-      #     fi
-      #     python -m pip install pyparsing psutil objgraph pyxdsm pydot
-
-      #     echo "Pre-install playwright dependencies to avoid 'Playwright Host validation warning'"
-      #     playwright install --with-deps
+          echo "Pre-install playwright dependencies to avoid 'Playwright Host validation warning'"
+          playwright install --with-deps
 
       # Enable tmate debugging of manually-triggered workflows if the input option was provided
       #
@@ -282,14 +242,14 @@ jobs:
           cd "$HOME"
 
           # Build testflo command
-          TESTFLO_CMD="testflo -n 2 openmdao --timeout=240 --coverage --coverpkg openmdao --durations=20"
+          TESTFLO_ARGS=(testflo -n 2 openmdao --timeout=240 --coverage --coverpkg openmdao --durations=20)
 
           # Add --show_skipped unless we're in minimal environment
           if [[ "${{ matrix.PIXI_ENVIRONMENT }}" != "minimal" ]]; then
-            TESTFLO_CMD="$TESTFLO_CMD --show_skipped"
+            TESTFLO_ARGS+=(--show_skipped)
           fi
 
-          $TESTFLO_CMD
+          "${TESTFLO_ARGS[@]}"
 
       - name: Run tests (windows)
         id: run_tests_windows
@@ -320,10 +280,10 @@ jobs:
           echo "============================================================="
           echo "Submit coverage"
           echo "============================================================="
-          cp $HOME/.coverage .
+          cp "$HOME/.coverage" .
           python -m pip install coveralls
-          SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
-          coveralls --basedir $SITE_DIR
+          SITE_DIR=$(python -c 'import site; print(site.getsitepackages()[-1])')
+          coveralls --basedir "$SITE_DIR"
 
       - name: Slack failure to upload to coveralls.io
         if: steps.coveralls.outcome == 'failure'
@@ -345,7 +305,7 @@ jobs:
           echo "============================================================="
           echo "Run bandit scan for high/medium severity issues"
           echo "============================================================="
-          cd $GITHUB_WORKSPACE
+          cd "$GITHUB_WORKSPACE"
           python -m bandit -c bandit.yml -ll -r openmdao
 
       - name: Perform linting with Ruff
@@ -384,3 +344,47 @@ jobs:
             echo "Tests failed"
             exit 1
           fi
+
+  coveralls:
+    name: Finish coverage
+    needs: [tests]
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+    - uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        parallel-finished: true
+
+  related_tests:
+    name: Run Dymos & pyCycle Tests
+    needs: [tests]
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: benc-uk/workflow-dispatch@v1
+      with:
+        workflow: Dymos Tests
+        repo: ${{ github.repository_owner }}/dymos
+        inputs: >
+          {
+            "run_name": "Test Latest OpenMDAO Development Version",
+            "latest": true
+           }
+        token: ${{ secrets.ACCESS_TOKEN }}
+      if: github.event_name == 'push'
+
+    - uses: benc-uk/workflow-dispatch@v1
+      with:
+        workflow: pyCycle Tests
+        repo: ${{ github.repository_owner }}/pycycle
+        inputs: >
+          {
+            "run_name": "Test Latest OpenMDAO Development Version",
+            "Ubuntu_Baseline": false,
+            "MacOS_Baseline": false,
+            "Windows_Baseline": false,
+            "OpenMDAO_Dev": true
+           }
+        token: ${{ secrets.ACCESS_TOKEN }}
+      if: github.event_name == 'push'
