@@ -1039,8 +1039,8 @@ class AllConnGraph(nx.DiGraph):
         return meta.pathname, meta.rel_name
 
     def set_model_meta(self, model, node, meta, locmeta):
-        # this helps us keep graph nodes and variable metadata in sync. Ultimately these need
-        # to be consolidated into a single data structure.
+        # this helps us keep graph nodes and variable metadata in sync.
+        # TODO: these need to be consolidated into a single data structure!
         node_meta = self.nodes[node]
 
         # this is only called on nodes corresponding to variables in the model, not on
@@ -1066,11 +1066,10 @@ class AllConnGraph(nx.DiGraph):
                     if node_meta.distributed:
                         self._distributed_nodes.add(node)
                     if not node_meta.dyn_shape:
-                        node_meta._shape = meta['shape']
-                        # if node_meta.distributed:
-                        #     node_meta.global_shape = self.compute_global_shape(node)
-                        # else:
-                        #     node_meta.global_shape = meta['shape']
+                        if node_meta.remote and node_meta.distributed:
+                            node_meta._shape = (0,)
+                        else:
+                            node_meta._shape = meta['shape']
                         if locmeta is not None:
                             val = locmeta['val']
                             if isinstance(val, Number):

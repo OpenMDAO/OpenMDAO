@@ -17,6 +17,7 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.relevance import get_relevance
 from openmdao.utils.array_utils import get_random_arr
+from openmdao.utils.general_utils import _unwrap_comm
 
 
 use_mpi = check_mpi_env()
@@ -499,15 +500,15 @@ class _TotalJacInfo(object):
                 full_tgt_inds = np.zeros(0, dtype=INT_DTYPE)
 
             tgt_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size, dtype=float),
-                                                  comm=self.comm)
+                                                  comm=_unwrap_comm(self.comm))
             self.tgt_petsc[mode] = tgt_vec
 
             src_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size, dtype=float),
-                                                  comm=self.comm)
+                                                  comm=_unwrap_comm(self.comm))
             self.src_petsc[mode] = src_vec
 
-            src_indexset = PETSc.IS().createGeneral(full_src_inds, comm=self.comm)
-            tgt_indexset = PETSc.IS().createGeneral(full_tgt_inds, comm=self.comm)
+            src_indexset = PETSc.IS().createGeneral(full_src_inds, comm=_unwrap_comm(self.comm))
+            tgt_indexset = PETSc.IS().createGeneral(full_tgt_inds, comm=_unwrap_comm(self.comm))
 
             return PETSc.Scatter().create(src_vec, src_indexset, tgt_vec, tgt_indexset)
 
