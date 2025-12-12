@@ -712,17 +712,18 @@ class AllConnGraph(nx.DiGraph):
         node_meta = self.nodes[node]
         if src_node is None:
             src_node = self.get_root(node)
-            src_meta = self.nodes[src_node]
+        src_meta = self.nodes[src_node]
+
+        src_inds_list = node_meta.src_inds_list
 
         if not get_remote and self.comm.size > 1:
             if src_meta.distributed and not node_meta.distributed:
                 raise RuntimeError(f"{self.msginfo}: Non-distributed variable '{node[1]}' has "
                                    f"a distributed source, '{src_node[1]}', so you must retrieve "
                                    "its value using 'get_remote=True'.")
-            elif node_meta.distributed:
+            elif node_meta.distributed and src_inds_list:
                 if src_meta.distributed or src_meta.remote:
                     if src_meta.distributed:
-                        src_inds_list = node_meta.src_inds_list
                         min_idx, max_idx = idx_list_to_extent(src_meta.global_shape, src_inds_list)
                         var_idx = self._var_allprocs_abs2idx[src_node[1]]
                         sizes = self._var_sizes['output'][:, var_idx]
