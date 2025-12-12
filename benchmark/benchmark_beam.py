@@ -1,10 +1,11 @@
 """
-This benchmark documents a performance problem with data transfers that needs to be examined.
+Benchmark documents a performance problem with data transfers that needs to be examined.
 """
 import unittest
 
 import openmdao.api as om
-from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
+from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import \
+    MultipointBeamGroup
 
 
 class BenchBeamNP1(unittest.TestCase):

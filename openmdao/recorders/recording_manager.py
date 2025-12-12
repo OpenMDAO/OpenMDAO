@@ -18,7 +18,7 @@ class RecordingManager(object):
 
     def __init__(self):
         """
-        init.
+        Init.
         """
         self._recorders = []
 

@@ -137,7 +137,6 @@ def _mem_prof_exec(options, user_args):
     """
     Process command line args and perform memory profiling on a specified python file.
     """
-
     progname = options.file[0]
     sys.path.insert(0, os.path.dirname(progname))
 

@@ -22,5 +22,9 @@ except ImportError:
         ----------
         f : function
             The function to be decorated.
+        *args : tuple
+            Dummy positional arguments.
+        **kwargs : dict
+            Dummy keyword arguments.
         """
         return f

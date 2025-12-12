@@ -1,5 +1,5 @@
 """
-This package contains various functions that may be useful in component compute methods.
+Various functions that may be useful in component compute methods.
 
 These functions are implemented using jax.numpy for the underlying calculations.
 This will allow these functions to be used in a way that supports jax's automatic differentiation

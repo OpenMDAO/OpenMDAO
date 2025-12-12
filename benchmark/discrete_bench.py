@@ -50,6 +50,27 @@ class ManyVarComp(ExplicitComponent):
 
 
 def build_model(ncomps=1, ndiscrete_ins=10, ndiscrete_outs=10, nins=10, nouts=10):
+    """
+    Create and return the problem to run the model.
+
+    Parameters
+    ----------
+    ncomps : int
+        The number of components in the model. Defaults to 1.
+    ndiscrete_ins : int
+        The number of discrete inputs in each component. Defaults to 10.
+    ndiscrete_outs : int
+        The number of discrete outputs in each component. Defaults to 10.
+    nins : int
+        The number of continuous inputs in each component. Defaults to 10.
+    nouts : int
+        The number of continuous outputs in each component. Defaults to 10.
+
+    Returns
+    -------
+    Problem
+        The problem which runs the model.
+    """
     p = Problem()
     model = p.model
     ivc = model.add_subsystem('ivc', IndepVarComp())
@@ -93,7 +114,8 @@ if __name__ == '__main__':
     import time
 
     parser = argparse.ArgumentParser(description="Benchmark a connected series of components with "
-                                     "specified numbers of inputs, outputs, and discrete inputs and outputs.")
+                                     "specified numbers of inputs, outputs, and discrete inputs and"
+                                     " outputs.")
     parser.add_argument('--comps', action='store', default=1, type=int, dest='comps',
                         help='Number of connected components (default is 1).')
     parser.add_argument('--ins', action='store', default=10, type=int, dest='ins',

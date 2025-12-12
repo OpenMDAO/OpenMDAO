@@ -87,6 +87,9 @@ async def create_help(playwright, output_file):
         subprocess.run(cmd.split())  # nosec: trusted input
 
 async def main():
+    """
+    Run the commands under playwright to generate html help.
+    """
     async with async_playwright() as playwright:
         for cmd in cmd_list:
             print("Generating diagram...")

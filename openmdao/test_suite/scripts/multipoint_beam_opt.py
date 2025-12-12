@@ -2,7 +2,8 @@
 import numpy as np
 
 import openmdao.api as om
-from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
+from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group \
+    import MultipointBeamGroup
 
 try:
     from openmdao.vectors.petsc_vector import PETScVector

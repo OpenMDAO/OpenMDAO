@@ -6,7 +6,7 @@ from warnings import warn
 
 def get_tag_info():
     """
-    Return the latest git tag, meaning, highest numerically, as a string, and the associated commit ID.
+    Return the latest git tag (highest numerically) as a string, and the associated commit ID.
     """
     # using a pattern to only grab tags that are in version format "X.Y.Z"
     git_versions = subprocess.Popen(['git', 'tag', '-l', '*.*.*'],  # nosec: trusted input
@@ -53,8 +53,7 @@ def get_commit_info():
 
 def get_doc_version():
     """
-    Returns either a git commit ID, or a X.Y.Z release number,
-    and an indicator if this is a release or not
+    Return either a git commit ID, or a X.Y.Z release number, and an indicator if this is a release.
     """
     release_tag, release_commit = get_tag_info()
 
