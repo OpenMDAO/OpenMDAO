@@ -1,10 +1,31 @@
+"""
+
+A command-line tool for creating the OpenMDAO release notes.
+
+python -m openmdao.devtools.make_release_notes
+
+Users will need to put their GitHub personal access token in the environment GITHUB_PAT to use this tool.
+
+This will create a local cache of pull requests, saved in the path of this script.
+If this cache does not exist, it will first pull all pull request from the last year.
+This cache is saved as `{REPO_NAME}_pulls.json` (so is `OPENMDAO_pulls.json by default`).
+
+Users can use this on other repositories as well with the -r or --repo option, which expects a string in owner/repo format.
+
+Options
+-------
+  -h, --help       show this help message and exit
+  -r, --repo REPO  GitHub repository in format owner/repo (default: OpenMDAO/OpenMDAO)
+
+"""
+
 from datetime import datetime, timezone, timedelta
 import os
 from pathlib import Path
 from typing import Optional
 import argparse
 
-from github import Github
+from github import Github, Auth
 from pydantic import BaseModel, Field
 
 
@@ -207,15 +228,33 @@ def main():
         help='GitHub repository in format owner/repo (default: OpenMDAO/OpenMDAO)'
     )
 
+    parser.add_argument(
+        '-l', '--list-caches',
+        action='store_true',
+        help='Show the absolute path of any cache files.'
+    )
+
+    this_dir = Path(__file__).parent
+
     args = parser.parse_args()
     repo_name = args.repo
 
+    if args.list_caches:
+        cache_files = list(this_dir.glob("*_pulls.json"))
+        if not cache_files:
+            print('\nNo cache files found.')
+        else:
+            print('Existing cache files:')
+            for f in cache_files:
+                print(f'  {f}')
+        exit(0)
+
     # Cache file location based on repo name
-    cache_file = Path(f'{repo_name.split("/")[-1]}_pulls.json')
+    cache_file = this_dir / f'{repo_name.split("/")[-1]}_pulls.json'
 
     print(f"Working with repository: {repo_name}")
 
-    g = Github(PERSONAL_ACCESS_TOKEN)
+    g = Github(auth=Auth.Token(PERSONAL_ACCESS_TOKEN))
     repo = g.get_repo(repo_name)
 
     # Check if cache exists
