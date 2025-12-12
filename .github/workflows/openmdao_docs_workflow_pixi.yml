@@ -51,7 +51,7 @@ jobs:
           # test baseline versions on Ubuntu
           - NAME: Ubuntu py313
             OS: ubuntu-24.04
-            PUBLISH: false
+            PUBLISH: true
             PIXI_ENVIRONMENT: dev
             SNOPT: ''
 

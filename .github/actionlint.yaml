@@ -1,0 +1,12 @@
+# actionlint configuration
+# https://github.com/rhysd/actionlint/blob/main/docs/config.md
+
+self-hosted-runner:
+  # Custom runner labels used in this repository
+  labels:
+    - ubuntu-24.04-arm
+
+shellcheck:
+  # Disable specific shellcheck rules
+  exclude-rules:
+    - SC2129  # Ignore suggestion about grouping redirects

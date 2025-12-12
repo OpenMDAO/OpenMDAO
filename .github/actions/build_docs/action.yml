@@ -35,6 +35,7 @@ runs:
         echo "matrix_name: ${{ inputs.matrix_name }}"
         echo "use_snopt: ${{ inputs.use_snopt }}"
         echo "publish: ${{ inputs.publish }}"
+        echo "pixi_env: ${{ inputs.pixi_env }}"
         echo "=================================="
 
     - name: Build docs

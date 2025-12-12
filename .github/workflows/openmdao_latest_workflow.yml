@@ -50,7 +50,6 @@ jobs:
             OS: ubuntu-latest
             PY: 3
             NUMPY: 2
-            SNOPT: 7.7
             PETSc: true
 
           # test latest versions on macos
@@ -58,7 +57,6 @@ jobs:
             OS: macos-latest
             PY: 3
             NUMPY: 2
-            SNOPT: 7.7
             PETSc: true
 
     runs-on: ${{ matrix.OS }}
@@ -86,17 +84,6 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: core.setFailed('The ${{ matrix.NAME }} job was not included in the run, exiting...');
-
-      - name: Create SSH key
-        if: (matrix.SNOPT || matrix.BUILD_DOCS)
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-        run: |
-          mkdir -p ~/.ssh/
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          sudo chmod 600 ~/.ssh/id_rsa
-          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Checkout code
         uses: actions/checkout@v5
@@ -162,42 +149,6 @@ jobs:
         run: |
           source .github/scripts/install_latest_deps.sh
 
-      - name: Install pyOptSparse
-        if: ${{ matrix.PYOPTSPARSE }}
-        env:
-          SNOPT_LOCATION: ${{ secrets.SNOPT_LOCATION }}
-          SNOPT_VERSION: ${{ matrix.SNOPT }}
-        run: |
-          echo "============================================================="
-          echo "Define useful functions"
-          echo "============================================================="
-          function latest_version() {
-            local REPO_URL=$1/releases/latest
-            local LATEST_URL=`curl -fsSLI -o /dev/null -w %{url_effective} $REPO_URL`
-            local LATEST_VER=`echo $LATEST_URL | awk '{split($0,a,"/tag/"); print a[2]}'`
-            echo $LATEST_VER
-          }
-          function latest_branch() {
-            local LATEST_VER=$(latest_version $1)
-            echo git+$1@$LATEST_VER
-          }
-
-          echo "============================================================="
-          echo "Install latest pyoptsparse"
-          echo "============================================================="
-          python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
-          BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
-          if [[ "${{ matrix.SNOPT }}" ]]; then
-              .github/actions/install_pyoptsparse/download_snopt.sh
-              if [ -d "SNOPT" ] ; then
-                SNOPT="-s SNOPT/src"
-              fi
-            else
-              echo "SNOPT source is not available"
-            fi
-          fi
-          build_pyoptsparse $BRANCH $SNOPT
-
       - name: Install OpenMDAO
         run: |
           echo "============================================================="
@@ -216,26 +167,26 @@ jobs:
           echo "============================================================="
           echo "Check installed versions of Python, Numpy and Scipy"
           echo "============================================================="
-          echo 'errors<<EOF' >> $GITHUB_OUTPUT
+          echo 'errors<<EOF' >> "$GITHUB_OUTPUT"
 
-          FINAL_VER=`python -c "import platform; print(platform.python_version())"`
+          FINAL_VER=$(python -c "import platform; print(platform.python_version())")
           if [[ ! "$FINAL_VER" == "${{ matrix.PY }}"* ]]; then
-            echo "Python version was changed from ${{ matrix.PY }} to $FINAL_VER" >> $GITHUB_OUTPUT
+            echo "Python version was changed from ${{ matrix.PY }} to $FINAL_VER" >> "$GITHUB_OUTPUT"
           fi
 
-          FINAL_VER=`python -c "import numpy; print(numpy.__version__)"`
+          FINAL_VER=$(python -c "import numpy; print(numpy.__version__)")
           if [[ ! "$FINAL_VER" == "$NUMPY_VER"* ]]; then
-            echo "NumPy version was changed from $NUMPY_VER to $FINAL_VER" >> $GITHUB_OUTPUT
+            echo "NumPy version was changed from $NUMPY_VER to $FINAL_VER" >> "$GITHUB_OUTPUT"
           fi
 
-          FINAL_VER=`python -c "import scipy; print(scipy.__version__)"`
+          FINAL_VER=$(python -c "import scipy; print(scipy.__version__)")
           if [[ ! "$FINAL_VER" == "$SCIPY_VER"* ]]; then
-            echo "SciPy version was changed from $SCIPY_VER to $FINAL_VER" >> $GITHUB_OUTPUT
+            echo "SciPy version was changed from $SCIPY_VER to $FINAL_VER" >> "$GITHUB_OUTPUT"
           fi
 
-          echo 'EOF' >> $GITHUB_OUTPUT
+          echo 'EOF' >> "$GITHUB_OUTPUT"
 
-          grep changed $GITHUB_OUTPUT || echo ""
+          grep changed "$GITHUB_OUTPUT" || echo ""
 
       # Enable tmate debugging of manually-triggered workflows if the input option was provided
       #
@@ -259,57 +210,10 @@ jobs:
           echo "============================================================="
           echo "Run tests (from directory other than repo root)"
           echo "============================================================="
-          cd $HOME
-          RPT_FILE=`pwd`/deprecations.txt
-          echo "RPT_FILE=$RPT_FILE" >> $GITHUB_ENV
-          testflo -n 1 openmdao --timeout=240 --deprecations_report=$RPT_FILE --exclude=test_warnings_filters
-
-      - name: Build docs
-        id: build_docs
-        if: matrix.BUILD_DOCS
-        continue-on-error: true
-        run: |
-          export OPENMDAO_REPORTS=0
-          export PYDEVD_DISABLE_FILE_VALIDATION=1
-
-          cd openmdao/docs
-          if [[ "${{ matrix.SNOPT }}" ]]; then
-            echo "============================================================="
-            echo "Building docs with SNOPT examples."
-            echo "============================================================="
-          else
-            echo "============================================================="
-            echo "Disabling SNOPT cells in notebooks."
-            echo "============================================================="
-            python openmdao_book/other/disable_snopt_cells.py
-          fi
-
-          echo "============================================================="
-          echo "Starting ipcluster to run MPI under notebooks"
-          echo "============================================================="
-          ./ipcluster_start.sh
-          sleep 12
-
-          echo "============================================================="
-          echo "Building the docs"
-          echo "============================================================="
-          echo "building source docs..."
-          python build_source_docs.py
-          echo "building book..."
-          jupyter-book build -W --keep-going openmdao_book
-          echo "copying build artifacts..."
-          python copy_build_artifacts.py
-
-      - name: Display doc build reports
-        if: steps.build_docs.outcome == 'failure'
-        continue-on-error: true
-        run: |
-          for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log'); do
-            echo "============================================================="
-            echo $f
-            echo "============================================================="
-            cat $f
-          done
+          cd "$HOME"
+          RPT_FILE=$(pwd)/deprecations.txt
+          echo "RPT_FILE=$RPT_FILE" >> "$GITHUB_ENV"
+          testflo -n 1 openmdao --timeout=240 --deprecations_report="$RPT_FILE" --exclude=test_warnings_filters
 
       - name: Deprecations Report
         id: deprecations_report
@@ -318,35 +222,13 @@ jobs:
           echo "============================================================="
           echo "Display deprecations report"
           echo "============================================================="
-          cat $RPT_FILE
+          cat "$RPT_FILE"
 
-          echo 'summary<<EOF' >> $GITHUB_OUTPUT
-          head -n 6 $RPT_FILE | cut -d':' -f 1 >> $GITHUB_OUTPUT
-          echo 'EOF' >> $GITHUB_OUTPUT
+          echo 'summary<<EOF' >> "$GITHUB_OUTPUT"
+          head -n 6 "$RPT_FILE" | cut -d':' -f 1 >> "$GITHUB_OUTPUT"
+          echo 'EOF' >> "$GITHUB_OUTPUT"
 
-          grep '^0 unique deprecation warnings' $RPT_FILE
-
-      - name: Scan for security issues
-        if: matrix.BANDIT
-        id: bandit
-        continue-on-error: true
-        run: |
-          python -m pip install bandit
-          echo "============================================================="
-          echo "Run bandit scan for high/medium severity issues"
-          echo "============================================================="
-          cd ${{ github.workspace }}
-          python -m bandit -c bandit.yml -ll -r openmdao
-
-      - name: Slack security issue
-        if: steps.bandit.outcome == 'failure'
-        uses: act10ns/slack@v2.0.0
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: 'warning'
-          message:
-            Security issue found on `${{ matrix.NAME }}` build.
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          grep '^0 unique deprecation warnings' "$RPT_FILE"
 
       - name: Slack env change
         if: steps.env_info.outputs.errors != ''
@@ -370,16 +252,6 @@ jobs:
             Unit testing failed on `${{ matrix.NAME }}` build.
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-      - name: Slack doc build failure
-        if: steps.build_docs.outcome == 'failure'
-        uses: act10ns/slack@v2.0.0
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          status: ${{ steps.build_docs.outcome }}
-          message: |
-            Doc build failed on `${{ matrix.NAME }}` build.
-            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
       - name: Slack deprecation warnings
         if: steps.deprecations_report.outcome == 'failure'
         uses: act10ns/slack@v2.0.0
@@ -392,18 +264,11 @@ jobs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Fail the workflow if tests or doc build failed
-        if: steps.run_tests.outcome == 'failure' || steps.build_docs.outcome == 'failure'
+        if: steps.run_tests.outcome == 'failure'
         uses: actions/github-script@v8
         with:
           script: |
               let test_fail = ${{ steps.run_tests.outcome == 'failure' }};
-              let docs_fail = ${{ steps.build_docs.outcome == 'failure' }};
-              if (test_fail && docs_fail) {
-                  core.setFailed('Tests and doc build failed.');
-              }
-              else if (test_fail) {
+              if (test_fail) {
                   core.setFailed('Tests failed.');
-              }
-              else if (docs_fail) {
-                  core.setFailed('Doc build failed.');
               }

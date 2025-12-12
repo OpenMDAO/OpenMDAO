@@ -101,7 +101,11 @@ tqdm = "*"
 pydoe3 = "*"
 
 [feature.opt.dependencies]
-pyoptsparse = ">=2.14.0"
+pyoptsparse = ">=2.14.2"
+cyipopt = "*"
+
+[feature.opt-oldest.dependencies]
+pyoptsparse = "==2.14.2"
 cyipopt = "*"
 
 # Jax not available for windows on conda-forge
@@ -161,6 +165,16 @@ colorama = "*"
 matplotlib = "*"
 rich = "*"
 
+[feature.local-pyoptsparse.dependencies]
+swig = "*"
+cython = "*"
+compilers = "*"
+cmake = "*"
+meson = "*"
+liblapack = "*"
+libblas = "*"
+pkg-config = "*"
+
 ###############################################
 # Oldest supported versions
 ###############################################
@@ -179,16 +193,21 @@ networkx = "==3.3"
 
 # Default - uses whatever Python solver picks
 default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test"], solve-group = "default" }
-dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging"], solve-group = "default" }
 minimal = { features = ["py313", "test"], solve-group = "default" }
 
 # Oldest supported versions
-oldest = { features = ["deps-oldest", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "oldest" }
+oldest = { features = ["deps-oldest", "doe", "opt-oldest", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "oldest" }
 
 # Python version matrix
 py311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py311" }
 py312 = { features = ["py312", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py312" }
 py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py313" }
+
+# Development-oriented environment
+dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging"], solve-group = "default" }
+
+# Omit pyoptsparse so it can be installed locally
+dev-local-pyoptsparse = { features = ["py313", "doe", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging", "local-pyoptsparse"], solve-group = "default" }
 
 ###############################################
 # Tasks
@@ -198,3 +217,12 @@ py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visua
 
 # Development workflow helpers
 clean = "rm -rf packaging dist *.egg-info .pixi"
+
+# Install OpenMDAO in development mode and set up pre-commit hooks
+install-openmdao-dev = { cmd = "pip install --no-deps -e . && pre-commit install", description = "Install OpenMDAO in development mode and set up pre-commit hooks" }
+
+# Install latest OpenMDAO from PyPI
+install-openmdao-latest = { cmd = "pip install --no-deps openmdao", description = "Install latest OpenMDAO from PyPI" }
+
+# Install OpenMDAO from GitHub master branch
+install-openmdao-master = { cmd = "pip install --no-deps git+https://github.com/OpenMDAO/OpenMDAO.git@master", description = "Install OpenMDAO from GitHub master branch" }
