@@ -114,7 +114,7 @@ class KrigingSurrogate(SurrogateModel):
                                   "it to the given file. If the specified file exists, it will be "
                                   "used to load the weights")
 
-    def train(self, x, y, method='L-BFGS-B', **minimize_options):
+    def train(self, x, y, method='SLSQP', **minimize_options):
         """
         Train the surrogate model with the given set of inputs and outputs.
 
