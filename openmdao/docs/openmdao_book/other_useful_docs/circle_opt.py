@@ -12,14 +12,17 @@ class CircleOpt(om.Group):
 
         # the following were randomly generated using np.random.random(10)*2-1 to randomly
         # disperse them within a unit circle centered at the origin.
-        indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
-                                          0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
-        indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
-                                          -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+        indeps.add_output('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,
+                                          0.62183717,  0.04007379,  0.46044942, -0.10129622,
+                                          0.27720413, -0.37107886]))
+        indeps.add_output('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912,
+                                         -0.67290778, -0.86236787, -0.97500023,  0.47739414,
+                                          0.51174103,  0.10052582]))
         indeps.add_output('r', .7)
 
         self.add_subsystem('arctan_yox', om.ExecComp('g=arctan(y/x)', has_diag_partials=True,
-                                                     g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)))
+                                                     g=np.ones(SIZE), x=np.ones(SIZE),
+                                                     y=np.ones(SIZE)))
 
         self.add_subsystem('circle', om.ExecComp('area=pi*r**2'))
 
@@ -34,7 +37,8 @@ class CircleOpt(om.Group):
                                                           g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                           odd=np.ones(SIZE//2)))
 
-        self.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        self.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE),
+                           x=np.ones(SIZE)))
 
         IND = np.arange(SIZE, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices

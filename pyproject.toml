@@ -206,6 +206,7 @@ ignore = [
     'D102',  # Don't require docstring in public method
     'D200',  # One-line docstring should fit on one line
     'D400',  # Sometimes you just don't need a period.
+    'E741',  # Allow ambiguous variable names (I)
 ]
 exclude = [
     ".git",
@@ -230,6 +231,8 @@ convention = "numpy"
 # Ignore files in the tests.
 "**/test_suite/**" = ["D", "E", "F"]
 "**/tests/*.py" = ["D", "E", "F"]
-"**/openmdao_book*/**" = ["D", "E", "F"]
+# Don't worry about devtools
 "**/devtools/**" = ["D", "E", "F"]
+# Don't worry about docs
+"*.ipynb" = ["D", "E", "F"]
 

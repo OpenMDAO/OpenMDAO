@@ -1,4 +1,4 @@
-""" Definition of the Paraboloid component.
+"""Definition of the Paraboloid component.
 
 Evaluates the equation:
 
