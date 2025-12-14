@@ -86,31 +86,42 @@ class KrigingSurrogate(SurrogateModel):
         """
         Declare options before kwargs are processed in the init method.
         """
+        import sys
+
         self.options.declare('eval_rmse', types=bool, default=False,
                              desc="Flag indicating whether the Root Mean Squared Error (RMSE) "
                                   "should be computed. Set to False by default.")
 
         # nugget smoothing parameter from [Sasena, 2002]
-        self.options.declare('nugget', default=10. * MACHINE_EPSILON,
+        self.options.declare('nugget', default=1.0e-6,
                              desc="Nugget smoothing parameter for smoothing noisy data. Represents "
                                   "the variance of the input values. If nugget is an ndarray, it "
                                   "must be of the same length as the number of training points. "
-                                  "Default: 10. * Machine Epsilon")
+                                  "Default: 1e-6")
 
-        self.options.declare('lapack_driver', types=str, default='gesvd',
-                             desc="Which lapack driver should be used for scipy's linalg.svd."
-                                  "Options are 'gesdd' which is faster but not as robust,"
-                                  "or 'gesvd' which is slower but more reliable."
-                                  "'gesvd' is the default.")
+        # Platform-dependent default for lapack_driver
+        # On Windows, gesvd can hang with ill-conditioned matrices, so use gesdd
+        default_driver = 'gesdd' if sys.platform == 'win32' else 'gesvd'
+
+        self.options.declare('lapack_driver', types=str, default=default_driver,
+                             desc="Which lapack driver should be used for scipy's linalg.svd. "
+                                  "Options are 'gesdd' which is faster but not as robust, "
+                                  "or 'gesvd' which is slower but more reliable. "
+                                  f"Default is '{default_driver}' for this platform.")
 
         self.options.declare('training_cache', types=str, default=None,
                              desc="Cache the trained model to avoid repeating training and write "
                                   "it to the given file. If the specified file exists, it will be "
                                   "used to load the weights")
 
-    def train(self, x, y):
+    def train(self, x, y, method='L-BFGS-B', **minimize_options):
         """
         Train the surrogate model with the given set of inputs and outputs.
+
+        Additional options for the internal hyperparameter training with
+        scipy.optimize.minimize can be passed as keyword arguments.
+
+        The default options passed are `{'eps': 1e-3, 'maxiter': 50}`.
 
         Parameters
         ----------
@@ -118,6 +129,12 @@ class KrigingSurrogate(SurrogateModel):
             Training input locations.
         y : array-like
             Model responses at given inputs.
+        method : str, optional
+            Optimization method to use for hyperparameter tuning.
+            Default is 'L-BFGS-B', which is the standard for Kriging/Gaussian processes.
+            Other options include 'SLSQP', 'TNC', etc.
+        **minimize_options : dict
+            Additional options passed to scipy.optimize.minimize.
         """
         super().train(x, y)
         x, y = np.atleast_2d(x, y)
@@ -192,14 +209,17 @@ class KrigingSurrogate(SurrogateModel):
 
         bounds = [(np.log(1e-5), np.log(1e5)) for _ in range(self.n_dims)]
 
-        options = {'eps': 1e-3}
+        options = {'eps': 1e-3, 'maxiter': 50}
 
         if cache:
             # Enable logging since we expect the model to take long to train
             options['disp'] = True
             options['iprint'] = 2
+        
+        options.update(minimize_options)
 
-        optResult = self._minimize(_calcll, 1e-1 * np.ones(self.n_dims), method='slsqp',
+        optResult = self._minimize(_calcll, 1e-1 * np.ones(self.n_dims),
+                                   method=method,
                                    options=options,
                                    bounds=bounds)
 
@@ -278,7 +298,14 @@ class KrigingSurrogate(SurrogateModel):
         # x = V S^-1 U^* b.
         # Tikhonov regularization is used to make the solution significantly
         # more robust.
-        h = 1e-8 * S[0]
+        # Adaptive Tikhonov regularization based on condition number
+        condition_number = S[0] / S[-1]
+        if condition_number > 1e10:
+            # For ill-conditioned matrices, use stronger regularization
+            h = 1e-6 * S[0]
+        else:
+            # For well-conditioned matrices, use current regularization
+            h = 1e-8 * S[0]
         inv_factors = S / (S ** 2. + h ** 2.)
 
         alpha = Vh.T.dot(np.einsum('j,kj,kl->jl', inv_factors, U, Y))
