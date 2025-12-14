@@ -299,13 +299,7 @@ class KrigingSurrogate(SurrogateModel):
         # Tikhonov regularization is used to make the solution significantly
         # more robust.
         # Adaptive Tikhonov regularization based on condition number
-        condition_number = S[0] / S[-1]
-        if condition_number > 1e10:
-            # For ill-conditioned matrices, use stronger regularization
-            h = 1e-6 * S[0]
-        else:
-            # For well-conditioned matrices, use current regularization
-            h = 1e-8 * S[0]
+        h = 1e-8 * S[0]
         inv_factors = S / (S ** 2. + h ** 2.)
 
         alpha = Vh.T.dot(np.einsum('j,kj,kl->jl', inv_factors, U, Y))
