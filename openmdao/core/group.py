@@ -11,7 +11,7 @@ import numpy as np
 import networkx as nx
 
 from openmdao.core.configinfo import _ConfigInfo
-from openmdao.core.system import System, collect_errors
+from openmdao.core.system import System
 from openmdao.core.component import Component, _DictValues
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.core.constants import _UNDEFINED, INT_DTYPE, _SetupStatus
@@ -25,7 +25,7 @@ from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import _flatten_src_indices, \
     ValueRepeater
 from openmdao.utils.general_utils import shape2tuple, ensure_compatible, \
-    meta2src_iter, is_undefined, env_truthy
+    meta2src_iter, is_undefined, env_truthy, collect_errors
 from openmdao.utils.units import unit_conversion, simplify_unit, _find_unit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
     get_unresolved_knowns, is_unresolved, get_active_edges, are_connected

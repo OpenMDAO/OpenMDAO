@@ -13,7 +13,7 @@ from numpy import ndarray, isscalar, ndim, atleast_1d
 from scipy.sparse import issparse, coo_matrix, csr_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, collect_errors, _iter_derivs
+    global_meta_names, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.subjac import Subjac
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
@@ -23,7 +23,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, sparsity_diff_viz
 from openmdao.utils.deriv_display import _deriv_display, _deriv_display_compact
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, inconsistent_across_procs, LocalRangeIterable
+    find_matches, make_set, inconsistent_across_procs, LocalRangeIterable, collect_errors
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation, OMInvalidCheckDerivativesOptionsWarning

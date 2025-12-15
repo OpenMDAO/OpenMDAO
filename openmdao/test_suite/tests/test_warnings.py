@@ -54,8 +54,9 @@ class TestWarnings(unittest.TestCase):
         with warnings.catch_warnings(record=True) as w:
             p.setup()
             p.final_setup()
-            unit_warnings = [wm for wm in w if wm.category is om.UnitsWarning]
-            assert (len(unit_warnings) == 2)
+            
+        unit_warnings = [wm for wm in w if wm.category is om.UnitsWarning]
+        assert (len(unit_warnings) == 2)
 
     def test_doc_ignore_units_warning(self):
         """
@@ -152,7 +153,6 @@ class TestWarnings(unittest.TestCase):
                 p.final_setup()
 
         expected = "\nCollected errors for problem 'error_on_openmdao_warning':" \
-                   "\n   <model> <class Group>: Output 'a_comp.y' with units of 'm' is connected to input 'exec_comp.y' which has no units." \
-                   "\n   <model> <class Group>: Output 'a_comp.z' with units of 'm/s' is connected to input 'exec_comp.z' which has no units."
+                   "\n   <model> <class Group>: Output 'a_comp.y' with units of 'm' is connected to input 'exec_comp.y' which has no units."
 
         self.assertEqual(expected, str(e.exception), )

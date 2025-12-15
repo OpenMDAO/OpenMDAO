@@ -16,14 +16,14 @@ from http.server import HTTPServer
 
 from openmdao.visualization.graph_viewer import write_graph
 from openmdao.utils.general_utils import common_subpath, is_undefined, truncate_str, \
-    all_ancestors, collect_error
+    all_ancestors, collect_error, collect_errors
 from openmdao.utils.array_utils import array_connection_compatible, shape_to_len, \
     get_global_dist_shape, evenly_distrib_idxs, array_hash
 from openmdao.utils.graph_utils import dump_nodes, dump_edges
 from openmdao.utils.units import is_compatible
 from openmdao.utils.units import unit_conversion
 from openmdao.utils.indexer import indexer, Indexer, idx_list_to_extent
-from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.om_warnings import issue_warning, UnitsWarning
 from openmdao.utils.units import _is_unitless, has_val_mismatch
 from openmdao.visualization.tables.table_builder import generate_table
 from openmdao.core.constants import INT_DTYPE
@@ -2264,6 +2264,7 @@ class AllConnGraph(nx.DiGraph):
 
         return auto_nodes
 
+    @collect_errors
     def check(self, model):
         nodes = self.nodes
         in_degree = self.in_degree
@@ -2293,12 +2294,12 @@ class AllConnGraph(nx.DiGraph):
                             if uunitless and not vunitless:
                                 issue_warning(f"{model.msginfo}: Input '{v[1]}' with units of "
                                             f"'{vunits}' is connected to output '{u[1]}' "
-                                            f"which has no units.")
+                                            f"which has no units.", category=UnitsWarning)
                             elif not uunitless and vunitless:
                                 if not nodes[v].ambiguous_units:
                                     issue_warning(f"{model.msginfo}: Output '{u[1]}' with units of "
                                                 f"'{uunits}' is connected to input '{v[1]}' "
-                                                f"which has no units.")
+                                                f"which has no units.", category=UnitsWarning)
 
         desvars = model.get_design_vars()
         for req in self._required_conns:

@@ -1707,6 +1707,38 @@ def collect_error(msg, saved_errors, exc_type=None, tback=None, ident=None, msgi
     saved_errors.append((ident, msg, exc_type, tback))
 
 
+def collect_errors(method):
+    """
+    Decorate a method so that it will collect any exceptions for later display.
+
+    Parameters
+    ----------
+    method : method
+        The method to be decorated.
+
+    Returns
+    -------
+    method
+        The wrapped method.
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return method(self, *args, **kwargs)
+        except Exception:
+            if env_truthy('OPENMDAO_FAIL_FAST'):
+                raise
+
+            type_exc, exc, tb = sys.exc_info()
+            if isinstance(exc, KeyError) and self._get_saved_errors():
+                # it's likely the result of an earlier error, so ignore it
+                return
+
+            self._collect_error(str(exc), exc_type=type_exc, tback=tb)
+
+    return wrapper
+
+
 def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):
     """
     Check serial deriv values across ranks.
