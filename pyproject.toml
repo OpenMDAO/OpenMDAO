@@ -160,7 +160,7 @@ newtonsolver = "openmdao.solvers.nonlinear.newton:NewtonSolver"
 nonlinearblockgs = "openmdao.solvers.nonlinear.nonlinear_block_gs:NonlinearBlockGS"
 nonlinearblockjac = "openmdao.solvers.nonlinear.nonlinear_block_jac:NonlinearBlockJac"
 nonlinearrunonce = "openmdao.solvers.nonlinear.nonlinear_runonce:NonlinearRunOnce"
-nonlinearschursolver = "openmdao.solvers.nonlinear.nonlinear_schur:NonlinearSchurSolver"
+NonlinearSchur = "openmdao.solvers.nonlinear.nonlinear_schur:NonlinearSchur"
 
 [project.entry-points.openmdao_report]
 checks = "openmdao.error_checking.check_config:_check_report_register"

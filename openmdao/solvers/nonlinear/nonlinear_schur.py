@@ -1,4 +1,4 @@
-"""Define the NonlinearSchurSolver class."""
+"""Define the NonlinearSchur class."""
 
 
 import numpy as np
@@ -8,7 +8,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 import scipy
 
 
-class NonlinearSchurSolver(NonlinearSolver):
+class NonlinearSchur(NonlinearSolver):
     """
     Nonlinear Schur complement solver implementation.
 

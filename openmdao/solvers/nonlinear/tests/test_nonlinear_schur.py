@@ -191,7 +191,7 @@ def _run_test_problem(case, solver, mode, solution):
         p.model.linear_solver = om.DirectSolver()
 
     elif solver == "schur":
-        p.model.nonlinear_solver = om.NonlinearSchurSolver(
+        p.model.nonlinear_solver = om.NonlinearSchur(
             atol=1e-14,
             rtol=1e-14,
             solve_subsystems=True,
@@ -209,7 +209,7 @@ def _run_test_problem(case, solver, mode, solution):
         p.model.linear_solver = om.LinearSchur(mode_linear=mode)
 
     elif solver == "schur_BGS":
-        p.model.nonlinear_solver = om.NonlinearSchurSolver(
+        p.model.nonlinear_solver = om.NonlinearSchur(
             atol=1e-14,
             rtol=1e-14,
             solve_subsystems=True,
@@ -224,7 +224,7 @@ def _run_test_problem(case, solver, mode, solution):
         )
         p.model.linear_solver = om.LinearBlockGS()
     elif solver == "schur_schur":
-        p.model.nonlinear_solver = om.NonlinearSchurSolver(
+        p.model.nonlinear_solver = om.NonlinearSchur(
             atol=1e-14,
             rtol=1e-14,
             solve_subsystems=True,
