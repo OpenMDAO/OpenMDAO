@@ -1285,7 +1285,7 @@ class Group(System):
             node = ('o', name)
             node_meta = graph.nodes[node]
             if node_meta.val is not None:
-                graph.set_tree_val(self, node, node_meta.val)  # force updates of input values
+                # graph.set_tree_val(self, node, node_meta.val)  # force updates of input values
                 if node_meta.discrete:
                     self._discrete_outputs[name] = node_meta.val
                 else:
