@@ -374,6 +374,8 @@ class TestLoadCase(unittest.TestCase):
 
         model = prob.model
         model.nonlinear_solver.add_recorder(self.recorder)
+        
+        prob.final_setup()
 
         fail = not prob.run_driver().success
         prob.cleanup()
