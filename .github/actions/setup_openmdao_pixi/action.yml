@@ -64,6 +64,7 @@ runs:
         environments: ${{ inputs.environment }}
         frozen: ${{ inputs.frozen }}
         cache: false
+        post-cleanup:  ${{ runner.os != 'Windows' }}  # Issue in cleanup on windows
 
     - name: 'Install OpenMDAO'
       shell: bash -l {0}
