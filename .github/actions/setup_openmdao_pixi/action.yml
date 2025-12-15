@@ -6,6 +6,10 @@ inputs:
     description: 'Pixi environment(s) to install'
     required: false
     default: 'py313'
+  openmdao_pixi_ref:
+    description: 'OpenMDAO git ref to use for pixi.toml (branch/tag/commit, default: master)'
+    required: false
+    default: 'master'
   frozen:
     description: 'Use frozen lock file (recommended for CI)'
     required: false
@@ -17,11 +21,7 @@ inputs:
   openmdao_version:
     description: 'OpenMDAO version (for PyPI and Github installs only): "" (latest) or str (e.g. "3.42.0")'
     required: false
-    default: ''
-  openmdao_ref:
-    description: 'OpenMDAO git ref to use for pixi.toml (branch/tag/commit, default: master)'
-    required: false
-    default: 'master'
+    default: '''
 
 runs:
   using: 'composite'
@@ -37,12 +37,12 @@ runs:
           mkdir -p ${{ github.workspace }}/.openmdao-pixi
 
           # Fetch pixi.toml
-          curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_ref }}/pixi.toml" \
+          curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_pixi_ref }}/pixi.toml" \
             -o ${{ github.workspace }}/.openmdao-pixi/pixi.toml
 
           # Fetch pixi.lock if using frozen mode
           if [[ "${{ inputs.frozen }}" == "true" ]]; then
-            curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_ref }}/pixi.lock" \
+            curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_pixi_ref }}/pixi.lock" \
               -o ${{ github.workspace }}/.openmdao-pixi/pixi.lock
           fi
 
