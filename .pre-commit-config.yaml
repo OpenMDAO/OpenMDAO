@@ -6,3 +6,12 @@ repos:
     # Run the linter.
     - id: ruff
       types_or: [ python, pyi, jupyter ]
+
+- repo: https://github.com/rhysd/actionlint
+  rev: v1.7.4
+  hooks:
+    - id: actionlint
+      name: Lint GitHub Actions workflows
+      # For now, only run on the pixi workflows
+      files: ^\.github/workflows/.*_pixi\.ya?ml$
+      # files: ^\.github/workflows/.*\.ya?ml$

@@ -85,7 +85,7 @@ runs:
 
           local_developer)
             echo "Installing from local directory in developer mode"
-            python -m pip install -e .
+            pixi run install-openmdao-dev
             ;;
 
           local)
