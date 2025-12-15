@@ -1,6 +1,7 @@
 """Define the ExplicitComponent class."""
 
 from itertools import chain
+from types import MethodType
 
 from openmdao.jacobians.dictionary_jacobian import ExplicitDictionaryJacobian
 from openmdao.jacobians.jacobian import JacobianUpdateContext
@@ -80,6 +81,48 @@ class ExplicitComponent(Component):
         """
         if is_undefined(self.matrix_free):
             self.matrix_free = overrides_method('compute_jacvec_product', self, ExplicitComponent)
+
+    def override_method(self, name, method):
+        """
+        Dynamically add a method to this component instance.
+
+        This allows users to create an `ExplicitComponent` that has a
+        `compute_partials` or `compute_jacvec_product` that isn't defined
+        statically, but instead is dynamically created during `setup`. The
+        motivating use case is the `omjlcomps` library, where the
+        `compute_partials` or `compute_jacvec_product` methods are implemented
+        in the Julia programming language (see `omjlcomps.JuliaExplicitComp` in
+        byuflowlab/OpenMDAO.jl).
+
+        Parameters
+        ----------
+        name : str
+            The name of the method to add. Must be either 'compute_partials' or
+            'compute_jacvec_product'.
+        method : function
+            The function to add as a method. Will be converted to a MethodType if necessary.
+
+        Raises
+        ------
+        ValueError
+            If name is not 'compute_partials' or 'compute_jacvec_product'.
+        """
+        if name not in ('compute_partials', 'compute_jacvec_product'):
+            raise ValueError(f"{self.msginfo}: name must be either 'compute_partials' or "
+                             f"'compute_jacvec_product', but got '{name}'.")
+
+        # Convert to MethodType if not already a bound method
+        if not isinstance(method, MethodType):
+            method = MethodType(method, self)
+
+        # Set the method on the instance
+        setattr(self, name, method)
+
+        # Update the appropriate attribute
+        if name == 'compute_partials':
+            self._has_compute_partials = True
+        elif name == 'compute_jacvec_product':
+            self.matrix_free = True
 
     def _jac_wrt_iter(self, wrt_matches=None):
         """

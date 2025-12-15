@@ -1,0 +1,88 @@
+name: OpenMDAO Docs (pixi)
+
+on:
+  # Trigger on push or pull request events for the master branch
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Trigger on release, to publish release versioned docs to openmdao.org
+  release:
+    types: [published]
+
+  # Allow running the workflow manually from the Actions tab
+  # All jobs are included by default and may be deselected if desired
+  workflow_dispatch:
+
+    inputs:
+
+      run_name:
+        type: string
+        description: 'Name of workflow run as it will appear under Actions tab:'
+        required: false
+        default: ""
+
+      debug_enabled:
+        type: boolean
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
+
+concurrency:
+  # Cancel any existing CI runs if we push to this branch
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+run-name:  ${{ inputs.run_name }}
+
+permissions: {}
+
+jobs:
+
+  tests:
+
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # test baseline versions on Ubuntu
+          - NAME: Ubuntu py313
+            OS: ubuntu-24.04
+            PUBLISH: false
+            PIXI_ENVIRONMENT: dev
+            SNOPT: ''
+
+    runs-on: ${{ matrix.OS }}
+
+    name: ${{ matrix.NAME }}
+
+    defaults:
+      run:
+        # Note this isn't passed to the composite action
+        shell: bash -l {0}
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: 'Setup OpenMDAO pixi Environment'
+        id: setup_pixi_environment
+        uses: ./.github/actions/setup_openmdao_pixi
+        with:
+          environment: '${{ matrix.PIXI_ENVIRONMENT }}'
+          openmdao_install_from: 'wheel'
+
+      - name: 'Build and Optionally Publish Docs'
+        id: build_docs
+        uses: ./.github/actions/build_docs
+        with:
+          matrix_name: ${{ matrix.NAME }}
+          use_snopt: ${{ format('{0}', matrix.SNOPT != '') }}
+          SECRET_docs_location: ${{ secrets.DOCS_LOCATION }}
+          SECRET_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          publish: ${{ matrix.PUBLISH }}
+          use_pixi: 'true'

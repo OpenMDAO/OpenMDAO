@@ -1,0 +1,200 @@
+# OpenMDAO Pixi Environment Configuration
+#
+# Pixi provides reproducible development environments with both conda and pip packages.
+# This is especially useful for dependencies not available on PyPI (like MPI, PETSc).
+#
+# Quick Start:
+#   pixi install --frozen        # Install with exact CI-tested versions
+#   pixi shell                   # Activate the default environment
+#   pip install -e .             # Install OpenMDAO in development mode
+#
+#
+# Available Environments:
+#
+# - default: General development environment with JAX, numba, visualization, notebooks, and testing support, but no MPI.
+#            Good for users who don't want MPI capability.
+#            Usage: pixi shell  (or pixi shell -e default)
+#
+# - py311, py312, py313: Full environments pinned to specific Python versions.
+#          Useful for testing compatibility across Python versions.
+#          These are probably the most useful environments for ueers.
+#          Usage: pixi shell -e py312
+#
+# - minimal: Default dependencies only plus testing related dependencies.
+#            Used for testing in the absence of dependencies.
+#            Usage: pixi shell -e minimal
+#
+# - dev: Comprehensive environment with all dependencies as well as documentation and packaging-related dependencies.
+#        Usage: pixi shell -e docs
+#
+# - oldest: Includes oldest supported versions of all dependencies except packaging-related ones.
+#           Usage: pixi shell -e oldest
+#
+#
+# Installation:
+#   pixi install --frozen -e <environment>    # Install specific environment
+#   pixi run -e <environment> <command>       # Run command in environment
+#
+# For more information: https://pixi.sh
+
+[workspace]
+name = "openmdao"
+description = "OpenMDAO workspace"
+authors = ["OpenMDAO Team <https://github.com/OpenMDAO>"]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+
+###############################################
+# Base Dependencies
+###############################################
+
+[dependencies]
+python = ">=3.11"
+numpy = ">=2.0"
+scipy = ">=1.13"
+networkx = ">=3.3"
+pip = ">=25.3"
+packaging = ">=25.0"
+requests = ">=2.32.5"
+
+###############################################
+# Python version features
+###############################################
+
+[feature.py311.dependencies]
+python = "3.11.*"
+
+[feature.py312.dependencies]
+python = "3.12.*"
+
+[feature.py313.dependencies]
+python = "3.13.*"
+
+###############################################
+# Pin scipy <= 1.16 for for some environments
+###############################################
+
+[target.win-64.dependencies]
+scipy = ">=1.13,<1.16"
+
+[target.osx-64.dependencies]
+scipy = ">=1.13,<1.16"
+
+[target.osx-arm64.dependencies]
+scipy = ">=1.13,<1.16"
+
+##########################################################
+# Optional features (version-agnostic as much as possible)
+##########################################################
+
+[feature.docs.dependencies]
+ipyparallel = "*"
+jupyter-book = ">=1.0.3,<2"
+matplotlib = "*"
+numpydoc = "*"
+sphinx-sitemap = "*"
+idna = "*"
+jinja2 = "*"
+tqdm = "*"
+
+[feature.doe.dependencies]
+pydoe3 = "*"
+
+[feature.opt.dependencies]
+pyoptsparse = ">=2.14.0"
+cyipopt = "*"
+
+# Jax not available for windows on conda-forge
+[feature.jax.pypi-dependencies]
+jax = "*"
+
+# petsc isn't available for windows
+[feature.mpi.target.linux-64.dependencies]
+openmpi = "*"
+mpi4py = "*"
+petsc = "*"
+petsc4py = "*"
+
+[feature.mpi.target.osx-64.dependencies]
+openmpi = "*"
+mpi4py = "*"
+petsc = "*"
+petsc4py = "*"
+
+[feature.mpi.target.osx-arm64.dependencies]
+openmpi = "*"
+mpi4py = "*"
+petsc = "*"
+petsc4py = "*"
+
+[feature.notebooks.dependencies]
+ipympl = "*"
+notebook = "*"
+idna = "*"
+
+[feature.numba.dependencies]
+numba = "*"
+
+[feature.packaging.dependencies]
+hatchling = "*"
+
+[feature.test.dependencies]
+pre-commit = "*"
+aiounittest = "*"
+num2words = "*"
+numpydoc = "*"
+parameterized = "*"
+playwright = "*"
+pycodestyle = "*"
+pydocstyle = "*"
+testflo = "*"
+websockets = "*"
+actionlint = "*"
+ruff = "*"
+coverage = "*"
+nbdime = "*"
+
+[feature.visualization.dependencies]
+panel = "*"
+bokeh = "*"
+colorama = "*"
+matplotlib = "*"
+rich = "*"
+
+###############################################
+# Oldest supported versions
+###############################################
+
+[feature.deps-oldest.dependencies]
+python = "3.11.*"
+numpy = "2.0.*"
+scipy = "1.13.*"
+networkx = "==3.3"
+
+###############################################
+# Environments
+###############################################
+
+[environments]
+
+# Default - uses whatever Python solver picks
+default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test"], solve-group = "default" }
+dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging"], solve-group = "default" }
+minimal = { features = ["py313", "test"], solve-group = "default" }
+
+# Oldest supported versions
+oldest = { features = ["deps-oldest", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "oldest" }
+
+# Python version matrix
+py311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py311" }
+py312 = { features = ["py312", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py312" }
+py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py313" }
+
+###############################################
+# Tasks
+###############################################
+
+[tasks]
+
+# Development workflow helpers
+clean = "rm -rf packaging dist *.egg-info .pixi"
