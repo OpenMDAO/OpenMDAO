@@ -21,7 +21,7 @@ inputs:
   openmdao_version:
     description: 'OpenMDAO version (for PyPI and Github installs only): "" (latest) or str (e.g. "3.42.0")'
     required: false
-    default: '''
+    default: ''
 
 runs:
   using: 'composite'
