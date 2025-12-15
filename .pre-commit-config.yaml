@@ -1,14 +1,14 @@
 repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version (update periodically by running 'pre-commit autoupdate')
-  rev: v0.6.8
+  rev: v0.14.9
   hooks:
     # Run the linter.
     - id: ruff
       types_or: [ python, pyi, jupyter ]
 
 - repo: https://github.com/rhysd/actionlint
-  rev: v1.7.4
+  rev: v1.7.9
   hooks:
     - id: actionlint
       name: Lint GitHub Actions workflows
