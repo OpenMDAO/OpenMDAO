@@ -709,6 +709,7 @@ class AllConnGraph(nx.DiGraph):
 
     def get_val_from_src(self, system, name, units=None, indices=None, get_remote=False, rank=None,
                          vec_name='nonlinear', kind=None, flat=False, use_vec=False, src_node=None):
+        
         node = self.find_node(system.pathname, name)
         node_meta = self.nodes[node]
         if src_node is None:
@@ -770,6 +771,8 @@ class AllConnGraph(nx.DiGraph):
 
         if flat and not node_meta.discrete:
             val = val.ravel()
+
+        print(f"{self.msginfo}: get_val_from_src: {name} {val}") # DBG
 
         return val
 
@@ -838,9 +841,13 @@ class AllConnGraph(nx.DiGraph):
         if flat and not node_meta.discrete:
             val = val.ravel()
 
+        print(f"{system.msginfo}: get_val: {name} {val}") # DBG
+
         return val
 
     def set_val(self, system, name, val, units=None, indices=None):
+        print(f"{system.msginfo}: set_val: {name} {val}") # DBG
+
         node = self.find_node(system.pathname, name)
         node_meta = self.nodes[node]
 
