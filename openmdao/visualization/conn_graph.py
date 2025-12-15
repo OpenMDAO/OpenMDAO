@@ -930,8 +930,8 @@ class AllConnGraph(nx.DiGraph):
                                        f"indices to set it.")
                 srcval = val
 
-        # propagate shape and value down the tree
-        self.set_tree_val(model, src_node, srcval)
+            # propagate shape and value down the tree
+            self.set_tree_val(model, src_node, srcval)
 
     def set_tree_val(self, model, src_node, srcval):
         # given a source node, set its ultimate source (if different than src_node), and set

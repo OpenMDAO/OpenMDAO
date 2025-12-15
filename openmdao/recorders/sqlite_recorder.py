@@ -629,6 +629,13 @@ class SqliteRecorder(CaseRecorder):
             outputs = data['output']
             residuals = data['residual']
 
+            import pprint
+            
+            print("Inserting inputs")
+            pprint.pprint(inputs)
+            print("Inserting outputs")
+            pprint.pprint(outputs)
+
             # convert to list so this can be dumped as JSON
             for i_o_r in (inputs, outputs, residuals):
                 if i_o_r is None:
