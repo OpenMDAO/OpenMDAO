@@ -1794,68 +1794,6 @@ class Group(System):
 
         return implicit_connections
 
-    # def _setup_global_connections(self):
-    #     """
-    #     Compute dict of all connections between inputs and outputs.
-
-    #     This should only be called on the top level group.
-    #     """
-    #     assert self.pathname == '', "call _setup_global_connections on the top level Group only."
-
-    #     conn_graph = self._get_conn_graph()
-
-    #     # add nodes for all absolute inputs and connected absolute outputs
-    #     conn_graph.add_variable_meta(self)
-
-    #     if self.comm.size > 1:
-    #         conn_graph.gather_data(self)
-
-    #     conn_graph.add_implicit_connections(self, self._get_implicit_connections())
-
-    #     groups = list(self.system_iter(include_self=True, recurse=True, typ=Group))
-    #     for g in groups:
-    #         conn_graph.add_manual_connections(g)
-
-    #     # check for cycles
-    #     if not nx.is_directed_acyclic_graph(conn_graph):
-    #         cycle_edges = nx.find_cycle(conn_graph, orientation='original')
-    #         errmsg = '\n'.join([f'     {edge[0]} ---> {edge[1]}'
-    #                             for edge in cycle_edges])
-    #         self._collect_error('Cycle detected in input-to-input connections. '
-    #                             f'This is not allowed.\n{errmsg}')
-
-    #     conn_graph.update_src_inds_lists(self)
-    #     conn_graph.add_auto_ivc_nodes(self)
-
-    #     for g in groups:
-    #         conn_graph.add_group_input_defaults(g)
-
-    #     self._setup_auto_ivcs()
-    #     #self.display_conn_graph()
-
-    #     conn_graph.update_all_node_meta(self)
-    #     conn_graph.transform_input_input_connections(self)
-
-    #     conn_dict = conn_graph.create_all_conns_dict(self)
-
-    #     global_conn_dict = {'': {}}
-    #     root_dict = global_conn_dict['']
-    #     for path, conn_data in conn_dict.items():
-    #         for name in all_ancestors(path):
-    #             if name in global_conn_dict:
-    #                 global_conn_dict[name].update(conn_data)
-    #             else:
-    #                 global_conn_dict[name] = conn_data.copy()
-
-    #         # don't forget the root path!
-    #         root_dict.update(conn_data)
-
-    #     for system in self.system_iter(include_self=True, recurse=True):
-    #         if isinstance(system, Group):
-    #             system._conn_abs_in2out = conn_dict.get(system.pathname, {})
-    #             system._conn_global_abs_in2out = global_conn_dict.get(system.pathname, {})
-    #         system._resolver._conns = self._conn_global_abs_in2out
-
     def get_indep_vars(self, local, include_discrete=False):
         """
         Return a dict of independant variables contained in this group or any of its subgroups.

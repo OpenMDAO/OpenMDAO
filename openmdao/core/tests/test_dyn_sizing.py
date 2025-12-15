@@ -268,8 +268,7 @@ class TestPassSizeDistributed(unittest.TestCase):
             "\n   <model> <class Group>: Input 'C.in' has src_indices so the shape of connected output 'B.out' cannot be determined."
             "\n   <model> <class Group>: dynamic sizing of non-distributed input 'E.in' from distributed output 'D.out' without src_indices is not supported."
             "\n   <model> <class Group>: Failed to resolve shapes for ['A.out', 'B.in', 'B.out', 'E.in', 'E.out']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-            "\n   <model> <class Group>: When connecting 'B.out' to 'C.in': index 0 is out of bounds for source dimension of size 0."
-            "\n   <model> <class Group>: Can't connect distributed output 'D.out' to non-distributed input 'E.in' without specifying src_indices.")
+            "\n   <model> <class Group>: Can't automatically determine src_indices for connection from distributed variable 'D.out' to serial variable 'E.in'.")
 
 
 class ResizableComp(om.ExplicitComponent):
@@ -912,10 +911,10 @@ class TestDistribDynShapeComboNoSrcIndsErrs(unittest.TestCase):
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'serial_dist_rev_err':"
            "\n   <model> <class Group>: dynamic sizing of non-distributed output 'indeps.x' from distributed input 'comp.x' is not supported because not all comp.x ranks are the same shape (shapes=[(3,), (6,), (9,)])."
-           "\n   <model> <class Group>: Failed to resolve shapes for ['indeps.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-           "\n   'comp' <class DistCompDiffSizeKnownInput>: Can't determine src_indices automatically for input 'comp.x'. They must be supplied manually.")
+           "\n   <model> <class Group>: Failed to resolve shapes for ['indeps.x']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
 
     def test_dist_serial_fwd_err(self):
+        self.maxDiff = 1000
         p = om.Problem(name='dist_serial_fwd_err')
         indeps = p.model.add_subsystem('indeps', om.IndepVarComp())
         indeps.add_output('x', np.ones(3), distributed=True)
@@ -930,7 +929,7 @@ class TestDistribDynShapeComboNoSrcIndsErrs(unittest.TestCase):
             "\nCollected errors for problem 'dist_serial_fwd_err':\n"
             "   <model> <class Group>: dynamic sizing of non-distributed input 'comp.x' from distributed output 'indeps.x' without src_indices is not supported.\n"
             "   <model> <class Group>: Failed to resolve shapes for ['comp.x', 'comp.y']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.\n"
-            "   <model> <class Group>: Can't connect distributed output 'indeps.x' to non-distributed input 'comp.x' without specifying src_indices.")
+            "   <model> <class Group>: Can't automatically determine src_indices for connection from distributed variable 'indeps.x' to serial variable 'comp.x'.")
 
     def test_dist_serial_rev_err(self):
         p = om.Problem(name='dist_serial_rev_err')

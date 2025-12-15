@@ -847,17 +847,16 @@ class MPITests(unittest.TestCase):
 
         prob.model.connect('ivc.x0','adder.x')
         prob.setup()
-        try:
+        with self.assertRaises(Exception) as cm:
             prob.final_setup()
-        except Exception as err:
-            self.assertTrue(
-                "\nCollected errors for problem 'bad_distrib_problem':"
-                "\n   <model> <class Group>: Attempted to connect from 'ivc.x0' to 'adder.x', but "
-                "'ivc.x0' doesn't exist. Perhaps you meant to connect to one of the following outputs: ['ivc.x']."
-                "\n   <model> <class Group>: Failed to resolve shapes for ['adder.x']. To see the "
-                "dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'." in str(err))
-        else:
-            self.fail("Exception expected.")
+
+        self.assertTrue(
+            "\nCollected errors for problem 'bad_distrib_problem':"
+            "\n   <model> <class Group>: Attempted to connect from 'ivc.x0' to 'adder.x', but "
+            "'ivc.x0' doesn't exist. Perhaps you meant to connect to one of the following outputs: ['ivc.x']."
+            "\n   <model> <class Group>: Failed to resolve shapes for ['adder.x']. To see the "
+            "dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'." in str(cm.exception.args[0]))
+
 
 
 class NonParallelTests(unittest.TestCase):

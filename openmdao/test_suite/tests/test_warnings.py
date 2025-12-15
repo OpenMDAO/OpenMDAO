@@ -152,7 +152,7 @@ class TestWarnings(unittest.TestCase):
                 p.final_setup()
 
         expected = "\nCollected errors for problem 'error_on_openmdao_warning':" \
-                   "\n   <model> <class Group>: Output 'a_comp.y' with units of 'm' is connected to " \
-                   "input 'exec_comp.y' which has no units."
+                   "\n   <model> <class Group>: Output 'a_comp.y' with units of 'm' is connected to input 'exec_comp.y' which has no units." \
+                   "\n   <model> <class Group>: Output 'a_comp.z' with units of 'm/s' is connected to input 'exec_comp.z' which has no units."
 
         self.assertEqual(expected, str(e.exception), )

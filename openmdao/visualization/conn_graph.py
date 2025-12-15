@@ -509,6 +509,7 @@ class AllConnGraph(nx.DiGraph):
         self._var_allprocs_discrete = None
         self._var_allprocs_abs2idx = None
         self._var_abs2meta = None
+        self._bad_conns = set()
 
     def _collect_error(self, msg, exc_type=None, tback=None, ident=None):
         """
@@ -1017,6 +1018,7 @@ class AllConnGraph(nx.DiGraph):
             if src[0] == 'o':
                 for p in self.pred[tgt]:
                     if p[0] == 'o':
+                        self._bad_conns.add((src, tgt))
                         # sort names because sometimes the order is reversed
                         names = sorted([self.msgname(src), self.msgname(p)])
                         group._collect_error(
@@ -1258,6 +1260,7 @@ class AllConnGraph(nx.DiGraph):
             if src_io is None:
                 guesses = get_close_matches(prom_src, list(resolver.prom_iter('output')) +
                                             list(allprocs_discrete_out.keys()))
+                self._bad_conns.add((prom_src, prom_tgt))
                 group._collect_error(f"{group.msginfo}: Attempted to connect from '{prom_src}' to "
                                      f"'{prom_tgt}', but '{prom_src}' doesn't exist. Perhaps you "
                                      "meant to connect to one of the following outputs: "
@@ -1271,6 +1274,7 @@ class AllConnGraph(nx.DiGraph):
 
             if tgt_io == 'output':
                 # check that target is not also an input
+                self._bad_conns.add((prom_src, prom_tgt))
                 group._collect_error(f"{group.msginfo}: Attempted to connect from '{prom_src}' to "
                                     f"'{prom_tgt}', but '{prom_tgt}' is an output. All "
                                     "connections must be to an input.")
@@ -1279,6 +1283,7 @@ class AllConnGraph(nx.DiGraph):
             if tgt_io is None:
                 guesses = get_close_matches(prom_tgt, list(resolver.prom_iter('input')) +
                                             list(allprocs_discrete_in.keys()))
+                self._bad_conns.add((prom_src, prom_tgt))
                 group._collect_error(f"{group.msginfo}: Attempted to connect from '{prom_src}' to "
                                      f"'{prom_tgt}', but '{prom_tgt}' doesn't exist. Perhaps you "
                                      f"meant to connect to one of the following inputs: {guesses}.")
@@ -1288,6 +1293,7 @@ class AllConnGraph(nx.DiGraph):
             in_comps = {n.rpartition('.')[0] for n in resolver.absnames(prom_tgt, tgt_io)}
 
             if out_comps & in_comps:
+                self._bad_conns.add((prom_src, prom_tgt))
                 group._collect_error(f"{group.msginfo}: Source and target are in the same System "
                                      f"for connection from '{prom_src}' to '{prom_tgt}'.")
                 continue
@@ -2222,19 +2228,29 @@ class AllConnGraph(nx.DiGraph):
 
     def add_auto_ivc_nodes(self, model):
         assert model.pathname == ''
+        nodes = self.nodes
+        in_degree = self.in_degree
 
         # this occurs before the auto_ivc variables actually exist
-        dangling_inputs = [n for n in self.nodes() if n[0] == 'i' and self.in_degree(n) == 0]
+        dangling_inputs = [n for n in nodes() if n[0] == 'i' and in_degree(n) == 0]
 
-        # because we can have manual connection to nodes inside of the input tree, we have to
-        # traverse them all to make sure the root input node is actually dangling.
+        # because we can have manual connection to input nodes other than the 'root' input node,
+        # we have to traverse them all to make sure there aren't any outputs connected anywhere
+        # in the input tree..
         skip = set()
-        if self._mult_inconn_nodes:  # we can skip if no input nodes have > 1 predecessor
-            for d in dangling_inputs:
-                for _, v in dfs_edges(self, d):
-                    if v in self._mult_inconn_nodes:
+        for d in dangling_inputs:
+            for _, v in dfs_edges(self, d):
+                # if v has any output preds, then this input tree is not dangling
+                for p in self.predecessors(v):
+                    if p[0] == 'o':
                         skip.add(d)
                         break
+                if d in skip:
+                    break
+
+                if v in self._mult_inconn_nodes:
+                    skip.add(d)
+                    break
 
         if skip:
             dangling_inputs = [d for d in dangling_inputs if d not in skip]
@@ -2262,9 +2278,13 @@ class AllConnGraph(nx.DiGraph):
                         uunits = nodes[u].units
                         vmeta = nodes[v]
                         if auto and vmeta.distributed:
-                            raise ConnError(f"Distributed input '{v[1]}', is not connected.  "
-                                            "Declare an IndepVarComp and connect it to this "
-                                            "input to eliminate this error.")
+                            for s, t in self._bad_conns:
+                                if t[1] == v[1]:
+                                    break
+                            else:
+                                raise ConnError(f"Distributed input '{v[1]}', is not connected.  "
+                                                "Declare an IndepVarComp and connect it to this "
+                                                "input to eliminate this error.")
 
                         vunits = vmeta.units
                         if uunits is None or vunits is None:
