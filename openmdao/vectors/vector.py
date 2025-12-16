@@ -466,7 +466,7 @@ class Vector(object):
 
         return vinfo.view if self._under_complex_step else vinfo.view.real
 
-    def _abs_set_val(self, name, val):
+    def _abs_set_val(self, name, val, idx=_full_slice):
         """
         Set the variable value using the absolute name.
 
@@ -478,11 +478,13 @@ class Vector(object):
             Absolute name in the owning system's namespace.
         val : float or ndarray
             Value to set.
+        idx : int or slice or tuple of ints and/or slices
+            The locations where the data array should be updated.
         """
         if self._under_complex_step:
-            self._views[name].view[:] = val
+            self._views[name].view[idx] = val
         else:
-            self._views[name].view.real[:] = val
+            self._views[name].view.real[idx] = val
 
     def __setitem__(self, name, value):
         """

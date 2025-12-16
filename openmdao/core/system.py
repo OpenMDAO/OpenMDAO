@@ -5848,11 +5848,11 @@ class System(object, metaclass=SystemMetaclass):
                         if name in self._responses and self._responses[name]['alias'] is not None:
                             name = self._responses[name]['source']
                         if vec._contains_abs(name):
-                            print(f"{self.msginfo}: retrieve_DOK: {name} {get(name, False)}")  # DBG
+                            # print(f"{self.msginfo}: retrieve_DOK: {name} {get(name, False)}")  # DBG
                             vdict[name] = get(name, False)
                         else:
                             ivc_path = resolver.source(name)
-                            print(f"{self.msginfo}: retrieve_DOK (srcget): {ivc_path} {srcget(ivc_path, False)}")  # DBG
+                            # print(f"{self.msginfo}: retrieve_DOK (srcget): {ivc_path} {srcget(ivc_path, False)}")  # DBG
                             vdict[ivc_path] = srcget(ivc_path, False)
             elif local:
                 get = self._abs_get_val

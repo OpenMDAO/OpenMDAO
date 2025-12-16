@@ -709,7 +709,7 @@ class AllConnGraph(nx.DiGraph):
 
     def get_val_from_src(self, system, name, units=None, indices=None, get_remote=False, rank=None,
                          vec_name='nonlinear', kind=None, flat=False, use_vec=False, src_node=None):
-        
+
         node = self.find_node(system.pathname, name)
         node_meta = self.nodes[node]
         if src_node is None:
@@ -772,7 +772,7 @@ class AllConnGraph(nx.DiGraph):
         if flat and not node_meta.discrete:
             val = val.ravel()
 
-        print(f"{self.msginfo}: get_val_from_src: {name} {val}") # DBG
+        # print(f"{self.msginfo}: get_val_from_src: {name} {val}") # DBG
 
         return val
 
@@ -841,12 +841,12 @@ class AllConnGraph(nx.DiGraph):
         if flat and not node_meta.discrete:
             val = val.ravel()
 
-        print(f"{system.msginfo}: get_val: {name} {val}") # DBG
+        # print(f"{system.msginfo}: get_val: {name} {val}") # DBG
 
         return val
 
     def set_val(self, system, name, val, units=None, indices=None):
-        print(f"{system.msginfo}: set_val: {name} {val}") # DBG
+        # print(f"{system.msginfo}: set_val: {name} {val}") # DBG
 
         node = self.find_node(system.pathname, name)
         node_meta = self.nodes[node]
@@ -890,7 +890,7 @@ class AllConnGraph(nx.DiGraph):
 
         # do unit conversion on given val if needed
         try:
-            val = self.convert_set(val, src_units, tgt_units, (),  units)
+            sval = self.convert_set(val, src_units, tgt_units, (),  units)
         except Exception as err:
             raise ValueError(f"{system.msginfo}: Can't set value of '{self.msgname(node)}': "
                              f"{str(err)}")
@@ -909,10 +909,22 @@ class AllConnGraph(nx.DiGraph):
         if system.has_vectors():
             srcval = model._abs_get_val(src, get_remote=False)
             if np.ndim(srcval) > 0:
-                self.set_subarray(srcval, inds, val, node)
+                self.set_subarray(srcval, inds, sval, node)
             else:
-                srcval = val
+                srcval = sval
                 system._outputs._abs_set_val(src, srcval)
+
+            # also set the input if it's absolute
+            if node[0] == 'i' and node[1] in model._var_abs2meta['input']:
+                try:
+                    tval = self.convert_set(val, tgt_units, tgt_units, (),  units)
+                except Exception as err:
+                    raise ValueError(f"{system.msginfo}: Can't set value of '{self.msgname(node)}':"
+                                     f" {str(err)}")
+                if indices is None:
+                    system._inputs._abs_set_val(node[1], tval)
+                else:
+                    system._inputs._abs_set_val(node[1], tval, idx=indices())
         else:
             srcval = src_meta.val
 
@@ -920,15 +932,15 @@ class AllConnGraph(nx.DiGraph):
                 if isinstance(srcval, Number):
                     if inds:
                         raise RuntimeError("Can't set a non-array using indices.")
-                    src_meta.val = val
+                    src_meta.val = sval
                     srcval = src_meta.val
                 else:
-                    self.set_subarray(srcval, inds, val, node)
+                    self.set_subarray(srcval, inds, sval, node)
             else:
                 if inds:
                     raise RuntimeError(f"Shape of '{name}' isn't known yet so you can't use "
                                        f"indices to set it.")
-                srcval = val
+                srcval = sval
 
             # propagate shape and value down the tree
             self.set_tree_val(model, src_node, srcval)
