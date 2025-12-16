@@ -282,7 +282,12 @@ jobs:
           cd "$HOME"
 
           # Build testflo command
-          TESTFLO_CMD="testflo -n 2 openmdao --timeout=240 --coverage --coverpkg openmdao --durations=20"
+          TESTFLO_CMD="testflo -n 2 openmdao --timeout=240 --durations=20"
+
+          # Do not perform coverage on macOS
+          if [[ "${{ runner.os }}" != "macOS" ]]; then
+            TESTFLO_CMD="$TESTFLO_CMD --coverage --coverpkg openmdao"
+          fi
 
           # Add --show_skipped unless we're in minimal environment
           if [[ "${{ matrix.PIXI_ENVIRONMENT }}" != "minimal" ]]; then

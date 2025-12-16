@@ -29,32 +29,24 @@ runs:
     - name: Determine pixi.toml source
       shell: bash -l {0}
       run: |
-        # Get workspace path in correct format for bash
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          WORKSPACE=$(cygpath -u "${{ github.workspace }}")
-        else
-          WORKSPACE="${{ github.workspace }}"
-        fi
-
-        # Export for use in later steps
-        echo "WORKSPACE=${WORKSPACE}" >> $GITHUB_ENV
-
         if [[ "${{ github.repository }}" == "OpenMDAO/OpenMDAO" ]]; then
           echo "Running in OpenMDAO repo, using local pixi.toml"
-          echo "PIXI_MANIFEST=${WORKSPACE}/pixi.toml" >> $GITHUB_ENV
+          echo "PIXI_MANIFEST=${{ github.workspace }}/pixi.toml" >> $GITHUB_ENV
         else
           echo "Running outside OpenMDAO repo, fetching pixi files from GitHub"
-          mkdir -p "${WORKSPACE}/.openmdao-pixi"
+          mkdir -p ${{ github.workspace }}/.openmdao-pixi
 
-          curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_ref }}/pixi.toml" \
-            -o "${WORKSPACE}/.openmdao-pixi/pixi.toml"
+          # Fetch pixi.toml
+          curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_pixi_ref }}/pixi.toml" \
+            -o ${{ github.workspace }}/.openmdao-pixi/pixi.toml
 
+          # Fetch pixi.lock if using frozen mode
           if [[ "${{ inputs.frozen }}" == "true" ]]; then
-            curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_ref }}/pixi.lock" \
-              -o "${WORKSPACE}/.openmdao-pixi/pixi.lock"
+            curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_pixi_ref }}/pixi.lock" \
+              -o ${{ github.workspace }}/.openmdao-pixi/pixi.lock
           fi
 
-          echo "PIXI_MANIFEST=${WORKSPACE}/.openmdao-pixi/pixi.toml" >> $GITHUB_ENV
+          echo "PIXI_MANIFEST=${{ github.workspace }}/.openmdao-pixi/pixi.toml" >> $GITHUB_ENV
         fi
 
     - name: Setup Pixi
@@ -104,8 +96,8 @@ runs:
               exit 1
             fi
             echo "Building wheel"
-            pip wheel --no-deps ${{ env.WORKSPACE }}
-            WHEEL=$(find ${{ env.WORKSPACE }}/openmdao-*.whl)
+            pip wheel --no-deps ${{ github.workspace }}
+            WHEEL=$(find ${{ github.workspace }}/openmdao-*.whl)
             echo "Installing from wheel: $WHEEL"
             python -m pip install "${WHEEL}"
             ;;
@@ -116,7 +108,7 @@ runs:
               exit 1
             fi
             echo "Installing from local directory in developer mode"
-            cd ${{ env.WORKSPACE }}
+            cd ${{ github.workspace }}
             pixi run install-openmdao-dev
             ;;
 
@@ -126,7 +118,7 @@ runs:
               exit 1
             fi
             echo "Installing from local directory"
-            cd ${{ env.WORKSPACE }}
+            cd ${{ github.workspace }}
             python -m pip install .
             ;;
 
