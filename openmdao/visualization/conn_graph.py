@@ -730,7 +730,7 @@ class AllConnGraph(nx.DiGraph):
                         var_idx = self._var_allprocs_abs2idx[src_node[1]]
                         sizes = self._var_sizes['output'][:, var_idx]
                         # sizes for src var in each proc
-                        start = np.sum(sizes[:self.comm.rank])  # start index of src var on this proc
+                        start = np.sum(sizes[:self.comm.rank])  # start index of src on this proc
                         end = start + sizes[self.comm.rank]
                         err = min_idx != max_idx and (not (start <= min_idx < end) or
                                                       not (start <= max_idx < end))
