@@ -29,21 +29,26 @@ runs:
     - name: Determine pixi.toml source
       shell: bash -l {0}
       run: |
+        # Normalize path for bash on all platforms
+        WORKSPACE="${{ github.workspace }}"
+        # Convert backslashes to forward slashes (works in Git Bash)
+        WORKSPACE="${WORKSPACE//\\//}"
+
         if [[ "${{ github.repository }}" == "OpenMDAO/OpenMDAO" ]]; then
           echo "Running in OpenMDAO repo, using local pixi.toml"
-          echo "PIXI_MANIFEST=${{ github.workspace }}/pixi.toml" >> $GITHUB_ENV
+          echo "PIXI_MANIFEST=${WORKSPACE}/pixi.toml" >> $GITHUB_ENV
         else
           echo "Running outside OpenMDAO repo, fetching pixi files from GitHub"
-          mkdir -p ${{ github.workspace }}/.openmdao-pixi
+          mkdir -p "${WORKSPACE}/.openmdao-pixi"
 
           # Fetch pixi.toml
           curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_pixi_ref }}/pixi.toml" \
-            -o ${{ github.workspace }}/.openmdao-pixi/pixi.toml
+            -o "${WORKSPACE}/.openmdao-pixi/pixi.toml"
 
           # Fetch pixi.lock if using frozen mode
           if [[ "${{ inputs.frozen }}" == "true" ]]; then
             curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_pixi_ref }}/pixi.lock" \
-              -o ${{ github.workspace }}/.openmdao-pixi/pixi.lock
+              -o "${WORKSPACE}/.openmdao-pixi/pixi.lock"
           fi
 
           echo "PIXI_MANIFEST=${{ github.workspace }}/.openmdao-pixi/pixi.toml" >> $GITHUB_ENV
