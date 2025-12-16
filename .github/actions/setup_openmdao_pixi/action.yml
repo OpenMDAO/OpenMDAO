@@ -58,20 +58,20 @@ runs:
           pypi)
             if [[ -n "$VERSION" ]]; then
               echo "Installing OpenMDAO==$VERSION from PyPI"
-              python -m pip install "openmdao==${VERSION}"
+              python -m pip install "openmdao==${VERSION}" --no-deps
             else
               echo "Installing latest OpenMDAO from PyPI"
-              python -m pip install "openmdao"
+              python -m pip install "openmdao" --no-deps
             fi
             ;;
 
           github)
             if [[ -n "$VERSION" ]]; then
               echo "Installing OpenMDAO@${VERSION} from GitHub"
-              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@${VERSION}#egg=openmdao"
+              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@${VERSION}#egg=openmdao" --no-deps
             else
               echo "Installing OpenMDAO@master from GitHub"
-              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@master#egg=openmdao"
+              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@master#egg=openmdao" --no-deps
             fi
             ;;
 
@@ -80,17 +80,17 @@ runs:
             pip wheel --no-deps .
             WHEEL=$(find openmdao-*.whl)
             echo "Installing from wheel: $WHEEL"
-            python -m pip install "${WHEEL}"
+            python -m pip install "${WHEEL}" --no-deps
             ;;
 
           local_developer)
             echo "Installing from local directory in developer mode"
-            pixi run install-openmdao-dev
+            python -m pip install -e . --no-deps
             ;;
 
           local)
             echo "Installing from local directory"
-            python -m pip install .
+            python -m pip install . --no-deps
             ;;
 
           none|"")
