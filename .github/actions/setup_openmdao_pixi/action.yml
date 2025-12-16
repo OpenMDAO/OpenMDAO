@@ -104,8 +104,8 @@ runs:
             # Normalize workspace path
             WORKSPACE="${{ github.workspace }}"
             WORKSPACE="${WORKSPACE//\\//}"
-            pip wheel --no-deps "${WORKSPACE}"
-            WHEEL=$(find "${WORKSPACE}/openmdao-*.whl")
+            pip wheel --no-deps --wheel-dir=. "${WORKSPACE}"
+            WHEEL=$(find "$./openmdao-*.whl")
             echo "Installing from wheel: $WHEEL"
             python -m pip install "${WHEEL}"
             ;;
