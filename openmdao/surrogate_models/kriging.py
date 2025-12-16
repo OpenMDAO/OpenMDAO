@@ -93,11 +93,11 @@ class KrigingSurrogate(SurrogateModel):
                                   "should be computed. Set to False by default.")
 
         # nugget smoothing parameter from [Sasena, 2002]
-        self.options.declare('nugget', default=1.0e-6,
+        self.options.declare('nugget', default=10. * MACHINE_EPSILON,
                              desc="Nugget smoothing parameter for smoothing noisy data. Represents "
                                   "the variance of the input values. If nugget is an ndarray, it "
                                   "must be of the same length as the number of training points. "
-                                  "Default: 1e-6")
+                                  "Default: 10. * Machine Epsilon")
 
         # Platform-dependent default for lapack_driver
         # On Windows, gesvd can hang with ill-conditioned matrices, so use gesdd
@@ -114,14 +114,14 @@ class KrigingSurrogate(SurrogateModel):
                                   "it to the given file. If the specified file exists, it will be "
                                   "used to load the weights")
 
-    def train(self, x, y, method='SLSQP', **minimize_options):
+    def train(self, x, y, verbose=False, method='SLSQP', **minimize_options):
         """
         Train the surrogate model with the given set of inputs and outputs.
 
         Additional options for the internal hyperparameter training with
         scipy.optimize.minimize can be passed as keyword arguments.
 
-        The default options passed are `{'eps': 1e-3, 'maxiter': 50}`.
+        The default options passed are `{'tol': 1e-3, 'maxiter': 50}`.
 
         Parameters
         ----------
@@ -129,6 +129,8 @@ class KrigingSurrogate(SurrogateModel):
             Training input locations.
         y : array-like
             Model responses at given inputs.
+        verbose : bool, optional
+            Print internal minimization results and post-training data for debugging.
         method : str, optional
             Optimization method to use for hyperparameter tuning.
             Default is 'L-BFGS-B', which is the standard for Kriging/Gaussian processes.
@@ -209,19 +211,26 @@ class KrigingSurrogate(SurrogateModel):
 
         bounds = [(np.log(1e-5), np.log(1e5)) for _ in range(self.n_dims)]
 
-        options = {'eps': 1e-3, 'maxiter': 50}
+        options = {'eps': 1.0e-3, 'tol': 1e-6, 'maxiter': 1000}
 
         if cache:
             # Enable logging since we expect the model to take long to train
             options['disp'] = True
             options['iprint'] = 2
-        
+
         options.update(minimize_options)
+
+        tol = options.pop('tol')
 
         optResult = self._minimize(_calcll, 1e-1 * np.ones(self.n_dims),
                                    method=method,
                                    options=options,
+                                   tol = tol,
                                    bounds=bounds)
+
+        if verbose:
+            print('--- Surrogate Training Minimization Result (verbose=True) ---')
+            print(optResult)
 
         if not optResult.success:
             raise ValueError(f'Kriging Hyper-parameter optimization failed: {optResult.message}')
@@ -236,6 +245,7 @@ class KrigingSurrogate(SurrogateModel):
 
         # Save data to cache if specified
         if cache:
+            print('--- Post Training Data Cache (verbose=True) ---')
             data = {
                 'n_samples': self.n_samples,
                 'n_dims': self.n_dims,
@@ -253,6 +263,10 @@ class KrigingSurrogate(SurrogateModel):
                 'sigma2': self.sigma2,
                 'hash': training_data_hash
             }
+
+            if verbose:
+                from pprint import pprint
+                pprint(data)
 
             if not os.path.exists(cache) or cache_hash != training_data_hash:
                 with open(cache, 'wb') as f:
@@ -298,14 +312,7 @@ class KrigingSurrogate(SurrogateModel):
         # x = V S^-1 U^* b.
         # Tikhonov regularization is used to make the solution significantly
         # more robust.
-        # Adaptive Tikhonov regularization based on condition number
-        condition_number = S[0] / S[-1]
-        if condition_number > 1e10:
-            # For ill-conditioned matrices, use stronger regularization
-            h = 1e-6 * S[0]
-        else:
-            # For well-conditioned matrices, use current regularization
-            h = 1e-8 * S[0]
+        h = 1.e-8 * S[0]
         inv_factors = S / (S ** 2. + h ** 2.)
 
         alpha = Vh.T.dot(np.einsum('j,kj,kl->jl', inv_factors, U, Y))
