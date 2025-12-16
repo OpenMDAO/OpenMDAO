@@ -225,7 +225,7 @@ class KrigingSurrogate(SurrogateModel):
         optResult = self._minimize(_calcll, 1e-1 * np.ones(self.n_dims),
                                    method=method,
                                    options=options,
-                                   tol = tol,
+                                   tol=tol,
                                    bounds=bounds)
 
         if verbose:
