@@ -170,82 +170,6 @@ jobs:
             echo "mpi4py or petsc4py not installed in this environment, skipping MPI checks"
           fi
 
-      # - name: Build SNOPT
-      #   if: matrix.SNOPT && runner.os != 'Windows'
-      #   continue-on-error: false
-      #   env:
-      #     SNOPT_LOCATION: ${{ secrets.SNOPT_LOCATION }}
-      #     SNOPT_VERSION: ${{ matrix.SNOPT }}
-      #   run: |
-      #     eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
-      #     echo "============================================================="
-      #     echo "Build SNOPT library"
-      #     echo "============================================================="
-      #     if [[ -n "${{ secrets.SNOPT_LOCATION }}" && "${{ matrix.SNOPT }}" == "7.7" ]]; then
-      #       echo "-------------------------------------------------------------"
-      #       echo "Getting SNOPT source"
-      #       echo "-------------------------------------------------------------"
-      #       .github/actions/install_pyoptsparse/download_snopt.sh
-      #     fi
-
-      #     if [[ -d "SNOPT" ]]; then
-      #       echo "-------------------------------------------------------------"
-      #       echo "Building SNOPT"
-      #       echo "-------------------------------------------------------------"
-      #       cd SNOPT
-      #       ./configure
-      #       make
-      #       make check
-
-      #       echo "-------------------------------------------------------------"
-      #       echo "Building Python bindings"
-      #       echo "-------------------------------------------------------------"
-      #       echo "  > Copying required files from pySNOPT.."
-
-      #       git clone https://github.com/mdolab/pyoptsparse "$HOME/pyoptsparse"
-
-      #       PYSNOPT_SOURCE="$HOME/pyoptsparse/pyoptsparse/pySNOPT/source/"
-      #       cp -v "$PYSNOPT_SOURCE"/*.f src/
-      #       cp -v "$PYSNOPT_SOURCE/f2py/snopt.pyf" .
-
-      #       echo "  > Removing problematic files..."
-      #       rm -f src/snopth.f
-      #       rm -f src/sn27lu77.f
-      #       rm -f src/sn27lu90.f
-
-      #       echo "  > Building Python bindings..."
-      #       python -m numpy.f2py -m snopt -c snopt.pyf src/*.f -L"$(pwd)/lib" -L/lib -lsnopt7
-
-      #       echo "-------------------------------------------------------------"
-      #       echo "Try to import SNOPT"
-      #       echo "-------------------------------------------------------------"
-      #       python -c "import snopt; print(snopt)"
-
-      #       echo "-------------------------------------------------------------"
-      #       echo "Set PYOPTSPARSE_IMPORT_SNOPT_FROM for subsequent steps"
-      #       echo "-------------------------------------------------------------"
-      #       echo "PYOPTSPARSE_IMPORT_SNOPT_FROM=$(pwd)" >> $GITHUB_ENV
-
-      #       cd ../..
-      #     fi
-
-      # - name: Install optional dependencies
-      #   if: matrix.OPTIONAL == '[all]' || matrix.OPTIONAL == '[all,numba]'
-      #   run: |
-      #     eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
-      #     echo "============================================================="
-      #     echo "Install additional packages for testing/coverage"
-      #     echo "============================================================="
-      #     if [[  "${{ matrix.OS }}" == "macos-15" ]]; then
-      #       brew install graphviz -q
-      #     else
-      #       pixi add graphviz
-      #     fi
-      #     python -m pip install pyparsing psutil objgraph pyxdsm pydot
-
-      #     echo "Pre-install playwright dependencies to avoid 'Playwright Host validation warning'"
-      #     playwright install --with-deps
-
       # Enable tmate debugging of manually-triggered workflows if the input option was provided
       #
       # To access the terminal through the web-interface:
@@ -296,6 +220,13 @@ jobs:
 
           $TESTFLO_CMD
 
+      - name: Display test report on failure (bash)
+        if: steps.run_tests_bash.outcome == 'failure'
+        run: |
+          echo "::group::Test Failure Report"
+          cat "$HOME/testflo_report.out"
+          echo "::endgroup::"
+
       - name: Run tests (windows)
         id: run_tests_windows
         if: runner.os == 'Windows'
@@ -312,6 +243,14 @@ jobs:
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
           cd "$HOME"
           testflo -n 1 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20 --pre_announce
+
+      - name: Display test report on failure (windows)
+        if: steps.run_tests_windows.outcome == 'failure'
+        shell: pwsh
+        run: |
+          echo "::group::Test Failure Report"
+          Get-Content "$env:HOME/testflo_report.out"
+          echo "::endgroup::"
 
       - name: Submit coverage
         id: coveralls

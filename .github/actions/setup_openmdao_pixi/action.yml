@@ -78,20 +78,20 @@ runs:
           pypi)
             if [[ -n "$VERSION" ]]; then
               echo "Installing OpenMDAO==$VERSION from PyPI"
-              python -m pip install "openmdao==${VERSION}"
+              python -m pip install "openmdao==${VERSION}" --no-deps
             else
               echo "Installing latest OpenMDAO from PyPI"
-              python -m pip install "openmdao"
+              python -m pip install "openmdao" --no-deps
             fi
             ;;
 
           github)
             if [[ -n "$VERSION" ]]; then
               echo "Installing OpenMDAO@${VERSION} from GitHub"
-              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@${VERSION}#egg=openmdao"
+              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@${VERSION}#egg=openmdao" --no-deps
             else
               echo "Installing OpenMDAO@master from GitHub"
-              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@master#egg=openmdao"
+              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@master#egg=openmdao" --no-deps
             fi
             ;;
 
@@ -106,7 +106,7 @@ runs:
             python -m build --wheel
             WHEEL=$(find dist/openmdao-*.whl)
             echo "Installing from wheel: $WHEEL"
-            python -m pip install "${WHEEL}"
+            python -m pip install "${WHEEL}" --no-deps
             ;;
 
           local_developer)
@@ -115,8 +115,7 @@ runs:
               exit 1
             fi
             echo "Installing from local directory in developer mode"
-            cd ${{ github.workspace }}
-            pixi run install-openmdao-dev
+            python -m pip install -e . --no-deps
             ;;
 
           local)
@@ -125,8 +124,7 @@ runs:
               exit 1
             fi
             echo "Installing from local directory"
-            cd ${{ github.workspace }}
-            python -m pip install .
+            python -m pip install . --no-deps
             ;;
 
           none|"")
