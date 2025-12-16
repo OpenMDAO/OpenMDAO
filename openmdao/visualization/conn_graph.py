@@ -22,7 +22,7 @@ from openmdao.utils.array_utils import array_connection_compatible, shape_to_len
 from openmdao.utils.graph_utils import dump_nodes, dump_edges
 from openmdao.utils.units import is_compatible
 from openmdao.utils.units import unit_conversion
-from openmdao.utils.indexer import indexer, Indexer, idx_list_to_extent
+from openmdao.utils.indexer import indexer, Indexer, idx_list_to_index_array
 from openmdao.utils.om_warnings import issue_warning, UnitsWarning
 from openmdao.utils.units import _is_unitless, has_val_mismatch
 from openmdao.visualization.tables.table_builder import generate_table
@@ -724,25 +724,29 @@ class AllConnGraph(nx.DiGraph):
                                    f"a distributed source, '{src_node[1]}', so you must retrieve "
                                    "its value using 'get_remote=True'.")
             elif node_meta.distributed and src_inds_list:
-                if src_meta.distributed or src_meta.remote:
-                    if src_meta.distributed:
-                        min_idx, max_idx = idx_list_to_extent(src_meta.global_shape, src_inds_list)
-                        var_idx = self._var_allprocs_abs2idx[src_node[1]]
-                        sizes = self._var_sizes['output'][:, var_idx]
-                        # sizes for src var in each proc
-                        start = np.sum(sizes[:self.comm.rank])  # start index of src on this proc
-                        end = start + sizes[self.comm.rank]
-                        err = min_idx != max_idx and (not (start <= min_idx < end) or
-                                                      not (start <= max_idx < end))
-                    elif src_meta.remote:
-                        err = True
+                # if src_meta.distributed or src_meta.remote:
+                if src_meta.distributed:
+                    model = system._problem_meta['model_ref']()
+                    src_inds_list = self.inds_into_local_distrib(model, src_node, node,
+                                                                    src_inds_list)
+
+                    # min_idx, max_idx = idx_list_to_extent(src_meta.global_shape, src_inds_list)
+                    # var_idx = self._var_allprocs_abs2idx[src_node[1]]
+                    # sizes = self._var_sizes['output'][:, var_idx]
+                    # # sizes for src var in each proc
+                    # start = np.sum(sizes[:self.comm.rank])  # start index of src on this proc
+                    # end = start + sizes[self.comm.rank]
+                    # err = min_idx != max_idx and (not (start <= min_idx < end) or
+                    #                               not (start <= max_idx < end))
+                elif src_meta.remote:
+                    err = True
 
                     if self.comm.allreduce(err, op=MPI.LOR):
                         raise RuntimeError(f"{self.msginfo}: Can't retrieve distributed variable "
-                                           f"'{node[1]}' because its src_indices reference "
-                                           "entries from other processes. You can retrieve values "
-                                           "from all processes using "
-                                           "`get_val(<name>, get_remote=True)`.")
+                                            f"'{node[1]}' because its src_indices reference "
+                                            "entries from other processes. You can retrieve values "
+                                            "from all processes using "
+                                            "`get_val(<name>, get_remote=True)`.")
         if use_vec:
             val = system._abs_get_val(src_node[1], get_remote, rank, vec_name, kind, flat,
                                       from_root=True)
@@ -755,7 +759,7 @@ class AllConnGraph(nx.DiGraph):
 
         try:
             val = self.convert_get(node, val, src_meta.units, node_meta.units,
-                                   node_meta.src_inds_list, units, indices,
+                                   src_inds_list, units, indices,
                                    get_remote=get_remote)
         except Exception as err:
             raise ValueError(f"{system.msginfo}: Can't get value of '{node[1]}': {str(err)}")
@@ -845,6 +849,32 @@ class AllConnGraph(nx.DiGraph):
 
         return val
 
+    def inds_into_local_distrib(self, model, src_node, tgt_node, inds):
+        if inds and self.comm.size > 1 and self.nodes[src_node].distributed:
+            src = src_node[1]
+            src_indices = idx_list_to_index_array(inds)
+            ssizes = model._var_sizes['output']
+            sidx = model._var_allprocs_abs2idx[src]
+            ssize = ssizes[self.comm.rank, sidx]
+            start = np.sum(ssizes[:self.comm.rank, sidx])
+            end = start + ssize
+            if np.any(src_indices < start) or np.any(src_indices >= end):
+                err = True
+            else:
+                err = False
+
+            if self.comm.allreduce(err, op=MPI.LOR):
+                raise RuntimeError(f"{model.msginfo}: Can't retrieve distributed variable "
+                                    f"'{tgt_node[1]}' because its src_indices reference "
+                                    "entries from other processes. You can retrieve values "
+                                    "from all processes using "
+                                    "`get_val(<name>, get_remote=True)`.")
+            if start > 0:
+                src_indices = src_indices - start
+            inds = [indexer(src_indices)]
+
+        return inds
+
     def set_val(self, system, name, val, units=None, indices=None):
         # print(f"{system.msginfo}: set_val: {name} {val}") # DBG
 
@@ -908,6 +938,21 @@ class AllConnGraph(nx.DiGraph):
 
         if system.has_vectors():
             srcval = model._abs_get_val(src, get_remote=False)
+            if inds and node[0] == 'i' and src_meta.distributed:
+                inds = self.inds_into_local_distrib(model, src_node, node, inds)
+                # src_indices = idx_list_to_index_array(inds)
+                # ssizes = model._var_sizes['output']
+                # sidx = model._var_allprocs_abs2idx[src]
+                # ssize = ssizes[self.comm.rank, sidx]
+                # start = np.sum(ssizes[:self.comm.rank, sidx])
+                # end = start + ssize
+                # if np.any(src_indices < start) or np.any(src_indices >= end):
+                #     raise RuntimeError(f"{model.msginfo}: Can't set {name}: "
+                #                        "src_indices refer to out-of-process array entries.")
+                # if start > 0:
+                #     src_indices = src_indices - start
+                # inds = [indexer(src_indices)]
+
             if np.ndim(srcval) > 0:
                 self.set_subarray(srcval, inds, sval, node)
             else:
