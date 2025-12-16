@@ -101,7 +101,10 @@ runs:
               exit 1
             fi
             echo "Building wheel"
-            pip wheel --no-deps ${{ github.workspace }}
+            # Normalize workspace path
+            WORKSPACE="${{ github.workspace }}"
+            WORKSPACE="${WORKSPACE//\\//}"
+            pip wheel --no-deps "${WORKSPACE}"
             WHEEL=$(find ${{ github.workspace }}/openmdao-*.whl)
             echo "Installing from wheel: $WHEEL"
             python -m pip install "${WHEEL}"
