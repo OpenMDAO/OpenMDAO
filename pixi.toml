@@ -198,3 +198,12 @@ py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visua
 
 # Development workflow helpers
 clean = "rm -rf packaging dist *.egg-info .pixi"
+
+# Install OpenMDAO in development mode and set up pre-commit hooks
+install-openmdao-dev = { cmd = "pip install --no-deps -e . && pre-commit install", description = "Install OpenMDAO in development mode and set up pre-commit hooks" }
+
+# Install latest OpenMDAO from PyPI
+install-openmdao-latest = { cmd = "pip install --no-deps openmdao", description = "Install latest OpenMDAO from PyPI" }
+
+# Install OpenMDAO from GitHub master branch
+install-openmdao-master = { cmd = "pip install --no-deps git+https://github.com/OpenMDAO/OpenMDAO.git@master", description = "Install OpenMDAO from GitHub master branch" }

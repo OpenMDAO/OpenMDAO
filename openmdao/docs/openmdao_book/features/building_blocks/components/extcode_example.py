@@ -6,13 +6,12 @@ import argparse
 
 def main():
     """
-    A standalone program for testing ExternalCodeComp.
+    Test ExternalCodeComp.
 
     Writes "test data" to the specified output file after an optional delay.
     Optionally writes the value of the environment variable "TEST_ENV_VAR"
     to the file.
     """
-
     parser = argparse.ArgumentParser()
     parser.add_argument("output_filename")
     parser.add_argument("-e", "--write_test_env_var",

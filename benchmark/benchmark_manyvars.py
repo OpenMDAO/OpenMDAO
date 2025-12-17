@@ -12,8 +12,8 @@ def _build_comp(np, no, ns=0):
 
 
 class BM(unittest.TestCase):
-    """Some tests for setup of a component with a large
-    number of variables.
+    """
+    Some tests for setup of a component with a large number of variables.
     """
 
     def benchmark_1Kparams(self):

@@ -191,6 +191,30 @@ include = [
 line-length = 100
 indent-width = 4
 
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle
+    "F",  # pyflakes
+    "D",  # pydocstyle
+    "D409", # Section underline sould match length of its name.
+    "D417", # Missing argument descriptions.
+    "D419", # Missing argument descriptions.
+]
+ignore = [
+    'D100',  # Don't require docstring in public module
+    'D101',  # Don't require docstring in public module
+    'D102',  # Don't require docstring in public method
+    'D200',  # One-line docstring should fit on one line
+    'D400',  # Sometimes you just don't need a period.
+    'E741',  # Allow ambiguous variable names (I)
+]
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    "test_*.py",
+]
+
 [tool.ruff.format]
 indent-style = "space"
 line-ending = "lf"
@@ -202,11 +226,13 @@ convention = "numpy"
 # Ignore `F401` (unused import) in api files.
 "api.py" = ["F401"]
 "parallel_api.py" = ["F401"]
-"__init__.py" = ["F401"]
-# Ignore files in the test suite.
-"**/test_suite/**" = ["E","F"]
-# Allow variable name I for current
-"**/extcode_resistor.py" = ["E741"]
-"**/circuit_analysis_examples.ipynb" = ["E741"]
-# Ignore some import related conventions in docs
-"**/openmdao_book/**" = ["E402","F811"]
+# Allow unused imports and don't require a docstring in __init__.py
+"__init__.py" = ["F401", "D104"]
+# Ignore files in the tests.
+"**/test_suite/**" = ["D", "E", "F"]
+"**/tests/*.py" = ["D", "E", "F"]
+# Don't worry about devtools
+"**/devtools/**" = ["D", "E", "F"]
+# Don't worry about docs
+"*.ipynb" = ["D", "E", "F"]
+

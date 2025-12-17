@@ -2,8 +2,10 @@ import unittest
 
 import openmdao.api as om
 from openmdao.test_suite.test_examples.beam_optimization.beam_group import BeamGroup
-from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import MultipointBeamGroup
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, assert_check_totals
+from openmdao.test_suite.test_examples.beam_optimization.multipoint_beam_group import \
+    MultipointBeamGroup
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials, \
+    assert_check_totals
 from openmdao.utils.mpi import MPI
 
 try:
