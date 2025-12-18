@@ -245,7 +245,6 @@ class KrigingSurrogate(SurrogateModel):
 
         # Save data to cache if specified
         if cache:
-            print('--- Post Training Data Cache (verbose=True) ---')
             data = {
                 'n_samples': self.n_samples,
                 'n_dims': self.n_dims,
@@ -266,6 +265,7 @@ class KrigingSurrogate(SurrogateModel):
 
             if verbose:
                 from pprint import pprint
+                print('--- Post Training Data Cache (verbose=True) ---')
                 pprint(data)
 
             if not os.path.exists(cache) or cache_hash != training_data_hash:
