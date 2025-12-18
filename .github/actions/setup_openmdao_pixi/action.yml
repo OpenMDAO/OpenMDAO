@@ -6,6 +6,10 @@ inputs:
     description: 'Pixi environment(s) to install'
     required: false
     default: 'py313'
+  openmdao_pixi_ref:
+    description: 'OpenMDAO git ref to use for pixi.toml (branch/tag/commit, default: master)'
+    required: false
+    default: 'master'
   frozen:
     description: 'Use frozen lock file (recommended for CI)'
     required: false
@@ -25,14 +29,29 @@ runs:
     - name: Determine pixi.toml source
       shell: bash -l {0}
       run: |
-        # Check if we're in the OpenMDAO repo
+        # Normalize path for bash on all platforms
+        WORKSPACE="${{ github.workspace }}"
+        # Convert backslashes to forward slashes (works in Git Bash)
+        WORKSPACE="${WORKSPACE//\\//}"
+
         if [[ "${{ github.repository }}" == "OpenMDAO/OpenMDAO" ]]; then
           echo "Running in OpenMDAO repo, using local pixi.toml"
-          echo "PIXI_MANIFEST=pixi.toml" >> $GITHUB_ENV
+          echo "PIXI_MANIFEST=${WORKSPACE}/pixi.toml" >> $GITHUB_ENV
         else
-          echo "Running outside OpenMDAO repo, using pixi.toml from action checkout"
-          # Action is at .github/actions/setup_openmdao_pixi/, so go up 3 levels to repo root
-          echo "PIXI_MANIFEST=${{ github.action_path }}/../../../pixi.toml" >> $GITHUB_ENV
+          echo "Running outside OpenMDAO repo, fetching pixi files from GitHub"
+          mkdir -p "${WORKSPACE}/.openmdao-pixi"
+
+          # Fetch pixi.toml
+          curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_pixi_ref }}/pixi.toml" \
+            -o "${WORKSPACE}/.openmdao-pixi/pixi.toml"
+
+          # Fetch pixi.lock if using frozen mode
+          if [[ "${{ inputs.frozen }}" == "true" ]]; then
+            curl -sSL "https://raw.githubusercontent.com/OpenMDAO/OpenMDAO/${{ inputs.openmdao_pixi_ref }}/pixi.lock" \
+              -o "${WORKSPACE}/.openmdao-pixi/pixi.lock"
+          fi
+
+          echo "PIXI_MANIFEST=${{ github.workspace }}/.openmdao-pixi/pixi.toml" >> $GITHUB_ENV
         fi
 
     - name: Setup Pixi
@@ -42,11 +61,12 @@ runs:
         environments: ${{ inputs.environment }}
         frozen: ${{ inputs.frozen }}
         cache: false
+        post-cleanup:  ${{ runner.os != 'Windows' }}  # Issue in cleanup on windows
 
     - name: 'Install OpenMDAO'
       shell: bash -l {0}
       run: |
-        eval "$(pixi shell-hook -e ${{ inputs.environment }})"
+        eval "$(pixi shell-hook -e ${{ inputs.environment }} --manifest-path=${{ env.PIXI_MANIFEST }})"
         echo "============================================================="
         echo "Install OpenMDAO"
         echo "============================================================="
@@ -76,19 +96,33 @@ runs:
             ;;
 
           wheel)
+            if [[ "${{ github.repository }}" != "OpenMDAO/OpenMDAO" ]]; then
+              echo "Error: 'wheel' install method only works in OpenMDAO repo"
+              exit 1
+            fi
             echo "Building wheel"
-            pip wheel --no-deps .
-            WHEEL=$(find openmdao-*.whl)
+            cd ${{ github.workspace }}
+            python -m pip install build
+            python -m build --wheel
+            WHEEL=$(find dist/openmdao-*.whl)
             echo "Installing from wheel: $WHEEL"
             python -m pip install "${WHEEL}" --no-deps
             ;;
 
           local_developer)
+            if [[ "${{ github.repository }}" != "OpenMDAO/OpenMDAO" ]]; then
+              echo "Error: 'local_developer' install method only works in OpenMDAO repo"
+              exit 1
+            fi
             echo "Installing from local directory in developer mode"
             python -m pip install -e . --no-deps
             ;;
 
           local)
+            if [[ "${{ github.repository }}" != "OpenMDAO/OpenMDAO" ]]; then
+              echo "Error: 'local' install method only works in OpenMDAO repo"
+              exit 1
+            fi
             echo "Installing from local directory"
             python -m pip install . --no-deps
             ;;
@@ -106,4 +140,4 @@ runs:
     - name: Display installed packages
       shell: bash -l {0}
       run: |
-        pixi list -e "${{ inputs.environment }}" --explicit
+        pixi list -e "${{ inputs.environment }}" --manifest-path=${{ env.PIXI_MANIFEST }} --explicit
