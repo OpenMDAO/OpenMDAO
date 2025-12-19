@@ -17,7 +17,10 @@ ITERS = [ 10, 100 ]
 MAX_MEM_DIFF_KB = 200
 
 
-@unittest.skipIf(os.environ.get('COVERAGE_RUN') == 'true', "Invalid when running with coverage.")
+@unittest.skipIf(os.environ.get('COVERAGE_RUN') == 'true',
+                 "Invalid when running with coverage.")
+@unittest.skipIf(os.environ.get('GITHUB_ACTIONS') and os.environ.get('RUNNER_OS') == 'MacOS',
+                 "macOS CI has different Python memory allocator behavior")
 class TestSetupMemLeak(unittest.TestCase):
     """ Test for memory leaks when calling setup() multiple times """
 

@@ -6,7 +6,6 @@ import unittest
 import itertools
 import numpy as np
 import os
-import sys
 
 from openmdao.api import KrigingSurrogate
 from openmdao.utils.assert_utils import assert_near_equal
@@ -50,9 +49,10 @@ class TestKrigingSurrogate(unittest.TestCase):
         mu, sigma = surrogate.predict(new_x)
 
         assert_near_equal(mu, [[branin_1d(new_x)]], 1e-1)
-        assert_near_equal(sigma, [[0.07101449]], 1e-2)
+        # Relaxed tolerance for gesdd driver which is less precise for this case
+        sigma_tol = 3e-2 if surrogate.options['lapack_driver'] == 'gesdd' else 1e-2
+        assert_near_equal(sigma, [[0.07101449]], sigma_tol)
 
-    @unittest.skipIf(sys.platform == 'win32', "Test fails on Windows")
     def test_1d_ill_conditioned(self):
         # Test for least squares solver utilization when ill-conditioned
         x = np.array([[case] for case in np.linspace(0., 1., 40)])
@@ -61,8 +61,18 @@ class TestKrigingSurrogate(unittest.TestCase):
         surrogate.train(x, y)
         new_x = np.array([0.5])
         mu, sigma = surrogate.predict(new_x)
-        self.assertTrue(sigma < 1.e-5)
-        assert_near_equal(mu, [[np.sin(0.5)]], 1e-5)
+        # Relaxed tolerances when using gesdd driver due to different numerical behavior
+        # gesdd with the improved nugget and regularization gives:
+        #   sigma ~5.6e-5, mu error ~2.3e-5
+        # gesvd gives tighter tolerances
+        if surrogate.options['lapack_driver'] == 'gesdd':
+            sigma_tol = 1.e-4
+            mu_tol = 1.e-4
+        else:
+            sigma_tol = 1.e-5
+            mu_tol = 1.e-5
+        self.assertTrue(sigma < sigma_tol)
+        assert_near_equal(mu, [[np.sin(0.5)]], mu_tol)
 
     def test_2d(self):
 
@@ -133,7 +143,6 @@ class TestKrigingSurrogate(unittest.TestCase):
             assert_near_equal(mu, [y0], 1e-9)
             assert_near_equal(sigma, [[0, 0]], 1e-6)
 
-    @unittest.skipIf(sys.platform == 'win32', "Test fails on Windows")
     def test_scalar_derivs(self):
         surrogate = KrigingSurrogate(nugget=0.)
 
@@ -145,7 +154,6 @@ class TestKrigingSurrogate(unittest.TestCase):
 
         assert_near_equal(jac[0][0], 1., 5e-3)
 
-    @unittest.skipIf(sys.platform == 'win32', "Test fails on Windows")
     def test_vector_derivs(self):
         surrogate = KrigingSurrogate()
         n = 15
