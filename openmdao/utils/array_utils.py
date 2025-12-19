@@ -49,7 +49,8 @@ def get_global_dist_shape(dist_shapes):
     tuple or None
         The global shape of the distributed variable.
     """
-    dshapelists = [list(dshape) for dshape in dist_shapes if dshape is not None]
+    dshapelists = [list(dshape) for dshape in dist_shapes
+                   if dshape is not None and shape_to_len(dshape) > 0]
 
     # during some error conditions, there may be no shapes that are not None on any rank, so
     # we need to check for that

@@ -283,6 +283,7 @@ class Component(System):
 
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.'
+        nprocs = self.comm.size
 
         for io in ['input', 'output']:
             abs2meta = self._var_abs2meta[io]
@@ -292,6 +293,10 @@ class Component(System):
             for prom_name in self._var_rel_names[io]:
                 abs_name = prefix + prom_name
                 abs2meta[abs_name] = metadata = self._var_rel2meta[prom_name]
+
+                if nprocs == 1:
+                    metadata['distributed'] = False
+
                 self._resolver.add_mapping(abs_name, prom_name, io,
                                            local=True, distributed=metadata['distributed'])
 

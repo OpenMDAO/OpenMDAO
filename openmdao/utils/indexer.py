@@ -627,9 +627,9 @@ class ShapedSliceIndexer(Indexer):
 
         if step:
             return f"{start}:{stop}:{step}"
-        elif start:
+        elif start is not None:
             return f"{start}:{stop}"
-        elif stop:
+        elif stop is not None:
             return f":{stop}"
         return ":"
 

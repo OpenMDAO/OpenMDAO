@@ -1208,7 +1208,11 @@ class Problem(object, metaclass=ProblemMetaclass):
                 mode = self._orig_mode
 
             self._metadata['mode'] = mode
+
+            model._get_conn_graph().sync_auto_ivcs(model)
         else:
+            model._get_conn_graph().sync_auto_ivcs(model)
+
             first = False
             mode = self._metadata['mode']
 

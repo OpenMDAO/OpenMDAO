@@ -22,8 +22,7 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
 from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
-from openmdao.utils.array_utils import _flatten_src_indices, \
-    ValueRepeater
+from openmdao.utils.array_utils import _flatten_src_indices, ValueRepeater
 from openmdao.utils.general_utils import shape2tuple, ensure_compatible, \
     meta2src_iter, is_undefined, env_truthy, collect_errors
 from openmdao.utils.units import unit_conversion, simplify_unit, _find_unit
@@ -226,8 +225,6 @@ class Group(System):
         Cache for the system graph.
     _key_owner : dict
         The owning rank keyed by absolute jacobian key.
-    _var_existence : dict or None
-        Keeps track of which ranks each variable exists on.
     """
 
     def __init__(self, **kwargs):
@@ -263,7 +260,6 @@ class Group(System):
         self._is_explicit = None
         self._sys_graph_cache = None
         self._key_owner = None
-        self._var_existence = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1173,6 +1169,43 @@ class Group(System):
 
         self._problem_meta['setup_status'] = _SetupStatus.POST_SETUP2
 
+    # def check_autoivc_ambiguity(self):
+    #     if self.comm.size > 1:
+    #         graph = self._get_conn_graph()
+    #         abs2meta_out = self._var_allprocs_abs2meta['output']
+    #         for src in sorted(graph._sync_auto_ivcs):
+    #             ambig = False
+
+    #             if src in abs2meta_out:
+    #                 val = array_hash(self._outputs[src].ravel())
+    #             else:
+    #                 val = self._discrete_outputs[src]
+
+    #             vals = self.comm.gather(val, root=0)
+    #             if self.comm.rank == 0:
+    #                 start = None
+    #                 for v in vals:
+    #                     if start is None:
+    #                         start = v
+    #                     else:
+    #                         if start != v:
+    #                             ambig = True
+    #                             break
+    #                 self.comm.bcast(ambig, root=0)
+    #             else:
+    #                 ambig = self.comm.bcast(None, root=0)
+
+    #             if ambig:
+    #                 # find root input node
+    #                 for u, v in nx.dfs_edges(graph, ('o', src)):
+    #                     if v[0] == 'i':
+    #                         tgt = v
+    #                         break
+
+    #                 self._collect_error(
+    #                     f"The values of '{src}' have different values across processes. Call "
+    #                     f"model.set_input_defaults('{tgt[1]}', val=?) to remove the ambiguity.")
+
     def _final_setup(self):
         """
         Perform final setup for this system and its descendant systems.
@@ -1281,9 +1314,18 @@ class Group(System):
             self._problem_meta['setup_status'] = _SetupStatus.POST_FINAL_SETUP
 
         graph = self._get_conn_graph()
+        # graph.sync_auto_ivcs(self)
         for name in chain(self._var_abs2meta['output'], self._var_discrete['output']):
             node = ('o', name)
             node_meta = graph.nodes[node]
+            # if name in graph._sync_auto_ivcs:
+            #     owner = graph._sync_auto_ivcs[name]
+            #     if owner == self.comm.rank:
+            #         val = node_meta.val
+            #         self.comm.bcast(val, root=owner)
+            #     else:
+            #         node_meta.val = self.comm.bcast(None, root=owner)
+
             if node_meta.val is not None:
                 # graph.set_tree_val(self, node, node_meta.val)  # force updates of input values
                 if node_meta.discrete:
@@ -1296,12 +1338,6 @@ class Group(System):
 
         for name in self._discrete_inputs:
             self._discrete_inputs[name] = graph.nodes[('i', name)].val
-
-        # for abs_name, meta in self._var_abs2meta['output'].items():
-        #     self._outputs.set_var(abs_name, graph.nodes[('o', abs_name)].val)
-
-        # for name in self._discrete_outputs:
-        #     self._discrete_outputs[name] = graph.nodes[('o', name)].val
 
     def _get_root_vectors(self):
         """
@@ -1488,8 +1524,6 @@ class Group(System):
         """
         Compute the list of abs var names, abs/prom name maps, and metadata dictionaries.
         """
-        self._var_existence = None
-
         super()._setup_var_data()
 
         resolver = self._resolver
@@ -2045,7 +2079,7 @@ class Group(System):
                 # throw out any that have units of None but are not dynamic
                 unresolved = {node for node in unresolved if conn_nodes[node].dyn_units}
             if unresolved:
-                unresolved = sorted([u[1] for u in unresolved])
+                unresolved = sorted([u[1] for u in unresolved if not u[1].startswith('_auto_ivc.')])
                 propstr = 'shapes' if prop == 'shape' else 'units'
                 self._collect_error(f"{self.msginfo}: Failed to resolve {propstr} for {unresolved}."
                                     f" To see the dynamic {propstr} dependency graph, "
@@ -3510,15 +3544,12 @@ class Group(System):
             abs_tgt_node = graph.nodes[('i', tgts[0])]
             # need to query discrete from a leaf node because internal nodes have not resolved yet
             discrete = abs_tgt_node['discrete']
-            remote = False  # TODO: fix this
 
             relsrc = src.rsplit('.', 1)[-1]
             if discrete:
                 auto_ivc.add_discrete_output(relsrc, val=abs_tgt_node['val'])
             else:
                 auto_ivc.add_output(relsrc)
-            if remote:
-                auto_ivc._add_remote(relsrc)
 
         if not auto2tgt:
             return auto_ivc
@@ -3531,7 +3562,13 @@ class Group(System):
         # bind auto_ivc conn graph nodes to their variable metadata
         locmeta = auto_ivc._var_abs2meta['output']
         for name, meta in auto_ivc._var_allprocs_abs2meta['output'].items():
-            graph.set_model_meta(self, ('o', name), meta, locmeta.get(name))
+            anode = ('o', name)
+            for tgt in sorted(auto2tgt[name]):
+                if tgt in self._vars_to_gather:
+                    graph._sync_auto_ivcs[name] = self._vars_to_gather[tgt]
+                    break
+
+            graph.set_model_meta(self, anode, meta, locmeta[name])
 
         locmeta = auto_ivc._var_discrete['output']
         for name, meta in auto_ivc._var_allprocs_discrete['output'].items():

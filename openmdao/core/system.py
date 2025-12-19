@@ -5780,15 +5780,11 @@ class System(object, metaclass=SystemMetaclass):
             raise RuntimeError(f"{self.msginfo}: Called set_val({name}, ...) before setup "
                                "completes.")
 
-        if not self._is_local:
-            # we'll do any necessary transfers later
-            return
-
         if self._problem_meta is not None and self._problem_meta['model_ref']() is None:
             # This is a weird corner case where the Problem has been deleted.  We have a test
             # case where a system contains a subproblem that it adds itself to, and the test checks that we can still
             # call get_val on the system even after the subproblem has been deleted.
-            if self._inputs is not None:  # vectors are set up
+            if self._inputs is not None and self._is_local:  # vectors are set up
                 iotype = self._resolver.get_iotype(name, report_error=True)
                 if iotype == 'input':
                     self._inputs[name] = val
