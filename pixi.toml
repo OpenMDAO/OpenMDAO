@@ -70,19 +70,6 @@ python = "3.12.*"
 [feature.py313.dependencies]
 python = "3.13.*"
 
-###############################################
-# Pin scipy <= 1.16 for for some environments
-###############################################
-
-[target.win-64.dependencies]
-scipy = ">=1.13,<1.16"
-
-[target.osx-64.dependencies]
-scipy = ">=1.13,<1.16"
-
-[target.osx-arm64.dependencies]
-scipy = ">=1.13,<1.16"
-
 ##########################################################
 # Optional features (version-agnostic as much as possible)
 ##########################################################
