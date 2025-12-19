@@ -747,19 +747,20 @@ class TestRemoteDistribDynShapes(unittest.TestCase):
         # this test has remote distributed components (distributed comps under parallel groups)
         p = self._build_model(solve_dyn_fwd=False)
 
-        with self.assertRaises(Exception) as cm:
-            p.setup()
-            p.final_setup()
+        # because the src_indices for the sink variables are a 'full slice', we actually can determine
+        # the shapes of all variables here, so no error should be raised.
+        p.setup()
+        p.final_setup()
 
-        print(cm.exception.args[0])
-
-        self.assertTrue(
-            "Collected errors for problem 'remote_distrib_err':\n"
-            "   <model> <class Group>: Input 'sink.x1' has src_indices so the shape of connected output 'par.G1.C2.y1' cannot be determined.\n"
-            "   <model> <class Group>: Input 'sink.x2' has src_indices so the shape of connected output 'par.G2.C2.y1' cannot be determined.\n"
-            "   <model> <class Group>: Failed to resolve shapes for ['indep.x1', 'par.G1.C1.x1', 'par.G1.C1.y1', 'par.G1.C2.x1', 'par.G1.C2.y1', "
-            "'par.G2.C1.x1', 'par.G2.C1.y1', 'par.G2.C2.x1', 'par.G2.C2.y1']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'."
-           in cm.exception.args[0])
+        self.assertEqual(p.model._var_allprocs_abs2meta['input']['par.G1.C1.x1']['global_shape'], (8,))
+        self.assertEqual(p.model._var_allprocs_abs2meta['output']['par.G1.C1.y1']['global_shape'], (8,))
+        self.assertEqual(p.model._var_allprocs_abs2meta['input']['par.G1.C2.x1']['global_shape'], (8,))
+        self.assertEqual(p.model._var_allprocs_abs2meta['output']['par.G1.C2.y1']['global_shape'], (8,))
+        self.assertEqual(p.model._var_allprocs_abs2meta['input']['par.G2.C1.x1']['global_shape'], (8,))
+        self.assertEqual(p.model._var_allprocs_abs2meta['output']['par.G2.C1.y1']['global_shape'], (8,))
+        self.assertEqual(p.model._var_allprocs_abs2meta['input']['par.G2.C2.x1']['global_shape'], (8,))
+        self.assertEqual(p.model._var_allprocs_abs2meta['output']['par.G2.C2.y1']['global_shape'], (8,))
+        self.assertEqual(p.model._var_allprocs_abs2meta['output']['indep.x1']['global_shape'], (4,))
 
 
 class TestDynShapeFeature(unittest.TestCase):
