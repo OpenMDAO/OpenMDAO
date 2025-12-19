@@ -71,6 +71,21 @@ def _strip_np(shape):
 
 
 def is_equal(a, b):
+    """
+    Check equality of a and b.
+
+    Parameters
+    ----------
+    a : any
+        First value to compare.
+    b : any
+        Second value to compare.
+
+    Returns
+    -------
+    bool
+        True if a and b are equal, False otherwise.
+    """
     if not (isinstance(b, type(a)) or isinstance(a, type(b))):
         return False
 
@@ -81,6 +96,25 @@ def is_equal(a, b):
 
 
 def are_compatible_values(a, b, discrete, src_indices=None):
+    """
+    Check compatibility of values a and b.
+
+    Parameters
+    ----------
+    a : any
+        First value to compare.
+    b : any
+        Second value to compare.
+    discrete : bool
+        Whether the values are discrete.
+    src_indices : Indexer or None
+        The src_indices applied to a, if any.
+
+    Returns
+    -------
+    bool
+        True if a and b are compatible, False otherwise.
+    """
     if discrete:
         return (isinstance(b, type(a)) or isinstance(a, type(b)))
 
@@ -101,7 +135,20 @@ def are_compatible_values(a, b, discrete, src_indices=None):
 class ConnError(ValueError):
     """
     An error raised when a connection is incompatible.
+
+    Parameters
+    ----------
+    msg : str
+        The error message.
+    ident : hashable object
+        Identifier of the object responsible for issuing the error.
+
+    Attributes
+    ----------
+    ident : hashable object
+        Identifier of the object responsible for issuing the error.
     """
+
     def __init__(self, msg, ident=None):
         super().__init__(msg)
         self.ident = ident
@@ -126,13 +173,39 @@ BY_CONN = SHAPE_BY_CONN | UNITS_BY_CONN
 
 
 class Defaults():
+    """
+    Container for default values of a variable.
+
+    Attributes
+    ----------
+    val : any
+        Default value.
+    units : str or None
+        Default units.
+    src_shape : tuple or None
+        Default source shape.
+    """
+
     __slots__ = ['val', 'units', 'src_shape']
+
     def __init__(self, val=None, units=None, src_shape=None):
         self.val = val
         self.units = units
         self.src_shape = src_shape
 
     def __iter__(self):
+        """
+        Iterate over the attributes.
+
+        Yields
+        ------
+        any
+            The attribute value.
+        str or None
+            The units.
+        tuple or None
+            The source shape.
+        """
         yield self.val
         yield self.units
         yield self.src_shape
@@ -148,6 +221,9 @@ class NodeAttrs():
                  'copy_units', 'compute_units', 'distributed')
 
     def __init__(self):
+        """
+        Initialize NodeAttrs with all attributes set to None or default values.
+        """
         self.pathname = None
         self.rel_name = None
         self.flags = flag_type(0)
@@ -158,7 +234,7 @@ class NodeAttrs():
         self._units = None
         self._meta = None
         self._locmeta = None
-        self.defaults = Defaults()
+        self.defaults = Defaults(None, None, None)
         self.copy_shape = None
         self.compute_shape = None
         self.copy_units = None
@@ -166,28 +242,105 @@ class NodeAttrs():
         self.distributed = None  # 3 states: None (unknown), False or True
 
     def __getattr__(self, key):
+        """
+        Get missing attribute.
+
+        Parameters
+        ----------
+        key : str
+            The attribute name.
+
+        Returns
+        -------
+        None
+            Always returns None for missing attributes.
+        """
         return None
 
     def __getitem__(self, key):
+        """
+        Get attribute by key.
+
+        Parameters
+        ----------
+        key : str
+            The attribute name.
+
+        Returns
+        -------
+        any
+            The value of the attribute.
+        """
         return getattr(self, key)
 
     def __setitem__(self, key, value):
+        """
+        Set attribute by key.
+
+        Parameters
+        ----------
+        key : str
+            The attribute name.
+        value : any
+            The value to set.
+        """
         setattr(self, key, value)
 
     def get(self, key, default=None):
+        """
+        Get attribute by key with a default value if not found.
+
+        Parameters
+        ----------
+        key : str
+            The attribute name.
+        default : any, optional
+            The default value to return if the attribute is not found.
+
+        Returns
+        -------
+        any
+            The value of the attribute or the default value.
+        """
         return getattr(self, key, default)
 
     def update(self, kwargs):
+        """
+        Update attributes from a dictionary.
+
+        This method is used by networkx to populate initial node attributes.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Dictionary of attribute names and values to set.
+        """
         # networkx uses this to populate the initial node attributes.
         for key, value in kwargs.items():
             setattr(self, key, value)
 
     def msgname(self):
+        """
+        Get the full message name combining pathname and relative name.
+
+        Returns
+        -------
+        str
+            The full name if pathname exists, otherwise just the relative name.
+        """
         if self.pathname:
             return f"{self.pathname}.{self.rel_name}"
         return self.rel_name
 
     def __repr__(self):
+        """
+        Return a string representation of the NodeAttrs object.
+
+        Returns
+        -------
+        str
+            A formatted table representation of non-None attributes.
+        """
         rows = [[key, getattr(self, key)] for key in self.__slots__
                 if getattr(self, key) is not None and key != 'meta']
         table = generate_table(rows, tablefmt='plain')
@@ -408,6 +561,14 @@ class NodeAttrs():
         return self.dyn_shape or self.dyn_units
 
     def units_from_child(self):
+        """
+        Get units, preferring defaults if available.
+
+        Returns
+        -------
+        str or None
+            The units from defaults if available, None if ambiguous, otherwise the node's units.
+        """
         if self.defaults.units is not None:
             return self.defaults.units
 
@@ -417,6 +578,22 @@ class NodeAttrs():
         return self.units
 
     def shape_from_child(self, node_meta, src_indices):
+        """
+        Get shape for a child node, accounting for defaults and src_indices.
+
+        Parameters
+        ----------
+        node_meta : NodeAttrs
+            The metadata of the child node.
+        src_indices : Indexer or None
+            The source indices applied to this node.
+
+        Returns
+        -------
+        tuple or None
+            The shape from defaults if available, None if src_indices are partial or
+            if this node is distributed but the child is not, otherwise this node's shape.
+        """
         if self.defaults.src_shape is not None:
             return self.defaults.src_shape
 
@@ -430,6 +607,22 @@ class NodeAttrs():
         return self.shape
 
     def val_from_child(self, node_meta, src_indices):
+        """
+        Get value for a child node, accounting for defaults and compatibility.
+
+        Parameters
+        ----------
+        node_meta : NodeAttrs
+            The metadata of the child node.
+        src_indices : Indexer or None
+            The source indices applied to this node.
+
+        Returns
+        -------
+        any or None
+            The value from defaults if available, None if ambiguous, incompatible,
+            or if this node is distributed but the child is not, otherwise this node's value.
+        """
         if self.flags & NONE_UP_VAL or src_indices is not None:
             return None
 
@@ -452,12 +645,34 @@ class NodeAttrs():
         return self.val
 
     def dist_shapes(self, comm):
+        """
+        Gather shapes from all processes in a communicator.
+
+        Parameters
+        ----------
+        comm : MPI communicator
+            The MPI communicator to gather from.
+
+        Returns
+        -------
+        list
+            A list of shapes from all processes if MPI size > 1, otherwise a list
+            containing only this node's shape.
+        """
         if comm.size > 1:
             return comm.allgather(self.shape)
         else:
             return [self.shape]
 
     def as_dict(self):
+        """
+        Return attributes as a dictionary, excluding internal metadata.
+
+        Returns
+        -------
+        dict
+            A dictionary of non-None attributes excluding _meta, _locmeta, and _val.
+        """
         skip = {'_meta', '_locmeta', '_val'}
         ret = {}
         for name in self.__slots__:
@@ -468,6 +683,11 @@ class NodeAttrs():
         return ret
 
     def update_model_meta(self):
+        """
+        Update system metadata with the metadata from this node.
+
+        Synchronizes global and local metadata dictionaries with current node state.
+        """
         # update system metadata with the metadata from this node
         if self._meta is not None:
             for key in _global_to_update:
@@ -494,6 +714,7 @@ class AllConnGraph(nx.DiGraph):
     _mult_inconn_nodes : set
         A set of nodes that have multiple input connections.
     """
+
     node_attr_dict_factory = NodeAttrs
 
     def __init__(self, *args, **kwargs):
@@ -517,7 +738,7 @@ class AllConnGraph(nx.DiGraph):
         self._var_allprocs_abs2idx = None
         self._var_abs2meta = None
         self._bad_conns = set()
-        self._sync_auto_ivcs = {}  # auto_ivcs that require synchronization when setting intial values
+        self._sync_auto_ivcs = {}  # auto_ivcs that require sync when setting intial values
         self._autoivc_changed_tgts = set()
 
     def _collect_error(self, msg, exc_type=None, tback=None, ident=None):
@@ -548,8 +769,8 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        system : System
-            The current scoping system.
+        pathname : str
+            The current scoping system pathname.
         varname : str
             The variable name to find.
         io : str
@@ -1455,7 +1676,8 @@ class AllConnGraph(nx.DiGraph):
     def update_all_node_meta(self, model):
         # this is called twice, once in _setup_global_connections and once after all of the
         # dynamic shapes have been computed.
-        for abs_out in chain(self._var_allprocs_abs2meta['output'], self._var_allprocs_discrete['output']):
+        for abs_out in chain(self._var_allprocs_abs2meta['output'],
+                             self._var_allprocs_discrete['output']):
             node = ('o', abs_out)
             if self.out_degree(node) == 0:
                 continue
@@ -1504,7 +1726,8 @@ class AllConnGraph(nx.DiGraph):
                                         edges_to_send[ipath[i-1], p] = self.edges[ipath[i-1], p]
                             else:  # own_start
                                 if ipath:
-                                    edges_to_send[opath[-1], ipath[0]] = self.edges[opath[-1], ipath[0]]
+                                    edges_to_send[opath[-1], ipath[0]] = self.edges[opath[-1],
+                                                                                    ipath[0]]
                 else:  # dangling input node, may be promoted
                     for in_node in self.leaf_input_iter(start_node):
                         _, abs_in = in_node
@@ -1659,7 +1882,7 @@ class AllConnGraph(nx.DiGraph):
 
     def find_ambiguous_causes(self, node, causes, data_name):
         """
-        Starting from an ambiguous node, find all of the nodes that are causing the ambiguity.
+        Find all of the nodes that are causing the ambiguity, starting from an ambiguous node.
 
         Parameters
         ----------
@@ -2617,7 +2840,7 @@ class AllConnGraph(nx.DiGraph):
 
     def get_subarray(self, arr, indices_list):
         """
-        Applies a sequence of indexing operations to the input array.
+        Apply a sequence of indexing operations to the input array.
 
         Parameters
         ----------
@@ -2639,8 +2862,7 @@ class AllConnGraph(nx.DiGraph):
 
     def set_subarray(self, arr, indices_list, val, node):
         """
-        Sets the provided val into the positions of the original array corresponding to the final
-        subarray after applying the sequence of indexing operations.
+        Set the val into the positions of the original array based on indices_list.
 
         This function handles both views and copies by propagating changes back through the chain.
 
@@ -2916,7 +3138,8 @@ class AllConnGraph(nx.DiGraph):
             combined = ''
 
         return f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="1" CELLPADDING="0"><TR><TD ' \
-            f' ALIGN=\"LEFT\"><FONT POINT-SIZE=\"12\"><b>{name}</b></FONT></TD></TR>{combined}</TABLE>>'
+            f' ALIGN=\"LEFT\"><FONT POINT-SIZE=\"12\">' \
+            f'<b>{name}</b></FONT></TD></TR>{combined}</TABLE>>'
 
     def drawable_node_iter(self, pathname=''):
         """

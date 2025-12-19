@@ -1,0 +1,330 @@
+name: OpenMDAO Tests (pixi)
+
+on:
+  # Trigger on push or pull request events for the master branch
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Trigger on release, to publish release versioned docs to openmdao.org
+  release:
+    types: [published]
+
+  # Allow running the workflow manually from the Actions tab
+  # All jobs are included by default and may be deselected if desired
+  workflow_dispatch:
+
+    inputs:
+
+      run_name:
+        type: string
+        description: 'Name of workflow run as it will appear under Actions tab:'
+        required: false
+        default: ""
+
+      debug_enabled:
+        type: boolean
+        description: 'Run the build with tmate debugging enabled (https://github.com/marketplace/actions/debugging-with-tmate)'
+        required: false
+        default: false
+
+concurrency:
+  # Cancel any existing CI runs if we push to this branch
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+run-name:  ${{ inputs.run_name }}
+
+permissions: {}
+
+jobs:
+
+  tests:
+
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: false
+      matrix:
+        OS: [ubuntu-24.04, macos-latest]
+        PIXI_ENVIRONMENT: [minimal, py311, py312, py313, default, dev, oldest]
+        BANDIT: [false]
+        RUFF: [false]
+        SNOPT: [false]
+        include:
+          # Windows - only minimal
+          - OS: windows-latest
+            PIXI_ENVIRONMENT: minimal
+            BANDIT: false
+            RUFF: false
+
+          # Bandit only on Ubuntu py312
+          - OS: ubuntu-24.04
+            PIXI_ENVIRONMENT: py312
+            BANDIT: true
+            RUFF: false
+
+          # Ruff only on Ubuntu dev
+          - OS: ubuntu-24.04
+            PIXI_ENVIRONMENT: dev
+            BANDIT: false
+            RUFF: true
+
+        exclude:
+          # Exclude the duplicate ubuntu-24.04 + py312 with BANDIT: false
+          - OS: ubuntu-24.04
+            PIXI_ENVIRONMENT: py312
+            BANDIT: false
+
+          # Exclude the duplicate ubuntu-24.04 + dev with RUFF: false
+          - OS: ubuntu-24.04
+            PIXI_ENVIRONMENT: dev
+            RUFF: false
+
+    runs-on: ${{ matrix.OS }}
+
+    defaults:
+      run:
+        # Note this isn't passed to the composite action
+        shell: bash -l {0}
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: 'Setup OpenMDAO pixi Environment'
+        id: setup_pixi_environment
+        uses: ./.github/actions/setup_openmdao_pixi
+        with:
+          environment: '${{ matrix.PIXI_ENVIRONMENT }}'
+          openmdao_install_from: 'wheel'
+
+      - name: Display run details
+        run: |
+          echo "============================================================="
+          echo "Run #${GITHUB_RUN_NUMBER}"
+          echo "Run ID: ${GITHUB_RUN_ID}"
+          echo "Testing: ${GITHUB_REPOSITORY}"
+          echo "Triggered by: ${GITHUB_EVENT_NAME}"
+          echo "Initiated by: ${GITHUB_ACTOR}"
+          echo "============================================================="
+
+      - name: Create SSH key
+        if: matrix.SNOPT && runner.os != 'Windows'
+
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          mkdir -p ~/.ssh/
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          sudo chmod 600 ~/.ssh/id_rsa
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Install compilers
+        if: matrix.SNOPT && runner.os != 'Windows'
+        run: |
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          echo "============================================================="
+          echo "Install compilers"
+          echo "============================================================="
+          if [[  "${{ matrix.OS }}" != "macos-15" ]]; then
+            pixi add cython swig compilers cmake meson
+          else
+            pixi add cython swig compilers cmake meson
+          fi
+
+      - name: Check MPI and PETSc
+        continue-on-error: true
+        run: |
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          if python -c "import mpi4py, petsc4py" 2>/dev/null; then
+            echo "============================================================="
+            echo "Check MPI and PETSc installation"
+            echo "============================================================="
+            export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
+            export OMPI_MCA_rmaps_base_oversubscribe=1
+            export OMPI_MCA_btl=^openib
+            echo "-----------------------"
+            echo "Quick test of mpi4py:"
+            mpirun -n 3 python -c "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
+            echo "-----------------------"
+            echo "Quick test of petsc4py:"
+            mpirun -n 3 python -c "import numpy; from mpi4py import MPI; comm = MPI.COMM_WORLD; \
+              import petsc4py; petsc4py.init(); \
+              x = petsc4py.PETSc.Vec().createWithArray(numpy.ones(5)*comm.rank, comm=comm);  \
+              print(x.getArray())"
+            echo "-----------------------"
+
+            # shellcheck disable=SC2129
+            echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> "$GITHUB_ENV"
+            echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> "$GITHUB_ENV"
+            echo "OMPI_MCA_btl=^openib" >> "$GITHUB_ENV"
+
+            echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
+            echo "TMPDIR=/tmp" >> "$GITHUB_ENV"
+          else
+            echo "mpi4py or petsc4py not installed in this environment, skipping MPI checks"
+          fi
+
+      # Enable tmate debugging of manually-triggered workflows if the input option was provided
+      #
+      # To access the terminal through the web-interface:
+      #    1. Click on the web-browser link printed out in this action from the github
+      #       workflow terminal
+      #    2. Press cntrl + c in the new tab that opens up to reveal the terminal
+      #    3. To activate the conda environment run:
+      #        $ source $CONDA/etc/profile.d/conda.sh
+      #        $ conda activate test
+      - name: Setup tmate session
+        if: ${{ inputs.debug_enabled }}
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
+
+      - name: Run tests (bash)
+        id: run_tests_bash
+        if: runner.os != 'Windows'
+        timeout-minutes: 90
+        env:
+          OPENMDAO_CHECK_ALL_PARTIALS: true
+          # MPI settings for CI (all platforms)
+          PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
+          OMPI_MCA_rmaps_base_oversubscribe: "1"
+        run: |
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          echo "============================================================="
+          echo "Run tests with coverage (from directory other than repo root)"
+          echo "============================================================="
+          echo "############ .coveragerc contents #################"
+          cat .coveragerc
+          echo "###################################################"
+          cp .coveragerc "$HOME"
+          cd "$HOME"
+
+          # Build testflo command
+          TESTFLO_CMD="testflo -n 2 openmdao --timeout=240 --durations=20"
+
+          # Do not perform coverage on macOS
+          if [[ "${{ runner.os }}" != "macOS" ]]; then
+            TESTFLO_CMD="$TESTFLO_CMD --coverage --coverpkg openmdao"
+          fi
+
+          # Add --show_skipped unless we're in minimal environment
+          if [[ "${{ matrix.PIXI_ENVIRONMENT }}" != "minimal" ]]; then
+            TESTFLO_CMD="$TESTFLO_CMD --show_skipped"
+          fi
+
+          $TESTFLO_CMD
+
+      - name: Display test report on failure (bash)
+        if: steps.run_tests_bash.outcome == 'failure'
+        run: |
+          echo "::group::Test Failure Report"
+          cat "$HOME/testflo_report.out"
+          echo "::endgroup::"
+
+      - name: Run tests (windows)
+        id: run_tests_windows
+        if: runner.os == 'Windows'
+        timeout-minutes: 90
+        shell: pwsh
+        env:
+          OPENMDAO_CHECK_ALL_PARTIALS: true
+        run: |
+          & pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }} -s powershell | Out-String | Invoke-Expression
+          echo "============================================================="
+          echo "Run tests with coverage (from directory other than repo root)"
+          echo "============================================================="
+          copy .coveragerc "$HOME"
+          Set-DisplayResolution -Width 1920 -Height 1080 -Force
+          cd "$HOME"
+          testflo -n 1 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20 --pre_announce
+
+      - name: Display test report on failure (windows)
+        if: steps.run_tests_windows.outcome == 'failure'
+        shell: pwsh
+        run: |
+          echo "::group::Test Failure Report"
+          Get-Content "$env:HOME/testflo_report.out"
+          echo "::endgroup::"
+
+      - name: Submit coverage
+        id: coveralls
+        continue-on-error: true
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERALLS_SERVICE_NAME: "github"
+          COVERALLS_PARALLEL: true
+        run: |
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          echo "============================================================="
+          echo "Submit coverage"
+          echo "============================================================="
+          cp $HOME/.coverage .
+          python -m pip install coveralls
+          SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
+          coveralls --basedir $SITE_DIR
+
+      - name: Slack failure to upload to coveralls.io
+        if: steps.coveralls.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: 'warning'
+          message: |
+            Uploading of coverage data to coveralls.io failed.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Scan for security issues
+        if: matrix.BANDIT
+        id: bandit
+        continue-on-error: true
+        run: |
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          python -m pip install bandit
+          echo "============================================================="
+          echo "Run bandit scan for high/medium severity issues"
+          echo "============================================================="
+          cd $GITHUB_WORKSPACE
+          python -m bandit -c bandit.yml -ll -r openmdao
+
+      - name: Perform linting with Ruff
+        if: matrix.RUFF
+        run: |
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          echo "============================================================="
+          echo "Lint OpenMDAO code per settings in pyproject.toml"
+          echo "============================================================="
+          ruff check . --config pyproject.toml
+
+      - name: Slack unit test failure
+        if: failure() && steps.run_tests_bash.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.run_tests_bash.outcome }}
+          message:
+            Unit testing failed on `${{ matrix.OS }}` `${{ matrix.PIXI_ENVIRONMENT }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Slack security issue
+        if: steps.bandit.outcome == 'failure'
+        uses: act10ns/slack@v2.0.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ steps.bandit.outcome }}
+          message:
+            Security issue found on `${{ matrix.OS }}` `${{ matrix.PIXI_ENVIRONMENT }}` build.
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Fail the workflow if tests failed
+        if: always()
+        run: |
+          if [[ "${{ steps.run_tests_bash.outcome }}" == "failure" ]] || [[ "${{ steps.run_tests_windows.outcome }}" == "failure" ]]; then
+            echo "Tests failed"
+            exit 1
+          fi

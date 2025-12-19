@@ -18,7 +18,6 @@ def github_read_file(repository, file_path, github_token=None):
     """
     Get the contents of a file from a GitHub repository using the API.
 
-
     Parameters
     ----------
     repository : str
@@ -28,7 +27,8 @@ def github_read_file(repository, file_path, github_token=None):
     github_token : str, optional
         The GitHub token.
 
-    Returns:
+    Returns
+    -------
     str
         The contents of the file.
     """
@@ -50,8 +50,7 @@ def github_read_file(repository, file_path, github_token=None):
 
 def get_poem_message(repository, pull_id, github_token=None):
     """
-    Read the body of the specified pull request and generate a message if it resolves an issue
-    that references an associated POEM.
+    Print a message if the pull_id resolves an issues associated with a POEM.
 
     Parameters
     ----------
@@ -73,8 +72,9 @@ def get_poem_message(repository, pull_id, github_token=None):
     cmd = ["gh", "--repo", repository, "issue", "view", "--json", "body", pull_id]
     try:
         pull_json = subprocess.check_output(cmd)
-    except subprocess.CalledProcessError as err:
-        print(f"Unable to access pull request #{pull_id} on repository {repository}:\nrc={err.returncode}")
+    except subprocess.CalledProcessError:
+        print(f"Unable to access pull request #{pull_id} on "
+              "repository {repository}:\nrc={err.returncode}")
         return ERROR
 
     pull_body = json.loads(pull_json)["body"]
@@ -104,8 +104,9 @@ def get_poem_message(repository, pull_id, github_token=None):
     cmd = ["gh", "--repo", repository, "issue", "view", "--json", "body", issue_id]
     try:
         issue_json = subprocess.check_output(cmd)
-    except subprocess.CalledProcessError as err:
-        print(f"Unable to access issue  #{issue_id} on repository {repository}:\nrc={err.returncode}")
+    except subprocess.CalledProcessError:
+        print(f"Unable to access issue  #{issue_id} on repository "
+              "{repository}:\nrc={err.returncode}")
         return ERROR
 
     issue_body = json.loads(issue_json)["body"]

@@ -21,6 +21,7 @@ try:
     from bokeh.application.application import Application
     from bokeh.application.handlers import FunctionHandler
     from tornado.ioloop import PeriodicCallback
+    from tornado.web import StaticFileHandler
 
     bokeh_and_dependencies_available = True
 except ImportError:
@@ -30,7 +31,7 @@ except ImportError:
 # the time between calls to the udpate method
 # if this is too small, the GUI interactions get delayed because
 # code is busy trying to keep up with the periodic callbacks
-_time_between_callbacks_in_ms = 1000
+_time_between_callbacks_in_ms = 300
 
 # Number of milliseconds for unused session lifetime
 _unused_session_lifetime_milliseconds = 1000 * 60 * 10
@@ -139,8 +140,6 @@ def _rtplot_cmd(options, user_args):
         case_recorder_file = str(problem.driver._rec_mgr._recorders[0]._filepath)
 
         cmd = ['openmdao', 'realtime_plot', '--pid', str(os.getpid()), case_recorder_file]
-        # if not options.show:
-        #     cmd.insert(-1, '--no-display')
         if script_path:
             cmd.insert(-1, '--script')
             cmd.insert(-1, script_path)
@@ -313,6 +312,16 @@ class _CaseRecorderTracker:
         cons = self._initial_case.get_constraints()
         return cons.keys()
 
+    def _get_constraint_bounds(self, name):
+        cons = self._initial_case.get_constraints()
+        var_info = cons._var_info[name]
+        return (var_info['lower'], var_info['upper'])
+
+    def _get_desvar_bounds(self, name):
+        lower = self._cr.problem_metadata['variables'][name]['lower']
+        upper = self._cr.problem_metadata['variables'][name]['upper']
+        return lower, upper
+
     def _get_units(self, name):
         try:
             units = self._initial_case._get_units(name)
@@ -343,8 +352,8 @@ def realtime_plot(case_recorder_filename, callback_period,
 
     Parameters
     ----------
-    case_recorder_filename : MetaModelStructuredComp or MetaModelUnStructuredComp
-        The metamodel component.
+    case_recorder_filename : str
+        The path to the case recorder file that is the source of the data for the plot.
     callback_period : float
         The time period between when the application calls the update method.
     pid_of_calling_script : int
@@ -378,6 +387,13 @@ def realtime_plot(case_recorder_filename, callback_period,
             {"/": Application(FunctionHandler(_make_realtime_plot_doc))},
             port=_port_number,
             unused_session_lifetime_milliseconds=_unused_session_lifetime_milliseconds,
+            extra_patterns=[
+                (
+                    "/images/(.*)",
+                    StaticFileHandler,
+                    {"path": os.path.normpath(os.path.dirname(__file__) + "/images/")},
+                ),
+            ],
         )
         server.start()
 

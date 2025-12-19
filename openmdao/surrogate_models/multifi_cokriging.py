@@ -538,7 +538,7 @@ class MultiFiCoKriging(object):
         R = self._build_R(lvl, theta)
 
         try:
-            C = linalg.cholesky(R, lower=True)
+            C = np.linalg.cholesky(R)
         except linalg.LinAlgError:
             _logger.warning(('Cholesky decomposition of R at level %i failed' % lvl) +
                             ' with theta=' + str(theta))

@@ -195,6 +195,33 @@ class TestPassSize(unittest.TestCase):
             "['B.in', 'B.out', 'C.in', 'C.out']. To see the dynamic shapes dependency graph, do "
             "'openmdao view_dyn_shapes <your_py_file>'.")
 
+    def test_err_msg_with_other_input(self):
+        class CGInertia(om.ExplicitComponent):
+
+            def setup(self):
+
+                # This shape_by_conn is missing a source shape. An error is correctly
+                # raised for this.
+                self.add_input('Mission:FUEL_MASS', shape_by_conn=True, units="lbm")
+                self.add_output('aircraft:CG', compute_shape=lambda shapes: (
+                    shapes['Mission:FUEL_MASS'][0], 3))
+
+                # However, when you have one more normal input, the error is short-circuited,
+                # and setup2 bombs out while building a graph.
+                # You can try with this line commented to see the correct error.
+                self.add_input('aircraft:air_conditioning:mass', val=0.0, units="lbm")
+
+
+        prob = om.Problem(name='dyn_err_check')
+        prob.model.add_subsystem("cg", CGInertia(), promotes=["*"])
+        prob.setup()
+        with self.assertRaises(Exception) as cm:
+            prob.final_setup()
+
+        self.assertEqual(cm.exception.args[0],
+                         "\nCollected errors for problem 'dyn_err_check':"
+                         "\n   <model> <class Group>: Failed to resolve shapes for ['cg.Mission:FUEL_MASS', 'cg.aircraft:CG']. To see the dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'.")
+
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class TestPassSizeDistributed(unittest.TestCase):

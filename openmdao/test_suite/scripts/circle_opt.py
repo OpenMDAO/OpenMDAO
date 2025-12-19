@@ -35,7 +35,8 @@ class CircleOpt(om.Group):
                                                           g=np.ones(SIZE//2), even=np.ones(SIZE//2),
                                                           odd=np.ones(SIZE//2)))
 
-        self.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)))
+        self.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE),
+                           x=np.ones(SIZE)))
 
         IND = np.arange(SIZE, dtype=int)
         ODD_IND = IND[1::2]  # all odd indices
@@ -71,5 +72,7 @@ if __name__ == '__main__':
     p = om.Problem(model=CircleOpt(), driver=om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False))
     p.setup(mode='fwd')
     p.run_driver()
+
+    print('outputs directory:', p.get_outputs_dir())
 
     print(p['circle.area'], np.pi)

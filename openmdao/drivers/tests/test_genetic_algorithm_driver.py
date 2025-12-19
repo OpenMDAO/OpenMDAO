@@ -1052,6 +1052,33 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         self.maxDiff = None
         self.assertEqual(err.exception.args[0], msg)
 
+    @parameterized.expand([
+        (True, 1.0, -2.0),
+        (False,2.0, -1.0)
+    ],
+    name_func=_test_func_name)
+    def test_lower_upper_constraints(self, minimize, x_opt, f_opt):
+        prob = om.Problem()
+        model = prob.model
+
+        if minimize:
+            model.add_subsystem("parab", om.ExecComp("f=x**2-3"), promotes_inputs=["x"])
+        else:
+            model.add_subsystem("parab", om.ExecComp("f=-x**2+3"), promotes_inputs=["x"])
+
+        model.add_subsystem("const", om.ExecComp("g=x"), promotes_inputs=["x"])
+        model.set_input_defaults("x", 0.0)
+
+        prob.driver = om.SimpleGADriver()
+        model.add_objective("parab.f")
+        model.add_design_var("x", lower=0, upper=3)
+        model.add_constraint("const.g", lower=1, upper=2.0)
+
+        prob.setup()
+        model.set_val("x", 0)
+        prob.run_driver()
+        assert_near_equal(prob['x'], x_opt, 1e-4) 
+        assert_near_equal(prob['parab.f'], f_opt, 1e-4)
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")

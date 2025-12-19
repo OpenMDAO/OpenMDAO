@@ -21,6 +21,7 @@ class _NoColor(object):
     """
     A class to replace Fore, Back, and Style when colorama isn't istalled.
     """
+
     def __getattr__(self, name):
         return ''
 

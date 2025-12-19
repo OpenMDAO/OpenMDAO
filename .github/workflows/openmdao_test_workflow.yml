@@ -62,6 +62,11 @@ on:
         default: false
 
 
+concurrency:
+  # Cancel any existing CI runs if we push to this branch
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 run-name:  ${{ inputs.run_name }}
 
 permissions: {}
@@ -104,28 +109,28 @@ jobs:
             OPTIONAL: '[all]'
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.MacOS_Baseline }}
 
-          # test minimal install
-          - NAME: Ubuntu Minimal
-            OS: ubuntu-24.04
-            PY: '3.13'
-            NUMPY: '2.2'
-            SCIPY: '1.15'
-            OPTIONAL: '[test]'
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
+          # # test minimal install
+          # - NAME: Ubuntu Minimal
+          #   OS: ubuntu-24.04
+          #   PY: '3.13'
+          #   NUMPY: '2.2'
+          #   SCIPY: '1.15'
+          #   OPTIONAL: '[test]'
+          #   EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Minimal }}
 
-          # test oldest supported versions
-          - NAME: Ubuntu Oldest
-            OS: ubuntu-22.04
-            PY: '3.10'
-            NUMPY: '1.26'
-            SCIPY: '1.12'
-            PETSc: '3.20'
-            OPENMPI: '4.1'
-            PYOPTSPARSE_FROM: 'build_pyoptsparse'
-            PYOPTSPARSE: '2.10.2'
-            SNOPT: '7.7'
-            OPTIONAL: '[all]'
-            EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Oldest }}
+          # # test oldest supported versions
+          # - NAME: Ubuntu Oldest
+          #   OS: ubuntu-22.04
+          #   PY: '3.10'
+          #   NUMPY: '1.26'
+          #   SCIPY: '1.12'
+          #   PETSc: '3.20'
+          #   OPENMPI: '4.1'
+          #   PYOPTSPARSE_FROM: 'build_pyoptsparse'
+          #   PYOPTSPARSE: '2.10.2'
+          #   SNOPT: '7.7'
+          #   OPTIONAL: '[all]'
+          #   EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Ubuntu_Oldest }}
 
     runs-on: ${{ matrix.OS }}
 
@@ -148,7 +153,7 @@ jobs:
 
       - name: Exit if this job was excluded
         if: matrix.EXCLUDE
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
 
@@ -257,6 +262,9 @@ jobs:
       - name: Build SNOPT
         if: matrix.PYOPTSPARSE_FROM != 'build_pyoptsparse' && matrix.SNOPT
         continue-on-error: false
+        env:
+          SNOPT_LOCATION: ${{ secrets.SNOPT_LOCATION }}
+          SNOPT_VERSION: ${{ matrix.SNOPT }}
         run: |
           echo "============================================================="
           echo "Build SNOPT library"
@@ -265,9 +273,7 @@ jobs:
             echo "-------------------------------------------------------------"
             echo "Getting SNOPT source"
             echo "-------------------------------------------------------------"
-            scp -qr ${{ secrets.SNOPT_LOCATION }} .
-          elif [[ "${{ matrix.SNOPT }}" ]]; then
-            echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
+            .github/actions/install_pyoptsparse/download_snopt.sh
           fi
 
           if [ -d "SNOPT" ] ; then
@@ -327,6 +333,9 @@ jobs:
       - name: Install pyOptSparse using build_pyoptsparse
         if: matrix.PYOPTSPARSE && matrix.PYOPTSPARSE_FROM == 'build_pyoptsparse'
         continue-on-error: false
+        env:
+          SNOPT_LOCATION: ${{ secrets.SNOPT_LOCATION }}
+          SNOPT_VERSION: ${{ matrix.SNOPT }}
         run: |
           conda install -c conda-forge swig -q -y
 
@@ -348,17 +357,18 @@ jobs:
             PAROPT="-a"
           fi
 
-          if [[ "${{ matrix.SNOPT }}" == "7.7" && "${{ secrets.SNOPT_LOCATION_77 }}" ]]; then
+          if [[ "${{ matrix.SNOPT }}" == "7.7" ]]; then
             echo "  > Secure copying SNOPT 7.7 over SSH"
-            mkdir SNOPT
-            scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
-            SNOPT="-s SNOPT/src"
-          elif [[ "${{ matrix.SNOPT }}" == "7.2" && "${{ secrets.SNOPT_LOCATION_72 }}" ]]; then
+            .github/actions/install_pyoptsparse/download_snopt.sh
+            if [ -d "SNOPT" ] ; then
+              SNOPT="-s SNOPT/src"
+            fi
+          elif [[ "${{ matrix.SNOPT }}" == "7.2" ]]; then
             echo "  > Secure copying SNOPT 7.2 over SSH"
-            mkdir SNOPT
-            scp -qr ${{ secrets.SNOPT_LOCATION_72 }} SNOPT
-            ls -lR SNOPT
-            SNOPT="-s SNOPT/source"
+            .github/actions/install_pyoptsparse/download_snopt.sh
+            if [ -d "SNOPT" ] ; then
+              SNOPT="-s SNOPT/source"
+            fi
           elif [[ "${{ matrix.SNOPT }}" ]]; then
             echo "SNOPT version ${{ matrix.SNOPT }} was requested but source is not available"
           fi
@@ -522,8 +532,8 @@ jobs:
             ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
       - name: Fail the workflow if tests or doc build failed
-        if: steps.run_tests.outcome == 'failure' || steps.build_docs.outcome == 'failure'
-        uses: actions/github-script@v3
+        if: steps.run_tests.outcome == 'failure'
+        uses: actions/github-script@v8
         with:
           script: |
               let test_fail = ${{ steps.run_tests.outcome == 'failure' }};
@@ -546,7 +556,7 @@ jobs:
             PY: '3.12'
             NUMPY: '1.26'
             SCIPY: '1.13'
-            PYOPTSPARSE: '2.13.1'
+            PYOPTSPARSE: '2.14.0'
             BANDIT: true
             EXCLUDE: ${{ github.event_name == 'workflow_dispatch'  && ! inputs.Windows_Baseline }}
 
@@ -569,7 +579,7 @@ jobs:
 
       - name: Exit if this job was excluded
         if: matrix.EXCLUDE
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: core.setFailed('The ${{ matrix.NAME }} job was excluded from the run, exiting...');
 
@@ -613,6 +623,7 @@ jobs:
           echo "Install pyoptsparse from conda-forge"
           echo "============================================================="
           conda install -c conda-forge pyoptsparse=${{ matrix.PYOPTSPARSE }} -q -y
+          conda install cyipopt
 
       - name: Install optional dependencies
         run: |
@@ -649,7 +660,7 @@ jobs:
           copy .coveragerc $HOME
           cd $HOME
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
-          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20
+          testflo -n 2 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20 -s
 
       - name: Slack unit test failure
         if: failure() && steps.run_tests.outcome == 'failure'

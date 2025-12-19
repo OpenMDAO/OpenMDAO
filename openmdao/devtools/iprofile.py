@@ -64,7 +64,6 @@ def setup(methods=None, finalize=True):
 
     Parameters
     ----------
-
     methods : list, optional
         A list of tuples of profiled methods to override the default set.  The first
         entry is the method name or glob pattern and the second is a tuple of class
@@ -222,12 +221,10 @@ def _process_1_profile(fname):
 
     Parameters
     ----------
-
     flist : list of str
         Names of raw profiling data files.
 
     """
-
     totals = {}
     tree_nodes = {}
     tree_parts = []
@@ -265,12 +262,10 @@ def _process_profile(flist):
 
     Parameters
     ----------
-
     flist : list of str
         Names of raw profiling data files.
 
     """
-
     nfiles = len(flist)
 
     if nfiles == 1:
@@ -351,7 +346,6 @@ def _iprof_totals_exec(options, user_args):
     Called from the command line (openmdao prof_totals command) to create a file containing total
     elapsed times and number of calls for all profiled functions.
     """
-
     if not options.file:
         print("No files to process.")
         sys.exit(0)

@@ -3,12 +3,16 @@ import sys
 import importlib
 import inspect
 
-try:
-    from IPython.display import display, HTML, IFrame, Code
-    from IPython import get_ipython
-    ipy = get_ipython() is not None
-except ImportError:
-    ipy = display = HTML = IFrame = None
+# Fast path: if IPython already loaded, check it
+if 'IPython' in sys.modules:
+    try:
+        import IPython
+        ipy = IPython.get_ipython() is not None
+    except (ImportError, AttributeError):
+        ipy = False
+else:
+    # IPython not loaded = definitely not in IPython session
+    ipy = False
 
 from openmdao.utils.om_warnings import issue_warning, warn_deprecation
 
@@ -68,6 +72,7 @@ def get_code(reference, hide_doc_string=False):
         obj = ''.join(obj)
 
     if ipy:
+        from IPython.display import Code
         return Code(obj, language='python')
     else:
         issue_warning("IPython is not installed. Run `pip install openmdao[notebooks]` or "
@@ -85,6 +90,7 @@ def display_source(reference, hide_doc_string=False):
     hide_doc_string : bool
         Option to hide the docstring.
     """
+    from IPython.display import display
     if ipy:
         display(get_code(reference, hide_doc_string))
 
@@ -116,6 +122,7 @@ def show_options_table(reference, recording_options=False, options_dict='options
         obj = reference
 
     if ipy:
+        from IPython.display import display, HTML
         if recording_options:
             warn_deprecation('Argument `recording_options` is deprecated. Use '
                              '`options_dict="recording_options" to remove this '

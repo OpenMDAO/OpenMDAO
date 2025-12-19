@@ -11,6 +11,7 @@ import sys
 import tempfile
 import traceback
 import webbrowser
+from importlib.util import find_spec
 import inspect
 from itertools import combinations, groupby
 from contextlib import contextmanager
@@ -31,36 +32,16 @@ from openmdao.utils.array_utils import submat_sparsity_iter
 from openmdao.devtools.memory import mem_usage
 
 try:
-    import matplotlib as mpl
-    from matplotlib import pyplot
-
-    if Version(mpl.__version__) < Version("3.6"):
-        from matplotlib import cm
-except ImportError:
-    mpl = None
-
-try:
-    from bokeh.models import CategoricalColorMapper, ColumnDataSource, CustomJSHover, \
-        Div, HoverTool, PreText
-    from bokeh.layouts import column
-    from bokeh.palettes import Blues256, Reds256, gray, interp_palette
-    from bokeh.plotting import figure
-    import bokeh.resources as bokeh_resources
-    from bokeh.transform import transform
-    import bokeh.io
-except ImportError:
-    bokeh_resources = None
-
-
-try:
     import jax
     jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
     import jax.numpy as jnp
     from jax.experimental.sparse import BCOO
 except ImportError:
-
     jax = None
     jnp = np
+
+
+bokeh_available = find_spec('bokeh') is not None
 
 
 CITATIONS = """
@@ -1448,7 +1429,13 @@ class Coloring(object):
         issue_warning('display is deprecated. Use display_bokeh for rich html displays of coloring'
                       'or display_txt for a text-based display.', category=OMDeprecationWarning)
 
-        if mpl is None:
+        try:
+            import matplotlib as mpl
+            from matplotlib import pyplot
+
+            if Version(mpl.__version__) < Version("3.6"):
+                from matplotlib import cm
+        except ImportError:
             print("matplotlib is not installed so the coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
                   "object or by using 'openmdao view_coloring --textview <your_coloring_file>' "
@@ -1639,7 +1626,16 @@ class Coloring(object):
         use_prom_names : bool
             If True, display promoted names rather than absolute path names for variables.
         """
-        if bokeh_resources is None:
+        try:
+            from bokeh.models import CategoricalColorMapper, ColumnDataSource, CustomJSHover, \
+                Div, HoverTool, PreText
+            from bokeh.layouts import column
+            from bokeh.palettes import Blues256, Reds256, gray, interp_palette
+            from bokeh.plotting import figure
+            import bokeh.resources
+            from bokeh.transform import transform
+            import bokeh.io
+        except ImportError:
             print("bokeh is not installed so this coloring viewer is not available. The ascii "
                   "based coloring viewer can be accessed by calling display_txt() on the Coloring "
                   "object or by using 'openmdao view_coloring --textview <your_coloring_file>' "
@@ -1851,7 +1847,7 @@ class Coloring(object):
         if output_file is not None:
             bokeh.io.save(report_layout, filename=output_file,
                           title=f'total coloring report for {source_name}',
-                          resources=bokeh_resources.INLINE)
+                          resources=bokeh.resources.INLINE)
 
         if show:
             bokeh.io.show(report_layout)
@@ -3278,7 +3274,7 @@ def _run_total_coloring_report(driver):
     htmlpath = reports_dir / 'total_coloring.html'
 
     display_coloring(source=driver, output_file=htmlpath,
-                     as_text=bokeh_resources is None, show=False)
+                     as_text=not bokeh_available, show=False)
 
 
 # entry point for coloring report
@@ -3581,7 +3577,7 @@ def _view_coloring_exec(options, user_args):
         coloring.display_txt()
 
     if options.show_sparsity:
-        if bokeh_resources is not None:
+        if bokeh_available:
             Coloring.display_bokeh(source=options.file[0], show=True)
         else:
             Coloring.display_txt(source=options.file[0], html=False)
@@ -3791,8 +3787,8 @@ def display_coloring(source, output_file='total_coloring.html', as_text=False, s
     if coloring is None:
         return
 
-    if as_text or bokeh_resources is None:
-        if bokeh_resources is None and not as_text:
+    if as_text or not bokeh_available:
+        if not bokeh_available and not as_text:
             issue_warning("bokeh is not installed.\n"
                           "display_coloring will render output in plain text.")
 

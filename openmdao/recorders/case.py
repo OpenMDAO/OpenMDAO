@@ -174,7 +174,10 @@ class Case(object):
 
         if 'jacobian' in data.keys():
             if data_format >= 2:
-                jacobian = blob_to_array(data['jacobian'])
+                if isinstance(data['jacobian'], dict):
+                    jacobian = data['jacobian']
+                else:
+                    jacobian = blob_to_array(data['jacobian'])
                 if type(jacobian) is np.ndarray and not jacobian.shape:
                     jacobian = None
             else:

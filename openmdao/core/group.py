@@ -488,7 +488,8 @@ class Group(System):
                     try:
                         factor, offset = unit_conversion(units_out, units_in)
                     except Exception as err:
-                        self._collect_error(f"{self.msginfo}: When connecting '{src}' to '{abs_in}': {err}")
+                        self._collect_error(
+                            f"{self.msginfo}: When connecting '{src}' to '{abs_in}': {err}")
                     if factor == 1.0 and offset == 0.0:
                         has_unit_conv = False
                 else:

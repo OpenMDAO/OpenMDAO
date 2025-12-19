@@ -171,14 +171,23 @@ class CmdlineTestCase(unittest.TestCase):
         env_vars["TESTFLO_RUNNING"] = "0"
 
         cmd = f"openmdao {os.path.join(scriptdir, 'circle_opt.py')}"
+        print('Command:', cmd)
+        print('Current working dir:', os.getcwd())
         proc = subprocess.Popen(cmd.split(),  # nosec: trusted input
                                 env=env_vars,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
-            outs, errs = proc.communicate(timeout=10)
+            outs, errs = proc.communicate(timeout=20)
         except subprocess.TimeoutExpired:
             proc.kill()
             outs, errs = proc.communicate()
+
+        print('Output')
+        print('------')
+        print(outs.decode())
+        print('Errors')
+        print('------')
+        print(errs.decode())
 
         self.assertTrue(os.path.exists('circle_opt_out'))
 

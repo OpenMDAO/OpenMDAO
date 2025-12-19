@@ -1,0 +1,208 @@
+name: Setup OpenMDAO Conda Environment
+description: 'Setup conda with specified Python, NumPy, and SciPy versions'
+inputs:
+  os_version:
+    description: 'Operating system'
+    required: true
+  python_version:
+    description: 'Python version'
+    required: true
+  numpy_version:
+    description: 'NumPy version'
+    required: true
+  scipy_version:
+    description: 'SciPy version'
+    required: true
+  matrix_name:
+    description: 'Name of the run matrix entry being used (for logging)'
+    required: false
+    default: ''
+  exclude:
+    description: 'If true, current run matrix entry should not be executed'
+    required: false
+    default: 'false'
+  # Inputs needed for install_petsc
+  openmpi_version:
+    description: 'OpenMPI version'
+    required: false
+  petsc_version:
+    description: 'PETSc version'
+    required: false
+  mpi4py_version:
+    description: 'mpi4py version'
+    required: false
+  # Inputs for install_pyoptsparse
+  pyoptsparse_version:
+    description: 'Version of pyoptsparse to be used, or empty string for no pyoptsparse.'
+    required: false
+  pyoptsparse_from:
+    description: 'Location from which to acquire pyoptsparse, either "build_pyoptsparse" or "conda-forge" or "github" or ""'
+    required: false
+  snopt_version:
+    description: 'The version of SNOPT to test against, if avaiable.'
+    required: false
+  SECRET_ssh_private_key:
+    description: 'ssh private key when being run by OpenMDAO org'
+    required: false
+  SECRET_ssh_known_hosts:
+    description: 'ssh known hosts when being run by OpenMDAO org'
+    required: false
+  SECRET_snopt_location:
+    description: 'snopt location when being run by OpenMDAO org'
+    required: false
+  SECRET_snopt_location_77:
+    description: 'snopt 7.7 location when being run by OpenMDAO org'
+    required: false
+  SECRET_snopt_location_72:
+    description: 'snopt 7.2 location when being run by OpenMDAO org'
+    required: false
+  # Inputs for installing OpenMDAO
+  openmdao_install_from:
+    description: 'How to install OpenMDAO: pypi, github, wheel, local, or none'
+    required: false
+    default: 'pypi'
+  openmdao_version:
+    description: 'OpenMDAO version (for PyPI installs only): "" (latest) or str'
+    required: false
+    default: ''
+  openmdao_optional:
+    description: 'Optional dependencies like [all] or [docs,testing]'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+
+    - name: Display run details
+      if: inputs.matrix_name != ''
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Run #${GITHUB_RUN_NUMBER}"
+        echo "Run ID: ${GITHUB_RUN_ID}"
+        echo "Testing: ${GITHUB_REPOSITORY}"
+        echo "Triggered by: ${GITHUB_EVENT_NAME}"
+        echo "Initiated by: ${GITHUB_ACTOR}"
+        echo "============================================================="
+
+    - name: Exit if this job was excluded
+      if: inputs.exclude == 'true'
+      uses: actions/github-script@v8
+      with:
+        script: core.setFailed('The ${{ inputs.matrix_name }} job was excluded from the run, exiting...');
+
+    - name: Log inputs
+      shell: bash -l {0}
+      run: |
+        echo "===== Composite Action Inputs ====="
+        echo "matrix_name: ${{ inputs.matrix_name }}"
+        echo "python_version: ${{ inputs.python_version }}"
+        echo "numpy_version: ${{ inputs.numpy_version }}"
+        echo "scipy_version: ${{ inputs.scipy_version }}"
+        echo "exclude: ${{ inputs.exclude }}"
+        echo "=================================="
+
+    - name: Setup conda
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        python-version: ${{ inputs.python_version }}
+        conda-remove-defaults: true
+        channels: conda-forge
+        channel-priority: "strict"
+
+    - name: Install NumPy and SciPy
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Install NumPy and SciPy"
+        echo "============================================================="
+        conda install numpy=${{ inputs.numpy_version }} scipy=${{ inputs.scipy_version }} -q -y
+        python -m pip install --upgrade pip
+
+    - name: Install PETSc and mpi4py
+      uses: ./.github/actions/install_petsc
+      with:
+        openmpi_version: ${{ inputs.openmpi_version }}
+        petsc_version: ${{ inputs.petsc_version }}
+        mpi4py_version: ${{ inputs.mpi4py_version }}
+
+    - name: 'Install pyOptSparse'
+      id: install_pyoptsparse
+      uses: ./.github/actions/install_pyoptsparse
+      with:
+        pyoptsparse_version: ${{ inputs.pyoptsparse_version }}
+        pyoptsparse_from: ${{ inputs.pyoptsparse_from }}
+        snopt_version: ${{ inputs.snopt_version }}
+        SECRET_ssh_private_key: ${{ inputs.SECRET_ssh_private_key}}
+        SECRET_ssh_known_hosts: ${{ inputs.SECRET_ssh_known_hosts}}
+        SECRET_snopt_location: ${{ inputs.SECRET_snopt_location }}
+        SECRET_snopt_location_72: ${{ inputs.SECRET_snopt_location_72 }}
+        SECRET_snopt_location_77: ${{ inputs.SECRET_snopt_location_77}}
+
+    - name: 'Install OpenMDAO'
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Install OpenMDAO"
+        echo "============================================================="
+
+        INSTALL_FROM="${{ inputs.openmdao_install_from }}"
+        OPTIONAL="${{ inputs.openmdao_optional }}"
+        VERSION="${{ inputs.openmdao_version }}"
+
+        case "$INSTALL_FROM" in
+          pypi)
+            if [[ -n "$VERSION" ]]; then
+              echo "Installing OpenMDAO==$VERSION from PyPI"
+              python -m pip install "openmdao${OPTIONAL}==${VERSION}"
+            else
+              echo "Installing latest OpenMDAO from PyPI"
+              python -m pip install "openmdao${OPTIONAL}"
+            fi
+            ;;
+
+          github)
+            if [[ -n "$VERSION" ]]; then
+              echo "Installing OpenMDAO@${VERSION} from GitHub"
+              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@${VERSION}#egg=openmdao${OPTIONAL}"
+            else
+              echo "Installing OpenMDAO@master from GitHub"
+              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@master#egg=openmdao${OPTIONAL}"
+            fi
+            ;;
+
+          wheel)
+            echo "Building wheel"
+            pip wheel --no-deps .
+            WHEEL=$(find openmdao-*.whl)
+            echo "Installing from wheel: $WHEEL"
+            python -m pip install "${WHEEL}${OPTIONAL}"
+            ;;
+
+          local_developer)
+            echo "Installing from local directory in developer mode"
+            python -m pip install -e ".${OPTIONAL}"
+            ;;
+
+          local)
+            echo "Installing from local directory"
+            python -m pip install ".${OPTIONAL}"
+            ;;
+
+          none|"")
+            echo "Skipping OpenMDAO installation"
+            ;;
+
+          *)
+            echo "Error: Unknown install method '$INSTALL_FROM'"
+            exit 1
+            ;;
+        esac
+
+    - name: 'Install optional dependencies'
+      id: install_optional_dependendies
+      uses: ./.github/actions/install_optional_dependencies
+      with:
+        os_version: ${{ inputs.os_version }}
+        optional: ${{ inputs.openmdao_optional }}

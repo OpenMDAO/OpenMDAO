@@ -2,17 +2,10 @@
 A widget-based representation of OptionsDictionary for use in Jupyter notebooks.
 """
 
-try:
-    import ipywidgets as widgets
-    from ipywidgets import Layout
-    from IPython.display import display
-except Exception:
-    widgets = None
-
 from openmdao.utils.om_warnings import issue_warning
 
 
-class OptionsWidget(object):
+class OptionsWidget:
     """
     Widget to set options.
 
@@ -26,6 +19,13 @@ class OptionsWidget(object):
         """
         Initialize.
         """
+        try:
+            import ipywidgets as widgets
+            from ipywidgets import Layout
+            from IPython.display import display
+        except Exception:
+            widgets = None
+
         if widgets is None:
             issue_warning(f"ipywidgets is required to use {self.__class__.__name__}."
                           "To install it run `pip install openmdao[notebooks]`.")

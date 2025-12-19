@@ -1,6 +1,7 @@
 """A bunch of MPI utilities."""
 
 from contextlib import contextmanager
+from importlib.util import find_spec
 import io
 import os
 import sys
@@ -13,6 +14,92 @@ import numpy as np
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.utils.notebook_utils import notebook
 from openmdao.utils.indexer import array2slice
+
+
+_under_mpi_cache = None
+"""True if running under MPI with multiple processes, otherwise False."""
+
+
+def under_mpi():
+    """
+    Check if running under MPI with multiple processes.
+
+    Uses a fast-path check via environment variables for the common case
+    of not running under MPI. Only imports mpi4py if evidence suggests
+    we might be running under MPI.
+
+    Returns
+    -------
+    bool
+        True if running under MPI with multiple processes, otherwise False.
+    """
+    global _under_mpi_cache
+
+    if _under_mpi_cache is not None:
+        return _under_mpi_cache
+
+    # Check for explicit override
+    openmdao_use_mpi = os.environ.get('OPENMDAO_USE_MPI', '').lower()
+    if openmdao_use_mpi in ('1', 'true', 'yes', 'always'):
+        _under_mpi_cache = True
+        return _under_mpi_cache
+    elif openmdao_use_mpi in ('0', 'false', 'no', 'never'):
+        _under_mpi_cache = False
+        return _under_mpi_cache
+
+    # Fast path: Check common MPI environment variables
+    # Most MPI runs will set at least one of these
+    mpi_size_vars = [
+        'OMPI_COMM_WORLD_SIZE',  # OpenMPI
+        'PMI_SIZE',               # MPICH, Intel MPI, MVAPICH, MS-MPI
+        'MPI_LOCALNRANKS',        # Various implementations
+        'SLURM_NTASKS',           # SLURM scheduler
+        'MP_PROCS',               # IBM Spectrum MPI
+        'FJMPI_PROCS',            # Fujitsu MPI
+        'NECMPI_PROCS',           # NEC MPI
+    ]
+
+    for var in mpi_size_vars:
+        value = os.environ.get(var)
+        if value:
+            try:
+                size = int(value)
+                _under_mpi_cache = size > 1
+                return _under_mpi_cache
+            except ValueError:
+                pass
+
+    # Check for MPI presence indicators (suggest MPI but don't give size)
+    mpi_presence_vars = [
+        'MPI_SHEPHERD',  # SGI MPT
+        'MPI_ROOT',      # HP MPI
+        'MPI_FLAGS',     # Platform MPI
+    ]
+
+    has_mpi_indicator = any(var in os.environ for var in mpi_presence_vars)
+
+    # If no MPI environment variables at all, assume not under MPI
+    # This is the fast path for the common case
+    if not has_mpi_indicator:
+        # Double-check: is mpi4py even installed?
+        if find_spec("mpi4py") is None:
+            _under_mpi_cache = False
+            return _under_mpi_cache
+
+        # mpi4py exists but no env vars - likely not under MPI
+        # but could be a weird setup, so default to False
+        _under_mpi_cache = False
+        return _under_mpi_cache
+
+    # We found MPI presence indicators but not size
+    # Need to actually check via mpi4py (slow path)
+    try:
+        from mpi4py import MPI
+        _under_mpi_cache = MPI.COMM_WORLD.Get_size() > 1
+    except ImportError:
+        _under_mpi_cache = False
+
+    return _under_mpi_cache
 
 
 def _redirect_streams(to_fd):
@@ -101,11 +188,9 @@ elif use_mpi is False:
     MPI = None
 else:
     try:
-        from mpi4py import MPI
-
-        # If the import succeeds, but it doesn't look like a parallel
-        # run was intended, don't use MPI
-        if MPI.COMM_WORLD.size == 1:
+        if under_mpi():
+            from mpi4py import MPI
+        else:
             MPI = None
 
     except ImportError:

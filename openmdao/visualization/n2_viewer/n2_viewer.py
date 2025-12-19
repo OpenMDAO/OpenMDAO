@@ -27,7 +27,7 @@ from openmdao.utils.array_utils import convert_ndarray_to_support_nans_in_json
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.general_utils import default_noraise, is_undefined
 from openmdao.utils.mpi import MPI
-from openmdao.utils.notebook_utils import notebook, display, HTML, IFrame, colab
+from openmdao.utils.notebook_utils import notebook, colab
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.reports_system import register_report_hook
 from openmdao.utils.file_utils import _load_and_exec, _to_filename
@@ -636,14 +636,14 @@ def n2(data_source, outfile=_default_n2_filename, path=None, values=_UNDEFINED, 
                          outfile, allow_overwrite=True, var_dict=html_vars,
                          json_dumps_default=default_noraise, verbose=False).run()
 
-    if notebook:
-        if display_in_notebook:
-            # display in Jupyter Notebook
-            outfile = os.path.relpath(outfile)
-            if not colab:
-                display(IFrame(src=outfile, width="100%", height=700))
-            else:
-                display(HTML(outfile))
+    if notebook and display_in_notebook:
+        from IPython.display import display, IFrame, HTML
+        # display in Jupyter Notebook
+        outfile = os.path.relpath(outfile)
+        if not colab:
+            display(IFrame(src=outfile, width="100%", height=700))
+        else:
+            display(HTML(outfile))
     elif show_browser:
         # open it up in the browser
         from openmdao.utils.webview import webview

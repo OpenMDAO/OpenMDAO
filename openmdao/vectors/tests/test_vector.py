@@ -80,6 +80,21 @@ class TestVector(unittest.TestCase):
 
         self.assertEqual(hash1, hash3)
 
+    def test_items(self):
+        d_expected = {"v1": 1.0, "v2": 2.0, "v3": [3.0, 4.0]}
+
+        p = om.Problem()
+        comp = om.IndepVarComp()
+        comp.add_output('v1', val=d_expected["v1"], shape=tuple())
+        comp.add_output('v2', val=d_expected["v2"], shape=tuple())
+        comp.add_output('v3', val=d_expected["v3"])
+        p.model.add_subsystem('des_vars', comp, promotes=['*'])
+        p.setup()
+        p.final_setup()
+
+        for k, v in p.model._outputs.items(relative_to="des_vars"):
+            assert_near_equal(v, d_expected[k])
+
 
 A = np.array([[1.0, 8.0, 0.0], [-1.0, 10.0, 2.0], [3.0, 100.5, 1.0]])
 

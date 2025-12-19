@@ -8,6 +8,11 @@ try:
 except ImportError:
     pydot = None
 
+try:
+    import graphviz
+except ImportError:
+    graphviz = None
+
 import networkx as nx
 
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
@@ -120,11 +125,14 @@ class GraphViewer(object):
         pydot.Dot or None
             The pydot graph that was created.
         """
-        if pydot is None:
-            raise RuntimeError(f"{self._group.msginfo}: write_graph requires pydot.  Install pydot "
-                               "using 'pip install pydot'. Note that pydot requires graphviz, which"
+        if pydot is None or graphviz is None:
+            raise RuntimeError(f"{self._group.msginfo}: write_graph requires pydot and "
+                               "python-graphviz.  pydot and python-graphviz can be installed "
+                               "using 'pip'. Note that pydot requires graphviz, which"
                                " is a non-Python application.\nIt can be installed at the system "
-                               "level or via a package manager like conda.")
+                               "level or via a package manager like conda. Also, if you see an "
+                               "error message about 'dot' not supporting the -Tsvg option, try "
+                               "running 'dot -c' to set up the graphviz config files.")
 
         group = self._group
 
@@ -668,11 +676,13 @@ def write_graph(G, prog='dot', display=True, outfile=None):
     pydot.Dot
         The graph that was written.
     """
-    if pydot is None:
-        raise RuntimeError("write_graph requires pydot.  Install pydot using "
-                           "'pip install pydot'. Note that pydot requires graphviz, which is a "
-                           "non-Python application.\nIt can be installed at the system level "
-                           "or via a package manager like conda.")
+    if pydot is None or graphviz is None:
+        raise RuntimeError("write_graph requires pydot and python-graphviz.  pydot and "
+                           "python-graphviz can be installed using 'pip'. Note that pydot requires "
+                           "graphviz, which is a non-Python application.\nIt can be installed at "
+                           "the system level or via a package manager like conda. Also, if you see "
+                           "an error message about 'dot' not supporting the -Tsvg option, try "
+                           "running 'dot -c' to set up the graphviz config files.")
 
     if outfile is None:
         outfile = 'graph.html'
@@ -885,6 +895,9 @@ def _graph_cmd(options, user_args):
     """
     def _view_graph(model):
         group = model._get_subsystem(options.group) if options.group else model
+        if group is None:
+            raise ValueError(f"Group '{options.group}' not found in model.")
+
         if not options.auto_ivc:
             exclude = {'_auto_ivc'}
         else:

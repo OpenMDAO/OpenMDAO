@@ -15,10 +15,13 @@ BOOK_DIR = pathlib.Path(REPO_ROOT, 'openmdao_book')
 def build_book(book_dir=BOOK_DIR, clean=True):
     """
     Clean (if requested), build, and copy over necessary files for the JupyterBook to be created.
+
     Parameters
     ----------
-    book_dir
-    clean
+    book_dir : str
+        The directory containing the jupyter book.
+    clean : bool
+        If True, clean the jupter-book output prior to building.
     """
     save_cwd = os.getcwd()
     os.chdir(REPO_ROOT)

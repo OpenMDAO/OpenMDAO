@@ -2,7 +2,9 @@
 from pyxdsm.XDSM import XDSM, FUNC, IFUNC, RIGHT
 
 def make_xdsm():
-    # Change `use_sfmath` to False to use computer modern
+    """
+    Create the XDSM diagram for the sellar problem.
+    """
     x = XDSM(use_sfmath=False)
 
     x.add_system("dis1", FUNC, [r"\text{Discipline 1}", "y_1 = z_1^2 + z_2 + x - 0.2 y_2"])

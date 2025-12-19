@@ -20,17 +20,6 @@ from openmdao.utils.array_utils import get_random_arr
 from openmdao.utils.general_utils import _unwrap_comm
 
 
-use_mpi = check_mpi_env()
-if use_mpi is not False:
-    try:
-        from petsc4py import PETSc
-    except ImportError:
-        PETSc = None
-        if use_mpi is True:
-            raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
-elif use_mpi is False:
-    PETSc = None
-
 _directional_rng = np.random.default_rng(99)
 
 
@@ -412,6 +401,17 @@ class _TotalJacInfo(object):
         """
         Compute scatter between a given local jacobian row/col to others in other procs.
         """
+        use_mpi = check_mpi_env()
+        if use_mpi is not False:
+            try:
+                from petsc4py import PETSc
+            except ImportError:
+                PETSc = None
+                if use_mpi is True:
+                    raise ImportError("Importing petsc4py failed and OPENMDAO_USE_MPI is true.")
+        elif use_mpi is False:
+            PETSc = None
+
         model = self.model
         nproc = self.comm.size
 
