@@ -4,13 +4,36 @@ Classes that handle array indexing.
 
 import sys
 import numpy as np
-from numbers import Integral
-from itertools import zip_longest
+from numpy.lib.stride_tricks import as_strided
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import shape2tuple
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.om_warnings import issue_warning
+
+
+def get_virtual_array(shape):
+    """
+    Return a 'virtual' array of the given shape.
+
+    Only one element is actually allocated in memory.
+
+    Parameters
+    ----------
+    shape : tuple
+        Shape of the desired array.
+
+    Returns
+    -------
+    ndarray
+        The virtual array.
+    """
+    dummy = np.zeros(1, dtype=np.int8)
+    # Create a "virtual" view of the target shape.
+    #    By setting strides to all zeros, every index points to the
+    #    same memory address as the dummy array.
+    #    This is O(1) memory regardless of original_shape size.
+    return as_strided(dummy, shape=shape, strides=(0,) * len(shape))
 
 
 def array2slice(arr):
@@ -31,20 +54,24 @@ def array2slice(arr):
     """
     if arr.ndim == 1 and arr.dtype.kind in ('i', 'u'):
         if arr.size > 1:  # see if 1D array will convert to slice
-            if arr[0] >= 0 and arr[1] >= 0:
-                span = arr[1] - arr[0]
-            else:
+            if arr[0] < 0 or arr[1] < 0:
                 return None
-            if np.all((arr[1:] - arr[:-1]) == span):
-                if span > 0:
-                    # array is increasing with constant span
-                    return slice(arr[0], arr[-1] + 1, span)
-                elif span < 0:
-                    # array is decreasing with constant span
-                    return slice(arr[0], arr[-1] - 1, span)
+
+            diffs = np.diff(arr)
+            step = int(diffs[0])
+
+            if step == 0:
+                return None
+
+            if np.all(diffs == step):
+                if step > 0:
+                    return slice(int(arr[0]), int(arr[-1]) + 1, step)
+                elif arr[-1] > 0:
+                    return slice(int(arr[0]), int(arr[-1]) - 1, step)
+
         elif arr.size == 1:
             if arr[0] >= 0:
-                return slice(arr[0], arr[0] + 1)
+                return slice(int(arr[0]), int(arr[0]) + 1)
         else:
             return slice(0, 0)
 
@@ -259,9 +286,11 @@ class Indexer(object):
             raise RuntimeError(f"Can't get indexed_src_shape of {self} because source shape "
                                "is unknown.")
         if self._flat_src:
-            return resolve_shape((shape_to_len(self._src_shape),)).get_shape(self.flat())
+            shape = (shape_to_len(self._src_shape),)
         else:
-            return resolve_shape(self._src_shape).get_shape(self())
+            shape = self._src_shape
+
+        return get_virtual_array(shape)[s()].shape
 
     @property
     def indexed_src_size(self):
@@ -465,19 +494,19 @@ class ShapedIntIndexer(Indexer):
         """
         return 1
 
-    @property
-    def indexed_src_shape(self):
-        """
-        Return the shape of the index ().
+    # @property
+    # def indexed_src_shape(self):
+    #     """
+    #     Return the shape of the index ().
 
-        Returns
-        -------
-        tuple
-            The shape of the index.
-        """
-        if self._flat_src:
-            return (1,)
-        return super().indexed_src_shape
+    #     Returns
+    #     -------
+    #     tuple
+    #         The shape of the index.
+    #     """
+    #     if self._flat_src:
+    #         return (1,)
+    #     return super().indexed_src_shape
 
     def as_array(self, copy=False, flat=True):
         """
@@ -826,20 +855,20 @@ class SliceIndexer(ShapedSliceIndexer):
         """
         return self.shaped_array(copy=copy, flat=flat)
 
-    @property
-    def indexed_src_shape(self):
-        """
-        Return the shape of the result of indexing into the source.
+    # @property
+    # def indexed_src_shape(self):
+    #     """
+    #     Return the shape of the result of indexing into the source.
 
-        Returns
-        -------
-        tuple
-            The shape of the index.
-        """
-        slc = self._slice
-        if self._flat_src and slc.start is not None and slc.stop is not None:
-            return (len(range(slc.start, slc.stop, slc.step)),)
-        return super().indexed_src_shape
+    #     Returns
+    #     -------
+    #     tuple
+    #         The shape of the index.
+    #     """
+    #     slc = self._slice
+    #     if self._flat_src and slc.start is not None and slc.stop is not None:
+    #         return (len(range(slc.start, slc.stop, slc.step)),)
+    #     return super().indexed_src_shape
 
 
 class ShapedArrayIndexer(Indexer):
@@ -1056,7 +1085,11 @@ class ArrayIndexer(ShapedArrayIndexer):
         tuple
             The shape of the index.
         """
-        return self._arr.shape
+        if self._src_shape is None:
+            raise RuntimeError("Can't get index_src_shape because src_shape is None.")
+        if self._flat_src or len(self._src_shape) == 1:
+            return self._arr.shape
+        return super().indexed_src_shape
 
 
 class ShapedMultiIndexer(Indexer):
@@ -1566,7 +1599,10 @@ class IndexMaker(object):
         else:
             arr = np.atleast_1d(idx)
             if arr.ndim == 1:
-                # TODO: check for contiguous indices here, and if contiguous, replace with slice
+                # slc = array2slice(arr)
+                # if slc is not None:
+                #     idxer = SliceIndexer(slc, flat_src=flat_src)
+                # else:
                 idxer = ArrayIndexer(arr, flat_src=flat_src)
             else:
                 issue_warning("Using a non-tuple sequence for multidimensional indexing is "
@@ -1620,91 +1656,92 @@ def _convert_ellipsis_idx(shape, idx):
     return tuple(lst)
 
 
-class resolve_shape(object):
-    """
-    Class that computes the result shape from a source shape and an index.
+# class resolve_shape(object):
+#     """
+#     Class that computes the result shape from a source shape and an index.
 
-    Parameters
-    ----------
-    shape : tuple
-        The shape of the source.
+#     Parameters
+#     ----------
+#     shape : tuple
+#         The shape of the source.
 
-    Attributes
-    ----------
-    _shape : tuple
-        The shape of the source.
-    """
+#     Attributes
+#     ----------
+#     _shape : tuple
+#         The shape of the source.
+#     """
 
-    def __init__(self, shape):
-        """
-        Initialize attributes.
+#     def __init__(self, shape):
+#         """
+#         Initialize attributes.
 
-        Parameters
-        ----------
-        shape : tuple or int
-            Shape of the source.
-        """
-        self._shape = shape2tuple(shape)
+#         Parameters
+#         ----------
+#         shape : tuple or int
+#             Shape of the source.
+#         """
+#         self._shape = shape2tuple(shape)
 
-    def get_shape(self, idx):
-        """
-        Return the shape of the result of indexing into the source with index idx.
+#     def get_shape(self, idx):
+#         """
+#         Return the shape of the result of indexing into the source with index idx.
 
-        Parameters
-        ----------
-        idx : int, slice, tuple, ndarray
-            The index into the source.
+#         Parameters
+#         ----------
+#         idx : int, slice, tuple, ndarray
+#             The index into the source.
 
-        Returns
-        -------
-        tuple
-            The shape after indexing.
-        """
-        if not isinstance(idx, tuple):
-            idx = (idx,)
-            is_tup = False
-        else:
-            is_tup = True
+#         Returns
+#         -------
+#         tuple
+#             The shape after indexing.
+#         """
+#         if not isinstance(idx, tuple):
+#             idx = (idx,)
+#             is_tup = False
+#         else:
+#             is_tup = True
 
-        for i in idx:
-            if i is ...:
-                idx = _convert_ellipsis_idx(self._shape, idx)
-                break
+#         for i in idx:
+#             if i is ...:
+#                 idx = _convert_ellipsis_idx(self._shape, idx)
+#                 break
 
-        if len(self._shape) < len(idx):
-            raise ValueError(f"Index {idx} dimension too large to index into shape {self._shape}.")
+#         if len(self._shape) < len(idx):
+#             raise ValueError(f"Index {idx} dimension too large to index into shape "
+#                              f"{self._shape}.")
 
-        lens = []
-        seen_arr = False
-        arr_shape = None  # to handle multi-indexing where individual sub-arrays have a shape
-        for dim, ind in zip_longest(self._shape, idx):
-            if ind is None:
-                lens.append(dim)
-            elif isinstance(ind, slice):
-                lens.append(len(range(*ind.indices(dim))))
-            elif isinstance(ind, np.ndarray):
-                if not seen_arr:
-                    seen_arr = True
-                    if ind.ndim > 1:
-                        if arr_shape is not None and arr_shape != ind.shape:
-                            raise ValueError("Multi-index has index sub-arrays of different "
-                                             f"shapes ({arr_shape} != {ind.shape}).")
-                        arr_shape = ind.shape
-                    else:
-                        # only first array idx counts toward shape
-                        lens.append(ind.size)
-            # int indexers don't count toward shape (scalar array has shape ())
-            elif not isinstance(ind, Integral):
-                raise TypeError(f"Index {ind} of type '{type(ind).__name__}' is invalid.")
+#         lens = []
+#         seen_arr = False
+#         arr_shape = None  # to handle multi-indexing where individual sub-arrays have a shape
+#         for dim, ind in zip_longest(self._shape, idx):
+#             if ind is None:
+#                 lens.append(dim)
+#             elif isinstance(ind, slice):
+#                 lens.append(len(range(*ind.indices(dim))))
+#             elif isinstance(ind, np.ndarray):
+#                 if not seen_arr:
+#                     seen_arr = True
+#                     if ind.ndim > 1:
+#                         if arr_shape is not None and arr_shape != ind.shape:
+#                             raise ValueError("Multi-index has index sub-arrays of different "
+#                                              f"shapes ({arr_shape} != {ind.shape}).")
+#                         arr_shape = ind.shape
+#                     else:
+#                         # only first array idx counts toward shape
+#                         lens.append(ind.size)
+#             # int indexers don't count toward shape (scalar array has shape ())
+#             elif not isinstance(ind, Integral):
+#                 raise TypeError(f"Index {ind} of type '{type(ind).__name__}' is invalid.")
 
-        if arr_shape is not None:
-            return arr_shape
+#         if arr_shape is not None:
+#             return arr_shape
 
-        if is_tup or len(lens) >= 1:
-            return tuple(lens)
-        elif is_tup:
-            return ()
-        return (1,)
+#         if is_tup or len(lens) >= 1:
+#             return tuple(lens)
+#         elif is_tup:
+#             return ()
+#         return (1,)
 
 
 def idx_list_to_index_array(idx_list):
@@ -1964,7 +2001,8 @@ class ContiguousRange(object):
 
             dim_size = self.shape[shape_idx]
             # Calculate the size of all dimensions after the current one
-            remaining_size = shape_to_len(self.shape[shape_idx + 1:]) if shape_idx + 1 < len(self.shape) else 1
+            remaining_size = \
+                shape_to_len(self.shape[shape_idx + 1:]) if shape_idx + 1 < len(self.shape) else 1
 
             if isinstance(idx, int):
                 # Integer index - removes this dimension from result shape

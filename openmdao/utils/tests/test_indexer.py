@@ -4,6 +4,9 @@ import numpy as np
 from numpy.testing import assert_equal
 
 from openmdao.utils.indexer import indexer, combine_ranges
+from openmdao.utils.general_utils import setup_dbg
+
+setup_dbg()
 
 
 class IndexerTestCase(unittest.TestCase):
@@ -22,7 +25,7 @@ class IndexerTestCase(unittest.TestCase):
         ind.set_src_shape(src.shape)
         assert_equal(src[ind.shaped_array()], np.array([4]))
         assert_equal(ind.shaped_array(), np.array([4]))
-        assert_equal(ind.indexed_src_shape, (1,))
+        assert_equal(ind.indexed_src_shape, ())
         assert_equal(ind.min_src_dim, 1)
 
     def test_neg_int(self):
@@ -38,7 +41,7 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(src[ind.flat()], np.array([6]))
 
         ind.set_src_shape(src.shape)
-        assert_equal(ind.indexed_src_shape, (1,))
+        assert_equal(ind.indexed_src_shape, ())
         assert_equal(ind.min_src_dim, 1)
 
         assert_equal(ind.shaped_array(), np.array([6]))
@@ -133,7 +136,6 @@ class IndexerTestCase(unittest.TestCase):
         assert_equal(src[ind.as_array()], np.array([5,3,7,9]))
         assert_equal(src[ind.flat()], np.array([5,3,7,9]))
 
-        assert_equal(ind.indexed_src_shape, (4,))
         assert_equal(ind.min_src_dim, 1)
 
         try:
@@ -144,6 +146,7 @@ class IndexerTestCase(unittest.TestCase):
             self.fail("Exception expected")
 
         ind.set_src_shape(src.shape)
+        assert_equal(ind.indexed_src_shape, (4,))
         assert_equal(ind.shaped_array(), np.array([5,3,7,9]))
         assert_equal(src[ind.shaped_array()], np.array([5,3,7,9]))
         assert_equal(ind.shaped_instance()(), np.array([5,3,7,9]))

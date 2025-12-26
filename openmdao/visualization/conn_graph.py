@@ -2665,7 +2665,7 @@ class AllConnGraph(nx.DiGraph):
         edges = self.edges
         nodes = self.nodes
         for node in self.nodes():
-            if self.in_degree(node) == 0:
+            if node[0] == 'o' and self.in_degree(node) == 0:
                 for u, v in dfs_edges(self, node):
                     if v[0] == 'i':
                         edge_meta = edges[u, v]
@@ -2765,6 +2765,13 @@ class AllConnGraph(nx.DiGraph):
         for n in self.bfs_up_iter(node):
             if n[0] == 'o' and in_degree(n) == 0:
                 return n
+
+        # if we get here, node is an input promoted above the attachment point of its source output
+        for n in self.bfs_down_iter(node, include_self=False):
+            # look for output predecessors
+            for p in self.predecessors(n):
+                if p[0] == 'o':
+                    return self.get_root(p)
 
     def get_tree_iter(self, node):
         """
@@ -3027,8 +3034,8 @@ class AllConnGraph(nx.DiGraph):
             self._collect_error('Cycle detected in input-to-input connections. '
                                 f'This is not allowed.\n{errmsg}')
 
-        self.update_src_inds_lists(model)
         self.add_auto_ivc_nodes(model)
+        self.update_src_inds_lists(model)
 
         model._setup_auto_ivcs()
 
