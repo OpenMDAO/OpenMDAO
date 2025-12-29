@@ -1559,13 +1559,13 @@ class LocalRangeIterable(object):
             sizes = system._var_sizes['output']
             vec = system._outputs
             abs2meta = system._var_abs2meta['output']
-            node_meta = graph.nodes[('o', vname)]
+            node_meta = graph.nodes[('o', vname)]['attrs']
         else:
             all_abs2meta = system._var_allprocs_abs2meta['input']
             sizes = system._var_sizes['input']
             vec = system._inputs
             abs2meta = system._var_abs2meta['input']
-            node_meta = graph.nodes[('i', vname)]
+            node_meta = graph.nodes[('i', vname)]['attrs']
 
         if node_meta.distributed:
             var_idx = system._var_allprocs_abs2idx[vname]

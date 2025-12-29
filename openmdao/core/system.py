@@ -518,9 +518,25 @@ class System(object, metaclass=SystemMetaclass):
         self._jac_func_ = None  # for computing jacobian using AD (jax)
 
     def __repr__(self):
+        """
+        Return msginfo.
+
+        Returns
+        -------
+        str
+            Class name and instance absolute name.
+        """
         return self.msginfo
 
     def __str__(self):
+        """
+        Return classname.
+
+        Returns
+        -------
+        str
+            The classname.
+        """
         return self.__class__.__name__
 
     # def _get_var_sizing_info(self, abs_name, io):
@@ -747,7 +763,7 @@ class System(object, metaclass=SystemMetaclass):
         # szname = 'global_size' if total else 'size'
         start = end = 0
         for of in self._var_abs2meta['output']:
-            meta = graph.nodes[('o', of)]
+            meta = graph.nodes[('o', of)]['attrs']
             end += meta.global_size if total else meta.size
             yield of, start, end, _full_slice, sizes[:, toidx[of]] if meta.distributed else None
             start = end
@@ -800,7 +816,7 @@ class System(object, metaclass=SystemMetaclass):
         graph = self._get_conn_graph()
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
-                meta = graph.nodes[('i', wrt)]
+                meta = graph.nodes[('i', wrt)]['attrs']
                 end += meta.global_size if total else meta.size
                 vec = self._inputs if wrt in local_ins else None
                 dist_sizes = sizes_in[:, toidx[wrt]] if meta.distributed else None
@@ -3830,7 +3846,7 @@ class System(object, metaclass=SystemMetaclass):
         key = prom_name if use_prom_ivc else src_name
 
         graph = self._get_conn_graph()
-        src_node_meta = graph.nodes[('o', src_name)]
+        src_node_meta = graph.nodes[('o', src_name)]['attrs']
 
         meta['source'] = src_name
         meta['distributed'] = src_node_meta.distributed
@@ -3971,7 +3987,7 @@ class System(object, metaclass=SystemMetaclass):
             key = src_name
 
         src_node = ('o', src_name)
-        src_node_meta = graph.nodes[src_node]
+        src_node_meta = graph.nodes[src_node]['attrs']
 
         meta['source'] = src_name
         meta['distributed'] = dist = src_node_meta.distributed
@@ -5598,7 +5614,7 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 raise KeyError(f"{self.msginfo}: Variable '{abs_name}' not found.")
 
-        node_meta = graph.nodes[node]
+        node_meta = graph.nodes[node]['attrs']
 
         vars_to_gather = self._problem_meta['vars_to_gather']
         distrib = node_meta.distributed
@@ -5782,8 +5798,9 @@ class System(object, metaclass=SystemMetaclass):
 
         if self._problem_meta is not None and self._problem_meta['model_ref']() is None:
             # This is a weird corner case where the Problem has been deleted.  We have a test
-            # case where a system contains a subproblem that it adds itself to, and the test checks that we can still
-            # call get_val on the system even after the subproblem has been deleted.
+            # case where a system contains a subproblem that it adds itself to, and the test checks
+            # that we can still call get_val on the system even after the subproblem has been
+            # deleted.
             if self._inputs is not None and self._is_local:  # vectors are set up
                 iotype = self._resolver.get_iotype(name, report_error=True)
                 if iotype == 'input':
@@ -5844,11 +5861,9 @@ class System(object, metaclass=SystemMetaclass):
                         if name in self._responses and self._responses[name]['alias'] is not None:
                             name = self._responses[name]['source']
                         if vec._contains_abs(name):
-                            # print(f"{self.msginfo}: retrieve_DOK: {name} {get(name, False)}")  # DBG
                             vdict[name] = get(name, False)
                         else:
                             ivc_path = resolver.source(name)
-                            # print(f"{self.msginfo}: retrieve_DOK (srcget): {ivc_path} {srcget(ivc_path, False)}")  # DBG
                             vdict[ivc_path] = srcget(ivc_path, False)
             elif local:
                 get = self._abs_get_val

@@ -466,8 +466,8 @@ class Group(System):
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
             for abs_in, meta_in in self._var_abs2meta['input'].items():
                 src = self._conn_global_abs_in2out[abs_in]
-                in_node_meta = graph.nodes[('i', abs_in)]
-                src_node_meta = graph.nodes[('o', src)]
+                in_node_meta = graph.nodes[('i', abs_in)]['attrs']
+                src_node_meta = graph.nodes[('o', src)]['attrs']
 
                 src_meta = allprocs_meta_out[src]
                 ref = src_meta['ref']
@@ -976,7 +976,7 @@ class Group(System):
             if len(metalist) == 1:
                 continue
 
-            src_meta = graph.nodes[('o', src)]
+            src_meta = graph.nodes[('o', src)]['attrs']
 
             size = src_meta.global_size
             shape = src_meta.global_shape
@@ -1159,7 +1159,7 @@ class Group(System):
         for io in ['input', 'output']:
             for name in self._var_allprocs_abs2meta[io]:
                 node = (io[0], name)
-                nodes[node].update_model_meta()
+                nodes[node]['attrs'].update_model_meta()
 
         # setup of residuals must occur before setup of vectors and partials
         self._setup_residuals()
@@ -1318,7 +1318,7 @@ class Group(System):
         # graph.sync_auto_ivcs(self)
         for name in chain(self._var_abs2meta['output'], self._var_discrete['output']):
             node = ('o', name)
-            node_meta = graph.nodes[node]
+            node_meta = graph.nodes[node]['attrs']
             # if name in graph._sync_auto_ivcs:
             #     owner = graph._sync_auto_ivcs[name]
             #     if owner == self.comm.rank:
@@ -1335,10 +1335,10 @@ class Group(System):
                     self._outputs.set_var(name, node_meta.val)
 
         for abs_name, meta in self._var_abs2meta['input'].items():
-            self._inputs.set_var(abs_name, graph.nodes[('i', abs_name)].val)
+            self._inputs.set_var(abs_name, graph.nodes[('i', abs_name)]['attrs'].val)
 
         for name in self._discrete_inputs:
-            self._discrete_inputs[name] = graph.nodes[('i', name)].val
+            self._discrete_inputs[name] = graph.nodes[('i', name)]['attrs'].val
 
     def _get_root_vectors(self):
         """
@@ -1929,16 +1929,16 @@ class Group(System):
             return from_prop
 
         def copy_var_units(from_var, to_var):
-            from_units = conn_nodes[from_var].units
-            conn_to = conn_nodes[to_var]
+            from_units = conn_nodes[from_var]['attrs'].units
+            conn_to = conn_nodes[to_var]['attrs']
             conn_to.units = from_units
             return from_units
 
         def connect_nodes(src_node, tgt_node, multi=False):
             if src_node not in graph:
-                graph.add_node(src_node, conn_meta=conn_nodes[src_node])
+                graph.add_node(src_node, conn_meta=conn_nodes[src_node]['attrs'])
             if tgt_node not in graph:
-                graph.add_node(tgt_node, conn_meta=conn_nodes[tgt_node])
+                graph.add_node(tgt_node, conn_meta=conn_nodes[tgt_node]['attrs'])
 
             graph.add_edge(src_node, tgt_node, multi=multi)
 
@@ -1969,7 +1969,7 @@ class Group(System):
             for io in ['input', 'output']:
                 for abs_name in io_dict[io]:
                     node = (io[0], abs_name)
-                    node_meta = conn_nodes[node]
+                    node_meta = conn_nodes[node]['attrs']
                     copy_var = getattr(node_meta, copy_prop)
                     if copy_var:
                         cpy_var_path = comp_path + '.' + copy_var
@@ -1991,13 +1991,13 @@ class Group(System):
         # to other unknown and known property variables to form a directed graph.
         for out_name, out_meta in all_abs2meta_out.items():
             src_node = ('o', out_name)
-            src_meta = conn_nodes[src_node]
+            src_meta = conn_nodes[src_node]['attrs']
 
             src_prop = src_meta[prop]
             src_by_conn = src_meta[prop_by_conn] if src_prop is None else False
 
             for tgt_node in conn_graph.leaf_input_iter(src_node):
-                tgt_meta = conn_nodes[tgt_node]
+                tgt_meta = conn_nodes[tgt_node]['attrs']
                 tgt_prop = tgt_meta[prop]
                 tgt_prop_by_conn = tgt_meta.get(prop_by_conn) if tgt_prop is None else False
 
@@ -2012,7 +2012,7 @@ class Group(System):
             # so we're done
             return
 
-        knowns = {n for n in graph.nodes() if getattr(conn_nodes[n], prop) is not None}
+        knowns = {n for n in graph.nodes() if getattr(conn_nodes[n]['attrs'], prop) is not None}
         all_knowns = knowns.copy()
 
         do_sort = self.comm.size > 1
@@ -2047,23 +2047,24 @@ class Group(System):
 
                 for mnode in computed_nodes:
                     for k, _, data in graph.in_edges(mnode, data=True):
-                        if data['multi'] and getattr(conn_nodes[k], prop) is None:
+                        if data['multi'] and getattr(conn_nodes[k]['attrs'], prop) is None:
                             # if any preds are unknown, we can't compute the property yet
                             break
                     else:
                         # all compute_prop preds are known so compute the property
                         if prop == 'shape':
                             props = {
-                                n[1].rpartition('.')[-1]: getattr(conn_nodes[n], prop)
+                                n[1].rpartition('.')[-1]: getattr(conn_nodes[n]['attrs'], prop)
                                 for n in graph.predecessors(mnode)
                             }
                         elif prop == 'units':
                             props = {
-                                n[1].rpartition('.')[-1]: _find_unit(getattr(conn_nodes[n], prop))
+                                n[1].rpartition('.')[-1]: _find_unit(getattr(conn_nodes[n]['attrs'],
+                                                                             prop))
                                 for n in graph.predecessors(mnode)
                             }
 
-                        mnode_meta = conn_nodes[mnode]
+                        mnode_meta = conn_nodes[mnode]['attrs']
                         val = compute_var_property(mnode, props, getattr(mnode_meta, compute_prop))
                         if val is not None:
                             if prop == 'units':
@@ -2078,7 +2079,7 @@ class Group(System):
         if unresolved:
             if prop == 'units':
                 # throw out any that have units of None but are not dynamic
-                unresolved = {node for node in unresolved if conn_nodes[node].dyn_units}
+                unresolved = {node for node in unresolved if conn_nodes[node]['attrs'].dyn_units}
             if unresolved:
                 unresolved = sorted([u[1] for u in unresolved if not u[1].startswith('_auto_ivc.')])
                 propstr = 'shapes' if prop == 'shape' else 'units'
@@ -2122,7 +2123,7 @@ class Group(System):
         # ref or ref0 are defined for the output.
         for abs_in, abs_out in abs_in2out.items():
             inode = ('i', abs_in)
-            if conn_nodes[inode].discrete:
+            if conn_nodes[inode]['attrs'].discrete:
                 self._conn_discrete_in2out[abs_in] = abs_out
 
             if True:
@@ -3054,7 +3055,7 @@ class Group(System):
             # We currently cannot approximate across a group with a distributed component if the
             # inputs are distributed via src_indices.
             for iname in self._var_allprocs_abs2meta['input']:
-                node = nodes[('i', iname)]
+                node = nodes[('i', iname)]['attrs']
                 if node.distributed and node.src_inds_list and iname not in self._conn_abs_in2out:
                     msg = "{}: Approx_totals is not supported on a group with a distributed "
                     msg += "component whose input '{}' is distributed using src_indices. "
@@ -3223,7 +3224,7 @@ class Group(System):
                     continue
 
                 # meta = abs2meta[src]
-                meta = graph.nodes[('o', src)]
+                meta = graph.nodes[('o', src)]['attrs']
                 if meta.distributed:
                     dist_sizes = sizes[:, abs2idx[src]]
                 else:
@@ -3301,7 +3302,7 @@ class Group(System):
                 if (wrt_matches is None or wrt in wrt_matches) and wrt not in seen:
                     io = 'input' if wrt in abs2meta['input'] else 'output'
                     # meta = abs2meta[io][wrt]
-                    meta = graph.nodes[(io[0], wrt)]
+                    meta = graph.nodes[(io[0], wrt)]['attrs']
                     if total and approx_meta['indices'] is not None:
                         sub_wrt_idx = approx_meta['indices'].as_array()
                         size = sub_wrt_idx.size
@@ -3542,7 +3543,7 @@ class Group(System):
         auto_ivc.auto2tgt = auto2tgt
 
         for src, tgts in auto2tgt.items():
-            abs_tgt_node = graph.nodes[('i', tgts[0])]
+            abs_tgt_node = graph.nodes[('i', tgts[0])]['attrs']
             # need to query discrete from a leaf node because internal nodes have not resolved yet
             discrete = abs_tgt_node['discrete']
 
@@ -3573,7 +3574,7 @@ class Group(System):
 
         locmeta = auto_ivc._var_discrete['output']
         for name, meta in auto_ivc._var_allprocs_discrete['output'].items():
-            node_meta = graph.nodes[('o', name)]
+            node_meta = graph.nodes[('o', name)]['attrs']
             node_meta.discrete = True
             graph.set_model_meta(self, ('o', name), meta, locmeta.get(name.rpartition('.')[-1]))
 

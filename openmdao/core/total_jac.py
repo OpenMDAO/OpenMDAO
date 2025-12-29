@@ -601,7 +601,7 @@ class _TotalJacInfo(object):
             source = meta['source']
 
             #in_var_meta = all_abs2meta_out[source]
-            node_meta = graph.nodes[('o', source)]
+            node_meta = graph.nodes[('o', source)]['attrs']
             dist = node_meta.distributed
 
             in_idxs = meta['indices'] if 'indices' in meta else None

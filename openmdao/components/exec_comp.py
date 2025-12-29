@@ -699,8 +699,8 @@ class ExecComp(ExplicitComponent):
                 for out in sorted(outs):
                     for inp in ins:
                         if has_diag_partials:
-                            ival = nodes[('i', self.pathname + '.' + inp)].val
-                            oval = nodes[('o', self.pathname + '.' + out)].val
+                            ival = nodes[('i', self.pathname + '.' + inp)]['attrs'].val
+                            oval = nodes[('o', self.pathname + '.' + out)]['attrs'].val
                             iarray = isinstance(ival, ndarray) and ival.size > 1
                             if iarray and isinstance(oval, ndarray) and oval.size > 1:
                                 if oval.size != ival.size:

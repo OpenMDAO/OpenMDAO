@@ -185,7 +185,7 @@ class BroydenSolver(NonlinearSolver):
 
             for name in states:
                 #size = meta[prom2abs(name, 'output')]['global_size']
-                size = graph.nodes[('o', prom2abs(name, 'output'))].global_size
+                size = graph.nodes[('o', prom2abs(name, 'output'))]['attrs'].global_size
                 self._idx[name] = (n, n + size)
                 n += size
         else:
