@@ -5599,7 +5599,7 @@ class System(object, metaclass=SystemMetaclass):
         """
         val = _UNDEFINED
         if from_root:
-            model = system = self._problem_meta['model_ref']()
+            system = self._problem_meta['model_ref']()
         else:
             system = self
 
@@ -5616,12 +5616,16 @@ class System(object, metaclass=SystemMetaclass):
 
         node_meta = graph.nodes[node]['attrs']
 
-        vars_to_gather = self._problem_meta['vars_to_gather']
+        try:
+            vars_to_gather = self._vars_to_gather
+        except AttributeError:
+            vars_to_gather = set()
+
         distrib = node_meta.distributed
         discrete = node_meta.discrete
 
         if not discrete:
-            if not get_remote and self.comm.size > 1:
+            if not get_remote and system.comm.size > 1:
                 if node_meta.remote:
                     raise RuntimeError(f"{self.msginfo}: Variable '{abs_name}' is not local to "
                                        f"rank {self.comm.rank}. You can retrieve values from "
@@ -5654,7 +5658,7 @@ class System(object, metaclass=SystemMetaclass):
 
         if not discrete:
             try:
-                vec = self._vectors[kind][vec_name]
+                vec = system._vectors[kind][vec_name]
             except KeyError:
                 if vec_name != 'nonlinear':
                     raise ValueError(f"{self.msginfo}: Can't get variable named '{abs_name}' "
@@ -5662,12 +5666,10 @@ class System(object, metaclass=SystemMetaclass):
                                      "final_setup.")
                 val = node_meta.val
             else:
-                if from_root:
-                    vec = model._vectors[kind][vec_name]
                 if vec._contains_abs(abs_name):
                     val = vec._abs_get_val(abs_name, flat)
 
-        if get_remote and (distrib or abs_name in vars_to_gather) and self.comm.size > 1:
+        if get_remote and (distrib or abs_name in vars_to_gather):
             owner = self._owning_rank[abs_name]
             myrank = self.comm.rank
             if distrib:

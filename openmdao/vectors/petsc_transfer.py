@@ -498,7 +498,6 @@ def _get_output_inds(group, abs_out, abs_in):
         orig_src_inds = src_indices
 
         if not (out_dist or meta_in['distributed']):  # serial --> serial
-            print("serial --> serial!")
             if offsets[rank] > 0.:
                 return src_indices + offsets[rank], orig_src_inds
             else:

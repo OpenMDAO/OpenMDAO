@@ -1119,6 +1119,7 @@ class ShapedMultiIndexer(Indexer):
             raise RuntimeError(f"Can't index into a flat array with an indexer expecting {len(tup)}"
                                " dimensions.")
         super().__init__(flat_src)
+        self._remove_extra_brackets = False
         self._tup = tup
         self._set_idx_list()
 
@@ -1127,6 +1128,8 @@ class ShapedMultiIndexer(Indexer):
         for i in self._tup:
             if isinstance(i, (np.ndarray, list)):  # need special handling here for ndim > 1 arrays
                 self._idx_list.append(ArrayIndexer(i, flat_src=self._flat_src))
+                if self._idx_list[-1]._arr.ndim > 1:
+                    self._remove_extra_brackets = True
             else:
                 self._idx_list.append(indexer(i, flat_src=self._flat_src))
 
@@ -1141,6 +1144,19 @@ class ShapedMultiIndexer(Indexer):
         """
         return tuple(i() for i in self._idx_list)
 
+    def __str__(self):
+        """
+        Return string representation.
+
+        Returns
+        -------
+        str
+            String representation.
+        """
+        if self._remove_extra_brackets:
+            return repr(self)
+        return f"[{repr(self)}]"
+
     def __repr__(self):
         """
         Return string representation.
@@ -1150,7 +1166,7 @@ class ShapedMultiIndexer(Indexer):
         str
             String representation.
         """
-        return f"{', '.join(repr(indexer(i)) for i in self._tup)}"
+        return f"{', '.join(repr(i) for i in self._idx_list)}"
 
     def apply_offset(self, offset, flat=True):
         """
@@ -1558,7 +1574,7 @@ class IndexMaker(object):
     A Factory for Indexer objects.
     """
 
-    def __call__(self, idx, src_shape=None, flat_src=False):
+    def __call__(self, idx, src_shape=None, flat_src=False, try_slice=False):
         """
         Return an Indexer instance based on the passed indices/slices.
 
@@ -1570,6 +1586,8 @@ class IndexMaker(object):
             Source shape if known.
         flat_src : bool
             If True, indices are into a flat source.
+        try_slice : bool
+            If True, try to convert 1D index array to a slice.
 
         Returns
         -------
@@ -1599,11 +1617,13 @@ class IndexMaker(object):
         else:
             arr = np.atleast_1d(idx)
             if arr.ndim == 1:
-                # slc = array2slice(arr)
-                # if slc is not None:
-                #     idxer = SliceIndexer(slc, flat_src=flat_src)
-                # else:
-                idxer = ArrayIndexer(arr, flat_src=flat_src)
+                slc = None
+                if try_slice:
+                    slc = array2slice(arr)
+                if slc is not None:
+                    idxer = SliceIndexer(slc, flat_src=flat_src)
+                else:
+                    idxer = ArrayIndexer(arr, flat_src=flat_src)
             else:
                 issue_warning("Using a non-tuple sequence for multidimensional indexing is "
                               "deprecated; use `arr[tuple(seq)]` instead of `arr[seq]`. In the "
@@ -1654,94 +1674,6 @@ def _convert_ellipsis_idx(shape, idx):
             i += 1
 
     return tuple(lst)
-
-
-# class resolve_shape(object):
-#     """
-#     Class that computes the result shape from a source shape and an index.
-
-#     Parameters
-#     ----------
-#     shape : tuple
-#         The shape of the source.
-
-#     Attributes
-#     ----------
-#     _shape : tuple
-#         The shape of the source.
-#     """
-
-#     def __init__(self, shape):
-#         """
-#         Initialize attributes.
-
-#         Parameters
-#         ----------
-#         shape : tuple or int
-#             Shape of the source.
-#         """
-#         self._shape = shape2tuple(shape)
-
-#     def get_shape(self, idx):
-#         """
-#         Return the shape of the result of indexing into the source with index idx.
-
-#         Parameters
-#         ----------
-#         idx : int, slice, tuple, ndarray
-#             The index into the source.
-
-#         Returns
-#         -------
-#         tuple
-#             The shape after indexing.
-#         """
-#         if not isinstance(idx, tuple):
-#             idx = (idx,)
-#             is_tup = False
-#         else:
-#             is_tup = True
-
-#         for i in idx:
-#             if i is ...:
-#                 idx = _convert_ellipsis_idx(self._shape, idx)
-#                 break
-
-#         if len(self._shape) < len(idx):
-#             raise ValueError(f"Index {idx} dimension too large to index into shape "
-#                              f"{self._shape}.")
-
-#         lens = []
-#         seen_arr = False
-#         arr_shape = None  # to handle multi-indexing where individual sub-arrays have a shape
-#         for dim, ind in zip_longest(self._shape, idx):
-#             if ind is None:
-#                 lens.append(dim)
-#             elif isinstance(ind, slice):
-#                 lens.append(len(range(*ind.indices(dim))))
-#             elif isinstance(ind, np.ndarray):
-#                 if not seen_arr:
-#                     seen_arr = True
-#                     if ind.ndim > 1:
-#                         if arr_shape is not None and arr_shape != ind.shape:
-#                             raise ValueError("Multi-index has index sub-arrays of different "
-#                                              f"shapes ({arr_shape} != {ind.shape}).")
-#                         arr_shape = ind.shape
-#                     else:
-#                         # only first array idx counts toward shape
-#                         lens.append(ind.size)
-#             # int indexers don't count toward shape (scalar array has shape ())
-#             elif not isinstance(ind, Integral):
-#                 raise TypeError(f"Index {ind} of type '{type(ind).__name__}' is invalid.")
-
-#         if arr_shape is not None:
-#             return arr_shape
-
-#         if is_tup or len(lens) >= 1:
-#             return tuple(lens)
-#         elif is_tup:
-#             return ()
-#         return (1,)
 
 
 def idx_list_to_index_array(idx_list):

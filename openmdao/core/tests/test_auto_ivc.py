@@ -278,8 +278,8 @@ class MPITests(SerialTests):
             p.setup()
             p.final_setup()
         except Exception as err:
-            msg = ("\nCollected errors for problem \'discrete_fan_out2\':"
-                             "\n   <model> <class Group>: The following inputs promoted to \'x\' have different values, so the value of \'x\' is ambiguous. Call model.set_input_defaults(\'x\', val=?) to remove the ambiguity.")
+            msg = ("\nCollected errors for problem 'discrete_fan_out2':"
+                             "\n   <model> <class Group>: The inputs ['par.C1.x', 'par.C2.x'], promoted to 'x' have different values, so the value of 'x' is ambiguous. Call model.set_input_defaults('x', val=?) to remove the ambiguity.")
             self.assertTrue(msg in err.args[0])
         else:
             self.fail("Exception expected.")

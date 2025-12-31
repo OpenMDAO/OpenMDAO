@@ -53,11 +53,12 @@ python = ">=3.11"
 numpy = ">=2.0"
 scipy = ">=1.13"
 networkx = ">=3.3"
-pip = ">=25.3"
+pip = ">=25.3,<26"
 packaging = ">=25.0"
 requests = ">=2.32.5"
 graphviz = ">=14.1.0,<15"
 pydot = ">=4.0.1,<5"
+python-graphviz = ">=0.21,<0.22"
 
 ###############################################
 # Python version features
@@ -173,6 +174,7 @@ networkx = "==3.3"
 # Default - uses whatever Python solver picks
 default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test"], solve-group = "default" }
 dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging"], solve-group = "default" }
+dev311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging"], solve-group = "dev311" }
 minimal = { features = ["py313", "test"], solve-group = "default" }
 
 # Oldest supported versions

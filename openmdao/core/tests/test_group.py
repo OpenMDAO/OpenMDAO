@@ -1549,7 +1549,6 @@ class TestGroup(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'input_defaults_promotes_error':"
-           "\n   <model> <class Group>: While resolving children of 'G.test_param': cannot reshape array of size 1 into shape (5,)"
            "\n   <model> <class Group>: Can't connect '_auto_ivc.v0' to 'G.test_param': shape (1,) of '_auto_ivc.v0' is incompatible with shape (5,) of 'G.test_param'.")
 
     def test_set_input_defaults_keyerror(self):

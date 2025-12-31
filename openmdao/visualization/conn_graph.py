@@ -385,7 +385,10 @@ class NodeAttrs():
                     else:
                         self._val = value.item()
                 elif self._val is None:
-                    self._val = reshape(value, self._shape)
+                    if np.isscalar(value):
+                        self._val = np.full(self._shape, value, dtype=float)
+                    else:
+                        self._val = reshape(value, self._shape)
                 else:
                     self._val[:] = reshape(value, self._shape)
 
@@ -738,6 +741,7 @@ class AllConnGraph(nx.DiGraph):
         self._bad_conns = set()
         self._sync_auto_ivcs = {}  # auto_ivcs that require sync when setting intial values
         self._autoivc_changed_tgts = set()
+        self._dangling_prom_inputs = set()
 
     def add_node(self, name, *args, **kwargs):
         super().add_node(name, *args, **kwargs)
@@ -785,7 +789,14 @@ class AllConnGraph(nx.DiGraph):
         tuple of the form (io, name), where io is either 'i' or 'o'.
             The node found.
         """
-        name = pathname + '.' + varname if pathname else varname
+        if pathname:
+            prefix = pathname + '.'
+            if varname.startswith(prefix):
+                name = varname
+            else:
+                name = pathname + '.' + varname
+        else:
+            name = varname
 
         if io is None:
             node = ('o', name)
@@ -884,21 +895,31 @@ class AllConnGraph(nx.DiGraph):
         self._collect_error(f"{self.msginfo}: {excstr}", tback=exc.__traceback__, ident=ident)
 
     def input_root(self, node):
+        """
+        Return the top input predecessor to the given node.
+
+        Parameters
+        ----------
+        node : (str, str)
+            Tuple of the form ('i' or 'o', variable name)
+
+        Returns
+        -------
+        (str, str) or None
+            Node name ('i' or 'o', var name), or None.
+        """
         assert node[0] == 'i'
-        ionode = None
+        in_degree = self.in_degree
+        preds = self.predecessors
         dangling = []
         for n in self.bfs_up_iter(node, include_self=True):
             if n[0] == 'i':
-                if self.in_degree(n) == 0:  # over-promoted input or dangling input
+                if in_degree(n) == 0:  # over-promoted input or dangling input
                     dangling.append(n)
                 else:
-                    for p in self.predecessors(n):
-                        if p[0] == 'o':
-                            ionode = n
-                            break
-
-        if ionode is not None:
-            return ionode
+                    for io, _ in preds(n):
+                        if io == 'o':
+                            return n
 
         if dangling:
             return dangling[0]
@@ -1053,6 +1074,24 @@ class AllConnGraph(nx.DiGraph):
         # print(f"{self.msginfo}: get_val_from_src: {name} {val}") # DBG
 
         return val
+
+    def get_local_abs_in(self, system, name):
+        """
+        Retrieve the absolute name of a local input attached to the given name.
+
+        The name may be promoted or absolute.
+
+        Parameters
+        ----------
+        system : System
+            The scoping system.
+        name : str
+            The promoted or absolute input name.
+        """
+        absnames = system._resolver.absnames(name, 'input')
+        for absname in absnames:
+            if not self.nodes[('i', absname)]['attrs'].remote:
+                return absname
 
     def get_val(self, system, name, units=None, indices=None, get_remote=False, rank=None,
                 vec_name='nonlinear', kind=None, flat=False, from_src=True):
@@ -1677,6 +1716,8 @@ class AllConnGraph(nx.DiGraph):
                 continue
 
             self.resolve_conn_tree(model, node)
+
+        self.update_dangling_prom_inputs(model)
 
         self._first_pass = False
 
@@ -2509,10 +2550,12 @@ class AllConnGraph(nx.DiGraph):
                                     val = inp_meta.val
 
                             ambig = False
-                            vals = model.comm.gather(val, root=0)
+                            tups = model.comm.gather((val, inp_meta.remote), root=0)
                             if model.comm.rank == 0:
                                 start = None
-                                for v in vals:
+                                for v, remote in tups:
+                                    if remote:
+                                        continue
                                     if start is None:
                                         start = v
                                     else:
@@ -2524,8 +2567,9 @@ class AllConnGraph(nx.DiGraph):
                                 ambig = model.comm.bcast(None, root=0)
 
                             if ambig:
+                                inps = sorted([l for _, l in leaves])
                                 model._collect_error(
-                                    f"The following inputs promoted to '{tgt_node[1]}' have "
+                                    f"The inputs {inps}, promoted to '{tgt_node[1]}' have "
                                     f"different values, so the value of '{tgt_node[1]}' is "
                                     "ambiguous. Call model.set_input_defaults('"
                                     f"{self.top_name(tgt_node)}', val=?) to remove the ambiguity.")
@@ -2666,20 +2710,73 @@ class AllConnGraph(nx.DiGraph):
     def update_src_inds_lists(self, model):
         # propagate src_indices down the tree, but don't update shapes because we don't
         # know all of the shapes at the root and leaves of the tree yet.
+
+        # Also, determine the list of dangling promoted inputs for later processing.
         edges = self.edges
         nodes = self.nodes
-        for node in self.nodes():
-            if node[0] == 'o' and self.in_degree(node) == 0:
-                for u, v in dfs_edges(self, node):
-                    if v[0] == 'i':
-                        edge_meta = edges[u, v]
-                        src_inds = edge_meta.get('src_indices', None)
-                        src_inds_list = nodes[u]['attrs'].src_inds_list
-                        if src_inds is not None:
-                            src_inds_list = src_inds_list.copy()
-                            src_inds_list.append(src_inds)
+        self._dangling_prom_inputs = dangling = set()
 
-                        nodes[v]['attrs'].src_inds_list = src_inds_list
+        for node in self.nodes():
+            if self.in_degree(node) == 0:
+                if node[0] == 'o':
+                    for u, v in dfs_edges(self, node):
+                        if v[0] == 'i':
+                            edge_meta = edges[u, v]
+                            src_inds = edge_meta.get('src_indices', None)
+                            src_inds_list = nodes[u]['attrs'].src_inds_list
+                            if src_inds is not None:
+                                src_inds_list = src_inds_list.copy()
+                                src_inds_list.append(src_inds)
+
+                            nodes[v]['attrs'].src_inds_list = src_inds_list
+                else:
+                    dangling.add(node)
+
+    def get_anchored_input_node(self, node):
+        for n in self.bfs_down_iter(node, include_self=False):
+            for p in self.predecessors(n):
+                if p[0] == 'o':  # n is the src attachment point
+                    return n, p
+        return None, None
+
+    def update_dangling_prom_inputs(self, model):
+        # input nodes promoted above the source node attachment point of their tree, so finding
+        # the root and resolving values is more complicated.  If there are no
+        # src_indices between these nodes and their corresponding src attachment point then we
+        # can treat them as equivalent to their src attachement point.
+        edges = self.edges
+        nodes = self.nodes
+        first_pass = self._first_pass
+
+        for d in self._dangling_prom_inputs:
+            if d in self._resolved:
+                continue
+
+            anchor, src_node = self.get_anchored_input_node(d)
+            if anchor is not None:
+                src_inds_list = self.nodes[anchor]['attrs'].src_inds_list
+                path = nx.shortest_path(self, d, anchor)
+                for i in range(1, len(path)):
+                    src_indices = edges[path[i - 1], path[i]].get('src_indices', None)
+                    if src_indices is not None:
+                        break
+                else:
+                    # no src_indices found so we can store src_inds_list of the src
+                    # attachement node
+                    donodes = path[:-1]  # all but the anchor node
+                    donodes = donodes[::-1]  # reverse order
+                    for pnode in donodes:
+                        nodes[pnode]['attrs'].src_inds_list = src_inds_list
+                        self.resolve_from_children(model, src_node, pnode)
+
+                    src_meta = nodes[src_node]['attrs']
+                    if first_pass and not src_meta.dynamic:
+                        # see if leaf node is dynamic
+                        for leaf in self.leaf_input_iter(d):
+                            if nodes[leaf]['attrs'].dynamic:
+                                break
+                        else:
+                            self._resolved.add(d)
 
     def transform_input_input_connections(self, model):
         """
@@ -2819,8 +2916,9 @@ class AllConnGraph(nx.DiGraph):
         if node[0] == 'i' and self.out_degree(node) == 0:
             yield node
         else:
+            out_degree = self.out_degree
             for _, node in dfs_edges(self, node):
-                if node[0] == 'i' and self.out_degree(node) == 0:
+                if node[0] == 'i' and out_degree(node) == 0:
                     yield node
 
     def leaf_units(self, node):
