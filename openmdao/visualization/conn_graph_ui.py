@@ -19,9 +19,27 @@ import openmdao.utils.hooks as hooks
 
 
 class ConnGraphHandler(SimpleHTTPRequestHandler):
-    """Custom handler for serving the connection graph web interface."""
+    """
+    Custom handler for serving the connection graph web interface.
+
+    Attributes
+    ----------
+    conn_graph : AllConnGraph
+        Connection graph instance used to serve UI requests.
+    """
 
     def __init__(self, conn_graph, *args, **kwargs):
+        """Initialize the handler.
+
+        Parameters
+        ----------
+        conn_graph : AllConnGraph
+            Connection graph instance used to serve UI requests.
+        *args : list
+            Positional arguments passed to the base handler.
+        **kwargs : dict
+            Keyword arguments passed to the base handler.
+        """
         self.conn_graph = conn_graph
         super().__init__(*args, **kwargs)
 
@@ -81,7 +99,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         self.send_json_response(info)
 
     def serve_subsystem_graph(self, subsystem):
-        """Serve graph for a specific subsystem."""
+        """Serve graph for a specific subsystem.
+
+        Parameters
+        ----------
+        subsystem : str
+            Subsystem pathname to focus on.
+        """
         try:
             subgraph = self.conn_graph.get_drawable_graph(subsystem)
             pydot_graph = nx.drawing.nx_pydot.to_pydot(subgraph)
@@ -149,7 +173,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         self.send_json_response(response)
 
     def serve_variable_graph(self, variable):
-        """Serve graph focused on a specific variable."""
+        """Serve graph focused on a specific variable.
+
+        Parameters
+        ----------
+        variable : str
+            Variable name to focus on.
+        """
         try:
             # First try the variable name as-is
             try:
@@ -225,7 +255,13 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         self.send_json_response({'results': results[:20]})
 
     def get_subsystems(self):
-        """Get list of unique subsystems."""
+        """Get list of unique subsystems.
+
+        Returns
+        -------
+        list of str
+            Sorted list of subsystem pathnames.
+        """
         subsystems = {'model'}
         for _, node_data in self.conn_graph.nodes(data=True):
             pathname = node_data.get('pathname', '')
@@ -235,7 +271,20 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         return sorted(subsystems)
 
     def create_text_graph(self, subgraph, title):
-        """Create a simple text-based graph representation when Graphviz is not available."""
+        """Create a simple text-based graph representation when Graphviz is not available.
+
+        Parameters
+        ----------
+        subgraph : networkx.DiGraph
+            Graph to represent.
+        title : str
+            Title for the generated view.
+
+        Returns
+        -------
+        str
+            HTML string containing a simple graph representation.
+        """
         html = '<div style="font-family: monospace; padding: 20px;">'
         html += f'<h3>{title}</h3>'
         html += f'<p><strong>Nodes:</strong> {len(subgraph.nodes())}</p>'
@@ -265,20 +314,45 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         return html
 
     def get_query_param(self, param, default=''):
-        """Get query parameter value."""
+        """Get query parameter value.
+
+        Parameters
+        ----------
+        param : str
+            Query parameter name.
+        default : str
+            Default value if parameter is not present.
+
+        Returns
+        -------
+        str
+            Parameter value or the default.
+        """
         parsed_path = urlparse(self.path)
         query_params = parse_qs(parsed_path.query)
         return query_params.get(param, [default])[0]
 
     def send_json_response(self, data):
-        """Send JSON response."""
+        """Send JSON response.
+
+        Parameters
+        ----------
+        data : dict
+            Object to serialize as JSON.
+        """
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
         self.wfile.write(json.dumps(data).encode())
 
     def get_html_template(self):
-        """Get the HTML template."""
+        """Get the HTML template.
+
+        Returns
+        -------
+        str
+            HTML template content.
+        """
         fpath = os.path.join(os.path.dirname(__file__), 'conn_graph_ui_template.html')
         with open(fpath, "r", encoding="utf-8") as f:
             html_content = f.read()
@@ -303,7 +377,7 @@ def _conn_graph_setup_parser(parser):
 
 def _conn_graph_cmd(options, user_args):
     """
-    Return the post_setup hook function for 'openmdao graph'.
+    Execute the 'openmdao conn_graph' command.
 
     Parameters
     ----------
@@ -313,10 +387,24 @@ def _conn_graph_cmd(options, user_args):
         Args to be passed to the user script.
     """
     def _view_graph(model):
+        """Serve the connection graph UI.
+
+        Parameters
+        ----------
+        model : System
+            Model owning the connection graph.
+        """
         model._get_conn_graph().serve(port=options.port)
 
     # register the hooks
     def _set_dyn_hook(prob):
+        """Register setup hooks to display the graph.
+
+        Parameters
+        ----------
+        prob : Problem
+            Problem instance being set up.
+        """
         hooks._register_hook('_setup_part2', class_name='Group', inst_id='',
                              post=_view_graph, exit=True)
         hooks._setup_hooks(prob.model)

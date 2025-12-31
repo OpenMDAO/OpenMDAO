@@ -178,6 +178,8 @@ class Group(System):
         Group inputs added inside of setup but before configure.
     _static_manual_connections : dict
         Dictionary that stores all explicit connections added outside of setup.
+    _conn_graph : AllConnGraph
+        Connection graph instance used to store the connection graph.
     _conn_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit continuous var connections owned
         by this system only. The data is the same across all processors.
@@ -1170,43 +1172,6 @@ class Group(System):
 
         self._problem_meta['setup_status'] = _SetupStatus.POST_SETUP2
 
-    # def check_autoivc_ambiguity(self):
-    #     if self.comm.size > 1:
-    #         graph = self._get_conn_graph()
-    #         abs2meta_out = self._var_allprocs_abs2meta['output']
-    #         for src in sorted(graph._sync_auto_ivcs):
-    #             ambig = False
-
-    #             if src in abs2meta_out:
-    #                 val = array_hash(self._outputs[src].ravel())
-    #             else:
-    #                 val = self._discrete_outputs[src]
-
-    #             vals = self.comm.gather(val, root=0)
-    #             if self.comm.rank == 0:
-    #                 start = None
-    #                 for v in vals:
-    #                     if start is None:
-    #                         start = v
-    #                     else:
-    #                         if start != v:
-    #                             ambig = True
-    #                             break
-    #                 self.comm.bcast(ambig, root=0)
-    #             else:
-    #                 ambig = self.comm.bcast(None, root=0)
-
-    #             if ambig:
-    #                 # find root input node
-    #                 for u, v in nx.dfs_edges(graph, ('o', src)):
-    #                     if v[0] == 'i':
-    #                         tgt = v
-    #                         break
-
-    #                 self._collect_error(
-    #                     f"The values of '{src}' have different values across processes. Call "
-    #                     f"model.set_input_defaults('{tgt[1]}', val=?) to remove the ambiguity.")
-
     def _final_setup(self):
         """
         Perform final setup for this system and its descendant systems.
@@ -1315,26 +1280,17 @@ class Group(System):
             self._problem_meta['setup_status'] = _SetupStatus.POST_FINAL_SETUP
 
         graph = self._get_conn_graph()
-        # graph.sync_auto_ivcs(self)
         for name in chain(self._var_abs2meta['output'], self._var_discrete['output']):
             node = ('o', name)
             node_meta = graph.nodes[node]['attrs']
-            # if name in graph._sync_auto_ivcs:
-            #     owner = graph._sync_auto_ivcs[name]
-            #     if owner == self.comm.rank:
-            #         val = node_meta.val
-            #         self.comm.bcast(val, root=owner)
-            #     else:
-            #         node_meta.val = self.comm.bcast(None, root=owner)
 
             if node_meta.val is not None:
-                # graph.set_tree_val(self, node, node_meta.val)  # force updates of input values
                 if node_meta.discrete:
                     self._discrete_outputs[name] = node_meta.val
                 else:
                     self._outputs.set_var(name, node_meta.val)
 
-        for abs_name, meta in self._var_abs2meta['input'].items():
+        for abs_name in self._var_abs2meta['input']:
             self._inputs.set_var(abs_name, graph.nodes[('i', abs_name)]['attrs'].val)
 
         for name in self._discrete_inputs:

@@ -1109,6 +1109,8 @@ class ShapedMultiIndexer(Indexer):
         The wrapped tuple of indices/slices.
     _idx_list : list
         List of Indexers.
+    _remove_extra_brackets : bool
+        If True, remove extra brackets from the string representation.
     """
 
     def __init__(self, tup, flat_src=False):
@@ -1801,6 +1803,17 @@ _full_indexer = indexer(_full_slice, flat_src=False)
 
 
 class ContiguousRange(object):
+    """
+    Helper class that can be used to represent a contiguous range of indices.
+
+    Attributes
+    ----------
+    shape : tuple
+        The shape of the array.
+    rng : range
+        The range of indices.
+    """
+
     def __init__(self, shape, offset=0):
         self.shape = shape
         length = shape_to_len(shape)

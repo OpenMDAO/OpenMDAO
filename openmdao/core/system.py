@@ -205,6 +205,8 @@ class System(object, metaclass=SystemMetaclass):
         Dict mapping subsystem name to SysInfo(system, index) for children of this system.
     _subsystems_myproc : [<System>, ...]
         List of local subsystems that exist on this proc.
+    _sorted_subsystems_myproc : [<System>, ...]
+        List of local subsystems that exist on this proc, sorted by name.
     _var_promotes : { 'any': [], 'input': [], 'output': [] }
         Dictionary of lists of variable names/wildcards specifying promotion
         (used to calculate promoted names)
