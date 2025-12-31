@@ -1133,26 +1133,6 @@ def truncate_str(s, max_len=20, middle=' .. '):
     return f'{s[:div + rem]}{middle}{s[-div:]}'
 
 
-def _is_slicer_op(indices):
-    """
-    Check if an indexer contains a slice or ellipsis operator.
-
-    Parameters
-    ----------
-    indices : ndarray
-        Indices to check.
-
-    Returns
-    -------
-    bool
-        Returns True if indices contains a colon or ellipsis operator.
-    """
-    if isinstance(indices, tuple):
-        return any(isinstance(i, slice) or i is ... for i in indices)
-
-    return isinstance(indices, slice)
-
-
 def _src_name_iter(proms):
     """
     Yield keys from proms with promoted input names converted to source names.
@@ -1169,58 +1149,6 @@ def _src_name_iter(proms):
     """
     for meta in proms.values():
         yield meta['source']
-
-
-def _src_or_alias_item_iter(proms):
-    """
-    Yield items from proms dict with promoted input names converted to source or alias names.
-
-    Parameters
-    ----------
-    proms : dict
-        Original dict with some promoted paths.
-
-    Yields
-    ------
-    tuple
-        src_or_alias_name, metadata
-    """
-    for name, meta in proms.items():
-        if 'alias' in meta and meta['alias'] is not None:
-            yield meta['alias'], meta
-        elif meta['source'] is not None:
-            yield meta['source'], meta
-        else:
-            yield name, meta
-
-
-def convert_src_inds(parent_src_inds, my_src_inds, my_src_shape):
-    """
-    Compute lower level src_indices based on parent src_indices.
-
-    Parameters
-    ----------
-    parent_src_inds : ndarray
-        Parent src_indices.
-    my_src_inds : ndarray or fancy index
-        Src_indices at the current system level, before conversion.
-    my_src_shape : tuple
-        Expected source shape at the current system level.
-
-    Returns
-    -------
-    ndarray
-        Final src_indices based on those of the parent.
-    """
-    if parent_src_inds is None:
-        return my_src_inds
-    elif my_src_inds is None:
-        return parent_src_inds
-
-    if my_src_inds._flat_src:
-        return parent_src_inds.shaped_array(flat=True)[my_src_inds.flat()]
-    else:
-        return parent_src_inds.shaped_array(flat=False).reshape(my_src_shape)[my_src_inds()]
 
 
 def is_undefined(obj):
@@ -1273,42 +1201,6 @@ def shape2tuple(shape):
             if not isinstance(shape, Integral):
                 raise TypeError(f"{type(shape).__name__} is not a valid shape type.")
             return (shape,)
-
-
-def get_connection_owner(system, tgt):
-    """
-    Return (owner, promoted_src, promoted_tgt) for the given connected target.
-
-    Note : this is not speedy.  It's intended for use only in error messages.
-
-    Parameters
-    ----------
-    system : System
-        Any System.  The search always goes from the model level down.
-    tgt : str
-        Absolute pathname of the target variable.
-
-    Returns
-    -------
-    tuple
-        (owning group, promoted source name, promoted target name).
-    """
-    from openmdao.core.group import Group
-
-    model = system._problem_meta['model_ref']()
-    src = model._conn_global_abs_in2out[tgt]
-    resolver = model._resolver
-
-    if resolver.is_abs(src, 'output') and resolver.is_abs(tgt, 'input'):
-        if resolver.abs2prom(tgt, 'input') != resolver.abs2prom(src, 'output'):
-            # connection is explicit
-            for g in model.system_iter(include_self=True, recurse=True, typ=Group):
-                if g._manual_connections:
-                    tprom = g._resolver.abs2prom(tgt, 'input')
-                    if tprom in g._manual_connections:
-                        return g, g._resolver.abs2prom(src, 'output'), tprom
-
-    return system, src, tgt
 
 
 def _remove_old_configs(vscode_dir):

@@ -21,7 +21,7 @@ from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, 
 from openmdao.jacobians.dictionary_jacobian import Jacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
-from openmdao.utils.mpi import MPI, multi_proc_exception_check
+from openmdao.utils.mpi import MPI
 from openmdao.utils.options_dictionary import OptionsDictionary
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
 from openmdao.utils.units import is_compatible, unit_conversion, simplify_unit
@@ -2393,31 +2393,6 @@ class System(object, metaclass=SystemMetaclass):
 
         self._clear_jac_caches()
 
-    # def _setup_global_shapes(self):
-    #     """
-    #     Compute the global size and shape of all variables on this system.
-    #     """
-    #     for io in ('input', 'output'):
-    #         # now set global sizes and shapes into metadata for distributed variables
-    #         sizes = self._var_sizes[io]
-    #         for idx, (abs_name, mymeta) in enumerate(self._var_allprocs_abs2meta[io].items()):
-    #             local_shape = mymeta['shape']
-    #             if mymeta['distributed']:
-    #                 global_size = np.sum(sizes[:, idx])
-    #                 mymeta['global_size'] = global_size
-
-    #                 # assume that all but the first dimension of the shape of a
-    #                 # distributed variable is the same on all procs
-    #                 mymeta['global_shape'] = self._get_full_dist_shape(abs_name, local_shape, io)
-    #             else:
-    #                 # not distributed, just use local shape and size
-    #                 mymeta['global_size'] = mymeta['size']
-    #                 mymeta['global_shape'] = local_shape
-
-    #             # if abs_name in loc_meta[io]:
-    #             #     loc_meta[io][abs_name]['global_shape'] = mymeta['global_shape']
-    #             #     loc_meta[io][abs_name]['global_size'] = mymeta['global_size']
-
     def _setup_driver_units(self, abs2meta=None):
         """
         Compute unit conversions for driver variables.
@@ -2534,12 +2509,6 @@ class System(object, metaclass=SystemMetaclass):
             has_scaling = bool(self.comm.allreduce(int(has_scaling)))
 
         return has_scaling
-
-    def _setup_connections(self):
-        """
-        Compute dict of all connections owned by this system.
-        """
-        self._resolver._conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
 
     def _setup_vectors(self, parent_vectors):
         """
@@ -5915,6 +5884,7 @@ class System(object, metaclass=SystemMetaclass):
         float or ndarray of float
             The value converted to the specified units.
         """
+        # this isn't used any more, but leaving it here since it's a public method
         base_units = self._get_var_meta(name, 'units')
 
         if base_units == units:
@@ -5928,36 +5898,37 @@ class System(object, metaclass=SystemMetaclass):
 
         return (val + offset) * scale
 
-    # def convert_from_units(self, name, val, units):
-    #     """
-    #     Convert the given value from the specified units to those of the named variable.
+    def convert_from_units(self, name, val, units):
+        """
+        Convert the given value from the specified units to those of the named variable.
 
-    #     Parameters
-    #     ----------
-    #     name : str
-    #         Name of the variable.
-    #     val : float or ndarray of float
-    #         The value of the variable.
-    #     units : str
-    #         The units to convert to.
+        Parameters
+        ----------
+        name : str
+            Name of the variable.
+        val : float or ndarray of float
+            The value of the variable.
+        units : str
+            The units to convert to.
 
-    #     Returns
-    #     -------
-    #     float or ndarray of float
-    #         The value converted to the specified units.
-    #     """
-    #     base_units = self._get_conn_graph().get_meta(name)['units']
+        Returns
+        -------
+        float or ndarray of float
+            The value converted to the specified units.
+        """
+        # this isn't used any more, but leaving it here since it's a public method
+        base_units = self._get_conn_graph().get_meta(name)['units']
 
-    #     if base_units == units:
-    #         return val
+        if base_units == units:
+            return val
 
-    #     try:
-    #         scale, offset = unit_conversion(units, base_units)
-    #     except Exception:
-    #         msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
-    #         raise TypeError(msg.format(self.msginfo, name, base_units, units))
+        try:
+            scale, offset = unit_conversion(units, base_units)
+        except Exception:
+            msg = "{}: Can't express variable '{}' with units of '{}' in units of '{}'."
+            raise TypeError(msg.format(self.msginfo, name, base_units, units))
 
-    #     return (val + offset) * scale
+        return (val + offset) * scale
 
     def convert_units(self, name, val, units_from, units_to):
         """
@@ -6136,63 +6107,6 @@ class System(object, metaclass=SystemMetaclass):
             hash = hashlib.md5(str(data).encode()).hexdigest()  # nosec: content not sensitive
 
         return hash
-
-    def _get_full_dist_shape(self, abs_name, local_shape, io):
-        """
-        Get the full 'distributed' shape for a variable.
-
-        Variable name is absolute and variable is assumed to be continuous.
-
-        Parameters
-        ----------
-        abs_name : str
-            Absolute name of the variable.
-        local_shape : tuple
-            Local shape of the variable, used in error reporting.
-        io : str
-            'input' or 'output'.
-
-        Returns
-        -------
-        tuple
-            The distributed shape for the given variable.
-        """
-        abs2meta = self._var_allprocs_abs2meta[io]
-        if abs_name in abs2meta:
-            scope = self
-        else:
-            scope = self._problem_meta['model_ref']()
-            abs2meta = scope._var_allprocs_abs2meta[io]
-
-        meta = abs2meta[abs_name]
-        var_idx = scope._var_allprocs_abs2idx[abs_name]
-        global_size = np.sum(scope._var_sizes[io][:, var_idx])
-
-        # assume that all but the first dimension of the shape of a
-        # distributed variable is the same on all procs
-        shape = meta['shape']
-        if shape is None and self._get_saved_errors():
-            # a setup error has occurred earlier that caused shape to be None.  Just return (0,)
-            # to avoid a confusing KeyError
-            return (0,)
-        high_dims = shape[1:]
-        sz = shape_to_len(shape)
-        with multi_proc_exception_check(self.comm):
-            if high_dims:
-                high_size = shape_to_len(high_dims)
-
-                dim_size_match = bool(global_size % high_size == 0)
-                if dim_size_match is False and sz > 0:
-                    raise RuntimeError(f"{self.msginfo}: All but the first dimension of the "
-                                       "shape's local parts in a distributed variable must match "
-                                       f"across processes. For output '{abs_name}', local shape "
-                                       f"{local_shape} in MPI rank {self.comm.rank} has a "
-                                       "higher dimension that differs in another rank.")
-
-                dim1 = global_size // high_size
-                return tuple([dim1] + list(high_dims))
-
-        return (global_size,)
 
     def _collect_error(self, msg, exc_type=None, tback=None, ident=None):
         """

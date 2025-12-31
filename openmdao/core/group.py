@@ -94,11 +94,6 @@ class _PromotesInfo(object):
                 f"src_shape={self.src_shape}, promoted_from={self.promoted_from}, "
                 f"prom={self.prom})")
 
-    def prom_path(self):
-        if self.promoted_from is None or self.prom is None:
-            return ''
-        return '.'.join((self.promoted_from, self.prom)) if self.promoted_from else self.prom
-
     def copy(self):
         return _PromotesInfo(self.src_indices.copy(), self.flat, self.src_shape, self.promoted_from,
                              self.prom)
@@ -199,8 +194,6 @@ class Group(System):
         group or distributed component is below a DirectSolver so that we can raise an exception.
     _order_set : bool
         Flag to check if set_order has been called.
-    _auto_ivc_warnings : list
-        List of Auto IVC warnings to be raised later.
     _shapes_graph : nx.Graph
         Dynamic shape dependency graph, or None.
     _pre_components : set of str or None
@@ -1023,10 +1016,6 @@ class Group(System):
                 else:
                     offsets[io] = np.zeros(0, dtype=INT_DTYPE).reshape((1, 0))
 
-        #DBG
-        # om_dump(f"{self.msginfo}: var_offsets")
-        # om_dump_pprint(self._var_offsets)
-
         return self._var_offsets
 
     def _get_jac_col_scatter(self):
@@ -1611,19 +1600,6 @@ class Group(System):
         self._vars_to_gather = self._find_vars_to_gather()
         if self.pathname == '':
             self._problem_meta['vars_to_gather'] = self._vars_to_gather
-
-    def _resolve_group_input_defaults(self, show_warnings=False):
-        """
-        Resolve any ambiguities in group input defaults throughout the model.
-
-        Only called at the model level.
-
-        Parameters
-        ----------
-        show_warnings : bool
-            Bool to show or hide the auto_ivc warnings.
-        """
-        self._auto_ivc_warnings = []
 
     def _find_vars_to_gather(self):
         """
@@ -4141,24 +4117,6 @@ class Group(System):
                 self._key_owner = {}
 
         return self._key_owner
-
-    def debug_dump(self):
-        print('subsystems:', [s.pathname for s in self._subsystems_myproc])
-        print('sorted_subsystems:', [s.pathname for s in self._sorted_subsystems_myproc])
-        print('global_inputs:', list(self._var_allprocs_abs2meta['input']))
-        print('local_inputs:', list(self._var_abs2meta['input']))
-        print('inputs:', list(self._inputs))
-        print('invec:', self._inputs.asarray())
-        print('global_outputs:', list(self._var_allprocs_abs2meta['output']))
-        print('local_outputs:', list(self._var_abs2meta['output']))
-        print('outputs:', list(self._outputs))
-        print('outvec:', self._outputs.asarray())
-        import pprint
-        print('var_sizes:')
-        pprint.pprint(self._var_sizes)
-        print('abs2idx:')
-        pprint.pprint(self._var_allprocs_abs2idx)
-        print('', flush=True)
 
 
 def iter_solver_info(system):

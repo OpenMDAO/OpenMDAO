@@ -132,36 +132,6 @@ def scatter_dist_to_local(dist_val, comm, sizes):
     return local
 
 
-def get_evenly_distributed_size(comm, full_size):
-    """
-    Return the size of the current rank's part of an array of the given size.
-
-    Given a communicator and the size of an array, chop the array up
-    into pieces according to the size of the communicator, keeping the
-    distribution of entries as even as possible.
-
-    Parameters
-    ----------
-    comm : MPI communicator
-        The communicator we're distributing the array across.
-    full_size : int
-        Number of entries in the array.
-
-    Returns
-    -------
-    int
-        The size of this rank's part of the full distributed array.
-    """
-    base, leftover = divmod(full_size, comm.size)
-    sizes = np.full(comm.size, base, dtype=INT_DTYPE)
-
-    # evenly distribute the remainder across full_size-leftover procs,
-    # instead of giving the whole remainder to one proc
-    sizes[:leftover] += 1
-
-    return sizes[comm.rank]
-
-
 def take_nth(rank, size, seq):
     """
     Iterate returning every nth value.
@@ -699,39 +669,6 @@ def rand_sparsity(shape, density_ratio, dtype=bool, rng=None):
     coo.data[:] = 1  # set all nonzero values to 1. For bool won't matter, but need for other dtypes
 
     return coo
-
-
-def sparse_subinds(orig, inds):
-    """
-    Compute new rows or cols resulting from applying inds on top of an existing sparsity pattern.
-
-    This only comes into play when we have an approx total jacobian where some dv/resp have
-    indices.
-
-    Parameters
-    ----------
-    orig : ndarray
-        Either row or col indices (part of a subjac sparsity pattern).
-    inds : ndarray or list
-        Sub-indices introduced when adding a desvar or response.
-
-    Returns
-    -------
-    ndarray
-        New compressed rows or cols.
-    ndarray
-        Mask array that can be used to update subjac value and corresponding index array to orig.
-    """
-    mask = np.zeros(orig.size, dtype=bool)
-    for i in inds:
-        mask |= orig == i
-    newsp = orig[mask]
-
-    # replace the index with the 'compressed' index after we've masked out entries
-    for r, i in enumerate(np.sort(inds)):
-        newsp[newsp == i] = r
-
-    return newsp, mask
 
 
 def identity_column_iter(column):

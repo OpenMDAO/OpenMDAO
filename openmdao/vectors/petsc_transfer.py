@@ -124,9 +124,6 @@ else:
                         if 'input' in factors:
                             scaled_in_set.add(sub_in)
 
-                    #DBG
-                    # print(f"xfer {sub_in} input_inds: {input_inds} output_inds: {output_inds}")
-
                     xfer_in[sub_in].append(input_inds)
                     xfer_out[sub_in].append(output_inds)
                 else:
@@ -134,12 +131,6 @@ else:
                     # avoid hangs
                     xfer_in[sub_in]  # defaultdict will create an empty list there
                     xfer_out[sub_in]
-
-            #DBG
-            # om_dump(f"{group.msginfo}: fwd_xfer_in")
-            # om_dump_pprint(xfer_in)
-            # om_dump(f"{group.msginfo}: fwd_xfer_out")
-            # om_dump_pprint(xfer_out)
 
             if xfer_in:
                 full_xfer_in, full_xfer_out = _setup_index_views(total_len, xfer_in, xfer_out)
@@ -332,12 +323,6 @@ else:
                     if has_par_coloring:
                         xfer_in_nocolor[sub_out]
                         xfer_out_nocolor[sub_out]
-
-            #DBG
-            # om_dump(f"{group.msginfo}: rev_xfer_in")
-            # om_dump_pprint(xfer_in)
-            # om_dump(f"{group.msginfo}: rev_xfer_out")
-            # om_dump_pprint(xfer_out)
 
             full_xfer_in, full_xfer_out = _setup_index_views(total_size, xfer_in, xfer_out)
 

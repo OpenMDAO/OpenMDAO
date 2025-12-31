@@ -320,10 +320,6 @@ class Component(System):
             self._var_allprocs_abs2idx.update(
                 {n: i for i, n in enumerate(allprocs_abs2meta)})
 
-        #DBG
-        # om_dump(f"{self.msginfo}: var_allprocs_abs2idx")
-        # om_dump_pprint(self._var_allprocs_abs2idx)
-
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
             self._discrete_outputs = _DictValues(self._var_discrete['output'])

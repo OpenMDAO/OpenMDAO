@@ -651,24 +651,6 @@ class Problem(object, metaclass=ProblemMetaclass):
 
             self.model._clear_iprint()
 
-            #DBG
-            # om_dump("model stats")
-            # om_dump("inputs", self.model._inputs.asarray())
-            # om_dump(list(self.model._inputs))
-            # om_dump("outputs", self.model._outputs.asarray())
-            # om_dump(list(self.model._outputs))
-
-            # om_dump("var sizes")
-            # om_dump_pprint(self.model._var_sizes)
-            # om_dump("var allprocs abs2idx")
-            # om_dump_pprint(self.model._var_allprocs_abs2idx)
-            # om_dump("var allprocs abs2meta")
-            # om_dump_pprint(self.model._var_allprocs_abs2meta)
-            # om_dump("var abs2meta")
-            # om_dump_pprint(self.model._var_abs2meta)
-            # om_dump('conns')
-            # om_dump_pprint(self.model._conn_global_abs_in2out)
-
             self.model.run_solve_nonlinear()
         finally:
             self._recording_iter.prefix = old_prefix

@@ -54,9 +54,6 @@ class TestProblem(unittest.TestCase):
         p.set_val('foo', np.array([5., 5., 5.]))
         p.set_val('mul', [100])
 
-        p.model._get_conn_graph().dump_nodes()
-        p.model._get_conn_graph().dump_edges()
-
         p.run_model()
 
         foo = p.get_val('foo')

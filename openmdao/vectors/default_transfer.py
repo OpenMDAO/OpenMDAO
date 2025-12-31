@@ -207,27 +207,12 @@ class DefaultTransfer(Transfer):
                 fwd_xfer_in[sub_in].append(input_inds)
                 fwd_xfer_out[sub_in].append(output_inds)
 
-                # print(group.msginfo, sub_in, f"{abs_out} --> {abs_in}", "input_inds", input_inds, "output_inds", output_inds)
-
                 if rev and abs_out in abs2meta['output']:
                     sub_out = abs_out[mypathlen:].split('.', 1)[0]
                     if sub_in in scaled_in_set:
                         scaled_in_set.add(sub_out)
                     rev_xfer_in[sub_out].append(input_inds)
                     rev_xfer_out[sub_out].append(output_inds)
-
-        # #DBG
-        # om_dump(f"{group.msginfo}: fwd_xfer_in")
-        # om_dump_pprint(fwd_xfer_in)
-        # om_dump(f"{group.msginfo}: fwd_xfer_out")
-        # om_dump_pprint(fwd_xfer_out)
-
-        # if rev:
-        #     #DBG
-        #     om_dump(f"{group.msginfo}: rev_xfer_in")
-        #     om_dump_pprint(rev_xfer_in)
-        #     om_dump(f"{group.msginfo}: rev_xfer_out")
-        #     om_dump_pprint(rev_xfer_out)
 
         transfers['fwd'] = _setup_index_arrays(tot_size, fwd_xfer_in, fwd_xfer_out, vectors,
                                                scaled_in_set)

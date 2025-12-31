@@ -181,7 +181,6 @@ AMBIGUOUS_VAL = base << 6
 
 AMBIGUOUS = AMBIGUOUS_VAL | AMBIGUOUS_UNITS
 NONE_UP_VAL = REMOTE | AMBIGUOUS_VAL
-BY_CONN = SHAPE_BY_CONN | UNITS_BY_CONN
 
 
 class Defaults():
@@ -597,10 +596,6 @@ class NodeAttrs():
     @property
     def ambiguous(self):
         return bool(self.flags & AMBIGUOUS)
-
-    @property
-    def by_conn(self):
-        return bool(self.flags & BY_CONN)
 
     @property
     def dyn_shape(self):
@@ -1260,20 +1255,10 @@ class AllConnGraph(nx.DiGraph):
                                    f"a distributed source, '{src_node[1]}', so you must retrieve "
                                    "its value using 'get_remote=True'.")
             elif node_meta.distributed and src_inds_list:
-                # if src_meta.distributed or src_meta.remote:
                 if src_meta.distributed:
                     model = system._problem_meta['model_ref']()
                     src_inds_list = self.inds_into_local_distrib(model, src_node, node,
-                                                                    src_inds_list)
-
-                    # min_idx, max_idx = idx_list_to_extent(src_meta.global_shape, src_inds_list)
-                    # var_idx = self._var_allprocs_abs2idx[src_node[1]]
-                    # sizes = self._var_sizes['output'][:, var_idx]
-                    # # sizes for src var in each proc
-                    # start = np.sum(sizes[:self.comm.rank])  # start index of src on this proc
-                    # end = start + sizes[self.comm.rank]
-                    # err = min_idx != max_idx and (not (start <= min_idx < end) or
-                    #                               not (start <= max_idx < end))
+                                                                 src_inds_list)
                 elif src_meta.remote:
                     err = True
 
@@ -2781,22 +2766,6 @@ class AllConnGraph(nx.DiGraph):
 
         return ret
 
-    def get_defaults(self, meta):
-        """
-        Get the default metadata for the given node.
-
-        Parameters
-        ----------
-        meta : NodeAttrs
-            The metadata for the node.
-
-        Returns
-        -------
-        tuple
-            The default value, units, and source shape.
-        """
-        return meta.defaults.val, meta.defaults.units, meta.defaults.src_shape
-
     def get_parent_val_shape_units(self, parent, child):
         """
         Get the value, shape, and units from the parent of the given child node.
@@ -3724,21 +3693,6 @@ class AllConnGraph(nx.DiGraph):
                 if node[0] == 'i' and out_degree(node) == 0:
                     yield node
 
-    def leaf_units(self, node):
-        """Leaf units.
-
-        Parameters
-        ----------
-        node : any
-            node.
-
-        Returns
-        -------
-        any
-            Returned value.
-        """
-        return [self.nodes[n]['attrs'].units for n in self.leaf_input_iter(node)]
-
     def absnames(self, node):
         """Absnames.
 
@@ -3756,23 +3710,6 @@ class AllConnGraph(nx.DiGraph):
             return [n for _, n in self.leaf_input_iter(node)]
         else:
             return [self.get_root(node)[1]]
-
-    def io_conn_iter(self):
-        """
-        Iterate over all output-input connections in the graph.
-
-        There will be only one of these per connection tree.  A connection tree has an absolute
-        output at the root and absolute inputs at the leaves.
-
-        Yields
-        ------
-        tuple of the form (u, v)
-            The connected node pair (output to input).  Each node may be either promoted or
-            absolute.
-        """
-        for u, v in self.edges():
-            if u[0] == 'o' and v[0] == 'i':
-                yield u, v
 
     def get_subarray(self, arr, indices_list):
         """

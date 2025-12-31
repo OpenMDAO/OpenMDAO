@@ -239,41 +239,6 @@ class _AutoIndepVarComp(IndepVarComp):
         Set of var names connected to remote inputs.
     """
 
-    def __init__(self, name=None, val=1.0, **kwargs):
-        """
-        Initialize all attributes.
-
-        Parameters
-        ----------
-        name : str or None
-            name of the variable.
-            If None, variables should be defined external to this class by calling add_output.
-        val : float or ndarray
-            value of the variable if a single variable is being defined.
-        **kwargs : dict
-            keyword arguments.
-        """
-        super().__init__(name, val, **kwargs)
-        self._remotes = set()
-
-    def _add_remote(self, name):
-        self._remotes.add(name)
-
-    def _setup_vector_class(self):
-        if self.comm.size > 1:
-            all_remotes = set()
-            for remotes in self.comm.allgather(self._remotes):
-                all_remotes.update(remotes)
-
-            if all_remotes:
-                self._has_distrib_vars = True
-
-                self._remotes = all_remotes
-                for name in all_remotes:
-                    self._static_var_rel2meta[name]['distributed'] = True
-
-        super()._setup_vector_class()
-
     def add_output(self, name, val=1.0, units=None):
         """
         Add an independent variable to this component.
