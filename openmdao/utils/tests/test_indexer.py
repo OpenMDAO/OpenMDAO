@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from numpy.testing import assert_equal
 
-from openmdao.utils.indexer import indexer, combine_ranges
+from openmdao.utils.indexer import indexer, combine_ranges, get_virtual_array
 from openmdao.utils.general_utils import setup_dbg
 
 setup_dbg()
@@ -486,6 +486,96 @@ class TestCombineRanges(unittest.TestCase):
         ranges = [(1, 5), (5, 10), (11, 15)]
         result = combine_ranges(ranges)
         self.assertEqual(result, [(1, 10), (11, 15)])
+
+
+class TestGetVirtualArray(unittest.TestCase):
+
+    def _base_chain(self, arr, max_depth=20):
+        """
+        Return the chain of `.base` objects starting from the given array.
+        """
+        chain = [arr]
+        obj = arr
+        for _ in range(max_depth):
+            nxt = getattr(obj, 'base', None)
+            if nxt is None:
+                break
+            chain.append(nxt)
+            obj = nxt
+        return chain
+
+    def test_returns_ndarray_with_requested_shape(self):
+        shape = (2, 3, 4)
+        v = get_virtual_array(shape)
+        self.assertIsInstance(v, np.ndarray)
+        self.assertEqual(v.shape, shape)
+        self.assertEqual(v.ndim, len(shape))
+        self.assertEqual(v.dtype, np.int8)
+
+    def test_strides_are_all_zero(self):
+        shape = (5, 1, 2)
+        v = get_virtual_array(shape)
+        self.assertEqual(v.strides, (0,) * len(shape))
+
+    def test_base_allocation_is_single_element(self):
+        v = get_virtual_array((10, 10))
+        # NumPy may insert a non-ndarray `DummyArray` in the base chain, so search for the
+        # underlying allocated ndarray.
+        bases = [b for b in self._base_chain(v) if isinstance(b, np.ndarray)]
+        self.assertTrue(bases, "Expected at least one ndarray in the base chain.")
+
+        smallest = min(bases, key=lambda a: a.nbytes)
+        self.assertEqual(smallest.shape, (1,))
+        self.assertEqual(smallest.size, 1)
+        self.assertEqual(smallest.dtype, np.int8)
+        self.assertEqual(smallest.nbytes, 1)
+
+    def test_aliasing_write_updates_all_elements(self):
+        v = get_virtual_array((3, 4))
+        # sanity: starts as zeros
+        self.assertTrue(np.all(v == 0))
+
+        v[0, 0] = 7
+        self.assertTrue(np.all(v == 7))
+
+        v[2, 3] = -3
+        self.assertTrue(np.all(v == -3))
+
+    def test_slices_share_same_data_pointer(self):
+        v = get_virtual_array((4, 5))
+        # Any view/slice should point at the same byte because stride is zero.
+        self.assertEqual(v.ctypes.data, v[0:1, 0:1].ctypes.data)
+        self.assertEqual(v.ctypes.data, v[3:, 4:].ctypes.data)
+
+    def test_0d_shape(self):
+        v = get_virtual_array(())
+        self.assertEqual(v.shape, ())
+        self.assertEqual(v.ndim, 0)
+        self.assertEqual(v.strides, ())
+        self.assertEqual(int(v[()]), 0)
+        v[()] = 11
+        self.assertEqual(int(v[()]), 11)
+
+    def test_zero_length_dimensions(self):
+        v1 = get_virtual_array((0,))
+        self.assertEqual(v1.shape, (0,))
+        self.assertEqual(v1.size, 0)
+        self.assertEqual(v1.strides, (0,))
+
+        v2 = get_virtual_array((2, 0, 3))
+        self.assertEqual(v2.shape, (2, 0, 3))
+        self.assertEqual(v2.size, 0)
+        self.assertEqual(v2.strides, (0, 0, 0))
+
+    def test_shape_with_numpy_ints(self):
+        shape = (np.int64(2), np.int32(3))
+        v = get_virtual_array(shape)
+        self.assertEqual(v.shape, (2, 3))
+        self.assertEqual(v.strides, (0, 0))
+
+    def test_invalid_negative_dimension_raises(self):
+        with self.assertRaises(ValueError):
+            get_virtual_array((-1,))
 
 
 if __name__ == '__main__':

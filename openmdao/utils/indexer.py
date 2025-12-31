@@ -494,20 +494,6 @@ class ShapedIntIndexer(Indexer):
         """
         return 1
 
-    # @property
-    # def indexed_src_shape(self):
-    #     """
-    #     Return the shape of the index ().
-
-    #     Returns
-    #     -------
-    #     tuple
-    #         The shape of the index.
-    #     """
-    #     if self._flat_src:
-    #         return (1,)
-    #     return super().indexed_src_shape
-
     def as_array(self, copy=False, flat=True):
         """
         Return an index array into a flat array.
@@ -854,21 +840,6 @@ class SliceIndexer(ShapedSliceIndexer):
             The index array.
         """
         return self.shaped_array(copy=copy, flat=flat)
-
-    # @property
-    # def indexed_src_shape(self):
-    #     """
-    #     Return the shape of the result of indexing into the source.
-
-    #     Returns
-    #     -------
-    #     tuple
-    #         The shape of the index.
-    #     """
-    #     slc = self._slice
-    #     if self._flat_src and slc.start is not None and slc.stop is not None:
-    #         return (len(range(slc.start, slc.stop, slc.step)),)
-    #     return super().indexed_src_shape
 
 
 class ShapedArrayIndexer(Indexer):
