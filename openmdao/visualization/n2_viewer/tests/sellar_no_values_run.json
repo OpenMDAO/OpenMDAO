@@ -56,7 +56,7 @@
                     "dtype": "ndarray",
                     "is_discrete": false,
                     "distributed": false,
-                    "shape": "(2,)",
+                    "shape": "(1,)",
                     "desc": "",
                     "implicit": false,
                     "units": "None"
@@ -67,7 +67,7 @@
                     "dtype": "ndarray",
                     "is_discrete": false,
                     "distributed": false,
-                    "shape": "(1,)",
+                    "shape": "(2,)",
                     "desc": "",
                     "implicit": false,
                     "units": "None"

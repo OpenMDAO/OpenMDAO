@@ -1667,8 +1667,8 @@ class TestSqliteCaseReader(unittest.TestCase):
             "con1": -22.42830237,
             "con2": -11.94151185,
             # unpromoted output names
-            "_auto_ivc.v1": 1.,
-            "_auto_ivc.v0": [5., 2.],
+            "_auto_ivc.v0": 1.,
+            "_auto_ivc.v1": [5., 2.],
             "obj_cmp.obj": 28.58830817,
             "con_cmp1.con1": -22.42830237,
             "con_cmp2.con2": -11.94151185,
@@ -3596,12 +3596,12 @@ class TestFeatureSqliteReader(unittest.TestCase):
 
         # you can access variable values using either the promoted or the absolute name
         self.assertEqual((objs['obj'], objs['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
-        self.assertEqual((dvs['x'], dvs['_auto_ivc.v1']), (dvs['_auto_ivc.v1'], dvs['x']))
+        self.assertEqual((dvs['x'], dvs['_auto_ivc.v0']), (dvs['_auto_ivc.v0'], dvs['x']))
         self.assertEqual((rsps['obj'], rsps['obj_cmp.obj']), (rsps['obj_cmp.obj'], rsps['obj']))
 
         # you can also access the variables directly from the case object
         self.assertEqual((case['obj'], case['obj_cmp.obj']), (objs['obj_cmp.obj'], objs['obj']))
-        self.assertEqual((case['x'], case['_auto_ivc.v1']), (dvs['_auto_ivc.v1'], dvs['x']))
+        self.assertEqual((case['x'], case['_auto_ivc.v0']), (dvs['_auto_ivc.v0'], dvs['x']))
 
     def test_feature_list_inputs_and_outputs(self):
         prob = SellarProblem(nonlinear_solver=om.NonlinearBlockGS,

@@ -270,12 +270,12 @@ class NodeAttrs():
                  '_src_inds_list', 'flags', '_meta', '_locmeta', 'copy_shape', 'compute_shape',
                  'copy_units', 'compute_units', 'distributed')
 
-    def __init__(self):
+    def __init__(self, pathname=None, rel_name=None):
         """
         Initialize NodeAttrs with all attributes set to None or default values.
         """
-        self.pathname = None
-        self.rel_name = None
+        self.pathname = pathname
+        self.rel_name = rel_name
         self.flags = flag_type(0)
         self._src_inds_list = []
         self._val = None
@@ -1743,10 +1743,7 @@ class AllConnGraph(nx.DiGraph):
         """
         node = self.node_name(system, name, io)
         if node not in self:
-            attrs = NodeAttrs()
-            attrs.pathname = system.pathname
-            attrs.rel_name = name
-
+            attrs = NodeAttrs(pathname=system.pathname, rel_name=name)
             self.add_node(node, attrs=attrs)
         else:
             attrs = self.nodes[node]['attrs']
@@ -3312,35 +3309,88 @@ class AllConnGraph(nx.DiGraph):
             Returned value.
         """
         assert model.pathname == ''
-        nodes = self.nodes
         in_degree = self.in_degree
 
-        # this occurs before the auto_ivc variables actually exist
-        dangling_inputs = [n for n in nodes() if n[0] == 'i' and in_degree(n) == 0]
+        pred = self.predecessors
 
-        # because we can have manual connection to input nodes other than the 'root' input node,
-        # we have to traverse them all to make sure there aren't any outputs connected anywhere
-        # in the input tree..
-        skip = set()
-        for d in dangling_inputs:
-            for _, v in dfs_edges(self, d):
-                # if v has any output preds, then this input tree is not dangling
-                for p in self.predecessors(v):
-                    if p[0] == 'o':
-                        skip.add(d)
+        # traverse up the tree from each absolute input node and find its src if it has one
+
+        dangling_inputs = set()
+        above_anchors = set()  # inputs nodes directly above an anchor node
+
+        for name in chain(model._var_allprocs_abs2meta['input'],
+                               model._var_allprocs_discrete['input']):
+            start_node = ('i', name)
+            src = None
+            stack = [start_node]
+            while stack:
+                node = stack.pop()
+                preds = list(pred(node))
+                outs = [p for p in preds if p[0] == 'o']
+                ins = [p for p in preds if p[0] == 'i']
+                if outs:
+                    assert src is None and len(outs) == 1
+                    src = outs[0]
+                    above_anchors.update(ins)
+                    continue
+
+                stack.extend(ins)
+
+            if src is None:
+                dangling_inputs.add(node)
+
+        final_dangling_inputs = []
+
+        if dangling_inputs:
+            # find the ancestor node of each dangling input
+
+            for d in dangling_inputs:
+                stack = [d]
+                found = False
+                while stack:
+                    node = stack.pop()
+                    if in_degree(node) == 0:
+                        final_dangling_inputs.append(node)
+                        found = True
                         break
-                if d in skip:
-                    break
+                    preds = list(pred(node))
+                    assert len(preds) == 1
+                    p = preds[0]
+                    if p in above_anchors:
+                        final_dangling_inputs.append(node)
+                        found = True
+                        break
+                    stack.append(p)
 
-                if v in self._mult_inconn_nodes:
-                    skip.add(d)
-                    break
+                if not found:
+                    final_dangling_inputs.append(d)
 
-        if skip:
-            dangling_inputs = [d for d in dangling_inputs if d not in skip]
+        # # this occurs before the auto_ivc variables actually exist
+        # dangling_inputs = [n for n in nodes() if n[0] == 'i' and in_degree(n) == 0]
+
+        # # because we can have manual connection to input nodes other than the 'root' input node,
+        # # we have to traverse them all to make sure there aren't any outputs connected anywhere
+        # # in the input tree..
+        # skip = set()
+        # for d in dangling_inputs:
+        #     for _, v in dfs_edges(self, d):
+        #         # if v has any output preds, then this input tree is not dangling
+        #         for p in self.predecessors(v):
+        #             if p[0] == 'o':
+        #                 skip.add(d)
+        #                 break
+        #         if d in skip:
+        #             break
+
+        #         if v in self._mult_inconn_nodes:
+        #             skip.add(d)
+        #             break
+
+        # if skip:
+        #     dangling_inputs = [d for d in dangling_inputs if d not in skip]
 
         auto_nodes = []
-        for i, n in enumerate(dangling_inputs):
+        for i, n in enumerate(sorted(final_dangling_inputs)):
             auto_node, _ = self.get_node_attrs(model, f'_auto_ivc.v{i}', 'output')
             self.add_edge(auto_node, n, type='manual')
             auto_nodes.append(auto_node)
@@ -3348,8 +3398,9 @@ class AllConnGraph(nx.DiGraph):
         return auto_nodes
 
     @collect_errors
-    def check(self, model):
-        """Check.
+    def final_check(self, model):
+        """
+        Check for any errors after all updates are complete.
 
         Parameters
         ----------
@@ -3357,46 +3408,43 @@ class AllConnGraph(nx.DiGraph):
             model.
         """
         nodes = self.nodes
-        in_degree = self.in_degree
         for abs_out in self._var_allprocs_abs2meta['output']:
             node = ('o', abs_out)
-            if node[0] == 'o' and in_degree(node) == 0:  # a root output node
+            auto = node[1].startswith('_auto_ivc.')
 
-                auto = node[1].startswith('_auto_ivc.')
-
-                for u, v in dfs_edges(self, node):
-                    uunits = nodes[u]['attrs'].units
-                    vmeta = nodes[v]['attrs']
-                    if auto and vmeta.distributed:
-                        for _, t in self._bad_conns:
-                            if t[1] == v[1]:
-                                break
+            for u, v in dfs_edges(self, node):
+                vmeta = nodes[v]['attrs']
+                if auto and vmeta.distributed:
+                    for _, t in self._bad_conns:
+                        if t[1] == v[1]:
+                            break
+                    else:
+                        iroot = self.input_root(v)
+                        if iroot != v:
+                            promas = f", promoted as '{iroot[1]}',"
                         else:
-                            iroot = self.input_root(v)
-                            if iroot != v:
-                                promas = f", promoted as '{iroot[1]}',"
-                            else:
-                                promas = ""
-                            self._collect_error(f"Distributed input '{v[1]}'{promas} is not "
-                                                "connected. Declare an IndepVarComp and connect it "
-                                                "to this input to eliminate this error.",
-                                                ident=(u, v))
-                            continue
+                            promas = ""
+                        self._collect_error(f"Distributed input '{v[1]}'{promas} is not "
+                                            "connected. Declare an IndepVarComp and connect it "
+                                            "to this input to eliminate this error.",
+                                            ident=(u, v))
+                        continue
 
-                    if u[0] == 'o' and v[0] == 'i':  # an output to input connection
-                        vunits = vmeta.units
-                        if uunits is None or vunits is None:
-                            uunitless = _is_unitless(uunits)
-                            vunitless = _is_unitless(vunits)
-                            if uunitless and not vunitless:
-                                issue_warning(f"{model.msginfo}: Input '{v[1]}' with units of "
-                                            f"'{vunits}' is connected to output '{u[1]}' "
+                if u[0] == 'o' and v[0] == 'i':  # an output to input connection
+                    uunits = nodes[u]['attrs'].units
+                    vunits = vmeta.units
+                    if uunits is None or vunits is None:
+                        uunitless = _is_unitless(uunits)
+                        vunitless = _is_unitless(vunits)
+                        if uunitless and not vunitless:
+                            issue_warning(f"{model.msginfo}: Input '{v[1]}' with units of "
+                                        f"'{vunits}' is connected to output '{u[1]}' "
+                                        f"which has no units.", category=UnitsWarning)
+                        elif not uunitless and vunitless:
+                            if not nodes[v]['attrs'].ambiguous_units:
+                                issue_warning(f"{model.msginfo}: Output '{u[1]}' with units of "
+                                            f"'{uunits}' is connected to input '{v[1]}' "
                                             f"which has no units.", category=UnitsWarning)
-                            elif not uunitless and vunitless:
-                                if not nodes[v]['attrs'].ambiguous_units:
-                                    issue_warning(f"{model.msginfo}: Output '{u[1]}' with units of "
-                                                f"'{uunits}' is connected to input '{v[1]}' "
-                                                f"which has no units.", category=UnitsWarning)
 
         desvars = model.get_design_vars()
         for req in self._required_conns:
@@ -3628,6 +3676,10 @@ class AllConnGraph(nx.DiGraph):
                 return n
 
         # if we get here, node is an input promoted above the attachment point of its source output
+        # or an absolute input
+        if in_degree(node) == 0 and self.out_degree(node) == 0:
+            return node
+
         for n in self.bfs_down_iter(node, include_self=False):
             # look for output predecessors
             for p in self.predecessors(n):

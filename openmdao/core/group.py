@@ -1142,7 +1142,7 @@ class Group(System):
 
         self._check_connections()
 
-        graph.check(self)
+        graph.final_check(self)
 
         nodes = graph.nodes
 

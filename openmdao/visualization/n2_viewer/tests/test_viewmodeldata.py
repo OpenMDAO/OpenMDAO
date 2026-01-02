@@ -186,15 +186,15 @@ class TestViewerData(unittest.TestCase):
             [
                 {"src": "sub.d1.y1", "tgt": "con_cmp1.y1"},
                 {"src": "sub.d2.y2", "tgt": "con_cmp2.y2"},
-                {"src": "_auto_ivc.v1", "tgt": "obj_cmp.x"},
+                {"src": "_auto_ivc.v0", "tgt": "obj_cmp.x"},
                 {"src": "sub.d1.y1", "tgt": "obj_cmp.y1"},
                 {"src": "sub.d2.y2", "tgt": "obj_cmp.y2"},
-                {"src": "_auto_ivc.v0", "tgt": "obj_cmp.z"},
-                {"src": "_auto_ivc.v1", "tgt": "sub.d1.x"},
+                {"src": "_auto_ivc.v1", "tgt": "obj_cmp.z"},
+                {"src": "_auto_ivc.v0", "tgt": "sub.d1.x"},
                 {"src": "sub.state_eq_group.state_eq.y2_command", "tgt": "sub.d1.y2"},
-                {"src": "_auto_ivc.v0", "tgt": "sub.d1.z"},
+                {"src": "_auto_ivc.v1", "tgt": "sub.d1.z"},
                 {"src": "sub.d1.y1", "tgt": "sub.d2.y1"},
-                {"src": "_auto_ivc.v0", "tgt": "sub.d2.z"},
+                {"src": "_auto_ivc.v1", "tgt": "sub.d2.z"},
                 {"src": "sub.d2.y2", "tgt": "sub.state_eq_group.state_eq.y2_actual", "cycle_arrows": ["sub.d1 sub.d2", "sub.state_eq_group.state_eq sub.d1"]}
             ]
         """)
