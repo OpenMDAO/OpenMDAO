@@ -132,6 +132,36 @@ def scatter_dist_to_local(dist_val, comm, sizes):
     return local
 
 
+def get_evenly_distributed_size(comm, full_size):
+    """
+    Return the size of the current rank's part of an array of the given size.
+
+    Given a communicator and the size of an array, chop the array up
+    into pieces according to the size of the communicator, keeping the
+    distribution of entries as even as possible.
+
+    Parameters
+    ----------
+    comm : MPI communicator
+        The communicator we're distributing the array across.
+    full_size : int
+        Number of entries in the array.
+
+    Returns
+    -------
+    int
+        The size of this rank's part of the full distributed array.
+    """
+    base, leftover = divmod(full_size, comm.size)
+    sizes = np.full(comm.size, base, dtype=INT_DTYPE)
+
+    # evenly distribute the remainder across full_size-leftover procs,
+    # instead of giving the whole remainder to one proc
+    sizes[:leftover] += 1
+
+    return sizes[comm.rank]
+
+
 def take_nth(rank, size, seq):
     """
     Iterate returning every nth value.

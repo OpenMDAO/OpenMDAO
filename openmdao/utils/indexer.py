@@ -1285,10 +1285,9 @@ class ShapedMultiIndexer(Indexer):
         """
         Check if this multi-indexer is contiguous.
 
-        A multi-indexer is contiguous if:
-        1. All sub-indexers are individually contiguous (int or slice with step=1)
-        2. If any dimension uses a full slice (:), all subsequent dimensions must
-           also use full slices. Otherwise, there will be gaps in the flattened array.
+        A multi-indexer is contiguous if all sub-indexers are individually contiguous, or
+        if any dimension uses a full slice, all subsequent dimensions must
+        also use full slices. Otherwise, there will be gaps in the flattened array.
 
         Returns
         -------
