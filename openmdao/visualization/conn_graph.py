@@ -1955,7 +1955,7 @@ class AllConnGraph(nx.DiGraph):
 
         # if we get here, node is dynamically shaped so we didn't know the shape the first time
         # around
-        if node in self._distributed_nodes:
+        if node in self._distributed_nodes and self.comm.size > 1:
             node_meta = self.nodes[node]['attrs']
             dist_shapes = self.comm.allgather(node_meta.shape)
             self._dist_shapes[node] = dist_shapes
