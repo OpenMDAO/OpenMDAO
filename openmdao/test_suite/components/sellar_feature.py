@@ -122,8 +122,8 @@ class SellarMDA(om.Group):
         cycle.add_subsystem('d2', SellarDis2(), promotes_inputs=['z', 'y1'],
                             promotes_outputs=['y2'])
 
-        cycle.set_input_defaults('x', 1.0)
-        cycle.set_input_defaults('z', np.array([5.0, 2.0]))
+        self.set_input_defaults('x', 1.0)
+        self.set_input_defaults('z', np.array([5.0, 2.0]))
 
         # Nonlinear Block Gauss Seidel is a gradient free solver
         cycle.nonlinear_solver = om.NonlinearBlockGS()
@@ -221,8 +221,8 @@ class SellarMDAWithUnits(om.Group):
         cycle.add_subsystem('d2', self.SellarDis2Units(), promotes_inputs=['z', 'y1'],
                             promotes_outputs=['y2'])
 
-        cycle.set_input_defaults('x', 1.0, units='degC')
-        cycle.set_input_defaults('z', np.array([5.0, 2.0]), units='degC')
+        self.set_input_defaults('x', 1.0, units='degC')
+        self.set_input_defaults('z', np.array([5.0, 2.0]), units='degC')
 
         # Nonlinear Block Gauss Seidel is a gradient free solver
         cycle.nonlinear_solver = om.NonlinearBlockGS()
@@ -250,10 +250,10 @@ class SellarMDALinearSolver(om.Group):
     def setup(self):
 
         cycle = self.add_subsystem('cycle', om.Group(), promotes=['*'])
-        cycle.add_subsystem('d1', SellarDis1(), 
+        cycle.add_subsystem('d1', SellarDis1(),
                             promotes_inputs=['x', 'z', 'y2'],
                             promotes_outputs=['y1'])
-        cycle.add_subsystem('d2', SellarDis2(), 
+        cycle.add_subsystem('d2', SellarDis2(),
                             promotes_inputs=['z', 'y1'],
                             promotes_outputs=['y2'])
 

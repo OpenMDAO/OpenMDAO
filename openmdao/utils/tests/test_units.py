@@ -398,8 +398,7 @@ class TestModuleFunctions(unittest.TestCase):
                               promotes_inputs=['x', 'y'])
 
         msg = ("\nCollected errors for problem 'incompatible_units':"
-               "\n   <model> <class Group>: Output units of 'Hz*s' for 'indeps.y' are incompatible with input "
-               "units of 'ft' for 'exec_comp.y'.")
+               "\n   <model> <class Group>: Can't implicitly connect 'y' to 'y': units 'Hz*s' of 'y' are incompatible with units 'ft' of 'y'.")
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()
@@ -434,8 +433,7 @@ class TestUnitless(unittest.TestCase):
             promotes_inputs=['x'])
 
         msg = ("\nCollected errors for problem 'unitless_connection_error':"
-               "\n   <model> <class Group>: Output units of 'unitless' for 'indeps.x' are incompatible with input "
-               "units of 'm' for 'exec_comp.x'.")
+               "\n   <model> <class Group>: Can't implicitly connect 'x' to 'x': units 'unitless' of 'x' are incompatible with units 'm' of 'x'.")
 
         with self.assertRaises(RuntimeError) as cm:
             p.setup()

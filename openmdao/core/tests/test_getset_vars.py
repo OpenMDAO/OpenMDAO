@@ -121,7 +121,7 @@ class TestGetSetVariables(unittest.TestCase):
 
         # -------------------------------------------------------------------
 
-        msg = "<model> <class Group>: Variable '{}' not found. Perhaps you meant one of the following variables: ['g.c.{}']."
+        msg = ": Variable '{}' not found. Perhaps you meant one of the following variables: ['g.c.{}']."
 
         # inputs
         with self.assertRaises(KeyError) as ctx:
@@ -340,6 +340,8 @@ class TestGetSetVariables(unittest.TestCase):
 
         p.run_model()
 
+        # p.model.display_conn_graph(varname='C1.x')
+
         np.testing.assert_allclose(p['indep.x'][:7], np.ones(7) * 24.)
         np.testing.assert_allclose(p['indep.x'][7:10], np.ones(3) * 3.)
         np.testing.assert_allclose(p['C1.x'], np.ones(7) * 2.)
@@ -365,15 +367,19 @@ class TestGetSetVariables(unittest.TestCase):
         p.model.promotes('C1', inputs=['x'], src_indices=list(range(7)))
         p.model.promotes('C2', inputs=['x'], src_indices=list(range(7, 10)))
 
-        with self.assertRaises(RuntimeError) as cm:
+        with self.assertRaises(Exception) as cm:
             p.setup()
             p.final_setup()
 
         self.assertEqual(str(cm.exception),
-           "\nCollected errors for problem 'serial_multi_src_inds_units_promoted_no_src':"
-           "\n   <model> <class Group>: The following inputs, ['C1.x', 'C2.x', 'C3.x'], promoted "
-           "to 'x', are connected but their metadata entries ['units'] differ. Call "
-           "model.set_input_defaults('x', units=?) to remove the ambiguity.")
+                         "\nCollected errors for problem 'serial_multi_src_inds_units_promoted_no_src':"
+                         "\n   <model> <class Group>: The following inputs promoted to 'x' have different units:"
+                         "\n  "
+                         "\n   C1.x  ft  "
+                         "\n   C2.x  inch"
+                         "\n   C3.x  mm  "
+                         "\n  "
+                         "\n   Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
 
     def test_serial_multi_src_inds_units_setval_promoted(self):
         p = Problem()

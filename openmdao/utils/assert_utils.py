@@ -747,35 +747,6 @@ def assert_near_equal(actual, desired, tolerance=1e-15, tol_type='rel'):
     return error
 
 
-def mimic(func, mimicfunc, *args, **kwargs):
-    """
-    Verify that mimicfunc produces the same result as func.
-
-    This can be useful when refactoring to verify that the new version of a function has
-    identical outputs to the original.
-
-    Parameters
-    ----------
-    func : function
-        The function to mimic.
-    mimicfunc : function
-        The mimic function.
-    *args : tuple
-        The arguments to pass to the functions.
-    **kwargs : dict
-        The keyword arguments to pass to the functions.
-
-    Returns
-    -------
-    object, object
-        The return values of func and mimicfunc.
-    """
-    ret1 = func(*args, **kwargs)
-    ret2 = mimicfunc(*args, **kwargs)
-    assert_near_equal(ret1, ret2)
-    return ret1, ret2
-
-
 def assert_sparsity_matches_fd(system, direction='fwd', outstream=sys.stdout):
     """
     Assert that the sparsity of the system matches the finite difference sparsity.

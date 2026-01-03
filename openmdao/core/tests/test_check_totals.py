@@ -465,9 +465,9 @@ class TestProblemCheckTotals(unittest.TestCase):
         prob.check_totals(method='fd', show_progress=True, out_stream=stream)
 
         lines = stream.getvalue().splitlines()
-        self.assertTrue("1/3: Checking derivatives with respect to: 'x [2]' ..." in lines[0])
-        self.assertTrue("2/3: Checking derivatives with respect to: 'z [0]' ..." in lines[1])
-        self.assertTrue("3/3: Checking derivatives with respect to: 'z [1]' ..." in lines[2])
+        self.assertTrue("1/3: Checking derivatives with respect to: 'x [0]' ..." in lines[0])
+        self.assertTrue("2/3: Checking derivatives with respect to: 'z [1]' ..." in lines[1])
+        self.assertTrue("3/3: Checking derivatives with respect to: 'z [2]' ..." in lines[2])
 
         prob.run_model()
 

@@ -251,6 +251,8 @@ class SparseCompExplicit(ExplicitComponent):
         setup_vars(self, ofs='*', wrts='*', sparse_partials=self.sparse_partials, bad_sparsity=self.bad_sparsity)
 
     def compute(self, inputs, outputs):
+        #DBG
+        print(f"{self.msginfo}: inputs {inputs.asarray()}")
         prod = self.sparsity.dot(inputs.asarray())
         start = end = 0
         for i in range(self.osplit):
@@ -259,6 +261,7 @@ class SparseCompExplicit(ExplicitComponent):
             outputs[outname] = prod[start:end]
             start = end
         self._nruns += 1
+        print(f"{self.msginfo}: outputs {outputs.asarray()}")
 
 
 # relative tolerances for jacobian checks
@@ -366,9 +369,11 @@ class TestColoringExplicit(unittest.TestCase):
         for method, isplit, osplit, sparse_partials in itertools.product(['fd', 'cs'],
                                                                          [1,2,7,19],
                                                                          [1,2,5,11],
-                                                                         [True, False]):
+                                                                         [False, True]):
+            #DBG
+            print(method, isplit, osplit, sparse_partials)
 
-            with self.subTest(msg=f'{method=} {isplit=} {osplit=} {sparse_partials=}'):
+            if True: # with self.subTest(msg=f'{method=} {isplit=} {osplit=} {sparse_partials=}'):
                 prob = Problem(name=f'test_partials_explicit_{method}_'
                                f'{isplit}_{osplit}_{sparse_partials}')
                 model = prob.model
