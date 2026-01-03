@@ -666,7 +666,6 @@ class Component(System):
             'shape': shape,
             'size': shape_to_len(shape),
             'src_inds_list': None,
-            # 'flat_src_indices': None,
             'units': units,
             'desc': desc,
             'tags': make_set(tags),

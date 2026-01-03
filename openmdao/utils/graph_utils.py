@@ -221,10 +221,10 @@ def is_unresolved(graph, node, meta_name):
     """
     nodes = graph.nodes
     for s in graph.successors(node):
-        if nodes[s]['conn_meta'][meta_name] is None:
+        if getattr(nodes[s]['conn_meta'], meta_name) is None:
             return True
     for p in graph.predecessors(node):
-        if nodes[p]['conn_meta'][meta_name] is None:
+        if getattr(nodes[p]['conn_meta'], meta_name) is None:
             return True
     return False
 
@@ -303,7 +303,7 @@ def get_active_edges(graph, knowns, meta_name):
 
     for known in knowns:
         for succ in graph.successors(known):
-            if nodes[succ]['conn_meta'][meta_name] is None:
+            if getattr(nodes[succ]['conn_meta'], meta_name) is None:
                 if edges[known, succ]['multi']:
                     computed_nodes.add(succ)
                 else:
@@ -360,6 +360,8 @@ def dump_edges(G, show_none=False):
     ----------
     G : networkx.DiGraph
         Directed graph of Systems and variables.
+    show_none : bool
+        If True, show edges with None data.
     """
     for u, v, data in G.edges(data=True):
         print(f"{u} -> {v}:")
@@ -368,60 +370,3 @@ def dump_edges(G, show_none=False):
         else:
             dct = {k: v for k, v in data.items() if v is not None}
             print(textwrap.indent(pformat(dct), '  '))
-
-
-# _shape_extract = ('distributed', 'shape', 'compute_shape', 'shape_by_conn', 'copy_shape')
-# _units_extract = ('units', 'compute_units', 'units_by_conn', 'copy_units')
-
-
-# def add_shape_node(graph, name, io, meta):
-#     """
-#     Add a shape node to the graph.
-
-#     Parameters
-#     ----------
-#     graph : networkx.DiGraph
-#         Graph to add the shape node to.
-#     name : str
-#         Name of the shape node.
-#     io : str
-#         Input or output.
-#     meta : dict
-#         Metadata for the variable from the connection graph.
-#     """
-#     # kwargs = {k: meta[k] for k in _shape_extract}
-#     # if node_meta['shape'] is not None:
-#     #     kwargs['shape'] = node_meta['shape']
-
-#     # if io == 'input':
-#     #     kwargs['src_indices'] = meta.get('src_indices')
-#     #     kwargs['flat_src_indices'] = meta.get('flat_src_indices')
-
-#     graph.add_node(name, io=io, meta=meta)
-
-
-# def add_units_node(graph, name, io, meta):
-#     """
-#     Add a units node to the graph.
-
-#     Parameters
-#     ----------
-#     graph : networkx.DiGraph
-#         Graph to add the units node to.
-#     name : str
-#         Name of the units node.
-#     io : str
-#         Input or output.
-#     meta : dict
-#         Metadata for the variable from the connection graph.
-#     """
-#     # kwargs = {k: meta[k] for k in _units_extract}
-
-#     # if node_meta['units'] is not None:
-#     #     kwargs['units'] = node_meta['units']
-
-#     # if kwargs['units'] is not None:
-#     #     # Turn units data into a PhysicalUnit so units of expressions can be computed.
-#     #     kwargs['units'] = _find_unit(kwargs['units'])
-
-#     graph.add_node(name, io=io, meta=meta)

@@ -9,11 +9,8 @@ import traceback
 import unittest
 import functools
 
-import numpy as np
-
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.utils.notebook_utils import notebook
-from openmdao.utils.indexer import array2slice
 
 
 _under_mpi_cache = None
@@ -374,45 +371,6 @@ else:
             A wrapper for fn that reports possible memory leaks.
         """
         return fn
-
-
-if MPI:
-    def translate_ranks(parent_comm, child_comm, try_slice=False):
-        """
-        Return the child's ranks in the context of the parent communicator.
-
-        Parameters
-        ----------
-        parent_comm : MPI communicator
-            The parent communicator.
-        child_comm : MPI communicator
-            The child communicator.
-        try_slice : bool
-            If True, return a slice instead of a list of ranks if possible.
-
-        Returns
-        -------
-        list of int
-            The child's ranks in the context of the parent communicator.
-        """
-        ranks = MPI.Group.Translate_ranks(child_comm.Get_group(),
-                                          np.arange(child_comm.size),
-                                          parent_comm.Get_group())
-
-        if try_slice:
-            # try to convert ranks to a slice to avoid any unnecessary copying of data in some cases
-            slc = array2slice(np.asarray(ranks))
-            if slc is None:
-                return ranks
-            return slc
-        else:
-            return ranks
-else:
-    def translate_ranks(parent_comm, child_comm, try_slice=False):
-        """
-        Return a full slice if MPI is not active.
-        """
-        return slice(None)
 
 
 if MPI:

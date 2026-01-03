@@ -541,48 +541,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         return self.__class__.__name__
 
-    # def _get_var_sizing_info(self, abs_name, io):
-    #     """
-    #     Get sizing info for a continuous variable.
-    #     """
-    #     allmeta = self._var_allprocs_abs2meta[io]
-    #     locmeta = self._var_abs2meta[io]
-    #     if abs_name in locmeta:
-    #         loc = locmeta[abs_name]
-    #         val = loc['val']
-    #         locshape = loc['shape']
-    #         locsize = loc['size']
-    #     else:
-    #         val = locshape = locsize = None
-
-    #     shape = allmeta[abs_name]['shape']
-    #     size = allmeta[abs_name]['size']
-    #     global_size = allmeta[abs_name]['global_size']
-    #     global_shape = allmeta[abs_name]['global_shape']
-
-    #     if abs_name in self._var_allprocs_abs2idx:
-    #         idx = self._var_allprocs_abs2idx[abs_name]
-    #         sizes = self._var_sizes[io][:, idx]
-    #     else:
-    #         sizes = None
-
-    #     return shape, size, global_shape, global_size, val, locshape, locsize, sizes
-
-    # def _dump_shape_table(self):
-    #     print(self.msginfo)
-    #     print("Inputs:")
-    #     rows = []
-    #     for name in self._var_allprocs_abs2meta['input']:
-    #         rows.append((name,) + self._get_var_sizing_info(name, 'input'))
-    #     generate_table(rows, headers=['Name', 'Shape', 'Size', 'Gshape', 'Gsize',
-    #                                   'Val', 'Lshape', 'Lsize', 'Vsizes']).display()
-    #     print("\n\nOutputs:")
-    #     rows = []
-    #     for name in self._var_allprocs_abs2meta['output']:
-    #         rows.append((name,) + self._get_var_sizing_info(name, 'output'))
-    #     generate_table(rows, headers=['Name', 'Shape', 'Size', 'Gshape', 'Gsize',
-    #                                   'Val', 'Lshape', 'Lsize', 'Vsizes']).display()
-
     if _om_dump:
         @property
         def comm(self):
@@ -762,7 +720,6 @@ class System(object, metaclass=SystemMetaclass):
         sizes = self._var_sizes['output']
         total = self.pathname == ''
         graph = self._get_conn_graph()
-        # szname = 'global_size' if total else 'size'
         start = end = 0
         for of in self._var_abs2meta['output']:
             meta = graph.nodes[('o', of)]['attrs']
@@ -805,7 +762,6 @@ class System(object, metaclass=SystemMetaclass):
         local_outs = self._var_abs2meta['output']
 
         total = self.pathname == ''
-        # szname = 'global_size' if total else 'size'
 
         start = end = 0
         for of, _start, _end, _, dist_sizes in self._get_jac_ofs():
@@ -3826,26 +3782,17 @@ class System(object, metaclass=SystemMetaclass):
             if 'indices' not in meta:
                 meta['indices'] = None
             abs2idx = model._var_allprocs_abs2idx
-            #sizes = model._var_sizes['output']
 
             if src_name in abs2idx:  # var is continuous
-                #vmeta = abs2meta_out[src_name]
                 indices = meta['indices']
                 if indices is not None:
                     # Index defined in this design var.
                     # update src shapes for Indexer objects
-                    #indices.set_src_shape(vmeta['global_shape'])
                     indices.set_src_shape(src_node_meta.global_shape)
-                    #indices = indices.shaped_instance()
                     meta['size'] = meta['global_size'] = indices.indexed_src_size
                 else:
                     meta['size'] = src_node_meta.size
                     meta['global_size'] = src_node_meta.global_size
-                    #if meta['distributed']:
-                        #meta['size'] = sizes[model.comm.rank, abs2idx[src_name]]
-                    #else:
-                        #meta['size'] = sizes[model._owning_rank[src_name], abs2idx[src_name]]
-                    #meta['global_size'] = vmeta['global_size']
             else:
                 meta['global_size'] = meta['size'] = 0  # discrete var
 
@@ -3933,7 +3880,6 @@ class System(object, metaclass=SystemMetaclass):
         """
         model = self._problem_meta['model_ref']()
         graph = model._get_conn_graph()
-        # abs2meta_out = model._var_allprocs_abs2meta['output']
 
         alias = meta['alias']
         prom = meta['name']  # 'usually' a promoted name, but can be absolute
@@ -3969,20 +3915,17 @@ class System(object, metaclass=SystemMetaclass):
             owning_rank = model._owning_rank
 
             if src_name in abs2idx:
-                # out_meta = abs2meta_out[src_name]
 
                 if 'indices' in meta and meta['indices'] is not None:
                     indices = meta['indices']  # already an Indexer object
-                    # indices.set_src_shape(out_meta['global_shape'])
                     indices.set_src_shape(src_node_meta.global_shape)
-                    # indices = indices.shaped_instance()
                     meta['size'] = meta['global_size'] = indices.indexed_src_size
                 else:
                     if dist:
                         meta['size'] = sizes[self.comm.rank, abs2idx[src_name]]
                     else:
                         meta['size'] = sizes[owning_rank[src_name], abs2idx[src_name]]
-                    meta['global_size'] = src_node_meta.global_size # out_meta['global_size']
+                    meta['global_size'] = src_node_meta.global_size
             else:
                 meta['size'] = meta['global_size'] = 0  # discrete var, don't know size
 

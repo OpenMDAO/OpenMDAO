@@ -55,7 +55,7 @@ class TestBalanceComp(unittest.TestCase):
         # set an actual solver, and re-setup. Then check derivatives at a converged point
         prob.model.linear_solver = om.DirectSolver()
         prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
-        
+
         prob.setup()
 
         prob.run_model()

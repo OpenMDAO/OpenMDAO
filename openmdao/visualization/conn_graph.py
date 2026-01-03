@@ -2059,14 +2059,12 @@ class AllConnGraph(nx.DiGraph):
             tgt, tgt_attrs = self.get_node_attrs(group, prom_name, io)
 
         if pinfo is None:
-            src_indices = flat_src_indices = src_shape = None
+            src_indices = src_shape = None
         else:
             src_indices = pinfo.src_indices
-            flat_src_indices = pinfo.flat
             src_shape = pinfo.src_shape
 
-        self.check_add_edge(group, src, tgt, src_indices=src_indices,
-                            flat_src_indices=flat_src_indices)
+        self.check_add_edge(group, src, tgt, src_indices=src_indices)
 
         if src_shape is not None:
             # group input defaults haven't been added yet, so just put src_shape there so we
@@ -2087,7 +2085,7 @@ class AllConnGraph(nx.DiGraph):
         allprocs_discrete_in = group._var_allprocs_discrete['input']
         allprocs_discrete_out = group._var_allprocs_discrete['output']
 
-        for prom_tgt, (prom_src, src_indices, flat) in manual_connections.items():
+        for prom_tgt, (prom_src, src_indices) in manual_connections.items():
             src_io = resolver.get_iotype(prom_src)
             if src_io is None:
                 guesses = get_close_matches(prom_src, list(resolver.prom_iter('output')) +
@@ -2136,8 +2134,7 @@ class AllConnGraph(nx.DiGraph):
             if src_io == 'input' and tgt_io == 'input':
                 self._input_input_conns.add((src_node, tgt_node))
 
-            self.check_add_edge(group, src_node, tgt_node, type='manual', src_indices=src_indices,
-                                flat_src_indices=flat)
+            self.check_add_edge(group, src_node, tgt_node, type='manual', src_indices=src_indices)
 
     def add_group_input_defaults(self, group):
         """
@@ -2292,7 +2289,6 @@ class AllConnGraph(nx.DiGraph):
                     if data.get('src_indices', None) is not None:
                         if edges[edge].get('src_indices', None) is None:
                             edges[edge]['src_indices'] = data['src_indices']
-                            edges[edge]['flat_src_indices'] = data['flat_src_indices']
                 else:
                     if edge[0] not in nodes:
                         pass
@@ -3603,8 +3599,7 @@ class AllConnGraph(nx.DiGraph):
             _, inp_src_prom = self.get_path_prom(inp_src)
             inp_src_prom = model._resolver.abs2prom(self.absnames(inp_src)[0], 'input')
 
-            model._manual_connections[inp_src_prom] = (src_prom, edge_meta.get('src_indices', None),
-                                                       edge_meta.get('flat_src_indices', None))
+            model._manual_connections[inp_src_prom] = (src_prom, edge_meta.get('src_indices', None))
 
     def create_all_conns_dict(self, model):
         """

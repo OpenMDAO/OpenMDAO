@@ -726,20 +726,7 @@ class TestBryoden(unittest.TestCase):
         prob.setup(check=False, force_alloc_complex=True)
         prob.set_solver_print(level=0)
 
-        prob.final_setup()
-
-        # print('inputs')
-        # print(prob.model._inputs.asarray())
-        # print('outputs')
-        # print(prob.model._outputs.asarray())
-
         prob.run_model()
-
-        # print("AFTER RUN MODEL")
-        # print('inputs')
-        # print(prob.model._inputs.asarray())
-        # print('outputs')
-        # print(prob.model._outputs.asarray())
 
         totals = prob.check_totals(method='cs', out_stream=None)
         assert_check_totals(totals)

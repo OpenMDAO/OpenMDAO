@@ -473,9 +473,6 @@ def _get_output_inds(group, abs_out, abs_in):
             offset = offsets[rank]
             output_inds = range(offset, offset + sizes[rank])
 
-        #DBG
-        # print(f"output_inds: {abs_out} {abs_in} {output_inds}")
-        # print("orig_src_inds: None")
         return output_inds, None
 
     else:
@@ -510,7 +507,4 @@ def _get_output_inds(group, abs_out, abs_in):
 
             start = end
 
-        #DBG
-        # om_dump(f"output_inds: {abs_out} {abs_in} {output_inds}")
-        # om_dump(f"orig_src_inds: {orig_src_inds}")
         return output_inds, orig_src_inds

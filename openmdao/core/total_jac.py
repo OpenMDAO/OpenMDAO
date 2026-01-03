@@ -600,7 +600,6 @@ class _TotalJacInfo(object):
 
             source = meta['source']
 
-            #in_var_meta = all_abs2meta_out[source]
             node_meta = graph.nodes[('o', source)]['attrs']
             dist = node_meta.distributed
 
@@ -612,10 +611,6 @@ class _TotalJacInfo(object):
             else:
                 irange = in_idxs.shaped_array(copy=True)
 
-            # if dist:
-            #     end += node_meta.global_size
-            # else:
-            #     end += node_meta.size
             end += len(irange)
 
             cache_lin_sol = meta['cache_linear_solution']

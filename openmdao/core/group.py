@@ -24,11 +24,11 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import _flatten_src_indices, ValueRepeater
 from openmdao.utils.general_utils import shape2tuple, ensure_compatible, \
-    meta2src_iter, is_undefined, env_truthy, collect_errors
+    meta2src_iter, is_undefined, collect_errors
 from openmdao.utils.units import unit_conversion, simplify_unit, _find_unit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
     get_unresolved_knowns, is_unresolved, get_active_edges, are_connected
-from openmdao.utils.mpi import MPI, check_mpi_exceptions  # , translate_ranks
+from openmdao.utils.mpi import MPI, check_mpi_exceptions
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.indexer import indexer, Indexer
 from openmdao.utils.relevance import get_relevance
@@ -50,8 +50,6 @@ import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
 
 
-dump_graphs = env_truthy('DUMP_GRAPHS')
-
 # use a class with slots instead of a namedtuple so that we can
 # change index after creation if needed.
 class _SysInfo(object):
@@ -68,9 +66,9 @@ class _SysInfo(object):
 
 
 class _PromotesInfo(object):
-    __slots__ = ['src_indices', 'flat', 'src_shape', 'promoted_from', 'prom']
+    __slots__ = ['src_indices', 'flat', 'src_shape']
 
-    def __init__(self, src_indices=None, flat=None, src_shape=None, promoted_from='', prom=None):
+    def __init__(self, src_indices=None, flat=None, src_shape=None):
         self.flat = flat
         self.src_shape = src_shape
         if src_indices is not None:
@@ -81,59 +79,6 @@ class _PromotesInfo(object):
                 self.src_indices = indexer(src_indices, src_shape=self.src_shape, flat_src=flat)
         else:
             self.src_indices = None
-        self.promoted_from = promoted_from  # pathname of promoting system
-        self.prom = prom  # local promoted name of input
-
-    def __iter__(self):
-        yield self.src_indices
-        yield self.flat
-        yield self.src_shape
-
-    def __repr__(self):  # pragma no cover
-        return (f"_PromotesInfo(src_indices={self.src_indices}, flat={self.flat}, "
-                f"src_shape={self.src_shape}, promoted_from={self.promoted_from}, "
-                f"prom={self.prom})")
-
-    def copy(self):
-        return _PromotesInfo(self.src_indices.copy(), self.flat, self.src_shape, self.promoted_from,
-                             self.prom)
-
-    def set_src_shape(self, shape):
-        if self.src_indices is not None:
-            self.src_indices.set_src_shape(shape)
-        self.src_shape = shape
-
-    def compare(self, other):
-        """
-        Compare attributes in the two objects.
-
-        Two attributes are considered mismatched only if neither is None and their values
-        are unequal.
-
-        Returns
-        -------
-        list
-            List of unequal atrribute names.
-        """
-        mismatches = []
-
-        if self.flat != other.flat:
-            if self.flat is not None and other.flat is not None:
-                mismatches.append('flat_src_indices')
-
-        if self.src_shape != other.src_shape:
-            if self.src_shape is not None and other.src_shape is not None:
-                mismatches.append('src_shape')
-
-        self_srcinds = None if self.src_indices is None else self.src_indices.as_array()
-        other_srcinds = None if other.src_indices is None else other.src_indices.as_array()
-
-        if isinstance(self_srcinds, np.ndarray) and isinstance(other_srcinds, np.ndarray):
-            if (self_srcinds.shape != other_srcinds.shape or
-                    not np.all(self_srcinds == other_srcinds)):
-                mismatches.append('src_indices')
-
-        return mismatches
 
 
 def _chk_scale_factor(factor):
@@ -237,7 +182,6 @@ class Group(System):
         self._pre_config_group_inputs = {}
         self._static_group_inputs = {}
         self._static_manual_connections = {}
-        # self._static_conn_graph = AllConnGraph()
         self._conn_graph = None
         self._conn_abs_in2out = {}
         self._conn_discrete_in2out = {}
@@ -326,7 +270,7 @@ class Group(System):
         src_shape : int or tuple
             Assumed shape of any connected source or higher level promoted input.
         """
-        meta = {} # {'prom': name, 'auto': False}
+        meta = {}
         if is_undefined(val):
             src_shape = shape2tuple(src_shape)
             meta['val'] = None
@@ -431,7 +375,6 @@ class Group(System):
             Mapping of each absolute var name to its corresponding scaling factor tuple.
         """
         scale_factors = {}
-        graph = self._get_conn_graph()
 
         if self._has_output_scaling or self._has_resid_scaling:
             for abs_name, meta in self._var_allprocs_abs2meta['output'].items():
@@ -458,6 +401,7 @@ class Group(System):
         # This is a combined scale factor that includes the scaling of the connected source
         # and the unit conversion between the source output and each target input.
         if self._has_input_scaling:
+            graph = self._get_conn_graph()
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
             for abs_in, meta_in in self._var_abs2meta['input'].items():
                 src = self._conn_global_abs_in2out[abs_in]
@@ -493,9 +437,6 @@ class Group(System):
 
                 if not has_scaling and not has_unit_conv:
                     continue
-
-                # units_in = meta_in['units']
-                # units_out = src_meta['units']
 
                 src_inds_list = meta_in['src_inds_list']
 
@@ -812,7 +753,6 @@ class Group(System):
         """
         # save a ref to the problem level options.
         self._problem_meta = prob_meta
-        # self._initial_condition_cache = {}
         self._auto_ivc_recorders = []
         self._sys_graph_cache = None
         self._remote_sets = []
@@ -1128,10 +1068,6 @@ class Group(System):
 
         graph = self._get_conn_graph()
         graph.update_all_node_meta(self)
-
-        if dump_graphs:
-            self.display_conn_graph(outfile=f'conn_graph_{self.comm.rank}.svg')
-            self.display_dataflow_graph(outfile=f'dataflow_graph_{self.comm.rank}.svg')
 
         self._check_order()
         self._resolver._check_dup_prom_outs()
@@ -2018,9 +1954,6 @@ class Group(System):
                 self._collect_error(f"{self.msginfo}: Failed to resolve {propstr} for {unresolved}."
                                     f" To see the dynamic {propstr} dependency graph, "
                                     f"do 'openmdao view_dyn_{propstr} <your_py_file>'.")
-                # if prop=='shape' and self.comm.rank == 0:
-                #     from openmdao.visualization.dyn_shape_plot import view_dyn_shapes
-                #     view_dyn_shapes(self, outfile=f'shape_dep_graph_{self.comm.rank}.html')
 
     @collect_errors
     @check_mpi_exceptions
@@ -2263,30 +2196,21 @@ class Group(System):
                               category=UnusedOptionWarning)
 
         else:
-            promoted = inputs if inputs else any
-            try:
-                src_indices = indexer(src_indices, flat_src=flat_src_indices)
-            except Exception:
-                type_exc, exc, tb = sys.exc_info()
-                self._collect_error(f"{self.msginfo}: When promoting {promoted} from "
-                                    f"'{subsys_name}': {exc}", exc_type=type_exc, tback=tb,
-                                    ident=(self.pathname, tuple(promoted)))
-
             if outputs:
                 self._collect_error(f"{self.msginfo}: Trying to promote outputs {outputs} while "
                                     f"specifying src_indices {src_indices} is not meaningful.")
                 return
 
             try:
-                prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape,
-                                         promoted_from=subsys.pathname)
+                prominfo = _PromotesInfo(src_indices, flat_src_indices, src_shape)
             except Exception as err:
                 lst = []
                 if any is not None:
                     lst.extend(any)
                 if inputs is not None:
                     lst.extend(inputs)
-                self._collect_error(f"{self.msginfo}: When promoting {sorted(lst)}: {err}",
+                self._collect_error(f"{self.msginfo}: When promoting {sorted(lst)} from "
+                                    f"'{subsys_name}': {err}",
                                     ident=(self.pathname, tuple(lst)))
                 return
 
@@ -2296,17 +2220,6 @@ class Group(System):
             subsys._var_promotes['input'].extend((i, prominfo) for i in inputs)
         if outputs:
             subsys._var_promotes['output'].extend((o, None) for o in outputs)
-
-        # # check for attempt to promote with different alias
-        # list_comp = [i if isinstance(i, tuple) else (i, i)
-        #              for i, _ in subsys._var_promotes['input']]
-
-        # for original, new in list_comp:
-        #     for original_inside, new_inside in list_comp:
-        #         if original == original_inside and new != new_inside:
-        #             self._collect_error("%s: Trying to promote '%s' when it has been aliased to "
-        #                                 "'%s'." % (self.msginfo, original_inside, new))
-        #             continue
 
         # if this was called during configure(), mark this group as modified
         if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
@@ -2521,7 +2434,7 @@ class Group(System):
         else:
             manual_connections = self._manual_connections
 
-        manual_connections[tgt_name] = (src_name, src_indices, flat_src_indices)
+        manual_connections[tgt_name] = (src_name, src_indices)
 
     def set_order(self, new_order):
         """
@@ -3211,8 +3124,6 @@ class Group(System):
             local_outs = self._var_abs2meta['output']
             graph = self._get_conn_graph()
 
-            # szname = 'global_size' if total else 'size'
-
             seen = set()
             start = end = 0
 
@@ -3233,7 +3144,6 @@ class Group(System):
 
                 if (wrt_matches is None or wrt in wrt_matches) and wrt not in seen:
                     io = 'input' if wrt in abs2meta['input'] else 'output'
-                    # meta = abs2meta[io][wrt]
                     meta = graph.nodes[(io[0], wrt)]['attrs']
                     if total and approx_meta['indices'] is not None:
                         sub_wrt_idx = approx_meta['indices'].as_array()

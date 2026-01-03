@@ -408,9 +408,6 @@ class Indexer(object):
 
         return shape, dist_shape
 
-    def is_contiguous(self):
-        return False
-
 
 class ShapedIntIndexer(Indexer):
     """
@@ -547,9 +544,6 @@ class ShapedIntIndexer(Indexer):
             Int version of self.
         """
         return self._idx
-
-    def is_contiguous(self):
-        return True
 
 
 class IntIndexer(ShapedIntIndexer):
@@ -779,10 +773,6 @@ class ShapedSliceIndexer(Indexer):
         """
         return self.as_array().tolist()
 
-    def is_contiguous(self):
-        if self._slice.step == 1 or self._slice.step is None:
-            return True
-        return False
 
 class SliceIndexer(ShapedSliceIndexer):
     """
@@ -1280,35 +1270,6 @@ class ShapedMultiIndexer(Indexer):
             List or int version of self.
         """
         return self.as_array().tolist()
-
-    def is_contiguous(self):
-        """
-        Check if this multi-indexer is contiguous.
-
-        A multi-indexer is contiguous if all sub-indexers are individually contiguous, or
-        if any dimension uses a full slice, all subsequent dimensions must
-        also use full slices. Otherwise, there will be gaps in the flattened array.
-
-        Returns
-        -------
-        bool
-            True if the multi-indexer is contiguous, False otherwise.
-        """
-        # Check if any dimension uses a full slice
-        # If so, all subsequent dimensions must also use full slices
-        found_full_slice = False
-        for idxer in self._idx_list:
-            # all sub-indexers must be contiguous
-            if not idxer.is_contiguous():
-                return False
-            if idxer.is_full_slice():
-                found_full_slice = True
-            elif found_full_slice:
-                # We found a full slice earlier, but this dimension is not a full slice
-                # This creates gaps, so it's not contiguous
-                return False
-
-        return True
 
 
 class MultiIndexer(ShapedMultiIndexer):

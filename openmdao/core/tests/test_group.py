@@ -2326,7 +2326,7 @@ class TestGroupPromotes(unittest.TestCase):
         self.assertEqual(str(cm.exception),
             "\nCollected errors for problem 'src_indices_wildcard_output':"
             "\n   <model> <class SimpleGroup>: Trying to promote outputs ['*'] "
-            "while specifying src_indices [[0, 2, 4]] is not meaningful.")
+            "while specifying src_indices [0, 2, 4] is not meaningful.")
 
     def test_promotes_src_indices_collision(self):
 

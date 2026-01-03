@@ -10,9 +10,9 @@ from copy import deepcopy
 import weakref
 import pathlib
 import textwrap
+import traceback
 import time
 import atexit
-import traceback
 
 from itertools import chain
 
@@ -650,7 +650,6 @@ class Problem(object, metaclass=ProblemMetaclass):
             record_model_options(self, self._run_counter)
 
             self.model._clear_iprint()
-
             self.model.run_solve_nonlinear()
         finally:
             self._recording_iter.prefix = old_prefix
@@ -1174,7 +1173,6 @@ class Problem(object, metaclass=ProblemMetaclass):
 
                 responses = model.get_responses(recurse=True, use_prom_ivc=True)
                 designvars = model.get_design_vars(recurse=True, use_prom_ivc=True)
-
                 response_size, desvar_size = driver._update_voi_meta(model, responses,
                                                                      designvars)
 
@@ -1241,10 +1239,6 @@ class Problem(object, metaclass=ProblemMetaclass):
             driver._setup_recording()
             self._setup_recording()
             record_viewer_data(self)
-
-        # if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-        #     self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP
-        #     self._set_initial_conditions()
 
         if self.model.comm.size > 1:
             # this updates any source values that are attached to remote inputs
@@ -2229,7 +2223,6 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         abs2idx = model._var_allprocs_abs2idx
         resolver = self.model._resolver
-        # graph = model._get_conn_graph()
 
         if inputs:
             for abs_name in inputs:
