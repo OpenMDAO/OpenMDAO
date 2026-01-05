@@ -1297,8 +1297,6 @@ class AllConnGraph(nx.DiGraph):
         if flat and not node_meta.discrete:
             val = val.ravel()
 
-        # print(f"{self.msginfo}: get_val_from_src: {name} {val}") # DBG
-
         return val
 
     def get_local_abs_in(self, system, name):
@@ -2214,53 +2212,35 @@ class AllConnGraph(nx.DiGraph):
         in_degree = self.in_degree
         nodes = self.nodes
         edges = self.edges
-        for start_node in self.nodes():
-            if in_degree(start_node) == 0:  # src node or dangling input node
-                start_io, name = start_node
-                if start_io == 'o':
-                    own_start = name in vars_to_gather and vars_to_gather[name] == myrank
-                    if own_start:
-                        # include other promoted output nodes
-                        for u, v in nx.dfs_edges(self, start_node):
-                            if u not in nodes_to_send:
-                                nodes_to_send[u] = nodes[u]['attrs'].as_dict()
-                            if v[0] == 'i':
-                                # input nodes 'own' their edge, so bail here
-                                continue
-                            nodes_to_send[v] = nodes[v]['attrs'].as_dict()
-                            edges_to_send[u, v] = edges[u, v]
 
-                    for in_node in self.leaf_input_iter(start_node):
-                        _, abs_in = in_node
-                        own_in = abs_in in vars_to_gather and vars_to_gather[abs_in] == myrank
-                        if own_start or own_in:
-                            path = nx.shortest_path(self, start_node, in_node)
-                            for i, node in enumerate(path):
-                                if node[0] == 'i':
-                                    opath = path[:i]
-                                    ipath = path[i:]
-                                    break
+        for abs_in in chain(model._var_allprocs_abs2meta['input'],
+                            model._var_allprocs_discrete['input']):
+            if abs_in in vars_to_gather and vars_to_gather[abs_in] == myrank:
+                in_node = ('i', abs_in)
+                for inode in self.bfs_up_iter(in_node, include_self=False):
+                    if inode[0] == 'o' or in_degree(inode) == 0:
+                        path = nx.shortest_path(self, inode, in_node)
+                        outstart = inode[0] == 'o'
 
-                            if own_in:
-                                edges_to_send[opath[-1], ipath[0]] = edges[opath[-1], ipath[0]]
-                                for i, p in enumerate(ipath):
-                                    nodes_to_send[p] = nodes[p]['attrs'].as_dict()
-                                    if i > 0:
-                                        edges_to_send[ipath[i-1], p] = edges[ipath[i-1], p]
-                            else:  # own_start
-                                if ipath:
-                                    edges_to_send[opath[-1], ipath[0]] = edges[opath[-1],
-                                                                                    ipath[0]]
-                else:  # dangling input node, may be promoted
-                    for in_node in self.leaf_input_iter(start_node):
-                        _, abs_in = in_node
-                        own_in = abs_in in vars_to_gather and vars_to_gather[abs_in] == myrank
-                        if own_in:
-                            path = nx.shortest_path(self, start_node, in_node)
-                            for i, p in enumerate(path):
+                        for i, p in enumerate(path):
+                            if p not in nodes_to_send and (not outstart or i > 0):
                                 nodes_to_send[p] = nodes[p]['attrs'].as_dict()
-                                if i > 0:
-                                    edges_to_send[path[i-1], p] = edges[path[i-1], p]
+                            if i > 0:
+                                edge = (path[i-1], p)
+                                edges_to_send[edge] = edges[edge]
+
+        for abs_out in chain(model._var_allprocs_abs2meta['output'],
+                             model._var_allprocs_discrete['output']):
+            if abs_out in vars_to_gather and vars_to_gather[abs_out] == myrank:
+                # include other promoted output nodes
+                for u, v in nx.dfs_edges(self, ('o', abs_out)):
+                    if u not in nodes_to_send:
+                        nodes_to_send[u] = nodes[u]['attrs'].as_dict()
+                    edges_to_send[u, v] = edges[u, v]
+                    if v[0] == 'i':
+                        continue
+                    nodes_to_send[v] = nodes[v]['attrs'].as_dict()
+                    # edges_to_send[u, v] = edges[u, v]
 
         graph_info = model.comm.allgather((nodes_to_send, edges_to_send))
 
@@ -2292,10 +2272,11 @@ class AllConnGraph(nx.DiGraph):
                         if edges[edge].get('src_indices', None) is None:
                             edges[edge]['src_indices'] = data['src_indices']
                 else:
-                    if edge[0] not in nodes:
-                        pass
-                    if edge[1] not in nodes:
-                        pass
+                    assert edge[0] in nodes and edge[1] in nodes
+                    # if edge[0] not in nodes:
+                    #     pass
+                    # if edge[1] not in nodes:
+                    #     pass
                     self.add_edge(edge[0], edge[1], **data)
 
     def resolve_from_children(self, model, src_node, node, auto=False):
@@ -3314,16 +3295,16 @@ class AllConnGraph(nx.DiGraph):
         # traverse up the tree from each absolute input node and find its src if it has one
 
         dangling_inputs = set()
-        above_anchors = set()  # inputs nodes directly above an anchor node
+        above_anchors = set()  # input nodes directly above an anchor node
 
         for name in chain(model._var_allprocs_abs2meta['input'],
-                               model._var_allprocs_discrete['input']):
+                          model._var_allprocs_discrete['input']):
             start_node = ('i', name)
             src = None
             stack = [start_node]
             while stack:
                 node = stack.pop()
-                preds = list(pred(node))
+                preds = sorted(pred(node), key=lambda x: x[1])
                 outs = [p for p in preds if p[0] == 'o']
                 ins = [p for p in preds if p[0] == 'i']
                 if outs:
@@ -3351,7 +3332,7 @@ class AllConnGraph(nx.DiGraph):
                         final_dangling_inputs.append(node)
                         found = True
                         break
-                    preds = list(pred(node))
+                    preds = pred(node)
                     assert len(preds) == 1
                     p = preds[0]
                     if p in above_anchors:
@@ -3363,32 +3344,8 @@ class AllConnGraph(nx.DiGraph):
                 if not found:
                     final_dangling_inputs.append(d)
 
-        # # this occurs before the auto_ivc variables actually exist
-        # dangling_inputs = [n for n in nodes() if n[0] == 'i' and in_degree(n) == 0]
-
-        # # because we can have manual connection to input nodes other than the 'root' input node,
-        # # we have to traverse them all to make sure there aren't any outputs connected anywhere
-        # # in the input tree..
-        # skip = set()
-        # for d in dangling_inputs:
-        #     for _, v in dfs_edges(self, d):
-        #         # if v has any output preds, then this input tree is not dangling
-        #         for p in self.predecessors(v):
-        #             if p[0] == 'o':
-        #                 skip.add(d)
-        #                 break
-        #         if d in skip:
-        #             break
-
-        #         if v in self._mult_inconn_nodes:
-        #             skip.add(d)
-        #             break
-
-        # if skip:
-        #     dangling_inputs = [d for d in dangling_inputs if d not in skip]
-
         auto_nodes = []
-        for i, n in enumerate(sorted(final_dangling_inputs)):
+        for i, n in enumerate(sorted(final_dangling_inputs, key=lambda x: x[1])):
             auto_node, _ = self.get_node_attrs(model, f'_auto_ivc.v{i}', 'output')
             self.add_edge(auto_node, n, type='manual')
             auto_nodes.append(auto_node)
@@ -3460,9 +3417,7 @@ class AllConnGraph(nx.DiGraph):
                 self._collect_error(f"{self.msginfo}: Input '{req}'{promstr} requires a "
                                     f"connection but is not connected.")
 
-    def add_implicit_connections(self, model, implicit_conn_vars):
-        # implicit connections are added after all promotions are added, so any implicitly connected
-        # nodes are guaranteed to already exist in the graph.
+    def add_implicit_connections(self, model):
         """Add implicit connections.
 
         Parameters
@@ -3472,7 +3427,12 @@ class AllConnGraph(nx.DiGraph):
         implicit_conn_vars : any
             implicit conn vars.
         """
-        for prom_name in implicit_conn_vars:
+        # implicit connections are added after all promotions are added, so any implicitly connected
+        # nodes are guaranteed to already exist in the graph.
+        opp = {'i': 'o', 'o': 'i'}
+        implicit_conn_vars = {n for io, n in self.nodes() if (opp[io], n) in self}
+
+        for prom_name in sorted(implicit_conn_vars):
             self.check_add_edge(model, ('o', prom_name), ('i', prom_name), type='implicit')
 
     def update_src_inds_lists(self, model):
@@ -3999,7 +3959,7 @@ class AllConnGraph(nx.DiGraph):
         if model.comm.size > 1:
             self.gather_data(model)
 
-        self.add_implicit_connections(model, model._get_implicit_connections())
+        self.add_implicit_connections(model)
 
         # check for cycles
         if not nx.is_directed_acyclic_graph(self):
