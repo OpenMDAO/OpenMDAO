@@ -1414,8 +1414,6 @@ class AllConnGraph(nx.DiGraph):
         if flat and not node_meta.discrete:
             val = val.ravel()
 
-        # print(f"{system.msginfo}: get_val: {name} {val}") # DBG
-
         return val
 
     def inds_into_local_distrib(self, model, src_node, tgt_node, inds):
@@ -1525,8 +1523,9 @@ class AllConnGraph(nx.DiGraph):
         try:
             sval = self.convert_set(val, src_units, tgt_units, (),  units)
         except Exception as err:
-            raise ValueError(f"{system.msginfo}: Can't set value of '{self.msgname(node)}': "
-                             f"{str(err)}")
+            self._collect_error(f"{system.msginfo}: Can't set value of '{self.msgname(node)}': "
+                                f"{str(err)}")
+            return
 
         if node_meta.remote:
             if tgt_inds_list:
@@ -1563,8 +1562,9 @@ class AllConnGraph(nx.DiGraph):
                 try:
                     tval = self.convert_set(val, tgt_units, tgt_units, (),  units)
                 except Exception as err:
-                    raise ValueError(f"{system.msginfo}: Can't set value of '{self.msgname(node)}':"
-                                     f" {str(err)}")
+                    self._collect_error(f"{system.msginfo}: Can't set value of "
+                                        f"'{self.msgname(node)}': {str(err)}")
+                    return
                 if indices is None:
                     model._inputs._abs_set_val(node[1], tval)
                 else:
@@ -1575,15 +1575,17 @@ class AllConnGraph(nx.DiGraph):
             if srcval is not None:
                 if isinstance(srcval, Number):
                     if inds:
-                        raise RuntimeError("Can't set a non-array using indices.")
+                        self._collect_error("Can't set a non-array using indices.")
+                        return
                     src_meta.val = sval
                     srcval = src_meta.val
                 else:
                     self.set_subarray(srcval, inds, sval, node)
             else:
                 if inds:
-                    raise RuntimeError(f"Shape of '{name}' isn't known yet so you can't use "
-                                       f"indices to set it.")
+                    self._collect_error(f"Shape of '{name}' isn't known yet so you can't use "
+                                        f"indices to set it.")
+                    return
                 srcval = sval
 
             # propagate shape and value down the tree
