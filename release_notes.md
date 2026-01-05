@@ -1,3 +1,47 @@
+
+***********************************
+# Release Notes for OpenMDAO 3.42.0
+
+January 07, 2026
+
+OpenMDAO 3.42.0 is our first release for 2026. Happy New Year!
+
+The OpenMDAO repository now defines environments in files for use with [pixi](https://pixi.sh).
+These define the envrionments within which our github continuous integration tests are run.  These are optional, but should provide users a starting point for a functional OpenMDAO environment.
+For more information, check out our [Using Pixi for reproducable environments](https://openmdao.org/newdocs/versions/latest/getting_started/pixi_environment.html).
+OpenMDAO-dependent projects can now also use [our github action](https://openmdao.org/newdocs/versions/latest/getting_started/pixi_environment.html#using-openmdao-s-environments-for-github-actions-in-dependent-projects) to install these environments on github Actions.
+
+Units were added for `inHg60` (inches of mercury at 60 degrees Fahrenheit) and `inHg32`(inches of mercury at 32 degrees Fahrenheit).
+
+We've worked to delay some of the more expensive imports to OpenMDAO until they are actually needed. As a result, `import openmdao.api as om` should be significantly faster than before. In future versions we plan to do the same with the OpenMDAO command-line interface.
+
+## New Features
+
+- Added validation method to semistructured metamodel to warn about internal extrapolation. [#3641](https://github.com/OpenMDAO/OpenMDAO/pull/3641)
+- Handle Jacobians of type dict in addition to BLOBs in CaseReader [#3651](https://github.com/OpenMDAO/OpenMDAO/pull/3651)
+- Import speedup [#3650](https://github.com/OpenMDAO/OpenMDAO/pull/3650)
+- Added inHg60 and inHg32 to unit conversion.  [#3659](https://github.com/OpenMDAO/OpenMDAO/pull/3659)
+- Added pixi environments [#3656](https://github.com/OpenMDAO/OpenMDAO/pull/3656)
+- Added `override_method` for explicit and implicit components [#3660](https://github.com/OpenMDAO/OpenMDAO/pull/3660)
+
+## Bug Fixes
+
+- Simple fix for scalar vars in Group/AutoIVC. [#3626](https://github.com/OpenMDAO/OpenMDAO/pull/3626)
+- UI fixes for realtime plot optimization [#3643](https://github.com/OpenMDAO/OpenMDAO/pull/3643)
+- Fixed some broken cmdline tests [#3633](https://github.com/OpenMDAO/OpenMDAO/pull/3633)
+- Fix behaviour of `LinearRHSChecker.get_solution` for parallel systems [#3639](https://github.com/OpenMDAO/OpenMDAO/pull/3639)
+- Fixed a bug that prevented add_unit from referencing prefixed-units. [#3644](https://github.com/OpenMDAO/OpenMDAO/pull/3644)
+- Fixed constraint logic in simpleGAdriver [#3648](https://github.com/OpenMDAO/OpenMDAO/pull/3648)
+- Fixed error message when shape_by_conn is unresolved and compute_shape is set. [#3657](https://github.com/OpenMDAO/OpenMDAO/pull/3657)
+- Changes to make kriging tests work on windows: [#3664](https://github.com/OpenMDAO/OpenMDAO/pull/3664)
+
+## Miscellaneous
+
+- Added dev-tool used to make release notes. [#3661](https://github.com/OpenMDAO/OpenMDAO/pull/3661)
+- Remove linting tests, replace with ruff [#3662](https://github.com/OpenMDAO/OpenMDAO/pull/3662)
+- Some updates to the `setup_openmdao_pixi` GitHub action to make it usable by others. [#3665](https://github.com/OpenMDAO/OpenMDAO/pull/3665)
+- Changed CSS to allow the docs to make full use of the width of the browser [#3669](https://github.com/OpenMDAO/OpenMDAO/pull/3669)
+
 ***********************************
 # Release Notes for OpenMDAO 3.41.0
 
