@@ -1117,24 +1117,21 @@ def _check_output_shapes(self):
         except AttributeError:
             computed.append(None)
 
-    computed_out_shapes = {}
-    for name, oshape in zip(self._var_rel_names['output'], computed):
+    computed_out_shapes = []
+    for oshape in computed:
         if oshape == (0,):
             oshape = ()
-        computed_out_shapes[name] = oshape
+        computed_out_shapes.append(oshape)
 
     if len(output_shapes) != len(computed_out_shapes):
-        raise RuntimeError(f"{self.msginfo}: Output shapes {output_shapes} don't match "
-                           f"expected shapes {computed_out_shapes}.")
-
+        raise RuntimeError(f"{self.msginfo}: Output shapes {computed_out_shapes} don't match "
+                           f"expected shapes {output_shapes}.")
 
     bad = []
-    for shape_tup, computed_tup in zip(output_shapes.items(), computed_out_shapes.items()):
+    for shape_tup, comp_shape in zip(output_shapes.items(), computed_out_shapes):
         name, shape = shape_tup
-        exname, comp_shape = computed_tup
         if shape != comp_shape:
-            assert name == exname
-            bad.append(f"Shape mismatch for output '{exname}': expected {shape} but "
+            bad.append(f"Shape mismatch for output '{name}': expected {shape} but "
                        f"got {comp_shape}.")
 
     if bad:
