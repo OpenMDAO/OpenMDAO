@@ -125,13 +125,63 @@ class DotProductMultDiscretePrimal(om.JaxExplicitComponent):
         return (z, zz, disc_out)
 
 
+class BadShape(om.JaxExplicitComponent):
+    def setup(self):
+        self.add_input('x', shape=(2,3))
+        self.add_input('y', shape=(3,4))
+        self.add_output('z', shape=(2,3))
+        self.add_output('zz', shape=())
+
+        self.add_discrete_input('disc_in', val=2)
+        self.add_discrete_output('disc_out', val=3)
+
+    def compute_primal(self, x, y, disc_in):
+        def pos(x, y):
+            return jnp.dot(x, y), y * 3.0
+
+        def neg(x, y):
+            return -jnp.dot(x, y), y * 2.5
+
+        disc_out = -disc_in
+        z, zz = jax.lax.cond(disc_in >= 0, pos, neg, x, y)
+
+        return (z, zz, disc_out)
+
+
 x_shape = (2, 3)
 y_shape = (3, 4)
 method_dict = {'fd': 'cs', 'cs': 'fd', 'jax': 'fd'}
 
 
-@unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
+@unittest.skipIf(jax is None, 'jax is not available')
 class TestJaxComp(unittest.TestCase):
+    @parameterized.expand(itertools.product(['fwd', 'rev']), name_func=parameterized_name)
+    def test_shape_check(self, mode):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones((2,3))))
+        ivc.add_output('y', val=np.ones((3,4)))
+        ivc.add_discrete_output('disc_out', val=3)
+        comp = p.model.add_subsystem('comp', BadShape())
+
+        p.model.connect('ivc.x', 'comp.x')
+        p.model.connect('ivc.y', 'comp.y')
+        p.model.connect('ivc.disc_out', 'comp.disc_in')
+
+        p.setup(mode=mode)
+
+        x = np.arange(1,np.prod(x_shape)+1).reshape(x_shape) * 2.0
+        y = np.arange(1,np.prod(y_shape)+1).reshape(y_shape)* 3.0
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        p.final_setup()
+
+        with self.assertRaises(Exception) as cm:
+            p.run_model()
+
+        msg = ("'comp' <class BadShape>:"
+               "\n   Shape mismatch for output 'z': expected (2, 3) but got (2, 4)."
+               "\n   Shape mismatch for output 'zz': expected () but got (3, 4).")
+        self.assertEqual(cm.exception.args[0], msg)
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], ['matfree', 'jac'], ['jax', 'fd'],
                                             ['coloring', 'nocoloring']),
@@ -450,120 +500,118 @@ class TestJaxComp(unittest.TestCase):
                           ('G.comp.z', 'G.comp.z')})
 
 
-if sys.version_info >= (3, 9):
+class CompRetValue(om.JaxExplicitComponent):
+    def __init__(self, shape, nins=1, nouts=1, **kwargs):
+        self.compute_primal = getattr(self, f'compute_primal_{nins}_{nouts}')
+        super().__init__(**kwargs)
+        self.shape = shape
+        self.nins = nins
+        self.nouts = nouts
 
-    class CompRetValue(om.JaxExplicitComponent):
-        def __init__(self, shape, nins=1, nouts=1, **kwargs):
-            self.compute_primal = getattr(self, f'compute_primal_{nins}_{nouts}')
-            super().__init__(**kwargs)
-            self.shape = shape
-            self.nins = nins
-            self.nouts = nouts
-
-        def setup(self):
-            if self.shape == ():
-                for i in range(self.nins):
-                    self.add_input(f'x{i}', val=1.)
-                for i in range(self.nouts):
-                    self.add_output(f'y{i}', val=0.)
-            else:
-                for i in range(self.nins):
-                    self.add_input(f'x{i}', val=jnp.ones(self.shape))
-                for i in range(self.nouts):
-                    self.add_output(f'y{i}', val=jnp.zeros(self.shape))
-
-        def setup_partials(self):
-            self.declare_partials('*', '*')
-
-        def compute_primal_1_1(self, x0):
-            return x0**2
-
-        def compute_primal_2_1(self, x0, x1):
-            return x0**2 + x1**2
-
-        def compute_primal_1_2(self, x0):
-            return x0**2, x0*2
-
-        def compute_primal_2_2(self, x0, x1):
-            return x0**2, x1**2
-
-
-    class CompRetTuple(om.JaxExplicitComponent):
-        def __init__(self, shape, nins=1, nouts=1, **kwargs):
-            self.compute_primal = getattr(self, f'compute_primal_{nins}_{nouts}')
-            super().__init__(**kwargs)
-            self.shape = shape
-            self.nins = nins
-            self.nouts = nouts
-
-        def setup(self):
-            if self.shape == ():
-                for i in range(self.nins):
-                    self.add_input(f'x{i}', val=1.)
-                for i in range(self.nouts):
-                    self.add_output(f'y{i}', val=0.)
-            else:
-                for i in range(self.nins):
-                    self.add_input(f'x{i}', val=jnp.ones(self.shape))
-                for i in range(self.nouts):
-                    self.add_output(f'y{i}', val=jnp.zeros(self.shape))
-
-        def setup_partials(self):
-            self.declare_partials('*', '*')
-
-        def compute_primal_1_1(self, x0):
-            return (x0**2,)
-
-        def compute_primal_2_1(self, x0, x1):
-            return (x0**2 + x1**2,)
-
-        def compute_primal_1_2(self, x0):
-            return (x0**2, x0*2)
-
-        def compute_primal_2_2(self, x0, x1):
-            return (x0**2, x1**2)
-
-
-    class TopGrp(om.Group):
-        def __init__(self, shape, ret_tuple=False, nins=1, nouts=1, matrix_free=False, derivs_method='jax',
-                     use_coloring=False, **kwargs):
-            super().__init__(**kwargs)
-            self.shape = shape
-            self.ret_tuple = ret_tuple
-            self.nins = nins
-            self.nouts = nouts
-            self.matrix_free = matrix_free if derivs_method == 'jax' else False
-            self.derivs_method = derivs_method
-            self.use_coloring = use_coloring
-
-        def setup(self):
-            self.add_subsystem('ivc', om.IndepVarComp())
-            if self.shape == ():
-                for i in range(self.nins):
-                    self.ivc.add_output(f'x{i}', 0.)
-
-                if self.ret_tuple:
-                    comp = self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins,
-                                                                   nouts=self.nouts, derivs_method=self.derivs_method))
-                else:
-                    comp = self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins,
-                                                                   nouts=self.nouts, derivs_method=self.derivs_method))
-            else:
-                for i in range(self.nins):
-                    self.ivc.add_output(f'x{i}', np.zeros(self.shape))
-                if self.ret_tuple:
-                    comp = self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins,
-                                                                   nouts=self.nouts, derivs_method=self.derivs_method))
-                else:
-                    comp = self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins,
-                                                                   nouts=self.nouts, derivs_method=self.derivs_method))
-
-            comp.matrix_free = self.matrix_free
-            if self.use_coloring:
-                comp.declare_coloring()
-
+    def setup(self):
+        if self.shape == ():
             for i in range(self.nins):
-                self.connect(f'ivc.x{i}', f'comp.x{i}')
+                self.add_input(f'x{i}', val=1.)
+            for i in range(self.nouts):
+                self.add_output(f'y{i}', val=0.)
+        else:
+            for i in range(self.nins):
+                self.add_input(f'x{i}', val=jnp.ones(self.shape))
+            for i in range(self.nouts):
+                self.add_output(f'y{i}', val=jnp.zeros(self.shape))
+
+    def setup_partials(self):
+        self.declare_partials('*', '*')
+
+    def compute_primal_1_1(self, x0):
+        return x0**2
+
+    def compute_primal_2_1(self, x0, x1):
+        return x0**2 + x1**2
+
+    def compute_primal_1_2(self, x0):
+        return x0**2, x0*2
+
+    def compute_primal_2_2(self, x0, x1):
+        return x0**2, x1**2
+
+
+class CompRetTuple(om.JaxExplicitComponent):
+    def __init__(self, shape, nins=1, nouts=1, **kwargs):
+        self.compute_primal = getattr(self, f'compute_primal_{nins}_{nouts}')
+        super().__init__(**kwargs)
+        self.shape = shape
+        self.nins = nins
+        self.nouts = nouts
+
+    def setup(self):
+        if self.shape == ():
+            for i in range(self.nins):
+                self.add_input(f'x{i}', val=1.)
+            for i in range(self.nouts):
+                self.add_output(f'y{i}', val=0.)
+        else:
+            for i in range(self.nins):
+                self.add_input(f'x{i}', val=jnp.ones(self.shape))
+            for i in range(self.nouts):
+                self.add_output(f'y{i}', val=jnp.zeros(self.shape))
+
+    def setup_partials(self):
+        self.declare_partials('*', '*')
+
+    def compute_primal_1_1(self, x0):
+        return (x0**2,)
+
+    def compute_primal_2_1(self, x0, x1):
+        return (x0**2 + x1**2,)
+
+    def compute_primal_1_2(self, x0):
+        return (x0**2, x0*2)
+
+    def compute_primal_2_2(self, x0, x1):
+        return (x0**2, x1**2)
+
+
+class TopGrp(om.Group):
+    def __init__(self, shape, ret_tuple=False, nins=1, nouts=1, matrix_free=False, derivs_method='jax',
+                    use_coloring=False, **kwargs):
+        super().__init__(**kwargs)
+        self.shape = shape
+        self.ret_tuple = ret_tuple
+        self.nins = nins
+        self.nouts = nouts
+        self.matrix_free = matrix_free if derivs_method == 'jax' else False
+        self.derivs_method = derivs_method
+        self.use_coloring = use_coloring
+
+    def setup(self):
+        self.add_subsystem('ivc', om.IndepVarComp())
+        if self.shape == ():
+            for i in range(self.nins):
+                self.ivc.add_output(f'x{i}', 0.)
+
+            if self.ret_tuple:
+                comp = self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins,
+                                                                nouts=self.nouts, derivs_method=self.derivs_method))
+            else:
+                comp = self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins,
+                                                                nouts=self.nouts, derivs_method=self.derivs_method))
+        else:
+            for i in range(self.nins):
+                self.ivc.add_output(f'x{i}', np.zeros(self.shape))
+            if self.ret_tuple:
+                comp = self.add_subsystem('comp', CompRetTuple(shape=self.shape, nins=self.nins,
+                                                                nouts=self.nouts, derivs_method=self.derivs_method))
+            else:
+                comp = self.add_subsystem('comp', CompRetValue(shape=self.shape, nins=self.nins,
+                                                                nouts=self.nouts, derivs_method=self.derivs_method))
+
+        comp.matrix_free = self.matrix_free
+        if self.use_coloring:
+            comp.declare_coloring()
+
+        for i in range(self.nins):
+            self.connect(f'ivc.x{i}', f'comp.x{i}')
 
 
 

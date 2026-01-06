@@ -771,6 +771,7 @@ def _re_init(self):
     self._static_hash = None
     self._jac_colored_ = None
     self._output_shapes = None
+    self._do_shape_check = True
 
 
 def _get_differentiable_compute_primal(self, discrete_inputs):
@@ -1092,6 +1093,53 @@ def _jax_derivs2partials(self, deriv_vals, partials, ofnames, wrtnames):
                 partials[ofname, wrtname] = dvals
             else:
                 partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
+
+
+def _check_output_shapes(self):
+    """
+    Compare declared output shapes of compute_primal to those computed by jax.eval_shape.
+    """
+    rel_vars = self._var_rel2meta
+    output_shapes = {n: rel_vars[n]['shape'] for n in self._var_rel_names['output']}
+
+    discrete_inputs = self._discrete_inputs.values() if self._discrete_inputs else ()
+    differentiable_cp = _get_differentiable_compute_primal(self, discrete_inputs)
+
+    tracing_args = self._get_compute_primal_tracing_args()
+    retvals = jax.eval_shape(differentiable_cp, *tracing_args)
+    if not isinstance(retvals, tuple):
+        retvals = (retvals,)
+
+    computed = []
+    for val in retvals:
+        try:
+            computed.append(val.shape)
+        except AttributeError:
+            computed.append(None)
+
+    computed_out_shapes = {}
+    for name, oshape in zip(self._var_rel_names['output'], computed):
+        if oshape == (0,):
+            oshape = ()
+        computed_out_shapes[name] = oshape
+
+    if len(output_shapes) != len(computed_out_shapes):
+        raise RuntimeError(f"{self.msginfo}: Output shapes {output_shapes} don't match "
+                           f"expected shapes {computed_out_shapes}.")
+
+
+    bad = []
+    for shape_tup, computed_tup in zip(output_shapes.items(), computed_out_shapes.items()):
+        name, shape = shape_tup
+        exname, comp_shape = computed_tup
+        if shape != comp_shape:
+            assert name == exname
+            bad.append(f"Shape mismatch for output '{exname}': expected {shape} but "
+                       f"got {comp_shape}.")
+
+    if bad:
+        msg =  '\n   '.join(bad)
+        raise RuntimeError(f"{self.msginfo}:\n   {msg}")
 
 
 def _to_compute_primal_setup_parser(parser):

@@ -9,11 +9,11 @@ from functools import partial
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, \
+from openmdao.utils.jax_utils import jax, jit, jnp, \
     _jax_register_pytree_class, _compute_sparsity, get_vmap_tangents, \
     _update_subjac_sparsity, _jax_derivs2partials, _jax2np, \
     _ensure_returns_tuple, _compute_output_shapes, _update_add_input_kwargs, \
-    _update_add_output_kwargs, _get_differentiable_compute_primal, _re_init
+    _update_add_output_kwargs, _get_differentiable_compute_primal, _re_init, _check_output_shapes
 from openmdao.utils.code_utils import get_return_names, get_function_deps
 
 
@@ -235,6 +235,19 @@ class JaxExplicitComponent(ExplicitComponent):
             Always returns False.
         """
         return False
+
+    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+        if self._do_shape_check:
+            _check_output_shapes(self)
+            self._do_shape_check = False
+
+        super().compute(inputs, outputs, discrete_inputs, discrete_outputs)
+
+    def _get_compute_primal_tracing_args(self):
+        args = []
+        for name in self._var_rel_names['input']:
+            args.append(jax.ShapeDtypeStruct(self._var_rel2meta[name]['shape'], jnp.float64))
+        return args
 
     def _get_jax_compute_primal(self, discrete_inputs, need_jit):
         """

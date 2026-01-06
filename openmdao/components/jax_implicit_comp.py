@@ -10,11 +10,11 @@ from functools import partial
 
 from openmdao.core.implicitcomponent import ImplicitComponent
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, _jax_register_pytree_class, \
+from openmdao.utils.jax_utils import jax, jit, jnp, _jax_register_pytree_class, \
     _compute_sparsity, get_vmap_tangents, _update_subjac_sparsity, \
     _jax_derivs2partials, _ensure_returns_tuple, _update_add_input_kwargs, \
     _update_add_output_kwargs, _re_init, _get_differentiable_compute_primal, \
-    _jax2np, _compute_output_shapes
+    _jax2np, _compute_output_shapes, _check_output_shapes
 from openmdao.utils.code_utils import get_return_names, get_function_deps
 
 
@@ -104,6 +104,29 @@ class JaxImplicitComponent(ImplicitComponent):
                 if name is None:
                     name = f'out_{i}'
                 self.add_output(name)
+
+    def _get_compute_primal_tracing_args(self):
+        """
+        Return shapes of continuous args only.
+
+        Returns
+        -------
+        list
+            The list of shapes of continuous args.
+        """
+        args = []
+        for name in self._var_rel_names['input']:
+            args.append(jax.ShapeDtypeStruct(self._var_rel2meta[name]['shape'], jnp.float64))
+        for name in self._var_rel_names['output']:
+            args.append(jax.ShapeDtypeStruct(self._var_rel2meta[name]['shape'], jnp.float64))
+        return args
+
+    def _solve_nonlinear(self):
+        if self._do_shape_check:
+            _check_output_shapes(self)
+            self._do_shape_check = False
+
+        super()._solve_nonlinear()
 
     def add_input(self, name, **kwargs):
         """
@@ -541,3 +564,9 @@ class JaxImplicitComponent(ImplicitComponent):
             self._output_shapes = {n: shp for n, shp in zip(self._var_rel_names['output'],
                                                             out_shapes)}
         return self._output_shapes[name]
+    
+    def _solve_nonlinear(self):
+        if self._do_shape_check:
+            _check_output_shapes(self)
+            self._do_shape_check = False
+        super()._solve_nonlinear()

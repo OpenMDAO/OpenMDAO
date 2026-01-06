@@ -118,6 +118,12 @@ class JaxLinearSystemCompPrimalwOption(om.JaxImplicitComponent):
         return A.dot(x + self.options['adder']) - b
 
 
+class BadShapeJaxLinearSystemCompPrimalwOption(JaxLinearSystemCompPrimalwOption):
+
+    def compute_primal(self, A, b, x):
+        return (A.dot(x + self.options['adder']) - b)[0]
+
+
 class JaxLinearSystemCompPrimalwDiscrete(om.JaxImplicitComponent):
 
     def initialize(self):
@@ -248,6 +254,34 @@ class TestJaxImplicitComp(unittest.TestCase):
                                               abs_err_tol=2e-4, rel_err_tol=3e-6, show_only_incorrect=True),
                             atol=2e-4, rtol=3e-6)
         assert_check_partials(prob.check_partials(show_only_incorrect=True), rtol=1e-5)
+
+    @parameterized.expand(itertools.product(['fwd', 'rev']), name_func=parameterized_name)
+    def test_jax_bad_shape_lin_system_primal_w_option(self, mode):
+        A = np.array([[1., 1., 1.], [1., 2., 3.], [0., 1., 3.]])
+        b = np.array([1, 2, -3])
+
+        prob = om.Problem()
+
+        ivc = prob.model.add_subsystem('ivc', om.IndepVarComp())
+        ivc.add_output('A', A)
+        ivc.add_output('b', b)
+
+        lingrp = prob.model.add_subsystem('lingrp', om.Group())
+        lin = lingrp.add_subsystem('lin', BadShapeJaxLinearSystemCompPrimalwOption(size=3))
+
+        prob.model.connect('ivc.A', 'lingrp.lin.A')
+        prob.model.connect('ivc.b', 'lingrp.lin.b')
+
+        prob.setup(mode=mode)
+        prob.set_val('ivc.A', A)
+        prob.set_val('ivc.b', b)
+
+        with self.assertRaises(Exception) as cm:
+            prob.run_model()
+
+        msg = ("'lingrp.lin' <class BadShapeJaxLinearSystemCompPrimalwOption>:"
+               "\n   Shape mismatch for output 'x': expected (3,) but got ().")
+        self.assertEqual(cm.exception.args[0], msg)
 
     @parameterized.expand(itertools.product(['fwd', 'rev'], ['matfree', '']), name_func=parameterized_name)
     def test_jax_lin_system_primal_w_discrete(self, mode, matrix_free):
