@@ -2273,10 +2273,6 @@ class AllConnGraph(nx.DiGraph):
                             edges[edge]['src_indices'] = data['src_indices']
                 else:
                     assert edge[0] in nodes and edge[1] in nodes
-                    # if edge[0] not in nodes:
-                    #     pass
-                    # if edge[1] not in nodes:
-                    #     pass
                     self.add_edge(edge[0], edge[1], **data)
 
     def resolve_from_children(self, model, src_node, node, auto=False):
@@ -3304,7 +3300,7 @@ class AllConnGraph(nx.DiGraph):
             stack = [start_node]
             while stack:
                 node = stack.pop()
-                preds = sorted(pred(node), key=lambda x: x[1])
+                preds = list(pred(node))
                 outs = [p for p in preds if p[0] == 'o']
                 ins = [p for p in preds if p[0] == 'i']
                 if outs:
@@ -3332,7 +3328,7 @@ class AllConnGraph(nx.DiGraph):
                         final_dangling_inputs.append(node)
                         found = True
                         break
-                    preds = pred(node)
+                    preds = list(pred(node))
                     assert len(preds) == 1
                     p = preds[0]
                     if p in above_anchors:
@@ -4010,8 +4006,6 @@ class AllConnGraph(nx.DiGraph):
 
             system._resolver._conns = model._conn_global_abs_in2out
 
-        # model._setup_var_sizes()
-
     def create_node_label(self, node):
         """Create the label for a displayed node.
 
@@ -4062,7 +4056,8 @@ class AllConnGraph(nx.DiGraph):
                 if ambig:
                     content = '?'
 
-            if (content is None or content is False) and not show_always:
+            if (content is None or content is False or (isinstance(content, list) and not content))\
+                  and not show_always:
                 return ''
 
             if max_width is not None:
@@ -4104,7 +4099,7 @@ class AllConnGraph(nx.DiGraph):
         rows.append(get_table_row('units_by_conn', meta))
         rows.append(get_table_row('copy_units', meta))
         rows.append(get_table_row('discrete', meta))
-        rows.append(get_table_row('distributed', meta, show_always=True))
+        rows.append(get_table_row('distributed', meta))
         rows.append(get_table_row('remote', meta))
         rows = [r for r in rows if r]
 
