@@ -1682,6 +1682,21 @@ class Group(System):
         """
         return self._owned_output_sizes[self.comm.rank, self._var_allprocs_abs2idx[abs_name]]
 
+    def _get_implicit_connections(self):
+        """
+        Return a set of promoted variable names where an output and an input match.
+        """
+        if self.pathname:
+            implicit_connections = {self.pathname + '.' + n
+                                    for n in self._resolver.get_implicit_conns()}
+        else:
+            implicit_connections = self._resolver.get_implicit_conns()
+        for subsys in self._sorted_subsystems_myproc:
+            if isinstance(subsys, Group):
+                implicit_connections.update(subsys._get_implicit_connections())
+
+        return implicit_connections
+
     def get_indep_vars(self, local, include_discrete=False):
         """
         Return a dict of independant variables contained in this group or any of its subgroups.

@@ -3413,7 +3413,9 @@ class AllConnGraph(nx.DiGraph):
                 self._collect_error(f"{self.msginfo}: Input '{req}'{promstr} requires a "
                                     f"connection but is not connected.")
 
-    def add_implicit_connections(self, model):
+    def add_implicit_connections(self, model, implicit_conn_vars):
+        # implicit connections are added after all promotions are added, so any implicitly connected
+        # nodes are guaranteed to already exist in the graph.
         """Add implicit connections.
 
         Parameters
@@ -3423,12 +3425,7 @@ class AllConnGraph(nx.DiGraph):
         implicit_conn_vars : any
             implicit conn vars.
         """
-        # implicit connections are added after all promotions are added, so any implicitly connected
-        # nodes are guaranteed to already exist in the graph.
-        opp = {'i': 'o', 'o': 'i'}
-        implicit_conn_vars = {n for io, n in self.nodes() if (opp[io], n) in self}
-
-        for prom_name in sorted(implicit_conn_vars):
+        for prom_name in implicit_conn_vars:
             self.check_add_edge(model, ('o', prom_name), ('i', prom_name), type='implicit')
 
     def update_src_inds_lists(self, model):
@@ -3955,7 +3952,7 @@ class AllConnGraph(nx.DiGraph):
         if model.comm.size > 1:
             self.gather_data(model)
 
-        self.add_implicit_connections(model)
+        self.add_implicit_connections(model, model._get_implicit_connections())
 
         # check for cycles
         if not nx.is_directed_acyclic_graph(self):
