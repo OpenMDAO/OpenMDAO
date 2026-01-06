@@ -1717,14 +1717,14 @@ class AllConnGraph(nx.DiGraph):
 
         self.add_edge(src, tgt, **kwargs)
 
-    def node_name(self, system, name, io):
+    def node_name(self, pathname, name, io):
         """
         Return the name of a node.
 
         Parameters
         ----------
-        system : System
-            The system.
+        pathname : str
+            The pathname of the scoping system.
         name : str
             The name of the variable.
         io : str
@@ -1735,15 +1735,15 @@ class AllConnGraph(nx.DiGraph):
         tuple of the form ('i' or 'o', name)
             The node name.
         """
-        return (io[0], system.pathname + '.' + name if system.pathname else name)
+        return (io[0], pathname + '.' + name if pathname else name)
 
-    def get_node_attrs(self, system, name, io):
+    def get_node_attrs(self, pathname, name, io):
         """
         Get attrs from a node, adding the node if necessary.
         """
-        node = self.node_name(system, name, io)
+        node = self.node_name(pathname, name, io)
         if node not in self:
-            attrs = NodeAttrs(pathname=system.pathname, rel_name=name)
+            attrs = NodeAttrs(pathname=pathname, rel_name=name)
             self.add_node(node, attrs=attrs)
         else:
             attrs = self.nodes[node]['attrs']
@@ -1844,7 +1844,7 @@ class AllConnGraph(nx.DiGraph):
         io : str
             The I/O type of the variable, either 'input' or 'output'.
         """
-        node, node_meta = self.get_node_attrs(model, name, io)
+        node, node_meta = self.get_node_attrs('', name, io[0])
         node_meta.discrete = False
 
         self.set_model_meta(model, node, meta, locmeta)
@@ -1875,7 +1875,7 @@ class AllConnGraph(nx.DiGraph):
         io : str
             The I/O type of the variable, either 'input' or 'output'.
         """
-        node, node_meta = self.get_node_attrs(model, name, io)
+        node, node_meta = self.get_node_attrs('', name, io[0])
         node_meta.discrete = True
         self.set_model_meta(model, node, meta, locmeta)
 
@@ -2052,11 +2052,11 @@ class AllConnGraph(nx.DiGraph):
             The promotion information.
         """
         if io == 'input':
-            src, _ = self.get_node_attrs(group, prom_name, io)
-            tgt, tgt_attrs = self.get_node_attrs(subsys, sub_prom, io)
+            src, _ = self.get_node_attrs(group.pathname, prom_name, io[0])
+            tgt, tgt_attrs = self.get_node_attrs(subsys.pathname, sub_prom, io[0])
         else:
-            src, _ = self.get_node_attrs(subsys, sub_prom, io)
-            tgt, tgt_attrs = self.get_node_attrs(group, prom_name, io)
+            src, _ = self.get_node_attrs(subsys.pathname, sub_prom, io[0])
+            tgt, tgt_attrs = self.get_node_attrs(group.pathname, prom_name, io[0])
 
         if pinfo is None:
             src_indices = src_shape = None
@@ -2128,8 +2128,8 @@ class AllConnGraph(nx.DiGraph):
                                      f"for connection from '{prom_src}' to '{prom_tgt}'.")
                 continue
 
-            src_node, _ = self.get_node_attrs(group, prom_src, src_io)
-            tgt_node, _ = self.get_node_attrs(group, prom_tgt, tgt_io)
+            src_node, _ = self.get_node_attrs(group.pathname, prom_src, src_io[0])
+            tgt_node, _ = self.get_node_attrs(group.pathname, prom_tgt, tgt_io[0])
 
             if src_io == 'input' and tgt_io == 'input':
                 self._input_input_conns.add((src_node, tgt_node))
@@ -2154,7 +2154,7 @@ class AllConnGraph(nx.DiGraph):
                     notfound.append(name)
                     continue
 
-            node, node_meta = self.get_node_attrs(group, name, 'input')
+            node, node_meta = self.get_node_attrs(group.pathname, name, 'i')
 
             defaults = node_meta.defaults
 
@@ -3342,7 +3342,7 @@ class AllConnGraph(nx.DiGraph):
 
         auto_nodes = []
         for i, n in enumerate(sorted(final_dangling_inputs, key=lambda x: x[1])):
-            auto_node, _ = self.get_node_attrs(model, f'_auto_ivc.v{i}', 'output')
+            auto_node, _ = self.get_node_attrs('', f'_auto_ivc.v{i}', 'o')
             self.add_edge(auto_node, n, type='manual')
             auto_nodes.append(auto_node)
 
@@ -3425,8 +3425,10 @@ class AllConnGraph(nx.DiGraph):
         implicit_conn_vars : any
             implicit conn vars.
         """
-        for prom_name in implicit_conn_vars:
-            self.check_add_edge(model, ('o', prom_name), ('i', prom_name), type='implicit')
+        for pathname, relname in implicit_conn_vars:
+            onode, _ = self.get_node_attrs(pathname, relname, 'o')
+            inode, _ = self.get_node_attrs(pathname, relname, 'i')
+            self.check_add_edge(model, onode, inode, type='implicit')
 
     def update_src_inds_lists(self, model):
         # propagate src_indices down the tree, but don't update shapes because we don't
@@ -3949,10 +3951,12 @@ class AllConnGraph(nx.DiGraph):
         for g in groups:
             self.add_group_input_defaults(g)
 
+        self.add_implicit_connections(model, model._get_implicit_connections())
+
         if model.comm.size > 1:
             self.gather_data(model)
 
-        self.add_implicit_connections(model, model._get_implicit_connections())
+        # self.add_implicit_connections(model, model._get_implicit_connections())
 
         # check for cycles
         if not nx.is_directed_acyclic_graph(self):

@@ -1686,11 +1686,8 @@ class Group(System):
         """
         Return a set of promoted variable names where an output and an input match.
         """
-        if self.pathname:
-            implicit_connections = {self.pathname + '.' + n
-                                    for n in self._resolver.get_implicit_conns()}
-        else:
-            implicit_connections = self._resolver.get_implicit_conns()
+        implicit_connections = {(self.pathname, n)
+                                for n in self._resolver.get_implicit_conns()}
         for subsys in self._sorted_subsystems_myproc:
             if isinstance(subsys, Group):
                 implicit_connections.update(subsys._get_implicit_connections())
