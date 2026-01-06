@@ -388,6 +388,8 @@ def _conn_graph_setup_parser(parser):
                           'It displays the connection graph for the specified variable or system.')
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('--problem', action='store', dest='problem', help='Problem name')
+    parser.add_argument('-v', '--varname', action='store', dest='varname',
+                        help='Show connection tree containing the given variable.')
     parser.add_argument('--port', action='store', dest='port', help='Port number')
 
 
@@ -411,7 +413,10 @@ def _conn_graph_cmd(options, user_args):
         model : System
             Model owning the connection graph.
         """
-        model._get_conn_graph().serve(port=options.port)
+        if options.varname:
+            model._get_conn_graph().display(varname=options.varname)
+        else:
+            model._get_conn_graph().serve(port=options.port)
 
     # register the hooks
     def _set_dyn_hook(prob):
