@@ -554,7 +554,7 @@ jobs:
           # baseline versions
           - NAME: Windows Baseline
             PY: '3.12'
-            NUMPY: '2.3'
+            NUMPY: '2.2'
             SCIPY: '1.13'
             PYOPTSPARSE: '2.14.0'
             BANDIT: true
