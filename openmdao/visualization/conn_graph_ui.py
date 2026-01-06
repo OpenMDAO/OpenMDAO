@@ -22,6 +22,15 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
     """
     Custom handler for serving the connection graph web interface.
 
+    Parameters
+    ----------
+    conn_graph : AllConnGraph
+        Connection graph instance used to serve UI requests.
+    *args : list
+        Positional arguments passed to the base handler.
+    **kwargs : dict
+        Keyword arguments passed to the base handler.
+
     Attributes
     ----------
     conn_graph : AllConnGraph
@@ -29,22 +38,16 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
     """
 
     def __init__(self, conn_graph, *args, **kwargs):
-        """Initialize the handler.
-
-        Parameters
-        ----------
-        conn_graph : AllConnGraph
-            Connection graph instance used to serve UI requests.
-        *args : list
-            Positional arguments passed to the base handler.
-        **kwargs : dict
-            Keyword arguments passed to the base handler.
+        """
+        Initialize the handler.
         """
         self.conn_graph = conn_graph
         super().__init__(*args, **kwargs)
 
     def do_GET(self):
-        """Handle GET requests."""
+        """
+        Handle GET requests.
+        """
         parsed_path = urlparse(self.path)
 
         if parsed_path.path == '/':
@@ -63,7 +66,9 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             super().do_GET()
 
     def serve_main_page(self):
-        """Serve the main HTML page."""
+        """
+        Serve the main HTML page.
+        """
         html_content = self.get_html_template()
         self.send_response(200)
         self.send_header('Content-type', 'text/html')
@@ -71,7 +76,9 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         self.wfile.write(html_content.encode())
 
     def serve_graph_info(self):
-        """Serve basic graph information."""
+        """
+        Serve basic graph information.
+        """
         # Get all nodes with their data
         nodes_data = {}
         for node_id, node_data in self.conn_graph.nodes(data=True):
@@ -99,7 +106,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         self.send_json_response(info)
 
     def serve_subsystem_graph(self, subsystem):
-        """Serve graph for a specific subsystem.
+        """
+        Serve graph for a specific subsystem.
 
         Parameters
         ----------
@@ -173,7 +181,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         self.send_json_response(response)
 
     def serve_variable_graph(self, variable):
-        """Serve graph focused on a specific variable.
+        """
+        Serve graph focused on a specific variable.
 
         Parameters
         ----------
@@ -222,7 +231,9 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         self.send_json_response(response)
 
     def serve_search(self):
-        """Serve search results."""
+        """
+        Serve search results.
+        """
         query = self.get_query_param('q', '').lower()
         if not query:
             self.send_json_response({'results': []})
@@ -255,7 +266,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         self.send_json_response({'results': results[:20]})
 
     def get_subsystems(self):
-        """Get list of unique subsystems.
+        """
+        Get list of unique subsystems.
 
         Returns
         -------
@@ -271,7 +283,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         return sorted(subsystems)
 
     def create_text_graph(self, subgraph, title):
-        """Create a simple text-based graph representation when Graphviz is not available.
+        """
+        Create a simple text-based graph representation when Graphviz is not available.
 
         Parameters
         ----------
@@ -314,7 +327,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         return html
 
     def get_query_param(self, param, default=''):
-        """Get query parameter value.
+        """
+        Get query parameter value.
 
         Parameters
         ----------
@@ -333,7 +347,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         return query_params.get(param, [default])[0]
 
     def send_json_response(self, data):
-        """Send JSON response.
+        """
+        Send JSON response.
 
         Parameters
         ----------
@@ -346,7 +361,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         self.wfile.write(json.dumps(data).encode())
 
     def get_html_template(self):
-        """Get the HTML template.
+        """
+        Get the HTML template.
 
         Returns
         -------
@@ -387,7 +403,8 @@ def _conn_graph_cmd(options, user_args):
         Args to be passed to the user script.
     """
     def _view_graph(model):
-        """Serve the connection graph UI.
+        """
+        Serve the connection graph UI.
 
         Parameters
         ----------
@@ -398,7 +415,8 @@ def _conn_graph_cmd(options, user_args):
 
     # register the hooks
     def _set_dyn_hook(prob):
-        """Register setup hooks to display the graph.
+        """
+        Register setup hooks to display the graph.
 
         Parameters
         ----------
@@ -424,5 +442,3 @@ if __name__ == "__main__":
 
     # Start web UI
     prob.model._get_conn_graph().serve(port=8001)
-
-    # serve_simple_conn_graph_ui(conn_graph, port=8001)
