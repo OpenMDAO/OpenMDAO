@@ -372,6 +372,14 @@ def dump_edges(G, show_none=False):
             print(textwrap.indent(pformat(dct), '  '))
 
 
+def escape_dot_string(s):
+    """Escape special characters for DOT format"""
+    # Escape backslashes and quotes
+    s = s.replace('\\', '\\\\')
+    s = s.replace('"', '\\"')
+    return s
+
+
 def networkx_to_dot(G):
     """
     Convert a NetworkX graph to DOT format for viz.js
@@ -412,12 +420,21 @@ def networkx_to_dot(G):
     for node, attrs in G.nodes(data=True):
         attr_strs = []
 
-        # Add label (defaults to node name if not specified)
-        label = attrs.get('label', str(node))
-        attr_strs.append(f'label="{label}"')
+        # Check if label is HTML (indicated by html_label attribute)
+        if 'html_label' in attrs:
+            # Use angle brackets for HTML labels
+            attr_strs.append(f'label=<{attrs["html_label"]}>')
+        elif 'label' in attrs:
+            # Regular text label with escaping
+            label = escape_dot_string(str(attrs['label']))
+            attr_strs.append(f'label="{label}"')
+        else:
+            # Default to node name
+            label = escape_dot_string(str(node))
+            attr_strs.append(f'label="{label}"')
 
         # Add other attributes
-        for key in ['shape', 'color', 'style', 'fillcolor', 'tooltip', 'penwidth']:
+        for key in ['shape', 'color', 'style', 'fillcolor', 'penwidth', 'tooltip']:
             if key in attrs:
                 attr_strs.append(f'{key}="{attrs[key]}"')
 
@@ -429,8 +446,15 @@ def networkx_to_dot(G):
         attrs = G.edges[u, v]
         attr_strs = []
 
-        # Add edge attributes
-        for key in ['label', 'color', 'style', 'weight', 'dir', 'arrowhead', 'tooltip']:
+        # Handle HTML labels for edges
+        if 'html_label' in attrs:
+            attr_strs.append(f'label=<{attrs["html_label"]}>')
+        elif 'label' in attrs:
+            label = escape_dot_string(str(attrs['label']))
+            attr_strs.append(f'label="{label}"')
+
+        # Add other edge attributes
+        for key in ['color', 'style', 'weight', 'dir', 'arrowhead', 'tooltip']:
             if key in attrs:
                 attr_strs.append(f'{key}="{attrs[key]}"')
 
@@ -444,7 +468,7 @@ def networkx_to_dot(G):
     return "\n".join(lines)
 
 
-def create_html_visualization(dot_string, output_file="graph.html", show=True):
+def create_html_visualization(dot_string, outfile="graph.html", show=True):
     """Create an HTML file with viz.js visualization"""
     from openmdao.utils.webview import webview
 
@@ -493,12 +517,12 @@ def create_html_visualization(dot_string, output_file="graph.html", show=True):
 
     html_content = html_template.replace("DOT_STRING_PLACEHOLDER", dot_string)
 
-    with open(output_file, 'w') as f:
+    with open(outfile, 'w') as f:
         f.write(html_content)
 
-    print(f"Visualization saved to {output_file}")
+    print(f"Visualization saved to {outfile}")
 
     if show:
-        webview(output_file)
+        webview(outfile)
 
-    return output_file
+    return outfile

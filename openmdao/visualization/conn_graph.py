@@ -14,8 +14,8 @@ import threading
 import time
 from http.server import HTTPServer
 
-from openmdao.visualization.graph_viewer import write_graph
-from openmdao.utils.graph_utils import networkx_to_dot
+# from openmdao.visualization.graph_viewer import write_graph
+from openmdao.utils.graph_utils import networkx_to_dot, create_html_visualization
 from openmdao.utils.general_utils import common_subpath, is_undefined, truncate_str, \
     all_ancestors, collect_error, collect_errors
 from openmdao.utils.array_utils import array_connection_compatible, shape_to_len, \
@@ -4021,7 +4021,7 @@ class AllConnGraph(nx.DiGraph):
         str
             Returned html for the node label.
         """
-        def get_table_row(name, meta, mods=(), align='LEFT', max_width=None, show_always=False):
+        def get_table_row(name, meta, mods=(), max_width=None, show_always=False):
             """
             Get the html for a table row.
 
@@ -4033,8 +4033,6 @@ class AllConnGraph(nx.DiGraph):
                 The metadata for the node.
             mods : list of str
                 Modifiers for the html.
-            align : any
-                The alignment of the content.
             max_width : any
                 The maximum width of the content.
             show_always : any
@@ -4074,10 +4072,12 @@ class AllConnGraph(nx.DiGraph):
 
                 content = ''.join(starts) + content + ''.join(ends)
 
-            content = f"<b>{name}:</b> {content}"
+            name_td = (f"<TD ALIGN=\"LEFT\">"
+                       f"<FONT POINT-SIZE=\"10\"><b>{name}</b></FONT></TD>")
+            content_td = (f"<TD ALIGN=\"LEFT\">"
+                          f"<FONT POINT-SIZE=\"10\">{content}</FONT></TD>")
 
-            return \
-                f"<TR><TD ALIGN=\"{align}\"><FONT POINT-SIZE=\"10\">{content}</FONT></TD></TR>"
+            return f"<TR>{name_td}{content_td}</TR>"
 
         name = node[1]
         meta = self.nodes[node]['attrs']
@@ -4110,9 +4110,13 @@ class AllConnGraph(nx.DiGraph):
         else:
             combined = ''
 
-        return f'<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="1" CELLPADDING="0"><TR><TD ' \
-            f' ALIGN=\"LEFT\"><FONT POINT-SIZE=\"12\">' \
-            f'<b>{name}</b></FONT></TD></TR>{combined}</TABLE>>'
+        # Create title row with two cells to match data row structure
+        title_row = (f'<TR><TD ALIGN="LEFT" COLSPAN="2">'
+                     f'<FONT POINT-SIZE="12"><b>{name}</b></FONT></TD></TR>')
+
+        table_attrs = 'BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"'
+        table = f'<TABLE {table_attrs}>{title_row}{combined}</TABLE>'
+        return table
 
     def drawable_node_iter(self, pathname=''):
         """
@@ -4145,7 +4149,7 @@ class AllConnGraph(nx.DiGraph):
                 newdata['color'] = GRAPH_COLORS['ambiguous']
                 newdata['penwidth'] = '4'  # Thick border
 
-            newdata['label'] = self.create_node_label(node)
+            newdata['html_label'] = self.create_node_label(node)
             newdata['tooltip'] = (meta.pathname, meta.rel_name)
             newdata['style'] = 'filled,rounded'
             newdata['shape'] = 'box'  # Use box shape with rounded corners
@@ -4206,8 +4210,9 @@ class AllConnGraph(nx.DiGraph):
             if src_indices is None:
                 newdata['tooltip'] = f"{edge[0]} -> {edge[1]}"
             else:
-                newdata['label'] = truncate_str(src_indices, max_len=max_width)
-                newdata['tooltip'] = f"{edge[0]} -> {edge[1]}: src_indices: {src_indices}"
+                src_indices = truncate_str(src_indices, max_len=max_width)
+                newdata['label'] = src_indices
+                newdata['tooltip'] = f"{edge[0][1]} -> {edge[1][1]}: src_indices: {src_indices}"
 
             yield u, v, newdata
 
@@ -4230,6 +4235,7 @@ class AllConnGraph(nx.DiGraph):
             Whether to show cross boundary connections.
         """
         G = nx.DiGraph()
+        G.graph['orientation'] = 'TB'
 
         if pathname:
             # special handling for cross boundary connections
@@ -4245,8 +4251,8 @@ class AllConnGraph(nx.DiGraph):
                 for node in outside_nodes:
                     node_meta = nodes[node]['attrs']
                     meta = {
-                        'label': self.create_node_label(node),
-                        'tooltip': (node_meta['pathname'], node_meta['rel_name']),
+                        'html_label': self.create_node_label(node),
+                        'tooltip': str((node_meta['pathname'], node_meta['rel_name'])),
                         'style': 'filled,rounded',
                         'shape': 'box',
                         'pathname': node_meta['pathname'],
@@ -4272,15 +4278,15 @@ class AllConnGraph(nx.DiGraph):
             tree = nx.node_connected_component(G.to_undirected(as_view=True), varnode)
             G = nx.subgraph(G, tree)
 
-        replace = {}
-        for node in G.nodes():
-            # quote node names containing certain characters for use in dot
-            _, name = node
-            if ':' in name or '<' in name:
-                replace[node] = f'"{node}"'
+        # replace = {}
+        # for node in G.nodes():
+        #     # quote node names containing certain characters for use in dot
+        #     _, name = node
+        #     if ':' in name or '<' in name:
+        #         replace[node] = f'"{node}"'
 
-        if replace:
-            G = nx.relabel_nodes(G, replace)
+        # if replace:
+        #     G = nx.relabel_nodes(G, replace)
 
         return G
 
@@ -4303,7 +4309,7 @@ class AllConnGraph(nx.DiGraph):
         """
         return networkx_to_dot(self.get_drawable_graph(pathname, varname, show_cross_boundary))
 
-    def display(self, pathname='', varname=None, show_cross_boundary=True, outfile=None):
+    def display(self, pathname='', varname=None, show_cross_boundary=True, outfile='graph.html'):
         """Display.
 
         Parameters
@@ -4317,8 +4323,10 @@ class AllConnGraph(nx.DiGraph):
         outfile : any
             outfile.
         """
-        write_graph(self.get_drawable_graph(pathname, varname, show_cross_boundary),
-                    outfile=outfile)
+        create_html_visualization(self.get_dot(pathname, varname, show_cross_boundary),
+                                               outfile=outfile)
+        # write_graph(self.get_drawable_graph(pathname, varname, show_cross_boundary),
+        #             outfile=outfile)
 
     def print_tree(self, name):
         """Print tree.
