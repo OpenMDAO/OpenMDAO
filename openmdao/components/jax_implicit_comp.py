@@ -2,7 +2,6 @@
 An ImplicitComponent that uses JAX for derivatives.
 """
 
-import sys
 import inspect
 from types import MethodType
 from itertools import chain
@@ -35,6 +34,8 @@ class JaxImplicitComponent(ImplicitComponent):
     ----------
     _tangents : dict
         The tangents for the inputs and outputs.
+    _do_sparsity : bool
+        If True, compute the sparsity.
     _sparsity : coo_matrix or None
         The sparsity of the Jacobian.
     _jac_func_ : function or None
@@ -43,16 +44,25 @@ class JaxImplicitComponent(ImplicitComponent):
         The original compute_primal method.
     _ret_tuple_compute_primal : function
         The compute_primal method that returns a tuple.
+    _output_shapes : dict
+        A dict of output shapes used when shapes are computed dynamically.
+    _do_shape_check : bool
+        If True, check the declared output shapes vs. the shapes of the outputs returned from
+        compute_primal.
     """
 
     def __init__(self, matrix_free=False, fallback_derivs_method='fd', **kwargs):  # noqa
-        if sys.version_info < (3, 9):
-            raise RuntimeError("JaxImplicitComponent requires Python 3.9 or newer.")
-
         super().__init__(**kwargs)
         self.matrix_free = matrix_free
 
-        _re_init(self)
+        self._tangents = {'fwd': None, 'rev': None}
+        self._do_sparsity = False
+        self._sparsity = None
+        self._jac_func_ = None
+        self._static_hash = None
+        self._jac_colored_ = None
+        self._output_shapes = None
+        self._do_shape_check = True
 
         if self.compute_primal is None:
             raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
