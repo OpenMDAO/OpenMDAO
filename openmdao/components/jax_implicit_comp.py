@@ -40,6 +40,10 @@ class JaxImplicitComponent(ImplicitComponent):
         The sparsity of the Jacobian.
     _jac_func_ : function or None
         The function that computes the jacobian.
+    _jac_colored_ : function or None
+        The function that computes the colored jacobian.
+    _static_hash : tuple
+        The hash of the static values.
     _orig_compute_primal : function
         The original compute_primal method.
     _ret_tuple_compute_primal : function
