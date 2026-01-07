@@ -244,6 +244,16 @@ class JaxExplicitComponent(ExplicitComponent):
         super().compute(inputs, outputs, discrete_inputs, discrete_outputs)
 
     def _get_compute_primal_tracing_args(self):
+        """
+        Return jax.ShapeDtypeStructs for continuous args only.
+
+        The ShapeDtypeStruct keeps track of an array's dtype and shape for use by jax.eval_shape.
+
+        Returns
+        -------
+        list
+            The list of ShapeDtypeStructs of the continuous args.
+        """
         args = []
         for name in self._var_rel_names['input']:
             args.append(jax.ShapeDtypeStruct(self._var_rel2meta[name]['shape'], jnp.float64))

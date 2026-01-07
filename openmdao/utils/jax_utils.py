@@ -1110,22 +1110,20 @@ def _check_output_shapes(self):
     if not isinstance(retvals, tuple):
         retvals = (retvals,)
 
-    computed = []
+    computed_out_shapes = []
     for val in retvals:
         try:
-            computed.append(val.shape)
+            oshape = val.shape
+            if oshape == (0,):
+                oshape = ()
+            computed_out_shapes.append(oshape)
         except AttributeError:
-            computed.append(None)
-
-    computed_out_shapes = []
-    for oshape in computed:
-        if oshape == (0,):
-            oshape = ()
-        computed_out_shapes.append(oshape)
+            computed_out_shapes.append(None)
 
     if len(output_shapes) != len(computed_out_shapes):
-        raise RuntimeError(f"{self.msginfo}: Output shapes {computed_out_shapes} don't match "
-                           f"expected shapes {output_shapes}.")
+        raise RuntimeError(f"{self.msginfo}: The number of continuous outputs returned from "
+                           f"compute_primal ({len(computed_out_shapes)}) doesn't match the number "
+                           f"of declared continuous outputs ({len(output_shapes)}).")
 
     bad = []
     for shape_tup, comp_shape in zip(output_shapes.items(), computed_out_shapes):

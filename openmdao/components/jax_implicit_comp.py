@@ -107,12 +107,14 @@ class JaxImplicitComponent(ImplicitComponent):
 
     def _get_compute_primal_tracing_args(self):
         """
-        Return shapes of continuous args only.
+        Return jax.ShapeDtypeStructs for continuous args only.
+
+        The ShapeDtypeStruct keeps track of an array's dtype and shape for use by jax.eval_shape.
 
         Returns
         -------
         list
-            The list of shapes of continuous args.
+            The list of ShapeDtypeStructs of the continuous args.
         """
         args = []
         for name in self._var_rel_names['input']:
@@ -564,9 +566,3 @@ class JaxImplicitComponent(ImplicitComponent):
             self._output_shapes = {n: shp for n, shp in zip(self._var_rel_names['output'],
                                                             out_shapes)}
         return self._output_shapes[name]
-    
-    def _solve_nonlinear(self):
-        if self._do_shape_check:
-            _check_output_shapes(self)
-            self._do_shape_check = False
-        super()._solve_nonlinear()
