@@ -15,6 +15,7 @@ import time
 from http.server import HTTPServer
 
 from openmdao.visualization.graph_viewer import write_graph
+from openmdao.utils.graph_utils import networkx_to_dot
 from openmdao.utils.general_utils import common_subpath, is_undefined, truncate_str, \
     all_ancestors, collect_error, collect_errors
 from openmdao.utils.array_utils import array_connection_compatible, shape_to_len, \
@@ -4283,26 +4284,6 @@ class AllConnGraph(nx.DiGraph):
 
         return G
 
-    def get_pydot_graph(self, pathname='', varname=None, show_cross_boundary=True):
-        """Get pydot graph.
-
-        Parameters
-        ----------
-        pathname : any
-            pathname.
-        varname : any
-            varname.
-        show_cross_boundary : any
-            show cross boundary.
-
-        Returns
-        -------
-        any
-            Returned value.
-        """
-        return nx.drawing.nx_pydot.to_pydot(self.get_drawable_graph(pathname, varname,
-                                                                    show_cross_boundary))
-
     def get_dot(self, pathname='', varname=None, show_cross_boundary=True):
         """Get DOT.
 
@@ -4320,27 +4301,7 @@ class AllConnGraph(nx.DiGraph):
         any
             Returned value.
         """
-        return self.get_pydot_graph(pathname, varname, show_cross_boundary).to_string()
-
-    def get_svg(self, pathname='', varname=None, show_cross_boundary=True):
-        """Get SVG.
-
-        Parameters
-        ----------
-        pathname : any
-            pathname.
-        varname : any
-            varname.
-        show_cross_boundary : any
-            show cross boundary.
-
-        Returns
-        -------
-        any
-            Returned value.
-        """
-        return self.get_pydot_graph(pathname, varname,
-                                    show_cross_boundary).create_svg().decode('utf-8')
+        return networkx_to_dot(self.get_drawable_graph(pathname, varname, show_cross_boundary))
 
     def display(self, pathname='', varname=None, show_cross_boundary=True, outfile=None):
         """Display.

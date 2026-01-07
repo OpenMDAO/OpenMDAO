@@ -117,10 +117,10 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         try:
             subgraph = self.conn_graph.get_drawable_graph(subsystem)
             pydot_graph = nx.drawing.nx_pydot.to_pydot(subgraph)
-            try:
-                graphviz_svg = pydot_graph.create_svg().decode('utf-8')
-            except Exception:
-                graphviz_svg = self.create_text_graph(subgraph, f"System: {subsystem}")
+            # try:
+            #     graphviz_svg = pydot_graph.create_svg().decode('utf-8')
+            # except Exception:
+            #     graphviz_svg = self.create_text_graph(subgraph, f"System: {subsystem}")
 
             # get help colors from the subgraph (where fillcolor is set)
             incolor = outcolor = None
@@ -164,7 +164,8 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 'edges': len(subgraph.edges()),
                 'nodes_data': nodes_data,
                 'help_colors': help_colors,
-                'svg': graphviz_svg
+                # 'svg': graphviz_svg
+                'dot': pydot_graph,
             }
         except Exception as e:
             print(f"Error in serve_subsystem_graph: {e}")
@@ -435,15 +436,3 @@ def _conn_graph_cmd(options, user_args):
     # register the hooks
     hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook, ncalls=1)
     _load_and_exec(options.file[0], user_args)
-
-
-if __name__ == "__main__":
-    # Example usage
-    from example_conn_graph_ui import create_complex_engineering_model
-
-    # Create model
-    prob = create_complex_engineering_model()
-    prob.setup()
-
-    # Start web UI
-    prob.model._get_conn_graph().serve(port=8001)

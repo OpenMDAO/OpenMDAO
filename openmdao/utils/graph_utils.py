@@ -370,3 +370,135 @@ def dump_edges(G, show_none=False):
         else:
             dct = {k: v for k, v in data.items() if v is not None}
             print(textwrap.indent(pformat(dct), '  '))
+
+
+def networkx_to_dot(G):
+    """
+    Convert a NetworkX graph to DOT format for viz.js
+
+    Node attributes that viz.js recognizes:
+    - label: display text for the node
+    - shape: node shape (box, circle, ellipse, etc.)
+    - color: node color
+    - style: filled, rounded, etc.
+    - fillcolor: fill color when style=filled
+
+    Edge attributes that viz.js recognizes:
+    - label: display text for the edge
+    - color: edge color
+    - style: solid, dashed, dotted, bold
+    - weight: edge thickness
+    - arrowhead: arrow style (normal, dot, diamond, etc.)
+    - dir: arrow direction (forward, back, both, none)
+    """
+    lines = []
+
+    # Determine if graph is directed
+    if G.is_directed():
+        lines.append("digraph G {")
+        edge_op = "->"
+    else:
+        lines.append("graph G {")
+        edge_op = "--"
+
+    orientation = G.graph.get('orientation', 'LR')
+    shape = G.graph.get('shape', 'ellipse')
+
+    # Add graph attributes for better layout
+    lines.append(f"  rankdir={orientation};")  # Left to right layout
+    lines.append(f"  node [shape={shape}];")  # Default node shape
+
+    # Add nodes with attributes
+    for node, attrs in G.nodes(data=True):
+        attr_strs = []
+
+        # Add label (defaults to node name if not specified)
+        label = attrs.get('label', str(node))
+        attr_strs.append(f'label="{label}"')
+
+        # Add other attributes
+        for key in ['shape', 'color', 'style', 'fillcolor', 'tooltip', 'penwidth']:
+            if key in attrs:
+                attr_strs.append(f'{key}="{attrs[key]}"')
+
+        attr_str = ", ".join(attr_strs)
+        lines.append(f'  "{node}" [{attr_str}];')
+
+    # Add edges with attributes
+    for u, v in G.edges():
+        attrs = G.edges[u, v]
+        attr_strs = []
+
+        # Add edge attributes
+        for key in ['label', 'color', 'style', 'weight', 'dir', 'arrowhead', 'tooltip']:
+            if key in attrs:
+                attr_strs.append(f'{key}="{attrs[key]}"')
+
+        if attr_strs:
+            attr_str = ", ".join(attr_strs)
+            lines.append(f'  "{u}" {edge_op} "{v}" [{attr_str}];')
+        else:
+            lines.append(f'  "{u}" {edge_op} "{v}";')
+
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def create_html_visualization(dot_string, output_file="graph.html", show=True):
+    """Create an HTML file with viz.js visualization"""
+    from openmdao.utils.webview import webview
+
+    html_template = """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>NetworkX Graph Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+        }
+        #graph {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div id="graph"></div>
+    <script>
+        var viz = new Viz();
+        var dotString = `DOT_STRING_PLACEHOLDER`;
+
+        viz.renderSVGElement(dotString)
+            .then(function(element) {
+                document.getElementById('graph').appendChild(element);
+            })
+            .catch(error => {
+                console.error('Viz.js error:', error);
+                document.getElementById('graph').innerHTML = 'Error rendering graph: ' + error;
+            });
+    </script>
+</body>
+</html>"""
+
+    html_content = html_template.replace("DOT_STRING_PLACEHOLDER", dot_string)
+
+    with open(output_file, 'w') as f:
+        f.write(html_content)
+
+    print(f"Visualization saved to {output_file}")
+
+    if show:
+        webview(output_file)
+
+    return output_file
