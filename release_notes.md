@@ -7,8 +7,8 @@ January 07, 2026
 OpenMDAO 3.42.0 is our first release for 2026. Happy New Year!
 
 The OpenMDAO repository now defines environments in files for use with [pixi](https://pixi.sh).
-These define the envrionments within which our github continuous integration tests are run.  These are optional, but should provide users a starting point for a functional OpenMDAO environment.
-For more information, check out our [Using Pixi for reproducable environments](https://openmdao.org/newdocs/versions/latest/getting_started/pixi_environment.html).
+These define the environments within which our github continuous integration tests are run.  These are optional, but should provide users a starting point for a functional OpenMDAO environment.
+For more information, check out our [Using Pixi for reproducible environments](https://openmdao.org/newdocs/versions/latest/getting_started/pixi_environment.html).
 OpenMDAO-dependent projects can now also use [our github action](https://openmdao.org/newdocs/versions/latest/getting_started/pixi_environment.html#using-openmdao-s-environments-for-github-actions-in-dependent-projects) to install these environments on github Actions.
 
 Units were added for `inHg60` (inches of mercury at 60 degrees Fahrenheit) and `inHg32`(inches of mercury at 32 degrees Fahrenheit).
