@@ -2025,7 +2025,7 @@ class TestGroupPromotes(unittest.TestCase):
             top['Branch1.G1.comp1.a']
 
         self.assertEqual(cm.exception.args[0],
-                         ": Variable 'Branch1.G1.comp1.a' not found. Perhaps you meant one of the following variables: ['Branch1.G1.G2.comp1.a', 'Branch1.G1.G2.comp1.b', 'Branch1.G1.comp1.b'].")
+                         ": Variable 'Branch1.G1.comp1.a' not found.")
 
     def test_promotes_ivc_bug(self):
         # This used to fail with an index error

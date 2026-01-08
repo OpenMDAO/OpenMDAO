@@ -828,6 +828,9 @@ class AllConnGraph(nx.DiGraph):
         self._sync_auto_ivcs = {}  # auto_ivcs that require sync when setting intial values
         self._dangling_prom_inputs = set()
 
+    def add_node(self, node, **kwargs):
+        super().add_node(node, **kwargs)
+
     def _collect_error(self, msg, exc_type=None, tback=None, ident=None):
         """
         Save an error message to raise as an exception later.
@@ -895,7 +898,8 @@ class AllConnGraph(nx.DiGraph):
             return node
 
         msg = f"{pathname}: Variable '{varname}' not found."
-        guesses = sorted(set(get_close_matches(name, [n[1] for n in self.nodes()],
+        guesses = sorted(set(get_close_matches(name, [n[1] for n, d in self.nodes(data=True)
+                                                      if d['attrs'].pathname==pathname],
                                                n=3, cutoff=0.15)))
         guesses = [g for g in guesses if not g.startswith('_auto_ivc.')]
         if guesses:
