@@ -36,6 +36,8 @@ repository:
 html:
   use_issues_button: true
   use_repository_button: true
+  extra_css:
+    - custom.css
 
 # Enable use of latex math
 parse:
