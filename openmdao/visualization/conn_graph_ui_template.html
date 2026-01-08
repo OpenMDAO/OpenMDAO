@@ -645,9 +645,6 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
-
     <script type="module">
         let currentGraph = null;
         let currentSubsystem = 'model';
@@ -659,6 +656,8 @@
         }; // Cache the colors
         let colorsLoaded = false; // Track if colors have been loaded
         let helpRetryCount = 0; // Track retry attempts for help
+
+        import { instance } from "https://cdn.jsdelivr.net/npm/@viz-js/viz@3.2.4/+esm";
 
         // Helper function to darken a color
         function darkenColor(hex, factor) {
@@ -1230,7 +1229,7 @@
                 })
                 .then(data => {
                     if (data.success) {
-                        displayGraph(data.svg, `Variable: ${variable}`, data.nodes, data.edges);
+                        displayGraph(data.dot, `Variable: ${variable}`, data.nodes, data.edges);
                     } else {
                         console.error('Variable API error:', data.error);
                         showError(`Error loading variable: ${data.error}`);
@@ -1252,7 +1251,7 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        displayGraph(data.svg, `System: ${subsystem}`, data.nodes, data.edges);
+                        displayGraph(data.dot, `System: ${subsystem}`, data.nodes, data.edges);
                     } else {
                         showError(`Error loading subsystem: ${data.error}`);
                     }
@@ -1263,7 +1262,12 @@
                 });
         }
 
-        function displayGraph(svgContent, title, nodes, edges) {
+        function displayGraph(dotContent, title, nodes, edges) {
+            instance().then(viz => {
+                const svgContent = viz.renderSVGElement(dotContent);
+                // document.getElementById("graph").appendChild(svg);
+            });
+
             // Check if content is SVG or HTML
             if (svgContent.trim().startsWith('<svg')) {
                 // Add selection styling to SVG content

@@ -4071,7 +4071,8 @@ class AllConnGraph(nx.DiGraph):
 
                 content = ''.join(starts) + content + ''.join(ends)
 
-            line = f'<tr><td align="left"><b>{name}:</b></td><td align="left">{content}</td></tr>'
+            line = f'<tr><td align="left"><b>{name}:</b></td><td fixedsize="false" align="left">'\
+                f'{content}</td></tr>'
 
             return line
 
@@ -4106,9 +4107,17 @@ class AllConnGraph(nx.DiGraph):
         else:
             combined = ''
 
-        label = (f'<table border="0" cellborder="0" cellspacing="0" cellpadding="1">'
-                 f'<tr><td align="center" colspan="2"><b>{name}</b></td></tr>'
+        label = (f'<table border="0" cellborder="0" cellspacing="0" cellpadding="0">'
+                 f'<tr><td align="left" colspan="2"><b>{name}</b></td></tr>'
                  f'{combined}</table>')
+
+        # label = (f'<table border="0" cellborder="0" cellspacing="0" cellpadding="0">'
+        #          f'<tr><td><b>{name}</b></td></tr>'
+        #          f'<tr><td><table border="0" cellborder="0" cellspacing="0" cellpadding="0">'
+        #          f'{combined}'
+        #          f'</table></td></tr>'
+        #          f'</table>')
+
         return label
 
     def drawable_node_iter(self, pathname=''):
