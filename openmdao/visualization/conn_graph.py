@@ -14,8 +14,7 @@ import threading
 import time
 from http.server import HTTPServer
 
-# from openmdao.visualization.graph_viewer import write_graph
-from openmdao.utils.graph_utils import networkx_to_dot, create_html_visualization
+from openmdao.utils.graph_utils import networkx_to_dot, dot_to_html
 from openmdao.utils.general_utils import common_subpath, is_undefined, truncate_str, \
     all_ancestors, collect_error, collect_errors
 from openmdao.utils.array_utils import array_connection_compatible, shape_to_len, \
@@ -4072,12 +4071,9 @@ class AllConnGraph(nx.DiGraph):
 
                 content = ''.join(starts) + content + ''.join(ends)
 
-            name_td = (f"<TD ALIGN=\"LEFT\">"
-                       f"<FONT POINT-SIZE=\"10\"><b>{name}</b></FONT></TD>")
-            content_td = (f"<TD ALIGN=\"LEFT\">"
-                          f"<FONT POINT-SIZE=\"10\">{content}</FONT></TD>")
+            line = f'<tr><td align="left"><b>{name}:</b></td><td align="left">{content}</td></tr>'
 
-            return f"<TR>{name_td}{content_td}</TR>"
+            return line
 
         name = node[1]
         meta = self.nodes[node]['attrs']
@@ -4110,13 +4106,10 @@ class AllConnGraph(nx.DiGraph):
         else:
             combined = ''
 
-        # Create title row with two cells to match data row structure
-        title_row = (f'<TR><TD ALIGN="LEFT" COLSPAN="2">'
-                     f'<FONT POINT-SIZE="12"><b>{name}</b></FONT></TD></TR>')
-
-        table_attrs = 'BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0"'
-        table = f'<TABLE {table_attrs}>{title_row}{combined}</TABLE>'
-        return table
+        label = (f'<table border="0" cellborder="0" cellspacing="0" cellpadding="1">'
+                 f'<tr><td align="center" colspan="2"><b>{name}</b></td></tr>'
+                 f'{combined}</table>')
+        return label
 
     def drawable_node_iter(self, pathname=''):
         """
@@ -4323,10 +4316,8 @@ class AllConnGraph(nx.DiGraph):
         outfile : any
             outfile.
         """
-        create_html_visualization(self.get_dot(pathname, varname, show_cross_boundary),
-                                               outfile=outfile)
-        # write_graph(self.get_drawable_graph(pathname, varname, show_cross_boundary),
-        #             outfile=outfile)
+        dot_to_html(self.get_dot(pathname, varname, show_cross_boundary),
+                                  outfile=outfile)
 
     def print_tree(self, name):
         """Print tree.

@@ -380,6 +380,23 @@ def escape_dot_string(s):
     return s
 
 
+def _get_dot_label_str(G, node):
+    attrs = G.nodes[node]
+
+    # Check if label is HTML (indicated by html_label attribute)
+    if 'html_label' in attrs:
+        # Use angle brackets for HTML labels
+        return f'<{attrs["html_label"]}>'
+    elif 'label' in attrs:
+        # Regular text label with escaping
+        label = escape_dot_string(attrs['label'])
+        return f'"{label}"'
+    else:
+        # Default to node name
+        label = escape_dot_string(str(node))
+        return f'"{label}"'
+
+
 def networkx_to_dot(G):
     """
     Convert a NetworkX graph to DOT format for viz.js
@@ -415,23 +432,12 @@ def networkx_to_dot(G):
     # Add graph attributes for better layout
     lines.append(f"  rankdir={orientation};")  # Left to right layout
     lines.append(f"  node [shape={shape}];")  # Default node shape
+    lines.append("  labeljust=l;")  # Left-justify all labels
 
     # Add nodes with attributes
     for node, attrs in G.nodes(data=True):
-        attr_strs = []
-
-        # Check if label is HTML (indicated by html_label attribute)
-        if 'html_label' in attrs:
-            # Use angle brackets for HTML labels
-            attr_strs.append(f'label=<{attrs["html_label"]}>')
-        elif 'label' in attrs:
-            # Regular text label with escaping
-            label = escape_dot_string(str(attrs['label']))
-            attr_strs.append(f'label="{label}"')
-        else:
-            # Default to node name
-            label = escape_dot_string(str(node))
-            attr_strs.append(f'label="{label}"')
+        label = _get_dot_label_str(G, node)
+        attr_strs = [f'label={label}']
 
         # Add other attributes
         for key in ['shape', 'color', 'style', 'fillcolor', 'penwidth', 'tooltip']:
@@ -468,59 +474,55 @@ def networkx_to_dot(G):
     return "\n".join(lines)
 
 
-def create_html_visualization(dot_string, outfile="graph.html", show=True):
+def dot_to_html(dot_string, outfile="graph.html", show=True):
     """Create an HTML file with viz.js visualization"""
     from openmdao.utils.webview import webview
 
-    html_template = """<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>NetworkX Graph Visualization</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/viz.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/2.1.2/full.render.js"></script>
-    <style>
-        body {
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background-color: #f5f5f5;
-        }
-        #graph {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-    </style>
-</head>
-<body>
-    <div id="graph"></div>
-    <script>
-        var viz = new Viz();
-        var dotString = `DOT_STRING_PLACEHOLDER`;
+    html_template = """
+        <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>NetworkX Graph Visualization</title>
+                <style>
+                    body {
+                        margin: 0;
+                        padding: 0;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        width: 100vw;
+                        height: 100vh;
+                        background-color: white;
+                    }
+                    #graph {
+                        width: 100%;
+                        height: 100%;
+                        overflow: auto;
+                    }
+                </style>
+            </head>
+            <body>
+                <div id="graph"></div>
+                <script type="module">
+                    const dotString = `DOT_STRING_PLACEHOLDER`;
+                    import { instance } from "https://cdn.jsdelivr.net/npm/@viz-js/viz@3.2.4/+esm";
 
-        viz.renderSVGElement(dotString)
-            .then(function(element) {
-                document.getElementById('graph').appendChild(element);
-            })
-            .catch(error => {
-                console.error('Viz.js error:', error);
-                document.getElementById('graph').innerHTML = 'Error rendering graph: ' + error;
-            });
-    </script>
-</body>
-</html>"""
+                        instance().then(viz => {
+                            const svg = viz.renderSVGElement(dotString);
+                            document.getElementById("graph").appendChild(svg);
+                        });
+                </script>
+            </body>
+            </html>
+        """
 
     html_content = html_template.replace("DOT_STRING_PLACEHOLDER", dot_string)
 
     with open(outfile, 'w') as f:
         f.write(html_content)
 
-    print(f"Visualization saved to {outfile}")
+    print(f"Graph visualization saved to {outfile}")
 
     if show:
         webview(outfile)
