@@ -2,18 +2,17 @@
 An ExplicitComponent that uses JAX for derivatives.
 """
 
-import sys
 import inspect
 from types import MethodType
 from functools import partial
 
 from openmdao.core.explicitcomponent import ExplicitComponent
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.jax_utils import jax, jit, \
+from openmdao.utils.jax_utils import jax, jit, jnp, \
     _jax_register_pytree_class, _compute_sparsity, get_vmap_tangents, \
     _update_subjac_sparsity, _jax_derivs2partials, _jax2np, \
     _ensure_returns_tuple, _compute_output_shapes, _update_add_input_kwargs, \
-    _update_add_output_kwargs, _get_differentiable_compute_primal, _re_init
+    _update_add_output_kwargs, _get_differentiable_compute_primal, _re_init, _check_output_shapes
 from openmdao.utils.code_utils import get_return_names, get_function_deps
 
 
@@ -34,6 +33,8 @@ class JaxExplicitComponent(ExplicitComponent):
     ----------
     _tangents : dict
         The tangents for the inputs and outputs.
+    _do_sparsity : bool
+        If True, compute the sparsity.
     _sparsity : coo_matrix or None
         The sparsity of the Jacobian.
     _jac_func_ : function or None
@@ -46,16 +47,25 @@ class JaxExplicitComponent(ExplicitComponent):
         The original compute_primal method.
     _ret_tuple_compute_primal : function
         The compute_primal method that returns a tuple.
+    _output_shapes : dict
+        A dict of output shapes used when shapes are computed dynamically.
+    _do_shape_check : bool
+        If True, check the declared output shapes vs. the shapes of the outputs returned from
+        compute_primal.
     """
 
     def __init__(self, matrix_free=False, fallback_derivs_method='fd', **kwargs):  # noqa
-        if sys.version_info < (3, 9):
-            raise RuntimeError("JaxExplicitComponent requires Python 3.9 or newer.")
-
         super().__init__(**kwargs)
         self.matrix_free = matrix_free
 
-        _re_init(self)
+        self._tangents = {'fwd': None, 'rev': None}
+        self._do_sparsity = False
+        self._sparsity = None
+        self._jac_func_ = None
+        self._static_hash = None
+        self._jac_colored_ = None
+        self._output_shapes = None
+        self._do_shape_check = True
 
         if self.compute_primal is None:
             raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
@@ -235,6 +245,29 @@ class JaxExplicitComponent(ExplicitComponent):
             Always returns False.
         """
         return False
+
+    def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+        if self._do_shape_check:
+            _check_output_shapes(self)
+            self._do_shape_check = False
+
+        super().compute(inputs, outputs, discrete_inputs, discrete_outputs)
+
+    def _get_compute_primal_tracing_args(self):
+        """
+        Return jax.ShapeDtypeStructs for continuous args only.
+
+        The ShapeDtypeStruct keeps track of an array's dtype and shape for use by jax.eval_shape.
+
+        Returns
+        -------
+        list
+            The list of ShapeDtypeStructs of the continuous args.
+        """
+        args = []
+        for name in self._var_rel_names['input']:
+            args.append(jax.ShapeDtypeStruct(self._var_rel2meta[name]['shape'], jnp.float64))
+        return args
 
     def _get_jax_compute_primal(self, discrete_inputs, need_jit):
         """
