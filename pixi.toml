@@ -50,7 +50,7 @@ platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
 
 [dependencies]
 python = ">=3.11"
-numpy = ">=2.0"
+numpy = ">=2.0,!=2.4.0"
 scipy = ">=1.13"
 networkx = ">=3.3"
 pip = ">=25.3"
