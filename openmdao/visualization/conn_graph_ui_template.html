@@ -506,6 +506,12 @@
             stroke-width: 4px !important;
         }
 
+        /* Preserve text styling in selected nodes */
+        .graph-svg .node.selected text {
+            fill: inherit !important;
+            stroke: none !important;
+        }
+
         .tree-label {
             flex: 1;
             font-size: 14px;

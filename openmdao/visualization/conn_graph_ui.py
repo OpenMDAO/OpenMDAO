@@ -366,7 +366,7 @@ def _conn_graph_setup_parser(parser):
         The parser we're adding options to.
     """
     parser.description = ('This command displays the connection graph for the specified variable '
-                          'or system using viz.js on the client side for rendering.')
+                          'or system.')
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('--problem', action='store', dest='problem', help='Problem name')
     parser.add_argument('-v', '--varname', action='store', dest='varname',
