@@ -11,7 +11,6 @@ import os
 import json
 from http.server import SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
-import networkx as nx
 
 from openmdao.visualization.conn_graph import GRAPH_COLORS
 from openmdao.utils.file_utils import _load_and_exec
@@ -115,12 +114,9 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             Subsystem pathname to focus on.
         """
         try:
+            # Get the DOT format string instead of pydot object
+            dot_string = self.conn_graph.get_dot(subsystem)
             subgraph = self.conn_graph.get_drawable_graph(subsystem)
-            pydot_graph = nx.drawing.nx_pydot.to_pydot(subgraph)
-            # try:
-            #     graphviz_svg = pydot_graph.create_svg().decode('utf-8')
-            # except Exception:
-            #     graphviz_svg = self.create_text_graph(subgraph, f"System: {subsystem}")
 
             # get help colors from the subgraph (where fillcolor is set)
             incolor = outcolor = None
@@ -164,8 +160,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
                 'edges': len(subgraph.edges()),
                 'nodes_data': nodes_data,
                 'help_colors': help_colors,
-                # 'svg': graphviz_svg
-                'dot': pydot_graph,
+                'dot': dot_string,
             }
         except Exception as e:
             print(f"Error in serve_subsystem_graph: {e}")
@@ -191,35 +186,20 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
             Variable name to focus on.
         """
         try:
-            # First try the variable name as-is
-            try:
-                pydot_graph = self.conn_graph.get_pydot_graph(varname=variable)
-            except Exception:
-                raise ValueError(f"Variable '{variable}' not found in connection graph")
+            # Get the DOT format string using the connection graph method
+            dot_string = self.conn_graph.get_dot(varname=variable)
+            subgraph = self.conn_graph.get_drawable_graph(varname=variable)
 
-            # pydot_graph is already a pydot.Dot object, so we can use it directly
-            try:
-                graphviz_svg = pydot_graph.create_svg().decode('utf-8')
-            except Exception:
-                # If SVG generation fails, create a text representation
-                # We need to convert the pydot graph to NetworkX for the text fallback
-                try:
-                    nx_graph = nx.drawing.nx_pydot.from_pydot(pydot_graph)
-                    graphviz_svg = self.create_text_graph(nx_graph, f"Variable: {variable}")
-                except Exception:
-                    graphviz_svg = f"<div style='padding: 20px; color: red;'>Error generating " \
-                        f"graph for variable: {variable}</div>"
-
-            # Count nodes and edges from the pydot graph
-            nodes_count = len(pydot_graph.get_nodes())
-            edges_count = len(pydot_graph.get_edges())
+            # Count nodes and edges from the subgraph
+            nodes_count = len(subgraph.nodes())
+            edges_count = len(subgraph.edges())
 
             response = {
                 'success': True,
                 'variable': variable,
                 'nodes': nodes_count,
                 'edges': edges_count,
-                'svg': graphviz_svg
+                'dot': dot_string
             }
         except Exception as e:
             # Provide more helpful error message
@@ -385,8 +365,8 @@ def _conn_graph_setup_parser(parser):
     parser : argparse subparser
         The parser we're adding options to.
     """
-    parser.description = ('This command requires pydot and graphviz to be installed. '
-                          'It displays the connection graph for the specified variable or system.')
+    parser.description = ('This command displays the connection graph for the specified variable '
+                          'or system using viz.js on the client side for rendering.')
     parser.add_argument('file', nargs=1, help='Python file containing the model.')
     parser.add_argument('--problem', action='store', dest='problem', help='Problem name')
     parser.add_argument('-v', '--varname', action='store', dest='varname',

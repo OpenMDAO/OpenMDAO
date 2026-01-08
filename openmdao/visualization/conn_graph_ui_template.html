@@ -718,34 +718,31 @@
         }
 
         // Function to add selection styling to SVG content
-        function addSelectionStylingToSvg(svgContent) {
-            // Add CSS styles to the SVG for selection highlighting
-            const styleTag = `
-                <defs>
-                    <style>
-                        .node.selected {
-                            stroke: #ffd700 !important;
-                            stroke-width: 4px !important;
-                            filter: drop-shadow(0 0 8px #ffd700) drop-shadow(0 0 4px #ffd700);
-                        }
-                        .node.selected circle {
-                            stroke: #ffd700 !important;
-                            stroke-width: 4px !important;
-                        }
-                        .node.selected ellipse {
-                            stroke: #ffd700 !important;
-                            stroke-width: 4px !important;
-                        }
-                        .node.selected polygon {
-                            stroke: #ffd700 !important;
-                            stroke-width: 4px !important;
-                        }
-                    </style>
-                </defs>
-            `;
-
-            // Insert the style tag after the opening <svg> tag
-            return svgContent.replace(/<svg[^>]*>/, (match) => match + styleTag);
+        function addSelectionStylingToSvg(svgElement) {
+            // svgElement is now a DOM element from viz.renderSVGElement()
+            // Add click handlers to graph nodes for selection
+            const nodes = svgElement.querySelectorAll('.node');
+            nodes.forEach(node => {
+                node.style.cursor = 'pointer';
+                node.addEventListener('click', function(e) {
+                    // Remove previous selection
+                    document.querySelectorAll('.node.selected').forEach(n => {
+                        n.classList.remove('selected');
+                    });
+                    // Add selection to clicked node
+                    this.classList.add('selected');
+                    e.stopPropagation();
+                });
+            });
+            
+            // Click on SVG background to deselect
+            svgElement.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    document.querySelectorAll('.node.selected').forEach(n => {
+                        n.classList.remove('selected');
+                    });
+                }
+            });
         }
 
         // Function to highlight a selected node in the graph
@@ -1263,37 +1260,32 @@
         }
 
         function displayGraph(dotContent, title, nodes, edges) {
+            showLoading('Rendering graph...');
+            
             instance().then(viz => {
-                const svgContent = viz.renderSVGElement(dotContent);
-                // document.getElementById("graph").appendChild(svg);
+                try {
+                    const svgElement = viz.renderSVGElement(dotContent);
+                    
+                    // Clear the loading message
+                    graphContent.innerHTML = '';
+                    
+                    // Append the SVG element to the graph container
+                    graphContent.appendChild(svgElement);
+                    
+                    // Add selection styling and event handlers
+                    const svgs = graphContent.querySelectorAll('svg');
+                    svgs.forEach(svg => {
+                        svg.classList.add('graph-svg');
+                        svg.style.width = '100%';
+                        svg.style.height = 'auto';
+                        addSelectionStylingToSvg(svg);
+                    });
+                } catch (error) {
+                    showError(`Error rendering graph: ${error.message}`);
+                }
+            }).catch(error => {
+                showError(`Error loading viz.js: ${error.message}`);
             });
-
-            // Check if content is SVG or HTML
-            if (svgContent.trim().startsWith('<svg')) {
-                // Add selection styling to SVG content
-                const styledSvgContent = addSelectionStylingToSvg(svgContent);
-                graphContent.innerHTML = `
-                    <div class="graph-svg" style="flex: 1; display: flex; align-items: center; justify-content: center;">${styledSvgContent}</div>
-                `;
-            } else {
-                graphContent.innerHTML = `
-                    <div class="graph-text" style="flex: 1;">${svgContent}</div>
-                `;
-            }
-
-            // Determine if this is a variable or subsystem view
-            let label, name;
-            if (title.startsWith('Variable:')) {
-                label = 'Variable:';
-                name = title.replace('Variable: ', '');
-            } else if (title.startsWith('System:')) {
-                label = 'System:';
-                name = title.replace('System: ', '');
-            } else {
-                label = 'View:';
-                name = title;
-            }
-
         }
 
         function showLoading(message) {
