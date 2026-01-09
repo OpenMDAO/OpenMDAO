@@ -18,7 +18,7 @@ import openmdao.utils.hooks as hooks
 
 
 class ConnGraphHandler(SimpleHTTPRequestHandler):
-    """
+    r"""
     Custom handler for serving the connection graph web interface.
 
     Parameters
