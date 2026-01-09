@@ -771,6 +771,7 @@ def _re_init(self):
     self._static_hash = None
     self._jac_colored_ = None
     self._output_shapes = None
+    self._do_shape_check = True
 
 
 def _get_differentiable_compute_primal(self, discrete_inputs):
@@ -1092,6 +1093,48 @@ def _jax_derivs2partials(self, deriv_vals, partials, ofnames, wrtnames):
                 partials[ofname, wrtname] = dvals
             else:
                 partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
+
+
+def _check_output_shapes(self):
+    """
+    Compare declared output shapes of compute_primal to those computed by jax.eval_shape.
+    """
+    rel_vars = self._var_rel2meta
+    output_shapes = {n: rel_vars[n]['shape'] for n in self._var_rel_names['output']}
+
+    discrete_inputs = self._discrete_inputs.values() if self._discrete_inputs else ()
+    differentiable_cp = _get_differentiable_compute_primal(self, discrete_inputs)
+
+    tracing_args = self._get_compute_primal_tracing_args()
+    retvals = jax.eval_shape(differentiable_cp, *tracing_args)
+    if not isinstance(retvals, tuple):
+        retvals = (retvals,)
+
+    computed_out_shapes = []
+    for val in retvals:
+        try:
+            oshape = val.shape
+            if oshape == (0,):
+                oshape = ()
+            computed_out_shapes.append(oshape)
+        except AttributeError:
+            computed_out_shapes.append(None)
+
+    if len(output_shapes) != len(computed_out_shapes):
+        raise RuntimeError(f"{self.msginfo}: The number of continuous outputs returned from "
+                           f"compute_primal ({len(computed_out_shapes)}) doesn't match the number "
+                           f"of declared continuous outputs ({len(output_shapes)}).")
+
+    bad = []
+    for shape_tup, comp_shape in zip(output_shapes.items(), computed_out_shapes):
+        name, shape = shape_tup
+        if shape != comp_shape:
+            bad.append(f"Shape mismatch for output '{name}': expected {shape} but "
+                       f"got {comp_shape}.")
+
+    if bad:
+        msg =  '\n   '.join(bad)
+        raise RuntimeError(f"{self.msginfo}:\n   {msg}")
 
 
 def _to_compute_primal_setup_parser(parser):
