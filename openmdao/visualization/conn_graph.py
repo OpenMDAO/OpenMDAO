@@ -1440,7 +1440,9 @@ class AllConnGraph(nx.DiGraph):
         """
         if inds and self.comm.size > 1 and self.nodes[src_node]['attrs'].distributed:
             src = src_node[1]
+            # TODO: this could be expensive.  Try to make it more efficient.
             src_indices = idx_list_to_index_array(inds)
+
             ssizes = model._var_sizes['output']
             sidx = model._var_allprocs_abs2idx[src]
             ssize = ssizes[self.comm.rank, sidx]
