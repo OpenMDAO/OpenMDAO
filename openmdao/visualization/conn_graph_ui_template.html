@@ -89,13 +89,21 @@
             display: flex;
             flex-direction: column;
             min-height: 0; /* Allow flex item to shrink */
+            cursor: grab;
+            position: relative;
+        }
+
+        .graph-container.dragging {
+            cursor: grabbing;
+            user-select: none;
         }
         .graph-svg {
-            width: 100%;
-            height: auto;
             border: none;
-            flex: 1;
-            object-fit: contain;
+            display: block;
+            min-width: fit-content;
+            max-width: none;
+            width: auto;
+            height: auto;
         }
         .graph-text {
             text-align: left;
@@ -533,6 +541,61 @@
             flex-direction: column;
             overflow: hidden;
         }
+
+        /* Zoom controls */
+        .zoom-controls {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            padding: 8px;
+        }
+
+        .zoom-button {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: #2c3e50;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .zoom-button:hover {
+            background: #34495e;
+            transform: scale(1.05);
+        }
+
+        .zoom-button:active {
+            transform: scale(0.95);
+        }
+
+        .zoom-button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .zoom-level {
+            font-size: 12px;
+            text-align: center;
+            color: #2c3e50;
+            font-weight: bold;
+            padding: 4px 0;
+            user-select: none;
+        }
     </style>
 </head>
 <body>
@@ -564,6 +627,15 @@
             <!-- Main content area -->
             <div class="main-content">
 
+            <!-- Zoom controls -->
+            <div class="zoom-controls" id="zoom-controls" style="display: none;">
+                <button class="zoom-button" id="zoom-in" title="Zoom In (+)">+</button>
+                <div class="zoom-level" id="zoom-level">100%</div>
+                <button class="zoom-button" id="zoom-out" title="Zoom Out (-)">−</button>
+                <button class="zoom-button" id="zoom-reset" title="Reset Zoom (0)" style="font-size: 16px;">⊙</button>
+                <button class="zoom-button" id="zoom-fit" title="Fit to Window (F)" style="font-size: 16px;">⊡</button>
+            </div>
+
             <div class="graph-container">
                 <div id="graph-content">
                     <div class="loading">
@@ -591,13 +663,23 @@
             </div>
             <div class="modal-body">
                 <p>A tool for visualizing and understanding how variables are connected and
-                promoted within your OpenMDAO model by examining their connection graphs.
+                promoted within your OpenMDAO model.
                 </p>
 
                 <ol>
-                    <li>Click on any system (⚙️) to see all connection graphs involving that
+                    <li>Click on any system to see all connection graphs involving that
                     system</li>
-                    <li>Click on any variable (<span class="tree-icon-button input" style="font-size: 11px; padding: 2px 4px; margin: 0 2px; display: inline;">i</span> or <span class="tree-icon-button output" style="font-size: 11px; padding: 2px 4px; margin: 0 2px; display: inline;">o</span>) to see only the connection graph for that variable</li>
+                    <li>Click on any variable (<span class="tree-icon-button input" style="font-size: 11px; padding: 2px 4px; margin: 0 2px; display: inline;">i</span> or <span class="tree-icon-button output" style="font-size: 11px; padding: 2px 4px; margin: 0 2px; display: inline;">o</span>) to see the connection graph containing that variable</li>
+                    <li>Use the zoom controls in the top-right corner:
+                        <ul>
+                            <li><strong>+</strong> to zoom in</li>
+                            <li><strong>−</strong> to zoom out</li>
+                            <li><strong>⊙</strong> to reset to 100% zoom</li>
+                            <li><strong>⊡</strong> to fit entire graph to window</li>
+                        </ul>
+                    </li>
+                    <li>Click and drag on empty space in the graph window to pan/move the graph around</li>
+                    <li>Keyboard shortcuts: <code>+</code> zoom in, <code>-</code> zoom out, <code>0</code> reset, <code>F</code> fit to window</li>
                 </ol>
 
                 <h3>Edge Types</h3>
@@ -663,6 +745,21 @@
         let colorsLoaded = false; // Track if colors have been loaded
         let helpRetryCount = 0; // Track retry attempts for help
 
+        // Zoom state
+        let currentZoom = 1.0;
+        const zoomStep = 0.1;
+        const minZoom = 0.1;
+        const maxZoom = 3.0;
+
+        // Pan state
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        let panStartOffsetX = 0;
+        let panStartOffsetY = 0;
+
         import { instance } from "https://cdn.jsdelivr.net/npm/@viz-js/viz@3.2.4/+esm";
 
         // Helper function to darken a color
@@ -723,6 +820,197 @@
             });
         }
 
+        // Zoom functionality
+        function updateZoom(newZoom) {
+            currentZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+
+            applyTransform();
+
+            // Update zoom level display
+            const zoomLevelEl = document.getElementById('zoom-level');
+            if (zoomLevelEl) {
+                zoomLevelEl.textContent = `${Math.round(currentZoom * 100)}%`;
+            }
+
+            // Update button states
+            const zoomInBtn = document.getElementById('zoom-in');
+            const zoomOutBtn = document.getElementById('zoom-out');
+            if (zoomInBtn) zoomInBtn.disabled = currentZoom >= maxZoom;
+            if (zoomOutBtn) zoomOutBtn.disabled = currentZoom <= minZoom;
+        }
+
+        function applyTransform() {
+            const svgs = document.querySelectorAll('.graph-svg');
+            svgs.forEach(svg => {
+                svg.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
+                svg.style.transformOrigin = 'top left';
+            });
+        }
+
+        function zoomIn() {
+            updateZoom(currentZoom + zoomStep);
+        }
+
+        function zoomOut() {
+            updateZoom(currentZoom - zoomStep);
+        }
+
+        function zoomReset() {
+            panX = 0;
+            panY = 0;
+            updateZoom(1.0);
+        }
+
+        function zoomFit() {
+            // Get the graph container and SVG elements
+            const graphContainer = document.querySelector('.graph-container');
+            const svg = document.querySelector('.graph-svg');
+
+            if (!graphContainer || !svg) return;
+
+            // Reset any existing transforms first to get true dimensions
+            const originalTransform = svg.style.transform;
+            svg.style.transform = 'none';
+
+            // Get the bounding box of the SVG content
+            const svgBBox = svg.getBBox();
+
+            // Also check the SVG's width/height attributes and viewBox
+            const svgWidth = Math.max(
+                svgBBox.width,
+                svg.width.baseVal.value || 0,
+                parseFloat(svg.getAttribute('width')) || 0
+            );
+            const svgHeight = Math.max(
+                svgBBox.height,
+                svg.height.baseVal.value || 0,
+                parseFloat(svg.getAttribute('height')) || 0
+            );
+
+            // Restore the original transform
+            svg.style.transform = originalTransform;
+
+            if (svgWidth === 0 || svgHeight === 0) {
+                console.warn('Could not determine SVG dimensions for fit-to-window');
+                return;
+            }
+
+            // Get the available space in the graph container
+            // Account for scrollbars and padding
+            const padding = 60;
+            const containerWidth = graphContainer.clientWidth - padding;
+            const containerHeight = graphContainer.clientHeight - padding;
+
+            // Calculate the zoom level needed to fit both dimensions
+            const zoomX = containerWidth / svgWidth;
+            const zoomY = containerHeight / svgHeight;
+
+            // Use the smaller zoom to ensure the entire graph fits in both dimensions
+            let fitZoom = Math.min(zoomX, zoomY);
+
+            // Add a small margin factor to ensure we don't cut off edges
+            fitZoom *= 0.90;
+
+            // Constrain to min/max zoom limits
+            const constrainedZoom = Math.max(minZoom, Math.min(maxZoom, fitZoom));
+
+            // If we hit the min zoom limit, warn the user
+            if (fitZoom < minZoom) {
+                console.warn(`Graph is too large to fit at minimum zoom (${Math.round(minZoom * 100)}%). ` +
+                           `Calculated zoom would be ${Math.round(fitZoom * 100)}%`);
+            }
+
+            // Reset pan and apply the fit zoom
+            panX = 0;
+            panY = 0;
+            updateZoom(constrainedZoom);
+        }
+
+        function setupPanning() {
+            const graphContainer = document.querySelector('.graph-container');
+            if (!graphContainer) return;
+
+            graphContainer.addEventListener('mousedown', (e) => {
+                // Don't pan if clicking on a node or if clicking on zoom controls
+                if (e.target.closest('.node') || e.target.closest('.zoom-controls')) {
+                    return;
+                }
+
+                isPanning = true;
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+                panStartOffsetX = panX;
+                panStartOffsetY = panY;
+                graphContainer.classList.add('dragging');
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isPanning) return;
+
+                const deltaX = e.clientX - panStartX;
+                const deltaY = e.clientY - panStartY;
+
+                panX = panStartOffsetX + deltaX;
+                panY = panStartOffsetY + deltaY;
+
+                applyTransform();
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isPanning) {
+                    isPanning = false;
+                    const graphContainer = document.querySelector('.graph-container');
+                    if (graphContainer) {
+                        graphContainer.classList.remove('dragging');
+                    }
+                }
+            });
+
+            // Reset panning when mouse leaves the window while dragging
+            document.addEventListener('mouseleave', () => {
+                if (isPanning) {
+                    isPanning = false;
+                    const graphContainer = document.querySelector('.graph-container');
+                    if (graphContainer) {
+                        graphContainer.classList.remove('dragging');
+                    }
+                }
+            });
+        }
+
+        function setupZoomControls() {
+            const zoomInBtn = document.getElementById('zoom-in');
+            const zoomOutBtn = document.getElementById('zoom-out');
+            const zoomResetBtn = document.getElementById('zoom-reset');
+            const zoomFitBtn = document.getElementById('zoom-fit');
+
+            if (zoomInBtn) zoomInBtn.addEventListener('click', zoomIn);
+            if (zoomOutBtn) zoomOutBtn.addEventListener('click', zoomOut);
+            if (zoomResetBtn) zoomResetBtn.addEventListener('click', zoomReset);
+            if (zoomFitBtn) zoomFitBtn.addEventListener('click', zoomFit);
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                // Only handle shortcuts when not typing in an input
+                if (e.target.tagName === 'INPUT') return;
+
+                if (e.key === '+' || e.key === '=') {
+                    e.preventDefault();
+                    zoomIn();
+                } else if (e.key === '-' || e.key === '_') {
+                    e.preventDefault();
+                    zoomOut();
+                } else if (e.key === '0') {
+                    e.preventDefault();
+                    zoomReset();
+                } else if (e.key === 'f' || e.key === 'F') {
+                    e.preventDefault();
+                    zoomFit();
+                }
+            });
+        }
+
         // Function to add selection styling to SVG content
         function addSelectionStylingToSvg(svgElement) {
             // svgElement is now a DOM element from viz.renderSVGElement()
@@ -740,7 +1028,7 @@
                     e.stopPropagation();
                 });
             });
-            
+
             // Click on SVG background to deselect
             svgElement.addEventListener('click', function(e) {
                 if (e.target === this) {
@@ -808,6 +1096,8 @@
             loadTreeStructure();
             setupFuzzySearch();
             setupResizer();
+            setupZoomControls();
+            setupPanning();
         });
 
         function loadTreeStructure() {
@@ -1267,25 +1557,34 @@
 
         function displayGraph(dotContent, title, nodes, edges) {
             showLoading('Rendering graph...');
-            
+
+            // Reset pan position for new graph
+            panX = 0;
+            panY = 0;
+
             instance().then(viz => {
                 try {
                     const svgElement = viz.renderSVGElement(dotContent);
-                    
+
                     // Clear the loading message
                     graphContent.innerHTML = '';
-                    
+
                     // Append the SVG element to the graph container
                     graphContent.appendChild(svgElement);
-                    
+
                     // Add selection styling and event handlers
                     const svgs = graphContent.querySelectorAll('svg');
                     svgs.forEach(svg => {
                         svg.classList.add('graph-svg');
-                        svg.style.width = '100%';
-                        svg.style.height = 'auto';
                         addSelectionStylingToSvg(svg);
                     });
+
+                    // Show zoom controls and apply current zoom level
+                    const zoomControls = document.getElementById('zoom-controls');
+                    if (zoomControls) {
+                        zoomControls.style.display = 'flex';
+                    }
+                    updateZoom(currentZoom);
                 } catch (error) {
                     showError(`Error rendering graph: ${error.message}`);
                 }
@@ -1296,10 +1595,20 @@
 
         function showLoading(message) {
             graphContent.innerHTML = `<div class="loading">${message}</div>`;
+            // Hide zoom controls when showing loading/error messages
+            const zoomControls = document.getElementById('zoom-controls');
+            if (zoomControls) {
+                zoomControls.style.display = 'none';
+            }
         }
 
         function showError(message) {
             graphContent.innerHTML = `<div class="loading" style="color: red;">${message}</div>`;
+            // Hide zoom controls when showing loading/error messages
+            const zoomControls = document.getElementById('zoom-controls');
+            if (zoomControls) {
+                zoomControls.style.display = 'none';
+            }
         }
 
         function loadHelpColors() {
@@ -1556,8 +1865,24 @@
             // Expand parent nodes to make the match visible
             expandToShowNode(currentMatch.element);
 
-            // Scroll to the match
-            currentMatch.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Scroll to the match within the sidebar only (don't scroll the entire page)
+            const treeContainer = document.getElementById('tree-container');
+            const sidebar = document.getElementById('sidebar');
+            if (treeContainer && currentMatch.element) {
+                // Get the position of the element relative to the tree container
+                const elementRect = currentMatch.element.getBoundingClientRect();
+                const containerRect = treeContainer.getBoundingClientRect();
+
+                // Calculate the offset within the scrollable container
+                const relativeTop = elementRect.top - containerRect.top;
+                const targetScroll = treeContainer.scrollTop + relativeTop - (containerRect.height / 2) + (elementRect.height / 2);
+
+                // Scroll the tree container smoothly
+                treeContainer.scrollTo({
+                    top: targetScroll,
+                    behavior: 'smooth'
+                });
+            }
 
             // Select the node (which will load its graph)
             const nodeData = getNodeDataFromElement(currentMatch.element);

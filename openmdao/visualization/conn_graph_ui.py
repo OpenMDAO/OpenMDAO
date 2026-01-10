@@ -81,13 +81,7 @@ class ConnGraphHandler(SimpleHTTPRequestHandler):
         # Get all nodes with their data
         nodes_data = {}
         for node_id, node_data in self.conn_graph.nodes(data=True):
-            # Convert tuple node_id to JSON-serializable format
-            if isinstance(node_id, tuple) and len(node_id) == 2:
-                node_id_json = [node_id[0], node_id[1]]
-            else:
-                node_id_json = str(node_id)
-
-            nodes_data[json.dumps(node_id_json)] = {
+            nodes_data[json.dumps(node_id)] = {
                 'rel_name': node_data.get('rel_name', ''),
                 'pathname': node_data.get('pathname', ''),
                 'io': node_id[0] if isinstance(node_id, tuple) and len(node_id) == 2 else '',

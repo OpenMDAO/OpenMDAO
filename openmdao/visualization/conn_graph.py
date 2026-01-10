@@ -4113,7 +4113,7 @@ class AllConnGraph(nx.DiGraph):
         else:
             combined = ''
 
-        label = (f'<table border="0" cellborder="0" cellspacing="0" cellpadding="0">'
+        label = (f'<table border="0" cellborder="0" cellspacing="0" cellpadding="0" width="250">'
                  f'<tr><td align="left" colspan="2"><b>{name}</b></td></tr>'
                  f'{combined}</table>')
 
@@ -4163,6 +4163,9 @@ class AllConnGraph(nx.DiGraph):
             newdata['shape'] = 'box'  # Use box shape with rounded corners
             newdata['pathname'] = meta.pathname
             newdata['rel_name'] = meta.rel_name
+            # Set fixed width to ensure consistent node sizing across all graphs
+            newdata['width'] = '3.5'  # Fixed width in inches
+            newdata['fixedsize'] = 'true'  # Force exact size
             yield node, newdata
 
     def drawable_edge_iter(self, pathname='', show_cross_boundary=True, max_width=50):
@@ -4244,6 +4247,16 @@ class AllConnGraph(nx.DiGraph):
         """
         G = nx.DiGraph()
         G.graph['orientation'] = 'TB'
+        # Don't scale graph to fit - let it render at natural size for scrolling
+        G.graph['ratio'] = 'auto'
+        G.graph['margin'] = '0'
+        # Set consistent node spacing to prevent nodes from being oversized in small graphs
+        G.graph['nodesep'] = '0.5'
+        G.graph['ranksep'] = '0.75'
+        # Prevent graph from expanding to fill arbitrary width
+        G.graph['size'] = '20,100!'  # Max 20 inches wide, unlimited height, don't expand
+        G.graph['pack'] = 'false'  # Don't pack components
+        G.graph['center'] = 'false'  # Don't center the graph
 
         if pathname:
             # special handling for cross boundary connections
@@ -4266,6 +4279,8 @@ class AllConnGraph(nx.DiGraph):
                         'pathname': node_meta['pathname'],
                         'rel_name': node_meta['rel_name'],
                         'fillcolor': GRAPH_COLORS['boundary'],
+                        'width': '3.5',
+                        'fixedsize': 'true',
                     }
                     draw_nodes.append((node, meta))
 
