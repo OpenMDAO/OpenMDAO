@@ -1395,7 +1395,7 @@ class DistribStateImplicit(om.ImplicitComponent):
 
                 tmp = np.zeros(1)
                 if self.comm.rank == 0:
-                    tmp[0] = d_r['out_var'].copy()
+                    tmp[:] = d_r['out_var']
                 self.comm.Bcast(tmp, root=0)
 
                 d_o['states'] -= tmp

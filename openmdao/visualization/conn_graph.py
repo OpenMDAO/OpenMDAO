@@ -828,9 +828,6 @@ class AllConnGraph(nx.DiGraph):
         self._sync_auto_ivcs = {}  # auto_ivcs that require sync when setting intial values
         self._dangling_prom_inputs = set()
 
-    def add_node(self, node, **kwargs):
-        super().add_node(node, **kwargs)
-
     def _collect_error(self, msg, exc_type=None, tback=None, ident=None):
         """
         Save an error message to raise as an exception later.
@@ -4113,7 +4110,7 @@ class AllConnGraph(nx.DiGraph):
         else:
             combined = ''
 
-        label = (f'<table border="0" cellborder="0" cellspacing="0" cellpadding="0" width="250">'
+        label = (f'<table border="0" cellborder="0" cellspacing="0" cellpadding="0">'
                  f'<tr><td align="left" colspan="2"><b>{name}</b></td></tr>'
                  f'{combined}</table>')
 
@@ -4163,9 +4160,6 @@ class AllConnGraph(nx.DiGraph):
             newdata['shape'] = 'box'  # Use box shape with rounded corners
             newdata['pathname'] = meta.pathname
             newdata['rel_name'] = meta.rel_name
-            # Set fixed width to ensure consistent node sizing across all graphs
-            newdata['width'] = '3.5'  # Fixed width in inches
-            newdata['fixedsize'] = 'true'  # Force exact size
             yield node, newdata
 
     def drawable_edge_iter(self, pathname='', show_cross_boundary=True, max_width=50):
@@ -4254,7 +4248,7 @@ class AllConnGraph(nx.DiGraph):
         G.graph['nodesep'] = '0.5'
         G.graph['ranksep'] = '0.75'
         # Prevent graph from expanding to fill arbitrary width
-        G.graph['size'] = '20,100!'  # Max 20 inches wide, unlimited height, don't expand
+        G.graph['size'] = '20,100!'  # Max 20 inches wide, 100 height, don't expand
         G.graph['pack'] = 'false'  # Don't pack components
         G.graph['center'] = 'false'  # Don't center the graph
 
@@ -4279,8 +4273,6 @@ class AllConnGraph(nx.DiGraph):
                         'pathname': node_meta['pathname'],
                         'rel_name': node_meta['rel_name'],
                         'fillcolor': GRAPH_COLORS['boundary'],
-                        'width': '3.5',
-                        'fixedsize': 'true',
                     }
                     draw_nodes.append((node, meta))
 
@@ -4346,6 +4338,8 @@ class AllConnGraph(nx.DiGraph):
         outfile : any
             outfile.
         """
+        if outfile is None:
+            outfile = 'graph.html'
         dot_to_html(self.get_dot(pathname, varname, show_cross_boundary),
                                   outfile=outfile)
 
