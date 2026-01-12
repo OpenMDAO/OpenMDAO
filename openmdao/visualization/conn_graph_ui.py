@@ -407,6 +407,7 @@ def _conn_graph_cmd(options, user_args):
                              post=_view_graph, exit=True)
         hooks._setup_hooks(prob.model)
 
+
     # register the hooks
     hooks._register_hook('setup', 'Problem', pre=_set_dyn_hook, ncalls=1)
     _load_and_exec(options.file[0], user_args)

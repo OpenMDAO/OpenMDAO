@@ -137,7 +137,7 @@ parameterized = "*"
 playwright = "*"
 pycodestyle = "*"
 pydocstyle = "*"
-testflo = "*"
+#testflo = "*"
 websockets = "*"
 actionlint = "*"
 ruff = "*"
@@ -150,9 +150,13 @@ bokeh = "*"
 colorama = "*"
 matplotlib = "*"
 rich = "*"
-graphviz = "*"
-python-graphviz = "*"
-pydot = "*"
+
+
+[feature.dev311.pypi-dependencies]
+openmdao = { path = ".", editable = true}
+dymos = { path = "../dymos", editable = true}
+om-pycycle = { path = "../pyCycle", editable = true}
+testflo = { path= "../testflo", editable = true}
 
 
 ###############################################
@@ -174,7 +178,7 @@ networkx = "==3.3"
 # Default - uses whatever Python solver picks
 default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test"], solve-group = "default" }
 dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging"], solve-group = "default" }
-dev311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging"], solve-group = "dev311" }
+dev311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging", "dev311"], solve-group = "dev311" }
 minimal = { features = ["py313", "test"], solve-group = "default" }
 
 # Oldest supported versions
