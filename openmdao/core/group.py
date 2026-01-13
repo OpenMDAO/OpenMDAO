@@ -11,6 +11,7 @@ import numpy as np
 import networkx as nx
 
 from openmdao.core.configinfo import _ConfigInfo
+from openmdao.core.conn_graph import AllConnGraph
 from openmdao.core.system import System
 from openmdao.core.component import Component, _DictValues
 from openmdao.core.implicitcomponent import ImplicitComponent
@@ -41,7 +42,6 @@ from openmdao.utils.name_maps import LOCAL, CONTINUOUS, DISTRIBUTED
 from openmdao.jacobians.dictionary_jacobian import DictionaryJacobian
 from openmdao.jacobians.subjac import Subjac
 from openmdao.jacobians.jacobian import GroupJacobianUpdateContext
-from openmdao.visualization.conn_graph import AllConnGraph
 from openmdao.utils.indexer import idx_list_to_index_array
 
 
@@ -401,7 +401,7 @@ class Group(System):
         # This is a combined scale factor that includes the scaling of the connected source
         # and the unit conversion between the source output and each target input.
         if self._has_input_scaling:
-            graph = self._get_conn_graph()
+            graph = self.get_conn_graph()
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
             for abs_in, meta_in in self._var_abs2meta['input'].items():
                 src = self._conn_global_abs_in2out[abs_in]
@@ -581,7 +581,7 @@ class Group(System):
         if self.pathname == '':
             self._conn_graph = AllConnGraph()
 
-        # self._get_conn_graph().update(self._static_conn_graph)
+        # self.get_conn_graph().update(self._static_conn_graph)
 
         # Call setup function for this group.
         self.setup()
@@ -806,7 +806,7 @@ class Group(System):
         # called after _setup_var_data, and _setup_var_data will have to be partially redone
         # after auto_ivcs have been added, but auto_ivcs can't be added until after we know all of
         # the connections.
-        self._get_conn_graph().setup_global_connections(self)
+        self.get_conn_graph().setup_global_connections(self)
 
     def _get_dataflow_graph(self):
         """
@@ -904,7 +904,7 @@ class Group(System):
                 else:
                     srcdict[src] = [meta]
 
-        graph = self._get_conn_graph()
+        graph = self.get_conn_graph()
 
         # loop over any sources having multiple aliases to ensure no overlap of indices
         for src, metalist in srcdict.items():
@@ -1051,7 +1051,7 @@ class Group(System):
 
     def _setup_dynamic_properties(self):
         # called on the top level Group only
-        graph = self._get_conn_graph()
+        graph = self.get_conn_graph()
         if graph._has_dynamic_shapes:
             self._setup_dynamic_property('shape')
         if graph._has_dynamic_units:
@@ -1066,7 +1066,7 @@ class Group(System):
         """
         self._setup_dynamic_properties()
 
-        graph = self._get_conn_graph()
+        graph = self.get_conn_graph()
         graph.update_all_node_meta(self)
 
         self._check_order()
@@ -1204,7 +1204,7 @@ class Group(System):
         if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self._problem_meta['setup_status'] = _SetupStatus.POST_FINAL_SETUP
 
-        graph = self._get_conn_graph()
+        graph = self.get_conn_graph()
         for name in chain(self._var_abs2meta['output'], self._var_discrete['output']):
             node = ('o', name)
             node_meta = graph.nodes[node]['attrs']
@@ -1421,7 +1421,7 @@ class Group(System):
         self._has_distrib_vars = False
         self._has_fd_group = self._owns_approx_jac
         rank = self.comm.rank
-        conn_graph = self._get_conn_graph()
+        conn_graph = self.get_conn_graph()
 
         # sort the subsystems alphabetically in order to make the ordering
         # of vars in vectors and other data structures independent of the
@@ -1660,7 +1660,7 @@ class Group(System):
             self._owned_output_sizes = self._var_sizes['output']
 
         if self.pathname == '':
-            graph = self._get_conn_graph()
+            graph = self.get_conn_graph()
             graph._owned_output_sizes = self._owned_output_sizes
             graph._var_allprocs_abs2idx = self._var_allprocs_abs2idx
             graph._owning_rank = self._owning_rank
@@ -1747,7 +1747,7 @@ class Group(System):
         """
         knowns = set()
         all_abs2meta_out = self._var_allprocs_abs2meta['output']
-        conn_graph = self._get_conn_graph()
+        conn_graph = self.get_conn_graph()
         conn_nodes = conn_graph.nodes
 
         if prop == 'shape':
@@ -1960,7 +1960,7 @@ class Group(System):
 
         Also, check shapes of connected variables.
         """
-        conn_graph = self._get_conn_graph()
+        conn_graph = self.get_conn_graph()
         conn_nodes = conn_graph.nodes
 
         abs_in2out = self._conn_abs_in2out
@@ -2886,7 +2886,7 @@ class Group(System):
         Call setup_partials in components.
         """
         self._subjacs_info = info = {}
-        graph = self._get_conn_graph()
+        graph = self.get_conn_graph()
         nodes = graph.nodes()
 
         for subsys in self._sorted_subsystems_myproc:
@@ -3050,7 +3050,7 @@ class Group(System):
 
             abs2idx = self._var_allprocs_abs2idx
             sizes = self._var_sizes['output']
-            graph = self._get_conn_graph()
+            graph = self.get_conn_graph()
 
             # szname = 'global_size' if total else 'size'
             # we're computing totals/semi-totals (vars may not be local)
@@ -3119,7 +3119,7 @@ class Group(System):
             abs2meta = self._var_allprocs_abs2meta
             local_ins = self._var_abs2meta['input']
             local_outs = self._var_abs2meta['output']
-            graph = self._get_conn_graph()
+            graph = self.get_conn_graph()
 
             seen = set()
             start = end = 0
@@ -3371,7 +3371,7 @@ class Group(System):
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
-        graph = self._get_conn_graph()
+        graph = self.get_conn_graph()
 
         auto2tgt = {}
         for srcnode in graph.nodes():
@@ -3957,7 +3957,7 @@ class Group(System):
                                       outfile=outfile)
 
     def display_conn_graph(self, varname=None, outfile=None):
-        self._get_conn_graph().display(self.pathname, varname=varname, outfile=outfile)
+        self.get_conn_graph().display(self.pathname, varname=varname, outfile=outfile)
 
     def _column_iotypes(self):
         """

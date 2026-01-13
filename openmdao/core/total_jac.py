@@ -579,7 +579,7 @@ class _TotalJacInfo(object):
         """
         iproc = self.comm.rank
         model = self.model
-        graph = model._get_conn_graph()
+        graph = model.get_conn_graph()
         has_par_deriv_color = False
         var_sizes = model._var_sizes
         var_offsets = model._get_var_offsets()

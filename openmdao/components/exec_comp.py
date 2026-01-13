@@ -693,7 +693,7 @@ class ExecComp(ExplicitComponent):
                     self._coloring_info.dynamic = False
 
             decl_partials = super().declare_partials
-            nodes = self._get_conn_graph().nodes
+            nodes = self.get_conn_graph().nodes
             for outs, vs, _ in self._exprs_info:
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):

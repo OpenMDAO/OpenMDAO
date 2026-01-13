@@ -1,7 +1,7 @@
 import unittest
 import openmdao.api as om
 import numpy as np
-from openmdao.visualization.conn_graph import is_equal, are_compatible_values
+from openmdao.core.conn_graph import is_equal, are_compatible_values
 from openmdao.utils.mpi import MPI
 
 
@@ -61,8 +61,8 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        # prob.model._get_conn_graph().display()
-        # prob.model._get_conn_graph().dump()
+        # prob.model.get_conn_graph().display()
+        # prob.model.get_conn_graph().dump()
         #print('done')
 
     def test_promoted_branching_output(self):
@@ -81,7 +81,7 @@ class TestAllConnectionTypes(unittest.TestCase):
 
         #prob.model.display_conn_graph()
         #prob.model.G2.display_conn_graph()
-        #prob.model._get_conn_graph().dump()
+        #prob.model.get_conn_graph().dump()
         #print('done')
 
     def test_promoted_branching_output_autoivc(self):
@@ -99,8 +99,8 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        #prob.model._get_conn_graph().display()
-        #prob.model._get_conn_graph().dump()
+        #prob.model.get_conn_graph().display()
+        #prob.model.get_conn_graph().dump()
         #print('done')
 
     def test_promoted_autoivc(self):
@@ -124,7 +124,7 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        #prob.model._get_conn_graph().display()
+        #prob.model.get_conn_graph().display()
 
     def test_no_promotion_input_to_input(self):
         prob = self.build_nested_model(promote=False, autoivc=True)
@@ -140,7 +140,7 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.run_model()
 
         #prob.model.display_conn_graph()
-        #prob.model._get_conn_graph().dump()
+        #prob.model.get_conn_graph().dump()
         #print('done')
 
     #def test_promotion_input_to_input(self):
@@ -153,7 +153,7 @@ class TestAllConnectionTypes(unittest.TestCase):
         #prob.run_model()
 
         #prob.model.display_conn_graph()
-        #prob.model._get_conn_graph().dump()
+        #prob.model.get_conn_graph().dump()
         #print('done')
 
 

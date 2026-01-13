@@ -373,7 +373,19 @@ def dump_edges(G, show_none=False):
 
 
 def escape_dot_string(s):
-    """Escape special characters for DOT format"""
+    """
+    Escape special characters for DOT format.
+
+    Parameters
+    ----------
+    s : str
+        The string to escape.
+
+    Returns
+    -------
+    str
+        The escaped string.
+    """
     # Escape backslashes and quotes
     s = s.replace('\\', '\\\\')
     s = s.replace('"', '\\"')
@@ -381,6 +393,21 @@ def escape_dot_string(s):
 
 
 def _get_dot_label_str(G, node):
+    """
+    Get the DOT label string for the given node.
+
+    Parameters
+    ----------
+    G : networkx.DiGraph
+        Directed graph of Systems and variables.
+    node : str
+        The name of the node.
+
+    Returns
+    -------
+    str
+        The DOT label string for the given node.
+    """
     attrs = G.nodes[node]
 
     # Check if label is HTML (indicated by html_label attribute)

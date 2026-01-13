@@ -719,7 +719,7 @@ class System(object, metaclass=SystemMetaclass):
         toidx = self._var_allprocs_abs2idx
         sizes = self._var_sizes['output']
         total = self.pathname == ''
-        graph = self._get_conn_graph()
+        graph = self.get_conn_graph()
         start = end = 0
         for of in self._var_abs2meta['output']:
             meta = graph.nodes[('o', of)]['attrs']
@@ -771,7 +771,7 @@ class System(object, metaclass=SystemMetaclass):
                 yield of, start, end, vec, _full_slice, dist_sizes
                 start = end
 
-        graph = self._get_conn_graph()
+        graph = self.get_conn_graph()
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
                 meta = graph.nodes[('i', wrt)]['attrs']
@@ -3772,7 +3772,7 @@ class System(object, metaclass=SystemMetaclass):
 
         key = prom_name if use_prom_ivc else src_name
 
-        graph = self._get_conn_graph()
+        graph = self.get_conn_graph()
         src_node_meta = graph.nodes[('o', src_name)]['attrs']
 
         meta['source'] = src_name
@@ -3879,7 +3879,7 @@ class System(object, metaclass=SystemMetaclass):
             Use promoted names for inputs, else convert to absolute source names.
         """
         model = self._problem_meta['model_ref']()
-        graph = model._get_conn_graph()
+        graph = model.get_conn_graph()
 
         alias = meta['alias']
         prom = meta['name']  # 'usually' a promoted name, but can be absolute
@@ -5459,17 +5459,15 @@ class System(object, metaclass=SystemMetaclass):
         return set(s for s in self.system_iter(include_self=True, recurse=True)
                    if s.nonlinear_solver and s.nonlinear_solver.supports['gradients'])
 
-    # def _get_conn_graph(self):
-    #     if self._problem_meta is None:
-    #         return self._static_conn_graph
+    def get_conn_graph(self):
+        """
+        Return the model connection graph.
 
-    #     model = self._problem_meta['model_ref']()
-    #     if model is None:
-    #         return self._static_conn_graph
-
-    #     return model._conn_graph
-
-    def _get_conn_graph(self):
+        Returns
+        -------
+        AllConnGraph
+            The model connection graph.
+        """
         if self._problem_meta is None:
             return None
         model =  self._problem_meta['model_ref']()
@@ -5517,7 +5515,7 @@ class System(object, metaclass=SystemMetaclass):
         else:
             system = self
 
-        graph = self._get_conn_graph()
+        graph = self.get_conn_graph()
         node = ('o', abs_name)
         if node in graph:
             typ = 'output'
@@ -5681,7 +5679,7 @@ class System(object, metaclass=SystemMetaclass):
                 else:
                     val = self._outputs[name]
         else:
-            graph =   self._get_conn_graph()
+            graph =   self.get_conn_graph()
             val = graph.get_val(self, name, units, indices, get_remote, rank,
                                 vec_name, kind, flat, from_src)
 
@@ -5724,7 +5722,7 @@ class System(object, metaclass=SystemMetaclass):
                 else:
                     self._outputs[name] = val
         else:
-            graph = self._get_conn_graph()
+            graph = self.get_conn_graph()
             graph.set_val(self, name, val, units=units, indices=indices)
 
     def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, local=False):
@@ -5860,7 +5858,7 @@ class System(object, metaclass=SystemMetaclass):
             The value converted to the specified units.
         """
         # this isn't used any more, but leaving it here since it's a public method
-        base_units = self._get_conn_graph().get_meta(name)['units']
+        base_units = self.get_conn_graph().get_meta(name)['units']
 
         if base_units == units:
             return val

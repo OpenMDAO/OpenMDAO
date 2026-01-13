@@ -1189,10 +1189,10 @@ class Problem(object, metaclass=ProblemMetaclass):
             self._metadata['mode'] = mode
 
             if self.model.comm.size > 1:
-                model._get_conn_graph().sync_auto_ivcs(model)
+                model.get_conn_graph().sync_auto_ivcs(model)
         else:
             if self.model.comm.size > 1:
-                model._get_conn_graph().sync_auto_ivcs(model)
+                model.get_conn_graph().sync_auto_ivcs(model)
 
             first = False
             mode = self._metadata['mode']

@@ -1444,7 +1444,7 @@ class LocalRangeIterable(object):
         self._vname = vname
         self._var_size = 0
 
-        graph = system._get_conn_graph()
+        graph = system.get_conn_graph()
 
         all_abs2meta = system._var_allprocs_abs2meta['output']
         if vname in all_abs2meta:

@@ -450,7 +450,7 @@ def _merge(inds_list, tot_size):
 def _get_output_inds(group, abs_out, abs_in):
     meta_in = group._var_abs2meta['input'][abs_in]
     out_dist = group._var_allprocs_abs2meta['output'][abs_out]['distributed']
-    src_indices = group._get_conn_graph().get_src_index_array(abs_in)
+    src_indices = group.get_conn_graph().get_src_index_array(abs_in)
 
     rank = group.comm.rank if abs_out in group._var_abs2meta['output'] else \
         group._owning_rank[abs_out]

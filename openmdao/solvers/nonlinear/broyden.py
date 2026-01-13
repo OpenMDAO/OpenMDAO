@@ -181,7 +181,7 @@ class BroydenSolver(NonlinearSolver):
             prom2abs = system._resolver.prom2abs
             # User has specified states, so we must size them.
             n = 0
-            graph = system._get_conn_graph()
+            graph = system.get_conn_graph()
 
             for name in states:
                 #size = meta[prom2abs(name, 'output')]['global_size']

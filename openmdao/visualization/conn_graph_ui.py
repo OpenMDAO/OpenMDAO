@@ -12,7 +12,7 @@ import json
 from http.server import SimpleHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
 
-from openmdao.visualization.conn_graph import GRAPH_COLORS
+from openmdao.core.conn_graph import GRAPH_COLORS
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
 
@@ -389,9 +389,9 @@ def _conn_graph_cmd(options, user_args):
             Model owning the connection graph.
         """
         if options.varname:
-            model._get_conn_graph().display(varname=options.varname)
+            model.get_conn_graph().display(varname=options.varname)
         else:
-            model._get_conn_graph().serve(port=options.port)
+            model.get_conn_graph().serve(port=options.port)
 
     # register the hooks
     def _set_dyn_hook(prob):

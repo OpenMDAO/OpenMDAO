@@ -41,14 +41,14 @@ GRAPH_COLORS = {
 
 _shape_func_map = {
     # (src distributed, tgt distributed, fwd)
-    (False, False, True): 'serial2serialfwd',
-    (False, False, False): 'serial2serialrev',
-    (False, True, True): 'serial2distfwd',
-    (False, True, False): 'serial2distrev',
-    (True, False, True): 'dist2serialfwd',
-    (True, False, False): 'dist2serialrev',
-    (True, True, True): 'dist2distfwd',
-    (True, True, False): 'dist2distrev',
+    (False, False, True): 'serial2serial_fwd_shape',
+    (False, False, False): 'serial2serial_rev_shape',
+    (False, True, True): 'serial2dist_fwd_shape',
+    (False, True, False): 'serial2dist_rev_shape',
+    (True, False, True): 'dist2serial_fwd_shape',
+    (True, False, False): 'dist2serial_rev_shape',
+    (True, True, True): 'dist2dist_fwd_shape',
+    (True, True, False): 'dist2dist_rev_shape',
 }
 
 
@@ -276,15 +276,16 @@ class NodeAttrs():
         """
         self.pathname = pathname
         self.rel_name = rel_name
+        self.defaults = Defaults(None, None, None)
+        self._meta = None
+        self._locmeta = None
+
         self.flags = flag_type(0)
         self._src_inds_list = []
         self._val = None
         self._shape = None
         self._global_shape = None
         self._units = None
-        self._meta = None
-        self._locmeta = None
-        self.defaults = Defaults(None, None, None)
         self.copy_shape = None
         self.compute_shape = None
         self.copy_units = None
@@ -904,17 +905,18 @@ class AllConnGraph(nx.DiGraph):
         raise KeyError(msg)
 
     def top_name(self, node):
-        """Top name.
+        """
+        Return the variable name relative to the top level group.
 
         Parameters
         ----------
-        node : any
-            node.
+        node : tuple of the form ('i' or 'o', name)
+            The node to get the top name for.
 
         Returns
         -------
-        any
-            Returned value.
+        str or None
+            The variable name relative to the top level group or None if the node is not connected.
         """
         if node[0] == 'i':
             root = self.input_root(node)
@@ -926,7 +928,6 @@ class AllConnGraph(nx.DiGraph):
             for _, v in dfs_edges(self, node):
                 if v[0] == 'o' and self.out_degree(v) == 0:
                     return v[1]
-            return None
 
     def base_error(self, msg, src, tgt, src_indices=None):
         """
@@ -934,18 +935,18 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        msg : any
+        msg : str
             msg.
-        src : any
+        src : tuple of the form ('i' or 'o', name)
             source.
-        tgt : any
+        tgt : tuple of the form ('i' or 'o', name)
             target.
-        src_indices : any
+        src_indices : Indexer or None
             source indices.
 
         Returns
         -------
-        any
+        str
             Returned value.
         """
         edge = (src, tgt)
@@ -975,18 +976,18 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        src : any
+        src : tuple of the form ('i' or 'o', name)
             source.
-        tgt : any
+        tgt : tuple of the form ('i' or 'o', name)
             target.
-        src_shape : any
+        src_shape : tuple
             source shape.
-        tgt_shape : any
+        tgt_shape : tuple
             target shape.
 
         Returns
         -------
-        any
+        str
             Returned value.
         """
         return self.base_error(f"shape {src_shape} of '{src[1]}' is incompatible with shape "
@@ -998,11 +999,11 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        going_up : any
+        going_up : bool
             going up.
-        src : any
+        src : tuple of the form ('i' or 'o', name)
             source.
-        tgt : any
+        tgt : tuple of the form ('i' or 'o', name)
             target.
         src_val : any
             source val.
@@ -1011,7 +1012,7 @@ class AllConnGraph(nx.DiGraph):
 
         Returns
         -------
-        any
+        str
             Returned value.
         """
         if going_up:
@@ -1034,20 +1035,20 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        going_up : any
+        going_up : bool
             going up.
-        src : any
+        src : tuple of the form ('i' or 'o', name)
             source.
-        tgt : any
+        tgt : tuple of the form ('i' or 'o', name)
             target.
-        src_units : any
+        src_units : str
             source units.
-        tgt_units : any
+        tgt_units : str
             target units.
 
         Returns
         -------
-        any
+        str
             Returned value.
         """
         if going_up:
@@ -1063,14 +1064,14 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        going_up : any
+        going_up : bool
             going up.
-        src : any
+        src : tuple of the form ('i' or 'o', name)
             source.
-        tgt : any
+        tgt : tuple of the form ('i' or 'o', name)
             target.
-        exc : any
-            exc.
+        exc : Exception
+            The exception to handle.
         """
         if going_up:
             src, tgt = tgt, src
@@ -1151,19 +1152,20 @@ class AllConnGraph(nx.DiGraph):
         return f'{node[1]} ({names})'
 
     def startswith(self, prefix, node):
-        """Startswith.
+        """
+        Check if the node name starts with the prefix.
 
         Parameters
         ----------
-        prefix : any
-            prefix.
-        node : any
-            node.
+        prefix : str
+            The prefix to check.
+        node : tuple of the form ('i' or 'o', name)
+            The node to check.
 
         Returns
         -------
-        any
-            Returned value.
+        bool
+            True if the node name starts with the prefix, False otherwise.
         """
         if prefix:
             return node[1].startswith(prefix)
@@ -1214,32 +1216,33 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        system : any
-            system.
-        name : any
-            name.
-        units : any
-            units.
-        indices : any
+        system : System
+            The System requesting the value.
+        name : str
+            The name of the variable to get the value of.
+        units : str or None
+            The units to convert to before returning the value.
+        indices : int or iter of ints or None
+            The indices or slice to return.
             indices.
-        get_remote : any
-            get remote.
-        rank : any
-            rank.
-        vec_name : any
-            vector name.
-        kind : any
-            kind.
-        flat : any
-            flat.
-        use_vec : any
-            use vector.
-        src_node : any
-            source node.
+        get_remote : bool
+            If True, retrieve the value even if it is on a remote process.
+        rank : int or None
+            If not None, only gather the value to this rank.
+        vec_name : str
+            The name of the vector to use.
+        kind : str or None
+            The kind of variable to get the value of.
+        flat : bool
+            If True, return the flattened version of the value.
+        use_vec : bool
+            If True, use the vector to get the value.
+        src_node : tuple of the form ('i' or 'o', name) or None
+            The source node.
 
         Returns
         -------
-        any
+        numpy.ndarray
             Returned value.
         """
         node = self.find_node(system.pathname, name)
@@ -1300,24 +1303,6 @@ class AllConnGraph(nx.DiGraph):
 
         return val
 
-    def get_local_abs_in(self, system, name):
-        """
-        Retrieve the absolute name of a local input attached to the given name.
-
-        The name may be promoted or absolute.
-
-        Parameters
-        ----------
-        system : System
-            The scoping system.
-        name : str
-            The promoted or absolute input name.
-        """
-        absnames = system._resolver.absnames(name, 'input')
-        for absname in absnames:
-            if not self.nodes[('i', absname)]['attrs'].remote:
-                return absname
-
     def get_val(self, system, name, units=None, indices=None, get_remote=False, rank=None,
                 vec_name='nonlinear', kind=None, flat=False, from_src=True):
         """
@@ -1348,7 +1333,7 @@ class AllConnGraph(nx.DiGraph):
 
         Returns
         -------
-        any
+        numpy.ndarray
             Returned value.
         """
         if indices is not None and not isinstance(indices, Indexer):
@@ -1622,19 +1607,11 @@ class AllConnGraph(nx.DiGraph):
 
             src_inds_list = tgt_meta.src_inds_list
 
-            if tgt_meta.distributed:
-                if src_dist:  # dist --> dist
-                    pass
-                else:  # serial --> dist
-                    pass
-            else:
-                if src_dist:  # dist --> serial
-                    pass
-                else:  # serial --> serial
-                    if src_inds_list:
-                        tgt_meta.val = self.get_subarray(srcval, src_inds_list)
-                    else:
-                        tgt_meta.val = srcval
+            if not (src_dist or tgt_meta.distributed): # serial --> serial
+                if src_inds_list:
+                    tgt_meta.val = self.get_subarray(srcval, src_inds_list)
+                else:
+                    tgt_meta.val = srcval
 
             if has_vecs:
                 if tgt_meta.discrete:
@@ -1694,9 +1671,8 @@ class AllConnGraph(nx.DiGraph):
             The source node.
         tgt : tuple of the form ('i' or 'o', name)
             The target node.
-        **kwargs : any
+        **kwargs : dict
             The keyword arguments to add the edge.
-            group.
         """
         if (src, tgt) in self.edges():
             return
@@ -3278,13 +3254,13 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        model : any
+        model : Group
             model.
 
         Returns
         -------
-        any
-            Returned value.
+        list of tuples of the form ('o', name)
+            The auto IVC nodes added.
         """
         assert model.pathname == ''
         in_degree = self.in_degree
@@ -3358,8 +3334,8 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        model : any
-            model.
+        model : Group
+            The top level group.
         """
         nodes = self.nodes
         for abs_out in self._var_allprocs_abs2meta['output']:
@@ -3423,9 +3399,9 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        model : any
-            model.
-        implicit_conn_vars : any
+        model : Group
+            The top level group.
+        implicit_conn_vars : list of tuples of the form (pathname, relname)
             implicit conn vars.
         """
         for pathname, relname in implicit_conn_vars:
@@ -3442,8 +3418,8 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        model : any
-            model.
+        model : Group
+            The top level group.
         """
         edges = self.edges
         nodes = self.nodes
@@ -3470,13 +3446,13 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        node : any
-            node.
+        node : tuple of the form ('i' or 'o', name)
+            The node to get the anchored input node for.
 
         Returns
         -------
-        any
-            Returned value.
+        tuple
+            The source attachment point and its predecessor.
         """
         for n in self.bfs_down_iter(node, include_self=False):
             for p in self.predecessors(n):
@@ -3493,8 +3469,8 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        model : any
-            model.
+        model : Group
+            The top level group.
         """
         edges = self.edges
         nodes = self.nodes
@@ -3617,13 +3593,13 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        node : any
-            node.
+        node : tuple of the form ('i' or 'o', name)
+            The starting node..
 
         Returns
         -------
-        any
-            Returned value.
+        tuple of the form ('i' or 'o', name) or None
+            The root node.
         """
         in_degree = self.in_degree
         for n in self.bfs_up_iter(node):
@@ -3632,8 +3608,9 @@ class AllConnGraph(nx.DiGraph):
 
         # if we get here, node is an input promoted above the attachment point of its source output
         # or an absolute input
+
         if in_degree(node) == 0 and self.out_degree(node) == 0:
-            return node
+            return node  # unconnected node
 
         for n in self.bfs_down_iter(node, include_self=False):
             # look for output predecessors
@@ -3684,13 +3661,13 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        node : any
-            node.
+        node : tuple of the form ('i' or 'o', name)
+            The starting node.
 
         Yields
         ------
-        any
-            Yielded value.
+        tuple of the form ('i' or 'o', name)
+            A leaf input node.
         """
         if node[0] == 'i' and self.out_degree(node) == 0:
             yield node
@@ -3701,17 +3678,18 @@ class AllConnGraph(nx.DiGraph):
                     yield node
 
     def absnames(self, node):
-        """Absnames.
+        """
+        Get the absolute names associated with a node.
 
         Parameters
         ----------
-        node : any
-            node.
+        node : tuple of the form ('i' or 'o', name)
+            The node to get the absolute names for.
 
         Returns
         -------
-        any
-            Returned value.
+        list of str
+            The absolute names associated with the node.
         """
         if node[0] == 'i':
             return [n for _, n in self.leaf_input_iter(node)]
@@ -3798,17 +3776,18 @@ class AllConnGraph(nx.DiGraph):
                 idx.indexed_val_set(prev, sub)
 
     def get_src_index_array(self, abs_in):
-        """Get source index array.
+        """
+        Get the source index array for a given absolute input name.
 
         Parameters
         ----------
-        abs_in : any
-            absolute in.
+        abs_in : str
+            The absolute input name.
 
         Returns
         -------
-        any
-            Returned value.
+        numpy.ndarray or None
+            The source index array or None if the input is not found.
         """
         node = ('i', abs_in)
         if node not in self:
@@ -3832,31 +3811,32 @@ class AllConnGraph(nx.DiGraph):
 
     def convert_get(self, node, val, src_units, tgt_units, src_inds_list=(), units=None,
                     indices=None, get_remote=False):
-        """Convert value for get.
+        """
+        Convert the value for a given node based on units and indices.
 
         Parameters
         ----------
-        node : any
-            node.
-        val : any
-            val.
-        src_units : any
-            source units.
-        tgt_units : any
-            target units.
-        src_inds_list : any
-            source indices list.
-        units : any
-            units.
-        indices : any
-            indices.
-        get_remote : any
-            get remote.
+        node : tuple of the form ('i' or 'o', name)
+            The node to convert the value for.
+        val : numpy.ndarray
+            The value to convert.
+        src_units : str
+            The source units.
+        tgt_units : str
+            The target units.
+        src_inds_list : list of Indexer
+            The source indices list.
+        units : str or None
+            The units to convert to.
+        indices : Indexer or None
+            The indices to convert.
+        get_remote : bool
+            Whether to get the remote value.
 
         Returns
         -------
-        any
-            Returned value.
+        numpy.ndarray
+            The converted value.
         """
         node_meta = self.nodes[node]['attrs']
 
@@ -3892,22 +3872,23 @@ class AllConnGraph(nx.DiGraph):
         return val
 
     def convert_set(self, val, src_units, tgt_units, src_inds_list=(), units=None, indices=None):
-        """Convert value for set.
+        """
+        Convert the value for a given node based on units and indices.
 
         Parameters
         ----------
-        val : any
+        val : numpy.ndarray
             val.
-        src_units : any
-            source units.
-        tgt_units : any
-            target units.
-        src_inds_list : any
-            source indices list.
-        units : any
-            units.
-        indices : any
-            indices.
+        src_units : str
+            The source units.
+        tgt_units : str
+            The target units.
+        src_inds_list : list of Indexer
+            The source indices list.
+        units : str or None
+            The units to convert to.
+        indices : Indexer or None
+            The indices to convert.
 
         Returns
         -------
@@ -4030,15 +4011,16 @@ class AllConnGraph(nx.DiGraph):
             Parameters
             ----------
             name : str
-                name.
+                The name of the attribute.
             meta : NodeAttrs
                 The metadata for the node.
             mods : list of str
                 Modifiers for the html.
-            max_width : any
+            max_width : int or None
                 The maximum width of the content.
-            show_always : any
-                Whether to show the content always.
+            show_always : bool
+                Whether to show the content always. If True, the content will be shown regardless of
+                whether it is None, False, or an empty list.
 
             Returns
             -------
@@ -4113,13 +4095,6 @@ class AllConnGraph(nx.DiGraph):
         label = (f'<table border="0" cellborder="0" cellspacing="0" cellpadding="0">'
                  f'<tr><td align="left" colspan="2"><b>{name}</b></td></tr>'
                  f'{combined}</table>')
-
-        # label = (f'<table border="0" cellborder="0" cellspacing="0" cellpadding="0">'
-        #          f'<tr><td><b>{name}</b></td></tr>'
-        #          f'<tr><td><table border="0" cellborder="0" cellspacing="0" cellpadding="0">'
-        #          f'{combined}'
-        #          f'</table></td></tr>'
-        #          f'</table>')
 
         return label
 
@@ -4293,50 +4268,44 @@ class AllConnGraph(nx.DiGraph):
             tree = nx.node_connected_component(G.to_undirected(as_view=True), varnode)
             G = nx.subgraph(G, tree)
 
-        # replace = {}
-        # for node in G.nodes():
-        #     # quote node names containing certain characters for use in dot
-        #     _, name = node
-        #     if ':' in name or '<' in name:
-        #         replace[node] = f'"{node}"'
-
-        # if replace:
-        #     G = nx.relabel_nodes(G, replace)
-
         return G
 
     def get_dot(self, pathname='', varname=None, show_cross_boundary=True):
-        """Get DOT.
+        """
+        Get DOT representation of the connection graph.
 
         Parameters
         ----------
-        pathname : any
-            pathname.
-        varname : any
-            varname.
-        show_cross_boundary : any
-            show cross boundary.
+        pathname : str
+            The pathname of the system to display.
+        varname : str or None
+            Display the connection tree associated with this variable.  If None, display the entire
+            collection graph.
+        show_cross_boundary : bool
+            Whether to show cross boundary connections.
 
         Returns
         -------
-        any
-            Returned value.
+        str
+            The DOT representation of the connection graph.
         """
         return networkx_to_dot(self.get_drawable_graph(pathname, varname, show_cross_boundary))
 
     def display(self, pathname='', varname=None, show_cross_boundary=True, outfile='graph.html'):
-        """Display.
+        """
+        Display the connection graph.
 
         Parameters
         ----------
-        pathname : any
-            pathname.
-        varname : any
-            varname.
-        show_cross_boundary : any
-            show cross boundary.
-        outfile : any
-            outfile.
+        pathname : str
+            The pathname of the system to display.
+        varname : str or None
+            Display the connection tree associated with this variable.  If None, display the entire
+            collection graph.
+        show_cross_boundary : bool
+            Whether to show cross boundary connections.
+        outfile : str
+            The name of the file to write the graph to.
         """
         if outfile is None:
             outfile = 'graph.html'
@@ -4344,12 +4313,13 @@ class AllConnGraph(nx.DiGraph):
                                   outfile=outfile)
 
     def print_tree(self, name):
-        """Print tree.
+        """
+        Print the tree of a given variable.
 
         Parameters
         ----------
-        name : any
-            name.
+        name : str
+            The name of the variable to print the tree of.
         """
         if name in self:
             node = name
@@ -4369,7 +4339,16 @@ class AllConnGraph(nx.DiGraph):
             print(f"{indent}{node[1]}  {dismeta}")
 
     def serve(self, port=None, open_browser=True):
-        """Serve connection graph web UI."""
+        """
+        Serve the connection graph web UI.
+
+        Parameters
+        ----------
+        port : int or None
+            The port to serve the graph on. If None, an unused port will be found.
+        open_browser : bool
+            Whether to open the browser to the graph.
+        """
         from openmdao.visualization.conn_graph_ui import ConnGraphHandler
         import socket
 
@@ -4506,20 +4485,20 @@ class AllConnGraph(nx.DiGraph):
 
         return self._var_existence
 
-    def serial2serialfwd(self, from_node, to_node, src_inds_list, is_full_slice):
+    def serial2serial_fwd_shape(self, from_node, to_node, src_inds_list, is_full_slice):
         """
         Compute the shape for a serial to serial connection.
 
         Parameters
         ----------
         from_node : tuple of the form ('i' or 'o', name)
-            from node.
+            The from node.
         to_node : tuple of the form ('i' or 'o', name)
-            to node.
+            The to node.
         src_inds_list : list of Indexers
             The source indices list.
-        is_full_slice : any
-            Whether the source is a full slice.
+        is_full_slice : bool
+            If True, the source is a full slice.
 
         Returns
         -------
@@ -4535,20 +4514,20 @@ class AllConnGraph(nx.DiGraph):
         self.nodes[to_node]['attrs'].shape = shp
         return shp
 
-    def serial2serialrev(self, from_node, to_node, src_inds_list, is_full_slice):
+    def serial2serial_rev_shape(self, from_node, to_node, src_inds_list, is_full_slice):
         """
         Compute the shape for a serial to serial reverse connection.
 
         Parameters
         ----------
         from_node : tuple of the form ('i' or 'o', name)
-            from node.
+            The from node.
         to_node : tuple of the form ('i' or 'o', name)
-            to node.
-        src_inds_list : any
+            The to node.
+        src_inds_list : list of Indexers
             The source indices list.
         is_full_slice : bool
-            Whether the source is a full slice.
+            If True, the source is a full slice.
 
         Returns
         -------
@@ -4566,20 +4545,20 @@ class AllConnGraph(nx.DiGraph):
         self.nodes[to_node]['attrs'].shape = shp
         return shp
 
-    def serial2distfwd(self, from_node, to_node, src_inds_list, is_full_slice):
+    def serial2dist_fwd_shape(self, from_node, to_node, src_inds_list, is_full_slice):
         """
         Compute the shape for a serial to distributed forward connection.
 
         Parameters
         ----------
         from_node : tuple of the form ('i' or 'o', name)
-            from node.
+            The from node.
         to_node : tuple of the form ('i' or 'o', name)
-            to node.
-        src_inds_list : any
+            The to node.
+        src_inds_list : list of Indexers
             The source indices list.
         is_full_slice : bool
-            Whether the source is a full slice.
+            If True, the source is a full slice.
 
         Returns
         -------
@@ -4629,20 +4608,20 @@ class AllConnGraph(nx.DiGraph):
         to_meta.global_shape = gshape
         return shape
 
-    def serial2distrev(self, from_node, to_node, src_inds_list, is_full_slice):
+    def serial2dist_rev_shape(self, from_node, to_node, src_inds_list, is_full_slice):
         """
         Compute the shape for a serial to distributed reverse connection.
 
         Parameters
         ----------
         from_node : tuple of the form ('i' or 'o', name)
-            from node.
+            The from node.
         to_node : tuple of the form ('i' or 'o', name)
-            to node.
+            The to node.
         src_inds_list : list of Indexers
             The source indices list.
         is_full_slice : bool
-            Whether the source is a full slice.
+            If True, the source is a full slice.
 
         Returns
         -------
@@ -4669,20 +4648,20 @@ class AllConnGraph(nx.DiGraph):
             self.nodes[to_node]['attrs'].shape = shape0
             return shape0
 
-    def dist2serialfwd(self, from_node, to_node, src_inds_list, is_full_slice):
+    def dist2serial_fwd_shape(self, from_node, to_node, src_inds_list, is_full_slice):
         """
         Compute the shape for a distributed to serial forward connection.
 
         Parameters
         ----------
         from_node : tuple of the form ('i' or 'o', name)
-            from node.
+            The from node.
         to_node : tuple of the form ('i' or 'o', name)
-            to node.
+            The to node.
         src_inds_list : list of Indexers
             The source indices list.
         is_full_slice : bool
-            Whether the source is a full slice.
+            If True, the source is a full slice.
 
         Returns
         -------
@@ -4707,20 +4686,20 @@ class AllConnGraph(nx.DiGraph):
                 f"from distributed output '{from_node[1]}' without src_indices is not "
                 "supported.")
 
-    def dist2serialrev(self, from_node, to_node, src_inds_list, is_full_slice):
+    def dist2serial_rev_shape(self, from_node, to_node, src_inds_list, is_full_slice):
         """
         Compute the shape for a distributed to serial reverse connection.
 
         Parameters
         ----------
         from_node : tuple of the form ('i' or 'o', name)
-            from node.
+            The from node.
         to_node : tuple of the form ('i' or 'o', name)
-            to node.
+            The to node.
         src_inds_list : list of Indexers
             The source indices list.
-        is_full_slice : any
-            Whether the source is a full slice.
+        is_full_slice : bool
+            If True, the source is a full slice.
 
         Returns
         -------
@@ -4772,20 +4751,20 @@ class AllConnGraph(nx.DiGraph):
                                 f"of connected output '{to_node[1]}' cannot be "
                                 "determined.")
 
-    def dist2distfwd(self, from_node, to_node, src_inds_list, is_full_slice):
+    def dist2dist_fwd_shape(self, from_node, to_node, src_inds_list, is_full_slice):
         """
         Compute the shape for a distributed to distributed forward connection.
 
         Parameters
         ----------
         from_node : tuple of the form ('i' or 'o', name)
-            from node.
+            The from node.
         to_node : tuple of the form ('i' or 'o', name)
-            to node.
+            The to node.
         src_inds_list : list of Indexers
             The source indices list.
         is_full_slice : bool
-            Whether the source is a full slice.
+            If True, the source is a full slice.
 
         Returns
         -------
@@ -4822,20 +4801,20 @@ class AllConnGraph(nx.DiGraph):
 
         return shp
 
-    def dist2distrev(self, from_node, to_node, src_inds_list, is_full_slice):
+    def dist2dist_rev_shape(self, from_node, to_node, src_inds_list, is_full_slice):
         """
         Compute the shape for a distributed to distributed reverse connection.
 
         Parameters
         ----------
         from_node : tuple of the form ('i' or 'o', name)
-            from node.
+            The from node.
         to_node : tuple of the form ('i' or 'o', name)
-            to node.
+            The to node.
         src_inds_list : list of Indexers
             The source indices list.
         is_full_slice : bool
-            Whether the source is a full slice.
+            If True, the source is a full slice.
 
         Returns
         -------
