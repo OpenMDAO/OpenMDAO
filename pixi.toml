@@ -56,9 +56,7 @@ networkx = ">=3.3"
 pip = ">=25.3,<26"
 packaging = ">=25.0"
 requests = ">=2.32.5"
-graphviz = ">=14.1.0,<15"
-pydot = ">=4.0.1,<5"
-python-graphviz = ">=0.21,<0.22"
+tomli-w = ">=1.2.0,<2"
 
 ###############################################
 # Python version features
@@ -137,7 +135,7 @@ parameterized = "*"
 playwright = "*"
 pycodestyle = "*"
 pydocstyle = "*"
-#testflo = "*"
+testflo = "*"
 websockets = "*"
 actionlint = "*"
 ruff = "*"
@@ -150,13 +148,6 @@ bokeh = "*"
 colorama = "*"
 matplotlib = "*"
 rich = "*"
-
-
-[feature.dev311.pypi-dependencies]
-openmdao = { path = ".", editable = true}
-dymos = { path = "../dymos", editable = true}
-om-pycycle = { path = "../pyCycle", editable = true}
-testflo = { path= "../testflo", editable = true}
 
 
 ###############################################
@@ -178,7 +169,6 @@ networkx = "==3.3"
 # Default - uses whatever Python solver picks
 default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test"], solve-group = "default" }
 dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging"], solve-group = "default" }
-dev311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging", "dev311"], solve-group = "dev311" }
 minimal = { features = ["py313", "test"], solve-group = "default" }
 
 # Oldest supported versions
