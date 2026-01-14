@@ -1411,7 +1411,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                 comp_content = comp_stream.getvalue()
                 if comp_content:
                     if show_only_incorrect:
-                        if incorrect_msg:
+                        if incorrect_msg:  # only do this once
                             print(incorrect_msg, file=out_stream, end='')
                             incorrect_msg = ''
 
