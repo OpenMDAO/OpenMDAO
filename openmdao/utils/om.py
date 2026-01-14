@@ -4,6 +4,7 @@ OpenMDAO CLI functions.
 
 import sys
 import os
+import shutil
 import argparse
 import importlib.metadata as ilmd
 
@@ -470,10 +471,20 @@ def _list_pre_post_cmd(options, user_args):
     """
     def _list_pre_post(prob):
         prob.list_pre_post(outfile=options.outfile)
+        shutil.rmtree('____DUMMY_DIR')
 
     # register the hook
     hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
                          post=_list_pre_post, exit=True)
+
+    # The problem setup when executing the options.file[0] will automatically
+    # remove existing reports in the reports directory. However, the reports
+    # are never re-created since "exit=True" which means that the remaining
+    # hooks after the "list_pre_post" (those that do report generation) are not
+    # run. So rather than deleting the existing reports and re-generating them,
+    # we instead temporarily redirect where the problem tries to delete the
+    # reports from then delete that dummy directory.
+    os.environ['OPENMDAO_WORKDIR'] = '____DUMMY_DIR'
 
     _load_and_exec(options.file[0], user_args)
 
