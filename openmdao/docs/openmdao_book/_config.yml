@@ -57,6 +57,7 @@ launch_buttons:
 sphinx:
   config:
     autosummary_generate: true
+    numpydoc_class_members_toctree: false
     html_baseurl: 'https://openmdao.org/newdocs/versions/latest/'
     sitemap_filename: 'sitemap.xml'
     html_theme: 'om-theme'
