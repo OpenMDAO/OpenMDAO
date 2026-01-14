@@ -3,7 +3,6 @@
 import unittest
 import numpy as np
 
-from io import StringIO
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
@@ -52,128 +51,6 @@ class TestConnections(unittest.TestCase):
         self.assertEqual(self.C1._inputs['x'], 111.)
         self.assertEqual(self.C3._inputs['x'], 222.)
         self.assertEqual(self.C4._inputs['x'], 333.)
-
-    def test_pull_size_from_source(self):
-        raise unittest.SkipTest("setting input size based on src size not supported yet")
-
-        class Src(om.ExplicitComponent):
-
-            def setup(self):
-
-                self.add_input('x', 2.0)
-                self.add_output('y1', np.zeros((3, )))
-                self.add_output('y2', shape=((3, )))
-
-            def compute(self, inputs, outputs):
-                x = inputs['x']
-
-                outputs['y1'] = x * np.array([1.0, 2.0, 3.0])
-                outputs['y2'] = x * np.array([1.0, 2.0, 3.0])
-
-        class Tgt(om.ExplicitComponent):
-
-            def setup(self):
-
-                self.add_input('x1')
-                self.add_input('x2')
-                self.add_output('y1', 0.0)
-                self.add_output('y2', 0.0)
-
-            def compute(self, inputs, outputs):
-                x1 = inputs['x1']
-                x2 = inputs['x2']
-
-                outputs['y1'] = np.sum(x1)
-                outputs['y2'] = np.sum(x2)
-
-        p = om.Problem()
-        p.model.add_subsystem('src', Src())
-        p.model.add_subsystem('tgt', Tgt())
-
-        p.model.connect('src.y1', 'tgt.x1')
-        p.model.connect('src.y2', 'tgt.x2')
-
-        p.setup()
-        p.run_model()
-
-        self.assertEqual(p['tgt.y1'], 12.0)
-        self.assertEqual(p['tgt.y2'], 12.0)
-
-    def test_pull_size_from_source_with_indices(self):
-        raise unittest.SkipTest("setting input size based on src size not supported yet")
-
-        class Src(om.ExplicitComponent):
-
-            def setup(self):
-
-                self.add_input('x', 2.0)
-                self.add_output('y1', np.zeros((3, )))
-                self.add_output('y2', shape=((3, )))
-                self.add_output('y3', 3.0)
-
-            def compute(self, inputs, outputs):
-                """ counts up. """
-
-                x = inputs['x']
-
-                outputs['y1'] = x * np.array([1.0, 2.0, 3.0])
-                outputs['y2'] = x * np.array([1.0, 2.0, 3.0])
-                outputs['y3'] = x * 4.0
-
-        class Tgt(om.ExplicitComponent):
-
-            def setup(self):
-
-                self.add_input('x1')
-                self.add_input('x2')
-                self.add_input('x3')
-                self.add_output('y1', 0.0)
-                self.add_output('y2', 0.0)
-                self.add_output('y3', 0.0)
-
-            def compute(self, inputs, outputs):
-                """ counts up. """
-
-                x1 = inputs['x1']
-                x2 = inputs['x2']
-                x3 = inputs['x3']
-
-                outputs['y1'] = np.sum(x1)
-                outputs['y2'] = np.sum(x2)
-                outputs['y3'] = np.sum(x3)
-
-        top = om.Problem()
-        top.model.add_subsystem('src', Src())
-        top.model.add_subsystem('tgt', Tgt())
-
-        top.model.connect('src.y1', 'tgt.x1', src_indices=(0, 1))
-        top.model.connect('src.y2', 'tgt.x2', src_indices=(0, 1))
-        top.model.connect('src.y3', 'tgt.x3')
-
-        top.setup()
-        top.run_model()
-
-        self.assertEqual(top['tgt.y1'], 6.0)
-        self.assertEqual(top['tgt.y2'], 6.0)
-        self.assertEqual(top['tgt.y3'], 8.0)
-
-    def test_inp_inp_conn_no_src(self):
-        raise unittest.SkipTest("no setup testing yet")
-        self.p.model.connect('G3.G4.C3.x', 'G3.G4.C4.x')
-
-        stream = StringIO()
-        self.p.setup(out_stream=stream)
-
-        self.p['G3.G4.C3.x'] = 999.
-        self.assertEqual(self.p.model.G3.G4.C3._inputs['x'], 999.)
-        self.assertEqual(self.p.model.G3.G4.C4._inputs['x'], 999.)
-
-        content = stream.getvalue()
-        self.assertTrue("The following parameters have no associated unknowns:\n"
-                        "G1.G2.C1.x\nG3.G4.C3.x\nG3.G4.C4.x" in content)
-        self.assertTrue("The following components have no connections:\n"
-                        "G1.G2.C1\nG1.G2.C2\nG3.G4.C3\nG3.G4.C4\n" in content)
-        self.assertTrue("No recorders have been specified, so no data will be saved." in content)
 
 
 class TestConnectionsPromoted(unittest.TestCase):
@@ -302,9 +179,7 @@ class TestConnectionsIndices(unittest.TestCase):
         # Should not be allowed because the source and target shapes do not match
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp')
 
-        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: The source and target shapes do not match or are " + \
-                   "ambiguous for the connection 'idvp.blammo' to 'arraycomp.inp'. " + \
-                   "The source shape is (1,) but the target shape is (2,)."
+        expected = "\nCollected errors for problem 'bad_shapes':\n   <model> <class Group>: Can't connect 'idvp.blammo' to 'arraycomp.inp': shape (1,) of 'idvp.blammo' is incompatible with shape (2,) of 'arraycomp.inp'."
         self.prob.setup()
         try:
             self.prob.final_setup()
@@ -319,15 +194,14 @@ class TestConnectionsIndices(unittest.TestCase):
         self.build_model('bad_length')
         self.prob.model.connect('idvp.blammo', 'arraycomp.inp', src_indices=[0, 0, 0])
 
-        expected = "\nCollected errors for problem 'bad_length':\n   <model> <class Group>: The source indices [0 0 0] do not specify a valid shape " + \
-                   "for the connection 'idvp.blammo' to 'arraycomp.inp'. The target shape is " + \
-                   "(2,) but indices are shape (3,)."
+        expected = ("Collected errors for problem 'bad_length':\n"
+                    "   <model> <class Group>: Can't connect 'idvp.blammo' to 'arraycomp.inp' when applying index [[0, 0, 0]]: shape (3,) of 'idvp.blammo' is incompatible with shape (2,) of 'arraycomp.inp'.")
 
-        self.prob.setup()
         try:
+            self.prob.setup()
             self.prob.final_setup()
         except Exception as err:
-            self.assertEqual(str(err), expected)
+            self.assertTrue(expected in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -341,10 +215,9 @@ class TestConnectionsIndices(unittest.TestCase):
         try:
             self.prob.final_setup()
         except Exception as err:
-            self.assertEqual(str(err),
+            self.assertTrue(
                "\nCollected errors for problem 'bad_value':"
-               "\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp1': "
-               "index 100000 is out of bounds for source dimension of size 5.")
+               "\n   <model> <class Group>: Can't connect 'idvp.arrout' to 'arraycomp.inp1' when applying index [[100000]]: index 100000 is out of bounds for source dimension of size 5." in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -358,10 +231,9 @@ class TestConnectionsIndices(unittest.TestCase):
         try:
             self.prob.final_setup()
         except Exception as err:
-            self.assertEqual(str(err),
+            self.assertTrue(
                "\nCollected errors for problem 'bad_value_bug':"
-               "\n   <model> <class Group>: When connecting 'idvp.arrout' to 'arraycomp.inp': "
-               "index 100000 is out of bounds for source dimension of size 5.")
+               "\n   <model> <class Group>: Can't connect 'idvp.arrout' to 'arraycomp.inp' when applying index [[0, 100000]]: index 100000 is out of bounds for source dimension of size 5." in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -449,9 +321,7 @@ class TestShapes(unittest.TestCase):
                                                 y={'val': np.zeros((5, 2))}))
         p.model.connect('indep.x', 'C1.x')
 
-        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: The source and target shapes do not match or are " + \
-                   "ambiguous for the connection 'indep.x' to 'C1.x'. The source shape is " + \
-                   "(1, 10, 1, 1) but the target shape is (5, 2)."
+        expected = "\nCollected errors for problem 'connect_incompatible_shapes':\n   <model> <class Group>: Can't connect 'indep.x' to 'C1.x': shape (1, 10, 1, 1) of 'indep.x' is incompatible with shape (5, 2) of 'C1.x'."
 
         p.setup()
         with self.assertRaises(Exception) as context:
@@ -486,9 +356,7 @@ class TestMultiConns(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(str(context.exception),
-           "\nCollected errors for problem 'mult_conns':"
-           "\n   <model> <class Group>: The following inputs have multiple connections: "
-                   "sub.c2.y from ['indeps.y', 'sub.c1.y'].")
+           "\nCollected errors for problem 'mult_conns':\n   <model> <class Group>: Target 'sub.y (sub.c2.y)' cannot be connected to 'sub.y (sub.c1.y)' because it's already connected to 'y (indeps.y)'.")
 
     def test_mixed_conns_same_level(self):
 
@@ -508,12 +376,9 @@ class TestMultiConns(unittest.TestCase):
         with self.assertRaises(Exception) as context:
             prob.setup()
             prob.final_setup()
-            prob.run_model()
 
         self.assertEqual(str(context.exception),
-           "\nCollected errors for problem 'mixed_conns_same_level':"
-           "\n   <model> <class Group>: Input 'c2.y' cannot be connected to 'indeps.x' "
-                   "because it's already connected to 'c1.y'.")
+           "\nCollected errors for problem 'mixed_conns_same_level':\n   <model> <class Group>: Target 'y (c2.y)' cannot be connected to 'indeps.x' because it's already connected to 'y (c1.y)'.")
 
 
 class TestAutoIVCAllowableShapeMismatch(unittest.TestCase):
@@ -631,10 +496,8 @@ class TestConnectionsDistrib(unittest.TestCase):
             prob.setup()
             prob.final_setup()
         except Exception as err:
-            self.assertTrue(
-                             "\nCollected errors for problem 'serial_mpi_error':" \
-                             "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':" \
-                             " index 2 is out of bounds for source dimension of size 2." in str(err))
+            self.assertTrue("\nCollected errors for problem 'serial_mpi_error':" \
+                             "\n   <model> <class Group>: Can't connect 'p1.x' to 'c3.x' when applying index [[1, 2]]: index 2 is out of bounds for source dimension of size 2." in str(err))
         else:
             self.fail('Exception expected.')
 
@@ -665,7 +528,7 @@ class TestConnectionsDistrib(unittest.TestCase):
         except Exception as err:
             self.assertTrue(
                              "\nCollected errors for problem 'serial_mpi_error_flat':" \
-                             "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':" \
+                             "\n   <model> <class Group>: Can't connect 'p1.x' to 'c3.x' when applying index [[1, 2]]:" \
                              " index 2 is out of bounds for source dimension of size 2." in str(err))
         else:
             self.fail('Exception expected.')
@@ -721,7 +584,7 @@ class TestConnectionsError(unittest.TestCase):
 
         self.assertTrue(
             "\nCollected errors for problem 'incompatible_src_indices':"
-            "\n   <model> <class Group>: When connecting 'p1.x' to 'c3.x':"
+            "\n   <model> <class Group>: Can't connect 'p1.x' to 'c3.x' when applying index [[1, 2]]:"
             " index 2 is out of bounds for source dimension of size 2." in str(context.exception))
 
 
@@ -735,8 +598,8 @@ class TestConnectionsMPIBug(unittest.TestCase):
         class Burn(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('x', np.arange(12))
-                self.add_output('y', np.arange(12))
+                self.add_input('x', np.arange(12).reshape((3,4)))
+                self.add_output('y', np.arange(12).reshape((3,4)))
 
             def compute(self, inputs, outputs):
                 outputs['y'] = inputs['x'] * 2.0
@@ -744,9 +607,9 @@ class TestConnectionsMPIBug(unittest.TestCase):
         class LinkageComp(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('in1', np.zeros((3, 2)))
-                self.add_input('in2', np.zeros((3, 2)))
-                self.add_output('out', np.zeros((3, 2)))
+                self.add_input('in1', np.zeros((6,)))
+                self.add_input('in2', np.zeros((6,)))
+                self.add_output('out', np.zeros((6,)))
 
             def compute(self, inputs, outputs):
                 outputs['out'] = 3 * inputs['in2'] - 2.5 * inputs['in1']

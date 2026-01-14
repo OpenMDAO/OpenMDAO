@@ -181,6 +181,11 @@ def _load_and_exec(script_name, user_args):
         The name of the script to load and exec.
     user_args : list of str
         Args to be passed to the user script.
+
+    Returns
+    -------
+    dict
+        The globals dictionary of the executed script.
     """
     if ':' in script_name and not isfile(script_name):
         return _load_and_run_test(script_name)
@@ -201,6 +206,8 @@ def _load_and_exec(script_name, user_args):
 
     with set_env_vars_context(OPENMDAO_SCRIPT_NAME=script_name):
         exec(code, globals_dict)  # nosec: private, internal use only
+
+    return globals_dict
 
 
 def fname2mod_name(fname):

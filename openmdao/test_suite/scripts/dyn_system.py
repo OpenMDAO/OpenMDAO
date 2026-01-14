@@ -6,20 +6,44 @@ import openmdao.api as om
 
 if __name__ == '__main__':
     p = om.Problem()
-    indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3))))
-    indep.add_output('x2', val=np.ones((4,2)))
+    indep = p.model.add_subsystem('indep', om.IndepVarComp('x1', val=np.ones((2,3)), units='m'))
+    indep.add_output('x2', val=np.ones((4,2)), units='ft')
 
     p.model.add_subsystem('C1', om.ExecComp('y1, y2 = x1*2, x2*2',
-                                                x1={'shape_by_conn': True, 'copy_shape': 'y1'},
-                                                x2={'shape_by_conn': True, 'copy_shape': 'y2'},
-                                                y1={'shape_by_conn': True, 'copy_shape': 'x1'},
-                                                y2={'shape_by_conn': True, 'copy_shape': 'x2'}))
+                                                x1={'shape_by_conn': True,
+                                                    'copy_shape': 'y1',
+                                                    'units_by_conn': True,
+                                                    'copy_units': 'y1'},
+                                                x2={'shape_by_conn': True,
+                                                    'copy_shape': 'y2',
+                                                    'units_by_conn': True,
+                                                    'copy_units': 'y2'},
+                                                y1={'shape_by_conn': True,
+                                                    'copy_shape': 'x1',
+                                                    'units_by_conn': True,
+                                                    'copy_units': 'x1'},
+                                                y2={'shape_by_conn': True,
+                                                    'copy_shape': 'x2',
+                                                    'units_by_conn': True,
+                                                    'copy_units': 'x2'}))
 
     p.model.add_subsystem('C2', om.ExecComp('y1, y2 = x1*2, x2*2',
-                                                x1={'shape_by_conn': True, 'copy_shape': 'y1'},
-                                                x2={'shape_by_conn': True, 'copy_shape': 'y2'},
-                                                y1={'shape_by_conn': True, 'copy_shape': 'x1'},
-                                                y2={'shape_by_conn': True, 'copy_shape': 'x2'}))
+                                                x1={'shape_by_conn': True,
+                                                    'copy_shape': 'y1',
+                                                    'units_by_conn': True,
+                                                    'copy_units': 'y1'},
+                                                x2={'shape_by_conn': True,
+                                                    'copy_shape': 'y2',
+                                                    'units_by_conn': True,
+                                                    'copy_units': 'y2'},
+                                                y1={'shape_by_conn': True,
+                                                    'copy_shape': 'x1',
+                                                    'units_by_conn': True,
+                                                    'copy_units': 'x1'},
+                                                y2={'shape_by_conn': True,
+                                                    'copy_shape': 'x2',
+                                                    'units_by_conn': True,
+                                                    'copy_units': 'x2'}))
 
     p.model.connect('indep.x1', 'C1.x1')
     p.model.connect('indep.x2', 'C1.x2')

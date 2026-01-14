@@ -22,6 +22,8 @@ from math import floor, pi
 
 import numpy as np
 
+from openmdao.utils.array_utils import array_connection_compatible
+
 
 ####################################
 # Class Definitions
@@ -1074,7 +1076,7 @@ def convert_units(val, old_units, new_units=None):
     return (val + offset) * factor
 
 
-def _has_val_mismatch(units1, val1, units2, val2, rtol=1e-10):
+def has_val_mismatch(units1, val1, units2, val2, rtol=1e-10):
     """
     Return True if values differ after unit conversion or if values differ when units are None.
 
@@ -1102,9 +1104,13 @@ def _has_val_mismatch(units1, val1, units2, val2, rtol=1e-10):
     val1 = np.asarray(val1)
     val2 = np.asarray(val2)
 
-    if val1.shape != val2.shape:
+    if not array_connection_compatible(val1.shape, val2.shape):
         return True
 
+    # shapes are compatible but may not be the same, so compare
+    # flattened values
+    val1 = val1.ravel()
+    val2 = val2.ravel()
     absdiff = np.abs(val2 - val1)
     denominator_basis = np.maximum(np.abs(val1), np.abs(val2))
     threshold = rtol * denominator_basis

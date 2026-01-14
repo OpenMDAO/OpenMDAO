@@ -4,6 +4,7 @@ Utils for dealing with arrays.
 import sys
 from itertools import product
 import hashlib
+from math import prod
 
 import numpy as np
 
@@ -12,51 +13,63 @@ from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.omnumba import numba
 
 
-if sys.version_info >= (3, 8):
-    from math import prod
+def shape_to_len(shape):
+    """
+    Compute length given a shape tuple.
 
-    def shape_to_len(shape):
-        """
-        Compute length given a shape tuple.
+    Parameters
+    ----------
+    shape : tuple of int or None
+        Numpy shape tuple.
 
-        Parameters
-        ----------
-        shape : tuple of int or None
-            Numpy shape tuple.
+    Returns
+    -------
+    int
+        Length of array.
+    """
+    if shape is None:
+        return None
+    if shape == ():
+        return 1  # otherwise prod will return float 1.0
 
-        Returns
-        -------
-        int
-            Length of array.
-        """
-        if shape is None:
-            return None
-        return prod(shape)
-else:
-    def shape_to_len(shape):
-        """
-        Compute length given a shape tuple.
+    return prod(shape)
 
-        For realistic-dimension arrays, looping over the shape tuple is much faster than np.prod.
 
-        Parameters
-        ----------
-        shape : tuple of int
-            Numpy shape tuple.
+def get_global_dist_shape(dist_shapes):
+    """
+    Get the global shape of a distributed variable given its shapes on each rank.
 
-        Returns
-        -------
-        int
-            Length of multidimensional array.
-        """
-        if shape is None:
-            return None
+    Parameters
+    ----------
+    dist_shapes : list of tuple
+        The shapes of the distributed variable on each rank.
 
-        length = 1
-        for dim in shape:
-            length *= dim
+    Returns
+    -------
+    tuple or None
+        The global shape of the distributed variable.
+    """
+    dshapelists = [list(dshape) for dshape in dist_shapes
+                   if dshape is not None and shape_to_len(dshape) > 0]
 
-        return length
+    # during some error conditions, there may be no shapes that are not None on any rank, so
+    # we need to check for that
+    if not dshapelists:
+        return None
+
+    upper_dims = [dshape[1:] for dshape in dshapelists]
+
+    first_dim_size = dshapelists[0][0] if len(dshapelists[0]) > 0 else 1
+    first_upper = upper_dims[0]
+
+    # verify that all dshapes have equal higher dimensions (besides the first)
+    for dshape, upper in zip(dshapelists[1:], upper_dims[1:]):
+        if upper != first_upper:
+            raise ValueError("Shapes on each rank do not match in their upper dimensions.")
+
+        first_dim_size += dshape[0] if dshape else 1
+
+    return (first_dim_size,) + tuple(dshapelists[0][1:])
 
 
 def evenly_distrib_idxs(num_divisions, arr_size):
@@ -369,15 +382,15 @@ def array_connection_compatible(shape1, shape2):
     bool
         True if the two shapes are compatible for connection, else False.
     """
-    ashape1 = np.asarray(shape1, dtype=INT_DTYPE)
-    ashape2 = np.asarray(shape2, dtype=INT_DTYPE)
-
-    size1 = shape_to_len(ashape1)
-    size2 = shape_to_len(ashape2)
+    if shape1 == shape2:  # most common case
+        return True
 
     # Shapes are not connection-compatible if size is different
-    if size1 != size2:
+    if shape_to_len(shape1) != shape_to_len(shape2):
         return False
+
+    ashape1 = np.asarray(shape1, dtype=INT_DTYPE)
+    ashape2 = np.asarray(shape2, dtype=INT_DTYPE)
 
     nz1 = np.where(ashape1 > 1)[0]
     nz2 = np.where(ashape2 > 1)[0]
@@ -674,39 +687,6 @@ def rand_sparsity(shape, density_ratio, dtype=bool, rng=None):
     return coo
 
 
-def sparse_subinds(orig, inds):
-    """
-    Compute new rows or cols resulting from applying inds on top of an existing sparsity pattern.
-
-    This only comes into play when we have an approx total jacobian where some dv/resp have
-    indices.
-
-    Parameters
-    ----------
-    orig : ndarray
-        Either row or col indices (part of a subjac sparsity pattern).
-    inds : ndarray or list
-        Sub-indices introduced when adding a desvar or response.
-
-    Returns
-    -------
-    ndarray
-        New compressed rows or cols.
-    ndarray
-        Mask array that can be used to update subjac value and corresponding index array to orig.
-    """
-    mask = np.zeros(orig.size, dtype=bool)
-    for i in inds:
-        mask |= orig == i
-    newsp = orig[mask]
-
-    # replace the index with the 'compressed' index after we've masked out entries
-    for r, i in enumerate(np.sort(inds)):
-        newsp[newsp == i] = r
-
-    return newsp, mask
-
-
 def identity_column_iter(column):
     """
     Yield the given column with a 1 in each position.
@@ -750,7 +730,10 @@ def array_hash(arr, alg=hashlib.sha1):
     str
         The computed hash.
     """
-    return alg(arr.view(np.uint8)).hexdigest()
+    if arr.dtype.kind in ('f', 'c', 'i', 'u', 'b'):
+        return alg(arr.view(np.uint8)).hexdigest()
+    raise ValueError("array_hash only works for numerical arrays, but called with array of dtype "
+                     f"{arr.dtype}.")
 
 
 _randgen = np.random.default_rng()
@@ -1126,7 +1109,7 @@ _signed = (np.int8, np.int16, np.int32, np.int64)
 
 def get_index_dtype(size, allow_negative=False):
     """
-    Return the dtype of the index array for the given size.
+    Return the dtype large enough to represent the index array for the given size.
 
     Parameters
     ----------
