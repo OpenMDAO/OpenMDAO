@@ -60,6 +60,9 @@ jax = [
     "jax>=0.4.0",
     "jaxlib>=0.4.0",
 ]
+julia = [
+    "omjlcomps>=0.2.6",
+]
 numba = [
     "numba",
 ]
