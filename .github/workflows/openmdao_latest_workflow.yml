@@ -185,7 +185,7 @@ jobs:
           echo "============================================================="
           echo "Install latest pyoptsparse"
           echo "============================================================="
-          python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
+          python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse@v2.0.13
           BRANCH="-b $(latest_version https://github.com/mdolab/pyoptsparse)"
           if [[ "${{ matrix.SNOPT }}" ]]; then
               .github/actions/install_pyoptsparse/download_snopt.sh
