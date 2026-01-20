@@ -470,20 +470,37 @@ def _list_pre_post_cmd(options, user_args):
         Args to be passed to the user script.
     """
     def _list_pre_post(prob):
-        prob.list_pre_post(outfile=options.outfile)
-        shutil.rmtree('____DUMMY_DIR')
+        # Only run on the specified problem or on the top-level problem if none
+        # is specified. Want to avoid a premature exit since subproblems run
+        # their final_setup before the top problem.
+        if options.problem:
+            if prob._metadata['name'] != options.problem and \
+                    prob._metadata['pathname'] != options.problem:
+                return
+        elif '/' in prob._metadata['pathname']:
+            return
 
-    # register the hook
+        prob.list_pre_post(outfile=options.outfile)
+        try:
+            shutil.rmtree('____DUMMY_DIR')
+        except FileNotFoundError:
+            pass
+
+        # Exit after successfully displaying list_pre_post for the correct problem.
+        sys.exit()
+
+    # register the hook WITHOUT exit=True, since we handle it manually.
     hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
-                         post=_list_pre_post, exit=True)
+                         post=_list_pre_post, exit=False)
 
     # The problem setup when executing the options.file[0] will automatically
     # remove existing reports in the reports directory. However, the reports
-    # are never re-created since "exit=True" which means that the remaining
+    # are never re-created due to the system exit which means that the remaining
     # hooks after the "list_pre_post" (those that do report generation) are not
     # run. So rather than deleting the existing reports and re-generating them,
     # we instead temporarily redirect where the problem tries to delete the
-    # reports from then delete that dummy directory.
+    # reports from then delete that dummy directory. Note that this doesn't
+    # work if the script run in _load_and_exec sets the OPENMDAO_WORKDIR itself.
     os.environ['OPENMDAO_WORKDIR'] = '____DUMMY_DIR'
 
     _load_and_exec(options.file[0], user_args)
