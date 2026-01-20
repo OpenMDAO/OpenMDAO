@@ -91,11 +91,15 @@
             min-height: 0; /* Allow flex item to shrink */
         }
         .graph-svg {
-            width: 100%;
             height: auto;
             border: none;
-            flex: 1;
-            object-fit: contain;
+            display: block;
+        }
+        #graph-content {
+            display: inline-block;
+            min-width: min-content;
+            min-height: min-content;
+            padding: 20px;
         }
         .graph-text {
             text-align: left;
@@ -808,6 +812,7 @@
             loadTreeStructure();
             setupFuzzySearch();
             setupResizer();
+            setupGraphPanning();
         });
 
         function loadTreeStructure() {
@@ -1282,8 +1287,6 @@
                     const svgs = graphContent.querySelectorAll('svg');
                     svgs.forEach(svg => {
                         svg.classList.add('graph-svg');
-                        svg.style.width = '100%';
-                        svg.style.height = 'auto';
                         addSelectionStylingToSvg(svg);
                     });
                 } catch (error) {
@@ -1721,6 +1724,67 @@
             // Prevent text selection while resizing
             resizer.addEventListener('selectstart', function(e) {
                 e.preventDefault();
+            });
+        }
+
+        // Graph panning functionality
+        function setupGraphPanning() {
+            const graphContainer = document.querySelector('.graph-container');
+            let isPanning = false;
+            let startX, startY, scrollLeft, scrollTop;
+
+            graphContainer.addEventListener('mousedown', function(e) {
+                // Only start panning if clicking on the container itself, not on SVG elements
+                if (e.target.closest('.node') || e.target.closest('text')) {
+                    return;
+                }
+
+                isPanning = true;
+                graphContainer.style.cursor = 'grabbing';
+                graphContainer.style.userSelect = 'none';
+
+                startX = e.pageX - graphContainer.offsetLeft;
+                startY = e.pageY - graphContainer.offsetTop;
+                scrollLeft = graphContainer.scrollLeft;
+                scrollTop = graphContainer.scrollTop;
+            });
+
+            graphContainer.addEventListener('mouseleave', function() {
+                if (isPanning) {
+                    isPanning = false;
+                    graphContainer.style.cursor = '';
+                    graphContainer.style.userSelect = '';
+                }
+            });
+
+            graphContainer.addEventListener('mouseup', function() {
+                if (isPanning) {
+                    isPanning = false;
+                    graphContainer.style.cursor = '';
+                    graphContainer.style.userSelect = '';
+                }
+            });
+
+            graphContainer.addEventListener('mousemove', function(e) {
+                if (!isPanning) return;
+
+                e.preventDefault();
+                const x = e.pageX - graphContainer.offsetLeft;
+                const y = e.pageY - graphContainer.offsetTop;
+                const walkX = (x - startX);
+                const walkY = (y - startY);
+
+                graphContainer.scrollLeft = scrollLeft - walkX;
+                graphContainer.scrollTop = scrollTop - walkY;
+            });
+
+            // Add grab cursor when hovering over pannable area
+            graphContainer.addEventListener('mousemove', function(e) {
+                if (!isPanning && !e.target.closest('.node') && !e.target.closest('text')) {
+                    graphContainer.style.cursor = 'grab';
+                } else if (!isPanning) {
+                    graphContainer.style.cursor = '';
+                }
             });
         }
 

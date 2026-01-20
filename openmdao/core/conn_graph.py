@@ -4268,17 +4268,17 @@ class AllConnGraph(nx.DiGraph):
         """
         return networkx_to_dot(self.get_drawable_graph(pathname, varname, show_cross_boundary))
 
-    def display(self, pathname='', varname=None, show_cross_boundary=True, outfile='graph.html'):
+    def display(self, varname=None, pathname='', show_cross_boundary=True, outfile='graph.html'):
         """
         Display the connection graph.
 
         Parameters
         ----------
-        pathname : str
-            The pathname of the system to display.
         varname : str or None
             Display the connection tree associated with this variable.  If None, display the entire
             collection graph.
+        pathname : str
+            The pathname of the system to display.
         show_cross_boundary : bool
             Whether to show cross boundary connections.
         outfile : str

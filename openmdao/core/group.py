@@ -3957,7 +3957,7 @@ class Group(System):
                                       outfile=outfile)
 
     def display_conn_graph(self, varname=None, outfile=None):
-        self.get_conn_graph().display(self.pathname, varname=varname, outfile=outfile)
+        self.get_conn_graph().display(varname=varname, pathname=self.pathname, outfile=outfile)
 
     def _column_iotypes(self):
         """
