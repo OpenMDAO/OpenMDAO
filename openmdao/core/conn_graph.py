@@ -82,31 +82,6 @@ def _strip_np(shape):
     return tuple(ret)
 
 
-def is_equal(a, b):
-    """
-    Check equality of a and b.
-
-    Parameters
-    ----------
-    a : any
-        First value to compare.
-    b : any
-        Second value to compare.
-
-    Returns
-    -------
-    bool
-        True if a and b are equal, False otherwise.
-    """
-    if not (isinstance(b, type(a)) or isinstance(a, type(b))):
-        return False
-
-    if isinstance(a, np.ndarray):
-        return a.size == b.size and np.all(np.squeeze(a) == np.squeeze(b))
-
-    return a == b
-
-
 def are_compatible_values(a, b, discrete, src_indices=None):
     """
     Check compatibility of values a and b.
@@ -3764,6 +3739,8 @@ class AllConnGraph(nx.DiGraph):
 
         last = chain[-1]
         if (isinstance(last, np.ndarray) and last.ndim == 0) or np.isscalar(last):
+            if isinstance(val, np.ndarray) and val.size == 1:
+                val = val[0]
             chain[-1] = val
         else:
             last[:] = val
