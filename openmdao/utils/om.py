@@ -481,10 +481,6 @@ def _list_pre_post_cmd(options, user_args):
             return
 
         prob.list_pre_post(outfile=options.outfile)
-        try:
-            shutil.rmtree('____DUMMY_DIR')
-        except FileNotFoundError:
-            pass
 
         # Exit after successfully displaying list_pre_post for the correct problem.
         sys.exit()
@@ -493,15 +489,12 @@ def _list_pre_post_cmd(options, user_args):
     hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
                          post=_list_pre_post, exit=False)
 
-    # The problem setup when executing the options.file[0] will automatically
-    # remove existing reports in the reports directory. However, the reports
-    # are never re-created due to the system exit which means that the remaining
-    # hooks after the "list_pre_post" (those that do report generation) are not
-    # run. So rather than deleting the existing reports and re-generating them,
-    # we instead temporarily redirect where the problem tries to delete the
-    # reports from then delete that dummy directory. Note that this doesn't
-    # work if the script run in _load_and_exec sets the OPENMDAO_WORKDIR itself.
-    os.environ['OPENMDAO_WORKDIR'] = '____DUMMY_DIR'
+    # Set a flag to prevent report deletion during problem setup. This allows us to
+    # call list_pre_post and then exit without losing previously generated reports.
+    # The reports are deleted at the start of setup to ensure only current-run files
+    # are present, but since list_pre_post exits before report generation hooks run,
+    # we skip the deletion in this case.
+    os.environ['OPENMDAO_CLI_LIST_PRE_POST_MODE'] = 'true'
 
     _load_and_exec(options.file[0], user_args)
 

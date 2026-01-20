@@ -1149,14 +1149,17 @@ class Problem(object, metaclass=ProblemMetaclass):
         # from a previous run.
         # Start setup by deleting any existing reports so that the files
         # that are in that directory are all from this run and not a previous run
-        reports_dirpath = self.get_reports_dir()
-        if not MPI or (self.comm is not None and self.comm.rank == 0):
-            if os.path.isdir(reports_dirpath):
-                try:
-                    shutil.rmtree(reports_dirpath)
-                except FileNotFoundError:
-                    # Folder already removed by another proccess
-                    pass
+        # However, skip this deletion if we're in list_pre_post mode to preserve previously
+        # generated reports (since list_pre_post exits before report generation hooks run).
+        if os.environ.get('OPENMDAO_CLI_LIST_PRE_POST_MODE') != 'true':
+            reports_dirpath = self.get_reports_dir()
+            if not MPI or (self.comm is not None and self.comm.rank == 0):
+                if os.path.isdir(reports_dirpath):
+                    try:
+                        shutil.rmtree(reports_dirpath)
+                    except FileNotFoundError:
+                        # Folder already removed by another proccess
+                        pass
         self._metadata['reports_dir'] = self.get_reports_dir()
 
         try:
