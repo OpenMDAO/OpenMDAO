@@ -3,6 +3,7 @@ import openmdao.api as om
 import numpy as np
 from openmdao.core.conn_graph import are_compatible_values
 from openmdao.utils.mpi import MPI
+from openmdao.utils.assert_utils import assert_near_equal
 
 
 try:
@@ -154,6 +155,70 @@ class TestInputToInputConnections(unittest.TestCase):
         prob.setup()
         prob.final_setup()
         prob.run_model()
+
+    def test_src_indices(self):
+        prob = om.Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indeps', om.IndepVarComp())
+        indep.add_output('x', val=np.arange(10) + 1.0)
+
+        model.add_subsystem('C1', om.ExecComp('y = 2.0 * x', x=np.zeros(10), y=np.zeros(10)))
+        model.add_subsystem('C2', om.ExecComp('y = 3.0 * x', x=np.zeros(5), y=np.zeros(5)))
+
+        model.connect('indeps.x', 'C1.x')
+        model.connect('C1.x', 'C2.x', src_indices=[0, 2, 4, 6, 8])  # input-input with src_indices
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('C1.x'), np.arange(10) + 1.0)
+        assert_near_equal(prob.get_val('C1.y'), np.array([2., 4., 6., 8., 10., 12., 14., 16., 18., 20.]))
+        assert_near_equal(prob.get_val('C2.x'), np.array([1., 3., 5., 7., 9.]))
+        assert_near_equal(prob.get_val('C2.y'), np.array([3., 9., 15., 21., 27.]))
+
+    def test_src_indices_2_levels(self):
+        prob = om.Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indeps', om.IndepVarComp())
+        indep.add_output('x', val=np.arange(15) + 1.0)
+
+        model.add_subsystem('C1', om.ExecComp('y = 2.0 * x', x=np.zeros(10), y=np.zeros(10)))
+        model.add_subsystem('C2', om.ExecComp('y = 3.0 * x', x=np.zeros(5), y=np.zeros(5)))
+
+        model.connect('indeps.x', 'C1.x', src_indices=om.slicer[:10])
+        model.connect('C1.x', 'C2.x', src_indices=[0, 2, 4, 6, 8])  # input-input with src_indices
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('C1.x'), np.arange(10) + 1.0)
+        assert_near_equal(prob.get_val('C1.y'), np.array([2., 4., 6., 8., 10., 12., 14., 16., 18., 20.]))
+
+        assert_near_equal(prob.get_val('C2.x'), np.array([1., 3., 5., 7., 9.]))
+        assert_near_equal(prob.get_val('C2.y'), np.array([3., 9., 15., 21., 27.]))
+
+    def test_src_indices_2_levels_autoivc(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('C1', om.ExecComp('y = 2.0 * x', x=np.arange(15) + 1.0, y=np.zeros(15)))
+        model.add_subsystem('C2', om.ExecComp('y = 3.0 * x', x=np.zeros(10), y=np.zeros(10)))
+        model.add_subsystem('C3', om.ExecComp('y = 1.5 * x', x=np.zeros(5), y=np.zeros(5)))
+
+        model.connect('C1.x', 'C2.x', src_indices=om.slicer[:10])  # input-input with src_indices
+        model.connect('C2.x', 'C3.x', src_indices=[0, 2, 4, 6, 8])  # input-input with src_indices
+
+        prob.setup()
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('C1.x'), np.array([1., 2., 3., 4., 5., 6., 7., 8., 9., 10., 11., 12., 13., 14., 15.]))
+        assert_near_equal(prob.get_val('C1.y'), np.array([2., 4., 6., 8., 10., 12., 14., 16., 18., 20., 22., 24., 26., 28., 30.]))
+        assert_near_equal(prob.get_val('C2.x'), np.array([1., 2., 3., 4., 5., 6., 7., 8., 9., 10.]))
+        assert_near_equal(prob.get_val('C2.y'), np.array([3., 6., 9., 12., 15., 18., 21., 24., 27., 30.]))
+        assert_near_equal(prob.get_val('C3.x'), np.array([1., 3., 5., 7., 9.]))
+        assert_near_equal(prob.get_val('C3.y'), np.array([1.5, 4.5, 7.5, 10.5, 13.5]))
 
 
 class TestAllConnGraphUtilityFunctions(unittest.TestCase):
