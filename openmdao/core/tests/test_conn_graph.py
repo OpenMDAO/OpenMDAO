@@ -26,6 +26,7 @@ class TestAllConnectionTypes(unittest.TestCase):
 
         if not autoivc:
             model.add_subsystem('indeps', om.IndepVarComp('x', 10.0), promotes=get_proms(['x']))
+            
         G1 = model.add_subsystem('G1', om.Group(), promotes_inputs=get_proms(['x']))
         G2 = model.add_subsystem('G2', om.Group())
 
@@ -61,15 +62,10 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        # prob.model.get_conn_graph().display()
-        # prob.model.get_conn_graph().dump()
-        #print('done')
-
     def test_promoted_branching_output(self):
         prob = self.build_nested_model(promote=True)
         model = prob.model
 
-        # model.connect('G1.G1A.y', 'G2.G2A.a')
         model.connect('x', 'G2.G2A.a')
         model.connect('G2.G2A.b', 'G2.G2B.b')
 
@@ -79,17 +75,10 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        #prob.model.display_conn_graph()
-        #prob.model.G2.display_conn_graph()
-        #prob.model.get_conn_graph().dump()
-        #print('done')
-
     def test_promoted_branching_output_autoivc(self):
         prob = self.build_nested_model(promote=True, autoivc=True)
         model = prob.model
 
-        # model.connect('G1.G1A.y', 'G2.G2A.a')
-        #model.connect('x', 'G2.G2A.a')
         model.connect('G2.G2A.a', 'x')
         model.connect('G2.G2A.b', 'G2.G2B.b')
 
@@ -99,17 +88,11 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        #prob.model.get_conn_graph().display()
-        #prob.model.get_conn_graph().dump()
-        #print('done')
-
     def test_promoted_autoivc(self):
         prob = self.build_nested_model(promote=True)
 
         prob.setup()
         prob.run_model()
-
-        #prob.model.display_conn_graph()
 
     def test_no_promotion(self):
         prob = self.build_nested_model(promote=False)
@@ -124,8 +107,6 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        #prob.model.get_conn_graph().display()
-
     def test_no_promotion_input_to_input(self):
         prob = self.build_nested_model(promote=False, autoivc=True)
         model = prob.model
@@ -139,22 +120,36 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
-        #prob.model.display_conn_graph()
-        #prob.model.get_conn_graph().dump()
-        #print('done')
+    def test_promotion_input_to_input_autoivc(self):
+        prob = self.build_nested_model(promote=True, autoivc=True)
+        model = prob.model
 
-    #def test_promotion_input_to_input(self):
-        #self.fail("this test isn't implemented yet")
-        #prob = self.build_nested_model(promote=True, autoivc=True)
-        #model = prob.model
+        model.connect('x', 'G2.G2B.b')  # input-input
 
+        prob.setup()
+        prob.final_setup()
+        prob.run_model()
 
-        #prob.setup()
-        #prob.run_model()
+        # set outputs=False since name of auto_ivc may change between runs
+        conn_tree = prob.model.get_conn_graph().get_conn_tree_graph(('i', 'x'), outputs=False)
+        expected =  set([(('i', 'x'), ('i', 'G1.x')),
+                        (('i', 'G1.x'), ('i', 'G1.G1A.x')),
+                        (('i', 'G1.G1A.x'), ('i', 'G1.G1A.C1.x')),
+                        (('i', 'G1.x'), ('i', 'G1.G1B.y')),
+                        (('i', 'G1.G1B.y'), ('i', 'G1.G1B.C2.y')),
+                        (('i', 'G2.G2B.b'), ('i', 'G2.G2B.C5.b')),
+                        ])
+        self.assertEqual(set(conn_tree.edges()), expected)
 
-        #prob.model.display_conn_graph()
-        #prob.model.get_conn_graph().dump()
-        #print('done')
+    def test_promotion_input_to_input(self):
+        prob = self.build_nested_model(promote=True, autoivc=False)
+        model = prob.model
+
+        model.connect('x', 'G2.G2B.b')  # input-input
+
+        prob.setup()
+        prob.final_setup()
+        prob.run_model()
 
 
 class TestAllConnGraphUtilityFunctions(unittest.TestCase):

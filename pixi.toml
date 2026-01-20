@@ -187,6 +187,8 @@ py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visua
 # Development workflow helpers
 clean = "rm -rf packaging dist *.egg-info .pixi"
 
+test = "testflo --skip_dir=.pixi"
+
 # Install OpenMDAO in development mode and set up pre-commit hooks
 install-openmdao-dev = { cmd = "pip install --no-deps -e . && pre-commit install", description = "Install OpenMDAO in development mode and set up pre-commit hooks" }
 

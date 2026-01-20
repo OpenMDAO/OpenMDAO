@@ -1858,7 +1858,7 @@ class AllConnGraph(nx.DiGraph):
         node_meta.discrete = True
         self.set_model_meta(model, node, meta, locmeta)
 
-    def add_variable_meta(self, model):
+    def add_model_vars(self, model):
         """
         Add variable metadata to the graph.
 
@@ -3532,7 +3532,7 @@ class AllConnGraph(nx.DiGraph):
             else:
                 src_prom = model._resolver.abs2prom(abs_out, 'output')
 
-            _, inp_src_prom = self.get_path_prom(inp_src)
+            # _, inp_src_prom = self.get_path_prom(inp_src)
             inp_src_prom = model._resolver.abs2prom(self.absnames(inp_src)[0], 'input')
 
             model._manual_connections[inp_src_prom] = (src_prom, edge_meta.get('src_indices', None))
@@ -3925,7 +3925,7 @@ class AllConnGraph(nx.DiGraph):
         from openmdao.core.group import Group
 
         # add nodes for all absolute inputs and connected absolute outputs
-        self.add_variable_meta(model)
+        self.add_model_vars(model)
 
         systems = list(model.system_iter(include_self=True, recurse=True))
         groups = [s for s in systems if isinstance(s, Group)]
@@ -4840,3 +4840,28 @@ class AllConnGraph(nx.DiGraph):
                                 f"of connected output '{to_node[1]}' cannot be "
                                 "determined.")
 
+    def get_conn_tree_graph(self, node, inputs=True, outputs=True):
+        """
+        Get the connection tree graph for a given node.
+
+        Parameters
+        ----------
+        node : tuple of the form ('i' or 'o', name)
+            The node to get the connection tree for.
+        inputs : bool, optional
+            Whether to include input nodes in the graph.
+        outputs : bool, optional
+            Whether to include output nodes in the graph.
+
+        Returns
+        -------
+        nx.DiGraph
+            The connection tree graph containing all nodes connected to the given node.
+        """
+        nodes = nx.node_connected_component(self.to_undirected(as_view=True), node)
+        if not inputs:
+            nodes = [n for n in nodes if n[0] == 'o']
+        if not outputs:
+            nodes = [n for n in nodes if n[0] == 'i']
+
+        return self.subgraph(nodes)
