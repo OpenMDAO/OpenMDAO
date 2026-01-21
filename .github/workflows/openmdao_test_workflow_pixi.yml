@@ -109,11 +109,13 @@ jobs:
           echo "Testing: ${GITHUB_REPOSITORY}"
           echo "Triggered by: ${GITHUB_EVENT_NAME}"
           echo "Initiated by: ${GITHUB_ACTOR}"
+          echo "matrix.SNOPT: ${{matrix.SNOPT}}"
+          echo "matrix.RUFF: ${{matrix.RUFF}}"
+          echo "matrix.BANDIT: ${{matrix.BANDIT}}"
           echo "============================================================="
 
       - name: Create SSH key
         if: matrix.SNOPT && runner.os != 'Windows'
-
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
