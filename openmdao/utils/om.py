@@ -4,7 +4,6 @@ OpenMDAO CLI functions.
 
 import sys
 import os
-import shutil
 import argparse
 import importlib.metadata as ilmd
 
