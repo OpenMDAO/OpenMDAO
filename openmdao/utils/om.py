@@ -474,8 +474,7 @@ def _list_pre_post_cmd(options, user_args):
         # is specified. Want to avoid a premature exit since subproblems run
         # their final_setup before the top problem.
         if options.problem:
-            if prob._metadata['name'] != options.problem and \
-                    prob._metadata['pathname'] != options.problem:
+            if prob._metadata['name'] != options.problem:
                 return
         elif '/' in prob._metadata['pathname']:
             return
