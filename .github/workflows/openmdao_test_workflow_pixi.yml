@@ -51,7 +51,7 @@ jobs:
         PIXI_ENVIRONMENT: [minimal, py311, py312, py313, default, dev, oldest]
         BANDIT: [false]
         RUFF: [false]
-        SNOPT: [false]
+        SNOPT: [true]
         include:
           # Windows - only minimal
           - OS: windows-latest
@@ -112,7 +112,7 @@ jobs:
           echo "============================================================="
 
       - name: Create SSH key
-        if: matrix.SNOPT && runner.os != 'Windows'
+        if: matrix.SNOPT == 'true' && runner.os != 'Windows'
 
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -121,11 +121,11 @@ jobs:
           eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
           mkdir -p ~/.ssh/
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          sudo chmod 600 ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Install compilers
-        if: matrix.SNOPT && runner.os != 'Windows'
+        if: matrix.SNOPT == 'true' && runner.os != 'Windows'
         run: |
           eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
           echo "============================================================="
@@ -136,6 +136,43 @@ jobs:
           else
             pixi add cython swig compilers cmake meson
           fi
+
+      - uses: fortran-lang/setup-fortran@v1
+        id: setup-fortran
+        if: matrix.SNOPT == 'true' && runner.os == 'Windows'
+        with:
+          compiler: intel
+          version: 2025.2
+
+      - name: Install build_pyoptsparse
+        run: |
+          echo "============================================================="
+          echo "Install build_pyoptsparse in pixi environment"
+          echo "============================================================="
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          pip install . git+https://github.com/OpenMDAO/build_pyoptsparse.git
+
+      - name: Copy SNOPT source files
+        if: matrix.SNOPT == 'true'
+        run: |
+          echo "============================================================="
+          echo "Copying SNOPT 7.7 source files via SSH"
+          echo "============================================================="
+          mkdir -p SNOPT
+          scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
+          ls -la SNOPT/src
+
+      - name: Build SNOPT module
+        if: matrix.SNOPT == 'true'
+        env:
+          FC: ${{ runner.os == 'Windows' && 'ifx' || 'gfortran' }}
+          CC: ${{ runner.os == 'Windows' && 'cl' || 'gcc' }}
+        run: |
+          echo "============================================================="
+          echo "Build SNOPT module with build_pyoptsparse"
+          echo "============================================================="
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          python -m build_pyoptsparse.snopt_module SNOPT/src
 
       - name: Check MPI and PETSc
         continue-on-error: true
