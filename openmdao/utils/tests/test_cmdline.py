@@ -218,6 +218,20 @@ class CmdlineTestCase(unittest.TestCase):
         else:
             self.fail("Didn't find expected err msg in output.")
 
+    def test_list_pre_post_multiple_probs(self):
+        # confirm that top level result is output even if there are subproblems
+        cmd = f'openmdao list_pre_post {os.path.join(scriptdir, "circle_opt_with_sub.py")}'
+        proc = subprocess.Popen(cmd.split(),  # nosec: trusted input
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            outs, errs = proc.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            outs, errs = proc.communicate()
+
+        outstr = outs.decode('utf-8')
+        self.assertIn("Post-optimization components:\r\n    subprob", outstr)
+
 
 class CmdlineTestCaseCheck(unittest.TestCase):
     def test_auto_ivc_warnings_check(self):
