@@ -112,7 +112,7 @@ jobs:
           echo "============================================================="
 
       - name: Create SSH key
-        if: matrix.SNOPT == 'true' && runner.os != 'Windows'
+        if: matrix.SNOPT && runner.os != 'Windows'
 
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -125,7 +125,7 @@ jobs:
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Install compilers
-        if: matrix.SNOPT == 'true' && runner.os != 'Windows'
+        if: matrix.SNOPT && runner.os != 'Windows'
         run: |
           eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
           echo "============================================================="
@@ -139,7 +139,7 @@ jobs:
 
       - uses: fortran-lang/setup-fortran@v1
         id: setup-fortran
-        if: matrix.SNOPT == 'true' && runner.os == 'Windows'
+        if: matrix.SNOPT && runner.os == 'Windows'
         with:
           compiler: intel
           version: 2025.2
@@ -153,7 +153,7 @@ jobs:
           pip install . git+https://github.com/OpenMDAO/build_pyoptsparse.git
 
       - name: Copy SNOPT source files
-        if: matrix.SNOPT == 'true'
+        if: matrix.SNOPT
         run: |
           echo "============================================================="
           echo "Copying SNOPT 7.7 source files via SSH"
@@ -163,7 +163,7 @@ jobs:
           ls -la SNOPT/src
 
       - name: Build SNOPT module
-        if: matrix.SNOPT == 'true'
+        if: matrix.SNOPT
         env:
           FC: ${{ runner.os == 'Windows' && 'ifx' || 'gfortran' }}
           CC: ${{ runner.os == 'Windows' && 'cl' || 'gcc' }}
