@@ -230,7 +230,7 @@ class CmdlineTestCase(unittest.TestCase):
             outs, errs = proc.communicate()
 
         outstr = outs.decode('utf-8')
-        self.assertIn("Post-optimization components:\r\n    subprob", outstr)
+        self.assertIn("Post-optimization components:\n    subprob", outstr)
 
 
 class CmdlineTestCaseCheck(unittest.TestCase):
