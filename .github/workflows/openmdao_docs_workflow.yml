@@ -71,7 +71,7 @@ jobs:
             PYOPTSPARSE_FROM: 'build_pyoptsparse'
             SNOPT: '7.7'
             OPTIONAL: '[all,numba]'
-            PUBLISH: true
+            PUBLISH: false
             USE_PYPI: false
             OPENMPI: ''
             MPI4PY: ''
