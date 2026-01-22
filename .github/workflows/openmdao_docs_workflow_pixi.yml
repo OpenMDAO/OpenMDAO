@@ -51,9 +51,9 @@ jobs:
           # test baseline versions on Ubuntu
           - NAME: Ubuntu py313
             OS: ubuntu-24.04
-            PUBLISH: false
+            PUBLISH: true
             PIXI_ENVIRONMENT: dev
-            SNOPT: ''
+            SNOPT: true
 
     runs-on: ${{ matrix.OS }}
 
@@ -75,6 +75,69 @@ jobs:
         with:
           environment: '${{ matrix.PIXI_ENVIRONMENT }}'
           openmdao_install_from: 'wheel'
+
+      - name: Create SSH key
+        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT && runner.os != 'Windows'
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          mkdir -p ~/.ssh/
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Install compilers
+        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT && runner.os != 'Windows'
+        run: |
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          echo "============================================================="
+          echo "Install compilers"
+          echo "============================================================="
+          if [[  "${{ matrix.OS }}" != "macos-15" ]]; then
+            pixi add cython swig compilers cmake meson
+          else
+            pixi add cython swig compilers cmake meson
+          fi
+
+      - uses: fortran-lang/setup-fortran@v1
+        id: setup-fortran
+        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT && runner.os == 'Windows'
+        with:
+          compiler: intel
+          version: 2025.2
+
+      - name: Install build_pyoptsparse
+        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT
+        run: |
+          echo "============================================================="
+          echo "Install build_pyoptsparse in pixi environment"
+          echo "============================================================="
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          pip install . git+https://github.com/OpenMDAO/build_pyoptsparse.git
+
+      - name: Copy SNOPT source files
+        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT
+        run: |
+          echo "============================================================="
+          echo "Copying SNOPT 7.7 source files via SSH"
+          echo "============================================================="
+          mkdir -p SNOPT
+          scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
+          ls -la SNOPT/src
+
+      - name: Build SNOPT module
+        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT
+        env:
+          FC: ${{ runner.os == 'Windows' && 'ifx' || 'gfortran' }}
+          CC: ${{ runner.os == 'Windows' && 'cl' || 'gcc' }}
+        run: |
+          echo "============================================================="
+          echo "Build SNOPT module with build_pyoptsparse"
+          echo "============================================================="
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          python -m build_pyoptsparse.snopt_module SNOPT/src
 
       - name: 'Build and Optionally Publish Docs'
         id: build_docs
