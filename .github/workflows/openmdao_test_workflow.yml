@@ -339,7 +339,7 @@ jobs:
         run: |
           conda install -c conda-forge swig -q -y
 
-          python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse
+          python -m pip install git+https://github.com/OpenMDAO/build_pyoptsparse@v2.0.13
 
           if [[ "${{ matrix.PYOPTSPARSE }}" == "latest" ]]; then
             function latest_version() {
