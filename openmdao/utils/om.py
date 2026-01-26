@@ -470,11 +470,30 @@ def _list_pre_post_cmd(options, user_args):
         Args to be passed to the user script.
     """
     def _list_pre_post(prob):
+        # Only run on the specified problem or on the top-level problem if none
+        # is specified. Want to avoid a premature exit since subproblems run
+        # their final_setup before the top problem.
+        if options.problem:
+            if prob._metadata['name'] != options.problem:
+                return
+        elif '/' in prob._metadata['pathname']:
+            return
+
         prob.list_pre_post(outfile=options.outfile)
 
-    # register the hook
+        # Exit after successfully displaying list_pre_post for the correct problem.
+        sys.exit()
+
+    # register the hook WITHOUT exit=True, since we handle it manually.
     hooks._register_hook('final_setup', class_name='Problem', inst_id=options.problem,
-                         post=_list_pre_post, exit=True)
+                         post=_list_pre_post, exit=False)
+
+    # Set a flag to prevent report deletion during problem setup. This allows us to
+    # call list_pre_post and then exit without losing previously generated reports.
+    # The reports are deleted at the start of setup to ensure only current-run files
+    # are present, but since list_pre_post exits before report generation hooks run,
+    # we skip the deletion in this case.
+    os.environ['OPENMDAO_CLI_LIST_PRE_POST_MODE'] = 'true'
 
     _load_and_exec(options.file[0], user_args)
 

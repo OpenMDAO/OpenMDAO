@@ -211,6 +211,20 @@ class CmdlineTestCase(unittest.TestCase):
             
         self.assertTrue(b"'sub.arr' <class ExecComp>: Can\'t get value of 'sub.arr.x': cannot reshape array of size 15 into shape (2,)" in errs)
 
+    def test_list_pre_post_multiple_probs(self):
+        # confirm that top level result is output even if there are subproblems
+        cmd = f'openmdao list_pre_post {os.path.join(scriptdir, "circle_opt_with_sub.py")}'
+        proc = subprocess.Popen(cmd.split(),  # nosec: trusted input
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            outs, errs = proc.communicate(timeout=30)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            outs, errs = proc.communicate()
+
+        outstr = outs.decode('utf-8')
+        self.assertRegex(outstr, r"Post-optimization components:\s+subprob\b")
+
 
 class CmdlineTestCaseCheck(unittest.TestCase):
     def test_auto_ivc_warnings_check(self):

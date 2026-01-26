@@ -1,0 +1,16 @@
+name = "MyParaboloidPackage"
+uuid = "a013c6e3-dc76-40b3-894d-62618f778e16"
+authors = ["Daniel Ingraham <d.j.ingraham@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+ADTypes = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
+ComponentArrays = "b0b7db55-cfe3-40fc-9ded-d10e2dbeff66"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+OpenMDAOCore = "24d19c10-6eee-420f-95df-4537264b2753"
+
+[compat]
+ADTypes = "1.21.0"
+ComponentArrays = "0.15.31"
+ForwardDiff = "1.3.1"
+OpenMDAOCore = "0.3.3"
