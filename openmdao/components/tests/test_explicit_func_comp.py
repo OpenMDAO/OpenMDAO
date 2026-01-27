@@ -1227,8 +1227,8 @@ class TestJaxNumpy(unittest.TestCase):
         J = p.compute_totals(of=['comp.x'], wrt=['comp.a', 'comp.b', 'comp.c'])
 
         I = np.eye(np.prod(shape)) if shape else np.eye(1)  # noqa: E741
-        assert_near_equal(J['comp.x', 'comp.a'], I * np.ravel(p['comp.b']) * np.cos(np.ravel(p['comp.a'])), tolerance=1e-7)
-        assert_near_equal(J['comp.x', 'comp.b'], I * np.sin(np.ravel(p['comp.a'])), tolerance=1e-7)
+        assert_near_equal(J['comp.x', 'comp.a'], I * p['comp.b'].ravel() * np.cos(p['comp.a']).ravel(), tolerance=1e-7)
+        assert_near_equal(J['comp.x', 'comp.b'], I * np.sin(p['comp.a']).ravel(), tolerance=1e-7)
         assert_near_equal(J['comp.x', 'comp.c'], I * 3., tolerance=1e-7)
 
     def test_fwd3x2(self):
