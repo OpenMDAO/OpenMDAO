@@ -115,8 +115,27 @@ jobs:
           echo "matrix.BANDIT: ${{matrix.BANDIT}}"
           echo "============================================================="
 
+      - name: Check SNOPT availability
+        id: check_snopt
+        run: |
+          if [[ "${{ matrix.PIXI_ENVIRONMENT }}" != "minimal" ]] && [[ "${{ matrix.SNOPT }}" == "true" ]] && [[ "${{ secrets.SNOPT_LOCATION_77 }}" != "" ]]; then
+            echo "should_run_snopt=true" >> $GITHUB_OUTPUT
+            echo "SNOPT is enabled and secrets are available"
+          else
+            echo "should_run_snopt=false" >> $GITHUB_OUTPUT
+            if [[ "${{ matrix.SNOPT }}" == "true" ]]; then
+              if [[ "${{ matrix.PIXI_ENVIRONMENT }}" == "minimal" ]]; then
+                echo "SNOPT is enabled but minimal environment is not supported"
+              elif [[ "${{ secrets.SNOPT_LOCATION_77 }}" == "" ]]; then
+                echo "SNOPT is enabled but secrets are not available - skipping SNOPT steps"
+              fi
+            else
+              echo "SNOPT is disabled in matrix"
+            fi
+          fi
+
       - name: Create SSH key
-        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT && runner.os != 'Windows'
+        if: steps.check_snopt.outputs.should_run_snopt == 'true' && runner.os != 'Windows'
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
@@ -128,7 +147,7 @@ jobs:
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Install compilers
-        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT && runner.os != 'Windows'
+        if: steps.check_snopt.outputs.should_run_snopt == 'true' && runner.os != 'Windows'
         run: |
           eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
           echo "============================================================="
@@ -142,13 +161,13 @@ jobs:
 
       - uses: fortran-lang/setup-fortran@v1
         id: setup-fortran
-        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT && runner.os == 'Windows'
+        if: steps.check_snopt.outputs.should_run_snopt == 'true' && runner.os == 'Windows'
         with:
           compiler: intel
           version: 2025.2
 
       - name: Install build_pyoptsparse
-        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT
+        if: steps.check_snopt.outputs.should_run_snopt == 'true'
         run: |
           echo "============================================================="
           echo "Install build_pyoptsparse in pixi environment"
@@ -157,7 +176,7 @@ jobs:
           pip install . git+https://github.com/OpenMDAO/build_pyoptsparse.git
 
       - name: Copy SNOPT source files
-        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT
+        if: steps.check_snopt.outputs.should_run_snopt == 'true'
         run: |
           echo "============================================================="
           echo "Copying SNOPT 7.7 source files via SSH"
@@ -167,7 +186,7 @@ jobs:
           ls -la SNOPT/src
 
       - name: Build SNOPT module
-        if: matrix.PIXI_ENVIRONMENT != 'minimal' && matrix.SNOPT
+        if: steps.check_snopt.outputs.should_run_snopt == 'true'
         env:
           FC: ${{ runner.os == 'Windows' && 'ifx' || 'gfortran' }}
           CC: ${{ runner.os == 'Windows' && 'cl' || 'gcc' }}
