@@ -36,6 +36,12 @@
 #   pixi run -e <environment> <command>       # Run command in environment
 #
 # For more information: https://pixi.sh
+# 
+# Updating:
+#   It is fairly easy for a developer to accidentally commit a pixi.lock or pixi.toml file after issuing `pixi add` commands.
+#   To prevent this, OpenMDAO implements a pre-commit hook that automatically fails if either of these two files is included in the commit,
+#.  UNLESS the environment variable `ALLOW_PIXI_COMMIT=1` is set.
+#   This allows us to periodically update the pixi environments but
 
 [workspace]
 name = "openmdao"
@@ -186,11 +192,16 @@ py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visua
 # Development workflow helpers
 clean = "rm -rf packaging dist *.egg-info .pixi"
 
+# Install an arbitrary version of OpenMDAO into the environment from pyPI
+install-openmdao = { cmd = """
+    python -c "import subprocess; spec = 'openmdao' if '{{version}}' == 'latest' else 'openmdao=={{version}}'; subprocess.run(['pixi', 'add', '--pypi', spec], check=True)"
+""", args=[{"arg"="version", "default"="latest"}]}
+
 # Install OpenMDAO in development mode and set up pre-commit hooks
-install-openmdao-dev = { cmd = "pip install --no-deps -e . && pre-commit install", description = "Install OpenMDAO in development mode and set up pre-commit hooks" }
+install-openmdao-dev = { cmd = "pixi add --pypi --editable 'openmdao @ file://${PIXI_PROJECT_ROOT}' && pre-commit install", description = "Install OpenMDAO in development mode and set up pre-commit hooks" }
 
 # Install latest OpenMDAO from PyPI
-install-openmdao-latest = { cmd = "pip install --no-deps openmdao", description = "Install latest OpenMDAO from PyPI" }
+install-openmdao-latest = { cmd = "pixi add --pypi openmdao", description = "Install latest OpenMDAO from PyPI" }
 
 # Install OpenMDAO from GitHub master branch
-install-openmdao-master = { cmd = "pip install --no-deps git+https://github.com/OpenMDAO/OpenMDAO.git@master", description = "Install OpenMDAO from GitHub master branch" }
+install-openmdao-master = { cmd = "pixi add --pypi --git https://github.com/OpenMDAO/OpenMDAO.git --branch master openmdao", description = "Install OpenMDAO from GitHub master branch" }
