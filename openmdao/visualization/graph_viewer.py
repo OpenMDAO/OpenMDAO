@@ -8,6 +8,11 @@ try:
 except ImportError:
     pydot = None
 
+try:
+    import graphviz
+except ImportError:
+    graphviz = None
+
 import networkx as nx
 
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
@@ -120,11 +125,14 @@ class GraphViewer(object):
         pydot.Dot or None
             The pydot graph that was created.
         """
-        if pydot is None:
-            raise RuntimeError(f"{self._group.msginfo}: write_graph requires pydot.  Install pydot "
-                               "using 'pip install pydot'. Note that pydot requires graphviz, which"
+        if pydot is None or graphviz is None:
+            raise RuntimeError(f"{self._group.msginfo}: write_graph requires pydot and "
+                               "python-graphviz.  pydot and python-graphviz can be installed "
+                               "using 'pip'. Note that pydot requires graphviz, which"
                                " is a non-Python application.\nIt can be installed at the system "
-                               "level or via a package manager like conda.")
+                               "level or via a package manager like conda. Also, if you see an "
+                               "error message about 'dot' not supporting the -Tsvg option, try "
+                               "running 'dot -c' to set up the graphviz config files.")
 
         group = self._group
 
@@ -316,17 +324,16 @@ class GraphViewer(object):
             node_info[s.pathname] = meta.copy()
 
         if group.comm.size > 1:
-            if group._resolver.has_remote:
-                # not all systems exist in all procs, so must gather info from all procs
-                if group._gather_full_data():
-                    all_node_info = group.comm.allgather(node_info)
-                else:
-                    all_node_info = group.comm.allgather({})
+            # not all systems exist in all procs, so must gather info from all procs
+            if group._gather_full_data():
+                all_node_info = group.comm.allgather(node_info)
+            else:
+                all_node_info = group.comm.allgather({})
 
-                for info in all_node_info:
-                    for pathname, meta in info.items():
-                        if pathname not in node_info:
-                            node_info[pathname] = meta
+            for info in all_node_info:
+                for pathname, meta in info.items():
+                    if pathname not in node_info:
+                        node_info[pathname] = meta
 
         return node_info
 
@@ -649,7 +656,7 @@ def _get_node_display_meta(s, meta):
             meta['shape'] = 'box3d'
 
 
-def write_graph(G, prog='dot', display=True, outfile='graph.html'):
+def write_graph(G, prog='dot', display=True, outfile=None):
     """
     Write the graph to a file and optionally display it.
 
@@ -669,11 +676,16 @@ def write_graph(G, prog='dot', display=True, outfile='graph.html'):
     pydot.Dot
         The graph that was written.
     """
-    if pydot is None:
-        raise RuntimeError("write_graph requires pydot.  Install pydot using "
-                           "'pip install pydot'. Note that pydot requires graphviz, which is a "
-                           "non-Python application.\nIt can be installed at the system level "
-                           "or via a package manager like conda.")
+    if pydot is None or graphviz is None:
+        raise RuntimeError("write_graph requires pydot and python-graphviz.  pydot and "
+                           "python-graphviz can be installed using 'pip'. Note that pydot requires "
+                           "graphviz, which is a non-Python application.\nIt can be installed at "
+                           "the system level or via a package manager like conda. Also, if you see "
+                           "an error message about 'dot' not supporting the -Tsvg option, try "
+                           "running 'dot -c' to set up the graphviz config files.")
+
+    if outfile is None:
+        outfile = 'graph.html'
 
     ext = outfile.rpartition('.')[2]
     if not ext:

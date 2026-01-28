@@ -696,7 +696,7 @@ class TestBryoden(unittest.TestCase):
     def test_complex_step(self):
         prob = om.Problem()
         model = prob.model
-        sub = model.add_subsystem('sub', om.ParallelGroup(), promotes=['*'])
+        sub = model.add_subsystem('sub', om.Group(), promotes=['*'])
 
         model.add_subsystem('px', om.IndepVarComp('x', 1.0), promotes=['x'])
         model.add_subsystem('pz', om.IndepVarComp('z', np.array([5.0, 2.0])), promotes=['z'])

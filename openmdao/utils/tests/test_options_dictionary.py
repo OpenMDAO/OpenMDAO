@@ -108,7 +108,7 @@ test       **Required**  ['a', 'b']         N/A                    Test integer 
 | test      | **Required** | ['a', 'b']        | N/A                   | Test integer value                                                                        | N/A                       |
 """
 
-        self.assertEqual(self.dict.to_table(fmt='github').strip(), expected.strip())
+        self.assertEqual(self.dict.to_table(fmt='github', display=False).strip(), expected.strip())
 
         my_comp = MyComp()
 

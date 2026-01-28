@@ -289,22 +289,6 @@ def _check_comp_has_no_outputs(problem, logger):
         logger.warning(''.join(["The following Components do not have any outputs:\n"] + msg))
 
 
-def _check_auto_ivc_warnings(problem, logger):
-    """
-    Issue a logger warning if any components have conflicting attributes.
-
-    Parameters
-    ----------
-    problem : <Problem>
-        The problem being checked.
-    logger : object
-        The object that manages logging output.
-    """
-    if hasattr(problem.model, "_auto_ivc_warnings"):
-        for i in problem.model._auto_ivc_warnings:
-            logger.warning(i)
-
-
 def _check_system_configs(problem, logger):
     """
     Perform any system specific configuration checks.
@@ -635,7 +619,6 @@ _default_checks = {
     'missing_recorders': _check_missing_recorders,
     'unserializable_options': _check_unserializable_options,
     'comp_has_no_outputs': _check_comp_has_no_outputs,
-    'auto_ivc_warnings': _check_auto_ivc_warnings,
 }
 
 _all_checks = _default_checks.copy()

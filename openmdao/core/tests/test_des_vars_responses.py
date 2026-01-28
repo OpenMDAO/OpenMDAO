@@ -373,7 +373,8 @@ class TestDesvarOnModel(unittest.TestCase):
             prob.final_setup()
 
         self.assertEqual(context.exception.args[0], 
-           "<model> <class SellarDerivatives>: Output not found for design variable 'junk'.")
+           "\nCollected errors for problem 'design_var_not_exist':"
+           "\n   <model> <class SellarDerivatives>: Output not found for design variable 'junk'.")
 
     def test_desvar_affine_and_scaleradder(self):
 
@@ -943,7 +944,7 @@ class TestObjectiveOnModel(unittest.TestCase):
                           name_func=lambda f, n, p: 'test_desvar_size_err_' + '_'.join(a for a in p.args))
     def test_desvar_size_err(self, name):
 
-        prob = om.Problem()
+        prob = om.Problem(name=name)
 
         prob.model = SellarDerivatives()
         prob.model.nonlinear_solver = om.NonlinearBlockGS()
@@ -955,7 +956,8 @@ class TestObjectiveOnModel(unittest.TestCase):
             prob.run_model()
 
         self.assertEqual(str(context.exception),
-                         f"<model> <class SellarDerivatives>: When adding design var 'z', {name} should have size 1 but instead has size 2.")
+                         f"\nCollected errors for problem '{name}':"
+                         f"\n   <model> <class SellarDerivatives>: When adding design var 'z', {name} should have size 1 but instead has size 2.")
 
     @parameterized.expand(['lower', 'upper', 'equals', 'adder', 'scaler', 'ref', 'ref0'],
                           name_func=lambda f, n, p: 'test_constraint_size_err_' + '_'.join(a for a in p.args))

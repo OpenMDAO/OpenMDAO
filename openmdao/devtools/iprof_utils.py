@@ -77,7 +77,7 @@ def find_qualified_name(filename, line, cache, full=True):
     if filename not in cache:
         fcache = {}
 
-        with open(filename, 'r') as f:
+        with open(filename, 'r', encoding='utf-8') as f:
             contents = f.read()
             if len(contents) > 0 and contents[-1] != '\n':
                 contents += '\n'

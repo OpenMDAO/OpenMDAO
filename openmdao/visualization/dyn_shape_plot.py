@@ -7,6 +7,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.file_utils import _load_and_exec
 import openmdao.utils.hooks as hooks
 from openmdao.utils.general_utils import common_subpath
+from openmdao.visualization.graph_viewer import write_graph
 
 
 def _view_dyn_shapes_setup_parser(parser):
@@ -105,7 +106,7 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
 
     if title is None:
         # keep the names from being super long by removing any common subpath
-        common = common_subpath(graph.nodes())
+        common = common_subpath(n[1] for n in graph.nodes())
 
         if common:
             title = f"Dynamic shape dependencies in group '{common}'"
@@ -122,9 +123,11 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
     # prepend the shape onto the variable name
     node_colors = []
     node_labels = {}
-    for n in graph:
+    for node, meta in graph.nodes(data=True):
+        io, n = node
+        io = 'input' if io == 'i' else 'output'
         try:
-            meta = abs2meta['input'][n] if n in abs2meta['input'] else abs2meta['output'][n]
+            meta = abs2meta[io][n]
             shape = meta['shape']
         except KeyError:
             shape = None
@@ -138,15 +141,20 @@ def view_dyn_shapes(root, outfile='shape_dep_graph.png', show=True, title=None):
                     break
             else:
                 node_colors.append('green')
-        node_labels[n] = f"{shape}: {n[common_idx:]}"
+        node_labels[node] = f"{shape}: {n[common_idx:]}"
 
-    nx.draw_networkx(graph, with_labels=True, node_color=node_colors, labels=node_labels)
-    plt.axis('off')  # turn of axis
-    plt.title(title)
-    plt.savefig(outfile)
+    if outfile.endswith('.png'):
+        nx.draw_networkx(graph, with_labels=True, node_color=node_colors, labels=node_labels)
+        plt.axis('off')  # turn of axis
+        plt.title(title)
+        plt.savefig(outfile)
 
-    if show:
-        plt.show()
+        if show:
+            plt.show()
+    elif outfile.endswith('.html'):
+        write_graph(graph, display=show, outfile=outfile)
+    else:
+        raise ValueError(f"Unsupported file extension: {outfile}")
 
     # TODO: add a legend
     # TODO: use a better graph plotting lib, maybe D3 or something else, to get better layout
