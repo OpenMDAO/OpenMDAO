@@ -41,7 +41,6 @@ from openmdao.recorders.recording_manager import RecordingManager, record_viewer
 from openmdao.utils.deriv_display import _print_deriv_table, _deriv_display, _deriv_display_compact
 from openmdao.utils.mpi import MPI, FakeComm, multi_proc_exception_check, check_mpi_env
 from openmdao.utils.options_dictionary import OptionsDictionary
-from openmdao.utils.units import simplify_unit
 from openmdao.utils.logger_utils import get_logger, TestLogger
 from openmdao.utils.hooks import _setup_hooks, _reset_all_hooks
 from openmdao.utils.record_util import create_local_meta
@@ -487,9 +486,14 @@ class Problem(object, metaclass=ProblemMetaclass):
         float or ndarray or any python object
             the requested output/input variable.
         """
-        return self.get_val(name, get_remote=None)
+        meta_in = self.model._var_allprocs_abs2meta['input']
+        if name in meta_in and meta_in[name]['distributed']:
+            from_src = False
+        else:
+            from_src = True
+        return self.get_val(name, get_remote=None, from_src=from_src)
 
-    def get_val(self, name, units=None, indices=None, get_remote=False, copy=False):
+    def get_val(self, name, units=None, indices=None, get_remote=False, copy=False, from_src=True):
         """
         Get an output/input variable.
 
@@ -502,33 +506,33 @@ class Problem(object, metaclass=ProblemMetaclass):
         units : str, optional
             Units to convert to before return.
         indices : int or list of ints or tuple of ints or int ndarray or Iterable or None, optional
-            Indices or slice to return.
+            Indices or slice of the named variable to return.
         get_remote : bool or None
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
             in the Problem's MPI communicator.
             If False, only retrieve the value if it is on the current process, or only the part
             of the value that's on the current process for a distributed variable.
-            If None and the variable is remote or distributed, a RuntimeError will be raised.
+            If False and the variable is remote or distributed, a RuntimeError will be raised.
         copy : bool, optional
             If True, return a copy of the value.  If False, return a reference to the value.
+        from_src : bool
+            If True, retrieve value of an input variable from its connected source. This is
+            ignored and assumed to be True in all cases except when the name is the absolute name
+            of an input variable and the variable vectors have been initialized.  In that case the
+            value will be retrieved from the variable input vector directly.
 
         Returns
         -------
         object
             The value of the requested output/input variable.
         """
-        if self._metadata['setup_status'] <= _SetupStatus.POST_SETUP2:
-            abs_names = self.model._resolver.absnames(name)
-            val = self.model._get_cached_val(name, abs_names, get_remote=get_remote)
-            if not is_undefined(val):
-                if indices is not None:
-                    val = val[indices]
-                if units is not None:
-                    val = self.model.convert2units(name, val, simplify_unit(units))
-        else:
-            val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
-                                     from_src=True)
+        abs2meta = self.model._var_allprocs_abs2meta
+        if name not in abs2meta['input']:
+            from_src = True
+
+        val = self.model.get_val(name, units=units, indices=indices, get_remote=get_remote,
+                                 from_src=from_src, copy=copy)
 
         if is_undefined(val):
             if get_remote:
@@ -538,10 +542,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                                    f"rank {self.comm.rank}. You can retrieve values from "
                                    "other processes using `get_val(<name>, get_remote=True)`.")
 
-        if copy:
-            return deepcopy(val)
-        else:
-            return val
+        return val
 
     def __setitem__(self, name, value):
         """
@@ -577,23 +578,6 @@ class Problem(object, metaclass=ProblemMetaclass):
             raise RuntimeError(f"{self.msginfo}: '{name}' Cannot call set_val before setup.")
 
         self.model.set_val(name, val, units=units, indices=indices)
-
-    def _set_initial_conditions(self):
-        """
-        Set all initial conditions that have been saved in cache after setup.
-        """
-        for value, set_units, pathname, name in self.model._initial_condition_cache.values():
-            if pathname:
-                system = self.model._get_subsystem(pathname)
-                if system is None or not system._is_local:
-                    pass
-                else:
-                    system.set_val(name, value, units=set_units)
-            else:
-                self.model.set_val(name, value, units=set_units)
-
-        # Clean up cache
-        self.model._initial_condition_cache = {}
 
     def _check_collected_errors(self):
         """
@@ -1082,7 +1066,7 @@ class Problem(object, metaclass=ProblemMetaclass):
             'solver_info': SolverInfo(),
             'use_derivatives': derivatives,
             'force_alloc_complex': force_alloc_complex,  # forces allocation of complex vectors
-            'vars_to_gather': {},  # vars that are remote somewhere. does not include distrib vars
+            'vars_to_gather': {},  # vars that are remote somewhere.
             'static_mode': False,  # used to determine where various 'static'
                                    # and 'dynamic' data structures are stored.
                                    # Dynamic ones are added during System
@@ -1097,14 +1081,6 @@ class Problem(object, metaclass=ProblemMetaclass):
             'has_par_deriv_color': False,  # True if any dvs/responses have parallel deriv colors
             'mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
             'orig_mode': mode,  # mode (derivative direction) set by the user.  'auto' by default
-            'abs_in2prom_info': {},  # map of abs input name to list of length = sys tree height
-                                     # down to var location, to allow quick resolution of local
-                                     # src_shape/src_indices due to promotes.  For example,
-                                     # for abs_in of a.b.c.d, dict entry would be
-                                     # [None, None, None], corresponding to levels
-                                     # a, a.b, and a.b.c, with one of the Nones replaced
-                                     # by promotes info.  Dict entries are only created if
-                                     # src_indices are applied to the variable somewhere.
             'reports_dir': None,  # directory where reports will be written
             'saved_errors': [],  # store setup errors here until after final_setup
             'checking': False,  # True if check_totals or check_partials is running
@@ -1214,7 +1190,13 @@ class Problem(object, metaclass=ProblemMetaclass):
                 mode = self._orig_mode
 
             self._metadata['mode'] = mode
+
+            if self.model.comm.size > 1:
+                model.get_conn_graph().sync_auto_ivcs(model)
         else:
+            if self.model.comm.size > 1:
+                model.get_conn_graph().sync_auto_ivcs(model)
+
             first = False
             mode = self._metadata['mode']
 
@@ -1251,7 +1233,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         if (not self._metadata['allow_post_setup_reorder'] and
                 self._metadata['setup_status'] == _SetupStatus.PRE_SETUP and self.model._order_set):
-            raise RuntimeError(f"{self.msginfo}: Cannot call set_order without calling setup after")
+            raise RuntimeError(f"{self.msginfo}: Can't call set_order without calling setup after.")
 
         # set up recording, including any new recorders since last setup
         # TODO: We should be smarter and only setup the recording when new recorders have
@@ -1260,10 +1242,6 @@ class Problem(object, metaclass=ProblemMetaclass):
             driver._setup_recording()
             self._setup_recording()
             record_viewer_data(self)
-
-        if self._metadata['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
-            self._metadata['setup_status'] = _SetupStatus.POST_FINAL_SETUP
-            self._set_initial_conditions()
 
         if self.model.comm.size > 1:
             # this updates any source values that are attached to remote inputs
@@ -1436,7 +1414,7 @@ class Problem(object, metaclass=ProblemMetaclass):
                 comp_content = comp_stream.getvalue()
                 if comp_content:
                     if show_only_incorrect:
-                        if incorrect_msg:
+                        if incorrect_msg:  # only do this once
                             print(incorrect_msg, file=out_stream, end='')
                             incorrect_msg = ''
 
@@ -2289,7 +2267,6 @@ class Problem(object, metaclass=ProblemMetaclass):
                             model.set_val(abs_name, scatter_dist_to_local(val, model.comm, sizes))
                         else:
                             model.set_val(abs_name, val)
-
                 else:
                     issue_warning(f"{model.msginfo}: Output variable, '{name}', recorded "
                                   "in the case is not found in the model.")

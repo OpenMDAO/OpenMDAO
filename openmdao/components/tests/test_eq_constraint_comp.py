@@ -651,7 +651,7 @@ class TestEQConstraintComp(unittest.TestCase):
 
         prob.run_driver()
 
-        assert_near_equal(prob.driver._cons['eq_comp.y']['indices']._arr, np.asarray([n-2,n-1], dtype=int))
+        assert_near_equal(prob.driver._cons['eq_comp.y']['indices'].as_array(), np.asarray([n-2,n-1], dtype=int))
         self.assertEqual(prob.driver._cons['eq_comp.y']['flat_indices'], True)
 
 

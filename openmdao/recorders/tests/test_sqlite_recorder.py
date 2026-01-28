@@ -807,8 +807,8 @@ class TestSqliteRecorder(unittest.TestCase):
                 'con_cmp2.y2': 'y2'
             },
             'output': {
-                '_auto_ivc.v0': 'z',
-                '_auto_ivc.v1': 'x',
+                '_auto_ivc.v0': 'x',
+                '_auto_ivc.v1': 'z',
                 'd1.y1': 'y1',
                 'd2.y2': 'y2',
                 'obj_cmp.obj': 'obj',
@@ -1250,20 +1250,20 @@ class TestSqliteRecorder(unittest.TestCase):
             "con_cmp1.con1": [-22.42830237],
             "d1.y1": [25.58830237],
             "con_cmp2.con2": [-11.941511849],
-            "_auto_ivc.v0": [5.0, 2.0],
+            "_auto_ivc.v1": [5.0, 2.0],
             "obj_cmp.obj": [28.588308165],
             "d2.y2": [12.058488150],
-            "_auto_ivc.v1": [1.0]
+            "_auto_ivc.v0": [1.0]
         }
 
         expected_solver_residuals = {
             "con_cmp1.con1": [0.0],
             "d1.y1": [-1.318802844707534e-10],
             "con_cmp2.con2": [0.0],
-            "_auto_ivc.v0": [0.0, 0.0],
+            "_auto_ivc.v1": [0.0, 0.0],
             "obj_cmp.obj": [0.0],
             "d2.y2": [0.0],
-            "_auto_ivc.v1": [0.0]
+            "_auto_ivc.v0": [0.0]
         }
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
@@ -1285,10 +1285,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "con_cmp1.con1": [0.0],
             "d1.y1": [2.60769184e-12],
             "con_cmp2.con2": [0.0],
-            "_auto_ivc.v0": [0.0, 0.0],
+            "_auto_ivc.v1": [0.0, 0.0],
             "obj_cmp.obj": [0.0],
             "d2.y2": [0.0],
-            "_auto_ivc.v1": [0.0]
+            "_auto_ivc.v0": [0.0]
         }
 
         expected_data = ((coordinate, (t0, t1), expected_abs_error, expected_rel_error,
@@ -1465,10 +1465,10 @@ class TestSqliteRecorder(unittest.TestCase):
             "con_cmp1.con1": [-22.42830237],
             "d1.y1": [25.58830237],
             "con_cmp2.con2": [-11.941511849],
-            "_auto_ivc.v0": [5.0, 2.0],
+            "_auto_ivc.v1": [5.0, 2.0],
             "obj_cmp.obj": [28.588308165],
             "d2.y2": [12.058488150],
-            "_auto_ivc.v1": [1.0]
+            "_auto_ivc.v0": [1.0]
         }
 
         expected_solver_residuals = None
@@ -1521,8 +1521,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 3.6299074030587596e-12
 
         expected_solver_output = {
-            '_auto_ivc.v1': [1.],
-            '_auto_ivc.v0': [5., 2.],
+            '_auto_ivc.v0': [1.],
+            '_auto_ivc.v1': [5., 2.],
             'd1.y1': [25.58830237],
             'd2.y2': [12.05848815],
             'obj_cmp.obj': [28.58830817],
@@ -1531,8 +1531,8 @@ class TestSqliteRecorder(unittest.TestCase):
         }
 
         expected_solver_residuals = {
-            '_auto_ivc.v1': [0.],
-            '_auto_ivc.v0': [0., 0.],
+            '_auto_ivc.v0': [0.],
+            '_auto_ivc.v1': [0., 0.],
             'd1.y1': [-1.31880284e-10],
             'd2.y2': [0.],
             'obj_cmp.obj': [0.],
@@ -1561,8 +1561,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 1.991112651729199e-08
 
         expected_solver_output = {
-            '_auto_ivc.v1': [1.],
-            '_auto_ivc.v0': [5., 2.],
+            '_auto_ivc.v0': [1.],
+            '_auto_ivc.v1': [5., 2.],
             'd1.y1': [25.58830237],
             'd2.y2': [12.05848815],
             'obj_cmp.obj': [28.58830817],
@@ -1595,8 +1595,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 5.966657077752565e-12
 
         expected_solver_output = {
-            '_auto_ivc.v1': [1.],
-            '_auto_ivc.v0': [5., 2.],
+            '_auto_ivc.v0': [1.],
+            '_auto_ivc.v1': [5., 2.],
             'd1.y1': [25.58830237],
             'd2.y2': [12.05848815],
             'obj_cmp.obj': [28.58830817],
@@ -1630,8 +1630,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = 0.00042348707505980126
 
         expected_solver_output = {
-            '_auto_ivc.v1': [1.],
-            '_auto_ivc.v0': [5., 2.],
+            '_auto_ivc.v0': [1.],
+            '_auto_ivc.v1': [5., 2.],
             'd1.y1': [25.58830237],
             'd2.y2': [12.05848815],
             'obj_cmp.obj': [28.58830817],
@@ -1672,8 +1672,8 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_rel_error = None
 
         expected_solver_output = {
-            '_auto_ivc.v1': [1.],
-            '_auto_ivc.v0': [5., 2.],
+            '_auto_ivc.v0': [1.],
+            '_auto_ivc.v1': [5., 2.],
             'd1.y1': [27.8],
             'd2.y2': [12.27257053],
             'obj_cmp.obj': [30.80000468],
@@ -2962,20 +2962,22 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         cr = om.CaseReader(prob.get_outputs_dir() / "cases.sql")
 
         # access list of connections stored in metadata
-        connections = sorted(cr.problem_metadata['connections_list'], key=lambda x: (x['tgt'], x['src']))
-
-        self.assertEqual('\n'.join([conn['src']+'\t'+conn['tgt'] for conn in connections]),
-                         '\n'.join(["d1.y1\tcon_cmp1.y1",
-                                    "d2.y2\tcon_cmp2.y2",
-                                    "_auto_ivc.v1\td1.x",
-                                    "d2.y2\td1.y2",
-                                    "_auto_ivc.v0\td1.z",
-                                    "d1.y1\td2.y1",
-                                    "_auto_ivc.v0\td2.z",
-                                    "_auto_ivc.v1\tobj_cmp.x",
-                                    "d1.y1\tobj_cmp.y1",
-                                    "d2.y2\tobj_cmp.y2",
-                                    "_auto_ivc.v0\tobj_cmp.z"]))
+        connections = sorted((x['src'], x['tgt']) for x in cr.problem_metadata['connections_list'])
+        expected = sorted([
+            ("d1.y1", "con_cmp1.y1"),
+            ("d2.y2", "con_cmp2.y2"),
+            ("_auto_ivc.v0", "d1.x"),
+            ("d2.y2", "d1.y2"),
+            ("_auto_ivc.v1", "d1.z"),
+            ("d1.y1", "d2.y1"),
+            ("_auto_ivc.v1", "d2.z"),
+            ("_auto_ivc.v0", "obj_cmp.x"),
+            ("d1.y1", "obj_cmp.y1"),
+            ("d2.y2", "obj_cmp.y2"),
+            ("_auto_ivc.v1", "obj_cmp.z")
+        ])
+        
+        self.assertEqual(connections, expected)
 
         # access the model tree stored in metadata
         self.assertEqual(set(cr.problem_metadata['tree'].keys()),

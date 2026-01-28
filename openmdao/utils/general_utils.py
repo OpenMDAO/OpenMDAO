@@ -6,6 +6,7 @@ import textwrap
 import json
 import functools
 import atexit
+import pprint
 from types import TracebackType
 import unittest
 from contextlib import contextmanager
@@ -20,7 +21,6 @@ import numpy as np
 
 from openmdao.core.constants import INF_BOUND, _UNDEFINED
 from openmdao.utils.array_utils import shape_to_len
-from openmdao.utils.mpi import MPI
 
 
 _float_inf = float('inf')
@@ -381,7 +381,7 @@ def all_ancestors(pathname, delim='.'):
     """
     while pathname:
         yield pathname
-        pathname, _, _ = pathname.rpartition(delim)
+        pathname = pathname.rpartition(delim)[0]
 
 
 def find_matches(pattern, var_list):
@@ -1073,11 +1073,15 @@ def common_subpath(pathnames):
     str
         Common dotted subpath.  Returns '' if no common subpath is found.
     """
-    if len(pathnames) == 1:
-        return pathnames[0]
-
     if pathnames:
+        if not isinstance(pathnames, (list, tuple)):
+            pathnames = list(pathnames)
+
         npaths = len(pathnames)
+
+        if npaths == 1:
+            return pathnames[0]
+
         splits = [p.split('.') for p in pathnames]
         for common_loc in range(np.min([len(s) for s in splits])):
             p0 = splits[0][common_loc]
@@ -1095,24 +1099,38 @@ def common_subpath(pathnames):
     return ''
 
 
-def _is_slicer_op(indices):
+def truncate_str(s, max_len=20, middle=' .. '):
     """
-    Check if an indexer contains a slice or ellipsis operator.
+    Truncate a string to a maximum length.
+
+    Truncated strings will look like this:  f'first_part{middle}last_part'.
 
     Parameters
     ----------
-    indices : ndarray
-        Indices to check.
+    s : str
+        The string to be truncated.
+    max_len : int or None
+        The maximum length of the truncated string.  Must be greater than len(middle) + 2.
+    middle : str
+        The string to insert in the middle of the truncated string.  Defaults to ' .. '.
 
     Returns
     -------
-    bool
-        Returns True if indices contains a colon or ellipsis operator.
+    str
+        The truncated string.
     """
-    if isinstance(indices, tuple):
-        return any(isinstance(i, slice) or i is ... for i in indices)
+    if not isinstance(s, str):
+        s = str(s)
 
-    return isinstance(indices, slice)
+    if max_len is None or len(s) <= max_len:
+        return s
+
+    midlen = len(middle)
+    if max_len < midlen + 2:
+        raise ValueError(f"max_len must be greater than len('{middle}') + 2.")
+
+    div, rem = divmod(max_len - midlen, 2)
+    return f'{s[:div + rem]}{middle}{s[-div:]}'
 
 
 def _src_name_iter(proms):
@@ -1131,58 +1149,6 @@ def _src_name_iter(proms):
     """
     for meta in proms.values():
         yield meta['source']
-
-
-def _src_or_alias_item_iter(proms):
-    """
-    Yield items from proms dict with promoted input names converted to source or alias names.
-
-    Parameters
-    ----------
-    proms : dict
-        Original dict with some promoted paths.
-
-    Yields
-    ------
-    tuple
-        src_or_alias_name, metadata
-    """
-    for name, meta in proms.items():
-        if 'alias' in meta and meta['alias'] is not None:
-            yield meta['alias'], meta
-        elif meta['source'] is not None:
-            yield meta['source'], meta
-        else:
-            yield name, meta
-
-
-def convert_src_inds(parent_src_inds, my_src_inds, my_src_shape):
-    """
-    Compute lower level src_indices based on parent src_indices.
-
-    Parameters
-    ----------
-    parent_src_inds : ndarray
-        Parent src_indices.
-    my_src_inds : ndarray or fancy index
-        Src_indices at the current system level, before conversion.
-    my_src_shape : tuple
-        Expected source shape at the current system level.
-
-    Returns
-    -------
-    ndarray
-        Final src_indices based on those of the parent.
-    """
-    if parent_src_inds is None:
-        return my_src_inds
-    elif my_src_inds is None:
-        return parent_src_inds
-
-    if my_src_inds._flat_src:
-        return parent_src_inds.shaped_array(flat=True)[my_src_inds.flat()]
-    else:
-        return parent_src_inds.shaped_array(flat=False).reshape(my_src_shape)[my_src_inds()]
 
 
 def is_undefined(obj):
@@ -1237,42 +1203,6 @@ def shape2tuple(shape):
             return (shape,)
 
 
-def get_connection_owner(system, tgt):
-    """
-    Return (owner, promoted_src, promoted_tgt) for the given connected target.
-
-    Note : this is not speedy.  It's intended for use only in error messages.
-
-    Parameters
-    ----------
-    system : System
-        Any System.  The search always goes from the model level down.
-    tgt : str
-        Absolute pathname of the target variable.
-
-    Returns
-    -------
-    tuple
-        (owning group, promoted source name, promoted target name).
-    """
-    from openmdao.core.group import Group
-
-    model = system._problem_meta['model_ref']()
-    src = model._conn_global_abs_in2out[tgt]
-    resolver = model._resolver
-
-    if resolver.is_abs(src, 'output') and resolver.is_abs(tgt, 'input'):
-        if resolver.abs2prom(tgt, 'input') != resolver.abs2prom(src, 'output'):
-            # connection is explicit
-            for g in model.system_iter(include_self=True, recurse=True, typ=Group):
-                if g._manual_connections:
-                    tprom = g._resolver.abs2prom(tgt, 'input')
-                    if tprom in g._manual_connections:
-                        return g, g._resolver.abs2prom(src, 'output'), tprom
-
-    return system, src, tgt
-
-
 def _remove_old_configs(vscode_dir):
     launch_path = os.path.join(vscode_dir, 'launch.json')
 
@@ -1316,6 +1246,8 @@ def generate_launch_json_file(vscode_dir, base_port, ranks):
     ranks : int
         The specific ranks to debug.
     """
+    from openmdao.utils.mpi import MPI
+
     _remove_old_configs(vscode_dir)
 
     launch_path = os.path.join(vscode_dir, 'launch.json')
@@ -1381,6 +1313,8 @@ def setup_dbg():
     """
     If WING_DBG or VSCODE_DBG is truthy in the environment, set up their debuggers.
     """
+    from openmdao.utils.mpi import MPI
+
     # Get the base port from the VSCODE_DBG environment variable if set
     vscode_dbg = os.environ.get("VSCODE_DBG")
 
@@ -1510,18 +1444,22 @@ class LocalRangeIterable(object):
         self._vname = vname
         self._var_size = 0
 
+        conn_graph = system.get_conn_graph()
+
         all_abs2meta = system._var_allprocs_abs2meta['output']
         if vname in all_abs2meta:
             sizes = system._var_sizes['output']
             vec = system._outputs
             abs2meta = system._var_abs2meta['output']
+            node_meta = conn_graph.nodes[('o', vname)]['attrs']
         else:
             all_abs2meta = system._var_allprocs_abs2meta['input']
             sizes = system._var_sizes['input']
             vec = system._inputs
             abs2meta = system._var_abs2meta['input']
+            node_meta = conn_graph.nodes[('i', vname)]['attrs']
 
-        if all_abs2meta[vname]['distributed']:
+        if node_meta.distributed:
             var_idx = system._var_allprocs_abs2idx[vname]
             rank = system.comm.rank
             self._offset = np.sum(sizes[rank, :var_idx]) if use_vec_offset else 0
@@ -1532,7 +1470,7 @@ class LocalRangeIterable(object):
             self._var_size = np.sum(sizes[:, var_idx])
         elif vname not in abs2meta:  # variable is remote
             self._iter = self._remote_iter
-            self._var_size = all_abs2meta[vname]['global_size']
+            self._var_size = node_meta.global_size
         else:
             self._iter = self._serial_iter
             start, stop = vec.get_range(vname)
@@ -1540,7 +1478,7 @@ class LocalRangeIterable(object):
                 self._inds = range(start, stop)
             else:
                 self._inds = range(stop - start)
-            self._var_size = all_abs2meta[vname]['global_size']
+            self._var_size = node_meta.global_size
 
     def __repr__(self):
         """
@@ -1623,6 +1561,74 @@ def make_traceback():
     """
     finfo = getouterframes(currentframe())[2]
     return TracebackType(None, finfo.frame, finfo.frame.f_lasti, finfo.frame.f_lineno)
+
+
+def collect_error(msg, saved_errors, exc_type=None, tback=None, ident=None, msginfo=None):
+    """
+    Save an error message to raise as an exception later.
+
+    Parameters
+    ----------
+    msg : str
+        The connection error message to be saved.
+    saved_errors : list
+        List of saved errors.
+    exc_type : class or None
+        The type of exception to be raised if this error is the only one collected.
+    tback : traceback or None
+        The traceback of a caught exception.
+    ident : int
+        Identifier of the object responsible for issuing the error.
+    msginfo : str or None
+        Message info to add to the error message if it is not already present.
+    """
+    if exc_type is None:
+        exc_type = RuntimeError
+
+    if tback is None:
+        tback = make_traceback()
+
+    if msginfo and msginfo not in msg:
+        msg = f"{msginfo}: {msg}"
+
+    # if saved_errors is None it means we have already finished setup and all errors should
+    # be raised as exceptions immediately.
+    if saved_errors is None or env_truthy('OPENMDAO_FAIL_FAST'):
+        raise exc_type(msg).with_traceback(tback)
+
+    saved_errors.append((ident, msg, exc_type, tback))
+
+
+def collect_errors(method):
+    """
+    Decorate a method so that it will collect any exceptions for later display.
+
+    Parameters
+    ----------
+    method : method
+        The method to be decorated.
+
+    Returns
+    -------
+    method
+        The wrapped method.
+    """
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        try:
+            return method(self, *args, **kwargs)
+        except Exception:
+            if env_truthy('OPENMDAO_FAIL_FAST'):
+                raise
+
+            type_exc, exc, tb = sys.exc_info()
+            if isinstance(exc, KeyError) and self._get_saved_errors():
+                # it's likely the result of an earlier error, so ignore it
+                return
+
+            self._collect_error(str(exc), exc_type=type_exc, tback=tb)
+
+    return wrapper
 
 
 def inconsistent_across_procs(comm, arr, tol=1e-15, return_array=True):
@@ -1798,7 +1804,7 @@ def om_dump(*args, **kwargs):
     pass
 
 
-om_dump_indent = om_dump
+om_dump_indent = om_dump_pprint = om_dump
 
 
 def dbg(funct):
@@ -1842,6 +1848,8 @@ if _om_dump:
     parts = [s.strip() for s in os.environ['OPENMDAO_DUMP'].split(',')]
     trace = 'trace' in parts
     use_rank = 'rank' in parts
+    if use_rank:
+        from openmdao.utils.mpi import MPI
 
     if 'stdout' in parts:
         _dump_stream = sys.stdout
@@ -1857,11 +1865,20 @@ if _om_dump:
         else:
             dirname = os.path.join(os.getcwd(), 'dump_dir')
 
-        if not os.path.exists(dirname):
-            try:
-                os.makedirs(dirname)
-            except Exception:
-                dirname = os.getcwd()
+        if use_rank:
+            rank = MPI.COMM_WORLD.rank
+        else:
+            rank = 0
+
+        if rank == 0:
+            if not os.path.exists(dirname):
+                try:
+                    os.makedirs(dirname)
+                except Exception:
+                    dirname = os.getcwd()
+
+        if use_rank:
+            MPI.COMM_WORLD.barrier()
 
         for p in parts:
             if p.startswith('file='):
@@ -1879,7 +1896,6 @@ if _om_dump:
 
         rankstr = pidstr = ''
         if use_rank:
-            from openmdao.utils.mpi import MPI
             rankstr = f"_{MPI.COMM_WORLD.rank if MPI else 0}"
 
         if 'pid' in parts:
@@ -1905,6 +1921,12 @@ if _om_dump:
         kwargs['file'] = _dump_stream
         kwargs['flush'] = True
         print(*args, **kwargs)
+
+    def om_dump_pprint(*args, **kwargs):
+        """
+        Dump to a stream with pformat if OPENMDAO_DUMP is truthy in the environment.
+        """
+        om_dump(pprint.pformat(*args, **kwargs))
 
     def om_dump_indent(pathobj, *args, **kwargs):
         """
@@ -2061,6 +2083,7 @@ if _om_dump:
             if isinstance(comm, _DebugComm):
                 return comm._comm
             return comm
+
 
 # if OPENMDAO_DUMP is set to anything, even a falsey value, make om_dump and om_dump_indent
 # available as builtins so we don't have to import them anywhere

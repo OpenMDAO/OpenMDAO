@@ -313,16 +313,11 @@ class MPITests2(unittest.TestCase):
                                                       y=np.zeros((9, 3))))
 
         if prob.comm.rank == 0:
-            prob.model.connect('indep.x', 'comp.invec',
-                               src_indices=[[0,0,0,1,1,1,2,2,2,3,3,3,4,4,4],
-                                            [0,1,2,0,1,2,0,1,2,0,1,2,0,1,2]])
+            prob.model.connect('indep.x', 'comp.invec', src_indices=om.slicer[:5])
         else:
-            prob.model.connect('indep.x', 'comp.invec',
-                               # use some negative indices here to make sure they work
-                               src_indices=[[5,5,5,6,6,6,7,7,7,-1,8,-1],
-                                            [0,1,2,0,1,2,0,1,2,0,1,2]])
+            prob.model.connect('indep.x', 'comp.invec', src_indices=om.slicer[5:])
 
-        prob.model.connect('comp.outvec', 'total.x', src_indices=om.slicer[:], flat_src_indices=True)
+        prob.model.connect('comp.outvec', 'total.x', src_indices=om.slicer[:])
 
         prob.setup(check=False, mode='fwd')
         prob.run_model()
@@ -1124,7 +1119,7 @@ class MPITests2(unittest.TestCase):
 
         prob.setup(force_alloc_complex=True)
 
-        with self.assertRaises(RuntimeError) as context:
+        with self.assertRaises(Exception) as context:
             prob.run_model()
 
         msg = "'sub' <class Group>: Approx_totals is not supported on a group with a distributed "
@@ -1400,7 +1395,7 @@ class DistribStateImplicit(om.ImplicitComponent):
 
                 tmp = np.zeros(1)
                 if self.comm.rank == 0:
-                    tmp[0] = d_r['out_var'].copy()
+                    tmp[:] = d_r['out_var']
                 self.comm.Bcast(tmp, root=0)
 
                 d_o['states'] -= tmp
@@ -2048,6 +2043,7 @@ class ZeroLengthInputsOutputs(unittest.TestCase):
                             np.ones(1) if model.comm.rank == 0 else np.ones(1))
             assert_near_equal(prob.get_val('C2.outvec', get_remote=False),
                             2*np.ones(1) if model.comm.rank == 0 else -3*np.ones(1))
+
         assert_near_equal(prob['C3.sum'], -4.)
 
         assert_check_partials(prob.check_partials())

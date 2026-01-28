@@ -399,7 +399,7 @@ class MultiFiMetaModelTestCase(unittest.TestCase):
         prob.setup()
         prob.model._setup_part2()
 
-        assert_near_equal(prob['mm.x'], np.array([[1, 2, 3, 4], [1, 2, 3, 4], [1, 2, 3, 4]]))
+        assert_near_equal(prob['mm.x'], np.array([2, 2, 2]))
 
 class MultiFiMetaModelFeatureTestCase(unittest.TestCase):
 

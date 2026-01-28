@@ -168,7 +168,7 @@ class ProbRemoteTestCase(unittest.TestCase):
 
         # get_remote=True
         assert_near_equal(prob.get_val('ivc.x', get_remote=True), [7.])
-        assert_near_equal(prob.get_val('dst.x', get_remote=True), [7., 7.])  # ???????
+        assert_near_equal(prob.get_val('dst.x', get_remote=True, from_src=False), [7., 7.])
         assert_near_equal(prob.get_val('dst.y', get_remote=True), [2., 7., 7.])
         assert_near_equal(prob.get_val('par.c1.x', get_remote=True), [7.])
         assert_near_equal(prob.get_val('par.c1.y', get_remote=True), [14.])
@@ -254,8 +254,8 @@ class ProbRemoteTestCase(unittest.TestCase):
             assert_near_equal(prob.model.get_val('dst.x', get_remote=False, from_src=False), [7.])
             assert_near_equal(prob.get_val('dst.y', get_remote=False), [7.])
 
-            # par.c1 is remote
-            prob.get_val('par.c1.x', get_remote=False)  # from src ('ivc.x')
+            # par.c1 is remote but we get value from local src ('ivc.x')
+            prob.get_val('par.c1.x', get_remote=False)
 
             with self.assertRaises(RuntimeError) as cm:
                 prob.model.get_val('par.c1.x', get_remote=False, from_src=False)
