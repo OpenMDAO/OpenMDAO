@@ -401,12 +401,12 @@ class Group(System):
         # This is a combined scale factor that includes the scaling of the connected source
         # and the unit conversion between the source output and each target input.
         if self._has_input_scaling:
-            graph = self.get_conn_graph()
+            conn_graph = self.get_conn_graph()
             allprocs_meta_out = self._var_allprocs_abs2meta['output']
             for abs_in, meta_in in self._var_abs2meta['input'].items():
                 src = self._conn_global_abs_in2out[abs_in]
-                in_node_meta = graph.nodes[('i', abs_in)]['attrs']
-                src_node_meta = graph.nodes[('o', src)]['attrs']
+                in_node_meta = conn_graph.nodes[('i', abs_in)]['attrs']
+                src_node_meta = conn_graph.nodes[('o', src)]['attrs']
 
                 src_meta = allprocs_meta_out[src]
                 ref = src_meta['ref']
@@ -580,8 +580,6 @@ class Group(System):
 
         if self.pathname == '':
             self._conn_graph = AllConnGraph()
-
-        # self.get_conn_graph().update(self._static_conn_graph)
 
         # Call setup function for this group.
         self.setup()
@@ -904,14 +902,14 @@ class Group(System):
                 else:
                     srcdict[src] = [meta]
 
-        graph = self.get_conn_graph()
+        conn_graph = self.get_conn_graph()
 
         # loop over any sources having multiple aliases to ensure no overlap of indices
         for src, metalist in srcdict.items():
             if len(metalist) == 1:
                 continue
 
-            src_meta = graph.nodes[('o', src)]['attrs']
+            src_meta = conn_graph.nodes[('o', src)]['attrs']
 
             size = src_meta.global_size
             shape = src_meta.global_shape
@@ -1051,10 +1049,10 @@ class Group(System):
 
     def _setup_dynamic_properties(self):
         # called on the top level Group only
-        graph = self.get_conn_graph()
-        if graph._has_dynamic_shapes:
+        conn_graph = self.get_conn_graph()
+        if conn_graph._has_dynamic_shapes:
             self._setup_dynamic_property('shape')
-        if graph._has_dynamic_units:
+        if conn_graph._has_dynamic_units:
             self._setup_dynamic_property('units')
 
     def _setup_part2(self):
@@ -1066,8 +1064,8 @@ class Group(System):
         """
         self._setup_dynamic_properties()
 
-        graph = self.get_conn_graph()
-        graph.update_all_node_meta(self)
+        conn_graph = self.get_conn_graph()
+        conn_graph.update_all_node_meta(self)
 
         self._check_order()
         self._resolver._check_dup_prom_outs()
@@ -1078,9 +1076,9 @@ class Group(System):
 
         self._check_connections()
 
-        graph.final_check(self)
+        conn_graph.final_check(self)
 
-        nodes = graph.nodes
+        nodes = conn_graph.nodes
 
         # now make sure all graph data is in sync with the variable metadata
         for io in ['input', 'output']:
@@ -1204,10 +1202,10 @@ class Group(System):
         if self._problem_meta['setup_status'] < _SetupStatus.POST_FINAL_SETUP:
             self._problem_meta['setup_status'] = _SetupStatus.POST_FINAL_SETUP
 
-        graph = self.get_conn_graph()
+        conn_graph = self.get_conn_graph()
         for name in chain(self._var_abs2meta['output'], self._var_discrete['output']):
             node = ('o', name)
-            node_meta = graph.nodes[node]['attrs']
+            node_meta = conn_graph.nodes[node]['attrs']
 
             if node_meta.val is not None:
                 if node_meta.discrete:
@@ -1216,10 +1214,10 @@ class Group(System):
                     self._outputs.set_var(name, node_meta.val)
 
         for abs_name in self._var_abs2meta['input']:
-            self._inputs.set_var(abs_name, graph.nodes[('i', abs_name)]['attrs'].val)
+            self._inputs.set_var(abs_name, conn_graph.nodes[('i', abs_name)]['attrs'].val)
 
         for name in self._discrete_inputs:
-            self._discrete_inputs[name] = graph.nodes[('i', name)]['attrs'].val
+            self._discrete_inputs[name] = conn_graph.nodes[('i', name)]['attrs'].val
 
     def _get_root_vectors(self):
         """
@@ -1660,11 +1658,11 @@ class Group(System):
             self._owned_output_sizes = self._var_sizes['output']
 
         if self.pathname == '':
-            graph = self.get_conn_graph()
-            graph._owned_output_sizes = self._owned_output_sizes
-            graph._var_allprocs_abs2idx = self._var_allprocs_abs2idx
-            graph._owning_rank = self._owning_rank
-            graph._var_sizes = self._var_sizes
+            conn_graph = self.get_conn_graph()
+            conn_graph._owned_output_sizes = self._owned_output_sizes
+            conn_graph._var_allprocs_abs2idx = self._var_allprocs_abs2idx
+            conn_graph._owning_rank = self._owning_rank
+            conn_graph._var_sizes = self._var_sizes
 
     def _owned_size(self, abs_name):
         """
@@ -2886,8 +2884,8 @@ class Group(System):
         Call setup_partials in components.
         """
         self._subjacs_info = info = {}
-        graph = self.get_conn_graph()
-        nodes = graph.nodes()
+        conn_graph = self.get_conn_graph()
+        nodes = conn_graph.nodes()
 
         for subsys in self._sorted_subsystems_myproc:
             subsys._setup_partials()
@@ -3050,7 +3048,7 @@ class Group(System):
 
             abs2idx = self._var_allprocs_abs2idx
             sizes = self._var_sizes['output']
-            graph = self.get_conn_graph()
+            conn_graph = self.get_conn_graph()
 
             # szname = 'global_size' if total else 'size'
             # we're computing totals/semi-totals (vars may not be local)
@@ -3066,7 +3064,7 @@ class Group(System):
                     continue
 
                 # meta = abs2meta[src]
-                meta = graph.nodes[('o', src)]['attrs']
+                meta = conn_graph.nodes[('o', src)]['attrs']
                 if meta.distributed:
                     dist_sizes = sizes[:, abs2idx[src]]
                 else:
@@ -3119,7 +3117,7 @@ class Group(System):
             abs2meta = self._var_allprocs_abs2meta
             local_ins = self._var_abs2meta['input']
             local_outs = self._var_abs2meta['output']
-            graph = self.get_conn_graph()
+            conn_graph = self.get_conn_graph()
 
             seen = set()
             start = end = 0
@@ -3141,7 +3139,7 @@ class Group(System):
 
                 if (wrt_matches is None or wrt in wrt_matches) and wrt not in seen:
                     io = 'input' if wrt in abs2meta['input'] else 'output'
-                    meta = graph.nodes[(io[0], wrt)]['attrs']
+                    meta = conn_graph.nodes[(io[0], wrt)]['attrs']
                     if total and approx_meta['indices'] is not None:
                         sub_wrt_idx = approx_meta['indices'].as_array()
                         size = sub_wrt_idx.size
@@ -3371,18 +3369,18 @@ class Group(System):
         auto_ivc.name = '_auto_ivc'
         auto_ivc.pathname = auto_ivc.name
 
-        graph = self.get_conn_graph()
+        conn_graph = self.get_conn_graph()
 
         auto2tgt = {}
-        for srcnode in graph.nodes():
+        for srcnode in conn_graph.nodes():
             io, src = srcnode
             if io == 'o' and src.startswith('_auto_ivc.'):
-                auto2tgt[src] = [n for _, n in graph.leaf_input_iter(srcnode)]
+                auto2tgt[src] = [n for _, n in conn_graph.leaf_input_iter(srcnode)]
 
         auto_ivc.auto2tgt = auto2tgt
 
         for src, tgts in auto2tgt.items():
-            abs_tgt_node = graph.nodes[('i', tgts[0])]['attrs']
+            abs_tgt_node = conn_graph.nodes[('i', tgts[0])]['attrs']
             # need to query discrete from a leaf node because internal nodes have not resolved yet
             discrete = abs_tgt_node['discrete']
 
@@ -3406,16 +3404,17 @@ class Group(System):
             anode = ('o', name)
             for tgt in sorted(auto2tgt[name]):
                 if tgt in self._vars_to_gather:
-                    graph._sync_auto_ivcs[name] = self._vars_to_gather[tgt]
+                    conn_graph._sync_auto_ivcs[name] = self._vars_to_gather[tgt]
                     break
 
-            graph.set_model_meta(self, anode, meta, locmeta[name])
+            conn_graph.set_model_meta(self, anode, meta, locmeta[name])
 
         locmeta = auto_ivc._var_discrete['output']
         for name, meta in auto_ivc._var_allprocs_discrete['output'].items():
-            node_meta = graph.nodes[('o', name)]['attrs']
+            node_meta = conn_graph.nodes[('o', name)]['attrs']
             node_meta.discrete = True
-            graph.set_model_meta(self, ('o', name), meta, locmeta.get(name.rpartition('.')[-1]))
+            conn_graph.set_model_meta(self, ('o', name), meta,
+                                      locmeta.get(name.rpartition('.')[-1]))
 
         # now update our own data structures based on the new auto_ivc component variables
         old = self._subsystems_allprocs

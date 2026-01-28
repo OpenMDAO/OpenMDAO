@@ -4,9 +4,6 @@ import numpy as np
 from numpy.testing import assert_equal
 
 from openmdao.utils.indexer import indexer, combine_ranges, get_virtual_array
-from openmdao.utils.general_utils import setup_dbg
-
-setup_dbg()
 
 
 class IndexerTestCase(unittest.TestCase):

@@ -5,7 +5,7 @@ from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 import openmdao.api as om
 
 from openmdao.utils.jax_utils import jnp
-from openmdao.jaxfuncts.tests.test_jax_implicit import JaxQuadraticCompPrimal
+from openmdao.jax_funcs.tests.test_jax_implicit import JaxQuadraticCompPrimal
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
 
 

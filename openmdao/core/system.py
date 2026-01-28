@@ -719,10 +719,10 @@ class System(object, metaclass=SystemMetaclass):
         toidx = self._var_allprocs_abs2idx
         sizes = self._var_sizes['output']
         total = self.pathname == ''
-        graph = self.get_conn_graph()
+        conn_graph = self.get_conn_graph()
         start = end = 0
         for of in self._var_abs2meta['output']:
-            meta = graph.nodes[('o', of)]['attrs']
+            meta = conn_graph.nodes[('o', of)]['attrs']
             end += meta.global_size if total else meta.size
             yield of, start, end, _full_slice, sizes[:, toidx[of]] if meta.distributed else None
             start = end
@@ -771,10 +771,10 @@ class System(object, metaclass=SystemMetaclass):
                 yield of, start, end, vec, _full_slice, dist_sizes
                 start = end
 
-        graph = self.get_conn_graph()
+        conn_graph = self.get_conn_graph()
         for wrt, meta in self._var_abs2meta['input'].items():
             if wrt_matches is None or wrt in wrt_matches:
-                meta = graph.nodes[('i', wrt)]['attrs']
+                meta = conn_graph.nodes[('i', wrt)]['attrs']
                 end += meta.global_size if total else meta.size
                 vec = self._inputs if wrt in local_ins else None
                 dist_sizes = sizes_in[:, toidx[wrt]] if meta.distributed else None
@@ -3772,8 +3772,8 @@ class System(object, metaclass=SystemMetaclass):
 
         key = prom_name if use_prom_ivc else src_name
 
-        graph = self.get_conn_graph()
-        src_node_meta = graph.nodes[('o', src_name)]['attrs']
+        conn_graph = self.get_conn_graph()
+        src_node_meta = conn_graph.nodes[('o', src_name)]['attrs']
 
         meta['source'] = src_name
         meta['distributed'] = src_node_meta.distributed
@@ -3879,7 +3879,7 @@ class System(object, metaclass=SystemMetaclass):
             Use promoted names for inputs, else convert to absolute source names.
         """
         model = self._problem_meta['model_ref']()
-        graph = model.get_conn_graph()
+        conn_graph = model.get_conn_graph()
 
         alias = meta['alias']
         prom = meta['name']  # 'usually' a promoted name, but can be absolute
@@ -3904,7 +3904,7 @@ class System(object, metaclass=SystemMetaclass):
             key = src_name
 
         src_node = ('o', src_name)
-        src_node_meta = graph.nodes[src_node]['attrs']
+        src_node_meta = conn_graph.nodes[src_node]['attrs']
 
         meta['source'] = src_name
         meta['distributed'] = dist = src_node_meta.distributed
@@ -5515,18 +5515,18 @@ class System(object, metaclass=SystemMetaclass):
         else:
             system = self
 
-        graph = self.get_conn_graph()
+        conn_graph = self.get_conn_graph()
         node = ('o', abs_name)
-        if node in graph:
+        if node in conn_graph:
             typ = 'output'
         else:
             node = ('i', abs_name)
-            if node in graph:
+            if node in conn_graph:
                 typ = 'input'
             else:
                 raise KeyError(f"{self.msginfo}: Variable '{abs_name}' not found.")
 
-        node_meta = graph.nodes[node]['attrs']
+        node_meta = conn_graph.nodes[node]['attrs']
 
         try:
             vars_to_gather = self._vars_to_gather
@@ -5679,8 +5679,8 @@ class System(object, metaclass=SystemMetaclass):
                 else:
                     val = self._outputs[name]
         else:
-            graph =   self.get_conn_graph()
-            val = graph.get_val(self, name, units, indices, get_remote, rank,
+            conn_graph =   self.get_conn_graph()
+            val = conn_graph.get_val(self, name, units, indices, get_remote, rank,
                                 vec_name, kind, flat, from_src)
 
         if copy:
@@ -5722,8 +5722,8 @@ class System(object, metaclass=SystemMetaclass):
                 else:
                     self._outputs[name] = val
         else:
-            graph = self.get_conn_graph()
-            graph.set_val(self, name, val, units=units, indices=indices)
+            conn_graph = self.get_conn_graph()
+            conn_graph.set_val(self, name, val, units=units, indices=indices)
 
     def _retrieve_data_of_kind(self, filtered_vars, kind, vec_name, local=False):
         """

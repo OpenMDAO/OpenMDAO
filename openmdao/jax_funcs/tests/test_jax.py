@@ -6,7 +6,7 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.jax_utils import jax
 
 if jax is not None:
-    from openmdao.jaxfuncts import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, \
+    from openmdao.jax_funcs import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, \
         ks_min, smooth_round
 
 

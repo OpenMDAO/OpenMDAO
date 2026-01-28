@@ -1444,20 +1444,20 @@ class LocalRangeIterable(object):
         self._vname = vname
         self._var_size = 0
 
-        graph = system.get_conn_graph()
+        conn_graph = system.get_conn_graph()
 
         all_abs2meta = system._var_allprocs_abs2meta['output']
         if vname in all_abs2meta:
             sizes = system._var_sizes['output']
             vec = system._outputs
             abs2meta = system._var_abs2meta['output']
-            node_meta = graph.nodes[('o', vname)]['attrs']
+            node_meta = conn_graph.nodes[('o', vname)]['attrs']
         else:
             all_abs2meta = system._var_allprocs_abs2meta['input']
             sizes = system._var_sizes['input']
             vec = system._inputs
             abs2meta = system._var_abs2meta['input']
-            node_meta = graph.nodes[('i', vname)]['attrs']
+            node_meta = conn_graph.nodes[('i', vname)]['attrs']
 
         if node_meta.distributed:
             var_idx = system._var_allprocs_abs2idx[vname]

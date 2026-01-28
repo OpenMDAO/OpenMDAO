@@ -579,7 +579,7 @@ class _TotalJacInfo(object):
         """
         iproc = self.comm.rank
         model = self.model
-        graph = model.get_conn_graph()
+        conn_graph = model.get_conn_graph()
         has_par_deriv_color = False
         var_sizes = model._var_sizes
         var_offsets = model._get_var_offsets()
@@ -600,7 +600,7 @@ class _TotalJacInfo(object):
 
             source = meta['source']
 
-            node_meta = graph.nodes[('o', source)]['attrs']
+            node_meta = conn_graph.nodes[('o', source)]['attrs']
             dist = node_meta.distributed
 
             in_idxs = meta['indices'] if 'indices' in meta else None
