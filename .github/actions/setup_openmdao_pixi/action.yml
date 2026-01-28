@@ -78,7 +78,7 @@ runs:
           pypi)
             if [[ -n "$VERSION" ]]; then
               echo "Installing OpenMDAO==$VERSION from PyPI"
-              pixi run install-openmdao ${VERSION}"
+              pixi run install-openmdao "${VERSION}"
             else
               echo "Installing latest OpenMDAO from PyPI"
               pixi run install-openmdao
