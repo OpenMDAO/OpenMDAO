@@ -78,20 +78,20 @@ runs:
           pypi)
             if [[ -n "$VERSION" ]]; then
               echo "Installing OpenMDAO==$VERSION from PyPI"
-              python -m pip install "openmdao==${VERSION}" --no-deps
+              pixi run install-openmdao ${VERSION}"
             else
               echo "Installing latest OpenMDAO from PyPI"
-              python -m pip install "openmdao" --no-deps
+              pixi run install-openmdao
             fi
             ;;
 
           github)
             if [[ -n "$VERSION" ]]; then
               echo "Installing OpenMDAO@${VERSION} from GitHub"
-              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@${VERSION}#egg=openmdao" --no-deps
+              pixi add --pypi --git https://github.com/OpenMDAO/OpenMDAO.git --tag ${VERSION} openmdao
             else
               echo "Installing OpenMDAO@master from GitHub"
-              python -m pip install "git+https://github.com/OpenMDAO/OpenMDAO.git@master#egg=openmdao" --no-deps
+              pixi run install-openmdao-master
             fi
             ;;
 
@@ -114,8 +114,8 @@ runs:
               echo "Error: 'local_developer' install method only works in OpenMDAO repo"
               exit 1
             fi
-            echo "Installing from local directory in developer mode"
-            python -m pip install -e . --no-deps
+            echo "Installing from local directory in editable mode"
+            pixi run install-openmdao-dev
             ;;
 
           local)
@@ -124,7 +124,7 @@ runs:
               exit 1
             fi
             echo "Installing from local directory"
-            python -m pip install . --no-deps
+            pixi add --pypi 'openmdao @ file://${PIXI_PROJECT_ROOT}'
             ;;
 
           none|"")
