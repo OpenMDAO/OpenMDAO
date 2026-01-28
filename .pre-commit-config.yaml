@@ -15,3 +15,12 @@ repos:
       # For now, only run on the pixi workflows
       files: ^\.github/workflows/.*_pixi\.ya?ml$
       # files: ^\.github/workflows/.*\.ya?ml$
+
+- repo: local
+  hooks:
+    - id: block-pixi-commits
+      name: Block pixi.toml/pixi.lock commits
+      entry: bash -c 'if git diff --cached --name-only | grep -E "^pixi\.(toml|lock)$" && [ -z "$ALLOW_PIXI_COMMIT" ]; then echo "ERROR Attempting to commit pixi files. Use ALLOW_PIXI_COMMIT=1 git commit to override."; exit 1; fi'
+      language: system
+      pass_filenames: false
+      always_run: true
