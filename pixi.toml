@@ -36,6 +36,12 @@
 #   pixi run -e <environment> <command>       # Run command in environment
 #
 # For more information: https://pixi.sh
+# 
+# Updating:
+#   It is fairly easy for a developer to accidentally commit a pixi.lock or pixi.toml file after issuing `pixi add` commands.
+#   To prevent this, OpenMDAO implements a pre-commit hook that automatically fails if either of these two files is included in the commit,
+#.  UNLESS the environment variable `ALLOW_PIXI_COMMIT=1` is set.
+#   This allows us to periodically update the pixi environments but
 
 [workspace]
 name = "openmdao"
@@ -185,13 +191,6 @@ py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visua
 
 # Development workflow helpers
 clean = "rm -rf packaging dist *.egg-info .pixi"
-
-# Toggle to ignore/unignore changes to pixi.toml and pixi.lock
-pixi-ignore = "git update-index --skip-worktree pixi.toml pixi.lock"
-pixi-unignore = "git update-index --no-skip-worktree pixi.toml pixi.lock"
-
-# List the current status of whether or not pixi files are ignored under git.
-pixi-status = "git ls-files -v | grep '^[hS].*pixi'"
 
 # Install an arbitrary version of OpenMDAO into the environment from pyPI
 install-openmdao = { cmd = """
