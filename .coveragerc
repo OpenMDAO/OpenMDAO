@@ -2,6 +2,8 @@
 
 [run]
 disable_warnings = module-not-measured
+# Use the modern monitoring API instead of CTracer
+core = sysmon
 
 [report]
 omit =
