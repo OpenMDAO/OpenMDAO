@@ -116,12 +116,12 @@ class TestPETScKrylov(unittest.TestCase):
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
 
-        # Therefore, if we set `dictol < 1.0`, the solver should fail.
+        # Therefore, if we set `divtol < 1.0`, the solver should fail.
         group.linear_solver.options['divtol'] = 0.5
         with self.assertRaises(om.AnalysisError) as cm:
             group.run_solve_linear('fwd')
 
-        # Now if we set `dictol > 1.0`, the solver should succeed.
+        # Now if we set `divtol > 1.0`, the solver should succeed.
         group.linear_solver.options['divtol'] = 1.5
         d_outputs.set_val(1.0)
         d_residuals.set_val(0.0)
