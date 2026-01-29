@@ -82,6 +82,7 @@ test = [
     "pydocstyle>=2.0.0",
     "testflo>=1.3.6",
     "websockets>8",
+    "coverage>=7.6.0"
 ]
 visualization = [
     "panel",
