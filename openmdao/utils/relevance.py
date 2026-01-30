@@ -1244,6 +1244,7 @@ class Relevance(object):
         auto_dvs = [dv for dv in dvs if dv.startswith('_auto_ivc.')]
         dv0 = auto_dvs[0] if auto_dvs else dvs[0].rpartition('.')[0]
 
+        rev_conns = None
         if auto_dvs:
             rev_conns = get_rev_conns(model._conn_global_abs_in2out)
 
@@ -1346,7 +1347,8 @@ class Relevance(object):
 
         auto_ivc = model._auto_ivc
         auto_dvs = set(auto_dvs)
-        rev_conns = get_rev_conns(model._conn_global_abs_in2out)
+        if rev_conns is None:
+            rev_conns = get_rev_conns(model._conn_global_abs_in2out)
         if '_auto_ivc' not in pre:
             in_pre = False
             for vname in auto_ivc._resolver.abs_iter('output'):
@@ -1396,11 +1398,9 @@ class Relevance(object):
             List of (ir)relevant variables or systems.
         """
         if type == 'system':
-            it = self._rel_names_iter(self._current_rel_sarray, self._sys2idx, relevant)
-        else:
-            it = self._rel_names_iter(self._current_rel_varray, self._var2idx, relevant)
+            return list(self._rel_names_iter(self._current_rel_sarray, self._sys2idx, relevant))
 
-        return list(it)
+        return list(self._rel_names_iter(self._current_rel_varray, self._var2idx, relevant))
 
 
 def _vars2systems(nameiter):

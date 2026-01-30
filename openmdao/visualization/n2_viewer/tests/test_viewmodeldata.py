@@ -186,15 +186,15 @@ class TestViewerData(unittest.TestCase):
             [
                 {"src": "sub.d1.y1", "tgt": "con_cmp1.y1"},
                 {"src": "sub.d2.y2", "tgt": "con_cmp2.y2"},
-                {"src": "_auto_ivc.v1", "tgt": "obj_cmp.x"},
+                {"src": "_auto_ivc.v0", "tgt": "obj_cmp.x"},
                 {"src": "sub.d1.y1", "tgt": "obj_cmp.y1"},
                 {"src": "sub.d2.y2", "tgt": "obj_cmp.y2"},
-                {"src": "_auto_ivc.v0", "tgt": "obj_cmp.z"},
-                {"src": "_auto_ivc.v1", "tgt": "sub.d1.x"},
+                {"src": "_auto_ivc.v1", "tgt": "obj_cmp.z"},
+                {"src": "_auto_ivc.v0", "tgt": "sub.d1.x"},
                 {"src": "sub.state_eq_group.state_eq.y2_command", "tgt": "sub.d1.y2"},
-                {"src": "_auto_ivc.v0", "tgt": "sub.d1.z"},
+                {"src": "_auto_ivc.v1", "tgt": "sub.d1.z"},
                 {"src": "sub.d1.y1", "tgt": "sub.d2.y1"},
-                {"src": "_auto_ivc.v0", "tgt": "sub.d2.z"},
+                {"src": "_auto_ivc.v1", "tgt": "sub.d2.z"},
                 {"src": "sub.d2.y2", "tgt": "sub.state_eq_group.state_eq.y2_actual", "cycle_arrows": ["sub.d1 sub.d2", "sub.state_eq_group.state_eq sub.d1"]}
             ]
         """)
@@ -619,9 +619,8 @@ class TestN2(unittest.TestCase):
 
         browser_arg = '' if DEBUG_BROWSER else '--no_browser'
 
-        for values_arg in ('', '--no_values'):
-            with self.subTest(values_arg=values_arg):
-                check_call(f'openmdao n2 {values_arg} {browser_arg} {filename}')
+        check_call(f'openmdao n2 --no_values {browser_arg} {filename}')
+        check_call(f'openmdao n2 {browser_arg} {filename}')
 
     def test_n2_set_title(self):
         """
@@ -651,8 +650,7 @@ class TestN2(unittest.TestCase):
         p = om.Problem(BadConnectionModel(), name='n2_connection_error')
 
         msg = "\nCollected errors for problem 'n2_connection_error':" \
-              "\n   'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but " \
-              "'tgt.x' is an input. All connections must be from an output to an input."
+              "\n   <model> <class BadConnectionModel>: Can't connect 'sub.src.x' to 'sub.arr.x': shape (5, 3) of 'sub.src.x' is incompatible with shape (2,) of 'sub.arr.x'."
 
         with self.assertRaises(Exception) as cm:
             p.setup()

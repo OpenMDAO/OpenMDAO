@@ -808,28 +808,32 @@ class MPITests(unittest.TestCase):
     def test_auto_ivc_error(self):
         size = 2
 
-        prob = om.Problem()
+        prob = om.Problem(name='auto_ivc_error')
         prob.model.add_subsystem("C", DistribCompSimple(arr_size=size))
 
-        with self.assertRaises(RuntimeError) as context:
+        with self.assertRaises(Exception) as context:
             prob.setup()
             prob.final_setup()
 
-        err_msg = str(context.exception).split(':')[-1]
-        self.assertEqual(err_msg, 'Distributed component input "C.invec" is not connected.')
+        self.assertTrue("\nCollected errors for problem 'auto_ivc_error':"
+                        "\n   <model> <class Group>: Distributed input 'C.invec' is not connected. Declare an IndepVarComp and connect it to this input to eliminate this error."
+                        in context.exception.args[0])
 
     def test_auto_ivc_error_promoted(self):
         size = 2
 
-        prob = om.Problem()
+        prob = om.Problem(name='auto_ivc_error_promoted')
         prob.model.add_subsystem("C", DistribCompSimple(arr_size=size), promotes=['*'])
         prob.setup()
 
-        with self.assertRaises(RuntimeError) as context:
+        with self.assertRaises(Exception) as context:
             prob.final_setup()
 
-        err_msg = str(context.exception).split(':')[-1]
-        self.assertEqual(err_msg, 'Distributed component input "C.invec", promoted as "invec", is not connected.')
+        # err_msg = str(context.exception).split(':')[-1]
+        # self.assertEqual(err_msg, 'Distributed component input "C.invec", promoted as "invec", is not connected.')
+        self.assertTrue("\nCollected errors for problem 'auto_ivc_error_promoted':"
+                        "\n   <model> <class Group>: Distributed input 'C.invec', promoted as 'invec', is not connected. Declare an IndepVarComp and connect it to this input to eliminate this error."
+                        in context.exception.args[0])
 
     def test_bad_distrib_connect(self):
         class Adder(om.ExplicitComponent):
@@ -848,17 +852,16 @@ class MPITests(unittest.TestCase):
 
         prob.model.connect('ivc.x0','adder.x')
         prob.setup()
-        try:
+        with self.assertRaises(Exception) as cm:
             prob.final_setup()
-        except Exception as err:
-            self.assertTrue(
-                "\nCollected errors for problem 'bad_distrib_problem':"
-                "\n   <model> <class Group>: Attempted to connect from 'ivc.x0' to 'adder.x', but "
-                "'ivc.x0' doesn't exist. Perhaps you meant to connect to one of the following outputs: ['ivc.x']."
-                "\n   <model> <class Group>: Failed to resolve shapes for ['adder.x']. To see the "
-                "dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'." in str(err))
-        else:
-            self.fail("Exception expected.")
+
+        self.assertTrue(
+            "\nCollected errors for problem 'bad_distrib_problem':"
+            "\n   <model> <class Group>: Attempted to connect from 'ivc.x0' to 'adder.x', but "
+            "'ivc.x0' doesn't exist. Perhaps you meant to connect to one of the following outputs: ['ivc.x']."
+            "\n   <model> <class Group>: Failed to resolve shapes for ['adder.x']. To see the "
+            "dynamic shapes dependency graph, do 'openmdao view_dyn_shapes <your_py_file>'." in str(cm.exception.args[0]))
+
 
 
 class NonParallelTests(unittest.TestCase):

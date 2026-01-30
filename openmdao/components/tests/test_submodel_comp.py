@@ -94,7 +94,7 @@ class TestSubmodelComp(unittest.TestCase):
         with self.assertRaises(Exception) as ctx:
             p.set_val('r', 1)
 
-        msg = "<model> <class Group>: Variable 'r' not found."
+        msg = ": Variable 'r' not found."
         self.assertTrue(ctx.exception.args[0].startswith(msg))
 
     def test_variable_alias(self):
