@@ -212,8 +212,4 @@ install-openmdao-dev = { cmd = "pixi add --pypi --editable 'openmdao @ file://${
 install-openmdao-latest = { cmd = "pixi add --pypi openmdao", description = "Install latest OpenMDAO from PyPI" }
 
 # Install OpenMDAO from GitHub master branch
-<<<<<<< HEAD
 install-openmdao-master = { cmd = "pixi add --pypi --git https://github.com/OpenMDAO/OpenMDAO.git --branch master openmdao", description = "Install OpenMDAO from GitHub master branch" }
-=======
-install-openmdao-master = { cmd = "pip install --no-deps git+https://github.com/OpenMDAO/OpenMDAO.git@master", description = "Install OpenMDAO from GitHub master branch" }
->>>>>>> 177975eafc4aa2d525260758ce599d982397fc60
