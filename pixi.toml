@@ -6,7 +6,12 @@
 # Quick Start:
 #   pixi install --frozen        # Install with exact CI-tested versions
 #   pixi shell                   # Activate the default environment
-#   pip install -e .             # Install OpenMDAO in development mode
+#   pip run install-openmdao     # Install openmdao
+# 
+# For developers
+#   pixi install --frozen
+#   pixi shell -e dev
+#   pixi run install-openmdao-dev
 #
 #
 # Available Environments:
@@ -25,7 +30,7 @@
 #            Usage: pixi shell -e minimal
 #
 # - dev: Comprehensive environment with all dependencies as well as documentation and packaging-related dependencies.
-#        Usage: pixi shell -e docs
+#        Usage: pixi shell -e dev
 #
 # - oldest: Includes oldest supported versions of all dependencies except packaging-related ones.
 #           Usage: pixi shell -e oldest
@@ -191,6 +196,9 @@ py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visua
 
 # Development workflow helpers
 clean = "rm -rf packaging dist *.egg-info .pixi"
+
+# Run tests, skip .pixi directory if present.
+test = "testflo --skip_dir=.pixi"
 
 # Install an arbitrary version of OpenMDAO into the environment from pyPI
 install-openmdao = { cmd = """
