@@ -209,6 +209,9 @@ class PETScKrylov(LinearSolver):
         self.options.declare('ksp_type', default='fgmres', values=KSP_TYPES,
                              desc="KSP algorithm to use. Default is 'fgmres'.")
 
+        self.options.declare('divtol', default=None, types=float,
+                             desc="Divergence tolerance.")
+
         self.options.declare('restart', default=1000, types=int,
                              desc='Number of iterations between restarts. Larger values increase '
                              'iteration cost, but may be necessary for convergence')
@@ -395,6 +398,7 @@ class PETScKrylov(LinearSolver):
         maxiter = options['maxiter']
         atol = options['atol']
         rtol = options['rtol']
+        divtol = options['divtol']
 
         # assign x and b vectors based on mode
         if self._mode == 'fwd':
@@ -423,7 +427,7 @@ class PETScKrylov(LinearSolver):
         # run PETSc solver
         self._iter_count = 0
         ksp = self._get_ksp_solver(system)
-        ksp.setTolerances(max_it=maxiter, atol=atol, rtol=rtol)
+        ksp.setTolerances(max_it=maxiter, atol=atol, rtol=rtol, divtol=divtol)
         ksp.solve(rhs_petsc_vec, sol_petsc_vec)
 
         # stuff the result into the x vector

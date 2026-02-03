@@ -692,15 +692,15 @@ class ExecComp(ExplicitComponent):
                     self.options['do_coloring'] = False
                     self._coloring_info.dynamic = False
 
-            meta = self._var_rel2meta
             decl_partials = super().declare_partials
+            nodes = self.get_conn_graph().nodes
             for outs, vs, _ in self._exprs_info:
                 ins = sorted(set(vs).difference(outs))
                 for out in sorted(outs):
                     for inp in ins:
                         if has_diag_partials:
-                            ival = meta[inp]['val']
-                            oval = meta[out]['val']
+                            ival = nodes[('i', self.pathname + '.' + inp)]['attrs'].val
+                            oval = nodes[('o', self.pathname + '.' + out)]['attrs'].val
                             iarray = isinstance(ival, ndarray) and ival.size > 1
                             if iarray and isinstance(oval, ndarray) and oval.size > 1:
                                 if oval.size != ival.size:
@@ -1165,8 +1165,8 @@ class _IODict(object):
     """
     A dict wrapper that contains 2 different dicts.
 
-    Items are first looked for in the outputs
-    and then the inputs.
+    Items are first looked for in the inputs
+    and then the outputs.
 
     Attributes
     ----------

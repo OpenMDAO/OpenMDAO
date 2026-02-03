@@ -248,8 +248,7 @@ class TestReportsSystem(unittest.TestCase):
 
             self.assertEqual(str(err),
                 "\nCollected errors for problem 'error_problem':"
-                "\n   <model> <class Group>: When connecting 'p1.x' to 'comp.x': index 1 is out of "
-                "bounds for source dimension of size 1.")
+                "\n   <model> <class Group>: Can't connect 'p1.x' to 'comp.x' when applying index [[0, 1]]: index 1 is out of bounds for source dimension of size 1.")
         else:
             self.fail("exception expected")
 

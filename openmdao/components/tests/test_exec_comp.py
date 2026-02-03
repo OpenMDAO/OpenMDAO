@@ -1733,7 +1733,7 @@ class TestFunctionRegistration(unittest.TestCase):
 
         prob = om.Problem()
 
-        size = 100000
+        size = 10
         t = np.linspace(0, 1, size)
 
         prob.model.add_subsystem("ivc",

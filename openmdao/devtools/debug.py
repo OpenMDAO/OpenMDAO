@@ -14,6 +14,7 @@ from openmdao.utils.reports_system import register_report
 from openmdao.utils.file_utils import text2html, _load_and_exec
 from openmdao.utils.rangemapper import RangeMapper
 from openmdao.visualization.tables.table_builder import generate_table
+from openmdao.utils.array_utils import shape_to_len
 
 
 class _NoColor(object):
@@ -326,7 +327,8 @@ def config_summary(problem, stream=sys.stdout):
     noutputs = len(output_names)
     if setup_done:
         printer("Output variables:        %5d   Total size: %8d" %
-                (noutputs, sum(meta['output'][n]['global_size'] for n in output_names)))
+                (noutputs, sum(shape_to_len(meta['output'][n]['global_shape'])
+                               for n in output_names)))
     else:
         printer("Output variables:        %5d" % noutputs)
 
@@ -531,37 +533,6 @@ def trace_dump(fname='trace_dump', skip=(), flush=True):
             _print_c_func(frame, arg, _c_map[event])
 
     sys.setprofile(_mpi_trace_callback)
-
-
-def prom_info_dump(system, tgt):
-    """
-    Dump the promotion src_indices/src_shape data for the given absolute target name.
-
-    The data actually lives in the Problem metadata, but is more convenient to access during
-    debugging by using a System instance to access that metadata.
-
-    Promotion src_indices/src_shape data is displayed for all inputs, including tgt, that
-    are connected to the same source.
-
-    Parameters
-    ----------
-    system : System
-        Any System instance.
-    tgt : str
-        Absolute name of an input variable.
-    """
-    probmeta = system._problem_meta
-    model = probmeta['model_ref']()
-    src = model._conn_global_abs_in2out[tgt]
-    abs_in2prom_info = probmeta['abs_in2prom_info']
-    print('For tgt', tgt, 'and src', src, 'connected tgts and prom info are:')
-    for t, s in model._conn_global_abs_in2out.items():
-        if s == src:
-            print('    ', t)
-            if t in abs_in2prom_info:
-                for p in abs_in2prom_info[t]:
-                    print('        ', p)
-    print(flush=True)
 
 
 def comm_info(system, outfile=None, verbose=False, table_format='box_grid'):

@@ -231,8 +231,8 @@ class TestN2Viewer(unittest.TestCase):
         data_dict = _get_viewer_data(prob.get_outputs_dir() / self.filename, case_id=first_case)
 
         vals = data_dict['tree']['children'][0]['children']
-        ivc_0_val = vals[0]['val']
-        ivc_1_val = vals[1]['val']
+        ivc_0_val = vals[1]['val']
+        ivc_1_val = vals[0]['val']
 
         self.assertEqual(ivc_0_val[0], 5.)
         self.assertEqual(ivc_0_val[1], 2.)
