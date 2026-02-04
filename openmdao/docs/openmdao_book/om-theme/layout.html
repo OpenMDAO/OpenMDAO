@@ -101,6 +101,7 @@
               {# Article content #}
               {% block docs_body %}
               {# This is empty and only shows up if text has been highlighted by the URL #}
+                {#  the following line was modified from what was originally from pydata_sphinx_theme so that file could be overridden #}
                 {% include "components/searchbox.html" %}
                 <article class="bd-article">
                   {% block body %}{% endblock %}
