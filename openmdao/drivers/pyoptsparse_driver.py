@@ -17,7 +17,8 @@ from scipy.sparse import coo_matrix
 
 from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.analysis_error import AnalysisError
-from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
+from openmdao.core.driver import RecordingDebugging, filter_by_meta
+from openmdao.core.optimization_driver_base import OptimizationDriverBase
 from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import FakeComm, MPI
@@ -123,7 +124,7 @@ class UserRequestedException(Exception):
     pass
 
 
-class pyOptSparseDriver(Driver):
+class pyOptSparseDriver(OptimizationDriverBase):
     """
     Driver wrapper for pyoptsparse.
 
