@@ -231,7 +231,15 @@ const Search = {
   },
 
   init: () => {
-    const query = new URLSearchParams(window.location.search).get("q");
+    const params = new URLSearchParams(window.location.search);
+    const query = params.get("q");
+
+    if (params.has("search_source")) {
+      this._search_source = true
+      // $('input[name="search_source"]')[0].checked = true;
+      document.querySelector('input[name="search_source"]').checked = true;
+    }
+
     document
       .querySelectorAll('input[name="q"]')
       .forEach((el) => (el.value = query));
@@ -464,13 +472,33 @@ const Search = {
       highlightTerms,
       objectTerms,
     ] = Search._parseQuery(query);
-    const results = Search._performSearch(
+    var results = Search._performSearch(
       searchQuery,
       searchTerms,
       excludedTerms,
       highlightTerms,
       objectTerms,
     );
+
+
+
+            if (!this._search_source) {
+            // filter out all results from the source docs
+            results = results.filter(function(value, index, arr) {
+                return !value[0].startsWith("_srcdocs");
+            });
+        }
+
+        // lookup as object (only if search source option is true)
+        if (this._search_source) {
+            for (let i = 0; i < objectTerms.length; i++) {
+                var others = [].concat(objectTerms.slice(0, i),
+                    objectTerms.slice(i + 1, objectTerms.length));
+                results = results.concat(this.performObjectSearch(objectTerms[i], others));
+            }
+          }
+
+
 
     // for debugging
     //Search.lastresults = results.slice();  // a copy
