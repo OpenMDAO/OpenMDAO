@@ -134,12 +134,15 @@ parameterized = "*"
 playwright = "*"
 pycodestyle = "*"
 pydocstyle = "*"
-testflo = "*"
 websockets = "*"
 actionlint = "*"
 ruff = "*"
 coverage = ">=7.6.0"
 nbdime = "*"
+
+[feature.testflo.pypi-dependencies]
+# Pattern: package_name = { git = "url", branch = "branch_name" }
+testflo = { git = "https://github.com/naylor-b/testflo.git", branch = "fix_coverage" }
 
 [feature.visualization.dependencies]
 panel = "*"
@@ -166,17 +169,17 @@ networkx = "==3.3"
 [environments]
 
 # Default - uses whatever Python solver picks
-default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test"], solve-group = "default" }
-dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging"], solve-group = "default" }
-minimal = { features = ["py313", "test"], solve-group = "default" }
+default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "testflo"], solve-group = "default" }
+dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "testflo", "mpi", "docs", "packaging"], solve-group = "default" }
+minimal = { features = ["py313", "test", "testflo"], solve-group = "default" }
 
 # Oldest supported versions
-oldest = { features = ["deps-oldest", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "oldest" }
+oldest = { features = ["deps-oldest", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "testflo", "mpi"], solve-group = "oldest" }
 
 # Python version matrix
-py311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py311" }
-py312 = { features = ["py312", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py312" }
-py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py313" }
+py311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "testflo", "mpi"], solve-group = "py311" }
+py312 = { features = ["py312", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "testflo", "mpi"], solve-group = "py312" }
+py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "testflo", "mpi"], solve-group = "py313" }
 
 ###############################################
 # Tasks
