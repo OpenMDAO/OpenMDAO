@@ -240,7 +240,7 @@ class System(object, metaclass=SystemMetaclass):
         connections or a top level Group that is used to compute total derivatives
         across multiple processes.
     _vars_to_gather : dict
-        Contains names of non-distributed variables that are remote on at least one proc in the comm
+        Contains names of variables that are remote on at least one proc in the comm
     _conn_global_abs_in2out : {'abs_in': 'abs_out'}
         Dictionary containing all explicit & implicit connections (continuous and discrete)
         owned by this system or any descendant system. The data is the same across all processors.

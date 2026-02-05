@@ -925,7 +925,7 @@ class AllConnGraph(nx.DiGraph):
             Returned value.
         """
         edge = (src, tgt)
-        edge_meta = self.edges[edge]
+        edge_meta = self.edges.get(edge, {'type': 'manual'})
         typ = edge_meta.get('type', None)
         type_map = {None: 'promote', 'manual': 'connect', 'implicit': 'implicitly connect'}
         typestr = type_map[typ]

@@ -3,6 +3,9 @@
 [project attributes]
 proj.directory-list = [{'dirloc': loc('../..'),
 	'excludes': [
+    u'.pixi',
+    u'.cursor',
+    u'.claude',
 	u'openmdao/notes',
 	u'openmdao/devtools/docs_experiment/_build',
 	u'openmdao/devtools/docs_experiment/_srcdocs',
