@@ -319,6 +319,7 @@ jobs:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COVERALLS_SERVICE_NAME: "github"
           COVERALLS_PARALLEL: true
+          COVERAGE_RUN: true
         run: |
           eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
           echo "============================================================="
