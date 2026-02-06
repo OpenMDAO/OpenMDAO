@@ -92,6 +92,44 @@ class TestPETScKrylov(unittest.TestCase):
         output = d_residuals.asarray()
         assert_near_equal(output, group.expected_solution, 1e-15)
 
+    def test_solve_linear_ksp_divtol(self):
+        """Verify that PETScKrylov abides by the 'divtol' option.
+
+        `divtol` is the divergence tolerance. If the residual norm is greater
+        than `divtol` times the right hand side norm, the solver should fail.
+        """
+
+        group = TestImplicitGroup(lnSolverClass=om.PETScKrylov)
+        group.linear_solver.options['err_on_non_converge'] = True
+
+        p = om.Problem(group)
+        p.setup()
+        p.set_solver_print(level=0)
+
+        # Conclude setup but don't run model.
+        p.final_setup()
+
+        d_inputs, d_outputs, d_residuals = group.get_linear_vectors()
+
+        # Set the right hand side to all ones, and the initial guess to all zeros.
+        # This should mean the the initial residual norm is exactly the right hand side norm.
+        d_outputs.set_val(1.0)
+        d_residuals.set_val(0.0)
+
+        # Therefore, if we set `divtol < 1.0`, the solver should fail.
+        group.linear_solver.options['divtol'] = 0.5
+        with self.assertRaises(om.AnalysisError) as cm:
+            group.run_solve_linear('fwd')
+
+        # Now if we set `divtol > 1.0`, the solver should succeed.
+        group.linear_solver.options['divtol'] = 1.5
+        d_outputs.set_val(1.0)
+        d_residuals.set_val(0.0)
+        try:
+            group.run_solve_linear('fwd')
+        except om.AnalysisError:
+            self.fail("Solver should have succeeded.")
+
     def test_solve_linear_ksp_maxiter(self):
         """Verify that PETScKrylov abides by the 'maxiter' option."""
 
