@@ -97,6 +97,18 @@ class ParaboloidDiscrete(om.ExplicitComponent):
         discrete_outputs['f_xy'] = int(f_xy)
 
 
+class Mygroup(om.Group):
+    """Simple group with design var and constraint for remote testing."""
+
+    def setup(self):
+        self.add_subsystem('indep_var_comp', om.IndepVarComp('x'), promotes=['*'])
+        self.add_subsystem('Cy', om.ExecComp('y=2*x'), promotes=['*'])
+        self.add_subsystem('Cc', om.ExecComp('c=x+2'), promotes=['*'])
+
+        self.add_design_var('x')
+        self.add_constraint('c', lower=-3.)
+
+
 class ParaboloidDiscreteArray(om.ExplicitComponent):
 
     def setup(self):
@@ -369,6 +381,96 @@ class TestAnalysisDriverParallel(unittest.TestCase):
 
             # On rank 0 we should have even cases, with odd cases on rank 1
             self.assertSetEqual(case_nums, {i for i in range(rank, 100, 2)})
+
+    def test_remote_responses_parallel(self):
+        """
+        Test AnalysisDriver with remote responses in a parallel group.
+
+        This test verifies that AnalysisDriver can correctly record responses
+        from components that are distributed across MPI ranks using ParallelGroup.
+        This exercises the remote variable gathering code path during recording.
+        """
+        # Build model with parallel groups (similar to test_remote_vois.py pattern)
+        prob = om.Problem()
+
+        # Create parallel group with subsystems on different ranks
+        par = prob.model.add_subsystem('par', om.ParallelGroup())
+
+        # Add subsystems with design variables and constraints
+        # These will be on different ranks (G1 on ranks 0/2, G2 on ranks 1/3)
+        par.add_subsystem('G1', Mygroup())  # Contains design var 'x' and constraint 'c'
+        par.add_subsystem('G2', Mygroup())
+
+        # Add objective that combines outputs from both parallel subsystems
+        prob.model.add_subsystem('Obj', om.ExecComp('obj=y1+y2'))
+        prob.model.connect('par.G1.y', 'Obj.y1')
+        prob.model.connect('par.G2.y', 'Obj.y2')
+
+        # Create samples for design variables
+        samples = [
+            {'par.G1.x': {'val': 0.}, 'par.G2.x': {'val': 0.}},
+            {'par.G1.x': {'val': 0.5}, 'par.G2.x': {'val': 1.0}},
+            {'par.G1.x': {'val': 1.}, 'par.G2.x': {'val': 2.0}},
+        ]
+
+        # Setup AnalysisDriver with samples
+        prob.driver = om.AnalysisDriver(samples=samples)
+
+        # Add a recorder to capture all responses including remote ones
+        prob.driver.add_recorder(om.SqliteRecorder('remote_responses.sql'))
+
+        # Add responses that will be remote to some ranks
+        prob.driver.add_response('Obj.obj')      # Combined objective (not remote)
+        prob.driver.add_response('par.G1.y')     # Output from G1 (remote to ranks 1/3)
+        prob.driver.add_response('par.G2.y')     # Output from G2 (remote to ranks 0/2)
+
+        prob.setup()
+
+        # Run the driver
+        prob.run_driver()
+
+        prob.cleanup()
+
+        # Verify that samples were executed (at least 1 sample per rank)
+        self.assertGreaterEqual(prob.driver.iter_count, 1)
+
+        # On rank 0, read back the recorded cases and verify remote responses were recorded
+        if prob.comm.rank == 0:
+            # Use glob to find the recorded SQL files in the outputs directory
+            num_recorded_cases = 0
+            for file in glob.glob(str(prob.get_outputs_dir() / "remote_responses.sql*")):
+                if file.endswith('meta'):
+                    continue
+
+                reader = om.CaseReader(file)
+                cases = reader.list_cases('driver')
+
+                # We should have recorded at least one case
+                self.assertGreater(len(cases), 0)
+
+                # Verify that all responses (including remote ones) were recorded
+                for case_id in cases:
+                    case = reader.get_case(case_id)
+
+                    # Check that we can access all responses
+                    # These include remote responses from parallel subsystems
+                    obj_val = case.outputs['Obj.obj']
+                    g1_y = case.outputs['par.G1.y']
+                    g2_y = case.outputs['par.G2.y']
+
+                    # Verify values are recorded correctly
+                    self.assertIsNotNone(obj_val)
+                    self.assertIsNotNone(g1_y)
+                    self.assertIsNotNone(g2_y)
+
+                    # Verify obj = g1_y + g2_y (with small tolerance for floating point)
+                    # This tests that remote variables were correctly gathered during recording
+                    assert_near_equal(obj_val, g1_y + g2_y, tolerance=1e-6)
+
+                num_recorded_cases += len(cases)
+
+            # Verify we recorded cases
+            self.assertGreater(num_recorded_cases, 0)
 
 @use_tempdirs
 class TestAnalysisDriver(unittest.TestCase):
