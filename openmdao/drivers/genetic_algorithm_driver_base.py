@@ -2,8 +2,10 @@
 
 import numpy as np
 
+from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.constants import INF_BOUND
-from openmdao.core.optimization_driver_base import OptimizationDriverBase
+from openmdao.core.driver import RecordingDebugging
+from openmdao.drivers.optimization_driver_base import OptimizationDriverBase
 from openmdao.utils.mpi import MPI
 
 
@@ -325,3 +327,128 @@ class GeneticAlgorithmDriverBase(OptimizationDriverBase):
             return obj
         else:
             return obj + penalty * sum(np.power(constraint_violations, exponent))
+
+    def objective_callback(self, x, icase):
+        r"""
+        Evaluate problem objective at the requested point.
+
+        In case of multi-objective optimization, a simple weighted sum method is used:
+
+        .. math::
+
+           f = (\sum_{k=1}^{N_f} w_k \cdot f_k)^a
+
+        where :math:`N_f` is the number of objectives and :math:`a>0` is an exponential
+        weight. Choosing :math:`a=1` is equivalent to the conventional weighted sum method.
+
+        The weights given in the options are normalized, so:
+
+        .. math::
+
+            \sum_{k=1}^{N_f} w_k = 1
+
+        If one of the objectives :math:`f_k` is not a scalar, its elements will have the same
+        weights, and it will be normed with length of the vector.
+
+        Takes into account constraints with a penalty function.
+
+        All constraints are converted to the form of :math:`g_i(x) \leq 0` for
+        inequality constraints and :math:`h_i(x) = 0` for equality constraints.
+        The constraint vector for inequality constraints is the following:
+
+        .. math::
+
+           g = [g_1, g_2  \dots g_N], g_i \in R^{N_{g_i}}
+
+           h = [h_1, h_2  \dots h_N], h_i \in R^{N_{h_i}}
+
+        The number of all constraints:
+
+        .. math::
+
+           N_g = \sum_{i=1}^N N_{g_i},  N_h = \sum_{i=1}^N N_{h_i}
+
+        The fitness function is constructed with the penalty parameter :math:`p`
+        and the exponent :math:`\kappa`:
+
+        .. math::
+
+           \Phi(x) = f(x) + p \cdot \sum_{k=1}^{N^g}(\delta_k \cdot g_k)^{\kappa}
+           + p \cdot \sum_{k=1}^{N^h}|h_k|^{\kappa}
+
+        where :math:`\delta_k = 0` if :math:`g_k` is satisfied, 1 otherwise
+
+        .. note::
+
+            The values of :math:`\kappa` and :math:`p` can be defined as driver options.
+
+        Parameters
+        ----------
+        x : ndarray
+            Value of design variables.
+        icase : int
+            Case number, used for identification when run in parallel.
+
+        Returns
+        -------
+        float or ndarray
+            Objective value (ndarray if compute_pareto option exists and is True).
+        bool
+            Success flag, True if successful.
+        int
+            Case number, used for identification when run in parallel.
+        """
+        model = self._problem().model
+        success = 1
+
+        objs = self.get_objective_values()
+        nr_objectives = len(objs)
+
+        # Single objective, if there is only one objective, which has only one element
+        if nr_objectives > 1:
+            is_single_objective = False
+        else:
+            for obj in objs.items():
+                is_single_objective = len(obj) == 1
+                break
+
+        # Get multi-objective weights from base class helper
+        obj_weights, sum_weights, obj_exponent = self._get_multi_objective_weights(objs)
+
+        for name in self._designvars:
+            i, j = self._desvar_idx[name]
+            self.set_design_var(name, x[i:j])
+
+        # Execute the model
+        with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
+            self.iter_count += 1
+            try:
+                self._run_solve_nonlinear()
+
+            # Tell the optimizer that this is a bad point.
+            except AnalysisError:
+                model._clear_iprint()
+                success = 0
+
+            obj_values = self.get_objective_values()
+            if is_single_objective:  # Single objective optimization
+                for i in obj_values.values():
+                    obj = i  # First and only key in the dict
+
+            elif 'compute_pareto' in self.options and self.options['compute_pareto']:
+                # Pareto multi-objective (return all objectives, not weighted)
+                obj = np.array([val for val in obj_values.values()]).flatten()
+
+            else:  # Multi-objective optimization with weighted sums
+                obj = self._compute_weighted_objective(obj_values, obj_weights, sum_weights,
+                                                       obj_exponent)
+
+            # Apply penalty function for constraint violations
+            con_violations = self._compute_constraint_violations(self.get_constraint_values())
+            fun = self._apply_penalty_to_objective(obj, con_violations)
+            # Record after getting obj to assure they have
+            # been gathered in MPI.
+            rec.abs = 0.0
+            rec.rel = 0.0
+
+        return fun, success, icase

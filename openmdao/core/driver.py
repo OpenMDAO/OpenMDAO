@@ -9,9 +9,7 @@ import os
 import weakref
 
 import numpy as np
-import scipy.sparse as sp
 
-from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
@@ -275,13 +273,13 @@ class Driver(object, metaclass=DriverMetaclass):
 
         self._exc_info = None
         self._problem = None
-        self._designvars = None
+        self._designvars = {}
         self._designvars_discrete = []
-        self._cons = None
-        self._objs = None
-        self._responses = None
-        self._lin_dvs = None
-        self._nl_dvs = None
+        self._cons = {}
+        self._objs = {}
+        self._responses = {}
+        self._lin_dvs = {}
+        self._nl_dvs = {}
         self._in_find_feasible = False
 
         # Driver options
@@ -1229,52 +1227,6 @@ class Driver(object, metaclass=DriverMetaclass):
         """
         return 'SUCCESS' if self.result.success else 'FAIL'
 
-    def check_relevance(self):
-        """
-        Check if there are constraints that don't depend on any design vars.
-
-        This usually indicates something is wrong with the problem formulation.
-        """
-        # relevance not relevant if not using derivatives
-        if not self.supports['gradients']:
-            return
-
-        if 'singular_jac_behavior' in self.options:
-            singular_behavior = self.options['singular_jac_behavior']
-            if singular_behavior == 'ignore':
-                return
-        else:
-            singular_behavior = 'warn'
-
-        problem = self._problem()
-
-        # Do not perform this check if any subgroup uses approximated partials.
-        # This causes the relevance graph to be invalid.
-        for system in problem.model.system_iter(include_self=True, recurse=True, typ=Group):
-            if system._has_approx:
-                return
-
-        bad = {n for n in self._problem().model._relevance._no_dv_responses
-               if n not in self._designvars}
-        if bad:
-            bad_conns = [n for n, m in self._cons.items() if m['source'] in bad]
-            bad_objs = [n for n, m in self._objs.items() if m['source'] in bad]
-            badmsg = []
-            if bad_conns:
-                badmsg.append(f"constraint(s) {bad_conns}")
-            if bad_objs:
-                badmsg.append(f"objective(s) {bad_objs}")
-            bad = ' and '.join(badmsg)
-            # Note: There is a hack in ScipyOptimizeDriver for older versions of COBYLA that
-            #       implements bounds on design variables by adding them as constraints.
-            #       These design variables as constraints will not appear in the wrt list.
-            msg = f"{self.msginfo}: {bad} do not depend on any " \
-                  "design variables. Please check your problem formulation."
-            if singular_behavior == 'error':
-                raise RuntimeError(msg)
-            else:
-                issue_warning(msg, category=DriverWarning)
-
     def run(self):
         """
         Execute this driver.
@@ -1828,215 +1780,6 @@ class Driver(object, metaclass=DriverMetaclass):
 
         return active_cons, active_dvs
 
-    def _unscale_lagrange_multipliers(self, multipliers, assume_dv=False):
-        """
-        Unscale the Lagrange multipliers from optimizer scaling to physical/model scaling.
-
-        This method assumes that the optimizer is in a converged state, satisfying both the
-        primal constraints as well as the optimality conditions.
-
-        Parameters
-        ----------
-        active_constraints : Sequence[str]
-            Active constraints/dvs in the optimization, determined using the
-            get_active_cons_and_dvs method.
-        multipliers : dict[str: ArrayLike]
-            The Lagrange multipliers, in Driver-scaled units.
-        assume_dv : bool
-            This function can unscale the multipliers of either design variables or constraints.
-            Since variables can be both a design variable and a constraint, this flag
-            disambiguates the type of multiplier we're handling so the appropriate scaling
-            factors can be used.
-
-        Returns
-        -------
-        dict
-            The Lagrange multipliers in model/physical units.
-        """
-        if len(self._objs) != 1:
-            raise ValueError('Lagrange Multplier estimation requires that there '
-                             f'be a single objective, but there are {len(self._objs)}.')
-
-        obj_meta = list(self._objs.values())[0]
-        obj_ref = obj_meta['ref']
-        obj_ref0 = obj_meta['ref0']
-
-        if obj_ref is None:
-            obj_ref = 1.0
-        if obj_ref0 is None:
-            obj_ref0 = 0.0
-
-        obj_scaler = obj_meta['total_scaler'] or 1.0
-
-        unscaled_multipliers = {}
-
-        for name, val in multipliers.items():
-            if name in self._designvars and assume_dv:
-                scaler = self._designvars[name]['total_scaler']
-            else:
-                scaler = self._responses[name]['total_scaler']
-            scaler = scaler or 1.0
-
-            unscaled_multipliers[name] = val * scaler / obj_scaler
-
-        return unscaled_multipliers
-
-    def compute_lagrange_multipliers(self, driver_scaling=False, feas_tol=1.0E-6,
-                                     use_sparse_solve=True):
-        """
-        Get the approximated Lagrange multipliers of one or more constraints.
-
-        This method assumes that the optimizer is in a converged state, satisfying both the
-        primal constraints as well as the optimality conditions.
-
-        The estimation of which constraints are active depends upon the feasibility tolerance
-        specified. This applies to the driver-scaled values of the constraints, and should be
-        the same as that used by the optimizer, if available.
-
-        Parameters
-        ----------
-        driver_scaling : bool
-            If False, return the Lagrange multipliers estimates in their physical units.
-            If True, return the Lagrange multiplier estimates in a driver-scaled state.
-        feas_tol : float or None
-            The feasibility tolerance under which the optimization was run. If None, attempt
-            to determine this automatically based on the specified optimizer settings.
-        use_sparse_solve : bool
-            If True, use scipy.sparse.linalg.lstsq to solve for the multipliers. Otherwise, numpy
-            will be used with dense arrays.
-
-        Returns
-        -------
-        active_desvars : dict[str: dict]
-            A dictionary with an entry for each active design variable.
-            For each active design variable, the corresponding dictionary
-            provides the 'multipliers', active 'indices', and 'active_bounds'.
-        active_cons : dict[str: dict]
-            A dictionary with an entry for each active constraint.
-            For each active constraint, the corresponding dictionary
-            provides the 'multipliers', active 'indices', and 'active_bounds'.
-        """
-        if not self.supports['optimization']:
-            raise NotImplementedError('Lagrange multipliers are only available for '
-                                      'drivers which support optimization.')
-
-        prob = self._problem()
-
-        obj_name = list(self._objs.keys())[0]
-        constraints = self._cons
-        des_vars = self._designvars
-
-        of_totals = {obj_name, *constraints.keys()}
-
-        active_cons, active_dvs = self._get_active_cons_and_dvs(feas_atol=feas_tol,
-                                                                feas_rtol=feas_tol)
-
-        # Active cons and dvs provide the active indices in the design vars and constraints.
-        # But these design vars and constraints may themselves be indices of a larger
-        # variable.
-        totals = prob.compute_totals(list(of_totals),
-                                     list(des_vars),
-                                     driver_scaling=True)
-
-        grad_f = {inp: totals[obj_name, inp] for inp in des_vars.keys()}
-
-        n = sum([grad_f_val.size for grad_f_val in grad_f.values()])
-
-        grad_f_vec = np.zeros((n))
-        offset = 0
-        for grad_f_val in grad_f.values():
-            inp_size = grad_f_val.size
-            grad_f_vec[offset:offset + inp_size] = grad_f_val
-            offset += inp_size
-
-        active_jac_blocks = []
-
-        if not active_cons and not active_dvs:
-            return {}, {}
-
-        for (dv_name, active_meta) in active_dvs.items():
-            # For active design variable bounds, the constraint gradient
-            # wrt des vars is just an identity matrix sized by the number of
-            # active elements in the design variable.
-            active_idxs = active_meta['indices']
-
-            size = des_vars[dv_name]['size']
-            con_grad = {(dv_name, inp): np.eye(size)[active_idxs, ...] if inp == dv_name
-                        else np.zeros((size, dv_meta['size']))[active_idxs, ...]
-                        for (inp, dv_meta) in des_vars.items()}
-
-            if use_sparse_solve:
-                active_jac_blocks.append([sp.csr_matrix(cg) for cg in con_grad.values()])
-            else:
-                active_jac_blocks.append(list(con_grad.values()))
-
-        for (con_name, active_meta) in active_cons.items():
-            # If the constraint is a design variable, the constraint gradient
-            # wrt des vars is just an identity matrix sized by the number of
-            # active elements in the design variable.
-            active_idxs = active_meta['indices']
-            if con_name in des_vars.keys():
-                size = des_vars[con_name]['size']
-                con_grad = {(con_name, inp): np.eye(size)[active_idxs, ...] if inp == con_name
-                            else np.zeros((size, dv_meta['size']))[active_idxs, ...]
-                            for (inp, dv_meta) in des_vars.items()}
-            else:
-                con_grad = {(con_name, inp): totals[con_name, inp][active_idxs, ...]
-                            for inp in des_vars.keys()}
-            if use_sparse_solve:
-                active_jac_blocks.append([sp.csr_matrix(cg) for cg in con_grad.values()])
-            else:
-                active_jac_blocks.append(list(con_grad.values()))
-
-        if use_sparse_solve:
-            active_cons_mat = sp.block_array(active_jac_blocks)
-        else:
-            active_cons_mat = np.block(active_jac_blocks)
-
-        if use_sparse_solve:
-            lstsq_sol = sp.linalg.lsqr(active_cons_mat.T, -grad_f_vec)
-        else:
-            lstsq_sol = np.linalg.lstsq(active_cons_mat.T, -grad_f_vec, rcond=None)
-        multipliers_vec = lstsq_sol[0]
-
-        dv_multipliers = dict()
-        con_multipliers = dict()
-        offset = 0
-
-        dv_vals = self.get_design_var_values()
-        con_vals = self.get_constraint_values()
-
-        for desvar, act_info in active_dvs.items():
-            act_idxs = act_info['indices']
-            active_size = len(act_idxs)
-            mult_vals = multipliers_vec[offset:offset + active_size]
-            dv_multipliers[desvar] = np.zeros_like(dv_vals[desvar])
-            dv_multipliers[desvar].flat[act_idxs] = mult_vals
-            offset += active_size
-
-        for constraint, act_info in active_cons.items():
-            act_idxs = act_info['indices']
-            active_size = len(act_idxs)
-            mult_vals = multipliers_vec[offset:offset + active_size]
-            if constraint in des_vars:
-                con_multipliers[constraint] = np.zeros_like(dv_vals[constraint])
-            else:
-                con_multipliers[constraint] = np.zeros_like(con_vals[constraint])
-            con_multipliers[constraint].flat[act_idxs] = mult_vals
-            offset += active_size
-
-        if not driver_scaling:
-            dv_multipliers = self._unscale_lagrange_multipliers(dv_multipliers, assume_dv=True)
-            con_multipliers = self._unscale_lagrange_multipliers(con_multipliers, assume_dv=False)
-
-        for key, val in dv_multipliers.items():
-            active_dvs[key]['multipliers'] = val
-
-        for key, val in con_multipliers.items():
-            active_cons[key]['multipliers'] = val
-
-        return active_dvs, active_cons
-
     def _reraise(self):
         """
         Reraise any exception encountered when scipy calls back into our methods.
@@ -2357,7 +2100,7 @@ class Driver(object, metaclass=DriverMetaclass):
                                    driver_scaling=driver_scaling, lin_con_grad=lincongrad_cache,
                                    con_row_map=con_row_map)
 
-        # Wrap the actual least squares call so that we don't need to duplicate calls below'
+        # Wrap the actual least squares call so that we don't need to duplicate calls below
         if MPI and problem.comm.rank != 0:
             iprint = 0
 
