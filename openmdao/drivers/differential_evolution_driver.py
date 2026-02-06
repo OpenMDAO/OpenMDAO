@@ -37,12 +37,6 @@ class DifferentialEvolutionDriver(GeneticAlgorithmDriverBase):
 
     Attributes
     ----------
-    _problem_comm : MPI.Comm or None
-        The MPI communicator for the Problem.
-    _concurrent_pop_size : int
-        Number of points to run concurrently when model is a parallel one.
-    _concurrent_color : int
-        Color of current rank when running a parallel model.
     _desvar_idx : dict
         Keeps track of the indices for each desvar, since DifferentialEvolution sees an array of
         design variables.

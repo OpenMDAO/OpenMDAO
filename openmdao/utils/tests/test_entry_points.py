@@ -28,7 +28,9 @@ class TestEntryPoints(unittest.TestCase):
 
     # test if all relevant classes have been registered as entry points
     def test_ep_registered(self):
-        skip = set(['openmdao.surrogate_models.surrogate_model:MultiFiSurrogateModel'])
+        skip = set(['openmdao.surrogate_models.surrogate_model:MultiFiSurrogateModel',
+                    'openmdao.drivers.optimization_driver_base:OptimizationDriverBase',
+                    'openmdao.drivers.genetic_algorithm_driver_base:GeneticAlgorithmDriverBase'])
 
         # collect declared entry points for openmdao
         registered_eps = {}

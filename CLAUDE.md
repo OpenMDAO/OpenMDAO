@@ -2,7 +2,7 @@
 
 Unless otherwise directed...
 
-- Use the "dev" environment in the pixi.toml file in the root of this directory.
+- Use the "dev" environment in the pixi.toml file in the root of this project.
 
 - Use `pixi run test` to invoke tests.
 

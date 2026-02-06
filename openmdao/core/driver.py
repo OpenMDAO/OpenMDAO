@@ -275,12 +275,7 @@ class Driver(object, metaclass=DriverMetaclass):
         self._problem = None
         self._designvars = {}
         self._designvars_discrete = []
-        self._cons = {}
-        self._objs = {}
         self._responses = {}
-        self._lin_dvs = {}
-        self._nl_dvs = {}
-        self._in_find_feasible = False
 
         # Driver options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
