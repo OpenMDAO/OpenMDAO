@@ -611,8 +611,11 @@ def _load_report_plugins():
     _plugins_loaded = True
 
     for ep in _iter_entry_points('openmdao_report'):
-        register_func = ep.load()
-        register_func()  # this runs the function that calls register_report
+        try:
+            register_func = ep.load()
+            register_func()  # this runs the function that calls register_report
+        except Exception as e:
+            issue_warning(f"Error loading report plugins: {e}")
 
 
 def _get_reports_dir_files_html(reports_dir, explevel, level):

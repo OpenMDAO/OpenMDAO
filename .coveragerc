@@ -10,3 +10,6 @@ omit =
     */test_suite/*
     */docs/*
     */code_review/*
+    */dymos/*
+    */aviary/*
+    */pycycle/*

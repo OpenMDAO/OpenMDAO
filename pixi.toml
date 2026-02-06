@@ -134,12 +134,14 @@ parameterized = "*"
 playwright = "*"
 pycodestyle = "*"
 pydocstyle = "*"
-testflo = "*"
 websockets = "*"
 actionlint = "*"
 ruff = "*"
-coverage = "*"
+coverage = ">=7.6.0"
 nbdime = "*"
+
+[feature.test.pypi-dependencies]
+testflo = "*"
 
 [feature.visualization.dependencies]
 panel = "*"
