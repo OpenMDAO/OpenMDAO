@@ -158,7 +158,7 @@ class pyOptSparseDriver(OptimizationDriverBase):
         Pyopt_sparse solution object.
     _fill_NANs : bool
         Used internally to control when to return NANs for a bad evaluation.
-    _check_jac_on_first_eval : bool
+    _check_jac : bool
         Used internally to control when to perform singular checks on computed total derivs.
     _in_user_function :bool
         This is set to True at the start of a pyoptsparse callback to _objfunc and _gradfunc, and
@@ -231,7 +231,7 @@ class pyOptSparseDriver(OptimizationDriverBase):
         self._signal_cache = None
         self._user_termination_flag = False
         self._in_user_function = False
-        self._check_jac_on_first_eval = False
+        self._check_jac = False
         self._total_jac_format = 'dict'
         self._total_jac_sparsity = None
         self._model_ran = False
@@ -359,7 +359,7 @@ class pyOptSparseDriver(OptimizationDriverBase):
 
         self._check_for_missing_objective()
         self._check_for_invalid_desvar_values()
-        self._check_jac_on_first_eval = self.options['singular_jac_behavior'] in ['error', 'warn']
+        self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
 
         linear_constraints = [key for key, con in self._cons.items() if con['linear']]
 
@@ -797,9 +797,9 @@ class pyOptSparseDriver(OptimizationDriverBase):
                                                  return_format=self._total_jac_format)
 
                 # First time through, check for zero row/col.
-                if self._check_jac_on_first_eval and self._total_jac is not None:
+                if self._check_jac and self._total_jac is not None:
                     self._check_singular_jacobian()
-                    self._check_jac_on_first_eval = False
+                    self._check_jac = False
 
             # Let the optimizer try to handle the error
             except AnalysisError:

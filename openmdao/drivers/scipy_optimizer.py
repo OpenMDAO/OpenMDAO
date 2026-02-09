@@ -113,7 +113,7 @@ class ScipyOptimizeDriver(OptimizationDriverBase):
         Result returned from scipy.optimize call.
     opt_settings : dict
         Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
-    _check_jac_on_first_eval : bool
+    _check_jac : bool
         Used internally to control when to perform singular checks on computed total derivs.
     _con_cache : dict
         Cached result of constraint evaluations because scipy asks for them in a separate function.
@@ -167,7 +167,7 @@ class ScipyOptimizeDriver(OptimizationDriverBase):
         self._desvar_array_cache = None
         self.fail = False
         self.iter_count = 0
-        self._check_jac_on_first_eval = False
+        self._check_jac = False
         self._total_jac_format = 'array'
 
         self.cite = CITATIONS
@@ -220,7 +220,7 @@ class ScipyOptimizeDriver(OptimizationDriverBase):
         self.supports['two_sided_constraints'] = opt in _constraint_optimizers
         self.supports['equality_constraints'] = opt in _eq_constraint_optimizers
         self.supports._read_only = True
-        self._check_jac_on_first_eval = self.options['singular_jac_behavior'] in ['error', 'warn']
+        self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
 
         # Raises error if multiple objectives are not supported, but more objectives were defined.
         if not self.supports['multiple_objectives'] and len(self._objs) > 1:
@@ -745,9 +745,9 @@ class ScipyOptimizeDriver(OptimizationDriverBase):
             self._grad_cache = grad
 
             # First time through, check for zero row/col.
-            if self._check_jac_on_first_eval and self._total_jac is not None:
+            if self._check_jac and self._total_jac is not None:
                 self._check_singular_jacobian()
-                self._check_jac_on_first_eval = False
+                self._check_jac = False
 
         except Exception:
             if self._exc_info is None:  # only record the first one
