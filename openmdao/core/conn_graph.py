@@ -2923,7 +2923,7 @@ class AllConnGraph(nx.DiGraph):
                             if sz is not None:
                                 if sz == 0:
                                     src_indices = \
-                                        indexer(slice(0, 0), flat_src=True, src_shape=(0,))
+                                        indexer(slice(0, 0), flat_src=True, src_shape=src_shape)
                                 else:
                                     src_indices = \
                                         indexer(slice(offset, offset + sz),
@@ -4368,11 +4368,11 @@ class AllConnGraph(nx.DiGraph):
 
         try:
             with HTTPServer(("", port), handler) as httpd:
-                print(f"✅ Server running on http://localhost:{port}")
+                print(f"Server running on http://localhost:{port}")
                 print("Press Ctrl+C to stop")
                 httpd.serve_forever()
         except KeyboardInterrupt:
-            print("\n🛑 Server stopped")
+            print("\nServer stopped")
 
     def copy_var_shape(self, from_node, to_node):
         """
