@@ -12,7 +12,6 @@ from scipy.optimize import minimize
 from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import RecordingDebugging
 from openmdao.drivers.optimization_driver_base import OptimizationDriverBase
-from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
 from openmdao.utils.mpi import MPI
 
@@ -114,7 +113,7 @@ class ScipyOptimizeDriver(OptimizationDriverBase):
         Result returned from scipy.optimize call.
     opt_settings : dict
         Dictionary of solver-specific options. See the scipy.optimize.minimize documentation.
-    _check_jac : bool
+    _check_jac_on_first_eval : bool
         Used internally to control when to perform singular checks on computed total derivs.
     _con_cache : dict
         Cached result of constraint evaluations because scipy asks for them in a separate function.
@@ -168,7 +167,7 @@ class ScipyOptimizeDriver(OptimizationDriverBase):
         self._desvar_array_cache = None
         self.fail = False
         self.iter_count = 0
-        self._check_jac = False
+        self._check_jac_on_first_eval = False
         self._total_jac_format = 'array'
 
         self.cite = CITATIONS
@@ -177,6 +176,8 @@ class ScipyOptimizeDriver(OptimizationDriverBase):
         """
         Declare options before kwargs are processed in the init method.
         """
+        super()._declare_options()
+
         self.options.declare('optimizer', 'SLSQP', values=_all_optimizers,
                              desc='Name of optimizer to use')
         self.options.declare('tol', 1.0e-6, lower=0.0,
@@ -187,15 +188,6 @@ class ScipyOptimizeDriver(OptimizationDriverBase):
         self.options.declare('disp', default=True, types=(int, bool),
                              desc='Value of "disp" argument provided to scipy.optimize.minimize '
                              'which controls the verbosity of the optimization.')
-        self.options.declare('singular_jac_behavior', default='warn',
-                             values=['error', 'warn', 'ignore'],
-                             desc='Defines behavior of a zero row/col check after first call to'
-                             'compute_totals:'
-                             'error - raise an error.'
-                             'warn - raise a warning.'
-                             "ignore - don't perform check.")
-        self.options.declare('singular_jac_tol', default=1e-16,
-                             desc='Tolerance for zero row/column check.')
 
     def _get_name(self):
         """
@@ -228,7 +220,7 @@ class ScipyOptimizeDriver(OptimizationDriverBase):
         self.supports['two_sided_constraints'] = opt in _constraint_optimizers
         self.supports['equality_constraints'] = opt in _eq_constraint_optimizers
         self.supports._read_only = True
-        self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
+        self._check_jac_on_first_eval = self.options['singular_jac_behavior'] in ['error', 'warn']
 
         # Raises error if multiple objectives are not supported, but more objectives were defined.
         if not self.supports['multiple_objectives'] and len(self._objs) > 1:
@@ -747,33 +739,20 @@ class ScipyOptimizeDriver(OptimizationDriverBase):
         ndarray
             Gradient of objective with respect to input array.
         """
-        prob = self._problem()
-        model = prob.model
-
         try:
             grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
                                         return_format=self._total_jac_format)
             self._grad_cache = grad
 
             # First time through, check for zero row/col.
-            if self._check_jac and self._total_jac is not None:
-                for subsys in model.system_iter(include_self=True, recurse=True, typ=Group):
-                    if subsys._has_approx:
-                        break
-                else:
-                    raise_error = self.options['singular_jac_behavior'] == 'error'
-                    self._total_jac.check_total_jac(raise_error=raise_error,
-                                                    tol=self.options['singular_jac_tol'])
-                self._check_jac = False
+            if self._check_jac_on_first_eval and self._total_jac is not None:
+                self._check_singular_jacobian()
+                self._check_jac_on_first_eval = False
 
         except Exception:
             if self._exc_info is None:  # only record the first one
                 self._exc_info = sys.exc_info()
             return np.array([[]])
-
-        # print("Gradients calculated for objective")
-        # print('   xnew', x_new)
-        # print('   grad', grad[0, :])
 
         return grad[0, :]
 

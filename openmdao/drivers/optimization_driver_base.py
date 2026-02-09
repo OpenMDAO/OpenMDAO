@@ -93,6 +93,16 @@ class OptimizationDriverBase(Driver):
         # Get base Driver options first
         super()._declare_options()
 
+        self.options.declare('singular_jac_behavior', default='warn',
+                             values=['error', 'warn', 'ignore'],
+                             desc='Defines behavior of a zero row/col check after first call to'
+                                  'compute_totals:'
+                                  'error - raise an error.'
+                                  'warn - raise a warning.'
+                                  "ignore - don't perform check.")
+        self.options.declare('singular_jac_tol', default=1e-16,
+                             desc='Tolerance for zero row/column check.')
+
     def _split_dvs(self, model):
         """
         Determine which design vars are relevant to linear constraints vs nonlinear constraints.
@@ -200,6 +210,39 @@ class OptimizationDriverBase(Driver):
                     raise ValueError(s)
                 else:
                     issue_warning(s, category=DriverWarning)
+
+    def _check_singular_jacobian(self):
+        """
+        Check for zero rows/columns in the total Jacobian.
+
+        This check is only performed if the optimizer supports gradients. It will be performed
+        on the first evaluation of the total Jacobian.
+
+        Behavior is controlled by the 'singular_jac_behavior' option:
+        - 'error': Raise an error if singular Jacobian is detected
+        - 'warn': Issue a warning if singular Jacobian is detected
+        - 'ignore': Skip this check
+        """
+        # Only check singular jacobian if the optimizer uses gradients
+        if not self.supports['gradients']:
+            return
+
+        if self.options['singular_jac_behavior'] == 'ignore':
+            return
+
+        problem = self._problem()
+        model = problem.model
+
+        # Check if any subgroup uses approximated partials
+        for subsys in model.system_iter(include_self=True, recurse=True, typ=Group):
+            if subsys._has_approx:
+                return
+
+        # Check total Jacobian for zero rows/columns
+        if self._total_jac is not None:
+            raise_error = self.options['singular_jac_behavior'] == 'error'
+            self._total_jac.check_total_jac(raise_error=raise_error,
+                                            tol=self.options['singular_jac_tol'])
 
     def get_design_var_values(self, get_remote=True, driver_scaling=True):
         """
