@@ -2562,7 +2562,10 @@ class System(object, metaclass=SystemMetaclass):
             if rank == 0:
                 for f in os.listdir('.'):
                     if fnmatchcase(f, 'solver_errors.*.out'):
-                        os.remove(f)
+                        try:
+                            os.remove(f)
+                        except FileNotFoundError:
+                            pass  # avoid random concurrent test failures caused by race condition
 
         if self._nonlinear_solver is not None:
             self._nonlinear_solver._setup_solvers(self, 0)
