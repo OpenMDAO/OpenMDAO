@@ -2455,7 +2455,6 @@ class TestGroupPromotes(unittest.TestCase):
                 # Variable is specified in the original promote.
                 self.subsub.promotes('comp4', outputs=[('nac:z3', 'override:nac:z3')])
 
-
         prob = om.Problem()
         model = prob.model
 
@@ -2487,7 +2486,7 @@ class TestGroupPromotes(unittest.TestCase):
         g3.promotes('g4', any=['*'])
         g2.promotes('g3', any=['*'])
         g1.promotes('g2', any=['*'])
-        prob.model.promotes('g1', any=['a', 'b', 'x', 'y'])
+        prob.model.promotes('g1', any=['a', 'b', 'x', '*y*'])
         # This would previously result in an error before issue 2795 is fixed.
         prob.model.promotes('g1', [('y', 'my_y'), ('a', 'my_a'), ('x', 'my_x'), ('b', 'my_b')])
 
