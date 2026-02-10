@@ -2469,7 +2469,45 @@ class TestGroupPromotes(unittest.TestCase):
         assert_near_equal(prob.get_val('subsub.override:fuse:z3'), 900., tolerance=1.0E-4)
         assert_near_equal(prob.get_val('subsub.override:tail:z3'), 900., tolerance=1.0E-4)
         assert_near_equal(prob.get_val('subsub.override:nac:z3'), 900., tolerance=1.0E-4)
-        prob.model.list_vars()
+
+    def test_repromote_with_wildcard2(self):
+
+        prob = om.Problem()
+
+        g1 = prob.model.add_subsystem('g1', om.Group())
+        g2 = g1.add_subsystem('g2', om.Group())
+        g3 = g2.add_subsystem('g3', om.Group())
+        g4 = g3.add_subsystem('g4', om.Group())
+
+        g4.add_subsystem('c1', om.ExecComp('y = a * x + b'), promotes=['*'])
+
+        # At this point we have g1.g2.g3.g4.[y, a, x, b]
+        # The promote call took c1 out of the promoted path.
+        # Now promote the variables up to the top.
+        g3.promotes('g4', any=['*'])
+        g2.promotes('g3', any=['*'])
+        g1.promotes('g2', any=['*'])
+        prob.model.promotes('g1', any=['a', 'b', 'x', 'y'])
+        # This would previously result in an error before issue 2795 is fixed.
+        prob.model.promotes('g1', [('y', 'my_y'), ('a', 'my_a'), ('x', 'my_x'), ('b', 'my_b')])
+
+        prob.setup()
+
+        prob.set_val('my_a', 2.0)
+        prob.set_val('my_x', 3.0)
+        prob.set_val('my_b', 4.0)
+
+        prob.run_model()
+
+        y = prob.get_val('my_y')
+        a = prob.get_val('my_a')
+        x = prob.get_val('my_x')
+        b = prob.get_val('my_b')
+
+        assert_near_equal(y, 10.0, tolerance=1.0E-5)
+        assert_near_equal(a, 2.0, tolerance=1.0E-5)
+        assert_near_equal(x, 3.0, tolerance=1.0E-5)
+        assert_near_equal(b, 4.0, tolerance=1.0E-5)
 
 
 class MyComp(om.ExplicitComponent):
