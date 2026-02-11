@@ -1325,6 +1325,7 @@ class ExplicitDComp(om.ExplicitComponent):
         outputs["sum"] = self.comm.allreduce(np.sum(inputs["vector"]))
 
 
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ZeroDynDistShapeTestCase(unittest.TestCase):
     N_PROCS = 2
 
