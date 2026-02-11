@@ -254,6 +254,7 @@ jobs:
           # MPI settings for CI (all platforms)
           PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
           OMPI_MCA_rmaps_base_oversubscribe: "1"
+          COVERAGE_RUN: "true"
         run: |
           eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
           echo "============================================================="
@@ -294,6 +295,7 @@ jobs:
         shell: pwsh
         env:
           OPENMDAO_CHECK_ALL_PARTIALS: true
+          COVERAGE_RUN: "true"
         run: |
           & pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }} -s powershell | Out-String | Invoke-Expression
           echo "============================================================="
