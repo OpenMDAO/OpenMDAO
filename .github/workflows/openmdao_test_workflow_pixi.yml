@@ -55,13 +55,6 @@ jobs:
         COVERAGE: [false]
         include:
 
-          # Ubuntu - py313 with coverage
-          - OS: ubuntu-24.04
-            PIXI_ENVIRONMENT: py313
-            BANDIT: false
-            RUFF: false
-            COVERAGE: true
-
           # Windows - py313 with coverage
           - OS: windows-latest
             PIXI_ENVIRONMENT: py313
@@ -83,12 +76,12 @@ jobs:
             RUFF: false
             COVERAGE: false
 
-          # Ruff only on Ubuntu dev
+          # Do ruff and coverage on Ubuntu dev
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: dev
             BANDIT: false
             RUFF: true
-            COVERAGE: false
+            COVERAGE: true
 
         exclude:
           # Exclude the duplicate ubuntu-24.04 + py312 with BANDIT: false
@@ -97,22 +90,9 @@ jobs:
             BANDIT: false
             COVERAGE: false
 
-          # Exclude the duplicate ubuntu-24.04 + dev with RUFF: false
+          # Exclude the duplicate ubuntu-24.04 + dev with RUFF: false and COVERAGE: false
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: dev
-            RUFF: false
-            COVERAGE: false
-
-          # Ubuntu - py313 without coverage
-          - OS: ubuntu-24.04
-            PIXI_ENVIRONMENT: py313
-            BANDIT: false
-            RUFF: false
-            COVERAGE: false
-
-          # Windows - py313 without coverage
-          - OS: windows-latest
-            PIXI_ENVIRONMENT: py313
             BANDIT: false
             RUFF: false
             COVERAGE: false
