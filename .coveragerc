@@ -4,6 +4,7 @@
 disable_warnings = module-not-measured
 
 [report]
+ignore_errors = True
 omit =
     */tests/*
     */devtools/*
