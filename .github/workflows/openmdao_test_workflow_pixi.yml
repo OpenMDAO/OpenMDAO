@@ -54,12 +54,6 @@ jobs:
         SNOPT: [true]
         COVERAGE: [false]
         include:
-          # macOS - py313 with coverage
-          - OS: macos-latest
-            PIXI_ENVIRONMENT: py313
-            BANDIT: false
-            RUFF: false
-            COVERAGE: true
 
           # Ubuntu - py313 with coverage
           - OS: ubuntu-24.04
@@ -106,13 +100,6 @@ jobs:
           # Exclude the duplicate ubuntu-24.04 + dev with RUFF: false
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: dev
-            RUFF: false
-            COVERAGE: false
-
-          # macOS - py313 without coverage
-          - OS: macos-latest
-            PIXI_ENVIRONMENT: py313
-            BANDIT: false
             RUFF: false
             COVERAGE: false
 
