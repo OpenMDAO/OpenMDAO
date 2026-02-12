@@ -47,10 +47,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        OS: [ubuntu-24.04]
-        PIXI_ENVIRONMENT: [py313]
-        # OS: [ubuntu-24.04, macos-latest]
-        # PIXI_ENVIRONMENT: [minimal, py311, py312, py313, default, dev, oldest]
+        OS: [ubuntu-24.04, macos-latest]
+        PIXI_ENVIRONMENT: [minimal, py311, py312, py313, default, dev, oldest]
         BANDIT: [false]
         RUFF: [false]
         SNOPT: [true]
