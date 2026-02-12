@@ -52,35 +52,50 @@ jobs:
         BANDIT: [false]
         RUFF: [false]
         SNOPT: [true]
+        COVERAGE: [false]
         include:
+
+          # Windows - py313 with coverage
+          - OS: windows-latest
+            PIXI_ENVIRONMENT: py313
+            BANDIT: false
+            RUFF: false
+            COVERAGE: true
+
           # Windows - only minimal
           - OS: windows-latest
             PIXI_ENVIRONMENT: minimal
             BANDIT: false
             RUFF: false
+            COVERAGE: false
 
           # Bandit only on Ubuntu py312
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: py312
             BANDIT: true
             RUFF: false
+            COVERAGE: false
 
-          # Ruff only on Ubuntu dev
+          # Do ruff and coverage on Ubuntu dev
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: dev
             BANDIT: false
             RUFF: true
+            COVERAGE: true
 
         exclude:
           # Exclude the duplicate ubuntu-24.04 + py312 with BANDIT: false
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: py312
             BANDIT: false
+            COVERAGE: false
 
-          # Exclude the duplicate ubuntu-24.04 + dev with RUFF: false
+          # Exclude the duplicate ubuntu-24.04 + dev with RUFF: false and COVERAGE: false
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: dev
+            BANDIT: false
             RUFF: false
+            COVERAGE: false
 
     runs-on: ${{ matrix.OS }}
 
@@ -263,14 +278,14 @@ jobs:
           echo "############ .coveragerc contents #################"
           cat .coveragerc
           echo "###################################################"
-          cp .coveragerc "$HOME"
-          cd "$HOME"
+          cp .coveragerc $HOME
+          cd $HOME
 
           # Build testflo command
-          TESTFLO_CMD="testflo -n 2 openmdao --timeout=240 --durations=20"
+          TESTFLO_CMD="testflo openmdao --skip_dir=.pixi --timeout=240 --durations=20"
 
-          # Do not perform coverage on macOS
-          if [[ "${{ runner.os }}" != "macOS" ]]; then
+          # Only perform coverage on specified OS + Python version combinations
+          if [[ "${{ matrix.COVERAGE }}" == "true" ]]; then
             TESTFLO_CMD="$TESTFLO_CMD --coverage --coverpkg openmdao"
           fi
 
@@ -299,12 +314,21 @@ jobs:
         run: |
           & pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }} -s powershell | Out-String | Invoke-Expression
           echo "============================================================="
-          echo "Run tests with coverage (from directory other than repo root)"
+          echo "Run tests (from directory other than repo root)"
           echo "============================================================="
           copy .coveragerc "$HOME"
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
           cd "$HOME"
-          testflo -n 1 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20 --pre_announce
+
+          # Build testflo command
+          $TESTFLO_CMD = "testflo -n 1 openmdao --skip_dir=.pixi --timeout=240 --show_skipped --durations=20 --pre_announce"
+
+          # Only perform coverage on specified OS + Python version combinations
+          if ("${{ matrix.COVERAGE }}" -eq "true") {
+            $TESTFLO_CMD += " --coverage --coverpkg openmdao"
+          }
+
+          Invoke-Expression $TESTFLO_CMD
 
       - name: Display test report on failure (windows)
         if: steps.run_tests_windows.outcome == 'failure'
@@ -316,7 +340,8 @@ jobs:
 
       - name: Submit coverage
         id: coveralls
-        continue-on-error: true
+        if: matrix.COVERAGE
+        continue-on-error: false
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COVERALLS_SERVICE_NAME: "github"
@@ -332,7 +357,7 @@ jobs:
           coveralls --basedir $SITE_DIR
 
       - name: Slack failure to upload to coveralls.io
-        if: steps.coveralls.outcome == 'failure'
+        if: matrix.COVERAGE && steps.coveralls.outcome == 'failure'
         uses: act10ns/slack@v2.0.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -390,3 +415,51 @@ jobs:
             echo "Tests failed"
             exit 1
           fi
+
+  # Signal to Coveralls that all parallel test jobs have completed.
+  # See: https://docs.coveralls.io/parallel-builds
+  coveralls:
+    name: Finish Coveralls
+    needs: tests
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    continue-on-error: true
+    steps:
+      - name: Close parallel build on Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+
+  related_tests:
+    name: Run Dymos & pyCycle Tests
+    needs: tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: benc-uk/workflow-dispatch@v1
+      with:
+        workflow: Dymos Tests
+        repo: ${{ github.repository_owner }}/dymos
+        inputs: >
+          {
+            "run_name": "Test Latest OpenMDAO Development Version",
+            "latest": true
+           }
+        token: ${{ secrets.ACCESS_TOKEN }}
+      if: github.event_name == 'push'
+
+    - uses: benc-uk/workflow-dispatch@v1
+      with:
+        workflow: pyCycle Tests
+        repo: ${{ github.repository_owner }}/pycycle
+        inputs: >
+          {
+            "run_name": "Test Latest OpenMDAO Development Version",
+            "Ubuntu_Baseline": false,
+            "MacOS_Baseline": false,
+            "Windows_Baseline": false,
+            "OpenMDAO_Dev": true
+           }
+        token: ${{ secrets.ACCESS_TOKEN }}
+      if: github.event_name == 'push'
