@@ -16,6 +16,7 @@ Gradient-Based:
     - IPOPT: Interior Point Optimizer (requires separate installation)
     - SQP: Sequential Quadratic Programming
     - InteriorPoint: Interior point method
+    - OpenSQP: A sequential quadradict programming optimizer built into ModOpt
 
 Gradient-Free:
     - COBYLA: Constrained Optimization BY Linear Approximation
@@ -42,43 +43,60 @@ except ImportError:
 # Performant algorithms from ModOpt that support gradients
 _gradient_optimizers = {
     'SLSQP', 'PySLSQP', 'BFGS', 'LBFGSB', 'TrustConstr',
-    'SNOPT', 'IPOPT', 'SQP', 'InteriorPoint'
+    'SNOPT', 'IPOPT', 'SQP', 'InteriorPoint', 'OpenSQP',
 }
 
 # Algorithms that support constraints (inequality and/or equality)
 _constraint_optimizers = {
     'SLSQP', 'PySLSQP', 'COBYLA', 'TrustConstr', 'COBYQA',
-    'SNOPT', 'IPOPT', 'SQP', 'InteriorPoint'
+    'SNOPT', 'IPOPT', 'SQP', 'InteriorPoint', 'OpenSQP',
 }
 
 # Algorithms that support equality constraints
 _eq_constraint_optimizers = {
     'SLSQP', 'PySLSQP', 'TrustConstr', 'SNOPT', 'IPOPT',
-    'SQP', 'InteriorPoint', 'NewtonLagrange'
+    'SQP', 'InteriorPoint', 'NewtonLagrange', 'COBYQA', 'OpenSQP',
 }
 
 # Algorithms that support bounds
 _bounds_optimizers = {
     'SLSQP', 'PySLSQP', 'LBFGSB', 'TrustConstr', 'COBYLA',
-    'COBYQA', 'SNOPT', 'IPOPT', 'SQP', 'InteriorPoint'
+    'COBYQA', 'SNOPT', 'IPOPT', 'SQP', 'InteriorPoint', 'OpenSQP',
 }
 
 # Gradient-based algorithms that also support constraints
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 
-# All available optimizers (performant algorithms commonly used)
+# Has solver_options arg (track which arguments have a different interface)
+_solver_options_optimizers = {
+    'SLSQP', 'PySLSQP', 'COBYLA', 'BFGS', 'LBFGSB', 'NelderMead', 'COBYQA',
+    'TrustConstr', 'SNOPT', 'IPOPT', 'ConvexQPSolvers',
+}
+
+# All available optimizers
+# Don't include CVXOPT and ConvexQPSolvers from the "Performant Algorithms"
+# because they require a Hessian
 _all_optimizers = {
+    # "Performant Algorithms"
     'SLSQP', 'PySLSQP', 'COBYLA', 'BFGS', 'LBFGSB', 'NelderMead',
-    'COBYQA', 'TrustConstr', 'SNOPT', 'IPOPT',
-    'SQP', 'InteriorPoint'
+    'COBYQA', 'TrustConstr', 'OpenSQP', 'SNOPT', 'IPOPT', 'CVXOPT',
+    'ConvexQPSolvers',
+    # Educational Algorithms
+    'SQP', 'InteriorPoint',
 }
 
 CITATIONS = """
 @misc{modopt,
- author = {ModOpt Development Team},
- title = "{ModOpt: A Modular Optimization Framework for Multidisciplinary Design Optimization}",
+ author = {Joshy, Anugrah J. and Hwang, John T.},
+ title = "{modOpt: A Modular development environment and library for optimization algorithms}",
+ journal = "{Advances in Engineering Software},
+ volume = {213},
+ month = feb,
+ year = {2026},
+ articleno = {104084},
+ doi = {10.1016/j.advengsoft.2025.104084}
  howpublished = {\\url{https://github.com/LSDOlab/modopt}},
- year = {2023},
+ year = {2026},
  note = {Software package}
 }
 """
@@ -95,7 +113,7 @@ class ModOptProblem(mo.Problem):
     ----------
     driver : ModOptDriver
         The OpenMDAO driver managing the optimization.
-    x : ndarray
+    x_init : ndarray
         Initial values for design variables.
     bounds : list of lists or None
         Two-element list containing [lower_bounds, upper_bounds] for design variables,
@@ -111,7 +129,7 @@ class ModOptProblem(mo.Problem):
     ----------
     driver : ModOptDriver
         Reference to the OpenMDAO driver.
-    x : ndarray
+    x_init : ndarray
         Initial design variable values.
     bounds : list or None
         Design variable bounds.
@@ -283,6 +301,8 @@ class ModOptProblem(mo.Problem):
         ----------
         dvs : dict
             Dictionary with the current design variable names and values.
+        grad : dict
+            Dictionary with the design variable names and gradient wrt to obj.
 
         Returns
         -------
@@ -290,6 +310,7 @@ class ModOptProblem(mo.Problem):
             Gradient of the objective with respect to design variables.
         """
         self._update_desvar_values(dvs['x'])
+
         totals = self.driver._problem().compute_totals(
             of=list(self.driver._objs),
             wrt=list(self.driver._designvars),
@@ -323,8 +344,6 @@ class ModOptProblem(mo.Problem):
                 return_format='array'
             )
             jac['nl_con', 'x'] = totals
-
-        # Linear constraint jacobian already provided in setup_derivatives
 
     def _update_desvar_values(self, x):
         """
@@ -425,9 +444,6 @@ class ModOptDriver(Driver):
         """
         self.options.declare('optimizer', 'SLSQP', values=_all_optimizers,
                              desc='Name of optimizer to use')
-        self.options.declare('tol', 1.0e-6, lower=0.0,
-                             desc='Tolerance for termination. For detailed '
-                             'control, use solver-specific options.')
         self.options.declare('maxiter', 200, lower=0,
                              desc='Maximum number of iterations.')
         self.options.declare('disp', default=True, types=(int, bool),
@@ -481,6 +497,13 @@ class ModOptDriver(Driver):
             msg = '{} currently does not support multiple objectives.'
             raise RuntimeError(msg.format(self.msginfo))
 
+        # Don't currently support "ConvexQPSolvers" and "CVXOPT" optimizers from
+        # ModOpt due to the requirement of a gradient
+        if opt.lower() in ["convexqpsolvers", 'cvxopt']:
+            msg = ('{} currently does not support CVXOPT and ConvexQPSolvers '
+                   'due to the requirement of a Hessian.')
+            raise RuntimeError(msg.format(self.msginfo))
+
 
     def run(self):
         """
@@ -527,7 +550,10 @@ class ModOptDriver(Driver):
 
         # maxiter gets passed into ModOpt with all the other options.
         if 'maxiter' not in self.opt_settings:  # lets you override the value in options
-            self.opt_settings['maxiter'] = self.options['maxiter']
+            if opt == 'IPOPT':
+                self.opt_settings['max_iter'] = self.options['maxiter']
+            else:
+                self.opt_settings['maxiter'] = self.options['maxiter']
 
         # Size Problem
         ndesvar = 0
@@ -623,9 +649,6 @@ class ModOptDriver(Driver):
 
         # optimize
         try:
-            if prob.comm.rank != 0:
-                self.opt_settings['disp'] = False
-
             # --- Build modOpt Problem ---
             mo_prob = ModOptProblem(
                 driver=self,
@@ -638,19 +661,31 @@ class ModOptDriver(Driver):
 
             # --- Optimize ---
             optimizer_cls = getattr(mo, opt)
-            optimizer = optimizer_cls(
-                problem=mo_prob,
-                solver_options=self.opt_settings,
-            )
+            if opt in _solver_options_optimizers:
+                optimizer = optimizer_cls(
+                    problem=mo_prob,
+                    solver_options=self.opt_settings,
+                )
+            else:
+                optimizer = optimizer_cls(
+                    problem=mo_prob,
+                    **self.opt_settings,
+                )
             result = optimizer.solve()
 
             # Extract optimal design variables from result
             if hasattr(result, 'x'):
                 x_opt = result.x
+                success = result.success
             elif 'x' in result:
                 x_opt = result['x']
-            elif hasattr(result, 'dvs') and 'x' in result.dvs:
-                x_opt = result.dvs['x']
+                if opt == 'IPOPT':
+                    print(f'{"-" * 40}\n IPOPT doesnt return success status in '
+                          f'a consistent, easily readable way, so defaulting to '
+                          f'success=True. \n{"-" * 40}\n')
+                    success = True
+                else:
+                    success = result['success']
             else:
                 # Fallback: get from problem
                 x_opt = mo_prob.dvs['x'].get_data()
@@ -681,7 +716,7 @@ class ModOptDriver(Driver):
         if self._exc_info is not None:
             self._reraise()
 
-        return None
+        return success
 
 
 import openmdao.api as om
@@ -714,6 +749,7 @@ class Paraboloid(om.ExplicitComponent):
 
 
 if __name__ == '__main__':
+
     # build the model
     prob = om.Problem()
     prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y', 'z'])
@@ -739,12 +775,11 @@ if __name__ == '__main__':
 
     # setup the optimization
     prob.driver = ModOptDriver()
-    prob.driver.options['optimizer'] = 'PySLSQP'
-    prob.driver.options['tol'] = 1e-12
+    prob.driver.options['optimizer'] = 'IPOPT'
     prob.driver.options['maxiter'] = 1000
     # Optimizer specific settings
     prob.driver.opt_settings = {
-        'iprint': 0,
+        # 'opt_tol': 1e-6,
     }
     prob.model.add_design_var('x', lower=-50, upper=50)
     prob.model.add_design_var('y', lower=-50, upper=50)
@@ -752,7 +787,8 @@ if __name__ == '__main__':
     prob.model.add_objective('parab.f_xy')
 
     # to add the constraint to the model
-    prob.model.add_constraint('const.g', lower=5., upper=10.)
+    prob.model.add_constraint('const.g', lower=100., upper=200.)
+    # prob.model.add_constraint('y', equals=10.)
 
     prob.setup()
 
