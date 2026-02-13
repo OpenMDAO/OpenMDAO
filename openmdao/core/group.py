@@ -5,6 +5,7 @@ from collections.abc import Iterable
 
 from itertools import product, chain
 from numbers import Number
+from typing import TypeVar
 import inspect
 
 import numpy as np
@@ -48,6 +49,10 @@ from openmdao.utils.indexer import idx_list_to_index_array
 # regex to check for valid names.
 import re
 namecheck_rgx = re.compile('[a-zA-Z][_a-zA-Z0-9]*')
+
+
+# TypeVar for add_subsystem return type matching
+SubsystemType = TypeVar('SubsystemType', bound='System')
 
 
 # use a class with slots instead of a namedtuple so that we can
@@ -2220,9 +2225,10 @@ class Group(System):
         if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
             self._problem_meta['config_info']._prom_added(self.pathname)
 
-    def add_subsystem(self, name, subsys, promotes=None,
+    def add_subsystem(self, name: str, subsys: SubsystemType, promotes=None,
                       promotes_inputs=None, promotes_outputs=None,
-                      min_procs=1, max_procs=None, proc_weight=1.0, proc_group=None):
+                      min_procs=1, max_procs=None, proc_weight=1.0,
+                      proc_group=None) -> SubsystemType:
         """
         Add a subsystem.
 

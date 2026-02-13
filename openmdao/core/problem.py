@@ -237,13 +237,13 @@ class Problem(object, metaclass=ProblemMetaclass):
         self._set_name(name)
 
         if model is None:
-            self.model = Group()
+            self.model: Group = Group()
         elif isinstance(model, Group):
             from openmdao.core.parallel_group import ParallelGroup
             if isinstance(model, ParallelGroup):
                 raise TypeError(f"{self.msginfo}: The value provided for 'model' "
                                 "cannot be a ParallelGroup.")
-            self.model = model
+            self.model: Group = model
         else:
             raise TypeError(self.msginfo +
                             ": The value provided for 'model' is not a Group.")
