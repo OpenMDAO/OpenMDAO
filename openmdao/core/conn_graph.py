@@ -3835,9 +3835,9 @@ class AllConnGraph(nx.DiGraph):
 
         if units is not None:
             if src_units is None:
-                raise TypeError(f"Can't express value with units of '{src_units}' in units of "
-                                f"'{units}'.")
-            elif src_units != units:
+                src_units = tgt_units
+
+            if src_units != units:
                 try:
                     scale, offset = unit_conversion(src_units, units)
                 except Exception:
