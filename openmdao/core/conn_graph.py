@@ -3830,13 +3830,16 @@ class AllConnGraph(nx.DiGraph):
         if indices:
             val = self.get_subarray(val, [indices])
 
+        orig_units = units
+
         if units is None:
             units = tgt_units
 
         if units is not None:
             if src_units is None:
-                raise TypeError(f"Can't express value with units of '{src_units}' in units of "
-                                f"'{units}'.")
+                if orig_units is not None:
+                    raise TypeError(f"Can't express value with units of '{src_units}' in units of "
+                                    f"'{units}'.")
             elif src_units != units:
                 try:
                     scale, offset = unit_conversion(src_units, units)

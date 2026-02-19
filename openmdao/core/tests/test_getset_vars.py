@@ -317,6 +317,24 @@ class TestGetSetVariables(unittest.TestCase):
         np.testing.assert_allclose(p['C1.y'], (np.arange(7) + 1.) * 4.)
         np.testing.assert_allclose(p['C2.y'], (np.arange(7,10) + 1.) * 9.)
 
+    def test_unit_None_conn_to_unit(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(7)), promotes=['x'])
+        p.model.add_subsystem('C1', ExecComp('y=x*2.',
+                                             x={'val': np.zeros(7), 'units': 'inch'},
+                                             y={'val': np.zeros(7)}), promotes=['x'])
+        p.setup()
+        p.run_model()
+
+        with self.assertRaises(ValueError) as cm:
+            p.get_val('C1.x', units='inch')
+
+        msg = "<model> <class Group>: Can't get value of 'C1.x': Can't express value with units of 'None' in units of 'inch'."
+        self.assertEqual(cm.exception.args[0], msg)
+
+        # make sure access without specifying units is OK
+        p.get_val('C1.x')
+
     def test_serial_multi_src_inds_units_promoted(self):
         p = Problem()
         indep = p.model.add_subsystem('indep', IndepVarComp(), promotes=['x'])
