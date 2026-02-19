@@ -6,11 +6,11 @@ OpenMDAO provides analysis and optimization of multidisciplinary systems using t
 
 - Use the "dev" environment in the pixi.toml file in the root of this project.
 
-- Do not invoke git commands, let the developer handle that, but suggest a commit message.
+- Do not invoke git commands, but suggest a commit message.
 
 # Code Style
 
-- Prefer single quotes to double quotes, except to define docstrings. When nesting quotes, prefer double quotes for the outer string.
+- Use single quotes, except to define docstrings. When nesting quotes, use double quotes for the outer string.
 
 - Documentation is in the numpy doc style.
 
