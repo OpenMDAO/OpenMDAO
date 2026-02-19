@@ -321,19 +321,18 @@ class TestGetSetVariables(unittest.TestCase):
         p = Problem()
         p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(7)), promotes=['x'])
         p.model.add_subsystem('C1', ExecComp('y=x*2.',
-                                             x={'val': np.zeros(7), 'units': 'inch'},
+                                             x={'val': np.zeros(7), 'units': 'm'},
                                              y={'val': np.zeros(7)}), promotes=['x'])
         p.setup()
         p.run_model()
 
-        with self.assertRaises(ValueError) as cm:
-            p.get_val('C1.x', units='inch')
 
-        msg = "<model> <class Group>: Can't get value of 'C1.x': Can't express value with units of 'None' in units of 'inch'."
-        self.assertEqual(cm.exception.args[0], msg)
+        val = p.get_val('C1.x', units='mm')
+        np.testing.assert_allclose(val, np.ones(7) * 1000.)
 
-        # make sure access without specifying units is OK
-        p.get_val('C1.x')
+
+        val = p.get_val('C1.x')
+        np.testing.assert_allclose(val, np.ones(7))
 
     def test_serial_multi_src_inds_units_promoted(self):
         p = Problem()
