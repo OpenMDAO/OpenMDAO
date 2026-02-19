@@ -334,6 +334,37 @@ class TestGetSetVariables(unittest.TestCase):
         val = p.get_val('C1.x')
         np.testing.assert_allclose(val, np.ones(7))
 
+    def test_src_units_None_to_ambiguous_input_units(self):
+        p = Problem()
+        p.model.add_subsystem('indep', IndepVarComp('x', val=np.ones(7)))
+        p.model.add_subsystem('C1', ExecComp('y=x*2.',
+                                             x={'val': np.zeros(7), 'units': 'm'},
+                                             y={'val': np.zeros(7)}), promotes=['x'])
+        p.model.add_subsystem('C2', ExecComp('y=x*3.',
+                                             x={'val': np.zeros(7), 'units': 'mm'},
+                                             y={'val': np.zeros(7)}), promotes=['x'])
+
+        p.model.connect('indep.x', 'x')
+
+        p.setup()
+        p.run_model()
+
+        msg = ("The following inputs promoted to 'x' have different units:\n"
+        "  \n"
+        "   C1.x  m \n"
+        "   C2.x  mm\n"
+        "  \n"
+        "   Call model.set_input_defaults('x', units=?) to remove the ambiguity.")
+
+        with self.assertRaises(ValueError) as cm:
+            val = p.get_val('x')
+
+        self.assertEqual(cm.exception.args[0], msg)
+
+        with self.assertRaises(ValueError) as cm:
+            val = p.get_val('x', units='mm')
+        self.assertEqual(cm.exception.args[0], msg)
+
     def test_serial_multi_src_inds_units_promoted(self):
         p = Problem()
         indep = p.model.add_subsystem('indep', IndepVarComp(), promotes=['x'])
