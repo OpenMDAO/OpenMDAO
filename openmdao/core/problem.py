@@ -8,6 +8,7 @@ import pprint
 import os
 from copy import deepcopy
 from collections import OrderedDict
+from collections.abc import Mapping
 import weakref
 import pathlib
 import textwrap
@@ -133,7 +134,7 @@ def _default_prob_name():
 
 class _FunctionalCallback(object):
 
-    def __init__(self, prob, form, input_vars=None, output_vars=None):
+    def __init__(self, prob, form, input_vars, output_vars):
         self._problem = prob
 
         valid_forms = ("f", "dfdx", "fdfdx")
@@ -176,38 +177,54 @@ class _FunctionalCallback(object):
         # First, decided on what names we'll be working with.
         if self.form == "f":
             # For the "f" form, we won't be working with derivatives and won't rely on `_TotalJacInfo` to decided on inputs and outputs based on design variables and responses.
-            if (input_vars is None) or (output_vars is None):
-                raise ValueError(f"input_vars and output_vars arguments must be provided when using form='{self.form}'")
+            if (not input_vars) or (not output_vars):
+                raise ValueError(f"{self.msginfo}: input_vars and output_vars arguments must be provided when using form='{self.form}'")
             # `"f"` form is not doing derivatives, so no need for the `_TotalJacInfo`.
             tji = None
         else:
-            if input_vars is not None:
+            if input_vars:
                 # Extract just the names to pass to `_TotalJacInfo` constructor.
-                input_var_names = [vname for vname in input_vars.keys()]
+                input_var_names = []
+                for entry in input_vars:
+                    if isinstance(entry, str):
+                        input_var_names.append(entry)
+                    elif isinstance(entry, dict):
+                        for k in entry.keys():
+                            input_var_names.append(k)
+                    else:
+                        raise ValueError(f"{self.msginfo}: invalid entry {entry} in input_vars argument")
             else:
                 input_var_names = None
 
-            if output_vars is not None:
+            if output_vars:
                 # Extract just the names to pass to `_TotalJacInfo` constructor.
-                output_var_names = [vname for vname in output_vars.keys()]
+                output_var_names = []
+                for entry in output_vars:
+                    if isinstance(entry, str):
+                        output_var_names.append(entry)
+                    elif isinstance(entry, dict):
+                        for k in entry.keys():
+                            output_var_names.append(k)
+                    else:
+                        raise ValueError(f"{self.msginfo}: invalid entry {entry} in output_vars argument")
             else:
                 output_var_names = None
 
             tji = _TotalJacInfo(self.problem, output_var_names, input_var_names, return_format='flat_dict')
 
-            if input_vars is None:
+            if not input_vars:
                 # User didn't provide any input var data, so create one from what `_TotalJacInfo` decided.
-                input_vars = {vname: {"indices": vmeta["indices"]} for vname, vmeta in tji.input_meta["fwd"].items()}
-            if output_vars is None:
+                input_vars = [{vname: {"indices": vmeta["indices"]} for vname, vmeta in tji.input_meta["fwd"].items()}]
+            if not output_vars:
                 # User didn't provide any output var data, so create one from what `_TotalJacInfo` decided.
-                output_vars = {vname: {"indices": vmeta["indices"]} for vname, vmeta in tji.output_meta["fwd"].items()}
+                output_vars = [{vname: {"indices": vmeta["indices"]} for vname, vmeta in tji.output_meta["fwd"].items()}]
 
-        input_len, input_metadata = self._process_var_arguments(input_vars)
-        output_len, output_metadata = self._process_var_arguments(output_vars)
+        input_metadata, input_len = self._process_var_arguments(input_vars)
+        output_metadata, output_len = self._process_var_arguments(output_vars)
 
         return tji, input_len, input_metadata, output_len, output_metadata
 
-    def _process_var_arguments(self, vars_d):
+    def _process_var_arguments(self, io_vars):
         problem = self.problem
         # x0s = []
         offset = 0
@@ -215,7 +232,9 @@ class _FunctionalCallback(object):
         vmetas = OrderedDict()
         # I'm imagining that `var_args` will look like this:
         # [{"x": {"units": "m", "indices": [1, 2]}}, {"y": {"units": "s"}}, "z"]
-        for vname, vmeta in vars_d.items():
+        # ["x", {"t": {"units": "s"}}]
+        # for vname, vmeta in vars_d.items():
+        for entry in io_vars:
             # # Assume `v` is a dict
             # try:
             #     # We expect each dict to have just one item, mapping a variable name to arguments.
@@ -230,22 +249,17 @@ class _FunctionalCallback(object):
             #     # v.items threw an AttributeError, so v must be a string indicating the name of the variable.
             #     vname = v
             #     vargs = {}
+            if isinstance(entry, Mapping):
+                # Object is dict-like, so iterate over the mapping from variable names to variable metadata.
+                for vname, vmeta in entry.items():
+                    vmetas[vname], offset = self._get_var_metadata_with_defaults(vname, vmeta, offset)
+            else:
+                # Assume object is a string of a variable name, with no metadata.
+                vname = entry
+                vmeta = {}
+                vmetas[vname], offset = self._get_var_metadata_with_defaults(vname, vmeta, offset)
 
-            units = vmeta.get("units", None)
-            indices = vmeta.get("indices", None)
-            val = problem.get_val(vname, units=units, indices=indices)
-            try:
-                # Assume val is an ndarray.
-                shape = val.shape
-                val_len = len(val)
-            except AttributeError:
-                # Must be a scalar, so set the shape and length appropriately.
-                shape = ()
-                val_len = 1
-
-            offsets = (offset, offset+val_len)
-            vmetas[vname] = {"units": units, "indices": indices, "shape": shape, "offsets": offsets}
-            offset = offsets[-1]
+        return vmetas, offset
 
         # for v, vm in var_args.items():
         #     # Assume `vm` is a dict
@@ -284,7 +298,25 @@ class _FunctionalCallback(object):
         # x0 = np.concatenate(x0s)
 
         # offset ends up being the total length of the vector.
-        return offset, vmetas
+        # return offset, vmetas
+
+    def _get_var_metadata_with_defaults(self, vname, vmeta, offset):
+        problem = self.problem
+        units = vmeta.get("units", None)
+        indices = vmeta.get("indices", None)
+        val = problem.get_val(vname, units=units, indices=indices)
+        try:
+            # Assume val is an ndarray.
+            shape = val.shape
+            val_len = len(val)
+        except AttributeError:
+            # Must be a scalar, so set the shape and length appropriately.
+            shape = ()
+            val_len = 1
+
+        offset_new = offset + val_len
+        offsets = (offset, offset_new)
+        return {"units": units, "indices": indices, "shape": shape, "offsets": offsets}, offset_new
 
     def _vector_to_problem(self, vec, metadata):
         problem = self.problem
@@ -434,8 +466,8 @@ class _FunctionalCallback(object):
         self._problem_to_vector(y0, self._output_metadata)
         return y0
 
-    def create_jacobian(self):
-        J0 = np.zeros(self._output_len, self._input_len)
+    def create_jacobian_matrix(self):
+        J0 = np.zeros((self._output_len, self._input_len))
         return J0
 
 
