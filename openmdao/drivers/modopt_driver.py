@@ -14,8 +14,6 @@ Gradient-Based:
     - TrustConstr: Trust-region constrained algorithm
     - SNOPT: Sparse Nonlinear Optimizer (requires license)
     - IPOPT: Interior Point Optimizer (requires separate installation)
-    - SQP: Sequential Quadratic Programming
-    - InteriorPoint: Interior point method
     - OpenSQP: A sequential quadratic programming optimizer built into ModOpt
 
 Gradient-Free:
@@ -48,25 +46,25 @@ except ImportError:
 # Gradient-based algorithms from ModOpt
 _gradient_optimizers = {
     'SLSQP', 'PySLSQP', 'BFGS', 'LBFGSB', 'TrustConstr',
-    'SNOPT', 'IPOPT', 'SQP', 'InteriorPoint', 'OpenSQP',
+    'SNOPT', 'IPOPT', 'OpenSQP',
 }
 
 # Algorithms that support constraints (inequality and/or equality)
 _constraint_optimizers = {
     'SLSQP', 'PySLSQP', 'COBYLA', 'TrustConstr', 'COBYQA',
-    'SNOPT', 'IPOPT', 'SQP', 'InteriorPoint', 'OpenSQP',
+    'SNOPT', 'IPOPT', 'OpenSQP',
 }
 
 # Algorithms that support equality constraints
 _eq_constraint_optimizers = {
     'SLSQP', 'PySLSQP', 'TrustConstr', 'SNOPT', 'IPOPT',
-    'SQP', 'InteriorPoint', 'NewtonLagrange', 'COBYQA', 'OpenSQP',
+    'COBYQA', 'OpenSQP',
 }
 
 # Algorithms that support bounds
 _bounds_optimizers = {
     'SLSQP', 'PySLSQP', 'LBFGSB', 'TrustConstr', 'COBYLA',
-    'COBYQA', 'SNOPT', 'IPOPT', 'SQP', 'InteriorPoint', 'OpenSQP',
+    'COBYQA', 'SNOPT', 'IPOPT', 'OpenSQP',
 }
 
 # Gradient-based algorithms that also support constraints (intersection of both sets)
@@ -78,16 +76,11 @@ _solver_options_optimizers = {
     'TrustConstr', 'SNOPT', 'IPOPT', 'ConvexQPSolvers',
 }
 
-# All available optimizers
-# Don't include CVXOPT and ConvexQPSolvers from the "Performant Algorithms"
-# because they require a Hessian
+# All available optimizers (excluding CVXOPT and ConvexQPSolvers which require Hessian)
 _all_optimizers = {
-    # "Performant Algorithms"
     'SLSQP', 'PySLSQP', 'COBYLA', 'BFGS', 'LBFGSB', 'NelderMead',
     'COBYQA', 'TrustConstr', 'OpenSQP', 'SNOPT', 'IPOPT', 'CVXOPT',
     'ConvexQPSolvers',
-    # Educational Algorithms
-    'SQP', 'InteriorPoint',
 }
 
 CITATIONS = """
