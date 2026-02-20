@@ -16,7 +16,7 @@ Gradient-Based:
     - IPOPT: Interior Point Optimizer (requires separate installation)
     - SQP: Sequential Quadratic Programming
     - InteriorPoint: Interior point method
-    - OpenSQP: A sequential quadradict programming optimizer built into ModOpt
+    - OpenSQP: A sequential quadratic programming optimizer built into ModOpt
 
 Gradient-Free:
     - COBYLA: Constrained Optimization BY Linear Approximation
@@ -34,13 +34,18 @@ See the ModOpt documentation at https://modopt.readthedocs.io for detailed infor
 on algorithm-specific options and capabilities.
 """
 import numpy as np
-from openmdao.core.driver import Driver, RecordingDebugging
+import json
+from collections import OrderedDict
+from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 try:
     import modopt as mo
 except ImportError:
     mo = None
 
-# Performant algorithms from ModOpt that support gradients
+# TODO: Test and verify MPI compatibility
+# TODO: Implement better control of optimizer output verbosity
+
+# Gradient-based algorithms from ModOpt
 _gradient_optimizers = {
     'SLSQP', 'PySLSQP', 'BFGS', 'LBFGSB', 'TrustConstr',
     'SNOPT', 'IPOPT', 'SQP', 'InteriorPoint', 'OpenSQP',
@@ -64,10 +69,10 @@ _bounds_optimizers = {
     'COBYQA', 'SNOPT', 'IPOPT', 'SQP', 'InteriorPoint', 'OpenSQP',
 }
 
-# Gradient-based algorithms that also support constraints
+# Gradient-based algorithms that also support constraints (intersection of both sets)
 _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 
-# Has solver_options arg (track which arguments have a different interface)
+# Optimizers that use solver_options argument (different API from others)
 _solver_options_optimizers = {
     'SLSQP', 'PySLSQP', 'COBYLA', 'BFGS', 'LBFGSB', 'NelderMead', 'COBYQA',
     'TrustConstr', 'SNOPT', 'IPOPT', 'ConvexQPSolvers',
@@ -113,37 +118,44 @@ class ModOptProblem(mo.Problem):
     ----------
     driver : ModOptDriver
         The OpenMDAO driver managing the optimization.
-    x_init : ndarray
-        Initial values for design variables.
-    bounds : list of lists or None
-        Two-element list containing [lower_bounds, upper_bounds] for design variables,
-        or None if no bounds.
-    l_con_jac : ndarray or None
-        Pre-computed Jacobian for linear constraints, or None if no linear constraints.
-    l_con_bounds : list of lists
-        Two-element list containing [lower_bounds, upper_bounds] for linear constraints.
-    nl_con_bounds : list of lists
-        Two-element list containing [lower_bounds, upper_bounds] for nonlinear constraints.
+    x_info : OrderedDict
+        Dictionary with design variable names as keys and dictionaries containing
+        'init', 'lower', and 'upper' values as the values.
+    lin_con_jac : dict or None
+        Pre-computed Jacobian for linear constraints in dictionary format with
+        (constraint_name, design_var_name) tuples as keys, or None if no linear constraints.
+    lin_con_bounds : dict
+        Dictionary with linear constraint names as keys and dictionaries containing
+        'lower', 'upper', and 'size' as values.
+    nl_con_bounds : dict
+        Dictionary with nonlinear constraint names as keys and dictionaries containing
+        'lower', 'upper', and 'size' as values.
+    nl_con_jac_sparsity : dict
+        Sparsity pattern for nonlinear constraint Jacobian with (constraint_name, design_var_name)
+        tuples as keys and dictionaries containing 'rows' and 'cols' arrays as values.
 
     Attributes
     ----------
     driver : ModOptDriver
         Reference to the OpenMDAO driver.
-    x_init : ndarray
-        Initial design variable values.
-    bounds : list or None
-        Design variable bounds.
-    l_con_jac : ndarray or None
-        Linear constraint Jacobian.
-    l_con_bounds : list
+    x_info : OrderedDict
+        Design variable metadata including initial values and bounds.
+    lin_con_jac : dict or None
+        Pre-computed linear constraint Jacobian.
+    lin_con_bounds : dict
         Linear constraint bounds.
-    nl_con_bounds : list
+    nl_con_bounds : dict
         Nonlinear constraint bounds.
+    nl_con_jac_sparsity : dict
+        Sparsity pattern for nonlinear constraint Jacobian.
+    obj_name : str
+        Name of the objective function.
     _con_cache : dict or None
         Cached constraint values to avoid redundant evaluations.
     """
 
-    def __init__(self, driver, x_init, bounds, l_con_jac, l_con_bounds, nl_con_bounds):
+    def __init__(self, driver, x_info, lin_con_jac, lin_con_bounds,
+                 nl_con_bounds, nl_con_jac_sparsity):
         """
         Initialize the ModOptProblem.
 
@@ -151,63 +163,72 @@ class ModOptProblem(mo.Problem):
         ----------
         driver : ModOptDriver
             The OpenMDAO driver managing the optimization.
-        x_init : ndarray
-            Initial values for design variables.
-        bounds : list of lists or None
-            Design variable bounds.
-        l_con_jac : ndarray or None
-            Pre-computed Jacobian for linear constraints.
-        l_con_bounds : list of lists
-            Linear constraint bounds.
-        nl_con_bounds : list of lists
-            Nonlinear constraint bounds.
+        x_info : OrderedDict
+            Dictionary with design variable names as keys and dictionaries containing
+            'init', 'lower', and 'upper' values as the values.
+        lin_con_jac : dict or None
+            Pre-computed Jacobian for linear constraints in dictionary format with
+            (constraint_name, design_var_name) tuples as keys.
+        lin_con_bounds : dict
+            Dictionary with linear constraint names as keys and dictionaries containing
+            'lower', 'upper', and 'size' as values.
+        nl_con_bounds : dict
+            Dictionary with nonlinear constraint names as keys and dictionaries containing
+            'lower', 'upper', and 'size' as values.
+        nl_con_jac_sparsity : dict
+            Sparsity pattern for nonlinear constraint Jacobian with (constraint_name,
+            design_var_name) tuples as keys and dictionaries containing 'rows' and 'cols'
+            arrays defining the sparse structure.
         """
         self.driver = driver
-        self.x_init = x_init
-        self.bounds = bounds
-        self.l_con_jac = l_con_jac
-        self.l_con_bounds = l_con_bounds
+        self.x_info = x_info
+        self.lin_con_jac = lin_con_jac
+        self.lin_con_bounds = lin_con_bounds
         self.nl_con_bounds = nl_con_bounds
+        self.nl_con_jac_sparsity = nl_con_jac_sparsity
+        # ModOpt does not support multiple objectives
+        self.obj_name = list(self.driver._objs)[0]
         self._con_cache = None
         super().__init__()
 
     def initialize(self):
+        """
+        Initialize the problem name.
+
+        This is called by the ModOpt Problem base class.
+        """
         self.problem_name = 'modopt_problem'
 
     def setup(self):
         """
         Add design variables, constraints, and objective to the ModOpt Problem.
         """
-        if self.bounds is not None:
+        for name, info in self.x_info.items():
+            shape = info['init'].shape if isinstance(info['init'], np.ndarray) else (1,)
             self.add_design_variables(
-                name='x',
-                shape=self.x_init.shape,
-                lower=np.array(self.bounds[0]),
-                upper=np.array(self.bounds[1]),
-                vals=self.x_init,
-            )
-        else:
-            self.add_design_variables(
-                name='x',
-                shape=self.x_init.shape,
-                vals=self.x_init,
+                name=name,
+                shape=shape,
+                lower=info['lower'],
+                upper=info['upper'],
+                vals=info['init'],
             )
 
-        self.add_objective(name='f')
+        self.add_objective(name=self.obj_name)
 
-        if len(self.l_con_bounds[0]) > 0:
+        for name, info in self.lin_con_bounds.items():
             self.add_constraints(
-                name='l_con',
-                shape=(len(self.l_con_bounds[0]),),
-                lower=np.array(self.l_con_bounds[0]),
-                upper=np.array(self.l_con_bounds[1]),
+                name=name,
+                shape=(info['size'],),
+                lower=info['lower'],
+                upper=info['upper'],
             )
-        if len(self.nl_con_bounds[0]) > 0:
+
+        for name, info in self.nl_con_bounds.items():
             self.add_constraints(
-                name='nl_con',
-                shape=(len(self.nl_con_bounds[0]),),
-                lower=np.array(self.nl_con_bounds[0]),
-                upper=np.array(self.nl_con_bounds[1]),
+                name=name,
+                shape=(info['size'],),
+                lower=info['lower'],
+                upper=info['upper'],
             )
 
     def setup_derivatives(self):
@@ -216,16 +237,29 @@ class ModOptProblem(mo.Problem):
 
         This method informs ModOpt about which derivatives are available.
         For linear constraints, the Jacobian is provided directly. For nonlinear
-        constraints, derivatives are computed on-demand.
+        constraints, derivatives are computed on-demand, with sparsity information
+        if available from OpenMDAO.
         """
-        # TODO: Pull sparsity info here
-        self.declare_objective_gradient(wrt='x')
+        for des_var in self.x_info.keys():
+            # Objective gradient doesnt seem to support sparsity declaration
+            self.declare_objective_gradient(wrt=des_var)
 
-        if len(self.l_con_bounds[0]) > 0 and self.l_con_jac is not None:
-            self.declare_constraint_jacobian(of='l_con', wrt='x',
-                                             vals=self.l_con_jac)
-        if len(self.nl_con_bounds[0]) > 0:
-            self.declare_constraint_jacobian(of='nl_con', wrt='x')
+            # Set fixed linear jacobians
+            for lin_con in self.lin_con_bounds.keys():
+                self.declare_constraint_jacobian(
+                    of=lin_con,
+                    wrt=des_var,
+                    vals=self.lin_con_jac[lin_con, des_var]
+                )
+
+            # Declare nonlinear constraint Jacobian with sparsity if available
+            for nl_con in self.nl_con_bounds.keys():
+                self.declare_constraint_jacobian(
+                    of=nl_con,
+                    wrt=des_var,
+                    rows=self.nl_con_jac_sparsity[nl_con, des_var]['rows'],
+                    cols=self.nl_con_jac_sparsity[nl_con, des_var]['cols'],
+                )
 
     def compute_objective(self, dvs, obj):
         """
@@ -243,7 +277,7 @@ class ModOptProblem(mo.Problem):
             Dictionary to store the computed objective value.
         """
         model = self.driver._problem().model
-        self._update_desvar_values(dvs['x'])
+        self._update_desvar_values(dvs)
 
         with RecordingDebugging(self.driver._get_name(), self.driver.iter_count, self.driver):
             self.driver.iter_count += 1
@@ -255,7 +289,7 @@ class ModOptProblem(mo.Problem):
 
         self._con_cache = self.driver.get_constraint_values()
 
-        obj['f'] = f_new
+        obj[self.obj_name] = f_new
 
     def compute_constraints(self, dvs, cons):
         """
@@ -272,26 +306,15 @@ class ModOptProblem(mo.Problem):
         """
         # Use cached constraint values from compute_objective if available
         if self._con_cache is None:
-            self._update_desvar_values(dvs['x'])
+            self._update_desvar_values(dvs)
             self.driver._run_solve_nonlinear()
             vals = self.driver.get_constraint_values()
         else:
             vals = self._con_cache
             self._con_cache = None  # Clear cache after use
 
-        # Separate linear and nonlinear constraints
-        l_cons = []
-        nl_cons = []
-        for name, meta in self.driver._cons.items():
-            if meta.get('linear'):
-                l_cons.append(vals[name].flatten())
-            else:
-                nl_cons.append(vals[name].flatten())
-
-        if l_cons:
-            cons['l_con'] = np.concatenate(l_cons)
-        if nl_cons:
-            cons['nl_con'] = np.concatenate(nl_cons)
+        for name in list(self.lin_con_bounds) + list(self.nl_con_bounds):
+            cons[name] = vals[name].flatten()
 
     def compute_objective_gradient(self, dvs, grad):
         """
@@ -302,21 +325,17 @@ class ModOptProblem(mo.Problem):
         dvs : dict
             Dictionary with the current design variable names and values.
         grad : dict
-            Dictionary with the design variable names and gradient wrt to obj.
-
-        Returns
-        -------
-        ndarray
-            Gradient of the objective with respect to design variables.
+            Dictionary to store the gradient values. Keys are design variable names,
+            values are gradient arrays with respect to the objective.
         """
-        self._update_desvar_values(dvs['x'])
+        self._update_desvar_values(dvs)
 
         totals = self.driver._problem().compute_totals(
-            of=list(self.driver._objs),
-            wrt=list(self.driver._designvars),
-            return_format='array'
+            of=[self.obj_name],
+            wrt=list(self.x_info),
         )
-        grad['x'] = totals[0]
+        for des_var in self.x_info.keys():
+            grad[des_var] = totals[self.obj_name, des_var]
 
     def compute_constraint_jacobian(self, dvs, jac):
         """
@@ -332,33 +351,29 @@ class ModOptProblem(mo.Problem):
         jac : dict
             Dictionary to store the computed constraint Jacobians.
         """
-        self._update_desvar_values(dvs['x'])
+        self._update_desvar_values(dvs)
 
-        # Separate linear and nonlinear constraints
-        nl_cons = [name for name, meta in self.driver._cons.items() if not meta.get('linear')]
-
-        if nl_cons:
+        # Only need derivatives for the nonlinear constraints
+        if self.nl_con_bounds:
             totals = self.driver._problem().compute_totals(
-                of=nl_cons,
-                wrt=list(self.driver._designvars),
-                return_format='array'
+                of=list(self.nl_con_bounds),
+                wrt=list(self.x_info),
             )
-            jac['nl_con', 'x'] = totals
+            for des_var in self.x_info.keys():
+                for nl_con in self.nl_con_bounds.keys():
+                    jac[nl_con, des_var] = totals[nl_con, des_var]
 
-    def _update_desvar_values(self, x):
+    def _update_desvar_values(self, dvs):
         """
         Update OpenMDAO design variables from ModOpt's design vector.
 
         Parameters
         ----------
-        x : ndarray
-            Flat array of design variable values from ModOpt.
+        dvs : dict
+            Dictionary with the current design variable names and values.
         """
-        idx = 0
-        for name, meta in self.driver._designvars.items():
-            size = meta['global_size'] if meta['distributed'] else meta['size']
-            self.driver.set_design_var(name, x[idx : idx + size])
-            idx += size
+        for name in self.x_info.keys():
+            self.driver.set_design_var(name, dvs[name])
 
 
 class ModOptDriver(Driver):
@@ -395,8 +410,6 @@ class ModOptDriver(Driver):
         Used internally to control when to perform singular checks on computed total derivs.
     _con_cache : dict
         Cached result of constraint evaluations.
-    _dvlist : list
-        Copy of _designvars keys.
     _lincongrad_cache : np.ndarray or None
         Pre-calculated gradients of linear constraints.
     _desvar_array_cache : np.ndarray
@@ -425,6 +438,8 @@ class ModOptDriver(Driver):
         self.supports['two_sided_constraints'] = True
         self.supports['linear_constraints'] = True
         self.supports['simultaneous_derivatives'] = True
+        self.supports['linear_only_designvars'] = True
+        self.supports['total_jac_sparsity'] = True
 
         # What we don't support
         self.supports['multiple_objectives'] = False
@@ -435,6 +450,8 @@ class ModOptDriver(Driver):
 
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
+
+        self._total_jac_sparsity = None
 
         self.cite = CITATIONS
 
@@ -460,12 +477,12 @@ class ModOptDriver(Driver):
 
     def _get_name(self):
         """
-        Get name of current optimizer.
+        Get the name of this driver.
 
         Returns
         -------
         str
-            The name of the current optimizer.
+            Driver name in the format 'ModOpt_<optimizer_name>'.
         """
         return f"ModOpt_{self.options['optimizer']}"
 
@@ -473,17 +490,19 @@ class ModOptDriver(Driver):
         """
         Prepare the driver for execution.
 
-        This method sets optimizer-specific support flags based on the selected algorithm's
-        capabilities and validates the problem formulation. This is the final step of setup.
+        This method configures optimizer-specific support flags based on the selected
+        algorithm's capabilities, validates the problem formulation, and sets up sparsity
+        structures. Called during problem setup.
 
         Parameters
         ----------
         problem : Problem
-            Pointer to the containing problem.
+            The OpenMDAO Problem being optimized.
         """
         super()._setup_driver(problem)
         opt = self.options['optimizer']
 
+        # Update support flags based on optimizer capabilities
         self.supports._read_only = False
         self.supports['gradients'] = opt in _gradient_optimizers
         self.supports['inequality_constraints'] = opt in _constraint_optimizers
@@ -492,39 +511,39 @@ class ModOptDriver(Driver):
         self.supports._read_only = True
         self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
 
-        # Raises error if multiple objectives are not supported, but more objectives were defined.
+        # Validate problem formulation
         if not self.supports['multiple_objectives'] and len(self._objs) > 1:
             msg = '{} currently does not support multiple objectives.'
             raise RuntimeError(msg.format(self.msginfo))
 
-        # Don't currently support "ConvexQPSolvers" and "CVXOPT" optimizers from
-        # ModOpt due to the requirement of a gradient
+        # CVXOPT and ConvexQPSolvers require Hessian information which is not yet supported
         if opt.lower() in ["convexqpsolvers", 'cvxopt']:
             msg = ('{} currently does not support CVXOPT and ConvexQPSolvers '
-                   'due to the requirement of a Hessian.')
+                   'due to the requirement of Hessian information.')
             raise RuntimeError(msg.format(self.msginfo))
 
+        self._setup_tot_jac_sparsity()
 
     def run(self):
         """
         Optimize the problem using the selected ModOpt optimizer.
 
-        This method performs the following steps:
-        1. Performs an initial model evaluation
-        2. Extracts and formats design variables, bounds, and constraints
-        3. Pre-computes linear constraint Jacobians for efficiency
-        4. Creates a ModOptProblem wrapper around the OpenMDAO problem
-        5. Instantiates and runs the selected optimizer
-        6. Extracts optimal design variables and updates the model
-        7. Performs a final evaluation at the optimal point
+        The optimization process performs the following steps:
+        1. Initial model evaluation
+        2. Extract and format design variables, bounds, and constraints
+        3. Pre-compute linear constraint Jacobians for efficiency
+        4. Create ModOptProblem wrapper around the OpenMDAO problem
+        5. Instantiate and run the selected optimizer
+        6. Extract optimal design variables and update the model
+        7. Perform final evaluation at the optimal point
 
-        The optimization process uses ModOpt's Problem API, which handles callbacks
-        for objective and constraint evaluations as well as derivative computations.
+        The optimization uses ModOpt's Problem API, which handles callbacks for
+        objective and constraint evaluations as well as derivative computations.
 
         Returns
         -------
         bool
-            Failure flag; True if failed to converge, False if successful.
+            Success flag; True if optimization succeeded, False if it failed.
         """
         self.result.reset()
         prob = self._problem()
@@ -538,7 +557,7 @@ class ModOptDriver(Driver):
         self._check_for_missing_objective()
         self._check_for_invalid_desvar_values()
 
-        # Initial Run
+        # Perform initial model evaluation
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             with model._relevance.nonlinear_active('iter'):
                 self._run_solve_nonlinear()
@@ -546,71 +565,45 @@ class ModOptDriver(Driver):
 
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
-        self._dvlist = list(self._designvars)
 
-        # maxiter gets passed into ModOpt with all the other options.
-        if 'maxiter' not in self.opt_settings:  # lets you override the value in options
+        # Set maxiter for optimizer (unless already specified in opt_settings)
+        if 'maxiter' not in self.opt_settings:
             if opt == 'IPOPT':
+                # IPOPT uses 'max_iter' instead of 'maxiter'
                 self.opt_settings['max_iter'] = self.options['maxiter']
             else:
                 self.opt_settings['maxiter'] = self.options['maxiter']
 
-        # Size Problem
+        # Determine total number of design variables
         ndesvar = 0
-        for meta in self._designvars.values():
+        for name, meta in self._designvars.items():
             size = meta['global_size'] if meta['distributed'] else meta['size']
             ndesvar += size
-        x_init = np.empty(ndesvar)
 
         if ndesvar == 0:
             raise RuntimeError('Problem has no design variables.')
 
-        # Initial design vars
-        idx = 0
+        # Collect design variable information (initial values and bounds)
+        x_info = OrderedDict()
         use_bounds = (opt in _bounds_optimizers)
-        if use_bounds:
-            bounds = [[], []]
-        else:
-            bounds = None
-
         for name, meta in self._designvars.items():
-            size = meta['global_size'] if meta['distributed'] else meta['size']
-            x_init[idx : idx + size] = desvar_vals[name]
-            idx += size
+            x_info[name] = {}
+            x_info[name]['init'] = desvar_vals[name]
 
-            # Bounds if our optimizer supports them
             if use_bounds:
-                meta_low = meta['lower']
-                meta_high = meta['upper']
-                for j in range(size):
+                x_info[name]['lower'] = meta['lower']
+                x_info[name]['upper'] = meta['upper']
+            else:
+                x_info[name]['lower'] = None
+                x_info[name]['upper'] = None
 
-                    if isinstance(meta_low, np.ndarray):
-                        p_low = meta_low[j]
-                    else:
-                        p_low = meta_low
-
-                    if isinstance(meta_high, np.ndarray):
-                        p_high = meta_high[j]
-                    else:
-                        p_high = meta_high
-
-                    # Use 1.E16 here in case we've scaled the bounds
-                    if p_low <= -1.0E16:
-                        p_low = None
-                    if p_high >= 1.0E16:
-                        p_high = None
-
-                    bounds[0].append(p_low)
-                    bounds[1].append(p_high)
-
-
-        # Initialize constraint-related variables
+        # Collect constraint information
         lincongrad = None
-        nl_con_bounds = [[], []]
-        l_con_bounds = [[], []]
-
+        nl_con_bounds = dict()
+        lin_con_bounds = dict()
+        nl_con_jac_sparsity = dict()
         if opt in _constraint_optimizers:
-            # get list of linear constraints and precalculate gradients for them (if any)
+            # Identify linear constraints and pre-compute their Jacobians if optimizer uses gradients
             if opt in _constraint_grad_optimizers:
                 lincons = [name for name, meta in self._cons.items() if meta.get('linear')]
             else:
@@ -618,48 +611,65 @@ class ModOptDriver(Driver):
 
             if lincons:
                 lincongrad = self._lincongrad_cache = \
-                    self._compute_totals(of=lincons, wrt=self._dvlist, return_format='array')
+                    self._compute_totals(of=lincons, wrt=list(self._designvars))
             else:
                 self._lincongrad_cache = None
 
+            # Process constraints and organize into linear and nonlinear categories
             for name, meta in self._cons.items():
                 if meta['indices'] is not None:
                     meta['size'] = size = meta['indices'].indexed_src_size
                 else:
                     size = meta['global_size'] if meta['distributed'] else meta['size']
 
+                # Separate linear and nonlinear constraints
                 if meta['linear']:
                     if meta['equals'] is not None:
-                        l_con_bounds[0].append(meta['equals'])
-                        l_con_bounds[1].append(meta['equals'])
+                        lin_con_bounds[name] = {
+                            'lower': meta['equals'],
+                            'upper': meta['equals'],
+                            'size': size
+                        }
                     else:
-                        if meta['lower'] is not None:
-                            l_con_bounds[0].append(meta['lower'])
-                        if meta['upper'] is not None:
-                            l_con_bounds[1].append(meta['upper'])
+                        lin_con_bounds[name] = {
+                            'lower': meta['lower'],
+                            'upper': meta['upper'],
+                            'size': size
+                        }
                 else:
                     if meta['equals'] is not None:
-                        nl_con_bounds[0].append(meta['equals'])
-                        nl_con_bounds[1].append(meta['equals'])
+                        nl_con_bounds[name] = {
+                            'lower': meta['equals'],
+                            'upper': meta['equals'],
+                            'size': size
+                        }
                     else:
-                        if meta['lower'] is not None:
-                            nl_con_bounds[0].append(meta['lower'])
-                        if meta['upper'] is not None:
-                            nl_con_bounds[1].append(meta['upper'])
+                        nl_con_bounds[name] = {
+                            'lower': meta['lower'],
+                            'upper': meta['upper'],
+                            'size': size
+                        }
 
-        # optimize
+                    # Initialize sparsity structure for nonlinear constraint Jacobians
+                    # TODO: populate from OpenMDAO's actual sparsity information
+                    for x_name in self._designvars.keys():
+                        nl_con_jac_sparsity[name, x_name] = {}
+                        nl_con_jac_sparsity[name, x_name]['rows'] = None
+                        nl_con_jac_sparsity[name, x_name]['cols'] = None
+
+        # Run optimization
         try:
-            # --- Build modOpt Problem ---
+            # Build ModOpt Problem wrapper
             mo_prob = ModOptProblem(
                 driver=self,
-                x_init=x_init,
-                bounds=bounds,
-                l_con_jac=lincongrad,
-                l_con_bounds=l_con_bounds,
+                x_info=x_info,
+                lin_con_jac=lincongrad,
+                lin_con_bounds=lin_con_bounds,
                 nl_con_bounds=nl_con_bounds,
+                nl_con_jac_sparsity=nl_con_jac_sparsity,
             )
 
-            # --- Optimize ---
+            # Instantiate and run optimizer
             optimizer_cls = getattr(mo, opt)
             if opt in _solver_options_optimizers:
                 optimizer = optimizer_cls(
@@ -673,26 +683,32 @@ class ModOptDriver(Driver):
                 )
             result = optimizer.solve()
 
-            # Extract optimal design variables from result
+            # Extract optimal design variables and success flag from optimizer result
+            # Different optimizers return results in different formats
             if hasattr(result, 'x'):
                 x_opt = result.x
                 success = result.success
             elif 'x' in result:
                 x_opt = result['x']
                 if opt == 'IPOPT':
-                    print(f'{"-" * 40}\n IPOPT doesnt return success status in '
+                    # IPOPT success status is not consistently available through ModOpt's
+                    # interface due to how CasADi's nlpsol wrapper handles the solver object
+                    # TODO: Request improvement in ModOpt to expose IPOPT status
+                    print(f'{"-" * 40}\n IPOPT does not return success status in '
                           f'a consistent, easily readable way, so defaulting to '
                           f'success=True. \n{"-" * 40}\n')
                     success = True
                 else:
                     success = result['success']
             else:
-                # Fallback: get from problem
+                # Fallback for optimizers with non-standard result format
                 x_opt = mo_prob.dvs['x'].get_data()
+                success = True
 
-            # Update design variables in OpenMDAO model
+            # Update OpenMDAO design variables with optimal values
             idx = 0
-            for name, meta in self._designvars.items():
+            for name in mo_prob.x_info.keys():
+                meta = self._designvars[name]
                 size = meta['global_size'] if meta['distributed'] else meta['size']
                 self.set_design_var(name, x_opt[idx : idx + size])
                 idx += size
@@ -707,9 +723,9 @@ class ModOptDriver(Driver):
                     print('Optimization Complete')
                     print('-' * 35)
 
-        # If an exception was swallowed in one of our callbacks, we want to raise it
-        # rather than the cryptic message from ModOpt.
         except Exception as msg:
+            # If an exception occurred in one of our callbacks, re-raise it with
+            # the original context rather than ModOpt's generic exception message
             if self._exc_info is None:
                 raise
 
@@ -718,15 +734,74 @@ class ModOptDriver(Driver):
 
         return success
 
+    def _setup_tot_jac_sparsity(self, coloring=None):
+        """
+        Set up total Jacobian sub-Jacobian sparsity pattern.
+
+        This method extracts sparsity information from coloring objects or user-specified
+        sparsity patterns and stores it for use during optimization.
+
+        Parameters
+        ----------
+        coloring : Coloring or None
+            Coloring object containing sparsity information, or None to use
+            user-specified _total_jac_sparsity.
+        """
+        total_sparsity = None
+        self._con_subjacs = {'rows': [], 'cols': []}
+        coloring = coloring if coloring is not None else self._get_static_coloring()
+
+        # Extract sparsity from coloring or user-specified sparsity
+        if coloring is not None:
+            total_sparsity = coloring.get_subjac_sparsity()
+            if self._total_jac_sparsity is not None:
+                raise RuntimeError("Total jac sparsity was set in both _total_coloring"
+                                   " and _setup_tot_jac_sparsity.")
+        elif self._total_jac_sparsity is not None:
+            # Load sparsity from file if provided as string path
+            if isinstance(self._total_jac_sparsity, str):
+                with open(self._total_jac_sparsity, 'r') as f:
+                    self._total_jac_sparsity = json.load(f)
+            total_sparsity = self._total_jac_sparsity
+
+        if total_sparsity is None:
+            return
+
+        use_approx = self._problem().model._owns_approx_of is not None
+
+        nl_dvs = self._get_nl_dvs()
+
+        # Build sparsity structure for nonlinear constraints only
+        # (linear constraints have pre-computed Jacobians)
+        for con, conmeta in filter_by_meta(self._cons.items(), 'linear', exclude=True):
+            self._con_subjacs[con] = {}
+            consrc = conmeta['source']
+            for dv, dvmeta in nl_dvs.items():
+                if use_approx:
+                    dvsrc = dvmeta['source']
+                    rows, cols, shape = total_sparsity[consrc][dvsrc]
+                else:
+                    rows, cols, shape = total_sparsity[con][dv]
+                self._con_subjacs[con][dv] = {
+                    'coo': [rows, cols, np.zeros(rows.size)],
+                    'shape': shape,
+                }
+
 
 import openmdao.api as om
+
+
 class Paraboloid(om.ExplicitComponent):
     """
-    Evaluates the mixed-integer equation f(x,y,w) = (x-3)^2 + xy + (y+4)^2 - 3 + w.
+    Evaluates a paraboloid function for testing.
+
+    Computes f(x,y) = (x[0] + x[2] - 3)^2 + x[0]*y + (y + 4)^2 - 3
+
+    where x is a 3-element array.
     """
 
     def setup(self):
-        self.add_input('x', val=0.0)
+        self.add_input('x', val=np.zeros(3))
         self.add_input('y', val=0.0)
         self.add_input('z', val=0.0)
         self.add_output('f_xy', val=0.0)
@@ -745,55 +820,219 @@ class Paraboloid(om.ExplicitComponent):
         x = inputs['x']
         y = inputs['y']
 
-        outputs['f_xy'] = ((x - 3.0)**2 + x * y + (y + 4.0)**2 - 3.0)
+        outputs['f_xy'] = ((x[0] + x[2] - 3.0)**2 + x[0] * y + (y + 4.0)**2 - 3.0)
+
+
+class Con(om.ExplicitComponent):
+    """
+    Simple constraint component for testing.
+
+    Computes g = x[0] + x[2] + y + z where x is a 3-element array.
+    """
+
+    def setup(self):
+        self.add_input('x', val=np.zeros(3))
+        self.add_input('y', val=0.0)
+        self.add_input('z', val=0.0)
+        self.add_output('g', val=0.0)
+
+    def setup_partials(self):
+        self.declare_partials(of='g', wrt='y', method='fd')
+        self.declare_partials(of='g', wrt='x', method='fd', rows=[0, 0], cols=[0, 2])
+        self.declare_partials(of='g', wrt='z', method='fd')
+
+    def compute(self, inputs, outputs):
+        outputs['g'] = inputs['x'][0] + inputs['x'][2] + inputs['y'] + inputs['z']
 
 
 if __name__ == '__main__':
 
-    # build the model
-    prob = om.Problem()
-    prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y', 'z'])
+    # # build the model
+    # prob = om.Problem()
+    # prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y', 'z'])
 
-    # define the component whose output will be constrained
-    prob.model.add_subsystem('const', om.ExecComp('g = x + y + z'), promotes_inputs=['x', 'y', 'z'])
+    # # define the component whose output will be constrained
+    # prob.model.add_subsystem('const', Con(), promotes_inputs=['x', 'y', 'z'])
 
-    # Design variables 'x', 'y', and 'z' span components (connected due to our
-    # promotion), so we need to provide a common initial value for them. For
-    # these variables we have to use "set_input_defaults" because the variable
-    # connects to both "const" and "parab", but the initial values from "const"
-    # and "parab" are both different. So before we are able to use prob.set_val()
-    # for these variables we first have to call "set_input_defaults". Note
-    # that we would also have to do this and specify the units of the common
-    # initial value if "const" and "parab" had different units for them so that
-    # way it knows which units to use if "set_val" is ever used. I'm pretty
-    # sure that if a promoted variable name does not span multiple components
-    # (like "w") then this doesn't do anything and have to set whatever initial
-    # value I want with set_val.
-    prob.model.set_input_defaults('x', 3.0)
-    prob.model.set_input_defaults('y', -4.0)
-    prob.model.set_input_defaults('z', 0.0)
+    # # Design variables 'x', 'y', and 'z' span components (connected due to our
+    # # promotion), so we need to provide a common initial value for them. For
+    # # these variables we have to use "set_input_defaults" because the variable
+    # # connects to both "const" and "parab", but the initial values from "const"
+    # # and "parab" are both different. So before we are able to use prob.set_val()
+    # # for these variables we first have to call "set_input_defaults". Note
+    # # that we would also have to do this and specify the units of the common
+    # # initial value if "const" and "parab" had different units for them so that
+    # # way it knows which units to use if "set_val" is ever used. I'm pretty
+    # # sure that if a promoted variable name does not span multiple components
+    # # (like "w") then this doesn't do anything and have to set whatever initial
+    # # value I want with set_val.
+    # prob.model.set_input_defaults('x', np.array([3.0, 3.0, 3.0]))
+    # prob.model.set_input_defaults('y', -4.0)
+    # prob.model.set_input_defaults('z', 0.0)
 
-    # setup the optimization
-    prob.driver = ModOptDriver()
-    prob.driver.options['optimizer'] = 'IPOPT'
-    prob.driver.options['maxiter'] = 1000
-    # Optimizer specific settings
-    prob.driver.opt_settings = {
-        # 'opt_tol': 1e-6,
-    }
-    prob.model.add_design_var('x', lower=-50, upper=50)
-    prob.model.add_design_var('y', lower=-50, upper=50)
-    prob.model.add_design_var('z', lower=-5, upper=5)
-    prob.model.add_objective('parab.f_xy')
+    # # setup the optimization
+    # prob.driver = ModOptDriver()
+    # prob.driver.options['optimizer'] = 'SLSQP'
+    # prob.driver.options['maxiter'] = 1000
+    # # Optimizer specific settings
+    # prob.driver.opt_settings = {
+    #     # 'opt_tol': 1e-6,
+    # }
+    # prob.model.add_design_var('x', lower=-50, upper=50)
+    # prob.model.add_design_var('y', lower=-50, upper=50)
+    # prob.model.add_design_var('z', lower=-5, upper=5)
+    # prob.model.add_objective('parab.f_xy')
 
-    # to add the constraint to the model
-    prob.model.add_constraint('const.g', lower=100., upper=200.)
-    # prob.model.add_constraint('y', equals=10.)
+    # # to add the constraint to the model
+    # prob.model.add_constraint('const.g', lower=0., upper=10.)
+    # # prob.model.add_constraint('y', equals=10.)
 
-    prob.setup()
+    # prob.driver.declare_coloring()
+    # prob.setup()
 
-    prob.run_driver()
+    # prob.run_driver()
 
-    print(prob.get_val('parab.f_xy'))
-    print(prob.get_val('x'))
-    print(prob.get_val('y'))
+    # print(prob.get_val('parab.f_xy'))
+    # print(prob.get_val('x'))
+    # print(prob.get_val('y'))
+
+
+
+    # p = om.Problem()
+
+    # exec = om.ExecComp(['y = a*x**2',
+    #                     'z = a + x**2'],
+    #                     a={'shape': (1,)},
+    #                     y={'shape': (101,)},
+    #                     x={'shape': (101,)},
+    #                     z={'shape': (101,)})
+
+    # p.model.add_subsystem('exec', exec)
+
+    # p.model.add_design_var('exec.a', lower=-1000, upper=1000)
+    # p.model.add_objective('exec.y', index=50)
+    # p.model.add_constraint('exec.z', indices=[0], equals=25)
+    # p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
+
+    # p.driver = ModOptDriver()
+    # p.driver.options['optimizer'] = "SLSQP"
+
+    # p.driver.declare_coloring(show_summary=True, show_sparsity=True)
+
+    # p.setup(mode='rev')
+
+    # p.set_val('exec.x', np.linspace(-10, 10, 101))
+
+    # p.run_model()
+    # p.run_driver()
+
+
+
+    class DynamicPartialsComp(om.ExplicitComponent):
+        """
+        Component with dynamic partial derivative coloring for testing.
+
+        Computes g = arctan(y / x) element-wise for arrays x and y.
+
+        Parameters
+        ----------
+        size : int
+            Size of the input and output arrays.
+
+        Attributes
+        ----------
+        num_computes : int
+            Counter for the number of times compute has been called.
+        """
+
+        def __init__(self, size):
+            super().__init__()
+            self.size = size
+            self.num_computes = 0
+
+        def setup(self):
+            self.add_input('y', np.ones(self.size))
+            self.add_input('x', np.ones(self.size))
+            self.add_output('g', np.ones(self.size))
+
+            self.declare_partials('*', '*', method='cs')
+
+            # turn on dynamic partial coloring
+            self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=1, tol=1e-20,
+                                show_summary=True, show_sparsity=True)
+
+        def compute(self, inputs, outputs):
+            outputs['g'] = np.arctan(inputs['y'] / inputs['x'])
+            self.num_computes += 1
+
+
+    SIZE = 10
+
+    p = om.Problem()
+    model = p.model
+
+    # DynamicPartialsComp is set up to do dynamic partial coloring
+    arctan_yox = model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE), promotes_inputs=['x', 'y'])
+
+    model.add_subsystem('circle', om.ExecComp('area=pi*r**2'), promotes_inputs=['r'])
+
+    model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
+                                            g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)),
+                        promotes_inputs=['x', 'y', 'r'])
+
+    thetas = np.linspace(0, np.pi/4, SIZE)
+    model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
+                                                g=np.ones(SIZE), x=np.ones(SIZE),
+                                                theta=thetas))
+    model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
+                                                        g=np.ones(SIZE//2), even=np.ones(SIZE//2),
+                                                        odd=np.ones(SIZE//2)))
+
+    model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)),
+                        promotes_inputs=['x'])
+
+    IND = np.arange(SIZE, dtype=int)
+    ODD_IND = IND[1::2]  # all odd indices
+    EVEN_IND = IND[0::2]  # all even indices
+
+    model.connect('arctan_yox.g', 'theta_con.x')
+    model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
+    model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
+
+    p.driver = ModOptDriver()
+    p.driver.options['optimizer'] = "SLSQP"
+
+    #####################################
+    # set up dynamic total coloring here
+    p.driver.declare_coloring(show_summary=True, show_sparsity=True)
+    #####################################
+
+    model.add_design_var('x')
+    model.add_design_var('y')
+    model.add_design_var('r', lower=.5, upper=10)
+
+    # nonlinear constraints
+    model.add_constraint('r_con.g', equals=0)
+
+    model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
+    model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
+
+    # this constrains x[0] to be 1 (see definition of l_conx)
+    model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
+
+    # linear constraint
+    model.add_constraint('y', equals=0, indices=[0,], linear=True)
+
+    model.add_objective('circle.area', ref=-1)
+
+    p.setup(mode='fwd')
+
+    # the following were randomly generated using np.random.random(10)*2-1 to randomly
+    # disperse them within a unit circle centered at the origin.
+    p.set_val('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
+                            0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
+    p.set_val('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
+                            -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
+    p.set_val('r', .7)
+
+    p.run_driver()
