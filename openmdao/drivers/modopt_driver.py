@@ -41,7 +41,6 @@ except ImportError:
     mo = None
 
 # TODO: Test and verify MPI compatibility
-# TODO: Implement better control of optimizer output verbosity
 
 # Gradient-based algorithms from ModOpt
 _gradient_optimizers = {
@@ -457,7 +456,12 @@ class ModOptDriver(Driver):
         self.options.declare('maxiter', 200, lower=0,
                              desc='Maximum number of iterations.')
         self.options.declare('disp', default=True, types=(int, bool),
-                             desc='Controls the verbosity of the optimization output.')
+                             desc='Controls optimizer output verbosity. Can be bool (True/False) '
+                                  'or int for fine control (0=quiet, higher=more verbose). '
+                                  'Automatically maps to optimizer-specific settings. If '
+                                  'optimizer specific verbosity settings are provided in the '
+                                  '"opt_settings" attribute, then this option will be ignored '
+                                  'and those settings will be used instead.')
         self.options.declare('singular_jac_behavior', default='warn',
                              values=['error', 'warn', 'ignore'],
                              desc='Defines behavior of a zero row/col check after first call to '
@@ -478,6 +482,78 @@ class ModOptDriver(Driver):
             Driver name in the format 'ModOpt_<optimizer_name>'.
         """
         return f"ModOpt_{self.options['optimizer']}"
+
+    def _setup_verbosity(self, opt):
+        """
+        Configure optimizer-specific verbosity settings based on the driver's disp option.
+
+        Different optimizers use different option names and scales for controlling output
+        verbosity. This method translates the driver's 'disp' option to the appropriate
+        optimizer-specific settings.
+
+        Parameters
+        ----------
+        opt : str
+            Name of the optimizer being used.
+        """
+        disp = self.options['disp']
+
+        # Skip if user has already specified verbosity in opt_settings
+        verbosity_keys = {
+            'disp', 'iprint', 'print_level', 'isumm', 'print_file',
+            'print_frequency', 'verbose', 'verbosity', 'major print level',
+            'minor print level'
+        }
+        if any(key.lower() in [k.lower() for k in self.opt_settings.keys()]
+               for key in verbosity_keys):
+            return
+
+        # Map disp option to optimizer-specific settings
+        if opt == 'IPOPT':
+            # IPOPT uses print_level (0-12 scale)
+            if isinstance(disp, int):
+                self.opt_settings['print_level'] = min(max(disp, 0), 12)
+            else:
+                self.opt_settings['print_level'] = 5 if disp else 0
+
+        elif opt == 'SNOPT':
+            # SNOPT uses Major/Minor print levels
+            if isinstance(disp, int):
+                level = min(max(disp, 0), 10)
+                self.opt_settings['Major print level'] = level
+                self.opt_settings['Minor print level'] = level
+            else:
+                self.opt_settings['Major print level'] = 1 if disp else 0
+                self.opt_settings['Minor print level'] = 0
+
+        elif opt == 'TrustConstr':
+            # TrustConstr uses verbose (0-3 scale)
+            if isinstance(disp, int):
+                self.opt_settings['verbose'] = min(max(disp, 0), 3)
+            else:
+                self.opt_settings['verbose'] = 1 if disp else 0
+
+        elif opt in {'OpenSQP', 'PySLSQP'}:
+            # OpenSQP uses iprint
+            if isinstance(disp, int):
+                self.opt_settings['iprint'] = disp
+            else:
+                self.opt_settings['iprint'] = 1 if disp else 0
+
+        elif opt in {'LBFGSB'}:
+            # LBFGSB uses iprint, but with different settings
+            if isinstance(disp, int):
+                self.opt_settings['iprint'] = disp
+            else:
+                self.opt_settings['iprint'] = 0 if disp else -1
+
+        else:
+            # Most SciPy-based optimizers (SLSQP, COBYLA, COBYQA, BFGS, NelderMead)
+            # use 'disp' as boolean
+            if isinstance(disp, int):
+                self.opt_settings['disp'] = disp > 0
+            else:
+                self.opt_settings['disp'] = disp
 
     def _setup_driver(self, problem):
         """
@@ -558,6 +634,9 @@ class ModOptDriver(Driver):
 
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
+
+        # Configure optimizer-specific verbosity settings
+        self._setup_verbosity(opt)
 
         # Set maxiter for optimizer (unless already specified in opt_settings)
         if 'maxiter' not in self.opt_settings:
