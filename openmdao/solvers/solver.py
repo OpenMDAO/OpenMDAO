@@ -304,8 +304,8 @@ class Solver(object, metaclass=SolverMetaclass):
            A recorder instance to be added to RecManager.
         """
         if MPI:
-            raise RuntimeError(
-                "Recording of Solvers when running parallel code is not supported yet")
+            raise RuntimeError('Recording of Solvers when running '
+                               'parallel code is not supported yet')
         self._rec_mgr.append(recorder)
 
     def _declare_options(self):
@@ -1151,6 +1151,33 @@ class LinearSolver(Solver):
             system._apply_linear(self._mode, scope_out, scope_in)
         finally:
             self._recording_iter.pop()
+
+    def _vars_union(self, slv_vars, sys_vars):
+        """
+        Return the union of the two 'set's of variables.
+
+        The first 'set' comes from the this solver and the second from the set of variables
+        from the current System that are relevent to the current matrix vector product. Note
+        that this is called separately for input and output variables.
+        Also handles cases where incoming variables are _UNDEFINED or None instead of sets.
+
+        Parameters
+        ----------
+        slv_vars : set, None, or _UNDEFINED
+            First variable set.
+        sys_vars : set, None, or _UNDEFINED
+            Second variable set.
+
+        Returns
+        -------
+        set, None, or _UNDEFINED
+            The combined variable 'set'.
+        """
+        if sys_vars is None or slv_vars is None:
+            return None
+        if slv_vars == _UNDEFINED:
+            return sys_vars
+        return sys_vars.union(slv_vars)
 
     def preferred_sparse_format(self):
         """

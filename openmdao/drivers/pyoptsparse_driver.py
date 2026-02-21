@@ -30,7 +30,7 @@ else:
     pyoptsparse_version = None
 
 # All optimizers in pyoptsparse
-optlist = {'ALPSO', 'CONMIN', 'IPOPT', 'NLPQLP', 'NSGA2', 'ParOpt', 'PSQP', 'SLSQP', 'SNOPT'}
+optlist = {'ALPSO', 'CONMIN', 'IPOPT', 'NLPQLP', 'NSGA2', 'ParOpt', 'PSQP', 'SLSQP', 'SNOPT', 'SQP'}
 
 if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.0'):
     optlist.add('NOMAD')
@@ -67,7 +67,8 @@ respects_fail_flag = {
     'SNOPT': True,           # as of v2.0.0, requires SNOPT 7.7
     'FSQP': False,           # no longer supported as of v2.1.2
     'NLPY_AUGLAG': False,    # no longer supported as of v2.1.2
-    'NOMAD': False           # no longer supported as of v2.6.0
+    'NOMAD': False,           # no longer supported as of v2.6.0
+    'SQP': True,
 }
 
 DEFAULT_OPT_SETTINGS = {}

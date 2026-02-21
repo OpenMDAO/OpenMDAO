@@ -42,6 +42,7 @@ from openmdao.components.jax_implicit_comp import JaxImplicitComponent
 # Solvers
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
 from openmdao.solvers.linear.linear_block_jac import LinearBlockJac
+from openmdao.solvers.linear.linear_schur import LinearSchur
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.solvers.linear.petsc_direct_solver import PETScDirectSolver
 from openmdao.solvers.linear.petsc_ksp import PETScKrylov
@@ -55,6 +56,7 @@ from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
 from openmdao.solvers.nonlinear.newton import NewtonSolver
 from openmdao.solvers.nonlinear.nonlinear_runonce import NonlinearRunOnce
+from openmdao.solvers.nonlinear.nonlinear_schur import NonlinearSchur
 
 # Surrogate Models
 from openmdao.surrogate_models.kriging import KrigingSurrogate
