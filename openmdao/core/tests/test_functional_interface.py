@@ -98,6 +98,9 @@ class TestSimpleParaboloid(unittest.TestCase):
         x[1] = 2.5
         J = dfdx(x)
         J_expected = np.array([2*(x[0]-3.0) + x[1], x[0] + 2*(x[1] + 4.0)]).reshape(1, 2)
+        print(f"DJI: in problem: x = {prob.get_val('x')}, vector = {x[0]}")
+        print(f"DJI: in problem: y = {prob.get_val('y')}, vector = {x[1]}")
+        print(f"DJI: J = {J}, J_expected = {J_expected}")
         assert_near_equal(J, J_expected)
 
         J = dfdx.create_jacobian_matrix()
