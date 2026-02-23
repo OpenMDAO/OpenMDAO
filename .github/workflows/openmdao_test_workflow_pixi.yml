@@ -204,6 +204,7 @@ jobs:
           echo "###################################################"
           cp .coveragerc "$HOME"
           cd "$HOME"
+          python openmdao/core/tests/test_functional_interface.py 
 
           # Build testflo command
           TESTFLO_CMD="testflo -n 2 openmdao --timeout=240 --durations=20"
