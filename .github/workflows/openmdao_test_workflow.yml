@@ -450,7 +450,6 @@ jobs:
           echo "###################################################"
           cp .coveragerc $HOME
           cd $HOME
-          python openmdao/core/tests/test_functional_interface.py
           testflo -n 2 openmdao --timeout=240 --show_skipped --coverage --coverpkg openmdao --durations=20
 
       - name: Submit coverage
