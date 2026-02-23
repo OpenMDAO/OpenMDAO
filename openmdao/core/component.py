@@ -13,7 +13,7 @@ from numpy import ndarray, isscalar, ndim, atleast_1d
 from scipy.sparse import issparse, coo_matrix, csr_matrix
 
 from openmdao.core.system import System, _supported_methods, _DEFAULT_COLORING_META, \
-    global_meta_names, collect_errors, _iter_derivs
+    global_meta_names, _iter_derivs
 from openmdao.core.constants import INT_DTYPE, _DEFAULT_OUT_STREAM, _SetupStatus
 from openmdao.jacobians.subjac import Subjac
 from openmdao.jacobians.dictionary_jacobian import _CheckingJacobian
@@ -23,8 +23,7 @@ from openmdao.utils.mpi import MPI
 from openmdao.utils.array_utils import shape_to_len, submat_sparsity_iter, sparsity_diff_viz
 from openmdao.utils.deriv_display import _deriv_display, _deriv_display_compact
 from openmdao.utils.general_utils import format_as_float_or_array, ensure_compatible, \
-    find_matches, make_set, inconsistent_across_procs, LocalRangeIterable
-from openmdao.utils.indexer import Indexer, indexer
+    find_matches, make_set, inconsistent_across_procs, LocalRangeIterable, collect_errors
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.om_warnings import issue_warning, MPIWarning, DistributedComponentWarning, \
     DerivativesWarning, warn_deprecation, OMInvalidCheckDerivativesOptionsWarning
@@ -238,11 +237,11 @@ class Component(System):
         self.setup()
         self._setup_check()
 
-        self._set_vector_class()
+        self._setup_vector_class()
 
-    def _set_vector_class(self):
+    def _setup_vector_class(self):
         if self._has_distrib_vars:
-            dist_vec_class = self._problem_meta['distributed_vector_class']
+            dist_vec_class = self._distributed_vector_class
             if dist_vec_class is not None:
                 self._vector_class = dist_vec_class
             else:
@@ -251,9 +250,9 @@ class Component(System):
                               "available. The default non-distributed vectors will be used.",
                               prefix=self.msginfo, category=DistributedComponentWarning)
 
-                self._vector_class = self._problem_meta['local_vector_class']
+                self._vector_class = self._local_vector_class
         else:
-            self._vector_class = self._problem_meta['local_vector_class']
+            self._vector_class = self._local_vector_class
 
     def _configure_check(self):
         """
@@ -284,6 +283,7 @@ class Component(System):
 
         # Compute the prefix for turning rel/prom names into abs names
         prefix = self.pathname + '.'
+        nprocs = self.comm.size
 
         for io in ['input', 'output']:
             abs2meta = self._var_abs2meta[io]
@@ -293,6 +293,10 @@ class Component(System):
             for prom_name in self._var_rel_names[io]:
                 abs_name = prefix + prom_name
                 abs2meta[abs_name] = metadata = self._var_rel2meta[prom_name]
+
+                if nprocs == 1:
+                    metadata['distributed'] = False
+
                 self._resolver.add_mapping(abs_name, prom_name, io,
                                            local=True, distributed=metadata['distributed'])
 
@@ -300,9 +304,9 @@ class Component(System):
                     meta_name: metadata[meta_name]
                     for meta_name in global_meta_names[io]
                 }
-                if is_input and 'src_indices' in metadata:
+                if is_input and 'src_inds_list' in metadata:
                     allprocs_abs2meta[abs_name]['has_src_indices'] = \
-                        metadata['src_indices'] is not None
+                        bool(metadata['src_inds_list'])
 
             for prom_name, val in self._var_discrete[io].items():
                 abs_name = prefix + prom_name
@@ -312,6 +316,9 @@ class Component(System):
                 # Compute allprocs_discrete (metadata for discrete vars)
                 self._var_allprocs_discrete[io][abs_name] = v = val.copy()
                 del v['val']
+
+            self._var_allprocs_abs2idx.update(
+                {n: i for i, n in enumerate(allprocs_abs2meta)})
 
         if self._var_discrete['input'] or self._var_discrete['output']:
             self._discrete_inputs = _DictValues(self._var_discrete['input'])
@@ -372,7 +379,6 @@ class Component(System):
         Compute the arrays of variable sizes for all variables/procs on this system.
         """
         iproc = self.comm.rank
-        abs2idx = self._var_allprocs_abs2idx = {}
 
         for io in ('input', 'output'):
             sizes = self._var_sizes[io] = np.zeros((self.comm.size, len(self._var_rel_names[io])),
@@ -381,7 +387,6 @@ class Component(System):
             for i, (name, metadata) in enumerate(self._var_allprocs_abs2meta[io].items()):
                 sz = metadata['size']
                 sizes[iproc, i] = 0 if sz is None else sz
-                abs2idx[name] = i
 
             if self.comm.size > 1:
                 my_sizes = sizes[iproc, :].copy()
@@ -460,8 +465,6 @@ class Component(System):
             Subjacobian key.  Names are absolute.
         """
         yield from self._subjacs_info.keys()
-
-    _subjac_keys_iter = _declared_partials_iter
 
     def _get_missing_partials(self, missing):
         """
@@ -662,8 +665,7 @@ class Component(System):
             'val': val,
             'shape': shape,
             'size': shape_to_len(shape),
-            'src_indices': None,
-            'flat_src_indices': None,
+            'src_inds_list': None,
             'units': units,
             'desc': desc,
             'tags': make_set(tags),
@@ -1073,87 +1075,6 @@ class Component(System):
         """
         if self._problem_meta is not None and self._problem_meta['config_info'] is not None:
             self._problem_meta['config_info']._var_added(self.pathname, name)
-
-    def _update_dist_src_indices(self, abs_in2out, all_abs2meta, all_abs2idx, all_sizes):
-        """
-        Set default src_indices for any distributed inputs where they aren't set.
-
-        Parameters
-        ----------
-        abs_in2out : dict
-            Mapping of connected inputs to their source.  Names are absolute.
-        all_abs2meta : dict
-            Mapping of absolute names to metadata for all variables in the model.
-        all_abs2idx : dict
-            Dictionary mapping an absolute name to its allprocs variable index for the
-            whole model.
-        all_sizes : dict
-            Mapping of types to sizes of each variable in all procs for the whole model.
-
-        Returns
-        -------
-        list
-            Names of inputs where src_indices were added.
-        """
-        iproc = self.comm.rank
-        abs2meta_in = self._var_abs2meta['input']
-        all_abs2meta_in = all_abs2meta['input']
-        all_abs2meta_out = all_abs2meta['output']
-        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-
-        sizes_in = self._var_sizes['input']
-        # src is outside of this component, so we need to use the all_sizes dict to get the sizes
-        # of the output variables
-        sizes_out = all_sizes['output']
-        added_src_inds = []
-        # loop over continuous local inputs
-        for iname, meta_in in abs2meta_in.items():
-            if meta_in['src_indices'] is None and iname not in abs_in2prom_info:
-                src = abs_in2out[iname]
-                dist_in = meta_in['distributed']
-                dist_out = all_abs2meta_out[src]['distributed']
-                if dist_in or dist_out:
-                    i = self._var_allprocs_abs2idx[iname]
-                    gsize_out = all_abs2meta_out[src]['global_size']
-                    gsize_in = all_abs2meta_in[iname]['global_size']
-                    vout_sizes = sizes_out[:, all_abs2idx[src]]
-
-                    offset = None
-                    if gsize_out == gsize_in or (not dist_out and np.sum(vout_sizes) == gsize_in):
-                        # This assumes one of:
-                        # 1) a distributed output with total size matching the total size of a
-                        #    distributed input
-                        # 2) a non-distributed output with local size matching the total size of a
-                        #    distributed input
-                        # 3) a non-distributed output with total size matching the total size of a
-                        #    distributed input
-                        if dist_in:
-                            offset = np.sum(sizes_in[:iproc, i])
-                            end = offset + sizes_in[iproc, i]
-
-                    # total sizes differ and output is distributed, so can't determine mapping
-                    if offset is None:
-                        self._collect_error(f"{self.msginfo}: Can't determine src_indices "
-                                            f"automatically for input '{iname}'. They must be "
-                                            "supplied manually.", ident=(self.pathname, iname))
-                        continue
-
-                    if dist_in and not dist_out:
-                        src_shape = self._get_full_dist_shape(src, all_abs2meta_out[src]['shape'],
-                                                              'output')
-                    else:
-                        src_shape = all_abs2meta_out[src]['global_shape']
-
-                    if offset == end:
-                        idx = np.zeros(0, dtype=INT_DTYPE)
-                    else:
-                        idx = slice(offset, end)
-
-                    meta_in['src_indices'] = indexer(idx, flat_src=True, src_shape=src_shape)
-                    meta_in['flat_src_indices'] = True
-                    added_src_inds.append(iname)
-
-        return added_src_inds
 
     def _approx_partials(self, of, wrt, method='fd', **kwargs):
         """
@@ -1827,43 +1748,6 @@ class Component(System):
             self._first_call_to_linearize = False  # only do this once
             if coloring_mod._use_partial_sparsity:
                 self._get_coloring()
-
-    def _resolve_src_inds(self):
-        abs2prom = self._resolver.abs2prom
-        abs_in2prom_info = self._problem_meta['abs_in2prom_info']
-        all_abs2meta_in = self._var_allprocs_abs2meta['input']
-        abs2meta_in = self._var_abs2meta['input']
-        conns = self._problem_meta['model_ref']()._conn_global_abs_in2out
-        all_abs2meta_out = self._problem_meta['model_ref']()._var_allprocs_abs2meta['output']
-
-        for tgt, meta in abs2meta_in.items():
-            if tgt in abs_in2prom_info:
-                pinfo = abs_in2prom_info[tgt][-1]  # component always last in the plist
-                if pinfo is not None:
-                    inds, flat, shape = pinfo
-                    if inds is not None:
-                        all_abs2meta_in[tgt]['has_src_indices'] = True
-                        meta['src_shape'] = shape = all_abs2meta_out[conns[tgt]]['global_shape']
-                        if inds._flat_src:
-                            meta['flat_src_indices'] = True
-                        elif meta['flat_src_indices'] is None:
-                            meta['flat_src_indices'] = flat
-
-                        try:
-                            if not isinstance(inds, Indexer):
-                                meta['src_indices'] = inds = indexer(inds, flat_src=flat,
-                                                                     src_shape=shape)
-                            else:
-                                meta['src_indices'] = inds = inds.copy()
-                                inds.set_src_shape(shape)
-                                self._var_prom2inds[abs2prom(tgt, iotype='input')] = \
-                                    [shape, inds, flat]
-                        except Exception:
-                            type_exc, exc, tb = sys.exc_info()
-                            self._collect_error(f"When accessing '{conns[tgt]}' with src_shape "
-                                                f"{shape} from '{pinfo.prom_path()}' using "
-                                                f"src_indices {inds}: {exc}", exc_type=type_exc,
-                                                tback=tb, ident=(conns[tgt], tgt))
 
     def _check_consistent_serial_dinputs(self, nz_dist_outputs):
         """

@@ -3,7 +3,6 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_warnings
 
 
 class DynUnitsComp(om.ExplicitComponent):
@@ -228,7 +227,7 @@ class TestDynUnits(unittest.TestCase):
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'mismatched_dyn_units':"
-           "\n   <model> <class Group>: Output units of 'm/s' for 'comp.y1' are incompatible with input units of 'm' for 'sink.x1'.")
+           "\n   <model> <class Group>: Can't connect 'comp.y1' to 'sink.x1': units 'm/s' of 'comp.y1' are incompatible with units 'm' of 'sink.x1'.")
 
     def test_baseline_conn_inputs(self):
         # this is a source with units and sink without units, with a DynUnitsGroupConnectedInputs between them
@@ -342,19 +341,12 @@ class TestDynUnits(unittest.TestCase):
         p.model.connect('indep.x1', 'sink.x1')
         p.setup()
 
-        expected_warnings = (
-            (om.OpenMDAOWarning, "<model> <class Group>: 'units_by_conn' was set for unconnected variable 'sink.y1'."),
-            (om.OpenMDAOWarning, "<model> <class Group>: Can't copy units of variable 'sink.x11'. Variable doesn't exist or is not continuous.")
-        )
-
-        with assert_warnings(expected_warnings):
-            p.model._setup_dynamic_properties()
-
         with self.assertRaises(Exception) as cm:
             p.final_setup()
 
         self.assertEqual(str(cm.exception),
            "\nCollected errors for problem 'bad_copy_units_name':"
+           "\n   <model> <class Group>: sink: copy_shape variable 'x11' not found."
            "\n   <model> <class Group>: Failed to resolve units for ['sink.x1', 'sink.y1']. To see the dynamic units dependency graph, do 'openmdao view_dyn_units <your_py_file>'.")
 
     def test_unconnected_var_dyn_units(self):
@@ -365,13 +357,6 @@ class TestDynUnits(unittest.TestCase):
                                                   y1={'units_by_conn': True}))
         p.model.connect('indep.x1', 'sink.x1')
         p.setup()
-
-        expected_warnings = (
-            (om.OpenMDAOWarning, "<model> <class Group>: 'units_by_conn' was set for unconnected variable 'sink.y1'."),
-        )
-
-        with assert_warnings(expected_warnings):
-            p.model._setup_dynamic_properties()
 
         with self.assertRaises(Exception) as cm:
             p.final_setup()
@@ -514,7 +499,12 @@ class TestDynUnitsWithInputConns(unittest.TestCase):
 
         self.assertEqual(cm.exception.args[0],
            "\nCollected errors for problem 'units_from_conn_input_mismatch_group_inputs':"
-           "\n   <model> <class Group>: The following inputs, ['sub.comp1.x', 'sub.comp2.x'], promoted to 'sub.x', are connected but their metadata entries ['val'] differ. Call model.set_input_defaults('sub.x', val=?) to remove the ambiguity.")
+           "\n   <model> <class Group>: The following inputs promoted to 'sub.x' have different values, so the value of 'sub.x' is ambiguous:"
+           "\n    "
+           "\n   sub.comp1.x  km  [1.]"
+           "\n   sub.comp2.x  ft  [1.]"
+           "\n    "
+           "\n   Call model.set_input_defaults('sub.x', val=?) to remove the ambiguity.")
 
 
 if __name__ == "__main__":

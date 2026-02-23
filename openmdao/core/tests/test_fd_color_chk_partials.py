@@ -64,6 +64,7 @@ class FlightDynamics2DComp(om.ExplicitComponent):
 class TestColoringChkPartials(unittest.TestCase):
 
     def test_check_partials(self):
+        self.maxDiff = None
         nn = 5
 
         p = om.Problem(model=om.Group())
@@ -83,13 +84,20 @@ class TestColoringChkPartials(unittest.TestCase):
 
         p.setup(check=True, force_alloc_complex=True)
 
-        p.set_val('T', 1000*np.random.rand(nn))
-        p.set_val('D', 100*np.random.rand(nn))
-        p.set_val('L', 10000*np.random.rand(nn))
-        p.set_val('W', 10000*np.random.rand(nn))
-        p.set_val('TAS', 100*np.random.rand(nn))
-        p.set_val('alpha', 0.1 * np.random.rand(nn))
-        p.set_val('gamma', 1.0 * np.random.rand(nn))
+        state = np.random.get_state()
+        # set temporary seed for repeatable results
+        np.random.seed(42)
+
+        try:
+            p.set_val('T', 1000*np.random.rand(nn))
+            p.set_val('D', 100*np.random.rand(nn))
+            p.set_val('L', 10000*np.random.rand(nn))
+            p.set_val('W', 10000*np.random.rand(nn))
+            p.set_val('TAS', 100*np.random.rand(nn))
+            p.set_val('alpha', 0.1 * np.random.rand(nn))
+            p.set_val('gamma', 1.0 * np.random.rand(nn))
+        finally:
+            np.random.set_state(state)
 
         p.run_model()
 

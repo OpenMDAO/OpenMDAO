@@ -17,8 +17,8 @@ class SellarMDAConnect(om.Group):
         ######################################
         #cycle.connect('d2.y2', 'd1.y2')
 
-        cycle.set_input_defaults('x', 1.0)
-        cycle.set_input_defaults('z', np.array([5.0, 2.0]))
+        self.set_input_defaults('x', 1.0)
+        self.set_input_defaults('z', np.array([5.0, 2.0]))
 
         # Nonlinear Block Gauss Seidel is a gradient free solver
         cycle.nonlinear_solver = om.NonlinearBlockGS()

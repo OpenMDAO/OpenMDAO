@@ -20,6 +20,7 @@ else:
     from openmdao.core.constants import INT_DTYPE
     from openmdao.vectors.default_vector import DefaultVector
     from openmdao.vectors.petsc_transfer import PETScTransfer
+    from openmdao.utils.general_utils import _unwrap_comm
 
     class PETScVector(DefaultVector):
         """
@@ -90,14 +91,15 @@ else:
             data = self._data.real
 
             if self._alloc_complex:
-                self._petsc = PETSc.Vec().createWithArray(data.copy(), comm=system.comm)
+                self._petsc = PETSc.Vec().createWithArray(data.copy(),
+                                                          comm=_unwrap_comm(system.comm))
             else:
-                self._petsc = PETSc.Vec().createWithArray(data, comm=system.comm)
+                self._petsc = PETSc.Vec().createWithArray(data, comm=_unwrap_comm(system.comm))
 
             # Allocate imaginary for complex step
             if self._alloc_complex:
                 data = self._data.imag
-                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=system.comm)
+                self._imag_petsc = PETSc.Vec().createWithArray(data, comm=_unwrap_comm(system.comm))
 
             self._init_dup_inds(system)
 

@@ -4,13 +4,36 @@ Classes that handle array indexing.
 
 import sys
 import numpy as np
-from numbers import Integral
-from itertools import zip_longest
+from numpy.lib.stride_tricks import as_strided
 
 from openmdao.core.constants import INT_DTYPE
 from openmdao.utils.general_utils import shape2tuple
 from openmdao.utils.array_utils import shape_to_len
 from openmdao.utils.om_warnings import issue_warning
+
+
+def get_virtual_array(shape):
+    """
+    Return a 'virtual' array of the given shape.
+
+    Only one element is actually allocated in memory.
+
+    Parameters
+    ----------
+    shape : tuple
+        Shape of the desired array.
+
+    Returns
+    -------
+    ndarray
+        The virtual array.
+    """
+    dummy = np.zeros(1, dtype=np.int8)
+    # Create a "virtual" view of the target shape.
+    #    By setting strides to all zeros, every index points to the
+    #    same memory address as the dummy array.
+    #    This is O(1) memory regardless of original_shape size.
+    return as_strided(dummy, shape=shape, strides=(0,) * len(shape))
 
 
 def array2slice(arr):
@@ -31,28 +54,26 @@ def array2slice(arr):
     """
     if arr.ndim == 1 and arr.dtype.kind in ('i', 'u'):
         if arr.size > 1:  # see if 1D array will convert to slice
-            if arr[0] >= 0 and arr[1] >= 0:
-                span = arr[1] - arr[0]
-            else:
+            if arr[0] < 0 or arr[1] < 0:
                 return None
-            if np.all((arr[1:] - arr[:-1]) == span):
-                if span > 0:
-                    # array is increasing with constant span
-                    return slice(arr[0], arr[-1] + 1, span)
-                elif span < 0:
-                    # array is decreasing with constant span
-                    return slice(arr[0], arr[-1] - 1, span)
+
+            diffs = np.diff(arr)
+            step = int(diffs[0])
+
+            if step == 0:
+                return None
+
+            if np.all(diffs == step):
+                if step > 0:
+                    return slice(int(arr[0]), int(arr[-1]) + 1, step)
+                elif arr[-1] > 0:
+                    return slice(int(arr[0]), int(arr[-1]) - 1, step)
+
         elif arr.size == 1:
             if arr[0] >= 0:
-                return slice(arr[0], arr[0] + 1)
+                return slice(int(arr[0]), int(arr[0]) + 1)
         else:
             return slice(0, 0)
-
-
-def _truncate(s):
-    if len(s) > 40:
-        return s[:20] + ' ... ' + s[-20:]
-    return s
 
 
 def combine_ranges(ranges):
@@ -75,8 +96,9 @@ def combine_ranges(ranges):
     if not ranges:
         return rnglist
 
-    cstart, cend = ranges[0]
-    for start, end in ranges[1:]:
+    it = iter(ranges)
+    cstart, cend = next(it)
+    for start, end in it:
         if start == cend:
             cend = end
         else:
@@ -140,6 +162,8 @@ class Indexer(object):
         Distributed shape of the source.
     """
 
+    _copy_attrs = {'_src_shape', '_dist_shape', '_flat_src'}
+
     def __init__(self, flat_src=None):
         """
         Initialize attributes.
@@ -160,16 +184,54 @@ class Indexer(object):
         """
         raise NotImplementedError("No implementation of '__call__' found.")
 
-    def __repr__(self):
+    def __str__(self):
         """
-        Return simple string representation.
+        Return string representation.
 
         Returns
         -------
         str
             String representation.
         """
-        return f"{self.__class__.__name__}: {str(self)}"
+        return f"[{repr(self)}]"
+
+    def is_full_slice(self):
+        return False
+
+    def indexed_val(self, arr):
+        """
+        Return the value of the indices in the array.
+
+        Parameters
+        ----------
+        arr : ndarray
+            The array to index into.
+
+        Returns
+        -------
+        ndarray
+            The result of indexing into the array.
+        """
+        if self._flat_src:
+            return arr.ravel()[self.flat()]
+        else:
+            return arr[self()]
+
+    def indexed_val_set(self, arr, val):
+        """
+        Set the value of the indices in the array.
+
+        Parameters
+        ----------
+        arr : ndarray
+            The array to index into.
+        val : ndarray
+            The value to set.
+        """
+        if self._flat_src:
+            arr.ravel()[self.flat()] = val
+        else:
+            arr[self()] = val
 
     def copy(self, *args):
         """
@@ -186,7 +248,8 @@ class Indexer(object):
             A copy of this Indexer.
         """
         inst = self.__class__(*args)
-        inst.__dict__.update(self.__dict__)
+        for attr in self._copy_attrs:
+            setattr(inst, attr, getattr(self, attr))
         return inst
 
     def _set_attrs(self, parent):
@@ -223,9 +286,11 @@ class Indexer(object):
             raise RuntimeError(f"Can't get indexed_src_shape of {self} because source shape "
                                "is unknown.")
         if self._flat_src:
-            return resolve_shape(shape_to_len(self._src_shape)).get_shape(self.flat())
+            shape = (shape_to_len(self._src_shape),)
         else:
-            return resolve_shape(self._src_shape).get_shape(self())
+            shape = self._src_shape
+
+        return get_virtual_array(shape)[s()].shape
 
     @property
     def indexed_src_size(self):
@@ -285,23 +350,6 @@ class Indexer(object):
         if s is None:
             raise ValueError(f"Can't get shaped array of {self} because it has no source shape.")
         return s.as_array(copy=copy, flat=flat)
-
-    def apply(self, subidxer):
-        """
-        Apply a sub-Indexer to this Indexer and return the resulting indices.
-
-        Parameters
-        ----------
-        subidxer : Indexer
-            The Indexer to be applied to this one.
-
-        Returns
-        -------
-        ndarray
-            The resulting indices (always flat).
-        """
-        arr = self.shaped_array().ravel()
-        return arr[subidxer.flat()]
 
     def set_src_shape(self, shape, dist_shape=None):
         """
@@ -396,14 +444,9 @@ class ShapedIntIndexer(Indexer):
         """
         return self._idx
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return string representation.
-
-        Returns
-        -------
-        str
-            String representation.
         """
         return f"{self._idx}"
 
@@ -447,20 +490,6 @@ class ShapedIntIndexer(Indexer):
             The number of dimensions expected in the source array.
         """
         return 1
-
-    @property
-    def indexed_src_shape(self):
-        """
-        Return the shape of the index ().
-
-        Returns
-        -------
-        tuple
-            The shape of the index.
-        """
-        if self._flat_src:
-            return (1,)
-        return super().indexed_src_shape
 
     def as_array(self, copy=False, flat=True):
         """
@@ -589,7 +618,7 @@ class ShapedSliceIndexer(Indexer):
         """
         return self._slice
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return string representation.
 
@@ -598,7 +627,29 @@ class ShapedSliceIndexer(Indexer):
         str
             String representation.
         """
-        return f"{self._slice}"
+        start = self._slice.start if self._slice.start is not None else ''
+        stop = self._slice.stop if self._slice.stop is not None else ''
+
+        step = self._slice.step if self._slice.step is not None else 1
+        if step == 1:
+            step = ''
+
+        if step:
+            return f"{start}:{stop}:{step}"
+        elif start is not None:
+            return f"{start}:{stop}"
+        elif stop is not None:
+            return f":{stop}"
+        return ":"
+
+    def is_full_slice(self):
+        if self._slice.stop is None and self._slice.start is None and \
+                self._slice.step in (None, 1):
+            return True
+        if self._src_shape is None:
+            return False
+        inds = self._slice.indices(self._src_shape[0])
+        return inds[0] == 0 and inds[1] == self._src_shape[0] and inds[2] == 1
 
     def apply_offset(self, offset, flat=True):
         """
@@ -706,8 +757,8 @@ class ShapedSliceIndexer(Indexer):
             start = self._slice.start
             stop = self._slice.stop
             sz = shape_to_len(self._dist_shape)
-            if (start is not None and (start >= sz or start < -sz)
-                    or (stop is not None and (stop > sz or stop < -sz))):
+            if start != stop and ((start is not None and (start >= sz or start < -sz)
+                                  or (stop is not None and (stop > sz or stop < -sz)))):
                 raise IndexError(f"{self._slice} is out of bounds of the source shape "
                                  f"{self._dist_shape}.")
 
@@ -780,21 +831,6 @@ class SliceIndexer(ShapedSliceIndexer):
         """
         return self.shaped_array(copy=copy, flat=flat)
 
-    @property
-    def indexed_src_shape(self):
-        """
-        Return the shape of the result of indexing into the source.
-
-        Returns
-        -------
-        tuple
-            The shape of the index.
-        """
-        slc = self._slice
-        if self._flat_src and slc.start is not None and slc.stop is not None:
-            return (len(range(slc.start, slc.stop, slc.step)),)
-        return super().indexed_src_shape
-
 
 class ShapedArrayIndexer(Indexer):
     """
@@ -839,7 +875,7 @@ class ShapedArrayIndexer(Indexer):
         """
         return self._arr
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return string representation.
 
@@ -848,7 +884,7 @@ class ShapedArrayIndexer(Indexer):
         str
             String representation.
         """
-        return _truncate(f"{self._arr}".replace('\n', ''))
+        return f"{self._arr.tolist()}".replace('\n', '')
 
     def apply_offset(self, offset, flat=True):
         """
@@ -1010,7 +1046,11 @@ class ArrayIndexer(ShapedArrayIndexer):
         tuple
             The shape of the index.
         """
-        return self._arr.shape
+        if self._src_shape is None:
+            raise RuntimeError("Can't get index_src_shape because src_shape is None.")
+        if self._flat_src or len(self._src_shape) == 1:
+            return self._arr.shape
+        return super().indexed_src_shape
 
 
 class ShapedMultiIndexer(Indexer):
@@ -1030,6 +1070,8 @@ class ShapedMultiIndexer(Indexer):
         The wrapped tuple of indices/slices.
     _idx_list : list
         List of Indexers.
+    _remove_extra_brackets : bool
+        If True, remove extra brackets from the string representation.
     """
 
     def __init__(self, tup, flat_src=False):
@@ -1040,6 +1082,7 @@ class ShapedMultiIndexer(Indexer):
             raise RuntimeError(f"Can't index into a flat array with an indexer expecting {len(tup)}"
                                " dimensions.")
         super().__init__(flat_src)
+        self._remove_extra_brackets = False
         self._tup = tup
         self._set_idx_list()
 
@@ -1048,6 +1091,8 @@ class ShapedMultiIndexer(Indexer):
         for i in self._tup:
             if isinstance(i, (np.ndarray, list)):  # need special handling here for ndim > 1 arrays
                 self._idx_list.append(ArrayIndexer(i, flat_src=self._flat_src))
+                if self._idx_list[-1]._arr.ndim > 1:
+                    self._remove_extra_brackets = True
             else:
                 self._idx_list.append(indexer(i, flat_src=self._flat_src))
 
@@ -1071,7 +1116,20 @@ class ShapedMultiIndexer(Indexer):
         str
             String representation.
         """
-        return str(self._tup)
+        if self._remove_extra_brackets:
+            return repr(self)
+        return f"[{repr(self)}]"
+
+    def __repr__(self):
+        """
+        Return string representation.
+
+        Returns
+        -------
+        str
+            String representation.
+        """
+        return f"{', '.join(repr(i) for i in self._idx_list)}"
 
     def apply_offset(self, offset, flat=True):
         """
@@ -1295,7 +1353,7 @@ class EllipsisIndexer(Indexer):
         """
         return self._tup
 
-    def __str__(self):
+    def __repr__(self):
         """
         Return string representation.
 
@@ -1304,7 +1362,14 @@ class EllipsisIndexer(Indexer):
         str
             String representation.
         """
-        return f"{self._tup}"
+        s = []
+        for i in self._tup:
+            if i is ...:
+                s.append('...')
+            else:
+                s.append(repr(i))
+
+        return f"{', '.join(s)}"
 
     def apply_offset(self, offset, flat=True):
         """
@@ -1437,13 +1502,12 @@ class EllipsisIndexer(Indexer):
         """
         return self.as_array().tolist()
 
-
 class IndexMaker(object):
     """
     A Factory for Indexer objects.
     """
 
-    def __call__(self, idx, src_shape=None, flat_src=False):
+    def __call__(self, idx, src_shape=None, flat_src=False, try_slice=False):
         """
         Return an Indexer instance based on the passed indices/slices.
 
@@ -1455,6 +1519,8 @@ class IndexMaker(object):
             Source shape if known.
         flat_src : bool
             If True, indices are into a flat source.
+        try_slice : bool
+            If True, try to convert 1D index array to a slice.
 
         Returns
         -------
@@ -1479,10 +1545,18 @@ class IndexMaker(object):
                 idxer = MultiIndexer(idx, flat_src=flat_src)
             if flat_src and multi:
                 raise RuntimeError("Can't use a multdimensional index into a flat source.")
+        elif isinstance(idx, Indexer):
+            return idx
         else:
             arr = np.atleast_1d(idx)
             if arr.ndim == 1:
-                idxer = ArrayIndexer(arr, flat_src=flat_src)
+                slc = None
+                if try_slice:
+                    slc = array2slice(arr)
+                if slc is not None:
+                    idxer = SliceIndexer(slc, flat_src=flat_src)
+                else:
+                    idxer = ArrayIndexer(arr, flat_src=flat_src)
             else:
                 issue_warning("Using a non-tuple sequence for multidimensional indexing is "
                               "deprecated; use `arr[tuple(seq)]` instead of `arr[seq]`. In the "
@@ -1535,91 +1609,58 @@ def _convert_ellipsis_idx(shape, idx):
     return tuple(lst)
 
 
-class resolve_shape(object):
+def idx_list_to_index_array(idx_list):
     """
-    Class that computes the result shape from a source shape and an index.
+    Convert a sequential list of indexers to an equivalent array indexer.
 
     Parameters
     ----------
-    shape : tuple
-        The shape of the source.
+    idx_list : list of indexers
+        List of indexers.
 
-    Attributes
-    ----------
-    _shape : tuple
-        The shape of the source.
+    Returns
+    -------
+    ndarray
+        The equivalent index array.
     """
+    if len(idx_list) == 0:
+        return None
+    elif len(idx_list) == 1:
+        return idx_list[0].as_array()
+    else:
+        idx = idx_list[0]
+        arr = np.arange(shape_to_len(idx._src_shape)).reshape(idx._src_shape)
+        for i in range(len(idx_list)):
+            arr = idx_list[i].indexed_val(arr)
+        return arr
 
-    def __init__(self, shape):
-        """
-        Initialize attributes.
 
-        Parameters
-        ----------
-        shape : tuple or int
-            Shape of the source.
-        """
-        self._shape = shape2tuple(shape)
+def apply_idx_list(arr, idx_list):
+    """
+    Apply a sequential list of indexers to an array.
+    """
+    if len(idx_list) == 0:
+        return arr
+    elif len(idx_list) == 1:
+        return idx_list[0].indexed_val(arr)
+    else:
+        for i in range(len(idx_list)):
+            arr = idx_list[i].indexed_val(arr)
+        return arr
 
-    def get_shape(self, idx):
-        """
-        Return the shape of the result of indexing into the source with index idx.
 
-        Parameters
-        ----------
-        idx : int, slice, tuple, ndarray
-            The index into the source.
+def idx_list_to_shape(idx_list, src_shape):
+    """
+    Convert a sequential list of indexers to an equivalent shape.
+    """
+    if len(idx_list) == 0:
+        return src_shape
 
-        Returns
-        -------
-        tuple
-            The shape after indexing.
-        """
-        if not isinstance(idx, tuple):
-            idx = (idx,)
-            is_tup = False
-        else:
-            is_tup = True
-
-        for i in idx:
-            if i is ...:
-                idx = _convert_ellipsis_idx(self._shape, idx)
-                break
-
-        if len(self._shape) < len(idx):
-            raise ValueError(f"Index {idx} dimension too large to index into shape {self._shape}.")
-
-        lens = []
-        seen_arr = False
-        arr_shape = None  # to handle multi-indexing where individual sub-arrays have a shape
-        for dim, ind in zip_longest(self._shape, idx):
-            if ind is None:
-                lens.append(dim)
-            elif isinstance(ind, slice):
-                lens.append(len(range(*ind.indices(dim))))
-            elif isinstance(ind, np.ndarray):
-                if not seen_arr:
-                    seen_arr = True
-                    if ind.ndim > 1:
-                        if arr_shape is not None and arr_shape != ind.shape:
-                            raise ValueError("Multi-index has index sub-arrays of different "
-                                             f"shapes ({arr_shape} != {ind.shape}).")
-                        arr_shape = ind.shape
-                    else:
-                        # only first array idx counts toward shape
-                        lens.append(ind.size)
-            # int indexers don't count toward shape (scalar array has shape ())
-            elif not isinstance(ind, Integral):
-                raise TypeError(f"Index {ind} of type '{type(ind).__name__}' is invalid.")
-
-        if arr_shape is not None:
-            return arr_shape
-
-        if is_tup or len(lens) >= 1:
-            return tuple(lens)
-        elif is_tup:
-            return ()
-        return (1,)
+    shp = src_shape
+    for i in range(len(idx_list)):
+        idx_list[i].set_src_shape(shp)
+        shp = idx_list[i].indexed_src_shape
+    return shp
 
 
 # Since this is already user facing we'll leave it as is, and just use the output of
@@ -1653,3 +1694,5 @@ slicer = Slicer()
 _full_slice = slice(None)
 _flat_full_indexer = indexer(_full_slice, flat_src=True)
 _full_indexer = indexer(_full_slice, flat_src=False)
+
+

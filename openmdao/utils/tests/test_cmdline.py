@@ -208,15 +208,8 @@ class CmdlineTestCase(unittest.TestCase):
 
         if not os.path.isfile(n2file):
             self.fail(f"File '{n2file}' was not created: {errs}")
-
-        lines = errs.splitlines()
-        for i, line in enumerate(lines):
-            if b"Collected errors for problem" in line:
-                self.assertEqual(lines[i+1],
-                    b"   'sub' <class Group>: Attempted to connect from 'tgt.x' to 'cmp.x', but 'tgt.x' is an input. All connections must be from an output to an input.")
-                break
-        else:
-            self.fail("Didn't find expected err msg in output.")
+            
+        self.assertTrue(b"'sub.arr' <class ExecComp>: Can\'t get value of 'sub.arr.x': cannot reshape array of size 15 into shape (2,)" in errs)
 
     def test_list_pre_post_multiple_probs(self):
         # confirm that top level result is output even if there are subproblems

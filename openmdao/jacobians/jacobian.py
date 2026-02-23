@@ -166,9 +166,9 @@ class Jacobian(object):
         return self._subjac_from_meta(abs_key, meta, row_slice, col_slice, wrt_is_input, dtype)
 
     def _subjac_from_meta(self, key, meta, row_slice, col_slice, wrt_is_input, dtype,
-                          src_indices=None, factor=None, src=None):
+                          src_inds_list=None, factor=None, src=None):
         return Subjac.get_subjac_class(meta)(key, meta, row_slice, col_slice, wrt_is_input,
-                                             dtype, src_indices, factor, src)
+                                             dtype, src_inds_list, factor, src)
 
     def _get_subjacs(self, system=None):
         """
@@ -813,11 +813,11 @@ class SplitJacobian(Jacobian):
                             if factor == 1.0:
                                 factor = None
 
-                        src_indices = abs2meta_in[wrt]['src_indices']
+                        src_inds_list = abs2meta_in[wrt]['src_inds_list']
 
                         self._dr_do_subjacs[abs_key] = \
                             self.create_dr_do_subjac(conns, abs_key, src, meta, dtype,
-                                                     src_indices, factor)
+                                                     src_inds_list, factor)
                     elif not is_top:  # input is connected to something outside current system
                         dr_di_subjacs[abs_key] = self.create_subjac(abs_key, meta, dtype)
 
@@ -850,7 +850,8 @@ class SplitJacobian(Jacobian):
             matrixobj._update_from_submat(subjac, randgen)
         matrixobj._post_update()
 
-    def create_dr_do_subjac(self, conns, abs_key, src, meta, dtype, src_indices=None, factor=None):
+    def create_dr_do_subjac(self, conns, abs_key, src, meta, dtype, src_inds_list=None,
+                            factor=None):
         """
         Create a subjacobian for a square internal jacobian (d(residual)/d(source)).
 
@@ -866,8 +867,8 @@ class SplitJacobian(Jacobian):
             Metadata for the subjacobian.
         dtype : dtype
             The dtype of the subjacobian.
-        src_indices : array or None
-            Source indices for the subjacobian.
+        src_inds_list : list of indexers or None
+            List of indexers of the wrt variable with respect to the source.
         factor : float or None
             Factor for the subjacobian.
 
@@ -886,7 +887,7 @@ class SplitJacobian(Jacobian):
             col_slice = out_slices[src]
 
         return self._subjac_from_meta(abs_key, meta, out_slices[of], col_slice, False,
-                                      dtype, src_indices, factor, src)
+                                      dtype, src_inds_list, factor, src)
 
     def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
         """

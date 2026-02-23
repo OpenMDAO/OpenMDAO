@@ -45,7 +45,9 @@ runs:
         OMPI_MCA_rmaps_base_oversubscribe: "1"
       shell: bash -l {0}
       run: |
-        eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
+        if [[ "${{ inputs.use_pixi }}" == "true" ]]; then
+          eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
+        fi
 
         set +e           # Don't exit on error
         set -o pipefail  # But catch pipeline failures
@@ -68,7 +70,7 @@ runs:
           "$@"
           local exit_code=$?
           if [ $exit_code -ne 0 ]; then
-            echo "❌ Command failed with exit code $exit_code"
+            echo "Command failed with exit code $exit_code"
             BUILD_FAILED=1
           fi
           return $exit_code
@@ -121,8 +123,8 @@ runs:
         path: openmdao/docs/openmdao_book/_build/html
         retention-days: 1
 
-    - name: Publish docs
-      if: github.event_name != 'pull_request' && inputs.publish == 'true' && inputs.SECRET_docs_location != ''
+    - name: Publish docs (conda)
+      if: github.event_name != 'pull_request' && inputs.publish == 'true' && inputs.SECRET_docs_location != '' && inputs.use_pixi != 'true'
       shell: bash -l {0}
       run: |
         if [[ "${#DOCS_LOCATION}" ]]; then
@@ -135,6 +137,26 @@ runs:
           echo "============================================================="
           echo "Publish docs"
           echo "============================================================="
+          cd openmdao/docs
+          python upload_doc_version.py openmdao_book/_build/html/ ${{ inputs.SECRET_docs_location }}
+        else
+          echo "Docs destination not available."
+        fi
+
+    - name: Publish docs (pixi)
+      if: github.event_name != 'pull_request' && inputs.publish == 'true' && inputs.SECRET_docs_location != '' && inputs.use_pixi == 'true'
+      shell: bash -l {0}
+      run: |
+        if [[ "${#DOCS_LOCATION}" ]]; then
+          echo "============================================================="
+          echo "Add openssl to pixi environment"
+          echo "============================================================="
+          pixi add -e ${{ inputs.pixi_env }} openssl=3
+
+          echo "============================================================="
+          echo "Publish docs"
+          echo "============================================================="
+          eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
           cd openmdao/docs
           python upload_doc_version.py openmdao_book/_build/html/ ${{ inputs.SECRET_docs_location }}
         else

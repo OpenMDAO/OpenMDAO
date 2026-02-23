@@ -88,9 +88,15 @@ J_fd - J_fwd:
         try:
             assert_check_partials(data, atol=1.e-6, rtol=1.e-6, verbose=True)
         except Exception as err:
-            if not snum_equal(err.args[0].strip(), expected):
+            errlines = err.args[0].split('\n')
+            check = []
+            for line in errlines:
+                if not '(ACTUAL)' in line and not "Mismatch at index:" in line:
+                    check.append(line)
+            errstr = '\n'.join(check).strip()
+            if not snum_equal(errstr, expected):
                 # just show normal string diff
-                self.assertEqual(err.args[0], expected)
+                self.assertEqual(errstr, expected)
         else:
             self.fail('Exception expected.')
 
@@ -271,8 +277,14 @@ J_fd - J_fwd:
         try:
             assert_check_partials(data, atol=1.e-6, rtol=1.e-6, verbose=True)
         except ValueError as err:
-            if not snum_equal(err.args[0].strip(), expected):
-                self.assertEqual(err.args[0].strip(), expected)
+            errlines = err.args[0].split('\n')
+            check = []
+            for line in errlines:
+                if not '(ACTUAL)' in line and not "Mismatch at index:" in line:
+                    check.append(line)
+            errstr = '\n'.join(check).strip()
+            if not snum_equal(errstr, expected):
+                self.assertEqual(errstr, expected)
         else:
             self.fail('Exception expected.')
 

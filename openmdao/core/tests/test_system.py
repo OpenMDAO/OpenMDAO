@@ -374,16 +374,16 @@ class TestSystem(unittest.TestCase):
 
         desvars = model.list_outputs(is_design_var=True, list_autoivcs=True, out_stream=None)
         self.assertEqual(sorted([name for name, _ in desvars]),
-                         ['_auto_ivc.v0'])
+                         ['_auto_ivc.v1'])
 
         non_desvars = model.list_outputs(is_design_var=False, list_autoivcs=True, out_stream=None)
         self.assertEqual(sorted([name for name, _ in non_desvars]),
-                         ['_auto_ivc.v1', 'con_cmp1.con1', 'con_cmp2.con2',
+                         ['_auto_ivc.v0', 'con_cmp1.con1', 'con_cmp2.con2',
                           'cycle.d1.y1', 'cycle.d2.y2', 'obj_cmp.obj'])
 
         nonDV_indeps = model.list_outputs(is_indep_var=True, is_design_var=False, list_autoivcs=True, out_stream=None)
         self.assertEqual(sorted([name for name, _ in nonDV_indeps]),
-                         ['_auto_ivc.v1'])
+                         ['_auto_ivc.v0'])
 
     def test_list_options(self):
         model = SellarMDA()
@@ -472,7 +472,7 @@ class TestSystem(unittest.TestCase):
         with self.assertRaises(Exception) as cm:
             root._resolver.source('f')
 
-        self.assertEqual(cm.exception.args[0], "<model> <class Group>: Can't find source for 'f' because connections are not yet known.")
+        self.assertEqual(cm.exception.args[0], "<model> <class Group>: Can't find source for 'f'.")
 
     def test_list_inputs_before_final_setup(self):
         class SpeedComp(ExplicitComponent):

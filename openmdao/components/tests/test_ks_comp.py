@@ -315,8 +315,11 @@ class TestKSFunctionFeatures(unittest.TestCase):
         prob = om.Problem(model=model)
         prob.setup()
         prob.run_model()
-
-        assert_near_equal(prob.get_val('ks.KS', indices=0), np.amax(prob.get_val('x')), tolerance=1e-8)
+        
+        # this test was previously incorrect, because get_val('x') would be in units of 'ft' while
+        # get_val('ks.KS') would be in units of 'm', so an explicit 'units' arg is required to get
+        # the same answer.
+        assert_near_equal(prob.get_val('ks.KS', indices=0), np.amax(prob.get_val('x', units='m')), tolerance=1e-8)
 
     def test_minimum(self):
 

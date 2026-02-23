@@ -1,0 +1,2048 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AllConnGraph Explorer</title>
+<style>
+        * {
+            box-sizing: border-box;
+        }
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+        }
+        .container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .header button {
+            position: absolute;
+            right: 20px;
+        }
+        .content-area {
+            display: flex;
+            flex: 1;
+            min-height: 0;
+        }
+        .controls {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            background: #f8f9fa;
+            flex-shrink: 0;
+        }
+        .dropdown {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            background: white;
+            cursor: pointer;
+        }
+        .dropdown:focus {
+            outline: none;
+            border-color: #2c3e50;
+            box-shadow: 0 0 0 2px rgba(44, 62, 80, 0.2);
+        }
+        .search-results {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-top: none;
+            background: white;
+            display: none;
+        }
+        .search-result {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        .search-result:hover {
+            background: #f0f0f0;
+        }
+        .graph-container {
+            flex: 1;
+            padding: 0;
+            text-align: center;
+            overflow: auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 0; /* Allow flex item to shrink */
+            position: relative;
+        }
+        .graph-svg {
+            height: auto;
+            border: none;
+            display: block;
+        }
+        #graph-content {
+            display: inline-block;
+            min-width: min-content;
+            min-height: min-content;
+            padding: 20px;
+        }
+        .graph-text {
+            text-align: left;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            margin: 10px 0;
+            flex: 1;
+            overflow: auto;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        /* Modal styles */
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: auto;
+            padding: 0;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 680px;
+            max-height: 80%;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .close {
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover {
+            opacity: 0.7;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-body h3 {
+            color: #2c3e50;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .modal-body h3:first-child {
+            margin-top: 0;
+        }
+
+        .modal-body ol, .modal-body ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .modal-body li {
+            margin: 5px 0;
+        }
+
+        /* Legend styles */
+        .legend {
+            margin: 15px 0;
+        }
+
+        .legend-table {
+            border: none;
+            border-collapse: collapse;
+            margin: 15px 0;
+            width: 100%;
+        }
+
+        .legend-line-cell {
+            text-align: center;
+            vertical-align: middle;
+            width: 80px;
+            padding: 5px 10px 5px 0;
+        }
+
+        .legend-description-cell {
+            text-align: left;
+            vertical-align: middle;
+            padding: 5px 0;
+        }
+
+        .legend-line {
+            width: 50px;
+            height: 3px;
+            background-color: transparent;
+            margin: 0 auto;
+        }
+
+        /* Node Colors section - keep inline layout */
+        .legend .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .legend-line.solid {
+            border-top: 3px solid #333;
+        }
+
+        .legend-line.dashed {
+            border-top: 3px dashed #333;
+        }
+
+        .legend-line.dotted {
+            border-top: 3px dotted #333;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 15px;
+            border-radius: 3px;
+        }
+
+        .legend-color.input {
+            /* Color will be set dynamically by JavaScript */
+            background-color: #f0f0f0; /* Default gray */
+        }
+
+        .legend-color.output {
+            /* Color will be set dynamically by JavaScript */
+            background-color: #f0f0f0; /* Default gray */
+        }
+
+        .legend-color.highlight {
+            /* Color will be set dynamically by JavaScript */
+            background-color: #f0f0f0; /* Default gray */
+        }
+
+        .legend-color.boundary {
+            /* Color will be set dynamically by JavaScript */
+            background-color: #f0f0f0; /* Default gray */
+        }
+
+        .modal-body code {
+            background-color: #f8f9fa;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+
+        /* Tree structure styles */
+        .sidebar {
+            width: 300px;
+            min-width: 200px;
+            max-width: 600px;
+            background: #f8f9fa;
+            border-right: 1px solid #ddd;
+            overflow-y: auto;
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+        }
+
+        .resizer {
+            width: 4px;
+            background: #ddd;
+            cursor: col-resize;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .resizer:hover {
+            background: #007bff;
+        }
+
+        .resizer:active {
+            background: #0056b3;
+        }
+
+        .tree-header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .search-container {
+            padding: 10px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .search-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 12px;
+            color: #6c757d;
+            font-size: 16px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px 8px 40px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+
+        .search-input::placeholder {
+            color: #6c757d;
+        }
+
+        .tree-container {
+            padding: 10px;
+        }
+
+        .tree-node {
+            margin: 2px 0;
+        }
+
+        .tree-node-content {
+            display: flex;
+            align-items: center;
+            padding: 5px 8px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+        }
+
+        .tree-node-content:hover {
+            background-color: #e9ecef;
+        }
+
+        .tree-node-content.selected {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .tree-node-content.search-highlight {
+            background-color: #00ff00;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .tree-label.search-highlight {
+            background-color: #00ff00;
+            color: #333;
+            font-weight: bold;
+            border-radius: 3px;
+            padding: 2px 4px;
+            display: inline-block;
+            width: fit-content;
+        }
+
+        .search-highlight-span {
+            background-color: #00ff00;
+            color: #333;
+            font-weight: bold;
+            border-radius: 3px;
+            padding: 2px 4px;
+        }
+
+        .tree-toggle {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .tree-toggle:hover {
+            color: #333;
+        }
+
+        .tree-icon {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .tree-icon.double {
+            width: 40px;
+            height: 16px;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .tree-icon.double .input {
+            margin-right: 2px;
+        }
+
+        .tree-icon.double .output {
+            margin-right: 0;
+        }
+
+        .tree-icon.double .input.hidden,
+        .tree-icon.double .output.hidden {
+            visibility: hidden;
+        }
+
+        .tree-icon-button {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            border-radius: 3px;
+            border: 1px solid #ccc;
+            background: linear-gradient(135deg, #f0f0f0 0%, #e0e0e0 100%);
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.3);
+            color: #333;
+            text-shadow: 0 1px 0 rgba(255,255,255,0.5);
+            cursor: default;
+            user-select: none;
+        }
+
+        .tree-icon-button.input {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            border-color: #2980b9;
+            color: white;
+        }
+
+        .tree-icon-button.output {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            border-color: #c0392b;
+            color: white;
+        }
+
+        /* Graph node selection styling */
+        .graph-svg .node.selected {
+            stroke: #ffd700 !important;
+            stroke-width: 4px !important;
+            filter: drop-shadow(0 0 8px #ffd700) drop-shadow(0 0 4px #ffd700);
+        }
+
+        .graph-svg .node.selected circle {
+            stroke: #ffd700 !important;
+            stroke-width: 4px !important;
+        }
+
+        .graph-svg .node.selected ellipse {
+            stroke: #ffd700 !important;
+            stroke-width: 4px !important;
+        }
+
+        .graph-svg .node.selected polygon {
+            stroke: #ffd700 !important;
+            stroke-width: 4px !important;
+        }
+
+        /* Preserve text styling in selected nodes */
+        .graph-svg .node.selected text {
+            fill: inherit !important;
+            stroke: none !important;
+        }
+
+        .tree-label {
+            flex: 1;
+            font-size: 14px;
+        }
+
+        .tree-children {
+            margin-left: 20px;
+            border-left: 1px solid #ddd;
+            padding-left: 10px;
+        }
+
+        .tree-children.collapsed {
+            display: none;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Zoom controls */
+        .zoom-controls {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 100;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            padding: 8px;
+        }
+
+        .zoom-button {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: #2c3e50;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .zoom-button:hover {
+            background: #34495e;
+            transform: scale(1.05);
+        }
+
+        .zoom-button:active {
+            transform: scale(0.95);
+        }
+
+        .zoom-button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .zoom-level {
+            font-size: 12px;
+            text-align: center;
+            color: #2c3e50;
+            font-weight: bold;
+            padding: 4px 0;
+            user-select: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Full-width header -->
+        <div class="header">
+            <h1>Connection Graph Explorer</h1>
+            <button onclick="showHelp()" style="padding: 8px 16px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">Help</button>
+        </div>
+
+        <!-- Content area with sidebar and main content -->
+        <div class="content-area">
+            <!-- Sidebar with tree structure -->
+            <div class="sidebar" id="sidebar">
+                <div class="search-container">
+                    <div class="search-wrapper">
+                        <div class="search-icon">🔍</div>
+                        <input type="text" id="fuzzy-search" class="search-input" placeholder="Search..." />
+                    </div>
+                </div>
+                <div class="tree-container" id="tree-container">
+                    <div class="loading">Loading model structure...</div>
+                </div>
+            </div>
+
+            <!-- Resizer -->
+            <div class="resizer" id="resizer"></div>
+
+            <!-- Main content area -->
+            <div class="main-content">
+
+            <!-- Zoom controls -->
+            <div class="zoom-controls" id="zoom-controls" style="display: none;">
+                <button class="zoom-button" id="zoom-in" title="Zoom In (+)">+</button>
+                <div class="zoom-level" id="zoom-level">100%</div>
+                <button class="zoom-button" id="zoom-out" title="Zoom Out (-)">−</button>
+                <button class="zoom-button" id="zoom-reset" title="Reset Zoom (0)" style="font-size: 16px;">⊙</button>
+                <button class="zoom-button" id="zoom-fit" title="Fit to Window (F)" style="font-size: 16px;">⊡</button>
+            </div>
+
+            <div class="graph-container">
+                <div id="graph-content">
+                    <div class="loading">
+                        <h3>🔍 Select a system or variable from the tree to explore</h3>
+                        <p>Use the tree on the left to:</p>
+                        <ul style="text-align: left; display: inline-block;">
+                            <li>Navigate through your OpenMDAO model hierarchy</li>
+                            <li>View connection graphs for specific systems</li>
+                            <li>Focus on individual variables and their connections</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="help-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Connection Graph Explorer - Help</h2>
+                <span class="close" onclick="hideHelp()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>A tool for visualizing and understanding how variables are connected and
+                promoted within your OpenMDAO model by examining their connection graphs.
+                </p>
+
+                <ol>
+                    <li>Click on any system (⚙️) to see all connection graphs involving that
+                    system</li>
+                    <li>Click on any variable (<span class="tree-icon-button input" style="font-size: 11px; padding: 2px 4px; margin: 0 2px; display: inline;">i</span> or <span class="tree-icon-button output" style="font-size: 11px; padding: 2px 4px; margin: 0 2px; display: inline;">o</span>) to see only the connection graph for that variable</li>
+                    <li>Use the zoom controls in the top-right corner:
+                        <ul>
+                            <li><strong>+</strong> to zoom in</li>
+                            <li><strong>−</strong> to zoom out</li>
+                            <li><strong>⊙</strong> to reset to 100% zoom</li>
+                            <li><strong>⊡</strong> to fit entire graph to window</li>
+                        </ul>
+                    </li>
+                    <li>Click and drag on empty space in the graph window to pan/move the graph around</li>
+                    <li>Keyboard shortcuts: <code>+</code> zoom in, <code>-</code> zoom out, <code>0</code> reset, <code>F</code> fit to window</li>
+                </ol>
+
+                <h3>Edge Types</h3>
+                <table class="legend-table">
+                    <tr>
+                        <td class="legend-line-cell">
+                            <div class="legend-line solid"></div>
+                        </td>
+                        <td class="legend-description-cell">
+                            Manual connection (from a connect call)
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="legend-line-cell">
+                            <div class="legend-line dashed"></div>
+                        </td>
+                        <td class="legend-description-cell">
+                            Variable promotion
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="legend-line-cell">
+                            <div class="legend-line dotted"></div>
+                        </td>
+                        <td class="legend-description-cell">
+                            Connection when promoted input name matches promoted output name
+                        </td>
+                    </tr>
+                </table>
+
+                <h3>Node Colors</h3>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color input" id="input-color-swatch"></div>
+                        <span id="input-color-text"><strong>Input variables</strong></span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color output" id="output-color-swatch"></div>
+                        <span id="output-color-text"><strong>Output variables</strong></span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color highlight" id="highlight-color-swatch"></div>
+                        <span id="highlight-color-text"><strong>Selected variables</strong></span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color boundary" id="boundary-color-swatch"></div>
+                        <span id="boundary-color-text"><strong>Variables connecting from outside the system boundary</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        let currentGraph = null;
+        let currentSubsystem = 'model';
+        let cachedColors = {
+            input: '#3498db',
+            output: '#e74c3c',
+            highlight: '#ffd700',
+            boundary: '#ff6b6b'
+        }; // Cache the colors
+        let colorsLoaded = false; // Track if colors have been loaded
+        let helpRetryCount = 0; // Track retry attempts for help
+
+        // Zoom state
+        let currentZoom = 1.0;
+        const zoomStep = 0.1;
+        const minZoom = 0.1;
+        const maxZoom = 3.0;
+
+        // Pan state
+        let panX = 0;
+        let panY = 0;
+        let isPanning = false;
+        let panStartX = 0;
+        let panStartY = 0;
+        let panStartOffsetX = 0;
+        let panStartOffsetY = 0;
+
+        import { instance } from "https://cdn.jsdelivr.net/npm/@viz-js/viz@3.2.4/+esm";
+
+        // Helper function to darken a color
+        function darkenColor(hex, factor) {
+            // Remove # if present
+            hex = hex.replace('#', '');
+
+            // Parse RGB values
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+
+            // Darken by factor
+            const newR = Math.floor(r * (1 - factor));
+            const newG = Math.floor(g * (1 - factor));
+            const newB = Math.floor(b * (1 - factor));
+
+            // Convert back to hex
+            return '#' + ((1 << 24) + (newR << 16) + (newG << 8) + newB).toString(16).slice(1);
+        }
+
+        // Helper function to get contrasting text color (black or white)
+        function getContrastColor(hex) {
+            // Remove # if present
+            hex = hex.replace('#', '');
+
+            // Parse RGB values
+            const r = parseInt(hex.substr(0, 2), 16);
+            const g = parseInt(hex.substr(2, 2), 16);
+            const b = parseInt(hex.substr(4, 2), 16);
+
+            // Calculate luminance
+            const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+            // Return black for light backgrounds, white for dark backgrounds
+            return luminance > 0.5 ? '#000000' : '#ffffff';
+        }
+
+        // Function to update tree icon colors to match graph colors
+        function updateTreeIconColors() {
+            const inputIcons = document.querySelectorAll('.tree-icon-button.input');
+            const outputIcons = document.querySelectorAll('.tree-icon-button.output');
+
+            inputIcons.forEach(icon => {
+                if (cachedColors.input) {
+                    icon.style.background = `linear-gradient(135deg, ${cachedColors.input} 0%, ${darkenColor(cachedColors.input, 0.2)} 100%)`;
+                    icon.style.borderColor = darkenColor(cachedColors.input, 0.2);
+                    icon.style.color = getContrastColor(cachedColors.input);
+                }
+            });
+
+            outputIcons.forEach(icon => {
+                if (cachedColors.output) {
+                    icon.style.background = `linear-gradient(135deg, ${cachedColors.output} 0%, ${darkenColor(cachedColors.output, 0.2)} 100%)`;
+                    icon.style.borderColor = darkenColor(cachedColors.output, 0.2);
+                    icon.style.color = getContrastColor(cachedColors.output);
+                }
+            });
+        }
+
+        // Zoom functionality
+        function updateZoom(newZoom) {
+            currentZoom = Math.max(minZoom, Math.min(maxZoom, newZoom));
+
+            applyTransform();
+
+            // Update zoom level display
+            const zoomLevelEl = document.getElementById('zoom-level');
+            if (zoomLevelEl) {
+                zoomLevelEl.textContent = `${Math.round(currentZoom * 100)}%`;
+            }
+
+            // Update button states
+            const zoomInBtn = document.getElementById('zoom-in');
+            const zoomOutBtn = document.getElementById('zoom-out');
+            if (zoomInBtn) zoomInBtn.disabled = currentZoom >= maxZoom;
+            if (zoomOutBtn) zoomOutBtn.disabled = currentZoom <= minZoom;
+        }
+
+        function applyTransform() {
+            const svgs = document.querySelectorAll('.graph-svg');
+            svgs.forEach(svg => {
+                svg.style.transform = `translate(${panX}px, ${panY}px) scale(${currentZoom})`;
+                svg.style.transformOrigin = 'top left';
+            });
+        }
+
+        function zoomIn() {
+            updateZoom(currentZoom + zoomStep);
+        }
+
+        function zoomOut() {
+            updateZoom(currentZoom - zoomStep);
+        }
+
+        function zoomReset() {
+            panX = 0;
+            panY = 0;
+            updateZoom(1.0);
+        }
+
+        function zoomFit() {
+            // Get the graph container and SVG elements
+            const graphContainer = document.querySelector('.graph-container');
+            const svg = document.querySelector('.graph-svg');
+
+            if (!graphContainer || !svg) return;
+
+            // Reset any existing transforms first to get true dimensions
+            const originalTransform = svg.style.transform;
+            svg.style.transform = 'none';
+
+            // Get the bounding box of the SVG content
+            const svgBBox = svg.getBBox();
+
+            // Also check the SVG's width/height attributes and viewBox
+            const svgWidth = Math.max(
+                svgBBox.width,
+                svg.width.baseVal.value || 0,
+                parseFloat(svg.getAttribute('width')) || 0
+            );
+            const svgHeight = Math.max(
+                svgBBox.height,
+                svg.height.baseVal.value || 0,
+                parseFloat(svg.getAttribute('height')) || 0
+            );
+
+            // Restore the original transform
+            svg.style.transform = originalTransform;
+
+            if (svgWidth === 0 || svgHeight === 0) {
+                console.warn('Could not determine SVG dimensions for fit-to-window');
+                return;
+            }
+
+            // Get the available space in the graph container
+            // Account for scrollbars and padding
+            const padding = 60;
+            const containerWidth = graphContainer.clientWidth - padding;
+            const containerHeight = graphContainer.clientHeight - padding;
+
+            // Calculate the zoom level needed to fit both dimensions
+            const zoomX = containerWidth / svgWidth;
+            const zoomY = containerHeight / svgHeight;
+
+            // Use the smaller zoom to ensure the entire graph fits in both dimensions
+            let fitZoom = Math.min(zoomX, zoomY);
+
+            // Add a small margin factor to ensure we don't cut off edges
+            fitZoom *= 0.90;
+
+            // Constrain to min/max zoom limits
+            const constrainedZoom = Math.max(minZoom, Math.min(maxZoom, fitZoom));
+
+            // If we hit the min zoom limit, warn the user
+            if (fitZoom < minZoom) {
+                console.warn(`Graph is too large to fit at minimum zoom (${Math.round(minZoom * 100)}%). ` +
+                           `Calculated zoom would be ${Math.round(fitZoom * 100)}%`);
+            }
+
+            // Reset pan and apply the fit zoom
+            panX = 0;
+            panY = 0;
+            updateZoom(constrainedZoom);
+        }
+
+        function setupPanning() {
+            const graphContainer = document.querySelector('.graph-container');
+            if (!graphContainer) return;
+
+            graphContainer.addEventListener('mousedown', (e) => {
+                // Don't pan if clicking on a node or if clicking on zoom controls
+                if (e.target.closest('.node') || e.target.closest('.zoom-controls') || e.target.closest('text')) {
+                    return;
+                }
+
+                isPanning = true;
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+                panStartOffsetX = panX;
+                panStartOffsetY = panY;
+                graphContainer.style.cursor = 'grabbing';
+                graphContainer.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isPanning) return;
+
+                const deltaX = e.clientX - panStartX;
+                const deltaY = e.clientY - panStartY;
+
+                panX = panStartOffsetX + deltaX;
+                panY = panStartOffsetY + deltaY;
+
+                applyTransform();
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (isPanning) {
+                    isPanning = false;
+                    const graphContainer = document.querySelector('.graph-container');
+                    if (graphContainer) {
+                        graphContainer.style.cursor = '';
+                        graphContainer.style.userSelect = '';
+                    }
+                }
+            });
+
+            // Reset panning when mouse leaves the window while dragging
+            document.addEventListener('mouseleave', () => {
+                if (isPanning) {
+                    isPanning = false;
+                    const graphContainer = document.querySelector('.graph-container');
+                    if (graphContainer) {
+                        graphContainer.style.cursor = '';
+                        graphContainer.style.userSelect = '';
+                    }
+                }
+            });
+
+            // Add grab cursor when hovering over pannable area
+            graphContainer.addEventListener('mousemove', function(e) {
+                if (!isPanning && !e.target.closest('.node') && !e.target.closest('text') && !e.target.closest('.zoom-controls')) {
+                    graphContainer.style.cursor = 'grab';
+                } else if (!isPanning) {
+                    graphContainer.style.cursor = '';
+                }
+            });
+        }
+
+        function setupZoomControls() {
+            const zoomInBtn = document.getElementById('zoom-in');
+            const zoomOutBtn = document.getElementById('zoom-out');
+            const zoomResetBtn = document.getElementById('zoom-reset');
+            const zoomFitBtn = document.getElementById('zoom-fit');
+
+            if (zoomInBtn) zoomInBtn.addEventListener('click', zoomIn);
+            if (zoomOutBtn) zoomOutBtn.addEventListener('click', zoomOut);
+            if (zoomResetBtn) zoomResetBtn.addEventListener('click', zoomReset);
+            if (zoomFitBtn) zoomFitBtn.addEventListener('click', zoomFit);
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                // Only handle shortcuts when not typing in an input
+                if (e.target.tagName === 'INPUT') return;
+
+                if (e.key === '+' || e.key === '=') {
+                    e.preventDefault();
+                    zoomIn();
+                } else if (e.key === '-' || e.key === '_') {
+                    e.preventDefault();
+                    zoomOut();
+                } else if (e.key === '0') {
+                    e.preventDefault();
+                    zoomReset();
+                } else if (e.key === 'f' || e.key === 'F') {
+                    e.preventDefault();
+                    zoomFit();
+                }
+            });
+        }
+
+        // Function to add selection styling to SVG content
+        function addSelectionStylingToSvg(svgElement) {
+            // svgElement is now a DOM element from viz.renderSVGElement()
+            // Add click handlers to graph nodes for selection
+            const nodes = svgElement.querySelectorAll('.node');
+            nodes.forEach(node => {
+                node.style.cursor = 'pointer';
+                node.addEventListener('click', function(e) {
+                    // Remove previous selection
+                    document.querySelectorAll('.node.selected').forEach(n => {
+                        n.classList.remove('selected');
+                    });
+                    // Add selection to clicked node
+                    this.classList.add('selected');
+                    e.stopPropagation();
+                });
+            });
+
+            // Click on SVG background to deselect
+            svgElement.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    document.querySelectorAll('.node.selected').forEach(n => {
+                        n.classList.remove('selected');
+                    });
+                }
+            });
+        }
+
+        // Function to highlight a selected node in the graph
+        function highlightSelectedNode(variableName) {
+            // Remove previous selection
+            document.querySelectorAll('.graph-svg .node').forEach(node => {
+                node.classList.remove('selected');
+            });
+
+            // Find and highlight the selected node
+            if (variableName) {
+                const nodes = document.querySelectorAll('.graph-svg .node');
+                nodes.forEach(node => {
+                    const title = node.querySelector('title');
+                    if (title && title.textContent.includes(variableName)) {
+                        node.classList.add('selected');
+                    }
+                });
+            }
+        }
+
+        // Color mapping function to convert color names to hex values
+        function getColorHex(colorName) {
+            const colorMap = {
+                'peachpuff3': '#cdaf95',
+                'skyblue3': '#87ceeb',
+                'peachpuff': '#ffdab9',
+                'skyblue': '#87ceeb'
+            };
+            // If it's already a hex color (starts with #), return it as-is
+            if (colorName && colorName.startsWith('#')) {
+                return colorName;
+            }
+            return colorMap[colorName] || colorName;
+        }
+
+        // UI elements
+        const treeContainer = document.getElementById('tree-container');
+        const graphContent = document.getElementById('graph-content');
+
+        // Tree data structure
+        let treeData = {};
+        let selectedNode = null;
+        let globalGraphColors = null; // Store graph colors from initial load
+        let isSearchNavigation = false; // Flag to track if we're navigating from search
+
+        // Search state tracking
+        let searchState = {
+            currentQuery: '',
+            currentMatchIndex: 0,
+            allMatches: [],
+            isSearchActive: false
+        };
+
+        // Initialize the interface
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTreeStructure();
+            setupFuzzySearch();
+            setupResizer();
+            setupZoomControls();
+            setupPanning();
+        });
+
+        function loadTreeStructure() {
+            // First get the basic graph info
+            fetch('/api/graph_info')
+                .then(response => response.json())
+                .then(data => {
+                    // Store graph colors globally
+                    if (data.graph_colors) {
+                        globalGraphColors = data.graph_colors;
+                        loadHelpColors();
+                    } else {
+                        console.error('No graph_colors in API response');
+                    }
+                    // Build tree structure from subsystems
+                    buildTreeFromSubsystems(data.subsystems);
+                })
+                .catch(error => {
+                    console.error('Error loading tree structure:', error);
+                    treeContainer.innerHTML = '<div class="loading" style="color: red;">Error loading model structure</div>';
+                });
+        }
+
+        function buildTreeFromSubsystems(subsystems) {
+            // Create a hierarchical structure from variable names
+            const tree = {};
+
+            // Add model as root
+            tree['model'] = {
+                name: 'Model',
+                path: 'model',
+                type: 'system',
+                children: {},
+                variables: []
+            };
+
+            // Load variables and build tree from variable names
+            loadVariablesForTree(tree);
+        }
+
+        function loadVariablesForTree(tree) {
+            // Load all variables and build tree structure from variable names
+
+            fetch('/api/graph_info')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        buildTreeFromVariables(data.nodes_data, tree);
+                    } else {
+                        console.error('Error loading graph info:', data.error);
+                        treeContainer.innerHTML = '<div class="loading" style="color: red;">Error loading variables</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading variables:', error);
+                    treeContainer.innerHTML = '<div class="loading" style="color: red;">Error loading variables</div>';
+                });
+        }
+
+        function buildTreeFromVariables(nodesData, tree) {
+            // First, get the list of actual subsystems and their ancestors
+            const actualSubsystems = new Set();
+            Object.entries(nodesData).forEach(([nodeIdStr, nodeData]) => {
+                const pathname = nodeData.pathname || '';
+                if (pathname) {
+                    actualSubsystems.add(pathname);
+                    // Add all ancestor paths
+                    const parts = pathname.split('.');
+                    for (let i = 1; i < parts.length; i++) {
+                        const ancestorPath = parts.slice(0, i).join('.');
+                        actualSubsystems.add(ancestorPath);
+                    }
+                }
+            });
+
+            // Process each node to extract variable information
+            const allVariables = new Map();
+
+            Object.entries(nodesData).forEach(([nodeIdStr, nodeData]) => {
+                // Parse the node ID string back to tuple format
+                const nodeId = JSON.parse(nodeIdStr);
+                const [io, varName] = nodeId;
+                const pathname = nodeData.pathname || '';
+
+                if (!allVariables.has(varName)) {
+                    // Extract just the final part of the variable name for display
+                    const displayName = varName.split('.').pop();
+                    allVariables.set(varName, {
+                        name: displayName,
+                        fullName: varName,
+                        path: pathname,
+                        type: io,
+                        io: io,
+                        nodeId: nodeId,
+                        nodeData: nodeData,
+                        isBidirectional: false
+                    });
+                } else {
+                    // Variable already exists - check if it's bidirectional
+                    const existingVar = allVariables.get(varName);
+                    if (existingVar.io !== io) {
+                        // This is a bidirectional variable (has both input and output)
+                        existingVar.isBidirectional = true;
+                        existingVar.type = 'bidirectional';
+                        existingVar.io = 'bidirectional';
+                    }
+                }
+            });
+
+            // Now build the tree structure from variable names
+            allVariables.forEach((variable, key) => {
+
+                // Use the full variable name to build the tree structure
+                const fullVariableName = variable.fullName;
+                const nameParts = fullVariableName.split('.');
+                let current = tree['model'];
+
+                // Create hierarchy based on variable name parts
+                for (let i = 0; i < nameParts.length; i++) {
+                    const part = nameParts[i];
+                    const path = nameParts.slice(0, i + 1).join('.');
+
+                    if (i === nameParts.length - 1) {
+                        // This is the final part - add the variable
+                        if (!current.variables) {
+                            current.variables = [];
+                        }
+                        // Update the variable's path to match the tree hierarchy
+                        variable.path = path;
+                        current.variables.push(variable);
+                    } else {
+                        // This is an intermediate part - create or find the container
+                        if (!current.children[part]) {
+                            // Check if this path corresponds to an actual subsystem
+                            // or if it's a prefix of any actual subsystem
+                            const isActualSubsystem = actualSubsystems.has(path) ||
+                                Array.from(actualSubsystems).some(subsys => subsys.startsWith(path + '.'));
+                            current.children[part] = {
+                                name: part,
+                                path: path,
+                                type: isActualSubsystem ? 'system' : 'container',
+                                children: {},
+                                variables: []
+                            };
+                        }
+                        current = current.children[part];
+                    }
+                }
+            });
+
+            renderTree(tree);
+        }
+
+        function loadVariablesForAllSystems(tree) {
+            // First, collect all variables from all systems
+            const systemPaths = Object.keys(tree);
+            let loadedCount = 0;
+            const allVariables = new Map(); // Map to track variables and their owning systems
+
+            systemPaths.forEach(systemPath => {
+                const pathForAPI = systemPath === 'model' ? '' : systemPath;
+
+                fetch(`/api/subsystem/${encodeURIComponent(pathForAPI)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success && data.nodes_data && tree[systemPath]) {
+                            // Collect variables from this system
+                            for (const [nodeId, nodeData] of Object.entries(data.nodes_data)) {
+                                if (nodeData && nodeData.rel_name && !nodeData.rel_name.startsWith('_auto_ivc.')) {
+                                    const variableKey = `${nodeData.rel_name}_${nodeData.io}`;
+
+                                    // Determine the correct system path from the pathname
+                                    const correctSystemPath = nodeData.pathname || 'model';
+
+                                    // Only add if we haven't seen this variable before
+                                    // or if this is the correct system for this variable
+                                    if (!allVariables.has(variableKey) ||
+                                        allVariables.get(variableKey).systemPath !== correctSystemPath) {
+
+                                        allVariables.set(variableKey, {
+                                            name: nodeData.rel_name,
+                                            path: nodeData.pathname + '.' + nodeData.rel_name,
+                                            type: nodeData.io === 'i' ? 'input' : 'output',
+                                            io: nodeData.io,
+                                            systemPath: correctSystemPath
+                                        });
+                                    }
+                                }
+                            }
+                        }
+
+                        loadedCount++;
+                        if (loadedCount === systemPaths.length) {
+                            // Now assign variables to their correct systems
+                            assignVariablesToSystems(tree, allVariables);
+                            renderTree(tree);
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`Error loading variables for ${systemPath}:`, error);
+                        loadedCount++;
+                        if (loadedCount === systemPaths.length) {
+                            assignVariablesToSystems(tree, allVariables);
+                            renderTree(tree);
+                        }
+                    });
+            });
+        }
+
+        function assignVariablesToSystems(tree, allVariables) {
+            // Clear existing variables
+            Object.keys(tree).forEach(systemPath => {
+                tree[systemPath].variables = [];
+            });
+
+            // Assign each variable to its owning system
+            allVariables.forEach(variable => {
+                const systemPath = variable.systemPath;
+                if (tree[systemPath]) {
+                    tree[systemPath].variables.push({
+                        name: variable.name,
+                        fullName: variable.fullName,
+                        path: variable.path,
+                        type: variable.type,
+                        io: variable.io
+                    });
+                }
+            });
+        }
+
+        function renderTree(tree) {
+            treeData = tree;
+            treeContainer.innerHTML = '';
+
+            // Render the model root
+            const modelNode = tree['model'];
+            if (modelNode) {
+                const nodeElement = createTreeNode(modelNode, 0);
+                treeContainer.appendChild(nodeElement);
+            }
+        }
+
+        function createTreeNode(node, depth) {
+            const nodeDiv = document.createElement('div');
+            nodeDiv.className = 'tree-node';
+            nodeDiv.setAttribute('data-path', node.path);
+            nodeDiv.setAttribute('data-type', node.type);
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'tree-node-content';
+            contentDiv.onclick = () => selectNode(node);
+
+            // Ensure children and variables exist
+            const children = node.children || {};
+            const variables = node.variables || [];
+
+            // Toggle button for systems/containers with children
+            if ((node.type === 'system' || node.type === 'container') && (Object.keys(children).length > 0 || variables.length > 0)) {
+                const toggle = document.createElement('div');
+                toggle.className = 'tree-toggle';
+                // Show expanded state for first level (depth 0)
+                toggle.innerHTML = depth === 0 ? '▼' : '▶';
+                toggle.onclick = (e) => {
+                    e.stopPropagation();
+                    toggleNode(nodeDiv, toggle);
+                };
+                contentDiv.appendChild(toggle);
+            } else {
+                const spacer = document.createElement('div');
+                spacer.className = 'tree-toggle';
+                contentDiv.appendChild(spacer);
+            }
+
+            // Icon
+            const icon = document.createElement('div');
+            if (node.type === 'system') {
+                icon.className = 'tree-icon';
+                icon.innerHTML = '⚙️';
+            } else if (node.type === 'container') {
+                icon.className = 'tree-icon';
+                icon.innerHTML = '📁';
+            } else if (node.type === 'i') {
+                icon.className = 'tree-icon-button input';
+                icon.innerHTML = 'i';
+                // Set dynamic color to match graph input nodes
+                if (cachedColors.input) {
+                    icon.style.background = `linear-gradient(135deg, ${cachedColors.input} 0%, ${darkenColor(cachedColors.input, 0.2)} 100%)`;
+                    icon.style.borderColor = darkenColor(cachedColors.input, 0.2);
+                    icon.style.color = getContrastColor(cachedColors.input);
+                }
+            } else if (node.type === 'o') {
+                icon.className = 'tree-icon-button output';
+                icon.innerHTML = 'o';
+                // Set dynamic color to match graph output nodes
+                if (cachedColors.output) {
+                    icon.style.background = `linear-gradient(135deg, ${cachedColors.output} 0%, ${darkenColor(cachedColors.output, 0.2)} 100%)`;
+                    icon.style.borderColor = darkenColor(cachedColors.output, 0.2);
+                    icon.style.color = getContrastColor(cachedColors.output);
+                }
+            } else if (node.type === 'bidirectional') {
+                icon.className = 'tree-icon double';
+                icon.innerHTML = '<span class="tree-icon-button input" style="font-size: 11px; padding: 2px 4px;">i</span><span class="tree-icon-button output" style="font-size: 11px; padding: 2px 4px;">o</span>';
+                // Set dynamic colors for both input and output icons
+                if (cachedColors.input) {
+                    const inputIcon = icon.querySelector('.input');
+                    if (inputIcon) {
+                        inputIcon.style.background = `linear-gradient(135deg, ${cachedColors.input} 0%, ${darkenColor(cachedColors.input, 0.2)} 100%)`;
+                        inputIcon.style.borderColor = darkenColor(cachedColors.input, 0.2);
+                        inputIcon.style.color = getContrastColor(cachedColors.input);
+                    }
+                }
+                if (cachedColors.output) {
+                    const outputIcon = icon.querySelector('.output');
+                    if (outputIcon) {
+                        outputIcon.style.background = `linear-gradient(135deg, ${cachedColors.output} 0%, ${darkenColor(cachedColors.output, 0.2)} 100%)`;
+                        outputIcon.style.borderColor = darkenColor(cachedColors.output, 0.2);
+                        outputIcon.style.color = getContrastColor(cachedColors.output);
+                    }
+                }
+            }
+            contentDiv.appendChild(icon);
+
+            // Label
+            const label = document.createElement('div');
+            label.className = 'tree-label';
+            label.textContent = node.name;
+            contentDiv.appendChild(label);
+
+            nodeDiv.appendChild(contentDiv);
+
+            // Children container
+            const childrenDiv = document.createElement('div');
+            // Expand the first level (depth 0) of the model tree at startup
+            childrenDiv.className = depth === 0 ? 'tree-children' : 'tree-children collapsed';
+
+            // Add child systems (sorted alphabetically)
+            Object.values(children)
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .forEach(child => {
+                    childrenDiv.appendChild(createTreeNode(child, depth + 1));
+                });
+
+            // Add variables (sorted alphabetically)
+            variables
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .forEach(variable => {
+                    const varNode = {
+                        name: variable.name,
+                        fullName: variable.fullName,
+                        path: variable.path,
+                        type: variable.io, // Use io as the type for variables
+                        io: variable.io
+                    };
+                    childrenDiv.appendChild(createTreeNode(varNode, depth + 1));
+                });
+
+            nodeDiv.appendChild(childrenDiv);
+            return nodeDiv;
+        }
+
+        function toggleNode(nodeElement, toggle) {
+            const children = nodeElement.querySelector('.tree-children');
+            if (children.classList.contains('collapsed')) {
+                children.classList.remove('collapsed');
+                toggle.innerHTML = '▼';
+            } else {
+                children.classList.add('collapsed');
+                toggle.innerHTML = '▶';
+            }
+        }
+
+        function selectNode(node) {
+            // Remove previous selection
+            document.querySelectorAll('.tree-node-content.selected').forEach(el => {
+                el.classList.remove('selected');
+            });
+
+            // Clear any search highlights when selecting a new node (but not during search navigation)
+            if (!isSearchNavigation) {
+                document.querySelectorAll('.tree-node-content.search-highlight, .tree-label.search-highlight').forEach(el => {
+                    el.classList.remove('search-highlight');
+                });
+
+                // Remove any existing highlight spans
+                document.querySelectorAll('.search-highlight-span').forEach(span => {
+                    const parent = span.parentElement;
+                    parent.textContent = parent.textContent;
+                });
+            }
+
+            // Add selection to current node
+            event.currentTarget.classList.add('selected');
+            selectedNode = node;
+
+            // Load the appropriate graph
+            if (node.type === 'system' || node.type === 'container') {
+                updateCurrentSubsystem(node.path);
+                loadSubsystemGraph(node.path);
+            } else if (node.type === 'i' || node.type === 'o' || node.type === 'bidirectional') {
+                // For variables, load the variable-specific graph
+                updateCurrentSubsystem(node.path);
+                loadVariableGraph(node.fullName);
+                // Highlight the selected variable in the graph after a short delay to allow graph to render
+                setTimeout(() => {
+                    highlightSelectedNode(node.name);
+                }, 100);
+            }
+        }
+
+        // Update currentSubsystem when a system is selected
+        function updateCurrentSubsystem(systemPath) {
+            currentSubsystem = systemPath;
+            // No need to reload colors since we're using global graph colors
+        }
+
+        function loadVariableGraph(variable) {
+            showLoading('Loading variable graph...');
+
+            fetch(`/api/variable/${encodeURIComponent(variable)}`)
+                .then(response => {
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success) {
+                        displayGraph(data.dot, `Variable: ${variable}`, data.nodes, data.edges);
+                    } else {
+                        console.error('Variable API error:', data.error);
+                        showError(`Error loading variable: ${data.error}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('Variable API fetch error:', error);
+                    showError(`Error: ${error.message}`);
+                });
+        }
+
+        function loadSubsystemGraph(subsystem) {
+            showLoading('Loading subsystem graph...');
+
+            // Convert 'model' to empty string for top-level system
+            const subsystemPath = subsystem === 'model' ? '' : subsystem;
+
+            fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        displayGraph(data.dot, `System: ${subsystem}`, data.nodes, data.edges);
+                    } else {
+                        showError(`Error loading subsystem: ${data.error}`);
+                    }
+                })
+                .catch(error => {
+                    console.error('System load error:', error);
+                    showError(`Error: ${error.message}`);
+                });
+        }
+
+        function displayGraph(dotContent, title, nodes, edges) {
+            showLoading('Rendering graph...');
+
+            // Reset pan position for new graph
+            panX = 0;
+            panY = 0;
+
+            instance().then(viz => {
+                try {
+                    const svgElement = viz.renderSVGElement(dotContent);
+
+                    // Clear the loading message
+                    graphContent.innerHTML = '';
+
+                    // Append the SVG element to the graph container
+                    graphContent.appendChild(svgElement);
+
+                    // Add selection styling and event handlers
+                    const svgs = graphContent.querySelectorAll('svg');
+                    svgs.forEach(svg => {
+                        svg.classList.add('graph-svg');
+                        addSelectionStylingToSvg(svg);
+                    });
+
+                    // Show zoom controls and apply current zoom level
+                    const zoomControls = document.getElementById('zoom-controls');
+                    if (zoomControls) {
+                        zoomControls.style.display = 'flex';
+                    }
+                    updateZoom(currentZoom);
+                } catch (error) {
+                    showError(`Error rendering graph: ${error.message}`);
+                }
+            }).catch(error => {
+                showError(`Error loading viz.js: ${error.message}`);
+            });
+        }
+
+        function showLoading(message) {
+            graphContent.innerHTML = `<div class="loading">${message}</div>`;
+            // Hide zoom controls when showing loading/error messages
+            const zoomControls = document.getElementById('zoom-controls');
+            if (zoomControls) {
+                zoomControls.style.display = 'none';
+            }
+        }
+
+        function showError(message) {
+            graphContent.innerHTML = `<div class="loading" style="color: red;">${message}</div>`;
+            // Hide zoom controls when showing loading/error messages
+            const zoomControls = document.getElementById('zoom-controls');
+            if (zoomControls) {
+                zoomControls.style.display = 'none';
+            }
+        }
+
+        function loadHelpColors() {
+            // Use global graph colors if available
+            if (globalGraphColors) {
+                // Cache the colors from global graph colors
+                if (globalGraphColors.input) {
+                    cachedColors.input = getColorHex(globalGraphColors.input);
+                }
+                if (globalGraphColors.output) {
+                    cachedColors.output = getColorHex(globalGraphColors.output);
+                }
+                // Update tree icon colors to match
+                updateTreeIconColors();
+                if (globalGraphColors.highlight) {
+                    cachedColors.highlight = getColorHex(globalGraphColors.highlight);
+                } else {
+                    console.error('No highlight color in globalGraphColors');
+                }
+                if (globalGraphColors.boundary) {
+                    cachedColors.boundary = getColorHex(globalGraphColors.boundary);
+                } else {
+                    console.error('No boundary color in globalGraphColors');
+                }
+                colorsLoaded = true; // Mark as loaded
+                helpRetryCount = 0; // Reset retry counter
+            } else {
+                // Fallback to old method if global colors not available
+                const subsystemPath = currentSubsystem === 'model' ? '' : currentSubsystem;
+                colorsLoaded = false; // Reset flag
+
+                fetch(`/api/subsystem/${encodeURIComponent(subsystemPath)}`)
+                    .then(response => response.json())
+                    .then(subsystemData => {
+                        if (subsystemData.success && subsystemData.help_colors) {
+                            // Cache the colors
+                            if (subsystemData.help_colors.i) {
+                                cachedColors.input = getColorHex(subsystemData.help_colors.i);
+                            }
+                            if (subsystemData.help_colors.o) {
+                                cachedColors.output = getColorHex(subsystemData.help_colors.o);
+                            }
+                            // Update tree icon colors to match
+                            updateTreeIconColors();
+                        }
+                        colorsLoaded = true; // Mark as loaded
+                        helpRetryCount = 0; // Reset retry counter
+                    })
+                    .catch(error => {
+                        // Keep default colors if fetch fails
+                        colorsLoaded = true; // Still mark as loaded even if failed
+                        helpRetryCount = 0; // Reset retry counter
+                    });
+            }
+        }
+
+        window.showHelp = function() {
+            console.log('showHelp() called');
+
+            // Simple approach: just show the modal immediately
+            const modal = document.getElementById('help-modal');
+            if (modal) {
+                modal.style.display = 'flex';
+                console.log('Modal displayed successfully');
+
+                // Try to set colors if they're available, but don't block on it
+                try {
+                    const inputColorEl = document.getElementById('input-color-swatch');
+                    const outputColorEl = document.getElementById('output-color-swatch');
+                    const highlightColorEl = document.getElementById('highlight-color-swatch');
+                    const boundaryColorEl = document.getElementById('boundary-color-swatch');
+
+                    if (inputColorEl && cachedColors.input) {
+                        inputColorEl.style.backgroundColor = cachedColors.input;
+                    }
+                    if (outputColorEl && cachedColors.output) {
+                        outputColorEl.style.backgroundColor = cachedColors.output;
+                    }
+                    if (highlightColorEl && cachedColors.highlight) {
+                        highlightColorEl.style.backgroundColor = cachedColors.highlight;
+                    }
+                    if (boundaryColorEl && cachedColors.boundary) {
+                        boundaryColorEl.style.backgroundColor = cachedColors.boundary;
+                    }
+                } catch (error) {
+                    console.warn('Error setting colors:', error);
+                }
+            } else {
+                console.error('Modal element not found!');
+            }
+        }
+
+
+        window.hideHelp = function() {
+            document.getElementById('help-modal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('help-modal');
+            if (event.target === modal) {
+                hideHelp();
+            }
+        }
+
+        // Fuzzy search functionality
+        function setupFuzzySearch() {
+            const searchInput = document.getElementById('fuzzy-search');
+
+            searchInput.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    const query = searchInput.value.trim();
+                    if (query) {
+                        navigateToBestMatch(query);
+                    }
+                }
+            });
+
+            // Clear search state when user types
+            searchInput.addEventListener('input', function(event) {
+                clearSearchState();
+            });
+        }
+
+        // Simple fuzzy search algorithm
+        function fuzzyMatch(query, text) {
+            if (!query || !text) return 0;
+
+            const queryLower = query.toLowerCase();
+            const textLower = text.toLowerCase();
+
+            // Exact match gets highest score
+            if (textLower === queryLower) return 100;
+
+            // Starts with query gets high score
+            if (textLower.startsWith(queryLower)) return 90;
+
+            // Contains query gets medium score
+            if (textLower.includes(queryLower)) return 70;
+
+            // Fuzzy matching - check if all characters in query appear in order
+            let queryIndex = 0;
+            let score = 0;
+
+            for (let i = 0; i < textLower.length && queryIndex < queryLower.length; i++) {
+                if (textLower[i] === queryLower[queryIndex]) {
+                    score += 10;
+                    queryIndex++;
+                }
+            }
+
+            // If all query characters were found in order, return the score
+            if (queryIndex === queryLower.length) {
+                return score;
+            }
+
+            return 0;
+        }
+
+        // Find all tree nodes and their text content
+        function getAllTreeNodes() {
+            const nodes = [];
+            const treeElements = document.querySelectorAll('.tree-node');
+
+            treeElements.forEach(element => {
+                const labelElement = element.querySelector('.tree-label');
+                if (labelElement) {
+                    const text = labelElement.textContent;
+                    const path = element.getAttribute('data-path');
+                    const type = element.getAttribute('data-type');
+
+                    nodes.push({
+                        element: element,
+                        text: text,
+                        path: path,
+                        type: type
+                    });
+                }
+            });
+
+            return nodes;
+        }
+
+        // Find all matches for a query, sorted by score
+        function findAllMatches(query) {
+            const allNodes = getAllTreeNodes();
+            const matches = [];
+
+            allNodes.forEach(node => {
+                const score = fuzzyMatch(query, node.text);
+                if (score > 0) {
+                    matches.push({
+                        ...node,
+                        score: score
+                    });
+                }
+            });
+
+            // Sort by score (highest first)
+            matches.sort((a, b) => b.score - a.score);
+            return matches;
+        }
+
+        // Navigate to the next match (or first match if new search)
+        function navigateToBestMatch(query) {
+            // Check if this is a new search or continuing with the same query
+            if (query !== searchState.currentQuery) {
+                // New search - find all matches
+                searchState.currentQuery = query;
+                searchState.allMatches = findAllMatches(query);
+                searchState.currentMatchIndex = 0;
+                searchState.isSearchActive = true;
+            } else if (searchState.isSearchActive) {
+                // Same query - move to next match
+                searchState.currentMatchIndex = (searchState.currentMatchIndex + 1) % searchState.allMatches.length;
+            } else {
+                // No active search - start new one
+                searchState.currentQuery = query;
+                searchState.allMatches = findAllMatches(query);
+                searchState.currentMatchIndex = 0;
+                searchState.isSearchActive = true;
+            }
+
+            // Check if we have any matches
+            if (searchState.allMatches.length === 0) {
+                console.log('No match found for:', query);
+                searchState.isSearchActive = false;
+                return;
+            }
+
+            // Get the current match
+            const currentMatch = searchState.allMatches[searchState.currentMatchIndex];
+
+            // Clear previous highlights
+            document.querySelectorAll('.tree-node-content, .tree-label').forEach(el => {
+                el.classList.remove('search-highlight');
+            });
+
+            // Remove any existing highlight spans
+            document.querySelectorAll('.search-highlight-span').forEach(span => {
+                const parent = span.parentElement;
+                parent.textContent = parent.textContent;
+            });
+
+            // Highlight only the label (name) part of the match
+            const labelElement = currentMatch.element.querySelector('.tree-label');
+            if (labelElement) {
+                // Wrap the text content in a span for precise highlighting
+                const originalText = labelElement.textContent;
+                labelElement.innerHTML = `<span class="search-highlight-span">${originalText}</span>`;
+            }
+
+            // Expand parent nodes to make the match visible
+            expandToShowNode(currentMatch.element);
+
+            // Scroll to the match
+            currentMatch.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            // Select the node (which will load its graph)
+            const nodeData = getNodeDataFromElement(currentMatch.element);
+            if (nodeData) {
+                isSearchNavigation = true; // Set flag before navigation
+                selectNode(nodeData);
+                isSearchNavigation = false; // Clear flag after navigation
+            }
+
+            // Update search input placeholder to show current match position
+            updateSearchPlaceholder();
+        }
+
+        // Update search input placeholder to show current match position
+        function updateSearchPlaceholder() {
+            const searchInput = document.getElementById('fuzzy-search');
+            if (searchState.isSearchActive && searchState.allMatches.length > 0) {
+                const current = searchState.currentMatchIndex + 1;
+                const total = searchState.allMatches.length;
+                searchInput.placeholder = `Search... (${current} of ${total})`;
+            } else {
+                searchInput.placeholder = 'Search...';
+            }
+        }
+
+        // Clear search state when user types in search input
+        function clearSearchState() {
+            searchState.currentQuery = '';
+            searchState.currentMatchIndex = 0;
+            searchState.allMatches = [];
+            searchState.isSearchActive = false;
+
+            // Clear highlights
+            document.querySelectorAll('.tree-node-content, .tree-label').forEach(el => {
+                el.classList.remove('search-highlight');
+            });
+
+            // Remove any existing highlight spans
+            document.querySelectorAll('.search-highlight-span').forEach(span => {
+                const parent = span.parentElement;
+                parent.textContent = parent.textContent;
+            });
+
+            // Reset placeholder
+            updateSearchPlaceholder();
+        }
+
+        // Expand parent nodes to make a node visible
+        function expandToShowNode(nodeElement) {
+            // Get the path of the target node
+            const targetPath = nodeElement.getAttribute('data-path');
+            if (!targetPath) return;
+
+            // Split the target path into parts to find the hierarchy
+            const targetParts = targetPath.split('.');
+
+            // Find all tree nodes and expand only direct ancestors
+            const allTreeNodes = document.querySelectorAll('.tree-node');
+
+            allTreeNodes.forEach(node => {
+                const nodePath = node.getAttribute('data-path');
+                if (!nodePath) return;
+
+                // Check if this node is a direct ancestor of the target
+                const nodeParts = nodePath.split('.');
+                const isDirectAncestor = nodeParts.length < targetParts.length &&
+                                       targetParts.slice(0, nodeParts.length).join('.') === nodePath;
+
+                if (isDirectAncestor) {
+                    // This node is a direct ancestor of the target - expand it
+                    const childrenDiv = node.querySelector('.tree-children');
+                    if (childrenDiv && childrenDiv.classList.contains('collapsed')) {
+                        const toggle = node.querySelector('.tree-toggle');
+                        if (toggle) {
+                            toggleNode(node, toggle);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Get node data from DOM element
+        function getNodeDataFromElement(element) {
+            const path = element.getAttribute('data-path');
+            const type = element.getAttribute('data-type');
+            const labelElement = element.querySelector('.tree-label');
+            const text = labelElement ? labelElement.textContent : '';
+
+            // Find the corresponding node in treeData
+            return findNodeInTreeData(treeData, path, type, text);
+        }
+
+        // Find node in tree data structure
+        function findNodeInTreeData(tree, path, type, name) {
+            if (tree['model']) {
+                return findNodeInTreeDataRecursive(tree['model'], path, type, name);
+            }
+            return null;
+        }
+
+        function findNodeInTreeDataRecursive(node, path, type, name) {
+            if (node.path === path && node.type === type && node.name === name) {
+                return node;
+            }
+
+            // Check children
+            if (node.children) {
+                for (const child of Object.values(node.children)) {
+                    const found = findNodeInTreeDataRecursive(child, path, type, name);
+                    if (found) return found;
+                }
+            }
+
+            // Check variables
+            if (node.variables) {
+                for (const variable of node.variables) {
+                    if (variable.path === path && variable.type === type && variable.name === name) {
+                        return variable;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        // Resizer functionality
+        function setupResizer() {
+            const resizer = document.getElementById('resizer');
+            const sidebar = document.getElementById('sidebar');
+            let isResizing = false;
+
+            resizer.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+
+                const containerRect = document.querySelector('.content-area').getBoundingClientRect();
+                const newWidth = e.clientX - containerRect.left;
+
+                // Apply constraints
+                const minWidth = 200;
+                const maxWidth = 600;
+                const constrainedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+
+                sidebar.style.width = constrainedWidth + 'px';
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
+
+            // Prevent text selection while resizing
+            resizer.addEventListener('selectstart', function(e) {
+                e.preventDefault();
+            });
+        }
+
+    </script>
+</body>
+</html>
+

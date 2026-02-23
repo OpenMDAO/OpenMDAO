@@ -38,7 +38,7 @@ def index_to_varname(system, loc):
             break
         start = end
 
-    if varname == name:
+    if varname == name or name.startswith('_auto_ivc.'):
         name_string = "'{}' index {}.".format(varname, loc - start)
     else:
         name_string = "'{}' ('{}') index {}.".format(varname, name, loc - start)

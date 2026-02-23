@@ -17,6 +17,7 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.relevance import get_relevance
 from openmdao.utils.array_utils import get_random_arr
+from openmdao.utils.general_utils import _unwrap_comm
 
 
 _directional_rng = np.random.default_rng(99)
@@ -499,15 +500,15 @@ class _TotalJacInfo(object):
                 full_tgt_inds = np.zeros(0, dtype=INT_DTYPE)
 
             tgt_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size, dtype=float),
-                                                  comm=self.comm)
+                                                  comm=_unwrap_comm(self.comm))
             self.tgt_petsc[mode] = tgt_vec
 
             src_vec = PETSc.Vec().createWithArray(np.zeros(rowcol_size, dtype=float),
-                                                  comm=self.comm)
+                                                  comm=_unwrap_comm(self.comm))
             self.src_petsc[mode] = src_vec
 
-            src_indexset = PETSc.IS().createGeneral(full_src_inds, comm=self.comm)
-            tgt_indexset = PETSc.IS().createGeneral(full_tgt_inds, comm=self.comm)
+            src_indexset = PETSc.IS().createGeneral(full_src_inds, comm=_unwrap_comm(self.comm))
+            tgt_indexset = PETSc.IS().createGeneral(full_tgt_inds, comm=_unwrap_comm(self.comm))
 
             return PETSc.Scatter().create(src_vec, src_indexset, tgt_vec, tgt_indexset)
 
@@ -578,8 +579,8 @@ class _TotalJacInfo(object):
         """
         iproc = self.comm.rank
         model = self.model
+        conn_graph = model.get_conn_graph()
         has_par_deriv_color = False
-        all_abs2meta_out = model._var_allprocs_abs2meta['output']
         var_sizes = model._var_sizes
         var_offsets = model._get_var_offsets()
         abs2idx = model._var_allprocs_abs2idx
@@ -599,13 +600,18 @@ class _TotalJacInfo(object):
 
             source = meta['source']
 
-            in_var_meta = all_abs2meta_out[source]
-            dist = in_var_meta['distributed']
+            node_meta = conn_graph.nodes[('o', source)]['attrs']
+            dist = node_meta.distributed
 
-            if dist:
-                end += meta['global_size']
+            in_idxs = meta['indices'] if 'indices' in meta else None
+
+            if in_idxs is None:
+                # if the var is not distributed, global_size == local size
+                irange = np.arange(node_meta.global_size, dtype=INT_DTYPE)
             else:
-                end += meta['size']
+                irange = in_idxs.shaped_array(copy=True)
+
+            end += len(irange)
 
             cache_lin_sol = meta['cache_linear_solution']
             if model.comm.size > 1:
@@ -620,14 +626,6 @@ class _TotalJacInfo(object):
                     self.par_deriv_printnames[parallel_deriv_color] = []
 
                 self.par_deriv_printnames[parallel_deriv_color].append(name)
-
-            in_idxs = meta['indices'] if 'indices' in meta else None
-
-            if in_idxs is None:
-                # if the var is not distributed, global_size == local size
-                irange = np.arange(in_var_meta['global_size'], dtype=INT_DTYPE)
-            else:
-                irange = in_idxs.shaped_array(copy=True)
 
             in_var_idx = abs2idx[source]
             sizes = var_sizes['output']

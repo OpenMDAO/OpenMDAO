@@ -1,9 +1,11 @@
 """
 Various graph related utilities.
 """
+from pprint import pformat
+import textwrap
 import networkx as nx
+
 from openmdao.utils.general_utils import all_ancestors, common_subpath
-from openmdao.utils.units import _find_unit
 
 
 def get_sccs_topo(graph):
@@ -181,13 +183,16 @@ def get_unresolved_knowns(graph, meta_name, nodes):
     gnodes = graph.nodes
     unresolved = set()
     for node in nodes:
-        if gnodes[node][meta_name] is not None:  # node has known shape
+        if node in unresolved:
+            continue
+
+        if getattr(gnodes[node]['conn_meta'], meta_name, None) is not None:  # node has known shape
             for succ in graph.successors(node):
-                if gnodes[succ][meta_name] is None:
+                if getattr(gnodes[succ]['conn_meta'], meta_name, None) is None:
                     unresolved.add(node)
                     break
             for pred in graph.predecessors(node):
-                if gnodes[pred][meta_name] is None:
+                if getattr(gnodes[pred]['conn_meta'], meta_name, None) is None:
                     unresolved.add(node)
                     break
 
@@ -216,10 +221,10 @@ def is_unresolved(graph, node, meta_name):
     """
     nodes = graph.nodes
     for s in graph.successors(node):
-        if nodes[s][meta_name] is None:
+        if getattr(nodes[s]['conn_meta'], meta_name) is None:
             return True
     for p in graph.predecessors(node):
-        if nodes[p][meta_name] is None:
+        if getattr(nodes[p]['conn_meta'], meta_name) is None:
             return True
     return False
 
@@ -298,7 +303,7 @@ def get_active_edges(graph, knowns, meta_name):
 
     for known in knowns:
         for succ in graph.successors(known):
-            if nodes[succ][meta_name] is None:
+            if getattr(nodes[succ]['conn_meta'], meta_name) is None:
                 if edges[known, succ]['multi']:
                     computed_nodes.add(succ)
                 else:
@@ -334,49 +339,219 @@ def meta2node_data(meta, to_extract):
     return {k: meta[k] for k in to_extract}
 
 
-_shape_extract = ('distributed', 'shape', 'compute_shape', 'shape_by_conn', 'copy_shape')
-_units_extract = ('units', 'compute_units', 'units_by_conn', 'copy_units')
-
-
-def add_shape_node(graph, name, io, meta):
+def dump_nodes(G):
     """
-    Add a shape node to the graph.
+    Dump the nodes of the given graph.
 
     Parameters
     ----------
-    graph : networkx.DiGraph
-        Graph to add the shape node to.
-    name : str
-        Name of the shape node.
-    io : str
-        Input or output.
-    meta : dict
-        Metadata for the variable.
+    G : networkx.DiGraph
+        Directed graph of Systems and variables.
     """
-    kwargs = {k: meta[k] for k in _shape_extract}
-    if io == 'input':
-        kwargs['src_indices'] = meta.get('src_indices')
-        kwargs['flat_src_indices'] = meta.get('flat_src_indices')
-    graph.add_node(name, io=io, **kwargs)
+    for node, data in G.nodes(data=True):
+        print(f"{node}: {data}")
 
 
-def add_units_node(graph, name, io, meta):
+def dump_edges(G, show_none=False):
     """
-    Add a units node to the graph.
+    Dump the edges of the given graph.
 
     Parameters
     ----------
-    graph : networkx.DiGraph
-        Graph to add the units node to.
-    name : str
-        Name of the units node.
-    io : str
-        Input or output.
-    meta : dict
-        Metadata for the variable.
+    G : networkx.DiGraph
+        Directed graph of Systems and variables.
+    show_none : bool
+        If True, show edges with None data.
     """
-    kwargs = {k: meta[k] for k in _units_extract}
-    if kwargs['units'] is not None:
-        # Turn units data into a PhysicalUnit so units of expressions can be computed.
-        kwargs['units'] = _find_unit(kwargs['units'])
-    graph.add_node(name, io=io, **kwargs)
+    for u, v, data in G.edges(data=True):
+        print(f"{u} -> {v}:")
+        if show_none:
+            print(textwrap.indent(pformat(data), '  '))
+        else:
+            dct = {k: v for k, v in data.items() if v is not None}
+            print(textwrap.indent(pformat(dct), '  '))
+
+
+def escape_dot_string(s):
+    """
+    Escape special characters for DOT format.
+
+    Parameters
+    ----------
+    s : str
+        The string to escape.
+
+    Returns
+    -------
+    str
+        The escaped string.
+    """
+    # Escape backslashes and quotes
+    s = s.replace('\\', '\\\\')
+    s = s.replace('"', '\\"')
+    return s
+
+
+def _get_dot_label_str(G, node):
+    """
+    Get the DOT label string for the given node.
+
+    Parameters
+    ----------
+    G : networkx.DiGraph
+        Directed graph of Systems and variables.
+    node : str
+        The name of the node.
+
+    Returns
+    -------
+    str
+        The DOT label string for the given node.
+    """
+    attrs = G.nodes[node]
+
+    # Check if label is HTML (indicated by html_label attribute)
+    if 'html_label' in attrs:
+        # Use angle brackets for HTML labels
+        return f'<{attrs["html_label"]}>'
+    elif 'label' in attrs:
+        # Regular text label with escaping
+        label = escape_dot_string(attrs['label'])
+        return f'"{label}"'
+    else:
+        # Default to node name
+        label = escape_dot_string(str(node))
+        return f'"{label}"'
+
+
+def networkx_to_dot(G):
+    """
+    Convert a NetworkX graph to DOT format for viz.js
+
+    Node attributes that viz.js recognizes:
+    - label: display text for the node
+    - shape: node shape (box, circle, ellipse, etc.)
+    - color: node color
+    - style: filled, rounded, etc.
+    - fillcolor: fill color when style=filled
+
+    Edge attributes that viz.js recognizes:
+    - label: display text for the edge
+    - color: edge color
+    - style: solid, dashed, dotted, bold
+    - weight: edge thickness
+    - arrowhead: arrow style (normal, dot, diamond, etc.)
+    - dir: arrow direction (forward, back, both, none)
+    """
+    lines = []
+
+    # Determine if graph is directed
+    if G.is_directed():
+        lines.append("digraph G {")
+        edge_op = "->"
+    else:
+        lines.append("graph G {")
+        edge_op = "--"
+
+    orientation = G.graph.get('orientation', 'LR')
+    shape = G.graph.get('shape', 'ellipse')
+
+    # Add graph attributes for better layout
+    lines.append(f"  rankdir={orientation};")  # Left to right layout
+    lines.append(f"  node [shape={shape}];")  # Default node shape
+    lines.append("  labeljust=l;")  # Left-justify all labels
+
+    # Add nodes with attributes
+    for node, attrs in G.nodes(data=True):
+        label = _get_dot_label_str(G, node)
+        attr_strs = [f'label={label}']
+
+        # Add other attributes
+        for key in ['shape', 'color', 'style', 'fillcolor', 'penwidth', 'tooltip']:
+            if key in attrs:
+                attr_strs.append(f'{key}="{attrs[key]}"')
+
+        attr_str = ", ".join(attr_strs)
+        lines.append(f'  "{node}" [{attr_str}];')
+
+    # Add edges with attributes
+    for u, v in G.edges():
+        attrs = G.edges[u, v]
+        attr_strs = []
+
+        # Handle HTML labels for edges
+        if 'html_label' in attrs:
+            attr_strs.append(f'label=<{attrs["html_label"]}>')
+        elif 'label' in attrs:
+            label = escape_dot_string(str(attrs['label']))
+            attr_strs.append(f'label="{label}"')
+
+        # Add other edge attributes
+        for key in ['color', 'style', 'weight', 'dir', 'arrowhead', 'tooltip']:
+            if key in attrs:
+                attr_strs.append(f'{key}="{attrs[key]}"')
+
+        if attr_strs:
+            attr_str = ", ".join(attr_strs)
+            lines.append(f'  "{u}" {edge_op} "{v}" [{attr_str}];')
+        else:
+            lines.append(f'  "{u}" {edge_op} "{v}";')
+
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def dot_to_html(dot_string, outfile="graph.html", show=True):
+    """Create an HTML file with viz.js visualization"""
+    from openmdao.utils.webview import webview
+
+    html_template = """
+        <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="utf-8">
+                <title>NetworkX Graph Visualization</title>
+                <style>
+                    body {
+                        margin: 0;
+                        padding: 0;
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        width: 100vw;
+                        height: 100vh;
+                        background-color: white;
+                    }
+                    #graph {
+                        width: 100%;
+                        height: 100%;
+                        overflow: auto;
+                    }
+                </style>
+            </head>
+            <body>
+                <div id="graph"></div>
+                <script type="module">
+                    const dotString = `DOT_STRING_PLACEHOLDER`;
+                    import { instance } from "https://cdn.jsdelivr.net/npm/@viz-js/viz@3.2.4/+esm";
+
+                        instance().then(viz => {
+                            const svg = viz.renderSVGElement(dotString);
+                            document.getElementById("graph").appendChild(svg);
+                        });
+                </script>
+            </body>
+            </html>
+        """
+
+    html_content = html_template.replace("DOT_STRING_PLACEHOLDER", dot_string)
+
+    with open(outfile, 'w') as f:
+        f.write(html_content)
+
+    print(f"Graph visualization saved to {outfile}")
+
+    if show:
+        webview(outfile)
+
+    return outfile

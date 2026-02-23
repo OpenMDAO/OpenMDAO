@@ -6,7 +6,7 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.jax_utils import jax
 
 if jax is not None:
-    from openmdao.jax import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, \
+    from openmdao.jax_funcs import act_tanh, smooth_abs, smooth_max, smooth_min, ks_max, \
         ks_min, smooth_round
 
 
@@ -93,7 +93,7 @@ class TestJax(unittest.TestCase):
         assert_near_equal(ksmax, npmax, tolerance=1.0E-6)
 
     def test_ks_min(self):
-        x = np.random.random(1000)
+        x = np.random.default_rng(42).random(1000)
 
         ksmin = np.asarray(ks_min(x, rho=1.E6))
         npmin = np.min(x)

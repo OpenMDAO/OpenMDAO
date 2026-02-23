@@ -2,11 +2,26 @@
 
 [run]
 disable_warnings = module-not-measured
-
-[report]
+source = openmdao
 omit =
     */tests/*
     */devtools/*
     */test_suite/*
     */docs/*
     */code_review/*
+    */dymos/*
+    */aviary/*
+    */pycycle/*
+
+[report]
+ignore_errors = True
+include = *.py
+omit =
+    */tests/*
+    */devtools/*
+    */test_suite/*
+    */docs/*
+    */code_review/*
+    */dymos/*
+    */aviary/*
+    */pycycle/*

@@ -51,36 +51,51 @@ jobs:
         PIXI_ENVIRONMENT: [minimal, py311, py312, py313, default, dev, oldest]
         BANDIT: [false]
         RUFF: [false]
-        SNOPT: [false]
+        SNOPT: [true]
+        COVERAGE: [false]
         include:
+
+          # Windows - py313 with coverage
+          - OS: windows-latest
+            PIXI_ENVIRONMENT: py313
+            BANDIT: false
+            RUFF: false
+            COVERAGE: true
+
           # Windows - only minimal
           - OS: windows-latest
             PIXI_ENVIRONMENT: minimal
             BANDIT: false
             RUFF: false
+            COVERAGE: false
 
           # Bandit only on Ubuntu py312
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: py312
             BANDIT: true
             RUFF: false
+            COVERAGE: false
 
-          # Ruff only on Ubuntu dev
+          # Do ruff and coverage on Ubuntu dev
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: dev
             BANDIT: false
             RUFF: true
+            COVERAGE: true
 
         exclude:
           # Exclude the duplicate ubuntu-24.04 + py312 with BANDIT: false
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: py312
             BANDIT: false
+            COVERAGE: false
 
-          # Exclude the duplicate ubuntu-24.04 + dev with RUFF: false
+          # Exclude the duplicate ubuntu-24.04 + dev with RUFF: false and COVERAGE: false
           - OS: ubuntu-24.04
             PIXI_ENVIRONMENT: dev
+            BANDIT: false
             RUFF: false
+            COVERAGE: false
 
     runs-on: ${{ matrix.OS }}
 
@@ -109,11 +124,33 @@ jobs:
           echo "Testing: ${GITHUB_REPOSITORY}"
           echo "Triggered by: ${GITHUB_EVENT_NAME}"
           echo "Initiated by: ${GITHUB_ACTOR}"
+          echo "matrix.PIXI_ENVIRONMENT: ${{matrix.PIXI_ENVIRONMENT}}"
+          echo "matrix.SNOPT: ${{matrix.SNOPT}}"
+          echo "matrix.RUFF: ${{matrix.RUFF}}"
+          echo "matrix.BANDIT: ${{matrix.BANDIT}}"
           echo "============================================================="
 
-      - name: Create SSH key
-        if: matrix.SNOPT && runner.os != 'Windows'
+      - name: Check SNOPT availability
+        id: check_snopt
+        run: |
+          if [[ "${{ matrix.PIXI_ENVIRONMENT }}" != "minimal" ]] && [[ "${{ matrix.SNOPT }}" == "true" ]] && [[ "${{ secrets.SNOPT_LOCATION_77 }}" != "" ]]; then
+            echo "should_run_snopt=true" >> $GITHUB_OUTPUT
+            echo "SNOPT is enabled and secrets are available"
+          else
+            echo "should_run_snopt=false" >> $GITHUB_OUTPUT
+            if [[ "${{ matrix.SNOPT }}" == "true" ]]; then
+              if [[ "${{ matrix.PIXI_ENVIRONMENT }}" == "minimal" ]]; then
+                echo "SNOPT is enabled but minimal environment is not supported"
+              elif [[ "${{ secrets.SNOPT_LOCATION_77 }}" == "" ]]; then
+                echo "SNOPT is enabled but secrets are not available - skipping SNOPT steps"
+              fi
+            else
+              echo "SNOPT is disabled in matrix"
+            fi
+          fi
 
+      - name: Create SSH key
+        if: steps.check_snopt.outputs.should_run_snopt == 'true' && runner.os != 'Windows'
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
@@ -121,11 +158,11 @@ jobs:
           eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
           mkdir -p ~/.ssh/
           echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          sudo chmod 600 ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
       - name: Install compilers
-        if: matrix.SNOPT && runner.os != 'Windows'
+        if: steps.check_snopt.outputs.should_run_snopt == 'true' && runner.os != 'Windows'
         run: |
           eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
           echo "============================================================="
@@ -136,6 +173,44 @@ jobs:
           else
             pixi add cython swig compilers cmake meson
           fi
+
+      - uses: fortran-lang/setup-fortran@v1
+        id: setup-fortran
+        if: steps.check_snopt.outputs.should_run_snopt == 'true' && runner.os == 'Windows'
+        with:
+          compiler: intel
+          version: 2025.2
+
+      - name: Install build_pyoptsparse
+        if: steps.check_snopt.outputs.should_run_snopt == 'true'
+        run: |
+          echo "============================================================="
+          echo "Install build_pyoptsparse in pixi environment"
+          echo "============================================================="
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          pip install . git+https://github.com/OpenMDAO/build_pyoptsparse.git
+
+      - name: Copy SNOPT source files
+        if: steps.check_snopt.outputs.should_run_snopt == 'true'
+        run: |
+          echo "============================================================="
+          echo "Copying SNOPT 7.7 source files via SSH"
+          echo "============================================================="
+          mkdir -p SNOPT
+          scp -qr ${{ secrets.SNOPT_LOCATION_77 }} SNOPT
+          ls -la SNOPT/src
+
+      - name: Build SNOPT module
+        if: steps.check_snopt.outputs.should_run_snopt == 'true'
+        env:
+          FC: ${{ runner.os == 'Windows' && 'ifx' || 'gfortran' }}
+          CC: ${{ runner.os == 'Windows' && 'cl' || 'gcc' }}
+        run: |
+          echo "============================================================="
+          echo "Build SNOPT module with build_pyoptsparse"
+          echo "============================================================="
+          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
+          python -m build_pyoptsparse.snopt_module SNOPT/src
 
       - name: Check MPI and PETSc
         continue-on-error: true
@@ -194,6 +269,7 @@ jobs:
           # MPI settings for CI (all platforms)
           PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
           OMPI_MCA_rmaps_base_oversubscribe: "1"
+          COVERAGE_RUN: "true"
         run: |
           eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
           echo "============================================================="
@@ -207,10 +283,10 @@ jobs:
           python openmdao/core/tests/test_functional_interface.py 
 
           # Build testflo command
-          TESTFLO_CMD="testflo -n 2 openmdao --timeout=240 --durations=20"
+          TESTFLO_CMD="testflo openmdao --skip_dir=.pixi --timeout=240 --durations=20"
 
-          # Do not perform coverage on macOS
-          if [[ "${{ runner.os }}" != "macOS" ]]; then
+          # Only perform coverage on specified OS + Python version combinations
+          if [[ "${{ matrix.COVERAGE }}" == "true" ]]; then
             TESTFLO_CMD="$TESTFLO_CMD --coverage --coverpkg openmdao"
           fi
 
@@ -235,15 +311,25 @@ jobs:
         shell: pwsh
         env:
           OPENMDAO_CHECK_ALL_PARTIALS: true
+          COVERAGE_RUN: "true"
         run: |
           & pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }} -s powershell | Out-String | Invoke-Expression
           echo "============================================================="
-          echo "Run tests with coverage (from directory other than repo root)"
+          echo "Run tests (from directory other than repo root)"
           echo "============================================================="
           copy .coveragerc "$HOME"
           Set-DisplayResolution -Width 1920 -Height 1080 -Force
           cd "$HOME"
-          testflo -n 1 openmdao --timeout=240 --show_skipped --coverage  --coverpkg openmdao --durations=20 --pre_announce
+
+          # Build testflo command
+          $TESTFLO_CMD = "testflo -n 1 openmdao --skip_dir=.pixi --timeout=240 --show_skipped --durations=20 --pre_announce"
+
+          # Only perform coverage on specified OS + Python version combinations
+          if ("${{ matrix.COVERAGE }}" -eq "true") {
+            $TESTFLO_CMD += " --coverage --coverpkg openmdao"
+          }
+
+          Invoke-Expression $TESTFLO_CMD
 
       - name: Display test report on failure (windows)
         if: steps.run_tests_windows.outcome == 'failure'
@@ -255,7 +341,8 @@ jobs:
 
       - name: Submit coverage
         id: coveralls
-        continue-on-error: true
+        if: matrix.COVERAGE
+        continue-on-error: false
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COVERALLS_SERVICE_NAME: "github"
@@ -271,7 +358,7 @@ jobs:
           coveralls --basedir $SITE_DIR
 
       - name: Slack failure to upload to coveralls.io
-        if: steps.coveralls.outcome == 'failure'
+        if: matrix.COVERAGE && steps.coveralls.outcome == 'failure'
         uses: act10ns/slack@v2.0.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -329,3 +416,51 @@ jobs:
             echo "Tests failed"
             exit 1
           fi
+
+  # Signal to Coveralls that all parallel test jobs have completed.
+  # See: https://docs.coveralls.io/parallel-builds
+  coveralls:
+    name: Finish Coveralls
+    needs: tests
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    continue-on-error: true
+    steps:
+      - name: Close parallel build on Coveralls
+        uses: coverallsapp/github-action@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          parallel-finished: true
+
+  related_tests:
+    name: Run Dymos & pyCycle Tests
+    needs: tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: benc-uk/workflow-dispatch@v1
+      with:
+        workflow: Dymos Tests
+        repo: ${{ github.repository_owner }}/dymos
+        inputs: >
+          {
+            "run_name": "Test Latest OpenMDAO Development Version",
+            "latest": true
+           }
+        token: ${{ secrets.ACCESS_TOKEN }}
+      if: github.event_name == 'push'
+
+    - uses: benc-uk/workflow-dispatch@v1
+      with:
+        workflow: pyCycle Tests
+        repo: ${{ github.repository_owner }}/pycycle
+        inputs: >
+          {
+            "run_name": "Test Latest OpenMDAO Development Version",
+            "Ubuntu_Baseline": false,
+            "MacOS_Baseline": false,
+            "Windows_Baseline": false,
+            "OpenMDAO_Dev": true
+           }
+        token: ${{ secrets.ACCESS_TOKEN }}
+      if: github.event_name == 'push'

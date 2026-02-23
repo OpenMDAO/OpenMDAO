@@ -13,6 +13,8 @@ import numpy as np
 from numpy import bincount, isscalar
 from scipy.sparse import coo_matrix, csr_matrix, csc_matrix, issparse
 
+from openmdao.utils.indexer import idx_list_to_index_array
+
 # from openmdao.devtools.debug import DebugDict
 
 
@@ -81,7 +83,7 @@ class Subjac(object):
         View of this subjac's slice of the residual vector.
     """
 
-    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, dtype, src_indices=None,
+    def __init__(self, key, info, row_slice, col_slice, wrt_is_input, dtype, src_inds_list=None,
                  factor=None, src=None):
         """
         Initialize the subjacobian.
@@ -100,9 +102,9 @@ class Subjac(object):
             Whether the wrt variable is an input.
         dtype : dtype
             The dtype of the subjacobian.
-        src_indices : array or None
-            Source indices for the subjacobian.  If not None, this is a subjac in the dr/do matrix
-            of a SplitJacobian.
+        src_inds_list : list of indexers or None
+            List of indexers of the wrt variable with respect to the source.
+            If not None, this is a subjac in the dr/do matrix of a SplitJacobian.
         factor : float or None
             Unit conversion factor for the subjacobian.
         src : str or None
@@ -116,8 +118,10 @@ class Subjac(object):
         self.nrows = row_slice.stop - row_slice.start
         self.ncols = info['shape'][1]
         self.parent_ncols = col_slice.stop - col_slice.start
-        if src_indices is not None:
-            src_indices = src_indices.shaped_array(flat=True)
+        if src_inds_list is not None:
+            src_indices = idx_list_to_index_array(src_inds_list)
+        else:
+            src_indices = None
         self.src_indices = src_indices
         self.factor = factor
         self.src = src
