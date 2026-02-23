@@ -385,15 +385,14 @@ class _FunctionalCallback(object):
                 J = np.zeros((self._output_len, self._input_len), dtype=x.dtype)
 
         self._vector_to_problem(x, self._input_metadata)
+        # Do I really have to do this every time?
+        problem.run_model()
 
         if self.form in ("f", "fdfdx"):
-            problem.run_model()
             self._problem_to_vector(y, self._output_metadata)
 
         if self.form in ("dfdx", "fdfdx"):
-            totals = problem.compute_totals(
-                of=self.output_var_names, wrt=self.input_var_names,
-                return_format="flat_dict", driver_scaling=False)
+            totals = self._total_jac_info.compute_totals()
             self._totals_to_jacobian(J, totals)
 
         if self.form == "f":
