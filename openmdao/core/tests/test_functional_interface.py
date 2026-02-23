@@ -1,3 +1,4 @@
+import sys
 import unittest
 
 import numpy as np
@@ -5,6 +6,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_near_equal
+
 
 class TestSimpleParaboloid(unittest.TestCase):
 
@@ -97,10 +99,18 @@ class TestSimpleParaboloid(unittest.TestCase):
         x[0] = 1.5
         x[1] = 2.5
         J = dfdx(x)
+        # 2*(x - 3) + y = -6
+        # x + 2*(y + 4) = 8
+
+        # 2*x - 6 + y = -6
+        # 2*x + y = 0
+
+        # x + 2*y + 8 = 8
+        # x + 2*y = 0
         J_expected = np.array([2*(x[0]-3.0) + x[1], x[0] + 2*(x[1] + 4.0)]).reshape(1, 2)
-        print(f"DJI: in problem: x = {prob.get_val('x')}, vector = {x[0]}")
-        print(f"DJI: in problem: y = {prob.get_val('y')}, vector = {x[1]}")
-        print(f"DJI: J = {J}, J_expected = {J_expected}")
+        print(f"DJI: in problem: x = {prob.get_val('x')}, vector = {x[0]}", file=sys.stderr)
+        print(f"DJI: in problem: y = {prob.get_val('y')}, vector = {x[1]}", file=sys.stderr)
+        print(f"DJI: J = {J}, J_expected = {J_expected}", file=sys.stderr)
         assert_near_equal(J, J_expected)
 
         J = dfdx.create_jacobian_matrix()
@@ -109,7 +119,6 @@ class TestSimpleParaboloid(unittest.TestCase):
         dfdx(x, J=J)
         J_expected = np.array([2*(x[0]-3.0) + x[1], x[0] + 2*(x[1] + 4.0)]).reshape(1, 2)
         assert_near_equal(J, J_expected)
-
 
 
 if __name__ == "__main__":
