@@ -6,6 +6,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.testing_utils import use_tempdirs
 
 
 @use_tempdirs
