@@ -8,6 +8,7 @@ from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.utils.assert_utils import assert_near_equal
 
 
+@use_tempdirs
 class TestSimpleParaboloid(unittest.TestCase):
 
     def setUp(self):
