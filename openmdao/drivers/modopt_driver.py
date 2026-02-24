@@ -41,6 +41,12 @@ except ImportError:
     mo = None
 
 # TODO: Test and verify MPI compatibility
+# TODO: Relevance?
+# TODO: Default optimizer file output locations and allow user to define a location
+# TODO: SNOPT with the pyoptsparse driver has to use internal FD, not the openmdao FD?
+#        - Assume the modopt wrapper already has this sorted out and I don't have to worry about it
+# TODO: Look at error catches and other things in the pyoptsparse driver in the obj and grad methods
+#       What do we need and what do we not need???
 
 # Gradient-based algorithms from ModOpt
 _gradient_optimizers = {
@@ -675,7 +681,8 @@ class ModOptDriver(Driver):
         lin_con_bounds = dict()
         nl_con_jac_sparsity = dict()
         if opt in _constraint_optimizers:
-            # Identify linear constraints and pre-compute their Jacobians if optimizer uses gradients
+            # Identify linear constraints and pre-compute their Jacobians if optimizer
+            # uses gradients
             if opt in _constraint_grad_optimizers:
                 lincons = [name for name, meta in self._cons.items() if meta.get('linear')]
             else:
@@ -795,7 +802,7 @@ class ModOptDriver(Driver):
                     print('Optimization Complete')
                     print('-' * 35)
 
-        except Exception as msg:
+        except Exception:
             # If an exception occurred in one of our callbacks, re-raise it with
             # the original context rather than ModOpt's generic exception message
             if self._exc_info is None:
