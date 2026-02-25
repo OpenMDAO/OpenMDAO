@@ -35,13 +35,13 @@ import numpy as np
 import json
 from collections import OrderedDict
 from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
+from openmdao.utils.om_warnings import issue_warning
 try:
     import modopt as mo
 except ImportError:
     mo = None
 
 # TODO: Test and verify MPI compatibility
-# TODO: Relevance?
 # TODO: Default optimizer file output locations and allow user to define a location
 # TODO: SNOPT with the pyoptsparse driver has to use internal FD, not the openmdao FD?
 #        - Assume the modopt wrapper already has this sorted out and I don't have to worry about it
@@ -153,7 +153,7 @@ class ModOptProblem(mo.Problem):
     """
 
     def __init__(self, driver, x_info, lin_con_jac, lin_con_bounds,
-                 nl_con_bounds, nl_con_jac_sparsity):
+                 nl_con_bounds, nl_con_jac_sparsity, all_nl_relevant_dvs):
         """
         Initialize the ModOptProblem.
 
@@ -177,6 +177,8 @@ class ModOptProblem(mo.Problem):
             Sparsity pattern for nonlinear constraint Jacobian with (constraint_name,
             design_var_name) tuples as keys and dictionaries containing 'rows' and 'cols'
             arrays defining the sparse structure.
+        all_nl_relevant_dvs : set
+            Set of all design variable names that are relevant to any nonlinear constraint.
         """
         self.driver = driver
         self.x_info = x_info
@@ -184,6 +186,7 @@ class ModOptProblem(mo.Problem):
         self.lin_con_bounds = lin_con_bounds
         self.nl_con_bounds = nl_con_bounds
         self.nl_con_jac_sparsity = nl_con_jac_sparsity
+        self.all_nl_relevant_dvs = all_nl_relevant_dvs
         # ModOpt does not support multiple objectives
         self.obj_name = list(self.driver._objs)[0]
         self._con_cache = None
@@ -236,28 +239,34 @@ class ModOptProblem(mo.Problem):
         This method informs ModOpt about which derivatives are available.
         For linear constraints, the Jacobian is provided directly. For nonlinear
         constraints, derivatives are computed on-demand, with sparsity information
-        if available from OpenMDAO.
+        if available from OpenMDAO. Only relevant Jacobians (based on OpenMDAO's
+        relevance analysis) are declared.
         """
         for des_var in self.x_info.keys():
             # Objective gradient doesnt seem to support sparsity declaration
             self.declare_objective_gradient(wrt=des_var)
 
-            # Set fixed linear jacobians
+            # Set fixed linear jacobians - only for relevant design variable/constraint pairs
             for lin_con in self.lin_con_bounds.keys():
-                self.declare_constraint_jacobian(
-                    of=lin_con,
-                    wrt=des_var,
-                    vals=self.lin_con_jac[lin_con, des_var]
-                )
+                # Only declare if this pair exists (i.e., is relevant)
+                if (lin_con, des_var) in self.lin_con_jac:
+                    self.declare_constraint_jacobian(
+                        of=lin_con,
+                        wrt=des_var,
+                        vals=self.lin_con_jac[lin_con, des_var]
+                    )
 
             # Declare nonlinear constraint Jacobian with sparsity if available
+            # Only for relevant design variable/constraint pairs
             for nl_con in self.nl_con_bounds.keys():
-                self.declare_constraint_jacobian(
-                    of=nl_con,
-                    wrt=des_var,
-                    rows=self.nl_con_jac_sparsity[nl_con, des_var]['rows'],
-                    cols=self.nl_con_jac_sparsity[nl_con, des_var]['cols'],
-                )
+                # Only declare if this pair exists (i.e., is relevant)
+                if (nl_con, des_var) in self.nl_con_jac_sparsity:
+                    self.declare_constraint_jacobian(
+                        of=nl_con,
+                        wrt=des_var,
+                        rows=self.nl_con_jac_sparsity[nl_con, des_var]['rows'],
+                        cols=self.nl_con_jac_sparsity[nl_con, des_var]['cols'],
+                    )
 
     def compute_objective(self, dvs, obj):
         """
@@ -340,7 +349,8 @@ class ModOptProblem(mo.Problem):
         Compute the Jacobian of nonlinear constraints.
 
         Linear constraint Jacobians are pre-computed and provided during setup.
-        Only nonlinear constraint Jacobians are computed here.
+        Only nonlinear constraint Jacobians are computed here. Only computes Jacobians
+        for relevant design variable/constraint pairs based on relevance analysis.
 
         Parameters
         ----------
@@ -352,14 +362,14 @@ class ModOptProblem(mo.Problem):
         self._update_desvar_values(dvs)
 
         # Only need derivatives for the nonlinear constraints
-        if self.nl_con_bounds:
+        if self.nl_con_bounds and self.all_nl_relevant_dvs:
             totals = self.driver._problem().compute_totals(
                 of=list(self.nl_con_bounds),
-                wrt=list(self.x_info),
+                wrt=list(self.all_nl_relevant_dvs),
             )
-            for des_var in self.x_info.keys():
-                for nl_con in self.nl_con_bounds.keys():
-                    jac[nl_con, des_var] = totals[nl_con, des_var]
+            # Extract and store Jacobians for relevant (constraint, design_var) pairs
+            for (nl_con, des_var) in self.nl_con_jac_sparsity.keys():
+                jac[nl_con, des_var] = totals[nl_con, des_var]
 
     def _update_desvar_values(self, dvs):
         """
@@ -680,6 +690,21 @@ class ModOptDriver(Driver):
         nl_con_bounds = dict()
         lin_con_bounds = dict()
         nl_con_jac_sparsity = dict()
+        all_nl_relevant_dvs = set()
+        relevance = model._relevance
+
+        # Check for constraints that don't depend on any design variables
+        # relevance._no_dv_responses contains outputs that are not affected by any design variables
+        bad_resps = [n for n in relevance._no_dv_responses if n in self._cons]
+        bad_cons = [n for n, m in self._cons.items() if m['source'] in bad_resps]
+
+        if bad_cons:
+            issue_warning(f"Constraint(s) {sorted(bad_cons)} do not depend on any design "
+                          "variables and were not added to the optimization.")
+            for name in bad_cons:
+                del self._cons[name]
+                del self._responses[name]
+
         if opt in _constraint_optimizers:
             # Identify linear constraints and pre-compute their Jacobians if optimizer
             # uses gradients
@@ -688,9 +713,31 @@ class ModOptDriver(Driver):
             else:
                 lincons = []
 
+            # Use relevance to determine which design variables affect linear constraints
+            # Relevance works by setting a "seed" (the output we care about) and then checking
+            # which inputs (design variables) are "relevant" (affect that output).
+            # This is like reverse-mode AD: start from output, trace back to find affecting inputs.
             if lincons:
-                lincongrad = self._lincongrad_cache = \
-                    self._compute_totals(of=lincons, wrt=list(self._designvars))
+                # Collect all design variables that affect any linear constraint
+                all_relevant_dvs = set()
+                for name, meta in self._cons.items():
+                    if meta.get('linear'):
+                        # Set this constraint as a reverse seed to find relevant design variables
+                        # meta['source'] is the absolute path of the constraint output variable
+                        with relevance.seeds_active(rev_seeds=(meta['source'],)):
+                            # Check each design variable to see if it affects this constraint
+                            # dv_meta['source'] is the absolute path of the design variable
+                            for dv_name, dv_meta in self._designvars.items():
+                                if relevance.is_relevant(dv_meta['source']):
+                                    all_relevant_dvs.add(dv_name)
+
+                # Compute Jacobians only for relevant design variables
+                if all_relevant_dvs:
+                    lincongrad = self._lincongrad_cache = \
+                        self._compute_totals(of=lincons, wrt=list(all_relevant_dvs))
+                else:
+                    lincongrad = {}
+                    self._lincongrad_cache = None
             else:
                 self._lincongrad_cache = None
 
@@ -730,11 +777,21 @@ class ModOptDriver(Driver):
                         }
 
                     # Initialize sparsity structure for nonlinear constraint Jacobians
-                    # TODO: populate from OpenMDAO's actual sparsity information
-                    for x_name in self._designvars.keys():
-                        nl_con_jac_sparsity[name, x_name] = {}
-                        nl_con_jac_sparsity[name, x_name]['rows'] = None
-                        nl_con_jac_sparsity[name, x_name]['cols'] = None
+                    # Use relevance to only include design variables that affect this constraint.
+                    # For each nonlinear constraint, set it as a reverse seed and check which
+                    # design variables are relevant (i.e., affect this constraint).
+                    with relevance.seeds_active(rev_seeds=(meta['source'],)):
+                        for x_name, x_meta in self._designvars.items():
+                            # Only declare Jacobian if this design variable affects this constraint
+                            if relevance.is_relevant(x_meta['source']):
+                                nl_con_jac_sparsity[name, x_name] = {}
+                                # TODO: populate from OpenMDAO's actual sparsity information
+                                # Sparsity (rows/cols) is different from relevance - it describes
+                                # which specific elements are nonzero within a relevant Jacobian
+                                nl_con_jac_sparsity[name, x_name]['rows'] = None
+                                nl_con_jac_sparsity[name, x_name]['cols'] = None
+                                # Track all design variables relevant to any nonlinear constraint
+                                all_nl_relevant_dvs.add(x_name)
 
         # Run optimization
         try:
@@ -746,6 +803,7 @@ class ModOptDriver(Driver):
                 lin_con_bounds=lin_con_bounds,
                 nl_con_bounds=nl_con_bounds,
                 nl_con_jac_sparsity=nl_con_jac_sparsity,
+                all_nl_relevant_dvs=all_nl_relevant_dvs,
             )
 
             # Instantiate and run optimizer
