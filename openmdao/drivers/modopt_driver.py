@@ -290,6 +290,7 @@ class ModOptProblem(mo.Problem):
             self.driver.iter_count += 1
             with model._relevance.nonlinear_active('iter'):
                 self.driver._run_solve_nonlinear()
+                self.driver._model_ran = True
 
         # Get the objective function evaluations
         f_new = next(iter(self.driver.get_objective_values().values()))
@@ -315,6 +316,7 @@ class ModOptProblem(mo.Problem):
         if self._con_cache is None:
             self._update_desvar_values(dvs)
             self.driver._run_solve_nonlinear()
+            self.driver._model_ran = True
             vals = self.driver.get_constraint_values()
         else:
             vals = self._con_cache
@@ -368,8 +370,10 @@ class ModOptProblem(mo.Problem):
                 wrt=list(self.all_nl_relevant_dvs),
             )
             # Extract and store Jacobians for relevant (constraint, design_var) pairs
-            for (nl_con, des_var) in self.nl_con_jac_sparsity.keys():
-                jac[nl_con, des_var] = totals[nl_con, des_var]
+            for (nl_con, des_var), info in self.nl_con_jac_sparsity.items():
+                rows = info['rows']
+                cols = info['cols']
+                jac[nl_con, des_var] = totals[nl_con, des_var][rows, cols]
 
     def _update_desvar_values(self, dvs):
         """
@@ -460,6 +464,7 @@ class ModOptDriver(Driver):
         self.opt_settings = {}
 
         self._total_jac_sparsity = None
+        self._model_ran = False
 
         self.cite = CITATIONS
 
@@ -607,6 +612,7 @@ class ModOptDriver(Driver):
                    'due to the requirement of Hessian information.')
             raise RuntimeError(msg.format(self.msginfo))
 
+        self._model_ran = False
         self._setup_tot_jac_sparsity()
 
     def run(self):
@@ -646,7 +652,11 @@ class ModOptDriver(Driver):
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             with model._relevance.nonlinear_active('iter'):
                 self._run_solve_nonlinear()
+                model_ran = True
             self.iter_count += 1
+
+        self._model_ran = model_ran
+        self._coloring_info.run_model = not model_ran
 
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
@@ -661,6 +671,19 @@ class ModOptDriver(Driver):
                 self.opt_settings['max_iter'] = self.options['maxiter']
             else:
                 self.opt_settings['maxiter'] = self.options['maxiter']
+
+        # NOTE: ModOpt optimizer output files cannot be redirected to output_dir due to
+        # architectural limitations. All optimizer outputs go to ModOpt's default directory:
+        #   {problem_name}_outputs/{timestamp}/
+        #
+        # This affects IPOPT, SNOPT, PySLSQP, OpenSQP, and all other optimizers. The issue:
+        # - optimizer.out_dir is set during Optimizer.__init__() and cannot be overridden
+        # - ModOpt blindly prepends out_dir to all file paths without checking if they're absolute,
+        #   causing invalid path concatenation when absolute paths are used
+        #
+        # Users can manually specify output filenames (not full paths) in opt_settings if needed,
+        # and those files will be created in ModOpt's default output directory.
+        # Example: driver.opt_settings['output_file'] = 'my_ipopt_output.out'
 
         # Determine total number of design variables
         ndesvar = 0
@@ -685,16 +708,12 @@ class ModOptDriver(Driver):
                 x_info[name]['lower'] = None
                 x_info[name]['upper'] = None
 
-        # Collect constraint information
-        lincongrad = None
-        nl_con_bounds = dict()
-        lin_con_bounds = dict()
-        nl_con_jac_sparsity = dict()
-        all_nl_relevant_dvs = set()
-        relevance = model._relevance
+        # compute dynamic simul deriv coloring
+        prob.get_total_coloring(self._coloring_info, run_model=not model_ran)
 
         # Check for constraints that don't depend on any design variables
         # relevance._no_dv_responses contains outputs that are not affected by any design variables
+        relevance = model._relevance
         bad_resps = [n for n in relevance._no_dv_responses if n in self._cons]
         bad_cons = [n for n, m in self._cons.items() if m['source'] in bad_resps]
 
@@ -705,6 +724,12 @@ class ModOptDriver(Driver):
                 del self._cons[name]
                 del self._responses[name]
 
+        # Collect constraint information
+        lincongrad = None
+        nl_con_bounds = dict()
+        lin_con_bounds = dict()
+        nl_con_jac_sparsity = dict()
+        all_nl_relevant_dvs = set()
         if opt in _constraint_optimizers:
             # Identify linear constraints and pre-compute their Jacobians if optimizer
             # uses gradients
@@ -785,11 +810,19 @@ class ModOptDriver(Driver):
                             # Only declare Jacobian if this design variable affects this constraint
                             if relevance.is_relevant(x_meta['source']):
                                 nl_con_jac_sparsity[name, x_name] = {}
-                                # TODO: populate from OpenMDAO's actual sparsity information
-                                # Sparsity (rows/cols) is different from relevance - it describes
-                                # which specific elements are nonzero within a relevant Jacobian
-                                nl_con_jac_sparsity[name, x_name]['rows'] = None
-                                nl_con_jac_sparsity[name, x_name]['cols'] = None
+
+                                # Populate sparsity information from OpenMDAO's coloring
+                                # Sparsity (rows/cols) describes which specific elements are nonzero
+                                if name in self._con_subjacs and x_name in self._con_subjacs[name]:
+                                    # Extract rows/cols from COO format sparsity data
+                                    rows, cols, _ = self._con_subjacs[name][x_name]['coo']
+                                    nl_con_jac_sparsity[name, x_name]['rows'] = rows
+                                    nl_con_jac_sparsity[name, x_name]['cols'] = cols
+                                else:
+                                    # No sparsity info available - use dense (None means dense to ModOpt)
+                                    nl_con_jac_sparsity[name, x_name]['rows'] = None
+                                    nl_con_jac_sparsity[name, x_name]['cols'] = None
+
                                 # Track all design variables relevant to any nonlinear constraint
                                 all_nl_relevant_dvs.add(x_name)
 
@@ -854,6 +887,7 @@ class ModOptDriver(Driver):
             with RecordingDebugging(self._get_name(), self.iter_count, self):
                 with model._relevance.nonlinear_active('iter'):
                     self._run_solve_nonlinear()
+                    self._model_ran = model_ran
 
             if self.options['disp']:
                 if prob.comm.rank == 0:
@@ -885,7 +919,7 @@ class ModOptDriver(Driver):
             user-specified _total_jac_sparsity.
         """
         total_sparsity = None
-        self._con_subjacs = {'rows': [], 'cols': []}
+        self._con_subjacs = {}
         coloring = coloring if coloring is not None else self._get_static_coloring()
 
         # Extract sparsity from coloring or user-specified sparsity
