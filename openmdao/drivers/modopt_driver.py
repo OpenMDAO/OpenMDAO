@@ -189,6 +189,7 @@ class ModOptProblem(mo.Problem):
         # ModOpt does not support multiple objectives
         self.obj_name = list(self.driver._objs)[0]
         self._con_cache = None
+        self._all_constraint_names = list(self.lin_con_bounds) + list(self.nl_con_bounds)
         super().__init__()
 
     def initialize(self):
@@ -286,28 +287,16 @@ class ModOptProblem(mo.Problem):
 
         try:
             self._update_desvar_values(dvs)
-
-            with RecordingDebugging(self.driver._get_name(), self.driver.iter_count, self.driver):
-                self.driver.iter_count += 1
-                # Deactivate relevance if we haven't run the full model yet, so that
-                # the full model will run at least once.
-                with model._relevance.nonlinear_active('iter', active=self.driver._model_ran):
-                    self.driver._run_solve_nonlinear()
-                    self.driver._model_ran = True
+            self._run_model()
 
             # Get the objective function evaluations
             f_new = next(iter(self.driver.get_objective_values().values()))
-
             self._con_cache = self.driver.get_constraint_values()
-
             obj[self.obj_name] = f_new
 
         except Exception:
             # Clean up solver print stack and store exception for re-raising later
-            model._clear_iprint()
-            if self.driver._exc_info is None:
-                self.driver._exc_info = sys.exc_info()
-            # Return NaN to signal problematic evaluation to optimizer
+            self._handle_callback_exception(model)
             obj[self.obj_name] = np.nan
 
     def compute_constraints(self, dvs, cons):
@@ -329,30 +318,20 @@ class ModOptProblem(mo.Problem):
             # Use cached constraint values from compute_objective if available
             if self._con_cache is None:
                 self._update_desvar_values(dvs)
-
-                with RecordingDebugging(self.driver._get_name(), self.driver.iter_count, self.driver):
-                    self.driver.iter_count += 1
-                    # Deactivate relevance if we haven't run the full model yet, so that
-                    # the full model will run at least once.
-                    with model._relevance.nonlinear_active('iter', active=self.driver._model_ran):
-                        self.driver._run_solve_nonlinear()
-                        self.driver._model_ran = True
+                self._run_model()
                 vals = self.driver.get_constraint_values()
             else:
                 vals = self._con_cache
                 self._con_cache = None  # Clear cache after use
 
-            for name in list(self.lin_con_bounds) + list(self.nl_con_bounds):
+            for name in self._all_constraint_names:
                 cons[name] = vals[name].flatten()
 
         except Exception:
             # Clean up solver print stack and store exception for re-raising later
-            model._clear_iprint()
-            if self.driver._exc_info is None:
-                self.driver._exc_info = sys.exc_info()
-            # Fill constraints with NaN to signal problematic evaluation
-            for name in list(self.lin_con_bounds) + list(self.nl_con_bounds):
-                size = self.lin_con_bounds.get(name, self.nl_con_bounds.get(name))['size']
+            self._handle_callback_exception(model)
+            for name in self._all_constraint_names:
+                size = self._get_constraint_size(name)
                 cons[name] = np.full(size, np.nan)
 
     def compute_objective_gradient(self, dvs, grad):
@@ -381,10 +360,7 @@ class ModOptProblem(mo.Problem):
 
         except Exception:
             # Clean up solver print stack and store exception for re-raising later
-            model._clear_iprint()
-            if self.driver._exc_info is None:
-                self.driver._exc_info = sys.exc_info()
-            # Fill gradients with NaN to signal problematic evaluation
+            self._handle_callback_exception(model)
             for des_var, info in self.x_info.items():
                 grad[des_var] = np.full_like(info['init'], np.nan)
 
@@ -418,24 +394,19 @@ class ModOptProblem(mo.Problem):
                 for (nl_con, des_var), info in self.nl_con_jac_sparsity.items():
                     rows = info['rows']
                     cols = info['cols']
-                    # Handle both sparse and dense cases
+
                     if rows is not None and cols is not None:
-                        # Sparse: extract only the nonzero elements
                         jac[nl_con, des_var] = totals[nl_con, des_var][rows, cols]
                     else:
-                        # Dense: use the full Jacobian matrix
                         jac[nl_con, des_var] = totals[nl_con, des_var]
 
         except Exception:
             # Clean up solver print stack and store exception for re-raising later
-            model._clear_iprint()
-            if self.driver._exc_info is None:
-                self.driver._exc_info = sys.exc_info()
-            # Fill Jacobians with NaN to signal problematic evaluation
+            self._handle_callback_exception(model)
             for (nl_con, des_var), info in self.nl_con_jac_sparsity.items():
                 rows = info['rows']
                 cols = info['cols']
-                # Handle both sparse and dense cases
+
                 if rows is not None and cols is not None:
                     jac[nl_con, des_var] = np.full(len(rows), np.nan)
                 else:
@@ -454,6 +425,54 @@ class ModOptProblem(mo.Problem):
         """
         for name in self.x_info.keys():
             self.driver.set_design_var(name, dvs[name])
+
+    def _get_constraint_size(self, name):
+        """
+        Get the size of a constraint by name.
+
+        Parameters
+        ----------
+        name : str
+            Constraint name.
+
+        Returns
+        -------
+        int
+            Size of the constraint.
+        """
+        if name in self.lin_con_bounds:
+            return self.lin_con_bounds[name]['size']
+        return self.nl_con_bounds[name]['size']
+
+    def _run_model(self):
+        """
+        Execute the OpenMDAO model with proper recording and relevance handling.
+
+        Only evaluates the full model on the first iteration (sets _model_ran flag).
+        Subsequent iterations use relevance filtering for efficiency.
+        """
+        model = self.driver._problem().model
+        with RecordingDebugging(self.driver._get_name(), self.driver.iter_count, self.driver):
+            self.driver.iter_count += 1
+            with model._relevance.nonlinear_active('iter', active=self.driver._model_ran):
+                self.driver._run_solve_nonlinear()
+                self.driver._model_ran = True
+
+    def _handle_callback_exception(self, model):
+        """
+        Handle exceptions for ModOpt callbacks.
+
+        Clears solver print stack and stores exception info for re-raising after
+        optimization.
+
+        Parameters
+        ----------
+        model : System
+            The model to clear iprint on.
+        """
+        model._clear_iprint()
+        if self.driver._exc_info is None:
+            self.driver._exc_info = sys.exc_info()
 
 
 class ModOptDriver(Driver):
