@@ -1,7 +1,7 @@
 """
-OpenMDAO Wrapper for the ModOpt optimization library.
+OpenMDAO Wrapper for the modOpt optimization library.
 
-ModOpt is a modular optimization framework providing interfaces to various
+modOpt is a modular optimization framework providing interfaces to various
 gradient-based and gradient-free optimization algorithms.
 
 Available Optimizers
@@ -14,7 +14,7 @@ Gradient-Based:
     - TrustConstr: Trust-region constrained algorithm
     - SNOPT: Sparse Nonlinear Optimizer (requires license)
     - IPOPT: Interior Point Optimizer (requires separate installation)
-    - OpenSQP: A sequential quadratic programming optimizer built into ModOpt
+    - OpenSQP: A sequential quadratic programming optimizer built into modOpt
 
 Gradient-Free:
     - COBYLA: Constrained Optimization BY Linear Approximation
@@ -28,7 +28,7 @@ Notes
 - Linear constraints are handled efficiently by pre-computing their Jacobians
 - Gradient-free methods (COBYLA, COBYQA, NelderMead) are useful when derivatives are unavailable
 
-See the ModOpt documentation at https://modopt.readthedocs.io for detailed information
+See the modOpt documentation at https://modopt.readthedocs.io for detailed information
 on algorithm-specific options and capabilities.
 """
 import sys
@@ -37,17 +37,18 @@ import json
 from collections import OrderedDict
 from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.core.group import Group
 try:
     import modopt as mo
 except ImportError:
     mo = None
 
-# TODO: Test and verify MPI compatibility
+# TODO: Test MPI with distributed models (design variables must be replicated, not distributed)
 # TODO: Default optimizer file output locations and allow user to define a location
 # TODO: SNOPT with the pyoptsparse driver has to use internal FD, not the openmdao FD?
 #        - Assume the modopt wrapper already has this sorted out and I don't have to worry about it
 
-# Gradient-based algorithms from ModOpt
+# Gradient-based algorithms from modOpt
 _gradient_optimizers = {
     'SLSQP', 'PySLSQP', 'BFGS', 'LBFGSB', 'TrustConstr',
     'SNOPT', 'IPOPT', 'OpenSQP',
@@ -104,16 +105,16 @@ CITATIONS = """
 """
 
 
-class ModOptProblem(mo.Problem):
+class modOptProblem(mo.Problem):
     """
-    ModOpt Problem that delegates objective and constraint evaluation to an OpenMDAO driver.
+    modOpt Problem that delegates objective and constraint evaluation to an OpenMDAO driver.
 
-    This class wraps an OpenMDAO problem as a ModOpt optimization problem, translating
-    between ModOpt's interface and OpenMDAO's driver interface.
+    This class wraps an OpenMDAO problem as a modOpt optimization problem, translating
+    between modOpt's interface and OpenMDAO's driver interface.
 
     Parameters
     ----------
-    driver : ModOptDriver
+    driver : modOptDriver
         The OpenMDAO driver managing the optimization.
     x_info : OrderedDict
         Dictionary with design variable names as keys and dictionaries containing
@@ -133,7 +134,7 @@ class ModOptProblem(mo.Problem):
 
     Attributes
     ----------
-    driver : ModOptDriver
+    driver : modOptDriver
         Reference to the OpenMDAO driver.
     x_info : OrderedDict
         Design variable metadata including initial values and bounds.
@@ -154,11 +155,11 @@ class ModOptProblem(mo.Problem):
     def __init__(self, driver, x_info, lin_con_jac, lin_con_bounds,
                  nl_con_bounds, nl_con_jac_sparsity, all_nl_relevant_dvs):
         """
-        Initialize the ModOptProblem.
+        Initialize the modOptProblem.
 
         Parameters
         ----------
-        driver : ModOptDriver
+        driver : modOptDriver
             The OpenMDAO driver managing the optimization.
         x_info : OrderedDict
             Dictionary with design variable names as keys and dictionaries containing
@@ -186,7 +187,7 @@ class ModOptProblem(mo.Problem):
         self.nl_con_bounds = nl_con_bounds
         self.nl_con_jac_sparsity = nl_con_jac_sparsity
         self.all_nl_relevant_dvs = all_nl_relevant_dvs
-        # ModOpt does not support multiple objectives
+        # modOpt does not support multiple objectives
         self.obj_name = list(self.driver._objs)[0]
         self._con_cache = None
         self._all_constraint_names = list(self.lin_con_bounds) + list(self.nl_con_bounds)
@@ -196,13 +197,13 @@ class ModOptProblem(mo.Problem):
         """
         Initialize the problem name.
 
-        This is called by the ModOpt Problem base class.
+        This is called by the modOpt Problem base class.
         """
-        self.problem_name = 'modopt_problem'
+        self.problem_name = 'modOpt_problem'
 
     def setup(self):
         """
-        Add design variables, constraints, and objective to the ModOpt Problem.
+        Add design variables, constraints, and objective to the modOpt Problem.
         """
         for name, info in self.x_info.items():
             shape = info['init'].shape if isinstance(info['init'], np.ndarray) else (1,)
@@ -234,9 +235,9 @@ class ModOptProblem(mo.Problem):
 
     def setup_derivatives(self):
         """
-        Declare objective and constraint gradients to the ModOpt problem.
+        Declare objective and constraint gradients to the modOpt problem.
 
-        This method informs ModOpt about which derivatives are available.
+        This method informs modOpt about which derivatives are available.
         For linear constraints, the Jacobian is provided directly. For nonlinear
         constraints, derivatives are computed on-demand, with sparsity information
         if available from OpenMDAO. Only relevant Jacobians (based on OpenMDAO's
@@ -355,6 +356,18 @@ class ModOptProblem(mo.Problem):
                 of=[self.obj_name],
                 wrt=list(self.x_info),
             )
+
+            # First time through, check for zero row/col.
+            if self.driver._check_obj_grad and self.driver._total_jac is not None:
+                for subsys in model.system_iter(include_self=True, recurse=True, typ=Group):
+                    if subsys._has_approx:
+                        break
+                else:
+                    raise_error = self.driver.options['singular_jac_behavior'] == 'error'
+                    self.driver._total_jac.check_total_jac(raise_error=raise_error,
+                                                           tol=self.driver.options['singular_jac_tol'])
+                self.driver._check_obj_grad = False
+
             for des_var in self.x_info.keys():
                 grad[des_var] = totals[self.obj_name, des_var]
 
@@ -390,6 +403,18 @@ class ModOptProblem(mo.Problem):
                     of=list(self.nl_con_bounds),
                     wrt=list(self.all_nl_relevant_dvs),
                 )
+
+                # First time through, check for zero row/col.
+                if self.driver._check_nl_jac and self.driver._total_jac is not None:
+                    for subsys in model.system_iter(include_self=True, recurse=True, typ=Group):
+                        if subsys._has_approx:
+                            break
+                    else:
+                        raise_error = self.driver.options['singular_jac_behavior'] == 'error'
+                        self.driver._total_jac.check_total_jac(raise_error=raise_error,
+                                                            tol=self.driver.options['singular_jac_tol'])
+                    self.driver._check_nl_jac = False
+
                 # Extract and store Jacobians for relevant (constraint, design_var) pairs
                 for (nl_con, des_var), info in self.nl_con_jac_sparsity.items():
                     rows = info['rows']
@@ -416,7 +441,7 @@ class ModOptProblem(mo.Problem):
 
     def _update_desvar_values(self, dvs):
         """
-        Update OpenMDAO design variables from ModOpt's design vector.
+        Update OpenMDAO design variables from modOpt's design vector.
 
         Parameters
         ----------
@@ -460,7 +485,7 @@ class ModOptProblem(mo.Problem):
 
     def _handle_callback_exception(self, model):
         """
-        Handle exceptions for ModOpt callbacks.
+        Handle exceptions for modOpt callbacks.
 
         Clears solver print stack and stores exception info for re-raising after
         optimization.
@@ -475,17 +500,17 @@ class ModOptProblem(mo.Problem):
             self.driver._exc_info = sys.exc_info()
 
 
-class ModOptDriver(Driver):
+class modOptDriver(Driver):
     """
-    Driver wrapper for the ModOpt optimization library.
+    Driver wrapper for the modOpt optimization library.
 
-    ModOpt provides interfaces to various gradient-based and gradient-free optimization
+    modOpt provides interfaces to various gradient-based and gradient-free optimization
     algorithms including SLSQP, IPOPT, SNOPT, COBYLA, and others.
 
     Inequality and equality constraints are supported by several optimizers.
-    Refer to the ModOpt documentation for algorithm-specific capabilities.
+    Refer to the modOpt documentation for algorithm-specific capabilities.
 
-    ModOptDriver supports the following:
+    modOptDriver supports the following:
         - equality_constraints
         - inequality_constraints
         - two_sided_constraints
@@ -503,10 +528,14 @@ class ModOptDriver(Driver):
     iter_count : int
         Counter for function evaluations.
     opt_settings : dict
-        Dictionary of optimizer-specific options. See the ModOpt documentation
+        Dictionary of optimizer-specific options. See the modOpt documentation
         for algorithm-specific settings.
-    _check_jac : bool
-        Used internally to control when to perform singular checks on computed total derivs.
+    _check_obj_grad : bool
+        Used internally to control when to perform singular checks on computed
+        objective gradient.
+    _check_nl_jac : bool
+        Used internally to control when to perform singular checks on computed
+        nonlinear constraint jacobian.
     _con_cache : dict
         Cached result of constraint evaluations.
     _lincongrad_cache : np.ndarray or None
@@ -517,7 +546,7 @@ class ModOptDriver(Driver):
 
     def __init__(self, **kwargs):
         """
-        Initialize the ModOptDriver.
+        Initialize the modOptDriver.
 
         Parameters
         ----------
@@ -527,7 +556,7 @@ class ModOptDriver(Driver):
         super().__init__(**kwargs)
 
         if mo is None:
-            raise RuntimeError('ModOptDriver is not available, modopt is not'
+            raise RuntimeError('modOptDriver is not available, modOpt is not'
                                ' installed.')
 
         # What we support
@@ -550,6 +579,8 @@ class ModOptDriver(Driver):
         # The user places optimizer-specific settings in here.
         self.opt_settings = {}
 
+        self._check_obj_grad = False
+        self._check_nl_jac = False
         self._total_jac_sparsity = None
         self._model_ran = False
 
@@ -587,9 +618,9 @@ class ModOptDriver(Driver):
         Returns
         -------
         str
-            Driver name in the format 'ModOpt_<optimizer_name>'.
+            Driver name in the format 'modOpt_<optimizer_name>'.
         """
-        return f"ModOpt_{self.options['optimizer']}"
+        return f"modOpt_{self.options['optimizer']}"
 
     def _setup_verbosity(self, opt):
         """
@@ -686,7 +717,6 @@ class ModOptDriver(Driver):
         self.supports['two_sided_constraints'] = opt in _constraint_optimizers
         self.supports['equality_constraints'] = opt in _eq_constraint_optimizers
         self.supports._read_only = True
-        self._check_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
 
         # Validate problem formulation
         if not self.supports['multiple_objectives'] and len(self._objs) > 1:
@@ -704,18 +734,18 @@ class ModOptDriver(Driver):
 
     def run(self):
         """
-        Optimize the problem using the selected ModOpt optimizer.
+        Optimize the problem using the selected modOpt optimizer.
 
         The optimization process performs the following steps:
         1. Initial model evaluation
         2. Extract and format design variables, bounds, and constraints
         3. Pre-compute linear constraint Jacobians for efficiency
-        4. Create ModOptProblem wrapper around the OpenMDAO problem
+        4. Create modOptProblem wrapper around the OpenMDAO problem
         5. Instantiate and run the selected optimizer
         6. Extract optimal design variables and update the model
         7. Perform final evaluation at the optimal point
 
-        The optimization uses ModOpt's Problem API, which handles callbacks for
+        The optimization uses modOpt's Problem API, which handles callbacks for
         objective and constraint evaluations as well as derivative computations.
 
         Returns
@@ -734,6 +764,8 @@ class ModOptDriver(Driver):
 
         self._check_for_missing_objective()
         self._check_for_invalid_desvar_values()
+        self._check_obj_grad = self.options['singular_jac_behavior'] in ['error', 'warn']
+        self._check_nl_jac = self.options['singular_jac_behavior'] in ['error', 'warn']
 
         # Perform initial model evaluation
         with RecordingDebugging(self._get_name(), self.iter_count, self):
@@ -758,17 +790,17 @@ class ModOptDriver(Driver):
             else:
                 self.opt_settings['maxiter'] = self.options['maxiter']
 
-        # NOTE: ModOpt optimizer output files cannot be redirected to output_dir due to
-        # architectural limitations. All optimizer outputs go to ModOpt's default directory:
+        # NOTE: modOpt optimizer output files cannot be redirected to output_dir due to
+        # architectural limitations. All optimizer outputs go to modOpt's default directory:
         #   {problem_name}_outputs/{timestamp}/
         #
         # This affects IPOPT, SNOPT, PySLSQP, OpenSQP, and all other optimizers. The issue:
         # - optimizer.out_dir is set during Optimizer.__init__() and cannot be overridden
-        # - ModOpt blindly prepends out_dir to all file paths without checking if they're absolute,
+        # - modOpt blindly prepends out_dir to all file paths without checking if they're absolute,
         #   causing invalid path concatenation when absolute paths are used
         #
         # Users can manually specify output filenames (not full paths) in opt_settings if needed,
-        # and those files will be created in ModOpt's default output directory.
+        # and those files will be created in modOpt's default output directory.
         # Example: driver.opt_settings['output_file'] = 'my_ipopt_output.out'
 
         # Determine total number of design variables
@@ -905,7 +937,7 @@ class ModOptDriver(Driver):
                                     nl_con_jac_sparsity[name, x_name]['rows'] = rows
                                     nl_con_jac_sparsity[name, x_name]['cols'] = cols
                                 else:
-                                    # No sparsity info available - use dense (None means dense to ModOpt)
+                                    # No sparsity info available - use dense (None means dense to modOpt)
                                     nl_con_jac_sparsity[name, x_name]['rows'] = None
                                     nl_con_jac_sparsity[name, x_name]['cols'] = None
 
@@ -914,8 +946,8 @@ class ModOptDriver(Driver):
 
         # Run optimization
         try:
-            # Build ModOpt Problem wrapper
-            mo_prob = ModOptProblem(
+            # Build modOpt Problem wrapper
+            mo_prob = modOptProblem(
                 driver=self,
                 x_info=x_info,
                 lin_con_jac=lincongrad,
@@ -947,7 +979,7 @@ class ModOptDriver(Driver):
             elif 'x' in result:
                 x_opt = result['x']
                 if opt == 'IPOPT':
-                    # IPOPT success status is not consistently available through ModOpt's
+                    # IPOPT success status is not consistently available through modOpt's
                     # interface due to how CasADi's nlpsol wrapper handles the solver object
                     print(f'{"-" * 40}\n IPOPT does not return success status in '
                           f'a consistent, easily readable way, so defaulting to '
@@ -981,7 +1013,7 @@ class ModOptDriver(Driver):
 
         except Exception:
             # If an exception occurred in one of our callbacks, re-raise it with
-            # the original context rather than ModOpt's generic exception message
+            # the original context rather than modOpt's generic exception message
             if self._exc_info is None:
                 raise
 
