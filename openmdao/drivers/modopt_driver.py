@@ -31,6 +31,7 @@ Notes
 See the ModOpt documentation at https://modopt.readthedocs.io for detailed information
 on algorithm-specific options and capabilities.
 """
+import sys
 import numpy as np
 import json
 from collections import OrderedDict
@@ -45,8 +46,6 @@ except ImportError:
 # TODO: Default optimizer file output locations and allow user to define a location
 # TODO: SNOPT with the pyoptsparse driver has to use internal FD, not the openmdao FD?
 #        - Assume the modopt wrapper already has this sorted out and I don't have to worry about it
-# TODO: Look at error catches and other things in the pyoptsparse driver in the obj and grad methods
-#       What do we need and what do we not need???
 
 # Gradient-based algorithms from ModOpt
 _gradient_optimizers = {
@@ -284,20 +283,32 @@ class ModOptProblem(mo.Problem):
             Dictionary to store the computed objective value.
         """
         model = self.driver._problem().model
-        self._update_desvar_values(dvs)
 
-        with RecordingDebugging(self.driver._get_name(), self.driver.iter_count, self.driver):
-            self.driver.iter_count += 1
-            with model._relevance.nonlinear_active('iter'):
-                self.driver._run_solve_nonlinear()
-                self.driver._model_ran = True
+        try:
+            self._update_desvar_values(dvs)
 
-        # Get the objective function evaluations
-        f_new = next(iter(self.driver.get_objective_values().values()))
+            with RecordingDebugging(self.driver._get_name(), self.driver.iter_count, self.driver):
+                self.driver.iter_count += 1
+                # Deactivate relevance if we haven't run the full model yet, so that
+                # the full model will run at least once.
+                with model._relevance.nonlinear_active('iter', active=self.driver._model_ran):
+                    self.driver._run_solve_nonlinear()
+                    self.driver._model_ran = True
 
-        self._con_cache = self.driver.get_constraint_values()
+            # Get the objective function evaluations
+            f_new = next(iter(self.driver.get_objective_values().values()))
 
-        obj[self.obj_name] = f_new
+            self._con_cache = self.driver.get_constraint_values()
+
+            obj[self.obj_name] = f_new
+
+        except Exception:
+            # Clean up solver print stack and store exception for re-raising later
+            model._clear_iprint()
+            if self.driver._exc_info is None:
+                self.driver._exc_info = sys.exc_info()
+            # Return NaN to signal problematic evaluation to optimizer
+            obj[self.obj_name] = np.nan
 
     def compute_constraints(self, dvs, cons):
         """
@@ -312,18 +323,37 @@ class ModOptProblem(mo.Problem):
         cons : dict
             Dictionary to store the computed constraint values.
         """
-        # Use cached constraint values from compute_objective if available
-        if self._con_cache is None:
-            self._update_desvar_values(dvs)
-            self.driver._run_solve_nonlinear()
-            self.driver._model_ran = True
-            vals = self.driver.get_constraint_values()
-        else:
-            vals = self._con_cache
-            self._con_cache = None  # Clear cache after use
+        model = self.driver._problem().model
 
-        for name in list(self.lin_con_bounds) + list(self.nl_con_bounds):
-            cons[name] = vals[name].flatten()
+        try:
+            # Use cached constraint values from compute_objective if available
+            if self._con_cache is None:
+                self._update_desvar_values(dvs)
+
+                with RecordingDebugging(self.driver._get_name(), self.driver.iter_count, self.driver):
+                    self.driver.iter_count += 1
+                    # Deactivate relevance if we haven't run the full model yet, so that
+                    # the full model will run at least once.
+                    with model._relevance.nonlinear_active('iter', active=self.driver._model_ran):
+                        self.driver._run_solve_nonlinear()
+                        self.driver._model_ran = True
+                vals = self.driver.get_constraint_values()
+            else:
+                vals = self._con_cache
+                self._con_cache = None  # Clear cache after use
+
+            for name in list(self.lin_con_bounds) + list(self.nl_con_bounds):
+                cons[name] = vals[name].flatten()
+
+        except Exception:
+            # Clean up solver print stack and store exception for re-raising later
+            model._clear_iprint()
+            if self.driver._exc_info is None:
+                self.driver._exc_info = sys.exc_info()
+            # Fill constraints with NaN to signal problematic evaluation
+            for name in list(self.lin_con_bounds) + list(self.nl_con_bounds):
+                size = self.lin_con_bounds.get(name, self.nl_con_bounds.get(name))['size']
+                cons[name] = np.full(size, np.nan)
 
     def compute_objective_gradient(self, dvs, grad):
         """
@@ -337,14 +367,26 @@ class ModOptProblem(mo.Problem):
             Dictionary to store the gradient values. Keys are design variable names,
             values are gradient arrays with respect to the objective.
         """
-        self._update_desvar_values(dvs)
+        model = self.driver._problem().model
 
-        totals = self.driver._problem().compute_totals(
-            of=[self.obj_name],
-            wrt=list(self.x_info),
-        )
-        for des_var in self.x_info.keys():
-            grad[des_var] = totals[self.obj_name, des_var]
+        try:
+            self._update_desvar_values(dvs)
+
+            totals = self.driver._problem().compute_totals(
+                of=[self.obj_name],
+                wrt=list(self.x_info),
+            )
+            for des_var in self.x_info.keys():
+                grad[des_var] = totals[self.obj_name, des_var]
+
+        except Exception:
+            # Clean up solver print stack and store exception for re-raising later
+            model._clear_iprint()
+            if self.driver._exc_info is None:
+                self.driver._exc_info = sys.exc_info()
+            # Fill gradients with NaN to signal problematic evaluation
+            for des_var, info in self.x_info.items():
+                grad[des_var] = np.full_like(info['init'], np.nan)
 
     def compute_constraint_jacobian(self, dvs, jac):
         """
@@ -361,19 +403,45 @@ class ModOptProblem(mo.Problem):
         jac : dict
             Dictionary to store the computed constraint Jacobians.
         """
-        self._update_desvar_values(dvs)
+        model = self.driver._problem().model
 
-        # Only need derivatives for the nonlinear constraints
-        if self.nl_con_bounds and self.all_nl_relevant_dvs:
-            totals = self.driver._problem().compute_totals(
-                of=list(self.nl_con_bounds),
-                wrt=list(self.all_nl_relevant_dvs),
-            )
-            # Extract and store Jacobians for relevant (constraint, design_var) pairs
+        try:
+            self._update_desvar_values(dvs)
+
+            # Only need derivatives for the nonlinear constraints
+            if self.nl_con_bounds and self.all_nl_relevant_dvs:
+                totals = self.driver._problem().compute_totals(
+                    of=list(self.nl_con_bounds),
+                    wrt=list(self.all_nl_relevant_dvs),
+                )
+                # Extract and store Jacobians for relevant (constraint, design_var) pairs
+                for (nl_con, des_var), info in self.nl_con_jac_sparsity.items():
+                    rows = info['rows']
+                    cols = info['cols']
+                    # Handle both sparse and dense cases
+                    if rows is not None and cols is not None:
+                        # Sparse: extract only the nonzero elements
+                        jac[nl_con, des_var] = totals[nl_con, des_var][rows, cols]
+                    else:
+                        # Dense: use the full Jacobian matrix
+                        jac[nl_con, des_var] = totals[nl_con, des_var]
+
+        except Exception:
+            # Clean up solver print stack and store exception for re-raising later
+            model._clear_iprint()
+            if self.driver._exc_info is None:
+                self.driver._exc_info = sys.exc_info()
+            # Fill Jacobians with NaN to signal problematic evaluation
             for (nl_con, des_var), info in self.nl_con_jac_sparsity.items():
                 rows = info['rows']
                 cols = info['cols']
-                jac[nl_con, des_var] = totals[nl_con, des_var][rows, cols]
+                # Handle both sparse and dense cases
+                if rows is not None and cols is not None:
+                    jac[nl_con, des_var] = np.full(len(rows), np.nan)
+                else:
+                    con_size = self.nl_con_bounds[nl_con]['size']
+                    dv_size = len(self.x_info[des_var]['init'])
+                    jac[nl_con, des_var] = np.full((con_size, dv_size), np.nan)
 
     def _update_desvar_values(self, dvs):
         """
@@ -650,9 +718,8 @@ class ModOptDriver(Driver):
 
         # Perform initial model evaluation
         with RecordingDebugging(self._get_name(), self.iter_count, self):
-            with model._relevance.nonlinear_active('iter'):
-                self._run_solve_nonlinear()
-                model_ran = True
+            self._run_solve_nonlinear()
+            model_ran = True
             self.iter_count += 1
 
         self._model_ran = model_ran
@@ -863,7 +930,6 @@ class ModOptDriver(Driver):
                 if opt == 'IPOPT':
                     # IPOPT success status is not consistently available through ModOpt's
                     # interface due to how CasADi's nlpsol wrapper handles the solver object
-                    # TODO: Request improvement in ModOpt to expose IPOPT status
                     print(f'{"-" * 40}\n IPOPT does not return success status in '
                           f'a consistent, easily readable way, so defaulting to '
                           f'success=True. \n{"-" * 40}\n')
@@ -885,9 +951,9 @@ class ModOptDriver(Driver):
 
             # Final model evaluation at optimal point
             with RecordingDebugging(self._get_name(), self.iter_count, self):
-                with model._relevance.nonlinear_active('iter'):
-                    self._run_solve_nonlinear()
-                    self._model_ran = model_ran
+                self._run_solve_nonlinear()
+                self._model_ran = model_ran
+            self.iter_count += 1
 
             if self.options['disp']:
                 if prob.comm.rank == 0:
