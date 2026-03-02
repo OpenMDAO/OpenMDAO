@@ -124,3 +124,44 @@ class TestInputReportsMPI(unittest.TestCase):
         p.run_model()
 
         inputs_report(p, outfile='temp_inputs_report.md', display=True, precision=6, title=None, tablefmt='github')
+
+    def test_global_shape(self):
+
+        class MyComp(om.ExplicitComponent):
+            def initialize(self):
+                self.options.declare('size', types=int, default=1,
+                                        desc="Size of input vector x.")
+
+            def setup(self):
+                self.add_input('x', np.ones(self.options['size']), distributed=True)
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = np.sum(inputs['x'])*2.0
+
+        p = om.Problem()
+
+        p.model.add_subsystem('indep', om.IndepVarComp('x', np.arange(5, dtype=float)),
+                                promotes_outputs=['x'])
+
+        # decide what parts of the array we want based on our rank
+
+        if MPI.COMM_WORLD.rank == 0:
+            idxs = [0, 1, 2]
+        else:
+            # use [3, -1] here rather than [3, 4] just to show that we
+            # can use negative indices.
+            idxs = [3, -1]
+
+        p.model.add_subsystem('C1', MyComp(size=len(idxs)))
+        p.model.promotes('C1', inputs=['x'], src_indices=idxs)
+
+        p.setup()
+        p.set_val('x', np.arange(5, dtype=float))
+        p.run_model()
+
+        inputs_report(p, outfile='temp_inputs_report.md', display=False, precision=6, title=None, tablefmt='github')
+
+        if MPI.COMM_WORLD.rank == 0:
+            with open('temp_inputs_report.md') as f:
+                self.assertIn('(5,)', f.readlines()[2].split('|')[7])
