@@ -48,7 +48,7 @@ jobs:
       fail-fast: false
       matrix:
         OS: [ubuntu-24.04, macos-latest]
-        PIXI_ENVIRONMENT: [minimal, py311, py312, py313, default, dev, oldest]
+        PIXI_ENVIRONMENT: [minimal, py311, py312, py313, default, dev]
         BANDIT: [false]
         RUFF: [false]
         SNOPT: [true]
@@ -67,6 +67,14 @@ jobs:
             PIXI_ENVIRONMENT: minimal
             BANDIT: false
             RUFF: false
+            COVERAGE: false
+
+          # Only test the oldest environment on ubuntu
+          - OS: ubuntu-24.04
+            PIXI_ENVIRONMENT: oldest
+            BANDIT: false
+            RUFF: false
+            SNOPT: true
             COVERAGE: false
 
           # Bandit only on Ubuntu py312
