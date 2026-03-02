@@ -425,7 +425,6 @@ class ScipyOptimizeDriver(Driver):
                                 jac=signature_extender(
                                     WeakMethodWrapper(self, '_congradfunc'), args)
                             )
-
                     constraints.append(con)
                 else:
                     # Type of constraints is list of dict
