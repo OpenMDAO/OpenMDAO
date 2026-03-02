@@ -406,10 +406,8 @@ class ScipyOptimizeDriver(Driver):
                     
                     if linear:
                         # LinearConstraint
-                        lb_lin = np.where(lower <= -INF_BOUND, -np.inf, lower)
-                        ub_lin = np.where(upper >= INF_BOUND, np.inf, upper)
                         con = LinearConstraint(A=lincongrad[self._con_idx[name]],
-                                               lb=lb_lin, ub=ub_lin, keep_feasible=True)
+                                               lb=lb, ub=ub, keep_feasible=True)
                     else:
                         # NonlinearConstraint
                         # Loop over every index separately,
