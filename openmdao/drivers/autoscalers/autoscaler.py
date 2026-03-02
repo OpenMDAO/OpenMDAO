@@ -41,10 +41,14 @@ class Autoscaler:
         Initialize the autoscaler with driver metadata.
         Called once during driver setup.
     
-    update(driver)
+    configure(driver)
         Update any scaling parameters after the model has been executed.
         This can be used to assess the current values in the model,
         the current jacobian, etc.
+    
+    configure_requires_run_model()
+        Return true if configuring the autoscaler requires the
+        model to be in an executed state.
 
     apply_vec_scaling(vec)
         Scale a vector from model space to optimizer space.
@@ -124,15 +128,44 @@ class Autoscaler:
                 self._scaled_equals[voi_type] = self._compute_scaled_bounds(voi_type)
 
     @property
-    def has_scaling(self):
-        return self._has_scaling
-
-    def update(self, driver: 'Driver'):
+    def has_scaling(self) -> bool:
         """
-        Perform any last minute setup of the autoscaler at the start of the driver's execution.
+        Return True if any scaling is applied to design variables, constraints, or objectives.
 
-        This method is called during driver.run when the model has been executed. It can be used
-        to configure the scaling based on values in the model, the current model jacobian, etc.
+        Returns
+        -------
+        bool
+            True if any scaling is applied, otherwise False.
+        """
+        return self._has_scaling
+    
+    @property
+    def configure_requires_run_model(self) -> bool:
+        """
+        Return True if this autoscaler requires that the model be in an executed state.
+
+        Some autoscaling methods may require computing totals or otherwise inspecting
+        various inputs and outputs of the model.
+
+        This property is used to tell the driver that the run_model needs to be
+        called before configuring the driver.
+
+        Returns
+        -------
+        bool
+            True if the driver must execute run_model before the autoscaler's configure method.
+        """
+        return False
+
+    def configure(self, driver: 'Driver'):
+        """
+        Perform any last minute configuration at the start of the driver's execution.
+
+        This method is called during driver.run. It can be used to configure the scaling based
+        on values in the model, the current model jacobian, etc.
+
+        If configure requires that run_model has been executed, the user should override
+        the `requires_run_model` property of their Autoscaler to return True.
 
         Parameters
         ----------

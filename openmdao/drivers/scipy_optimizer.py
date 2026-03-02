@@ -281,6 +281,9 @@ class ScipyOptimizeDriver(Driver):
                 self._run_solve_nonlinear()
             self.iter_count += 1
 
+        # Configure the autoscaler
+        self._autoscaler.configure(self)
+
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
         self._dvlist = list(self._designvars)
