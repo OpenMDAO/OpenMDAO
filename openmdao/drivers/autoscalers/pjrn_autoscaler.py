@@ -31,6 +31,12 @@ class PJRNAutoscaler(Autoscaler):
         driver metadata entirely.
         If False, PJRN scalers are composed (multiplied) with the existing total_scaler;
         total_adder is kept unchanged.
+    large_range_tol : float
+        Design variable elements whose bound range (ub - lb) exceeds this threshold are
+        treated as effectively unbounded; the fallback characteristic range of 1.0 is used
+        instead. The default (1e10) safely catches the "infinity sentinel" values used by
+        various solvers and transcription frameworks (e.g., Dymos uses ±1e21, OpenMDAO uses
+        ±1e30, SNOPT uses ±1e20) while leaving room for genuinely large physical ranges.
 
     Attributes
     ----------
@@ -38,6 +44,8 @@ class PJRNAutoscaler(Autoscaler):
         True = one scaler per variable; False = one scaler per element.
     _override_scaling : bool
         True = replace total_scaler/total_adder; False = compose with existing.
+    _large_range_tol : float
+        Threshold above which a bound range is treated as effectively infinite.
     _original_scalers : dict
         Saved original total_scaler per VOI type and variable name.
     _original_adders : dict
@@ -50,7 +58,7 @@ class PJRNAutoscaler(Autoscaler):
     213-216.
     """
 
-    def __init__(self, block_mode=True, override_scaling=True):
+    def __init__(self, block_mode=True, override_scaling=True, large_range_tol=1e10):
         """
         Initialize the PJRNAutoscaler.
 
@@ -62,10 +70,14 @@ class PJRNAutoscaler(Autoscaler):
         override_scaling : bool
             If True (default), replace total_scaler/total_adder with PJRN values.
             If False, compose PJRN scalers with existing user scaling.
+        large_range_tol : float
+            Bound ranges exceeding this value are treated as effectively unbounded.
+            Defaults to 1e10.
         """
         super().__init__()
         self._block_mode = block_mode
         self._override_scaling = override_scaling
+        self._large_range_tol = large_range_tol
         self._original_scalers = {}
         self._original_adders = {}
 
@@ -136,7 +148,7 @@ class PJRNAutoscaler(Autoscaler):
         )
 
         # Build Kx^{-1} = diag(ub - lb) per design variable element and per-element adders
-        kx_inv, dv_adders = self._build_kx_inv(driver, dv_meta, wrt_list)
+        kx_inv, dv_adders = self._build_kx_inv(dv_meta, wrt_list)
 
         # Compute DV scalers: Kx_jj = 1/(ub_j - lb_j)
         dv_scalers = self._compute_dv_scalers(dv_meta, kx_inv)
@@ -206,16 +218,17 @@ class PJRNAutoscaler(Autoscaler):
             return np.broadcast_to(arr, (size,)).copy()
         return arr.copy()
 
-    def _build_kx_inv(self, driver, dv_meta, wrt_list):
+    def _build_kx_inv(self, dv_meta, wrt_list):
         """
         Build Kx^{-1} = diag(ub - lb) per design variable element.
 
-        For unbounded or zero-range elements, falls back to 10 * abs(x_current).
+        For unbounded or zero-range elements, falls back to 1.0.  Elements whose
+        bound range exceeds self._large_range_tol are also treated as unbounded,
+        which correctly handles "infinity sentinel" values from various frameworks
+        (e.g., Dymos uses ±1e21, SNOPT uses ±1e20).
 
         Parameters
         ----------
-        driver : Driver
-            The driver (used to retrieve current DV values for the fallback).
         dv_meta : dict
             Design variable metadata.
         wrt_list : list of str
@@ -233,9 +246,6 @@ class PJRNAutoscaler(Autoscaler):
         kx_inv = {}
         adders = {}
 
-        # Retrieve current DV values in physical space for the unbounded fallback
-        dv_vals = driver.get_design_var_values(driver_scaling=False)
-
         for name in wrt_list:
             meta = dv_meta[name]
             size = self._elem_size(meta)
@@ -244,33 +254,26 @@ class PJRNAutoscaler(Autoscaler):
             ub = self._expand_bound(meta.get('upper', INF_BOUND), size, is_lower=False)
 
             rng = ub - lb
-            bad_mask = ~np.isfinite(rng) | (rng < 1e-30)
+            bad_mask = ~np.isfinite(rng) | (rng > self._large_range_tol) | (rng < 1e-30)
 
             if np.any(bad_mask):
-                x_val = dv_vals.get(name)
-                if x_val is None:
-                    x_arr = np.zeros(size)
-                else:
-                    x_arr = np.asarray(x_val, dtype=float).ravel()
-                    if x_arr.size != size:
-                        x_arr = np.broadcast_to(x_arr, (size,)).copy()
-                fallback = np.maximum(10.0 * np.abs(x_arr), 1.0)
                 warnings.warn(
                     f"PJRNAutoscaler: design variable '{name}' has unbounded or "
-                    f'zero-range elements. Using 10 * |x| as the effective range '
-                    f'for those elements.',
+                    f'zero-range elements. Falling back to a characteristic range of '
+                    f'1.0 for those elements. Provide explicit bounds (lower/upper) '
+                    f'for more accurate PJRN scaling.',
                     RuntimeWarning, stacklevel=2
                 )
                 rng = rng.copy()
-                rng[bad_mask] = fallback[bad_mask]
+                rng[bad_mask] = 1.0
 
             kx_inv[name] = rng
 
             # Adder: shift the variable so its lower bound maps to zero.
-            # Use -lb for bounded elements; 0 for elements whose lb is non-finite.
-            finite_lb = np.isfinite(lb)
-            if np.any(finite_lb):
-                adder_arr = np.where(finite_lb, -lb, 0.0)
+            # Only use -lb when lb is a meaningful (non-sentinel) finite value.
+            meaningful_lb = np.isfinite(lb) & (np.abs(lb) <= self._large_range_tol)
+            if np.any(meaningful_lb):
+                adder_arr = np.where(meaningful_lb, -lb, 0.0)
                 adders[name] = adder_arr
             else:
                 adders[name] = None
