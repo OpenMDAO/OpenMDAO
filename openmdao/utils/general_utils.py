@@ -1235,7 +1235,7 @@ def _remove_old_configs(vscode_dir):
 
 
 def _generate_launch_json_file(vscode_dir, base_port, ranks):
-    from libopenmdao.utils.mpi import MPI
+    from openmdao.utils.mpi import MPI
 
     launch_path = os.path.join(vscode_dir, 'launch.json')
 
