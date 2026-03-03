@@ -1206,71 +1206,71 @@ def shape2tuple(shape):
 def _remove_old_configs(vscode_dir):
     launch_path = os.path.join(vscode_dir, 'launch.json')
 
-    # Read existing launch.json if it exists
-    if os.path.exists(launch_path):
-        with open(launch_path, 'r') as f:
+    if not os.path.exists(launch_path):
+        return
+
+    try:
+        with open(launch_path, 'r', encoding='utf-8') as f:
             config_top = json.load(f)
-        configs = config_top.get('configurations', [])
-        compounds = config_top.get('compounds', [])
+    except json.JSONDecodeError:
+        return # Don't try to fix a broken file here; just bail
 
-        # remove any old auto-added configs from configurations and compounds
-        configs = [c for c in configs
-                   if not (c['name'].startswith('_rank_') and c['name'].endswith('_config'))]
+    # 1. Filter out only the MPI specific items
+    configs = config_top.get('configurations', [])
+    new_configs = [c for c in configs
+                   if not (c.get('name', '').startswith('_rank_') and
+                           c.get('name', '').endswith('_config'))]
 
-        compounds = [c for c in compounds if c['name'] != 'MPI Debug']
+    compounds = config_top.get('compounds', [])
+    new_compounds = [c for c in compounds if c.get('name') != 'MPI Debug']
 
-        if configs:
-            config_top['configurations'] = configs
-        elif 'configurations' in config_top:
-            del config_top['configurations']
+    # 2. Update the object (KEEP the keys even if they are empty)
+    # This ensures the JSON structure remains valid for VS Code
+    config_top['configurations'] = new_configs
+    config_top['compounds'] = new_compounds
 
-        if compounds:
-            config_top['compounds'] = compounds
-        elif 'compounds' in config_top:
-            del config_top['compounds']
-
-        with open(os.path.join(vscode_dir, "launch.json"), "w") as f:
-            json.dump(config_top, f, indent=2)
+    # 3. Write back
+    with open(launch_path, "w", encoding='utf-8') as f:
+        json.dump(config_top, f, indent=2)
 
 
-def generate_launch_json_file(vscode_dir, base_port, ranks):
-    """
-    Generate a launch.json file for the VSCode debugger.
-
-    Parameters
-    ----------
-    vscode_dir : str
-        The full path of the .vscode directory.
-    base_port : int
-        The base port number for the debugger.
-    ranks : int
-        The specific ranks to debug.
-    """
+def _generate_launch_json_file(vscode_dir, base_port, ranks):
     from openmdao.utils.mpi import MPI
-
-    _remove_old_configs(vscode_dir)
 
     launch_path = os.path.join(vscode_dir, 'launch.json')
 
-    # Read existing launch.json if it exists
+    # 1. Load existing or create default
     if os.path.exists(launch_path):
-        with open(launch_path, 'r') as f:
-            config_top = json.load(f)
+        try:
+            with open(launch_path, 'r', encoding='utf-8') as f:
+                config_top = json.load(f)
+        except json.JSONDecodeError:
+            config_top = {"version": "0.2.0", "configurations": [], "compounds": []}
     else:
         config_top = {"version": "0.2.0", "configurations": [], "compounds": []}
 
-    configs = config_top.get('configurations', [])
-    compounds = config_top.get('compounds', [])
+    # 2. FILTER: Remove old MPI-specific entries only
+    # We keep everything that DOESN'T start with "_rank_"
+    configs = [
+        c for c in config_top.get('configurations', [])
+        if not c.get('name', '').startswith('_rank_')
+    ]
+
+    # Remove any existing "MPI Debug" compound
+    compounds = [
+        c for c in config_top.get('compounds', [])
+        if c.get('name') != "MPI Debug"
+    ]
 
     new_configs = []
     new_compound_configs = []
 
-    # Add a configuration for each MPI rank
+    # 3. Add the new configurations
     for rank in ranks:
         config_name = f"_rank_{rank}_config"
         config = {
             "name": config_name,
-            "type": "python",
+            "type": "debugpy",
             "request": "attach",
             "port": base_port + rank,
             "host": "localhost",
@@ -1283,23 +1283,22 @@ def generate_launch_json_file(vscode_dir, base_port, ranks):
         new_compound_configs.append(config_name)
 
     configs.extend(new_configs)
-    compounds.append(
-        {
-            "name": "MPI Debug",
-            "configurations": new_compound_configs,
-            "presentation": {
-                "order": 1
-            }
-        }
-    )
+    compounds.append({
+        "name": "MPI Debug",
+        "configurations": new_compound_configs,
+        "presentation": { "order": 1 }
+    })
 
+    # 4. Re-assign the cleaned and updated lists
     config_top['configurations'] = configs
     config_top['compounds'] = compounds
 
-    with open(os.path.join(vscode_dir, "launch.json"), "w") as f:
+    # 5. Write back safely
+    with open(launch_path, "w", encoding='utf-8') as f:
         json.dump(config_top, f, indent=2)
 
     if MPI is None or MPI.COMM_WORLD.rank == 0:
+        # Ensure cleanup only targets the MPI stuff we just added
         atexit.register(functools.partial(_remove_old_configs, vscode_dir))
 
 
@@ -1376,7 +1375,7 @@ def setup_dbg():
             vscode_dir = os.path.join(omdir, ".vscode")
             if not os.path.exists(vscode_dir):
                 os.makedirs(vscode_dir)
-            generate_launch_json_file(vscode_dir, base_port, ranks)
+            _generate_launch_json_file(vscode_dir, base_port, ranks)
 
         if MPI is not None:
             MPI.COMM_WORLD.barrier()

@@ -925,7 +925,7 @@ class AllConnGraph(nx.DiGraph):
             Returned value.
         """
         edge = (src, tgt)
-        edge_meta = self.edges[edge]
+        edge_meta = self.edges.get(edge, {'type': 'manual'})
         typ = edge_meta.get('type', None)
         type_map = {None: 'promote', 'manual': 'connect', 'implicit': 'implicitly connect'}
         typestr = type_map[typ]
@@ -1723,7 +1723,6 @@ class AllConnGraph(nx.DiGraph):
 
     def set_model_meta(self, model, node, meta, locmeta):
         # this helps us keep graph nodes and variable metadata in sync.
-        # TODO: these need to be consolidated into a single data structure!
         """
         Update node meta and locmete from the model.
 
@@ -2304,9 +2303,9 @@ class AllConnGraph(nx.DiGraph):
                         node_meta.val = val
 
             if ambig_units:
-                raise ConnError(self.ambig_units_msg(ambig_units))
+                raise ConnError(self.ambig_units_msg(ambig_units), ident=ambig_units)
             if ambig_val:
-                raise ConnError(self.ambig_values_msg(ambig_val))
+                raise ConnError(self.ambig_values_msg(ambig_val), ident=ambig_val)
 
         except Exception as err:
             if isinstance(err, ConnError):
@@ -2466,7 +2465,7 @@ class AllConnGraph(nx.DiGraph):
                 # we want the ambiguous child (input) for error reporting
                 for s in self.succ[node]:
                     if nodes[s]['attrs'].ambiguous_units:
-                        raise ConnError(self.ambig_units_msg(s))
+                        raise ConnError(self.ambig_units_msg(s), ident=s)
 
             one_none = (start is not None and u is None) or (start is None and u is not None)
             child_units_differ |= start != u
@@ -2791,9 +2790,12 @@ class AllConnGraph(nx.DiGraph):
                 elif not tgt_meta.ambiguous_val:
                     tgt_meta.val = src_val
 
-            if src_units is not None:
+            if src_units is None:
+                if tgt_meta.ambiguous_units and not self._first_pass:
+                    raise ConnError(self.ambig_units_msg(tgt), ident=tgt)
+            else:
                 if tgt_units is not None:
-                    if tgt_units != 'ambiguous' and not is_compatible(src_units, tgt_units):
+                    if not tgt_meta.ambiguous_units and not is_compatible(src_units, tgt_units):
                         raise ConnError(self.units_error(False, src, tgt, src_units, tgt_units))
                 elif tgt_meta.units_by_conn:
                     tgt_meta.units = src_units
@@ -2923,7 +2925,7 @@ class AllConnGraph(nx.DiGraph):
                             if sz is not None:
                                 if sz == 0:
                                     src_indices = \
-                                        indexer(slice(0, 0), flat_src=True, src_shape=(0,))
+                                        indexer(slice(0, 0), flat_src=True, src_shape=src_shape)
                                 else:
                                     src_indices = \
                                         indexer(slice(offset, offset + sz),
@@ -3835,9 +3837,9 @@ class AllConnGraph(nx.DiGraph):
 
         if units is not None:
             if src_units is None:
-                raise TypeError(f"Can't express value with units of '{src_units}' in units of "
-                                f"'{units}'.")
-            elif src_units != units:
+                src_units = tgt_units
+
+            if src_units != units:
                 try:
                     scale, offset = unit_conversion(src_units, units)
                 except Exception:
@@ -4368,11 +4370,11 @@ class AllConnGraph(nx.DiGraph):
 
         try:
             with HTTPServer(("", port), handler) as httpd:
-                print(f"✅ Server running on http://localhost:{port}")
+                print(f"Server running on http://localhost:{port}")
                 print("Press Ctrl+C to stop")
                 httpd.serve_forever()
         except KeyboardInterrupt:
-            print("\n🛑 Server stopped")
+            print("\nServer stopped")
 
     def copy_var_shape(self, from_node, to_node):
         """

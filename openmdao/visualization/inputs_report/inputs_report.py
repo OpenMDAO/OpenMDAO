@@ -106,7 +106,7 @@ def inputs_report(prob, outfile=None, display=True, precision=6, title=None,
             vcell, mincell, maxcell = _get_val_cells(val)
 
             rows.append([target, prom, sprom, src_is_ivc, src in desvars, _unit_str(meta),
-                         meta['shape'], sorted(meta['tags']), vcell, mincell, maxcell, src])
+                         meta['global_shape'], sorted(meta['tags']), vcell, mincell, maxcell, src])
 
     for target, meta in model._var_discrete['input'].items():
         prom = model._resolver.abs2prom(target, 'input')

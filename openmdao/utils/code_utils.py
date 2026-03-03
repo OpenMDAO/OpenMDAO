@@ -319,6 +319,16 @@ class _AttrCollector(ast.NodeVisitor):
 
             self.names = None
 
+    def visit_AnnAssign(self, node):
+        # Handle type-annotated assignments like: self.attr: Type = value
+        if self.class_stack:
+            self.names = []
+            self.visit(node.target)
+            if len(self.names) > 1 and self.names[0] == 'self':
+                self.class_dict[self.class_stack[-1]].add(self.names[1])
+
+            self.names = None
+
     def visit_Attribute(self, node):
         if self.names is not None:
             self.visit(node.value)

@@ -1306,6 +1306,39 @@ class TestDistDynShapesListOutputs(unittest.TestCase):
         prob.model.list_outputs()
 
 
+class CompInput(om.IndepVarComp):
+    def setup(self):
+        self.add_output("vector",
+                        val=np.ones((10*np.abs(self.comm.rank-1),2)),
+                        distributed=True)
+
+
+class ExplicitDComp(om.ExplicitComponent):
+    def setup(self):
+        self.add_input("vector",
+                        shape_by_conn=True,
+                        distributed=True)
+
+        self.add_output("sum")
+
+    def compute(self, inputs, outputs):
+        outputs["sum"] = self.comm.allreduce(np.sum(inputs["vector"]))
+
+
+@unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
+class ZeroDynDistShapeTestCase(unittest.TestCase):
+    N_PROCS = 2
+
+    def test_zero_dyn_dist_shape(self):
+        prob = om.Problem()
+        prob.model.add_subsystem("inputs", CompInput())
+        prob.model.add_subsystem("summer", ExplicitDComp())
+        prob.model.connect("inputs.vector", "summer.vector")
+        prob.setup()
+        prob.run_model()
+        print("sum", prob.get_val("summer.sum"))
+        assert_near_equal(prob.get_val("summer.sum", get_remote=True), 20.0)
+
 
 if __name__ == '__main__':
     from openmdao.utils.mpi import mpirun_tests
