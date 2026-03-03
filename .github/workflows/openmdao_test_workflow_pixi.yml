@@ -286,8 +286,9 @@ jobs:
           echo "############ .coveragerc contents #################"
           cat .coveragerc
           echo "###################################################"
-          cp .coveragerc $HOME
-          cd $HOME
+          cp .coveragerc "$HOME"
+          cd "$HOME"
+          python openmdao/core/tests/test_functional_interface.py 
 
           # Build testflo command
           TESTFLO_CMD="testflo openmdao --skip_dir=.pixi --timeout=240 --durations=20"
