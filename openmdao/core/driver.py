@@ -665,7 +665,16 @@ class Driver(object, metaclass=DriverMetaclass):
                                   category=DerivativesWarning)
 
         self._autoscaler.setup(driver=self)
-        
+
+        # Activate reports and install hooks on the autoscaler now that setup() has been called
+        # and _driver_ref / _get_inst_id() are available.
+        prob = self._problem()
+        if prob is not None:
+            from openmdao.utils.reports_system import activate_reports
+            from openmdao.utils.hooks import _setup_hooks
+            activate_reports(prob._reports, self._autoscaler)
+            _setup_hooks(self._autoscaler)
+
         # Pre-allocate optimizer vectors for all drivers
         try:
             dv_vec = OptimizerVector.create_from_model(voi_type='design_var',
@@ -1255,7 +1264,7 @@ class Driver(object, metaclass=DriverMetaclass):
                     con_val[upper_viol_idxs] -=  meta['upper']
                     con_val[non_viol_idxs] = 0.0
 
-            con_dict[name] = con_vec[name]
+            con_dict[name] = con_vec[name].copy()
 
         # If we computed violations, those were unscaled.
         # Now scale them.

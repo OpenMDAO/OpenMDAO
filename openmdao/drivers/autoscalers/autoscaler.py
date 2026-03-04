@@ -1,3 +1,4 @@
+import weakref
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -84,6 +85,8 @@ class Autoscaler:
         constraints.
     _scaled_equals : dict
         Dictionary mapping VOI type to scaled equality constraint value arrays.
+    _driver_ref : weakref or None
+        Weak reference to the driver this autoscaler belongs to. Set during setup().
 
     """
 
@@ -93,6 +96,27 @@ class Autoscaler:
         self._scaled_lower = {}
         self._scaled_upper = {}
         self._scaled_equals = {}
+        self._driver_ref = None
+
+    def _get_inst_id(self):
+        """
+        Return a unique identifier for this autoscaler instance.
+
+        Used by the hooks and reports systems to identify this specific autoscaler instance.
+        The identifier is derived from the owning driver's instance id.
+
+        Returns
+        -------
+        str or None
+            A string of the form '<driver_inst_id>.autoscaler', or None if setup has not
+            been called yet.
+        """
+        if self._driver_ref is None:
+            return None
+        driver = self._driver_ref()
+        if driver is None:
+            return None
+        return f'{driver._get_inst_id()}.autoscaler'
 
     def setup(self, driver: 'Driver'):
         """
@@ -103,6 +127,7 @@ class Autoscaler:
         driver : Driver
             The driver associated with this autoscaler.
         """
+        self._driver_ref = weakref.ref(driver)
         self._var_meta : dict[str, dict[str, dict]] = {
             'design_var': driver._designvars,
             'constraint': driver._cons,
