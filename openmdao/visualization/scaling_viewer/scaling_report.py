@@ -517,6 +517,15 @@ def _scaling_setup_parser(parser):
 _scaling_report_done = set()
 
 
+def _check_nl_totals(driver, **kwargs):
+    # Prevent hook from triggering until we have computed the total jacobian for the nonlinear
+    # constraints and objectives. Find feasible doesn't necessarily use the entire jacobian
+    # and so we disable this report when running find_feasible.
+    # Also skip if this autoscaler wants the report to fire post-configure instead.
+    return (driver._total_jac is not None and not driver._in_find_feasible
+            and not driver._autoscaler.report_after_configure)
+
+
 def _exitfunc(probname):
     global _scaling_report_done
     from openmdao.core.problem import _problem_names
@@ -543,20 +552,16 @@ def _scaling_cmd(options, user_args):
     # disable the reports system, we only want the scaling report and then we exit
     os.environ['OPENMDAO_REPORTS'] = '0'
 
-    def _do_scaling_report(autoscaler, infile='', outfile=_default_scaling_filename,
-                           show_browser=True, title=None, jac=True):
+    def _do_scaling_report(driver, infile='', outfile=_default_scaling_filename, show_browser=True,
+                           title=None, jac=True):
         global _scaling_report_done
-        driver = autoscaler._driver_ref()
-        if driver is None:
-            return
         _scaling_report_done.add(driver._problem()._name)
         if title is None:
             title = f"Driver scaling for {infile}"
         driver.scaling_report(outfile=outfile, show_browser=show_browser, title=title, jac=jac)
 
-    inst_id = f'{options.problem}.autoscaler' if options.problem is not None else None
-    hooks._register_hook('configure', class_name='Autoscaler', inst_id=inst_id,
-                         post=_do_scaling_report, ncalls=1,
+    hooks._register_hook('_compute_totals', class_name='Driver', inst_id=options.problem,
+                         post=_do_scaling_report, ncalls=1, predicate=_check_nl_totals,
                          infile=options.file[0], outfile=options.outfile,
                          show_browser=not options.no_browser, title=options.title,
                          jac=not options.nojac)
@@ -569,11 +574,7 @@ def _scaling_cmd(options, user_args):
 
 
 # scaling report definition
-def _run_scaling_report(autoscaler, report_filename=_default_scaling_filename):
-
-    driver = autoscaler._driver_ref()
-    if driver is None:
-        return
+def _run_scaling_report(driver, report_filename=_default_scaling_filename):
 
     prob = driver._problem()
     scaling_filepath = prob.get_reports_dir() / report_filename
@@ -592,6 +593,14 @@ def _run_scaling_report(autoscaler, report_filename=_default_scaling_filename):
             raise err
 
 
+def _run_scaling_report_for_autoscaler(autoscaler, report_filename=_default_scaling_filename):
+    # Entry point for the post-configure hook path (report_after_configure=True autoscalers).
+    driver = autoscaler._driver_ref()
+    if driver is None:
+        return
+    _run_scaling_report(driver, report_filename=report_filename)
+
+
 def _scaling_report_register():
-    register_report('scaling', _run_scaling_report, 'Driver scaling report', 'Autoscaler',
-                    'configure', 'post')
+    register_report('scaling', _run_scaling_report, 'Driver scaling report', 'Driver',
+                    '_compute_totals', 'post', predicate=_check_nl_totals)

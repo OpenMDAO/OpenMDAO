@@ -666,13 +666,18 @@ class Driver(object, metaclass=DriverMetaclass):
 
         self._autoscaler.setup(driver=self)
 
-        # Activate reports and install hooks on the autoscaler now that setup() has been called
-        # and _driver_ref / _get_inst_id() are available.
-        prob = self._problem()
-        if prob is not None:
-            from openmdao.utils.reports_system import activate_reports
-            from openmdao.utils.hooks import _setup_hooks
-            activate_reports(prob._reports, self._autoscaler)
+        # For autoscalers that do meaningful work in configure() and want the scaling report
+        # to reflect post-configure scaling, register a one-shot hook on configure().
+        # For the base Autoscaler (configure is a no-op), the scaling report fires via the
+        # existing Driver._compute_totals hook registered by _scaling_report_register().
+        if self._autoscaler.report_after_configure:
+            from openmdao.utils.hooks import _register_hook, _setup_hooks
+            from openmdao.visualization.scaling_viewer.scaling_report import (
+                _run_scaling_report_for_autoscaler,
+            )
+            _register_hook('configure', class_name='Autoscaler',
+                           inst_id=self._autoscaler._get_inst_id(),
+                           post=_run_scaling_report_for_autoscaler, ncalls=1)
             _setup_hooks(self._autoscaler)
 
         # Pre-allocate optimizer vectors for all drivers

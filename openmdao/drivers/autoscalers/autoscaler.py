@@ -182,6 +182,26 @@ class Autoscaler:
         """
         return False
 
+    @property
+    def report_after_configure(self) -> bool:
+        """
+        Return True if the scaling report should be generated after configure() is called.
+
+        When False (default), the scaling report is generated after the first nonlinear
+        totals computation during optimization (the same timing as on master). This is
+        appropriate for autoscalers whose configure() method is a no-op.
+
+        When True, the scaling report fires immediately after configure() completes.
+        Subclasses whose configure() method modifies scaling parameters should override
+        this property to return True so that the report reflects the post-configure scaling.
+
+        Returns
+        -------
+        bool
+            True if the scaling report should be generated after configure(), False otherwise.
+        """
+        return False
+
     def configure(self, driver: 'Driver'):
         """
         Perform any last minute configuration at the start of the driver's execution.
