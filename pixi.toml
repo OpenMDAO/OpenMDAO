@@ -121,6 +121,13 @@ mpi4py = "*"
 petsc = "*"
 petsc4py = "*"
 
+# MPI for linux only - used for py314 where opt/MPI conflict on macOS
+[feature.mpi-no-osx.target.linux-64.dependencies]
+openmpi = "*"
+mpi4py = "*"
+petsc = "*"
+petsc4py = "*"
+
 [feature.notebooks.dependencies]
 ipympl = "*"
 notebook = "*"
@@ -187,8 +194,8 @@ py311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visua
 py312 = { features = ["py312", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py312" }
 # Note that environment py313 is deprecated in favor of default
 py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "default" }
-# Currently py314 does not support mpi until IPOPT/MPI dependency conflicts are resolved.
-py314 = { features = ["py314", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test"], solve-group = "py314" }
+# py314 uses mpi-no-osx instead of mpi because opt/MPI conflict on macOS under py314.
+py314 = { features = ["py314", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi-no-osx"], solve-group = "py314" }
 
 ###############################################
 # Tasks
