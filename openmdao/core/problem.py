@@ -1949,25 +1949,36 @@ class Problem(object, metaclass=ProblemMetaclass):
         default_col_names = ['name', 'val', 'size']
 
         # Design vars
-        desvars = self.driver._designvars
+        desvars = deepcopy(self.driver._designvars)
         vals = self.driver.get_design_var_values(get_remote=True, driver_scaling=driver_scaling)
-        if not driver_scaling:
-            desvars = deepcopy(desvars)
-            for meta in desvars.values():
-                scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
-                adder = meta['adder'] if meta.get('adder') is not None else 0.
-                if 'lower' in meta:
-                    meta['lower'] = meta['lower'] / scaler - adder
-                if 'upper' in meta:
-                    meta['upper'] = meta['upper'] / scaler - adder
-        header = "Design Variables"
+
+        header = f"Design Variables {'(scaled)' if driver_scaling else '(unscaled)'}"
         if desvar_opts is None:
             desvar_opts = ['lower', 'upper', 'ref', 'ref0', 'indices', 'adder', 'scaler',
                            'parallel_deriv_color', 'cache_linear_solution', 'units', 'min', 'max']
         def_desvar_opts = [opt for opt in ('indices',) if opt not in desvar_opts and
                            _find_dict_meta(desvars, opt)]
         desvar_opts = [opt for opt in desvar_opts if _find_dict_meta(desvars, opt)]
+    
+        if ('lower' in desvar_opts or 'upper' in desvar_opts) and driver_scaling:
+            lower, upper, _ = self.driver._autoscaler.get_bounds_scaling('design_var')
+            for name in desvars:
+                if not desvars[name]['discrete']:
+                    if 'lower' in desvar_opts:
+                        desvars[name]['lower'] = lower[name]
+                    if 'upper' in desvar_opts:
+                        desvars[name]['upper'] = upper[name]
+
+        # include units in our outputs if any constraints have units that are not None
+        has_units = any(dvmeta.get('units', None) is not None for dvname, dvmeta in desvars.items())
+        if has_units and 'units' not in desvar_opts:
+            desvar_opts.append('units')
+
         col_names = default_col_names + def_desvar_opts + desvar_opts
+        if 'units' in col_names and driver_scaling:
+            for dv in desvars:
+                if desvars[dv]['units'] is not None:
+                    desvars[dv]['units'] += ' (scaled)'
         if out_stream:
             self._write_var_info_table(header, col_names, desvars, vals,
                                        show_promoted_name=show_promoted_name,
@@ -1981,18 +1992,9 @@ class Problem(object, metaclass=ProblemMetaclass):
         des_vars = [tuple(d) for d in des_vars]
 
         # Constraints
-        cons = self.driver._cons
+        cons = deepcopy(self.driver._cons)
         vals = self.driver.get_constraint_values(driver_scaling=driver_scaling)
-        if not driver_scaling:
-            cons = deepcopy(cons)
-            for meta in cons.values():
-                scaler = meta['scaler'] if meta.get('scaler') is not None else 1.
-                adder = meta['adder'] if meta.get('adder') is not None else 0.
-                if 'lower' in meta:
-                    meta['lower'] = meta['lower'] / scaler - adder
-                if 'upper' in meta:
-                    meta['upper'] = meta['upper'] / scaler - adder
-        header = "Constraints"
+        header = f"Constraints {'(scaled)' if driver_scaling else '(unscaled)'}"
         if cons_opts is None:
             cons_opts = ['lower', 'upper', 'equals', 'ref', 'ref0', 'indices', 'adder', 'scaler',
                          'linear', 'parallel_deriv_color', 'cache_linear_solution', 'units', 'min',
@@ -2001,7 +2003,25 @@ class Problem(object, metaclass=ProblemMetaclass):
         def_cons_opts = [opt for opt in ('indices', 'alias') if opt not in cons_opts and
                          _find_dict_meta(cons, opt)]
         cons_opts = [opt for opt in cons_opts if _find_dict_meta(cons, opt)]
+        # include units in our outputs if any constraints have units that are not None
+        has_units = any(cmeta.get('units', None) is not None for cname, cmeta in cons.items())
+        if has_units and 'units' not in cons_opts:
+            cons_opts.append('units')
+        if (('lower' in cons_opts or 'upper' in cons_opts or 'equals' in cons_opts)
+            and driver_scaling):
+            lower, upper, equals = self.driver._autoscaler.get_bounds_scaling('constraint')
+            for name in cons:
+                if 'lower' in cons_opts:
+                    cons[name]['lower'] = lower[name]
+                if 'upper' in cons_opts:
+                    cons[name]['upper'] = upper[name]
+                if 'equals' in cons_opts:
+                    cons[name]['equals'] = equals[name]
         col_names = default_col_names + def_cons_opts + cons_opts
+        if 'units' in col_names and driver_scaling:
+            for c in cons:
+                if cons[c]['units'] is not None:
+                    cons[c]['units'] += ' (scaled)'
         if out_stream:
             self._write_var_info_table(header, col_names, cons, vals,
                                        show_promoted_name=show_promoted_name,
@@ -2014,16 +2034,25 @@ class Problem(object, metaclass=ProblemMetaclass):
             c[1]['val'] = vals[c[0]]
         cons_vars = [tuple(c) for c in cons_vars]
 
-        objs = self.driver._objs
+        objs = deepcopy(self.driver._objs)
         vals = self.driver.get_objective_values(driver_scaling=driver_scaling)
-        header = "Objectives"
+        header = f"Objectives {'(scaled)' if driver_scaling else '(unscaled)'}"
         if objs_opts is None:
             objs_opts = ['ref', 'ref0', 'indices', 'adder', 'scaler', 'units',
                          'parallel_deriv_color', 'cache_linear_solution']
         def_obj_opts = [opt for opt in ('indices',) if opt not in objs_opts and
                         _find_dict_meta(objs, opt)]
         objs_opts = [opt for opt in objs_opts if _find_dict_meta(objs, opt)]
+        # include units in our outputs if any constraints have units that are not None
+        has_units = any(ometa.get('units', None) is not None for oname, ometa in objs.items())
+        if has_units and 'units' not in objs_opts:
+            objs_opts.append('units')
+
         col_names = default_col_names + def_obj_opts + objs_opts
+        if 'units' in col_names and driver_scaling:
+            for o in objs:
+                if objs[o]['units'] is not None:
+                    objs[o]['units'] += ' (scaled)'
         if out_stream:
             self._write_var_info_table(header, col_names, objs, vals,
                                        show_promoted_name=show_promoted_name,

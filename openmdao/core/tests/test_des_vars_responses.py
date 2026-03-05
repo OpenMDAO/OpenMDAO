@@ -436,8 +436,8 @@ class TestDesvarOnModel(unittest.TestCase):
 
         x_ref0 = des_vars['x']['ref0']
         x_ref = des_vars['x']['ref']
-        x_scaler = des_vars['x']['scaler']
-        x_adder = des_vars['x']['adder']
+        x_scaler = des_vars['x']['total_scaler']
+        x_adder = des_vars['x']['total_adder']
 
         self.assertAlmostEqual( x_scaler*(x_ref0 + x_adder), 0.0, places=12)
         self.assertAlmostEqual( x_scaler*(x_ref + x_adder), 1.0, places=12)
@@ -584,8 +584,8 @@ class TestConstraintOnModel(unittest.TestCase):
 
         con1_ref0 = constraints['con1']['ref0']
         con1_ref = constraints['con1']['ref']
-        con1_scaler = constraints['con1']['scaler']
-        con1_adder = constraints['con1']['adder']
+        con1_scaler = constraints['con1']['total_scaler']
+        con1_adder = constraints['con1']['total_adder']
 
         self.assertAlmostEqual( con1_scaler*(con1_ref0 + con1_adder), 0.0,
                                 places=12)
@@ -932,8 +932,8 @@ class TestObjectiveOnModel(unittest.TestCase):
 
         obj_ref0 = objectives['obj']['ref0']
         obj_ref = objectives['obj']['ref']
-        obj_scaler = objectives['obj']['scaler']
-        obj_adder = objectives['obj']['adder']
+        obj_scaler = objectives['obj']['total_scaler']
+        obj_adder = objectives['obj']['total_adder']
 
         self.assertAlmostEqual( obj_scaler*(obj_ref0 + obj_adder), 0.0,
                                 places=12)

@@ -16,16 +16,6 @@ from openmdao.utils.reports_system import register_report
 _default_scaling_filename = 'driver_scaling_report.html'
 
 
-def _unscale(val, scaler, adder, default=''):
-    if val is None:
-        return default
-    if scaler is not None:
-        val = val * (1.0 / scaler)
-    if adder is not None:
-        val = val - adder
-    return val
-
-
 def _getdef(val, unset):
     if val is None:
         return unset
@@ -55,7 +45,8 @@ def _get_flat(val, size, unset=''):
 
 
 def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=None,
-                    lower=None, upper=None, equals=None, inds=None):
+                    lower=None, upper=None, equals=None, inds=None,
+                    total_scaler=None, total_adder=None):
     if not (np.isscalar(mval) or mval.size == 1):
         rowchild = row.copy()
         children = row['_children'] = []
@@ -70,6 +61,8 @@ def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=Non
         upper_flat = _get_flat(upper, mval.size)
         lower_flat = _get_flat(lower, mval.size)
         equals_flat = _get_flat(equals, mval.size)
+        total_scaler_flat = _get_flat(total_scaler, mval.size)
+        total_adder_flat = _get_flat(total_adder, mval.size)
 
         if inds is None:
             inds = list(range(dval.size))
@@ -95,6 +88,10 @@ def _add_child_rows(row, mval, dval, scaler=None, adder=None, ref=None, ref0=Non
                 d['lower'] = [lower_flat[i], 1]
             if equals_flat is not None:
                 d['equals'] = [equals_flat[i], 1]
+            if total_scaler_flat is not None:
+                d['total_scaler'] = [total_scaler_flat[i], 1]
+            if total_adder_flat is not None:
+                d['total_adder'] = [total_adder_flat[i], 1]
             children.append(d)
 
 
@@ -197,9 +194,12 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
     con_table = []
     obj_table = []
 
-    dv_vals = driver.get_design_var_values(get_remote=True)
+    dv_vals = driver.get_design_var_values(get_remote=True, driver_scaling=True)
+    dv_vals_phys = driver.get_design_var_values(get_remote=True, driver_scaling=False)
     obj_vals = driver.get_objective_values(driver_scaling=True)
+    obj_vals_phys = driver.get_objective_values(driver_scaling=False)
     con_vals = driver.get_constraint_values(driver_scaling=True)
+    con_vals_phys = driver.get_constraint_values(driver_scaling=False)
 
     model = driver._problem().model
 
@@ -213,6 +213,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
                            "on the Problem.")
 
     default = ''
+    jac_cond_str = ''
 
     idx = 1  # unique ID for use by Tabulator
 
@@ -226,8 +227,10 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
     # set up design vars table data
     for name, meta in driver._designvars.items():
-        scaler = meta['total_scaler']
-        adder = meta['total_adder']
+        scaler = meta['scaler']
+        adder = meta['adder']
+        total_scaler = meta['total_scaler']
+        total_adder = meta['total_adder']
         ref = meta.get('ref')
         ref0 = meta.get('ref0')
         lower = meta.get('lower')
@@ -238,7 +241,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             discretes['dvs'].append(name)
 
         dval = dv_vals[name]
-        mval = _unscale(dval, scaler, adder, default)
+        mval = dv_vals_phys[name]
 
         index, inds = get_inds(dval, meta)
 
@@ -254,6 +257,8 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             'ref0': _get_val_and_size(ref0, default),
             'scaler': _get_val_and_size(scaler, default),
             'adder': _get_val_and_size(adder, default),
+            'total_scaler': _get_val_and_size(total_scaler, default),
+            'total_adder': _get_val_and_size(total_adder, default),
             'lower': _get_val_and_size(lower, default),  # scaled
             'upper': _get_val_and_size(upper, default),  # scaled
             'index': index,
@@ -261,14 +266,17 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
         dv_table.append(dct)
         _add_child_rows(dct, mval, dval, scaler=scaler, adder=adder, ref=ref, ref0=ref0,
-                        lower=lower, upper=upper, inds=inds)
+                        lower=lower, upper=upper, inds=inds,
+                        total_scaler=total_scaler, total_adder=total_adder)
 
         idx += 1
 
     # set up constraints table data
     for name, meta in driver._cons.items():
-        scaler = meta['total_scaler']
-        adder = meta['total_adder']
+        scaler = meta['scaler']
+        adder = meta['adder']
+        total_scaler = meta['total_scaler']
+        total_adder = meta['total_adder']
         ref = meta.get('ref')
         ref0 = meta.get('ref0')
         lower = meta.get('lower')
@@ -281,7 +289,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             discretes['con'].append(name)
 
         dval = con_vals[name]
-        mval = _unscale(dval, scaler, adder, default)
+        mval = con_vals_phys[name]
 
         index, inds = get_inds(dval, meta)
 
@@ -302,6 +310,8 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             'ref0': _get_val_and_size(ref0, default),
             'scaler': _get_val_and_size(scaler, default),
             'adder': _get_val_and_size(adder, default),
+            'total_scaler': _get_val_and_size(total_scaler, default),
+            'total_adder': _get_val_and_size(total_adder, default),
             'lower': _get_val_and_size(lower, default),  # scaled
             'upper': _get_val_and_size(upper, default),  # scaled
             'equals': _get_val_and_size(equals, default),  # scaled
@@ -310,14 +320,17 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
 
         con_table.append(dct)
         _add_child_rows(dct, mval, dval, scaler=scaler, adder=adder, ref=ref, ref0=ref0,
-                        lower=lower, upper=upper, equals=equals, inds=inds)
+                        lower=lower, upper=upper, equals=equals, inds=inds,
+                        total_scaler=total_scaler, total_adder=total_adder)
 
         idx += 1
 
     # set up objectives table data
     for name, meta in driver._objs.items():
-        scaler = meta['total_scaler']
-        adder = meta['total_adder']
+        scaler = meta['scaler']
+        adder = meta['adder']
+        total_scaler = meta['total_scaler']
+        total_adder = meta['total_adder']
         ref = meta.get('ref')
         ref0 = meta.get('ref0')
         alias = meta.get('alias', '')
@@ -327,7 +340,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             discretes['obj'].append(name)
 
         dval = obj_vals[name]
-        mval = _unscale(dval, scaler, adder, default)
+        mval = obj_vals_phys[name]
 
         index, inds = get_inds(dval, meta)
 
@@ -348,11 +361,13 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             'ref0': _get_val_and_size(meta.get('ref0'), default),
             'scaler': _get_val_and_size(scaler, default),
             'adder': _get_val_and_size(adder, default),
+            'total_scaler': _get_val_and_size(total_scaler, default),
+            'total_adder': _get_val_and_size(total_adder, default),
         }
 
         obj_table.append(dct)
         _add_child_rows(dct, mval, dval, scaler=scaler, adder=adder, ref=ref, ref0=ref0,
-                        inds=inds)
+                        inds=inds, total_scaler=total_scaler, total_adder=total_adder)
 
         idx += 1
 
@@ -400,12 +415,12 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             driver._compute_totals(of=data['oflabels'], wrt=data['wrtlabels'],
                                    return_format=driver._total_jac_format)
             totals = driver._total_jac.J  # .J is always an array even if return format != 'array'
-            # driver._total_jac = None
         else:
             totals = driver._total_jac.J  # .J is always an array even if return format != 'array'
             data['oflabels'] = list(driver._total_jac.output_meta['fwd'])
             data['wrtlabels'] = list(driver._total_jac.input_meta['fwd'])
 
+        jac_cond_str = f'{np.linalg.cond(totals):.6e}'
         data['linear'] = lindata = {}
         lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]
         lindata['wrtlabels'] = [n for n in dv_vals if n in ldvs]
@@ -468,6 +483,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             s = template.replace("<tabulator_src>", tabulator_src)
             s = s.replace("<tabulator_style>", tabulator_style)
             s = s.replace("<d3_src>", d3_src)
+            s = s.replace("<jac_cond>", jac_cond_str)
             s = s.replace("<scaling_data>", jsontxt)
             f.write(s)
 
@@ -501,6 +517,15 @@ def _scaling_setup_parser(parser):
 _scaling_report_done = set()
 
 
+def _check_nl_totals(driver, **kwargs):
+    # Prevent hook from triggering until we have computed the total jacobian for the nonlinear
+    # constraints and objectives. Find feasible doesn't necessarily use the entire jacobian
+    # and so we disable this report when running find_feasible.
+    # Also skip if this autoscaler wants the report to fire post-configure instead.
+    return (driver._total_jac is not None and not driver._in_find_feasible
+            and not driver._autoscaler.report_after_configure)
+
+
 def _exitfunc(probname):
     global _scaling_report_done
     from openmdao.core.problem import _problem_names
@@ -511,13 +536,6 @@ def _exitfunc(probname):
     missing = [p for p in probnames if p not in _scaling_report_done]
     if missing:
         print(f"\n\nDriver scaling report(s) not generated for Problem(s) {sorted(missing)}\n")
-
-
-def _check_nl_totals(driver, **kwargs):
-    # Prevent hook from triggering until we have computed the total jacobian for the nonlinear
-    # constraints and objectives. Find feasible doesn't necessarily use the entire jacobian
-    # and so we disable this report when running find_feasible.
-    return driver._total_jac is not None and not driver._in_find_feasible
 
 
 def _scaling_cmd(options, user_args):
@@ -573,6 +591,14 @@ def _run_scaling_report(driver, report_filename=_default_scaling_filename):
         if str(err) != "Can't compute total derivatives unless " \
                        "both 'of' or 'wrt' variables have been specified.":
             raise err
+
+
+def _run_scaling_report_for_autoscaler(autoscaler, report_filename=_default_scaling_filename):
+    # Entry point for the post-configure hook path (report_after_configure=True autoscalers).
+    driver = autoscaler._driver_ref()
+    if driver is None:
+        return
+    _run_scaling_report(driver, report_filename=report_filename)
 
 
 def _scaling_report_register():
