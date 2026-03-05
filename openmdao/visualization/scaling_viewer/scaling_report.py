@@ -213,6 +213,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
                            "on the Problem.")
 
     default = ''
+    jac_cond_str = ''
 
     idx = 1  # unique ID for use by Tabulator
 
@@ -419,6 +420,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             data['oflabels'] = list(driver._total_jac.output_meta['fwd'])
             data['wrtlabels'] = list(driver._total_jac.input_meta['fwd'])
 
+        jac_cond_str = f'{np.linalg.cond(totals):.6e}'
         data['linear'] = lindata = {}
         lindata['oflabels'] = [n for n, meta in driver._cons.items() if meta['linear']]
         lindata['wrtlabels'] = [n for n in dv_vals if n in ldvs]
@@ -481,7 +483,7 @@ def view_driver_scaling(driver, outfile=_default_scaling_filename, show_browser=
             s = template.replace("<tabulator_src>", tabulator_src)
             s = s.replace("<tabulator_style>", tabulator_style)
             s = s.replace("<d3_src>", d3_src)
-            s = s.replace("<jac_cond>", f'{np.linalg.cond(totals):.6e}')
+            s = s.replace("<jac_cond>", jac_cond_str)
             s = s.replace("<scaling_data>", jsontxt)
             f.write(s)
 
