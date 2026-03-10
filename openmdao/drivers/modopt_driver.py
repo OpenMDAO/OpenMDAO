@@ -42,6 +42,8 @@ try:
     import modopt as mo
 except ImportError:
     mo = None
+except Exception as err:
+    mo = err
 
 # TODO: Test MPI with distributed models (design variables must be replicated, not distributed)
 # TODO: Default optimizer file output locations and allow user to define a location
@@ -553,11 +555,15 @@ class modOptDriver(Driver):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        super().__init__(**kwargs)
-
         if mo is None:
             raise RuntimeError('modOptDriver is not available, modOpt is not'
                                ' installed.')
+
+        if isinstance(mo, Exception):
+            # there is some other issue with the modOpt installation
+            raise mo
+
+        super().__init__(**kwargs)
 
         # What we support
         self.supports['optimization'] = True
@@ -937,7 +943,8 @@ class modOptDriver(Driver):
                                     nl_con_jac_sparsity[name, x_name]['rows'] = rows
                                     nl_con_jac_sparsity[name, x_name]['cols'] = cols
                                 else:
-                                    # No sparsity info available - use dense (None means dense to modOpt)
+                                    # No sparsity info available - use dense (None means dense
+                                    # to modOpt)
                                     nl_con_jac_sparsity[name, x_name]['rows'] = None
                                     nl_con_jac_sparsity[name, x_name]['cols'] = None
 
@@ -1287,7 +1294,7 @@ if __name__ == '__main__':
     model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
     model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
 
-    p.driver = ModOptDriver()
+    p.driver = modOptDriver()
     p.driver.options['optimizer'] = "SLSQP"
 
     #####################################
