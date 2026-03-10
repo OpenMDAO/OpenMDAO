@@ -56,6 +56,7 @@ networkx = ">=3.3"
 pip = ">=25.3"
 packaging = ">=25.0"
 requests = ">=2.32.5"
+compilers = ">=1.8.0,<2"
 
 ###############################################
 # Python version features
@@ -69,6 +70,9 @@ python = "3.12.*"
 
 [feature.py313.dependencies]
 python = "3.13.*"
+
+[feature.py314.dependencies]
+python = "3.14.*"
 
 ##########################################################
 # Optional features (version-agnostic as much as possible)
@@ -91,6 +95,9 @@ pydoe3 = "*"
 pyoptsparse = ">=2.14.0"
 cyipopt = "*"
 
+[feature.opt.pypi-dependencies]
+build_pyoptsparse = { git = "https://github.com/OpenMDAO/build_pyoptsparse.git" }
+
 # Jax not available for windows on conda-forge
 [feature.jax.pypi-dependencies]
 jax = "*"
@@ -109,6 +116,13 @@ petsc = "*"
 petsc4py = "*"
 
 [feature.mpi.target.osx-arm64.dependencies]
+openmpi = "*"
+mpi4py = "*"
+petsc = "*"
+petsc4py = "*"
+
+# MPI for linux only - used for py314 where opt/MPI conflict on macOS
+[feature.mpi-no-osx.target.linux-64.dependencies]
 openmpi = "*"
 mpi4py = "*"
 petsc = "*"
@@ -168,7 +182,7 @@ networkx = "==3.3"
 [environments]
 
 # Default - uses whatever Python solver picks
-default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test"], solve-group = "default" }
+default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "default" }
 dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging"], solve-group = "default" }
 minimal = { features = ["py313", "test"], solve-group = "default" }
 
@@ -178,7 +192,10 @@ oldest = { features = ["deps-oldest", "doe", "opt", "jax", "numba", "notebooks",
 # Python version matrix
 py311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py311" }
 py312 = { features = ["py312", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py312" }
-py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py313" }
+# Note that environment py313 is deprecated in favor of default
+py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "default" }
+# py314 uses mpi-no-osx instead of mpi because opt/MPI conflict on macOS under py314.
+py314 = { features = ["py314", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi-no-osx"], solve-group = "py314" }
 
 ###############################################
 # Tasks
@@ -199,3 +216,10 @@ install-openmdao-latest = { cmd = "pip install --no-deps openmdao", description 
 
 # Install OpenMDAO from GitHub master branch
 install-openmdao-master = { cmd = "pip install --no-deps git+https://github.com/OpenMDAO/OpenMDAO.git@master", description = "Install OpenMDAO from GitHub master branch" }
+
+# Build the SNOPT module for pyoptsparse
+[tasks.build-snopt]
+description = "Build SNOPT module. Usage: pixi run build-snopt <path_to_snopt_source>"
+args = ["snopt_src"]
+cmd = "python -m build_pyoptsparse.snopt_module {{snopt_src}}"
+

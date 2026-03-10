@@ -5,7 +5,7 @@ inputs:
   environment:
     description: 'Pixi environment(s) to install'
     required: false
-    default: 'py313'
+    default: 'default'
   openmdao_pixi_ref:
     description: 'OpenMDAO git ref to use for pixi.toml (branch/tag/commit, default: master)'
     required: false
