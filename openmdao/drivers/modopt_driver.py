@@ -40,10 +40,13 @@ from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.group import Group
 try:
     import modopt as mo
+    problem = mo.Problem
 except ImportError:
     mo = None
+    problem = object
 except Exception as err:
     mo = err
+    problem = object
 
 # TODO: Test MPI with distributed models (design variables must be replicated, not distributed)
 # TODO: Default optimizer file output locations and allow user to define a location
@@ -107,7 +110,7 @@ CITATIONS = """
 """
 
 
-class modOptProblem(mo.Problem):
+class modOptProblem(problem):
     """
     modOpt Problem that delegates objective and constraint evaluation to an OpenMDAO driver.
 
