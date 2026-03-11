@@ -29,6 +29,10 @@ inputs:
     description: 'How to install OpenMDAO: pypi, github, wheel, local, local_developer, or none'
     required: false
     default: 'wheel'
+  frozen:
+    description: 'Use frozen pixi lock file (set to false to update dependencies)'
+    required: false
+    default: 'true'
   debug_enabled:
     description: 'Enable tmate debugging session'
     required: false
@@ -64,6 +68,7 @@ runs:
       with:
         environment: '${{ inputs.PIXI_ENVIRONMENT }}'
         openmdao_install_from: '${{ inputs.OPENMDAO_INSTALL_FROM }}'
+        frozen: '${{ inputs.frozen }}'
 
     - name: Display run details
       shell: bash -l {0}
