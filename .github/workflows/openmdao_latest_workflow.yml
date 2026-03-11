@@ -43,6 +43,12 @@ on:
         required: false
         default: false
 
+      update_pixi_lock:
+        type: boolean
+        description: 'Diff pixi lock file and submit a PR if changed'
+        required: false
+        default: false
+
 concurrency:
   # Cancel any existing runs if we trigger the workflow again
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -92,3 +98,60 @@ jobs:
           snopt_location_77: ${{ secrets.SNOPT_LOCATION_77 }}
           slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Upload the updated pixi.lock from one representative entry so the
+      # update_lockfile job can create a PR without re-running pixi.
+      - name: Upload updated pixi lock file
+        if: matrix.OS == 'ubuntu-24.04' && matrix.PIXI_ENVIRONMENT == 'default' && inputs.frozen != 'true' && inputs.update_pixi_lock != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pixi-lock
+          path: pixi.lock
+
+  update_lockfile:
+    name: Update Pixi Lockfile
+    needs: tests
+    runs-on: ubuntu-latest
+
+    # Only open a PR when all tests passed, dependencies were not frozen, and lock
+    # file update was requested. On scheduled runs inputs are null, so null != 'true'
+    # and null != 'false' both hold, meaning the job always runs on schedule.
+    if: needs.tests.result == 'success' && inputs.frozen != 'true' && inputs.update_pixi_lock != 'false'
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Download updated pixi lock file
+        uses: actions/download-artifact@v4
+        with:
+          name: pixi-lock
+          path: .
+
+      - name: Check if lock file changed
+        id: check_changes
+        run: |
+          if git diff --quiet pixi.lock; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "Lock file is unchanged, no PR needed."
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Lock file has changes, a PR will be created."
+          fi
+
+      - name: Create pull request
+        if: steps.check_changes.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: 'Update pixi lockfile'
+          title: 'Update pixi lockfile'
+          branch: update-pixi
+          base: master
+          labels: pixi
+          delete-branch: true
+          add-paths: pixi.lock
