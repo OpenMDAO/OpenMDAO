@@ -33,7 +33,7 @@ from pydantic import BaseModel, Field
 PERSONAL_ACCESS_TOKEN = os.environ['GITHUB_PAT']
 
 # When creating a new cache, fetch PRs from this far back
-INITIAL_LOOKBACK_DAYS = 365
+INITIAL_LOOKBACK_DAYS = 180
 
 
 class PullRequest(BaseModel):
@@ -153,7 +153,7 @@ def fetch_initial_pulls(repo, lookback_days=INITIAL_LOOKBACK_DAYS, state='closed
 
         # Stop if we've gone past the lookback period
         if pr_merge_time < cutoff_date:
-            break
+            continue
 
         cache.add_pull(PullRequest.from_github_pr(pr))
         count += 1
