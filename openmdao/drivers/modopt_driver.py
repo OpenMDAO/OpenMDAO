@@ -988,19 +988,14 @@ class modOptDriver(Driver):
                 success = result.success
             elif 'x' in result:
                 x_opt = result['x']
-                if opt == 'IPOPT':
-                    # IPOPT success status is not consistently available through modOpt's
-                    # interface due to how CasADi's nlpsol wrapper handles the solver object
-                    print(f'{"-" * 40}\n IPOPT does not return success status in '
-                          f'a consistent, easily readable way, so defaulting to '
-                          f'success=True. \n{"-" * 40}\n')
-                    success = True
-                else:
-                    success = result['success']
+                success = result['success']
             else:
                 # Fallback for optimizers with non-standard result format
                 x_opt = mo_prob.dvs['x'].get_data()
                 success = True
+                print(f'{"-" * 40}\n {opt} does not return success status in '
+                        f'a consistent, easily readable way, so defaulting to '
+                        f'success=True. \n{"-" * 40}\n')
 
             # Update OpenMDAO design variables with optimal values
             idx = 0
@@ -1298,7 +1293,7 @@ if __name__ == '__main__':
     model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
 
     p.driver = modOptDriver()
-    p.driver.options['optimizer'] = "SLSQP"
+    p.driver.options['optimizer'] = "IPOPT"
 
     #####################################
     # set up dynamic total coloring here
