@@ -1122,7 +1122,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
         # Optimal solution
         assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
-        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+        self.assertTrue(int(prob['p2.xI'].item()) in [3, -3])
 
     def test_two_branin_parallel_model(self):
         prob = om.Problem()
@@ -1166,7 +1166,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
         # Optimal solution
         assert_near_equal(prob['comp.f'], 0.98799098, 1e-4)
-        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+        self.assertTrue(int(prob['p2.xI'].item()) in [3, -3])
 
     def test_mixed_integer_3bar_default_bits(self):
         # Tests bug where letting openmdao calculate the bits didn't preserve
@@ -1371,8 +1371,9 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
             print('p2.xI', prob['p2.xI'])
 
         # Optimal solution
+        print(f"Rank {prob.comm.rank} - p2.xI: {prob['p2.xI']} (Type: {type(prob['p2.xI'])})")
         assert_near_equal(prob.get_val('comp.f'), 0.98799098, 1e-6)
-        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+        self.assertTrue(int(prob['p2.xI'].item()) in [3, -3])
         assert_near_equal(prob.get_val('p1.xC'), 11.94117647, 1e-6)
 
     def test_indivisible_error(self):
