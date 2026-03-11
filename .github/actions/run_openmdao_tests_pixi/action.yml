@@ -225,7 +225,6 @@ runs:
     - name: Run tests (bash)
       id: run_tests_bash
       if: runner.os != 'Windows'
-      timeout-minutes: 90
       shell: bash -l {0}
       env:
         OPENMDAO_CHECK_ALL_PARTIALS: true
@@ -270,7 +269,6 @@ runs:
     - name: Run tests (windows)
       id: run_tests_windows
       if: runner.os == 'Windows'
-      timeout-minutes: 90
       shell: pwsh
       env:
         OPENMDAO_CHECK_ALL_PARTIALS: true
