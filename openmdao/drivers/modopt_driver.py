@@ -547,6 +547,8 @@ class modOptDriver(Driver):
         Pre-calculated gradients of linear constraints.
     _desvar_array_cache : np.ndarray
         Cached array for setting design variables.
+    _mo_prob : <modOpt Problem object>
+        The modOpt problem object that is built and fed to the Optimizer.
     """
 
     def __init__(self, **kwargs):
@@ -592,6 +594,7 @@ class modOptDriver(Driver):
         self._check_nl_jac = False
         self._total_jac_sparsity = None
         self._model_ran = False
+        self._mo_prob = None
 
         self.cite = CITATIONS
 
@@ -619,6 +622,11 @@ class modOptDriver(Driver):
                              "ignore - don't perform check.")
         self.options.declare('singular_jac_tol', default=1e-16,
                              desc='Tolerance for zero row/column check.')
+        self.options.declare('turn_off_outputs', default=False, types=bool,
+                             desc='If True, prevents modOpt from generating any output files.')
+        self.options.declare('out_dir', default=None, types=(type(None), str),
+                             desc='The directory to store all the output files generated '
+                                  'from the optimization.')
 
     def _get_name(self):
         """
@@ -681,8 +689,8 @@ class modOptDriver(Driver):
             else:
                 self.opt_settings['verbose'] = 1 if disp else 0
 
-        elif opt in {'OpenSQP', 'PySLSQP'}:
-            # OpenSQP uses iprint
+        elif opt in {'PySLSQP'}:
+            # PySLSQP uses iprint
             if isinstance(disp, int):
                 self.opt_settings['iprint'] = disp
             else:
@@ -694,6 +702,12 @@ class modOptDriver(Driver):
                 self.opt_settings['iprint'] = disp
             else:
                 self.opt_settings['iprint'] = 0 if disp else -1
+
+        elif opt in {'OpenSQP'}:
+            # Leave out OpenSQP because it does not have any setting for printing
+            # to console.
+            # TODO: Get modOpt folks to add a user setting for control OpenSQP prints
+            pass
 
         else:
             # Most SciPy-based optimizers (SLSQP, COBYLA, COBYQA, BFGS, NelderMead)
@@ -957,7 +971,7 @@ class modOptDriver(Driver):
         # Run optimization
         try:
             # Build modOpt Problem wrapper
-            mo_prob = modOptProblem(
+            self._mo_prob = modOptProblem(
                 driver=self,
                 x_info=x_info,
                 lin_con_jac=lincongrad,
@@ -971,12 +985,16 @@ class modOptDriver(Driver):
             optimizer_cls = getattr(mo, opt)
             if opt in _solver_options_optimizers:
                 optimizer = optimizer_cls(
-                    problem=mo_prob,
+                    problem=self._mo_prob,
+                    turn_off_outputs=self.options['turn_off_outputs'],
+                    out_dir=self.options['out_dir'],
                     solver_options=self.opt_settings,
                 )
             else:
                 optimizer = optimizer_cls(
-                    problem=mo_prob,
+                    problem=self._mo_prob,
+                    turn_off_outputs=self.options['turn_off_outputs'],
+                    out_dir=self.options['out_dir'],
                     **self.opt_settings,
                 )
             result = optimizer.solve()
@@ -991,7 +1009,7 @@ class modOptDriver(Driver):
                 success = result['success']
             else:
                 # Fallback for optimizers with non-standard result format
-                x_opt = mo_prob.dvs['x'].get_data()
+                x_opt = self._mo_prob.dvs['x'].get_data()
                 success = True
                 print(f'{"-" * 40}\n {opt} does not return success status in '
                         f'a consistent, easily readable way, so defaulting to '
@@ -999,7 +1017,7 @@ class modOptDriver(Driver):
 
             # Update OpenMDAO design variables with optimal values
             idx = 0
-            for name in mo_prob.x_info.keys():
+            for name in self._mo_prob.x_info.keys():
                 meta = self._designvars[name]
                 size = meta['global_size'] if meta['distributed'] else meta['size']
                 self.set_design_var(name, x_opt[idx : idx + size])
@@ -1294,6 +1312,7 @@ if __name__ == '__main__':
 
     p.driver = modOptDriver()
     p.driver.options['optimizer'] = "IPOPT"
+    p.driver.options['turn_off_outputs'] = True
 
     #####################################
     # set up dynamic total coloring here
