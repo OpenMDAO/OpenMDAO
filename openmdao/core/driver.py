@@ -1411,6 +1411,8 @@ class Driver(object, metaclass=DriverMetaclass):
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             self._run_solve_nonlinear()
 
+        self._autoscaler.setup(driver=self)
+
         self.iter_count += 1
 
         return False

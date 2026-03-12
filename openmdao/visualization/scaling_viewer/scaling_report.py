@@ -523,7 +523,7 @@ def _check_nl_totals(driver, **kwargs):
     # and so we disable this report when running find_feasible.
     # Also skip if this autoscaler wants the report to fire post-configure instead.
     return (driver._total_jac is not None and not driver._in_find_feasible
-            and not driver._autoscaler.report_after_configure)
+            and not driver._autoscaler.report_after_setup)
 
 
 def _exitfunc(probname):

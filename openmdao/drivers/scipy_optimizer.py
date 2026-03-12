@@ -282,7 +282,7 @@ class ScipyOptimizeDriver(Driver):
             self.iter_count += 1
 
         # Configure the autoscaler
-        self._autoscaler.configure(self)
+        self._autoscaler.setup(self, model_has_run=True)
 
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()

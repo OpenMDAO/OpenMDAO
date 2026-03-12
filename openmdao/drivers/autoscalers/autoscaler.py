@@ -47,7 +47,7 @@ class Autoscaler:
         This can be used to assess the current values in the model,
         the current jacobian, etc.
     
-    configure_requires_run_model()
+    setup_requires_run_model()
         Return true if configuring the autoscaler requires the
         model to be in an executed state.
 
@@ -118,7 +118,7 @@ class Autoscaler:
             return None
         return f'{driver._get_inst_id()}.autoscaler'
 
-    def setup(self, driver: 'Driver'):
+    def setup(self, driver: 'Driver', model_has_run=False):
         """
         Perform setup of autoscaler during final setup of the problem.
 
@@ -126,7 +126,18 @@ class Autoscaler:
         ----------
         driver : Driver
             The driver associated with this autoscaler.
+        model_has_run: bool
+            True if setup is being called after the model has been run. If not,
+            and setup requires run model, it will be executed within setup.
         """
+        from openmdao.core.driver import RecordingDebugging
+
+        if self.setup_requires_run_model and not model_has_run:
+            with RecordingDebugging(driver._get_name(), self.iter_count, self):
+                with driver._problem().model._relevance.nonlinear_active('iter'):
+                    driver._run_solve_nonlinear()
+                driver.iter_count += 1
+        
         self._driver_ref = weakref.ref(driver)
         self._var_meta : dict[str, dict[str, dict]] = {
             'design_var': driver._designvars,
@@ -185,7 +196,7 @@ class Autoscaler:
     @property
     def report_after_setup(self) -> bool:
         """
-        Return True if the scaling report should be generated after configure() is called.
+        Return True if the scaling report should be generated after setup() is called.
 
         When False (default), the scaling report is generated after the first nonlinear
         totals computation during optimization (the same timing as on master). This is
