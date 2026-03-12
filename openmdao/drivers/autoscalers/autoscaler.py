@@ -165,7 +165,7 @@ class Autoscaler:
         return self._has_scaling
     
     @property
-    def configure_requires_run_model(self) -> bool:
+    def setup_requires_run_model(self) -> bool:
         """
         Return True if this autoscaler requires that the model be in an executed state.
 
@@ -183,7 +183,7 @@ class Autoscaler:
         return False
 
     @property
-    def report_after_configure(self) -> bool:
+    def report_after_setup(self) -> bool:
         """
         Return True if the scaling report should be generated after configure() is called.
 
@@ -201,23 +201,6 @@ class Autoscaler:
             True if the scaling report should be generated after configure(), False otherwise.
         """
         return False
-
-    def configure(self, driver: 'Driver'):
-        """
-        Perform any last minute configuration at the start of the driver's execution.
-
-        This method is called during driver.run. It can be used to configure the scaling based
-        on values in the model, the current model jacobian, etc.
-
-        If configure requires that run_model has been executed, the user should override
-        the `requires_run_model` property of their Autoscaler to return True.
-
-        Parameters
-        ----------
-        driver : Driver
-            The driver that is running this autoscaler.
-        """
-        pass
 
     def _scale_bound(self, val, adder, scaler, size, is_lower):
         """
@@ -444,6 +427,14 @@ class Autoscaler:
     def apply_objective_scaling(self, vec: 'OptimizerVector'):
         """
         Unscale the design variables from the optimizer space to the model space.
+
+        Notes
+        -----
+        Use caution in the definition of this method. OpenMDAO **always** minimizes
+        the objective, and negates the sign of the objective when maximizing (generally
+        by setting scaler or ref to a negative value). If your implementation changes
+        the sign of the objective, you max accidentally change an objective minimization
+        to a maximization or vice-versa.
 
         Parameters
         ----------

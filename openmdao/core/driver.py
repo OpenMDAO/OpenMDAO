@@ -667,10 +667,10 @@ class Driver(object, metaclass=DriverMetaclass):
         self._autoscaler.setup(driver=self)
 
         # For autoscalers that do meaningful work in configure() and want the scaling report
-        # to reflect post-configure scaling, register a one-shot hook on configure().
+        # to reflect post-setup scaling, register a one-shot hook on configure().
         # For the base Autoscaler (configure is a no-op), the scaling report fires via the
         # existing Driver._compute_totals hook registered by _scaling_report_register().
-        if self._autoscaler.report_after_configure:
+        if self._autoscaler.report_after_setup:
             from openmdao.utils.hooks import _register_hook, _setup_hooks
             from openmdao.visualization.scaling_viewer.scaling_report import (
                 _run_scaling_report_for_autoscaler,
