@@ -2764,13 +2764,8 @@ class TestSqliteRecorder(unittest.TestCase):
         unscaled_x = des_vars['x'][0]
         unscaled_y = des_vars['y'][0]
 
-        des_vars = last_case.get_design_vars(scaled=True)
-        scaled_x = des_vars['x'][0]
-        scaled_y = des_vars['y'][0]
-
-        adder, scaler = determine_adder_scaler(ref0, ref, None, None)
-        self.assertAlmostEqual((unscaled_x + adder) * scaler, scaled_x, places=12)
-        self.assertAlmostEqual((unscaled_y + adder) * scaler, scaled_y, places=12)
+        self.assertAlmostEqual(unscaled_x, prob.get_val('x'), places=12)
+        self.assertAlmostEqual(unscaled_y, prob.get_val('y'), places=12)
 
     def test_problem_record_before_final_setup(self):
         prob = om.Problem()

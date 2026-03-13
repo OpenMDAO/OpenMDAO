@@ -189,15 +189,6 @@ jobs:
           compiler: intel
           version: 2025.2
 
-      - name: Install build_pyoptsparse
-        if: steps.check_snopt.outputs.should_run_snopt == 'true'
-        run: |
-          echo "============================================================="
-          echo "Install build_pyoptsparse in pixi environment"
-          echo "============================================================="
-          eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
-          pip install . git+https://github.com/OpenMDAO/build_pyoptsparse.git
-
       - name: Copy SNOPT source files
         if: steps.check_snopt.outputs.should_run_snopt == 'true'
         run: |
@@ -218,7 +209,7 @@ jobs:
           echo "Build SNOPT module with build_pyoptsparse"
           echo "============================================================="
           eval "$(pixi shell-hook -e ${{ matrix.PIXI_ENVIRONMENT }})"
-          python -m build_pyoptsparse.snopt_module SNOPT/src
+          pixi run build-snopt SNOPT/src
 
       - name: Check MPI and PETSc
         continue-on-error: true
