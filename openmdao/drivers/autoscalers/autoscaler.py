@@ -40,15 +40,10 @@ class Autoscaler:
 
     setup(driver)
         Initialize the autoscaler with driver metadata.
-        Called once during driver setup.
-    
-    configure(driver)
-        Update any scaling parameters after the model has been executed.
-        This can be used to assess the current values in the model,
-        the current jacobian, etc.
+        Called once at the start of the driver.run method.
     
     setup_requires_run_model()
-        Return true if configuring the autoscaler requires the
+        Return True if setup of the autoscaler requires the
         model to be in an executed state.
 
     apply_vec_scaling(vec)
@@ -133,7 +128,7 @@ class Autoscaler:
         from openmdao.core.driver import RecordingDebugging
 
         if self.setup_requires_run_model and not model_has_run:
-            with RecordingDebugging(driver._get_name(), self.iter_count, self):
+            with RecordingDebugging(driver._get_name(), driver.iter_count, self):
                 with driver._problem().model._relevance.nonlinear_active('iter'):
                     driver._run_solve_nonlinear()
                 driver.iter_count += 1
