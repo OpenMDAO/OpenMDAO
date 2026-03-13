@@ -307,13 +307,13 @@ class _FunctionalCallback(object):
         try:
             # Assume val is an ndarray.
             shape = val.shape
-            val_len = len(val)
+            val_size = val.size
         except AttributeError:
-            # Must be a scalar, so set the shape and length appropriately.
+            # Must be a scalar, so set the shape and size appropriately.
             shape = ()
-            val_len = 1
+            val_size = 1
 
-        offset_new = offset + val_len
+        offset_new = offset + val_size
         offsets = (offset, offset_new)
         return {"units": units, "indices": indices, "shape": shape, "offsets": offsets}, offset_new
 
