@@ -12,6 +12,7 @@ from copy import deepcopy
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
+from openmdao.utils.indexer import indexer as make_indexer
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as coloring_mod
@@ -84,7 +85,7 @@ class _TotalJacInfo(object):
 
     def __init__(self, problem, of, wrt, return_format, approx=False,
                  debug_print=False, driver_scaling=True, get_remote=True, directional=False,
-                 coloring_info=None, driver=None):
+                 coloring_info=None, driver=None, of_indices=None, wrt_indices=None):
         """
         Initialize object.
 
@@ -118,6 +119,12 @@ class _TotalJacInfo(object):
         driver : <Driver>, None, or False
             The driver that owns the total jacobian.  If None, use the driver from the problem.
             If False, this total jacobian will be computed directly by the problem.
+        of_indices : iter of int or None
+            Indices into the list of 'of' variables selecting which of those variables are included
+            in the returned total derivatives. If None, the entire variable is included.
+        wrt_indices : iter of int or None
+            Indices into the list of 'wrt' variables selecting which of those variables are included
+            in the returned total derivatives. If None, the entire variable is included.
         """
         if driver is None:
             driver = problem.driver
@@ -155,6 +162,36 @@ class _TotalJacInfo(object):
                                "was called.")
 
         of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of, wrt)
+
+        if of_indices is not None:
+            conn_graph = model.get_conn_graph()
+            # of_metadata = dict(of_metadata)  # shallow copy so we don't mutate the original
+            for vname, new_idxs in zip(of_metadata, of_indices):
+                if new_idxs is None:
+                    continue
+                # meta = of_metadata[vname] = dict(of_metadata[vname])  # shallow copy entry
+                meta = of_metadata[vname]
+                src_shape = conn_graph.nodes[('o', meta['source'])]['attrs'].global_shape
+                new_idx_tuple = tuple(i for i in np.atleast_1d(new_idxs))
+                idxer = make_indexer(new_idx_tuple)
+                idxer.set_src_shape(src_shape)
+                meta['indices'] = idxer
+                meta['size'] = meta['global_size'] = idxer.indexed_src_size
+
+        if wrt_indices is not None:
+            conn_graph = model.get_conn_graph()
+            # wrt_metadata = dict(wrt_metadata)  # shallow copy so we don't mutate the original
+            for vname, new_idxs in zip(wrt_metadata, wrt_indices):
+                if new_idxs is None:
+                    continue
+                # meta = wrt_metadata[vname] = dict(wrt_metadata[vname])  # shallow copy entry
+                meta = wrt_metadata[vname]
+                src_shape = conn_graph.nodes[('o', meta['source'])]['attrs'].global_shape
+                new_idx_tuple = tuple(i for i in np.atleast_1d(new_idxs))
+                idxer = make_indexer(new_idx_tuple)
+                idxer.set_src_shape(src_shape)
+                meta['indices'] = idxer
+                meta['size'] = meta['global_size'] = idxer.indexed_src_size
 
         ofsize = sum(meta['global_size'] for meta in of_metadata.values())
         wrtsize = sum(meta['global_size'] for meta in wrt_metadata.values())

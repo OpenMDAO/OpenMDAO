@@ -182,34 +182,42 @@ class _FunctionalCallback(object):
             tji = None
         else:
             if input_vars:
-                # Extract just the names to pass to `_TotalJacInfo` constructor.
+                # Extract just the names and indices to pass to `_TotalJacInfo` constructor.
                 input_var_names = []
+                input_var_indices = []
                 for entry in input_vars:
                     if isinstance(entry, str):
                         input_var_names.append(entry)
-                    elif isinstance(entry, dict):
-                        for k in entry.keys():
+                        input_var_indices.append(None)
+                    elif isinstance(entry, Mapping):
+                        for k, meta in entry.items():
                             input_var_names.append(k)
+                            input_var_indices.append(meta.get("indices", None))
                     else:
                         raise ValueError(f"{self.msginfo}: invalid entry {entry} in input_vars argument")
             else:
                 input_var_names = None
+                input_var_indices = None
 
             if output_vars:
                 # Extract just the names to pass to `_TotalJacInfo` constructor.
                 output_var_names = []
+                output_var_indices = []
                 for entry in output_vars:
                     if isinstance(entry, str):
                         output_var_names.append(entry)
-                    elif isinstance(entry, dict):
-                        for k in entry.keys():
+                        output_var_indices.append(None)
+                    elif isinstance(entry, Mapping):
+                        for k, meta in entry.items():
                             output_var_names.append(k)
+                            output_var_indices.append(meta.get("indices", None))
                     else:
                         raise ValueError(f"{self.msginfo}: invalid entry {entry} in output_vars argument")
             else:
                 output_var_names = None
+                output_var_indices = None
 
-            tji = _TotalJacInfo(self.problem, output_var_names, input_var_names, return_format='flat_dict')
+            tji = _TotalJacInfo(self.problem, output_var_names, input_var_names, of_indices=output_var_indices, wrt_indices=input_var_indices, return_format='flat_dict')
 
             if not input_vars:
                 # User didn't provide any input var data, so create one from what `_TotalJacInfo` decided.
