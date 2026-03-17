@@ -762,10 +762,10 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                     self._y_max[con_name_with_type]
                 )
             iline += 1
-
         self._source.stream(self._source_stream_dict)
 
         self._labels_updated_with_units = True
+
         # end of _update method
 
     def _setup_data_source(self):
@@ -847,14 +847,26 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
         return toggle
 
     def _make_bounds_display(self, top, bottom, source, varname):
-        bounds_display = self.plot_figure.hstrip(
-            y1=top,
-            y0=bottom,
-            source=source,
-            fill_alpha=0.1,
-            fill_color=varname,
-            visible=False,
-        )
+
+        # if top or bottom are not float, it doesn't make sense to plot
+        #  bounds, so returning a Glyph that is not visible and has no size instead
+        #  of a strip that would show up on the plot but not be meaningful.
+        if not isinstance(top, (int, float)) or not isinstance(bottom, (int, float)):
+            bounds_display = self.plot_figure.hstrip(
+                y1=0.0,
+                y0=0.0,
+                source=source,
+                visible=False,
+            )
+        else:
+            bounds_display = self.plot_figure.hstrip(
+                y1=top,
+                y0=bottom,
+                source=source,
+                fill_alpha=0.1,
+                fill_color=varname,
+                visible=False,
+            )
         return bounds_display
 
     def _make_line_and_hover_tool(
@@ -887,7 +899,10 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
 
         # make graphics showing bounds
         if var_type == "desvars":
-            varname_minus_type = re.sub(r"\s*\[.*?\]$", "", varname)
+            # Need to remove the [dv] from the varname to get the bounds since the
+            #  varname used in the source and for the button includes the [dv] but
+            #  the case tracker methods expect just the name without that.
+            varname_minus_type = re.sub(r"\s*\[dv\]$", "", varname)
             lower_bound, upper_bound = self._case_tracker._get_desvar_bounds(
                 varname_minus_type
             )
@@ -903,12 +918,6 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                     desvars_button_label,
                 )
             else:
-                upper_bound_indicator = self._make_bounds_display(
-                    _bounds_infinity,
-                    upper_bound,
-                    self._desvar_bound_indicator_source,
-                    desvars_button_label,
-                )
                 upper_bound_indicator = self.plot_figure.quad(
                     right=0.0,
                     left=0.0,
@@ -942,9 +951,10 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             )
 
         if var_type == "cons":
-            # Match optional whitespace followed by [anything] at the end of string
-            varname_minus_type = re.sub(r"\s*\[.*?\]$", "", varname)
-
+            # Need to remove the [cons] from the varname to get the bounds since the
+            #  varname used in the source and for the button includes the [cons] but
+            #  the case tracker methods expect just the name without that.
+            varname_minus_type = re.sub(r"\s*\[cons\]$", "", varname)
             lower_bound, upper_bound = self._case_tracker._get_constraint_bounds(
                 varname_minus_type
             )
