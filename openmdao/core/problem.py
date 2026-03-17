@@ -133,7 +133,7 @@ def _default_prob_name():
 
 class _FunctionalCallback(object):
 
-    def __init__(self, prob, form, input_vars, output_vars):
+    def __init__(self, prob, form, input_vars, output_vars, driver_scaling):
         self._problem = prob
 
         valid_forms = ("f", "dfdx", "fdfdx")
@@ -142,7 +142,7 @@ class _FunctionalCallback(object):
             raise ValueError(msg)
         self._form = form
 
-        self._total_jac_info, self._input_len, self._input_metadata, self._output_len, self._output_metadata = self._process_vars(input_vars, output_vars)
+        self._total_jac_info, self._input_len, self._input_metadata, self._output_len, self._output_metadata = self._process_vars(input_vars, output_vars, driver_scaling)
 
         # if form == "f":
         #     if (input_vars is None) or (output_vars is None):
@@ -172,7 +172,7 @@ class _FunctionalCallback(object):
         # self._x_len = self._process_var_arguments(self._input_metadata)
         # self._y_len = self._process_var_arguments(self._output_metadata)
 
-    def _process_vars(self, input_vars, output_vars):
+    def _process_vars(self, input_vars, output_vars, driver_scaling):
         # First, decided on what names we'll be working with.
         if self.form == "f":
             # For the "f" form, we won't be working with derivatives and won't rely on `_TotalJacInfo` to decided on inputs and outputs based on design variables and responses.
@@ -217,7 +217,7 @@ class _FunctionalCallback(object):
                 output_var_names = None
                 output_var_indices = None
 
-            tji = _TotalJacInfo(self.problem, output_var_names, input_var_names, of_indices=output_var_indices, wrt_indices=input_var_indices, return_format='flat_dict')
+            tji = _TotalJacInfo(self.problem, output_var_names, input_var_names, of_indices=output_var_indices, wrt_indices=input_var_indices, return_format='flat_dict', driver_scaling=driver_scaling)
 
             if not input_vars:
                 # User didn't provide any input var data, so create one from what `_TotalJacInfo` decided.
@@ -326,7 +326,7 @@ class _FunctionalCallback(object):
         return {"units": units, "indices": indices, "shape": shape, "offsets": offsets}, offset_new
 
     def _vector_to_problem(self, vec, metadata):
-        problem = self.problem
+        problem = self._problem
 
         for vname, vmetadata in metadata.items():
             units = vmetadata["units"]
@@ -339,7 +339,7 @@ class _FunctionalCallback(object):
             problem.set_val(vname, val, indices=indices, units=units)
 
     def _problem_to_vector(self, vec, metadata):
-        problem = self.problem
+        problem = self._problem
 
         for vname, vmetadata in metadata.items():
             # units = vmetadata["units"]
@@ -409,6 +409,32 @@ class _FunctionalCallback(object):
             return J
         elif self.form == "fdfdx":
             return y, J
+
+    def get_input_val(self, name):
+        try:
+            vmetadata = self._input_metadata[name]
+        except KeyError:
+            msg = f"{self.msginfo}: {name} is not an input variable"
+            raise ValueError(msg)
+
+        units = vmetadata["units"]
+        indices = vmetadata["indices"]
+        val = self.problem.get_val(name, units=units, indices=indices)
+        val.shape = (-1,)
+        return val
+
+    def get_output_val(self, name):
+        try:
+            vmetadata = self._output_metadata[name]
+        except KeyError:
+            msg = f"{self.msginfo}: {name} is not an output variable"
+            raise ValueError(msg)
+
+        units = vmetadata["units"]
+        indices = vmetadata["indices"]
+        val = self.problem.get_val(name, units=units, indices=indices).flatten()
+        val.shape = (-1,)
+        return val
 
     @property
     def form(self):
@@ -2746,8 +2772,8 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
 
-    def get_callback(self, form, input_vars=None, output_vars=None):
-        return _FunctionalCallback(self, form, input_vars, output_vars)
+    def get_callback(self, form, input_vars=None, output_vars=None, driver_scaling=False):
+        return _FunctionalCallback(self, form, input_vars, output_vars, driver_scaling)
 
     def get_coloring_dir(self, mode, mkdir=False):
         """
