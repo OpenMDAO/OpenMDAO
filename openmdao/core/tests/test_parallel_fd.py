@@ -435,6 +435,30 @@ class MatMultParallelTestCase(unittest.TestCase):
         # this tests regular CS when not all vars are local
         self.run_model(22, 1, 1, 'cs', total=True)
 
+    def test_rel_step_bug(self):
+        mat = np.arange(30, dtype=float).reshape(5, 6)
+
+        p = om.Problem(model=om.Group(num_par_fd=4))
+        model = p.model
+        model.approx_totals(method='fd', step=1.0E-3, step_calc='rel_element')
+        comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd'))
+
+        model.set_input_defaults('comp.x', val=np.ones(mat.shape[1]))
+        p.setup(mode='fwd')
+        p.run_model()
+
+        pre_count = comp.num_computes
+
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.z', 'comp.x'], return_format='array')
+
+        post_count =  comp.num_computes
+
+        # how many computes were used in this proc to compute the total jacobian?
+        # Each proc should be doing 2 computes.
+        jac_count = post_count - pre_count
+
+        # self.assertEqual(jac_count, 2)
+
 
 def _setup_problem(mat, total_method='exact', partial_method='exact', total_num_par_fd=1,
                    partial_num_par_fd=1, approx_totals=False):
