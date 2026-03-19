@@ -441,7 +441,7 @@ class MatMultParallelTestCase(unittest.TestCase):
         p = om.Problem(model=om.Group(num_par_fd=4))
         model = p.model
         model.approx_totals(method='fd', step=1.0E-3, step_calc='rel_element')
-        comp = model.add_subsystem('comp', MatMultComp(mat, approx_method='fd'))
+        comp = model.add_subsystem('comp', MatMultComp(mat, add_z=True, approx_method='fd'))
 
         model.set_input_defaults('comp.x', val=np.ones(mat.shape[1]))
         p.setup(mode='fwd')

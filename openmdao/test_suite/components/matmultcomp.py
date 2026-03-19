@@ -9,19 +9,27 @@ import openmdao.api as om
 
 
 class MatMultComp(om.ExplicitComponent):
-    def __init__(self, mat, approx_method='exact', sleep_time=0.1, **kwargs):
+    def __init__(self, mat, approx_method='exact', sleep_time=0.1, add_z=False, **kwargs):
         super().__init__(**kwargs)
         self.mat = mat
         self.approx_method = approx_method
         self.sleep_time = sleep_time
+        self.add_z = add_z
 
     def setup(self):
         self.add_input('x', val=np.ones(self.mat.shape[1]))
+        if self.add_z:
+            self.add_input('z', val=np.ones(self.mat.shape[1]))
         self.add_output('y', val=np.zeros(self.mat.shape[0]))
         self.num_computes = 0
 
     def setup_partials(self):
-        self.declare_partials('*', '*', method=self.approx_method)
+        # rel_element step_calc is only valid for finite difference, not complex step
+        kwargs = {'method': self.approx_method}
+        if self.approx_method == 'fd':
+            kwargs['step'] = 1.E-3
+            kwargs['step_calc'] = 'rel_element'
+        self.declare_partials('*', '*', **kwargs)
 
     def compute(self, inputs, outputs):
         outputs['y'] = self.mat.dot(inputs['x'])
