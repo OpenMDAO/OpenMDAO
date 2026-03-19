@@ -1,0 +1,383 @@
+name: 'Run OpenMDAO Tests (Pixi)'
+description: 'Runs OpenMDAO tests using Pixi environments'
+
+inputs:
+  OS:
+    description: 'Operating system runner label (for display in notifications)'
+    required: true
+  PIXI_ENVIRONMENT:
+    description: 'Pixi environment to use for testing'
+    required: false
+    default: 'default'
+  BANDIT:
+    description: 'Run Bandit security scan'
+    required: false
+    default: 'false'
+  RUFF:
+    description: 'Run Ruff linting'
+    required: false
+    default: 'false'
+  SNOPT:
+    description: 'Build and install SNOPT'
+    required: false
+    default: 'false'
+  COVERAGE:
+    description: 'Run with coverage reporting'
+    required: false
+    default: 'false'
+  OPENMDAO_INSTALL_FROM:
+    description: 'How to install OpenMDAO: pypi, github, wheel, local, local_developer, or none'
+    required: false
+    default: 'wheel'
+  frozen:
+    description: 'Use frozen pixi lock file (set to false to update dependencies)'
+    required: false
+    default: 'true'
+  debug_enabled:
+    description: 'Enable tmate debugging session'
+    required: false
+    default: 'false'
+  ssh_private_key:
+    description: 'SSH private key for SNOPT source access'
+    required: false
+    default: ''
+  ssh_known_hosts:
+    description: 'SSH known hosts for SNOPT source access'
+    required: false
+    default: ''
+  snopt_location_77:
+    description: 'SNOPT 7.7 source location (SSH path)'
+    required: false
+    default: ''
+  slack_webhook_url:
+    description: 'Slack webhook URL for failure notifications'
+    required: false
+    default: ''
+  github_token:
+    description: 'GitHub token for coveralls reporting'
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+
+    - name: 'Setup OpenMDAO pixi Environment'
+      id: setup_pixi_environment
+      uses: ./.github/actions/setup_openmdao_pixi
+      with:
+        environment: '${{ inputs.PIXI_ENVIRONMENT }}'
+        openmdao_install_from: '${{ inputs.OPENMDAO_INSTALL_FROM }}'
+        frozen: '${{ inputs.frozen }}'
+
+    - name: Display run details
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Run #${GITHUB_RUN_NUMBER}"
+        echo "Run ID: ${GITHUB_RUN_ID}"
+        echo "Testing: ${GITHUB_REPOSITORY}"
+        echo "Triggered by: ${GITHUB_EVENT_NAME}"
+        echo "Initiated by: ${GITHUB_ACTOR}"
+        echo "PIXI_ENVIRONMENT: ${{ inputs.PIXI_ENVIRONMENT }}"
+        echo "SNOPT: ${{ inputs.SNOPT }}"
+        echo "RUFF: ${{ inputs.RUFF }}"
+        echo "BANDIT: ${{ inputs.BANDIT }}"
+        echo "============================================================="
+
+    - name: Check SNOPT availability
+      id: check_snopt
+      shell: bash -l {0}
+      run: |
+        if [[ "${{ inputs.PIXI_ENVIRONMENT }}" != "minimal" ]] && [[ "${{ inputs.SNOPT }}" == "true" ]] && [[ "${{ inputs.snopt_location_77 }}" != "" ]]; then
+          echo "should_run_snopt=true" >> $GITHUB_OUTPUT
+          echo "SNOPT is enabled and secrets are available"
+        else
+          echo "should_run_snopt=false" >> $GITHUB_OUTPUT
+          if [[ "${{ inputs.SNOPT }}" == "true" ]]; then
+            if [[ "${{ inputs.PIXI_ENVIRONMENT }}" == "minimal" ]]; then
+              echo "SNOPT is enabled but minimal environment is not supported"
+            elif [[ "${{ inputs.snopt_location_77 }}" == "" ]]; then
+              echo "SNOPT is enabled but secrets are not available - skipping SNOPT steps"
+            fi
+          else
+            echo "SNOPT is disabled"
+          fi
+        fi
+
+    - name: Create SSH key
+      if: steps.check_snopt.outputs.should_run_snopt == 'true' && runner.os != 'Windows'
+      shell: bash -l {0}
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.ssh_private_key }}
+        SSH_KNOWN_HOSTS: ${{ inputs.ssh_known_hosts }}
+      run: |
+        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
+        mkdir -p ~/.ssh/
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+    - name: Install compilers
+      if: steps.check_snopt.outputs.should_run_snopt == 'true' && runner.os != 'Windows'
+      shell: bash -l {0}
+      run: |
+        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
+        echo "============================================================="
+        echo "Install compilers"
+        echo "============================================================="
+        if [[ "${{ inputs.OS }}" != "macos-15" ]]; then
+          pixi add cython swig compilers cmake meson
+        else
+          pixi add cython swig compilers cmake meson
+        fi
+
+    - uses: fortran-lang/setup-fortran@v1
+      id: setup-fortran
+      if: steps.check_snopt.outputs.should_run_snopt == 'true' && runner.os == 'Windows'
+      with:
+        compiler: intel
+        version: 2025.2
+
+    - name: Install build_pyoptsparse
+      if: steps.check_snopt.outputs.should_run_snopt == 'true'
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Install build_pyoptsparse in pixi environment"
+        echo "============================================================="
+        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
+        pip install . git+https://github.com/OpenMDAO/build_pyoptsparse.git
+
+    - name: Copy SNOPT source files
+      if: steps.check_snopt.outputs.should_run_snopt == 'true'
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Copying SNOPT 7.7 source files via SSH"
+        echo "============================================================="
+        mkdir -p SNOPT
+        scp -qr ${{ inputs.snopt_location_77 }} SNOPT
+        ls -la SNOPT/src
+
+    - name: Build SNOPT module
+      if: steps.check_snopt.outputs.should_run_snopt == 'true'
+      shell: bash -l {0}
+      env:
+        FC: ${{ runner.os == 'Windows' && 'ifx' || 'gfortran' }}
+        CC: ${{ runner.os == 'Windows' && 'cl' || 'gcc' }}
+      run: |
+        echo "============================================================="
+        echo "Build SNOPT module with build_pyoptsparse"
+        echo "============================================================="
+        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
+        python -m build_pyoptsparse.snopt_module SNOPT/src
+
+    - name: Check MPI and PETSc
+      continue-on-error: true
+      shell: bash -l {0}
+      run: |
+        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
+        if python -c "import mpi4py, petsc4py" 2>/dev/null; then
+          echo "============================================================="
+          echo "Check MPI and PETSc installation"
+          echo "============================================================="
+          export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
+          export OMPI_MCA_rmaps_base_oversubscribe=1
+          export OMPI_MCA_btl=^openib
+          echo "-----------------------"
+          echo "Quick test of mpi4py:"
+          mpirun -n 3 python -c "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
+          echo "-----------------------"
+          echo "Quick test of petsc4py:"
+          mpirun -n 3 python -c "import numpy; from mpi4py import MPI; comm = MPI.COMM_WORLD; \
+            import petsc4py; petsc4py.init(); \
+            x = petsc4py.PETSc.Vec().createWithArray(numpy.ones(5)*comm.rank, comm=comm);  \
+            print(x.getArray())"
+          echo "-----------------------"
+
+          # shellcheck disable=SC2129
+          echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> "$GITHUB_ENV"
+          echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> "$GITHUB_ENV"
+          echo "OMPI_MCA_btl=^openib" >> "$GITHUB_ENV"
+
+          echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
+          echo "TMPDIR=/tmp" >> "$GITHUB_ENV"
+        else
+          echo "mpi4py or petsc4py not installed in this environment, skipping MPI checks"
+        fi
+
+    # Enable tmate debugging of manually-triggered workflows if the input option was provided
+    #
+    # To access the terminal through the web-interface:
+    #    1. Click on the web-browser link printed out in this action from the github
+    #       workflow terminal
+    #    2. Press cntrl + c in the new tab that opens up to reveal the terminal
+    #    3. To activate the conda environment run:
+    #        $ source $CONDA/etc/profile.d/conda.sh
+    #        $ conda activate test
+    - name: Setup tmate session
+      if: inputs.debug_enabled == 'true'
+      uses: mxschmitt/action-tmate@v3
+      with:
+        limit-access-to-actor: true
+
+    - name: Run tests (bash)
+      id: run_tests_bash
+      if: runner.os != 'Windows'
+      shell: bash -l {0}
+      env:
+        OPENMDAO_CHECK_ALL_PARTIALS: true
+        # MPI settings for CI (all platforms)
+        PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
+        OMPI_MCA_rmaps_base_oversubscribe: "1"
+        COVERAGE_RUN: "true"
+      run: |
+        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
+        echo "============================================================="
+        echo "Run tests with coverage (from directory other than repo root)"
+        echo "============================================================="
+        echo "############ .coveragerc contents #################"
+        cat .coveragerc
+        echo "###################################################"
+        cp .coveragerc $HOME
+        cd $HOME
+
+        # Build testflo command
+        TESTFLO_CMD="testflo openmdao --skip_dir=.pixi --timeout=240 --durations=20"
+
+        # Only perform coverage on specified OS + Python version combinations
+        if [[ "${{ inputs.COVERAGE }}" == "true" ]]; then
+          TESTFLO_CMD="$TESTFLO_CMD --coverage --coverpkg openmdao"
+        fi
+
+        # Add --show_skipped unless we're in minimal environment
+        if [[ "${{ inputs.PIXI_ENVIRONMENT }}" != "minimal" ]]; then
+          TESTFLO_CMD="$TESTFLO_CMD --show_skipped"
+        fi
+
+        $TESTFLO_CMD
+
+    - name: Display test report on failure (bash)
+      if: steps.run_tests_bash.outcome == 'failure'
+      shell: bash -l {0}
+      run: |
+        echo "::group::Test Failure Report"
+        cat "$HOME/testflo_report.out"
+        echo "::endgroup::"
+
+    - name: Run tests (windows)
+      id: run_tests_windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        OPENMDAO_CHECK_ALL_PARTIALS: true
+        COVERAGE_RUN: "true"
+      run: |
+        & pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }} -s powershell | Out-String | Invoke-Expression
+        echo "============================================================="
+        echo "Run tests (from directory other than repo root)"
+        echo "============================================================="
+        copy .coveragerc "$HOME"
+        Set-DisplayResolution -Width 1920 -Height 1080 -Force
+        cd "$HOME"
+
+        # Build testflo command
+        $TESTFLO_CMD = "testflo -n 1 openmdao --skip_dir=.pixi --timeout=240 --show_skipped --durations=20 --pre_announce"
+
+        # Only perform coverage on specified OS + Python version combinations
+        if ("${{ inputs.COVERAGE }}" -eq "true") {
+          $TESTFLO_CMD += " --coverage --coverpkg openmdao"
+        }
+
+        Invoke-Expression $TESTFLO_CMD
+
+    - name: Display test report on failure (windows)
+      if: steps.run_tests_windows.outcome == 'failure'
+      shell: pwsh
+      run: |
+        echo "::group::Test Failure Report"
+        Get-Content "$env:HOME/testflo_report.out"
+        echo "::endgroup::"
+
+    - name: Submit coverage
+      id: coveralls
+      if: inputs.COVERAGE == 'true'
+      continue-on-error: false
+      shell: bash -l {0}
+      env:
+        COVERALLS_REPO_TOKEN: ${{ inputs.github_token }}
+        COVERALLS_SERVICE_NAME: "github"
+        COVERALLS_PARALLEL: true
+      run: |
+        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
+        echo "============================================================="
+        echo "Submit coverage"
+        echo "============================================================="
+        cp $HOME/.coverage .
+        python -m pip install coveralls
+        SITE_DIR=`python -c 'import site; print(site.getsitepackages()[-1])'`
+        coveralls --basedir $SITE_DIR
+
+    - name: Slack failure to upload to coveralls.io
+      if: inputs.COVERAGE == 'true' && steps.coveralls.outcome == 'failure'
+      uses: act10ns/slack@v2.0.0
+      with:
+        webhook-url: ${{ inputs.slack_webhook_url }}
+        status: 'warning'
+        message: |
+          Uploading of coverage data to coveralls.io failed.
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Scan for security issues
+      if: inputs.BANDIT == 'true'
+      id: bandit
+      continue-on-error: true
+      shell: bash -l {0}
+      run: |
+        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
+        python -m pip install bandit
+        echo "============================================================="
+        echo "Run bandit scan for high/medium severity issues"
+        echo "============================================================="
+        cd $GITHUB_WORKSPACE
+        python -m bandit -c bandit.yml -ll -r openmdao
+
+    - name: Perform linting with Ruff
+      if: inputs.RUFF == 'true'
+      shell: bash -l {0}
+      run: |
+        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
+        echo "============================================================="
+        echo "Lint OpenMDAO code per settings in pyproject.toml"
+        echo "============================================================="
+        ruff check . --config pyproject.toml
+
+    - name: Slack unit test failure
+      if: failure() && steps.run_tests_bash.outcome == 'failure'
+      uses: act10ns/slack@v2.0.0
+      with:
+        webhook-url: ${{ inputs.slack_webhook_url }}
+        status: ${{ steps.run_tests_bash.outcome }}
+        message:
+          Unit testing failed on `${{ inputs.OS }}` `${{ inputs.PIXI_ENVIRONMENT }}` build.
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Slack security issue
+      if: steps.bandit.outcome == 'failure'
+      uses: act10ns/slack@v2.0.0
+      with:
+        webhook-url: ${{ inputs.slack_webhook_url }}
+        status: ${{ steps.bandit.outcome }}
+        message:
+          Security issue found on `${{ inputs.OS }}` `${{ inputs.PIXI_ENVIRONMENT }}` build.
+          ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    - name: Fail the workflow if tests failed
+      if: always()
+      shell: bash -l {0}
+      run: |
+        if [[ "${{ steps.run_tests_bash.outcome }}" == "failure" ]] || [[ "${{ steps.run_tests_windows.outcome }}" == "failure" ]]; then
+          echo "Tests failed"
+          exit 1
+        fi
