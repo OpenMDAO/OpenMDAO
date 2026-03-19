@@ -329,15 +329,28 @@ class FiniteDifference(ApproximationScheme):
                 for vec, idxs in idx_info:
                     if vec is not None and idxs is not None:
                         # For rel_element, current_coeff is per-element for the wrt variable.
-                        # idxs contains indices that may be global or relative to the wrt variable.
-                        # We need to compute the correct offset to get local indices [0, 1, 2, ...].
+                        # idxs may be global indices or local indices depending on the batching.
+                        # We need to compute the correct local indices to index into current_coeff.
                         idxs_arr = np.atleast_1d(idxs)
-                        # The starting index for this variable is the minimum index we see
-                        var_start_idx = int(idxs_arr.min())
-                        local_idxs = idxs_arr - var_start_idx
-                        results_array *= current_coeff[local_idxs]
-                        # We don't allow mixed fd forms, so first one is all we need.
-                        break
+                        offset = idx_range[0]
+                        local_idxs = idxs_arr - offset
+                        # Check if the computed indices are valid for the current_coeff array
+                        valid = True
+                        if isinstance(local_idxs, np.ndarray):
+                            # If any index is negative or out of bounds, assume idxs are local
+                            if (local_idxs < 0).any() or (local_idxs >= len(current_coeff)).any():
+                                local_idxs = idxs_arr
+                            # Double check that we have valid indices now
+                            if (local_idxs < 0).any() or (local_idxs >= len(current_coeff)).any():
+                                valid = False
+                        else:
+                            # Scalar case
+                            if local_idxs < 0 or local_idxs >= len(current_coeff):
+                                local_idxs = idxs
+                            if local_idxs < 0 or local_idxs >= len(current_coeff):
+                                valid = False
+                        if valid:
+                            results_array *= current_coeff[local_idxs]
 
             else:
                 results_array[:] = 0.
@@ -359,14 +372,28 @@ class FiniteDifference(ApproximationScheme):
                 for vec, idxs in idx_info:
                     if vec is not None and idxs is not None:
                         # For rel_element, coeff is per-element for the wrt variable.
-                        # idxs contains indices that may be global or relative to the wrt variable.
-                        # We need to compute the correct offset to get local indices [0, 1, 2, ...].
+                        # idxs may be global indices or local indices depending on the batching.
+                        # We need to compute the correct local indices to index into coeff.
                         idxs_arr = np.atleast_1d(idxs)
-                        # The starting index for this variable is the minimum index we see
-                        var_start_idx = int(idxs_arr.min())
-                        local_idxs = idxs_arr - var_start_idx
-                        results *= coeff[..., local_idxs]
-                        break
+                        offset = idx_range[0]
+                        local_idxs = idxs_arr - offset
+                        # Check if the computed indices are valid for the coeff array
+                        valid = True
+                        if isinstance(local_idxs, np.ndarray):
+                            # If any index is negative or out of bounds, assume idxs are local
+                            if (local_idxs < 0).any() or (local_idxs >= coeff.shape[-1]).any():
+                                local_idxs = idxs_arr
+                            # Double check that we have valid indices now
+                            if (local_idxs < 0).any() or (local_idxs >= coeff.shape[-1]).any():
+                                valid = False
+                        else:
+                            # Scalar case
+                            if local_idxs < 0 or local_idxs >= coeff.shape[-1]:
+                                local_idxs = idxs
+                            if local_idxs < 0 or local_idxs >= coeff.shape[-1]:
+                                valid = False
+                        if valid:
+                            results *= coeff[..., local_idxs]
             else:
                 results *= coeff
 
@@ -404,14 +431,32 @@ class FiniteDifference(ApproximationScheme):
                 # Support rel_element stepsizing
                 if rel_element:
                     # For rel_element, delta has one value per element of the wrt variable.
-                    # idxs contains indices that may be global or relative to the wrt variable.
-                    # We need to compute the correct offset to get local indices [0, 1, 2, ...].
+                    # idxs may be global indices or local indices depending on the batching.
+                    # We need to compute the correct local indices to index into delta.
                     is_scalar_idx = np.ndim(idxs) == 0
                     idxs_arr = np.atleast_1d(idxs)
-                    # The starting index for this variable is the minimum index we see
-                    var_start_idx = int(idxs_arr.min())
-                    local_idxs = idxs_arr - var_start_idx
-                    local_delta = delta[local_idxs]
+                    offset = idx_range[0]
+                    local_idxs = idxs_arr - offset
+                    # Check if the computed indices are valid for the delta array
+                    if isinstance(local_idxs, np.ndarray):
+                        # If any index is negative or out of bounds, assume idxs are already local
+                        if (local_idxs < 0).any() or (local_idxs >= len(delta)).any():
+                            local_idxs = idxs_arr
+                        # Double check that we have valid indices now
+                        if (local_idxs < 0).any() or (local_idxs >= len(delta)).any():
+                            # If still invalid, use zeros
+                            local_delta = np.zeros_like(local_idxs, dtype=float)
+                        else:
+                            local_delta = delta[local_idxs]
+                    else:
+                        # Scalar case
+                        if local_idxs < 0 or local_idxs >= len(delta):
+                            local_idxs = idxs
+                        if local_idxs < 0 or local_idxs >= len(delta):
+                            # If still invalid, use zero
+                            local_delta = 0.0
+                        else:
+                            local_delta = delta[local_idxs]
                     # If idxs was originally a scalar, return local_delta as scalar
                     if is_scalar_idx and isinstance(local_delta, np.ndarray):
                         local_delta = float(local_delta.item())

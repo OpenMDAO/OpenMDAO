@@ -32,7 +32,10 @@ class MatMultComp(om.ExplicitComponent):
         self.declare_partials('*', '*', **kwargs)
 
     def compute(self, inputs, outputs):
-        outputs['y'] = self.mat.dot(inputs['x'])
+        if self.add_z:
+            outputs['y'] = self.mat.dot(inputs['x'] * inputs['z'])
+        else:
+            outputs['y'] = self.mat.dot(inputs['x'])
         self.num_computes += 1
         time.sleep(self.sleep_time)
 
