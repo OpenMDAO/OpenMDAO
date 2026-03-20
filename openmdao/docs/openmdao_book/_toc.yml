@@ -52,6 +52,8 @@ parts:
       sections:
       - file: features/building_blocks/components/components
       - file: features/building_blocks/drivers/index
+        sections:
+        - file: features/building_blocks/drivers/autoscaler_api
       - file: features/building_blocks/solvers/solvers
       - file: features/building_blocks/surrogates/index
       - file: features/building_blocks/func_api
