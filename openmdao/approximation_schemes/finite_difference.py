@@ -91,6 +91,7 @@ class FiniteDifference(ApproximationScheme):
         """
         super().__init__()
         self._starting_ins = self._starting_outs = self._results_tmp = None
+        self._cached_local_idxs = []
 
     def add_approximation(self, wrt, system, kwargs, vector=None):
         """
@@ -322,27 +323,60 @@ class FiniteDifference(ApproximationScheme):
             rel_element = True
 
             if current_coeff[0]:
+                # Only compute/cache indices for forms with non-zero current_coeff (fwd/bckwd).
+                # For central form, current_coeff[0] is 0.0, so this block is skipped and
+                # self._cached_local_idxs remains empty. The coefficient loop will then skip the
+                # cached index logic (since len(self._cached_local_idxs) will be 0).
                 current_vec = system._outputs if total else system._residuals
                 # copy data from outputs (if doing total derivs) or residuals (if doing partials)
                 results_array[:] = current_vec.asarray()
 
+                # Compute and cache local indices to avoid recomputing them in _run_sub_point
+                self._cached_local_idxs = []
                 for vec, idxs in idx_info:
                     if vec is not None and idxs is not None:
-
-                        results_array *= current_coeff[idxs - idx_range[0]]
-                        # We don't allow mixed fd forms, so first one is all we need.
-                        break
+                        # For rel_element, current_coeff is per-element for the wrt variable.
+                        # idxs may be global indices or local indices depending on the batching.
+                        # We need to compute the correct local indices to index into current_coeff.
+                        idxs_arr = np.atleast_1d(idxs)
+                        offset = idx_range[0]
+                        local_idxs = idxs_arr - offset
+                        # Check if the computed indices are valid for the current_coeff array
+                        valid = True
+                        if isinstance(local_idxs, np.ndarray):
+                            # If any index is negative or out of bounds, assume idxs are local
+                            if (local_idxs < 0).any() or (local_idxs >= len(current_coeff)).any():
+                                local_idxs = idxs_arr
+                            # Double check that we have valid indices now
+                            if (local_idxs < 0).any() or (local_idxs >= len(current_coeff)).any():
+                                valid = False
+                        else:
+                            # Scalar case
+                            if local_idxs < 0 or local_idxs >= len(current_coeff):
+                                local_idxs = idxs
+                            if local_idxs < 0 or local_idxs >= len(current_coeff):
+                                valid = False
+                        if valid:
+                            self._cached_local_idxs.append(local_idxs)
+                            results_array *= current_coeff[local_idxs]
+                        else:
+                            self._cached_local_idxs.append(None)
+                    else:
+                        self._cached_local_idxs.append(None)
 
             else:
                 results_array[:] = 0.
+                self._cached_local_idxs = []
 
         elif not isinstance(current_coeff, np.ndarray) and current_coeff:
             current_vec = system._outputs if total else system._residuals
             # copy data from outputs (if doing total derivs) or residuals (if doing partials)
             results_array[:] = current_vec.asarray()
             results_array *= current_coeff
+            self._cached_local_idxs = []
         else:
             results_array[:] = 0.
+            self._cached_local_idxs = []
 
         # Run the Finite Difference
         for delta, coeff in zip(deltas, coeffs):
@@ -350,10 +384,12 @@ class FiniteDifference(ApproximationScheme):
                                           rel_element=rel_element)
 
             if rel_element:
-                for vec, idxs in idx_info:
-                    if vec is not None and idxs is not None:
-                        results *= coeff[idxs - idx_range[0]]
-                        break
+                # Use cached local indices computed in current_coeff loop to avoid recomputation
+                for i, (vec, idxs) in enumerate(idx_info):
+                    if vec is not None and idxs is not None and i < len(self._cached_local_idxs):
+                        local_idxs = self._cached_local_idxs[i]
+                        if local_idxs is not None:
+                            results *= coeff[..., local_idxs]
             else:
                 results *= coeff
 
@@ -385,12 +421,43 @@ class FiniteDifference(ApproximationScheme):
         ndarray
             Copy of the outputs or residuals array after running the perturbed system.
         """
-        for vec, idxs in idx_info:
+        for i, (vec, idxs) in enumerate(idx_info):
             if vec is not None and idxs is not None:
 
                 # Support rel_element stepsizing
                 if rel_element:
-                    local_delta = delta[idxs - idx_range[0]]
+                    is_scalar_idx = np.ndim(idxs) == 0
+                    idxs_arr = np.atleast_1d(idxs)
+
+                    # Use cached local indices if available 
+                    # (forward/backward forms with non-zero current_coeff)
+                    if i < len(self._cached_local_idxs) and self._cached_local_idxs[i] is not None:
+                        local_idxs = self._cached_local_idxs[i]
+                    else:
+                        # For central form or when cache is empty, compute local indices on the fly
+                        local_idxs = idxs_arr - idx_range[0]
+                        # Validate the computed indices
+                        if isinstance(local_idxs, np.ndarray):
+                            if (local_idxs < 0).any() or (local_idxs >= delta.shape[-1]):
+                                local_idxs = idxs_arr
+                        else:
+                            if local_idxs < 0 or local_idxs >= delta.shape[-1]:
+                                local_idxs = idxs
+
+                    # Handle delta indexing
+                    try:
+                        local_delta = delta[..., local_idxs] \
+                            if delta.ndim > 1 else delta[local_idxs]
+                    except (IndexError, TypeError):
+                        # If indexing fails, fall back to 0 or zeros
+                        if is_scalar_idx:
+                            local_delta = 0.0
+                        else:
+                            local_delta = np.zeros_like(idxs_arr, dtype=float)
+
+                    # If idxs was originally a scalar, ensure local_delta is scalar
+                    if is_scalar_idx and isinstance(local_delta, np.ndarray):
+                        local_delta = float(local_delta.item())
                 else:
                     local_delta = delta
 
