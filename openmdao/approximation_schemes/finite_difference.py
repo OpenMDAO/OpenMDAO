@@ -6,12 +6,6 @@ import numpy as np
 from openmdao.approximation_schemes.approximation_scheme import ApproximationScheme, _is_group
 
 
-# For rel_element step sizing, we need to track local indices for each idx_info tuple.
-# Local indices are computed once (either per iteration in the generator or upfront for colored)
-# and stored here to avoid repeatedly computing them in _run_point and _run_sub_point.
-VecIdxInfo = namedtuple('IdxInfo', ['vec', 'idxs', 'local_idxs'])
-
-
 DEFAULT_ORDER = {
     'forward': 1,
     'backward': 1,
@@ -97,147 +91,7 @@ class FiniteDifference(ApproximationScheme):
         """
         super().__init__()
         self._starting_ins = self._starting_outs = self._results_tmp = None
-
-    def _colored_column_iter(self, system, colored_approx_groups):
-        """
-        Perform colored approximations with local indices computed upfront in vec_ind_list.
-
-        Augments vec_ind_list with VecIdxInfo namedtuples containing computed local indices
-        before calling the parent method. This ensures local indices are computed once,
-        not repeatedly in _run_point and _run_sub_point.
-
-        Parameters
-        ----------
-        system : System
-            System where this approximation is occurring.
-        colored_approx_groups : list of tuples
-            Tuples of (data, jaccols, vec_ind_list, nzrows, seed_vars).
-
-        Yields
-        ------
-        int
-            column index
-        ndarray
-            solution array corresponding to the jacobian column at the given column index
-        """
-        # Augment vec_ind_list in colored_approx_groups with VecIdxInfo namedtuples
-        augmented_groups = []
-        for data, jcols, vec_ind_list, nzrows, seed_vars in colored_approx_groups:
-            augmented_vec_ind_list = self._augment_vec_ind_list(vec_ind_list)
-            augmented_groups.append((data, jcols, augmented_vec_ind_list, nzrows, seed_vars))
-
-        # Call parent's _colored_column_iter with augmented groups
-        yield from super()._colored_column_iter(system, augmented_groups)
-
-    def _vec_ind_iter(self, vec_ind_list):
-        """
-        Yield vector index list with local indices computed once per iteration for rel_element.
-
-        For rel_element step sizing, compute local indices once per iteration (in this generator)
-        and store them in VecIdxInfo namedtuples. This avoids recalculating them repeatedly
-        in _run_point and _run_sub_point.
-
-        Parameters
-        ----------
-        vec_ind_list : list
-            List of (Vector, indices) tuples.
-
-        Yields
-        ------
-        list
-            List of VecIdxInfo namedtuples with computed local indices.
-        int or ndarray or None
-            The indices for the current iteration.
-        """
-        if self._totals_directions:
-            # For directional case, augment the entire list
-            augmented_list = []
-            for vec, vec_idxs in vec_ind_list:
-                if vec_idxs is None:
-                    augmented_list.append(VecIdxInfo(vec=vec, idxs=None, local_idxs=None))
-                else:
-                    local_idxs = self._compute_local_indices(vec_idxs)
-                    augmented_list.append(VecIdxInfo(vec=vec, idxs=vec_idxs, local_idxs=local_idxs))
-            yield augmented_list, vec_ind_list[0][1]
-        else:
-            # For non-directional case, augment each entry
-            entry = [None]
-            for vec, vec_idxs in vec_ind_list:
-                if vec_idxs is None:
-                    continue
-                for vinds in vec_idxs:
-                    local_idxs = self._compute_local_indices(vinds)
-                    entry[0] = VecIdxInfo(vec=vec, idxs=vinds, local_idxs=local_idxs)
-                    yield entry, vinds
-
-    def _make_vec_idx_info(self, vec, idxs):
-        """
-        Create a VecIdxInfo namedtuple with computed local indices.
-
-        Parameters
-        ----------
-        vec : Vector or None
-            The vector to perturb.
-        idxs : int or ndarray or None
-            Indices into the vector.
-
-        Returns
-        -------
-        VecIdxInfo
-            Namedtuple with vec, idxs, and precomputed local_idxs.
-        """
-        if idxs is None:
-            local_idxs = None
-        else:
-            local_idxs = self._compute_local_indices(idxs)
-        return VecIdxInfo(vec=vec, idxs=idxs, local_idxs=local_idxs)
-
-    def _augment_vec_ind_list(self, vec_ind_list):
-        """
-        Convert vec_ind_list tuples to VecIdxInfo namedtuples with computed local indices.
-
-        Parameters
-        ----------
-        vec_ind_list : list of tuples
-            Each tuple is (vec, idxs).
-
-        Returns
-        -------
-        list of VecIdxInfo
-            Augmented namedtuples with computed local indices.
-        """
-        return [self._make_vec_idx_info(vec, idxs) for vec, idxs in vec_ind_list]
-
-    def _compute_local_indices(self, idxs):
-        """
-        Compute local indices relative to the first index in the current group.
-
-        For rel_element step sizing, when multiple wrt variables are being processed,
-        indices are relative to the start of the current wrt variable. Local indices
-        should be 0-based within that variable.
-
-        Parameters
-        ----------
-        idxs : int or ndarray or None
-            Indices to convert.
-
-        Returns
-        -------
-        int or ndarray or None
-            Local indices relative to minimum index, or None if input is None.
-        """
-        if idxs is None:
-            return None
-
-        idxs_arr = np.atleast_1d(idxs)
-        # For a group of indices from the same variable, find the offset
-        offset = int(idxs_arr.min())
-        local = idxs_arr - offset
-
-        # Return in original form (scalar or array)
-        if np.ndim(idxs) == 0:
-            return int(local[0]) if local.size > 0 else 0
-        return local
+        self._cached_local_idxs = []
 
     def add_approximation(self, wrt, system, kwargs, vector=None):
         """
@@ -445,8 +299,8 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        idx_info : list of VecIdxInfo namedtuples
-            List of VecIdxInfo(vec, idxs, local_idxs) with computed local indices.
+        idx_info : tuple of (Vector, ndarray of int)
+            Tuple of wrt indices and corresponding data vector to perturb.
         data : tuple of float
             Tuple of the form (deltas, coeffs, current_coeff)
         results_array : ndarray
@@ -469,24 +323,60 @@ class FiniteDifference(ApproximationScheme):
             rel_element = True
 
             if current_coeff[0]:
+                # Only compute/cache indices for forms with non-zero current_coeff (fwd/bckwd).
+                # For central form, current_coeff[0] is 0.0, so this block is skipped and
+                # self._cached_local_idxs remains empty. The coefficient loop will then skip the
+                # cached index logic (since len(self._cached_local_idxs) will be 0).
                 current_vec = system._outputs if total else system._residuals
                 # copy data from outputs (if doing total derivs) or residuals (if doing partials)
                 results_array[:] = current_vec.asarray()
 
-                for info in idx_info:
-                    if info.vec is not None and info.local_idxs is not None:
-                        results_array *= current_coeff[info.local_idxs]
+                # Compute and cache local indices to avoid recomputing them in _run_sub_point
+                self._cached_local_idxs = []
+                for vec, idxs in idx_info:
+                    if vec is not None and idxs is not None:
+                        # For rel_element, current_coeff is per-element for the wrt variable.
+                        # idxs may be global indices or local indices depending on the batching.
+                        # We need to compute the correct local indices to index into current_coeff.
+                        idxs_arr = np.atleast_1d(idxs)
+                        offset = idx_range[0]
+                        local_idxs = idxs_arr - offset
+                        # Check if the computed indices are valid for the current_coeff array
+                        valid = True
+                        if isinstance(local_idxs, np.ndarray):
+                            # If any index is negative or out of bounds, assume idxs are local
+                            if (local_idxs < 0).any() or (local_idxs >= len(current_coeff)).any():
+                                local_idxs = idxs_arr
+                            # Double check that we have valid indices now
+                            if (local_idxs < 0).any() or (local_idxs >= len(current_coeff)).any():
+                                valid = False
+                        else:
+                            # Scalar case
+                            if local_idxs < 0 or local_idxs >= len(current_coeff):
+                                local_idxs = idxs
+                            if local_idxs < 0 or local_idxs >= len(current_coeff):
+                                valid = False
+                        if valid:
+                            self._cached_local_idxs.append(local_idxs)
+                            results_array *= current_coeff[local_idxs]
+                        else:
+                            self._cached_local_idxs.append(None)
+                    else:
+                        self._cached_local_idxs.append(None)
 
             else:
                 results_array[:] = 0.
+                self._cached_local_idxs = []
 
         elif not isinstance(current_coeff, np.ndarray) and current_coeff:
             current_vec = system._outputs if total else system._residuals
             # copy data from outputs (if doing total derivs) or residuals (if doing partials)
             results_array[:] = current_vec.asarray()
             results_array *= current_coeff
+            self._cached_local_idxs = []
         else:
             results_array[:] = 0.
+            self._cached_local_idxs = []
 
         # Run the Finite Difference
         for delta, coeff in zip(deltas, coeffs):
@@ -494,9 +384,12 @@ class FiniteDifference(ApproximationScheme):
                                           rel_element=rel_element)
 
             if rel_element:
-                for info in idx_info:
-                    if info.vec is not None and info.local_idxs is not None:
-                        results *= coeff[..., info.local_idxs]
+                # Use cached local indices computed in current_coeff loop to avoid recomputation
+                for i, (vec, idxs) in enumerate(idx_info):
+                    if vec is not None and idxs is not None and i < len(self._cached_local_idxs):
+                        local_idxs = self._cached_local_idxs[i]
+                        if local_idxs is not None:
+                            results *= coeff[..., local_idxs]
             else:
                 results *= coeff
 
@@ -512,14 +405,14 @@ class FiniteDifference(ApproximationScheme):
         ----------
         system : System
             The system having its derivs approximated.
-        idx_info : list of VecIdxInfo namedtuples
-            List of VecIdxInfo(vec, idxs, local_idxs) with computed local indices.
-        delta : float or ndarray
-            Perturbation amount. If rel_element, array of per-element perturbations.
+        idx_info : tuple of (Vector, ndarray of int)
+            Tuple of wrt indices and corresponding data vector to perturb.
+        delta : float
+            Perturbation amount.
         total : bool
             If True total derivatives are being approximated, else partials.
         idx_range : range
-            Range of vector indices for this wrt variable (unused, kept for compatibility).
+            Range of vector indices for this wrt variable.
         rel_element : bool
             If True, then each element has a different delta.
 
@@ -528,17 +421,43 @@ class FiniteDifference(ApproximationScheme):
         ndarray
             Copy of the outputs or residuals array after running the perturbed system.
         """
-        for info in idx_info:
-            vec = info.vec
-            idxs = info.idxs
-            local_idxs = info.local_idxs
-
+        for i, (vec, idxs) in enumerate(idx_info):
             if vec is not None and idxs is not None:
+
                 # Support rel_element stepsizing
-                if rel_element and local_idxs is not None:
-                    # Use the local indices (computed once in the generator or upfront)
-                    # to select the correct delta values instead of recomputing indices
-                    local_delta = delta[local_idxs]
+                if rel_element:
+                    is_scalar_idx = np.ndim(idxs) == 0
+                    idxs_arr = np.atleast_1d(idxs)
+
+                    # Use cached local indices if available 
+                    # (forward/backward forms with non-zero current_coeff)
+                    if i < len(self._cached_local_idxs) and self._cached_local_idxs[i] is not None:
+                        local_idxs = self._cached_local_idxs[i]
+                    else:
+                        # For central form or when cache is empty, compute local indices on the fly
+                        local_idxs = idxs_arr - idx_range[0]
+                        # Validate the computed indices
+                        if isinstance(local_idxs, np.ndarray):
+                            if (local_idxs < 0).any() or (local_idxs >= delta.shape[-1]):
+                                local_idxs = idxs_arr
+                        else:
+                            if local_idxs < 0 or local_idxs >= delta.shape[-1]:
+                                local_idxs = idxs
+
+                    # Handle delta indexing
+                    try:
+                        local_delta = delta[..., local_idxs] \
+                            if delta.ndim > 1 else delta[local_idxs]
+                    except (IndexError, TypeError):
+                        # If indexing fails, fall back to 0 or zeros
+                        if is_scalar_idx:
+                            local_delta = 0.0
+                        else:
+                            local_delta = np.zeros_like(idxs_arr, dtype=float)
+
+                    # If idxs was originally a scalar, ensure local_delta is scalar
+                    if is_scalar_idx and isinstance(local_delta, np.ndarray):
+                        local_delta = float(local_delta.item())
                 else:
                     local_delta = delta
 

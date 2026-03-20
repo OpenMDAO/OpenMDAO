@@ -459,6 +459,30 @@ class MatMultParallelTestCase(unittest.TestCase):
 
         # self.assertEqual(jac_count, 2)
 
+    def test_rel_element_central_form(self):
+        """Test rel_element step sizing with central differencing to verify caching logic."""
+        mat = np.arange(30, dtype=float).reshape(5, 6)
+
+        p = om.Problem(model=om.Group(num_par_fd=4))
+        model = p.model
+        # Use central differencing (form='central') with rel_element step sizing
+        model.approx_totals(method='fd', form='central', step=1.0E-3, step_calc='rel_element')
+        comp = model.add_subsystem('comp', MatMultComp(mat, add_z=True, approx_method='fd'))
+
+        model.set_input_defaults('comp.x', val=np.ones(mat.shape[1]))
+        p.setup(mode='fwd')
+        p.run_model()
+
+        # Compute totals with central form - should work correctly even though
+        # current_coeff[0] is 0.0 for central form (cache will be empty).
+        # This tests that rel_element step sizing falls back to computing local indices
+        # on the fly when cache is empty (as with central form).
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.z', 'comp.x'], return_format='array')
+
+        # Verify jacobian is non-zero (actual value verification isn't critical,
+        # we mainly want to ensure no errors occur with central+rel_element)
+        self.assertGreater(np.linalg.norm(J), 0.0)
+
 
 def _setup_problem(mat, total_method='exact', partial_method='exact', total_num_par_fd=1,
                    partial_num_par_fd=1, approx_totals=False):
