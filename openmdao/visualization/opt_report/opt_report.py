@@ -353,7 +353,10 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                     min_val_as_str = _indicate_value_is_derived_from_array(min_val, vals_dict[name])
                 else:
                     min_val_as_str = str(vals_dict[name])
-                comp = (vals_dict[name] - meta['lower']) < _bounds_tolerance
+                if meta['lower'] is not None:
+                    comp = (vals_dict[name] - np.asarray(meta['lower']).ravel()) < _bounds_tolerance
+                else:
+                    comp = False
                 if np.any(comp):
                     row[col_name] = \
                         f'<span style="color:{_out_of_bounds_test_color}">({min_val_as_str})</span>'
@@ -365,20 +368,23 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                     max_val_as_str = _indicate_value_is_derived_from_array(max_val, vals_dict[name])
                 else:
                     max_val_as_str = str(vals_dict[name])
-                comp = (meta['upper'] - vals_dict[name]) < _bounds_tolerance
+                if meta['upper'] is not None:
+                    comp = (np.asarray(meta['upper']).ravel() - vals_dict[name]) < _bounds_tolerance
+                else:
+                    comp = False
                 if np.any(comp):
                     row[col_name] = \
                         f'<span style="color:{_out_of_bounds_test_color}">({max_val_as_str})</span>'
                 else:
                     row[col_name] = max_val_as_str
             elif col_name == 'lower':
-                if np.all(meta[col_name] == -INF_BOUND):
+                if meta[col_name] is None or np.all(meta[col_name] == -INF_BOUND):
                     row[col_name] = None
                 else:
                     lower_val = np.mean(meta[col_name])
                     row[col_name] = _indicate_value_is_derived_from_array(lower_val, meta[col_name])
             elif col_name == 'upper':
-                if np.all(meta[col_name] == INF_BOUND):
+                if meta[col_name] is None or np.all(meta[col_name] == INF_BOUND):
                     row[col_name] = None
                 else:
                     upper_val = np.mean(meta[col_name])
@@ -501,12 +507,16 @@ def _desvar_or_ineq_constraint_sparkline(ax, meta, val):
     _val = np.asarray(val).ravel()
 
     # get array for the lower and upper bounds
-    if isinstance(meta['lower'], float):
+    if meta['lower'] is None:
+        _lower = (-INF_BOUND * np.ones_like(val)[indices]).ravel()
+    elif isinstance(meta['lower'], float):
         _lower = (meta['lower'] * np.ones_like(val)[indices]).ravel()
     else:
         _lower = np.asarray(meta['lower']).ravel()
 
-    if isinstance(meta['upper'], float):
+    if meta['upper'] is None:
+        _upper = (INF_BOUND * np.ones_like(val)[indices]).ravel()
+    elif isinstance(meta['upper'], float):
         _upper = (meta['upper'] * np.ones_like(val)[indices]).ravel()
     else:
         _upper = np.asarray(meta['upper']).ravel()
@@ -675,9 +685,9 @@ def _constraint_plot(kind, meta, val, width=300):
 
     # If lower and upper are the same value, visualize the same as an equality constraint
     if (
-        'lower' in meta and meta['lower'] != -INF_BOUND
+        'lower' in meta and meta['lower'] != -INF_BOUND and meta['lower'] is not None
         and
-        'upper' in meta and meta['upper'] != INF_BOUND
+        'upper' in meta and meta['upper'] != INF_BOUND and meta['upper'] is not None
         and
         meta['lower'] == meta['upper']
     ):
@@ -692,7 +702,10 @@ def _constraint_plot(kind, meta, val, width=300):
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=_scalar_visual_figsize, dpi=_plot_dpi)
 
-    var_bounds_plot(kind, ax, float(val), meta['lower'], meta['upper'])
+    lower = -INF_BOUND if meta['lower'] is None else meta['lower']
+    upper = INF_BOUND if meta['upper'] is None else meta['upper']
+
+    var_bounds_plot(kind, ax, float(val), lower, upper)
     tmpfile = io.BytesIO()
     fig.savefig(tmpfile, format='png', transparent=True, bbox_inches='tight',
                 pad_inches=_plot_pad_inches)

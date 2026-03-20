@@ -1327,7 +1327,9 @@ class TestScaling(unittest.TestCase):
             with self.subTest(f'{g_ref=}'):
 
                 prob.model.set_constraint_options('paraboloid.g', ref=g_ref)
-                prob.run_driver()
+                result = prob.run_driver()
+
+                self.assertTrue(result.success)
 
                 g = prob.get_val('paraboloid.g')
                 # g should be active on its lower bound of 0.0
@@ -1490,15 +1492,18 @@ class TestScalingOverhaul(unittest.TestCase):
         assert_near_equal(driver.param_vals['p.x1_s_u'], 1.0)
         assert_near_equal(driver.param_vals['p.x1_s_s'], 1.0/7.0)
 
+        _, scaled_dv_ub, _ = prob.driver._autoscaler.get_bounds_scaling('design_var')
+        _, scaled_con_ub, _ = prob.driver._autoscaler.get_bounds_scaling('constraint')
+
         assert_near_equal(driver.param_meta['p.x1_u_u']['upper'], 11.0)
-        assert_near_equal(driver.param_meta['p.x1_u_s']['upper'], 11.0/7.0)
+        assert_near_equal(scaled_dv_ub['p.x1_u_s'], 11.0/7.0)
         assert_near_equal(driver.param_meta['p.x1_s_u']['upper'], 11.0)
-        assert_near_equal(driver.param_meta['p.x1_s_s']['upper'], 11.0/7.0)
+        assert_near_equal(scaled_dv_ub['p.x1_s_s'], 11.0/7.0)
 
         assert_near_equal(driver.con_meta['p.x1_u_u']['upper'], 3.3)
-        assert_near_equal(driver.con_meta['p.x1_u_s']['upper'], 3.3/13.0)
+        assert_near_equal(scaled_con_ub['p.x1_u_s'], 3.3/13.0)
         assert_near_equal(driver.con_meta['p.x1_s_u']['upper'], 3.3)
-        assert_near_equal(driver.con_meta['p.x1_s_s']['upper'], 3.3/13.0)
+        assert_near_equal(scaled_con_ub['p.x1_s_s'], 3.3/13.0)
 
         assert_near_equal(driver.con_vals['p.x1_u_u'], 1.0)
         assert_near_equal(driver.con_vals['p.x1_u_s'], 1.0/13.0)

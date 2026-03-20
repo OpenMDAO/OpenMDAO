@@ -61,11 +61,13 @@ _unsupported_optimizers = {'dogleg', 'trust-ncg'}
 # With "old-style" a bound is a tuple, with "new-style" a Bounds instance
 # In principle now everything can work with "old-style"
 # These settings have no effect to the optimizers implemented before SciPy 1.1
-_supports_new_style = {'trust-constr'}
-if Version(scipy_version) >= Version("1.4"):
-    _supports_new_style.add('differential_evolution')
+_supports_new_style = {'trust-constr', 'differential_evolution'}
+# if Version(scipy_version) >= Version("1.4"):
+#     _supports_new_style.add('differential_evolution')
 if Version(scipy_version) >= Version("1.14"):
     _supports_new_style.add('COBYQA')
+if Version(scipy_version) >= Version("1.11.0"):
+    _supports_new_style.add('shgo')
 _use_new_style = True  # Recommended to set to True
 
 CITATIONS = """
@@ -237,6 +239,7 @@ class ScipyOptimizeDriver(Driver):
         # Since COBYLA did not support bounds in versions of SciPy prior to 1.11, we need to
         # add to the _cons metadata for any bounds that need to be translated into a constraint
         if opt == 'COBYLA' and Version(scipy_version) < Version("1.11"):
+            added = False
             for name, meta in self._designvars.items():
                 lower = meta['lower']
                 upper = meta['upper']
@@ -246,6 +249,10 @@ class ScipyOptimizeDriver(Driver):
                     self._cons[name]['equals'] = None
                     self._cons[name]['linear'] = True
                     self._cons[name]['alias'] = None
+                    added = True
+            if added:
+                # Refresh constraint bounds cache to include the newly-added entries
+                self._autoscaler._compute_scaled_bounds('constraint')
 
     def run(self):
         """
@@ -274,6 +281,9 @@ class ScipyOptimizeDriver(Driver):
                 self._run_solve_nonlinear()
             self.iter_count += 1
 
+        # Configure the autoscaler
+        self._autoscaler.setup(self, model_has_run=True)
+
         self._con_cache = self.get_constraint_values()
         desvar_vals = self.get_design_var_values()
         self._dvlist = list(self._designvars)
@@ -301,6 +311,8 @@ class ScipyOptimizeDriver(Driver):
         else:
             bounds = None
 
+        lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
+
         for name, meta in self._designvars.items():
             size = meta['global_size'] if meta['distributed'] else meta['size']
             x_init[i:i + size] = desvar_vals[name]
@@ -308,24 +320,15 @@ class ScipyOptimizeDriver(Driver):
 
             # Bounds if our optimizer supports them
             if use_bounds:
-                meta_low = meta['lower']
-                meta_high = meta['upper']
+                meta_low = lower_dv[name]
+                meta_high = upper_dv[name]
                 for j in range(size):
+                    p_low = meta_low[j]
+                    p_high = meta_high[j]
 
-                    if isinstance(meta_low, np.ndarray):
-                        p_low = meta_low[j]
-                    else:
-                        p_low = meta_low
-
-                    if isinstance(meta_high, np.ndarray):
-                        p_high = meta_high[j]
-                    else:
-                        p_high = meta_high
-
-                    # Use 1.E16 here in case we've scaled the bounds
-                    if p_low <= -1.0E16:
+                    if p_low <= -INF_BOUND:
                         p_low = None
-                    if p_high >= 1.0E16:
+                    if p_high >= INF_BOUND:
                         p_high = None
 
                     bounds.append((p_low, p_high))
@@ -366,15 +369,17 @@ class ScipyOptimizeDriver(Driver):
             else:
                 self._lincongrad_cache = None
 
+            lower_con, upper_con, equals_con = self._autoscaler.get_bounds_scaling('constraint')
+
             # map constraints to index and instantiate constraints for scipy
             for name, meta in self._cons.items():
                 if meta['indices'] is not None:
                     meta['size'] = size = meta['indices'].indexed_src_size
                 else:
                     size = meta['global_size'] if meta['distributed'] else meta['size']
-                upper = meta['upper']
-                lower = meta['lower']
-                equals = meta['equals']
+                upper = upper_con[name]
+                lower = lower_con[name]
+                equals = equals_con[name] if meta['equals'] is not None else None
                 linear = name in lincons
 
                 if linear:
@@ -401,11 +406,11 @@ class ScipyOptimizeDriver(Driver):
                     else:
                         lb = lower
                         ub = upper
-
+                    
                     if linear:
                         # LinearConstraint
                         con = LinearConstraint(A=lincongrad[self._con_idx[name]],
-                                               lb=lower, ub=upper, keep_feasible=True)
+                                               lb=lb, ub=ub, keep_feasible=True)
                     else:
                         # NonlinearConstraint
                         # Loop over every index separately,
@@ -414,14 +419,15 @@ class ScipyOptimizeDriver(Driver):
                             # TODO add option for Hessian
                             # Double-sided constraints are accepted by the algorithm
                             args = [name, False, j]
+                            lb_j = np.maximum(lb[j], -INF_BOUND)
+                            ub_j = np.minimum(ub[j], INF_BOUND)
                             con = NonlinearConstraint(
                                 fun=signature_extender(
                                     WeakMethodWrapper(self, '_con_val_func'), args),
-                                lb=lb, ub=ub,
+                                lb=lb_j, ub=ub_j,
                                 jac=signature_extender(
                                     WeakMethodWrapper(self, '_congradfunc'), args)
                             )
-
                     constraints.append(con)
                 else:
                     # Type of constraints is list of dict
@@ -612,19 +618,19 @@ class ScipyOptimizeDriver(Driver):
             Value of the objective function evaluated at the new design point.
         """
         model = self._problem().model
+        dv_vec = self._vectors['design_var']
 
         try:
 
-            # Pass in new inputs
+            # Broadcast same x_new to all ranks
             if MPI:
                 model.comm.Bcast(x_new, root=0)
 
-            if self._desvar_array_cache is None:
-                self._desvar_array_cache = np.empty(x_new.shape, dtype=x_new.dtype)
+            # Update the cached design variable vector
+            dv_vec.set_data(x_new, driver_scaling=True)
 
-            self._desvar_array_cache[:] = x_new
-
-            self._scipy_update_design_vars(x_new)
+            # Design variables in dv_vec are now in optimizer scaled space and in driver-units.
+            self._set_design_vars(driver_scaling=True)
 
             with RecordingDebugging(self._get_name(), self.iter_count, self):
                 self.iter_count += 1
@@ -703,22 +709,17 @@ class ScipyOptimizeDriver(Driver):
         cons = self._con_cache
         meta = self._cons[name]
 
+        lower_con, upper_con, equals_con = self._autoscaler.get_bounds_scaling('constraint')
+
         # Equality constraints
-        equals = meta['equals']
-        if equals is not None:
-            if isinstance(equals, np.ndarray):
-                equals = equals[idx]
-            return cons[name][idx] - equals
+        if meta['equals'] is not None:
+            eq = equals_con[name]
+            return cons[name][idx] - eq[idx]
 
         # Note, scipy defines constraints to be satisfied when positive,
         # which is the opposite of OpenMDAO.
-        upper = meta['upper']
-        if isinstance(upper, np.ndarray):
-            upper = upper[idx]
-
-        lower = meta['lower']
-        if isinstance(lower, np.ndarray):
-            lower = lower[idx]
+        upper = upper_con[name][idx]
+        lower = lower_con[name][idx]
 
         if dbl or (lower <= -INF_BOUND):
             return upper - cons[name][idx]
@@ -748,6 +749,8 @@ class ScipyOptimizeDriver(Driver):
             grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
                                         return_format=self._total_jac_format)
             self._grad_cache = grad
+            if not np.all(np.isfinite(grad)):
+                print(f'DEBUG _gradfunc: NaN/Inf in grad shape={grad.shape}:\n{grad}')
 
             # First time through, check for zero row/col.
             if self._check_jac and self._total_jac is not None:
