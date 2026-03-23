@@ -163,6 +163,7 @@ class _TotalJacInfo(object):
 
         of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of, wrt)
 
+        # DJI: This block added by Claude.
         if of_indices is not None:
             conn_graph = model.get_conn_graph()
             # of_metadata = dict(of_metadata)  # shallow copy so we don't mutate the original
@@ -178,6 +179,7 @@ class _TotalJacInfo(object):
                 meta['indices'] = idxer
                 meta['size'] = meta['global_size'] = idxer.indexed_src_size
 
+        # DJI: This block added by Claude.
         if wrt_indices is not None:
             conn_graph = model.get_conn_graph()
             # wrt_metadata = dict(wrt_metadata)  # shallow copy so we don't mutate the original
@@ -241,7 +243,12 @@ class _TotalJacInfo(object):
             modes = [self.mode]
         else:
             if not has_lin_cons:
-                if driver and ((orig_of is None and orig_wrt is None) or not has_custom_derivs):
+                # DJI: the `(of_indices is None and wrt_indices is None)` was added by Claude.
+                if (
+                    driver and
+                        ((orig_of is None and orig_wrt is None) or not has_custom_derivs) and
+                        (of_indices is None and wrt_indices is None)
+                    ):
                     # we're using driver ofs/wrts
                     if coloring_info is None:
                         self.coloring_info = coloring_info = driver._coloring_info
