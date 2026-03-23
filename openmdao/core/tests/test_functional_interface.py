@@ -9,6 +9,10 @@ from openmdao.utils.assert_utils import assert_near_equal
 from openmdao.utils.testing_utils import use_tempdirs
 
 
+# Set the threshold to sys.maxsize to print all elements
+np.set_printoptions(threshold=sys.maxsize, linewidth=sys.maxsize)
+
+
 @use_tempdirs
 class TestSimpleParaboloid(unittest.TestCase):
 
@@ -206,19 +210,20 @@ def _get_multid_circle_problem():
     prob.set_val('y', y_random)
     prob.set_val('r', 0.7)
 
-    return SHAPE, SIZE, EVEN_IND, ODD_IND, prob
+    return SHAPE, SIZE, ALL_IND, EVEN_IND, ODD_IND, prob
 
 
 @use_tempdirs
 class TestMultiDimensionalCircleOptimization(unittest.TestCase):
 
     def setUp(self):
-        self._SHAPE, self._SIZE, self._EVEN_IND, self._ODD_IND, self._prob = _get_multid_circle_problem()
+        self._SHAPE, self._SIZE, self._ALL_IND, self._EVEN_IND, self._ODD_IND, self._prob = _get_multid_circle_problem()
         self._prob.run_driver()
 
     def test_f(self):
         SHAPE = self._SHAPE
         SIZE = self._SIZE
+        ALL_IND = self._ALL_IND
         prob = self._prob
 
         # This says I want `x[0, 0, 0, 0]` and `x[1, 1, 1, 1]`, in that order.
@@ -514,7 +519,7 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
         self.assertEqual(len(input_names), len(input_names_expected))
         self.assertTrue(all(name in input_names_expected for name in input_names))
 
-        # This doesn't include linear constraints.
+        # This doesn't include linear constraints, namely the constraint on the first index of y.
         # Not sure what to do about that.
         output_names_expected = ["r_con.g", "theta_con.g", "delta_theta_con.g", "l_conx.g", "circle.area"]
         output_names = dfdx.output_var_names
@@ -609,6 +614,7 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
         # Easier if I have the `x` and `y` values in the multidimensional shape.
         x = prob.get_val("x")
         y = prob.get_val("y")
+        r = prob.get_val("r")
         theta_actual = np.arctan2(y, x)
         even = theta_actual[EVEN_IND]
         odd = theta_actual[ODD_IND]
@@ -691,8 +697,7 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                     ddelta_theta_con_g_dodd[(*i, *j)] = -1.0
 
         # So now I should be able to chain rule all this.
-        # ddelta_theta_con_g_dx = ddelta_theta_con_g_deven * deven_dtheta_actual * dtheta_actual_dx + ddelta_theta_con_g_dodd * dodd_dtheta_actual * dtheta_actual_dx
-        # But I need to reshape things.
+        # But I need to reshape things for matrix multiplication to do the right thing for the chain rule.
         dtheta_actual_dx.shape = (SIZE, SIZE)
         deven_dtheta_actual.shape = (EVEN_SIZE, SIZE)
         dodd_dtheta_actual.shape = (ODD_SIZE, SIZE)
@@ -700,11 +705,6 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
         ddelta_theta_con_g_dodd.shape = (ODD_SIZE, ODD_SIZE)
 
         ddelta_theta_con_g_dx = ddelta_theta_con_g_deven @ deven_dtheta_actual @ dtheta_actual_dx + ddelta_theta_con_g_dodd @ dodd_dtheta_actual @ dtheta_actual_dx
-        # print(ddelta_theta_con_g_dx.shape, (EVEN_SIZE, SIZE))
-
-        # print(J[deltathetacong_start:deltathetacong_end, x_start:x_end])
-        # print(ddelta_theta_con_g_dx)
-        # print(J[deltathetacong_start:deltathetacong_end, x_start:x_end] - ddelta_theta_con_g_dx)
         assert_near_equal(J[deltathetacong_start:deltathetacong_end, x_start:x_end], ddelta_theta_con_g_dx)
 
         # Now do the same thing for the derivative of delta_theta_con_g wrt y.
@@ -716,41 +716,100 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
         ddelta_theta_con_g_dr = np.zeros((EVEN_SIZE, 1))
         assert_near_equal(J[deltathetacong_start:deltathetacong_end, r_start:r_end], ddelta_theta_con_g_dr)
 
-        # dtheta_actual_dy = np.zeros((SIZE, y_expected.size))
-        # for i in range(dtheta_actual_dy.size):
-        #     for j in range(y_expected.size):
-        #         if i == j:
-        #             dtheta_actual_dy[i, j] = x0[i]/(x0[i]**2 + y0[i]**2)
+        # OK, so now I want the derivatives of `r_con.g` wrt `x`, `y`, `r`.
+        dr_con_g_dx = np.zeros((*SHAPE, *SHAPE))
+        for j in np.ndindex(SHAPE):
+            for i in np.ndindex(SHAPE):
+                if i == j:
+                    dr_con_g_dx[(*i, *j)] = 2*x[j]
+        # Need to reshape into a matrix.
+        dr_con_g_dx.shape = (SIZE, SIZE)
+        assert_near_equal(J[rcong_start:rcong_end, x_start:x_end], dr_con_g_dx)
 
-        # Derivative of `delta_theta_con.g` wrt `x`.
-        # ddeltathetacong_dx_expected = np.zeros((deltathetacong_expected.size, x_expected.size))
-        # Seems like the easiest way to do this would be to get things in the multi-dimensional shape.
-        # x_expected_rs = x_expected.reshape(SHAPE)
-        # y_expected_rs = y_expected.reshape(SHAPE)
+        dr_con_g_dy = np.zeros((*SHAPE, *SHAPE))
+        for j in np.ndindex(SHAPE):
+            for i in np.ndindex(SHAPE):
+                if i == j:
+                    dr_con_g_dy[(*i, *j)] = 2*y[j]
+        # Need to reshape into a matrix.
+        dr_con_g_dy.shape = (SIZE, SIZE)
+        assert_near_equal(J[rcong_start:rcong_end, y_start:y_end], dr_con_g_dy)
 
-        # Now, need to get the odd and even parts of ddeltathetacong_dx_expected.
-        # So, I know dtheta_actual_dx.
-        # What would deven/dtheta_actual be?
-        # Well.
-        # Should be able to get that, then do some multiplication.
+        dr_con_g_dr = np.zeros((*SHAPE, *r.shape))
+        for j in np.ndindex(*r.shape):
+            for i in np.ndindex(*SHAPE):
+                dr_con_g_dr[(*i, *j)] = -2*r[j]
+        # Need to reshape into a matrix.
+        dr_con_g_dr.shape = (SIZE, r.size)
+        assert_near_equal(J[rcong_start:rcong_end, r_start:r_end], dr_con_g_dr)
 
-        # # How do I get ddeltathetacong_deven?
-        # ODD_IND_FLAT = np.ravel_multi_index(ODD_IND, SHAPE).flatten()
-        # EVEN_IND_FLAT = np.ravel_multi_index(EVEN_IND, SHAPE).flatten()
-        # deltathetacong_dx_expected = dtheta_actual_dx[EVEN_IND_FLAT, EVEN_IND_FLAT] - dtheta_actual_dx[ODD_IND_FLAT, ODD_IND_FLAT]
+        dtheta_con_g_even_dtheta_actual = np.zeros((*EVEN_SHAPE, *SHAPE))
+        for idx_out_idx_in in zip(*[np.ndenumerate(idxs) for idxs in EVEN_IND]):
+            # The total input index will be
+            idx_in = tuple(io_ii[1] for io_ii in idx_out_idx_in)
+            # The total output index is any of the first entries in idx_out_idx_in.
+            idx_out = idx_out_idx_in[0][0]
+            dtheta_con_g_even_dtheta_actual[(*idx_out, *idx_in)] = 1.0
+        dtheta_con_g_even_dtheta_actual.shape = (EVEN_SIZE, SIZE)
+        # Now do the chain rule to get the derivatives wrt x, y, z.
 
-        # # Derivative of area wrt x is zero.
-        # darea_dx_expected = np.zeros((area_expected.size, x_expected.size))
-        # assert_near_equal(J[area_start:area_end, x_start:x_end], darea_dx_expected)
+        # dtheta_actual_dr is just zero.
+        dtheta_actual_dr = np.zeros((SIZE, r.size))
 
-        # # Derivative of area wrt y is zero.
-        # darea_dy_expected = np.zeros((area_expected.size, y_expected.size))
-        # assert_near_equal(J[area_start:area_end, y_start:y_end], darea_dy_expected)
+        dtheta_con_g_dx = dtheta_con_g_even_dtheta_actual @ dtheta_actual_dx
+        dtheta_con_g_dy = dtheta_con_g_even_dtheta_actual @ dtheta_actual_dy
+        dtheta_con_g_dr = dtheta_con_g_even_dtheta_actual @ dtheta_actual_dr
 
-        # # area = pi*r**2, so darea_dr = 2*pi*r.
-        # darea_dr_expected = np.zeros((area_expected.size, r_expected.size))
-        # darea_dr_expected[:, :] = 2*np.pi*r_expected
-        # assert_near_equal(J[area_start:area_end, r_start:r_end], darea_dr_expected)
+        assert_near_equal(J[thetacong_start:thetacong_end, x_start:x_end], dtheta_con_g_dx)
+        assert_near_equal(J[thetacong_start:thetacong_end, y_start:y_end], dtheta_con_g_dy)
+        assert_near_equal(J[thetacong_start:thetacong_end, r_start:r_end], dtheta_con_g_dr)
+
+        # Next, get the derivative of `l_conx.g`.
+        dl_conx_g_0_dx = np.zeros((1, *SHAPE))
+        # So, the indices I want are just the first one.
+        ALL_IND = self._ALL_IND
+        idx0s = tuple(idx.flat[0] for idx in ALL_IND)
+        dl_conx_g_0_dx[(0, *idx0s)] = 1.0
+        dl_conx_g_0_dx.shape = (1, SIZE)
+        assert_near_equal(J[lconxg_start:lconxg_end, x_start:x_end], dl_conx_g_0_dx)
+
+        # Other derivatives of l_conx.g are zero.
+        dl_conx_g_0_dy = np.zeros((1, *SHAPE))
+        dl_conx_g_0_dy.shape = ((1, SIZE))
+        dl_conx_g_0_dr = np.zeros((1, 1))
+        assert_near_equal(J[lconxg_start:lconxg_end, y_start:y_end], dl_conx_g_0_dy)
+        assert_near_equal(J[lconxg_start:lconxg_end, r_start:r_end], dl_conx_g_0_dr)
+
+        # Next derivative: circle.area = pi*r**2, so derivative is just 2*pi*r of course.
+        dcircle_area_dr = np.zeros((1, 1))
+        dcircle_area_dr[0, 0] = 2*np.pi*r_expected[0]
+
+        dcircle_area_dx = np.zeros((1, SIZE))
+        dcircle_area_dy = np.zeros((1, SIZE))
+        assert_near_equal(J[area_start:area_end, x_start:x_end], dcircle_area_dx)
+        assert_near_equal(J[area_start:area_end, y_start:y_end], dcircle_area_dy)
+        assert_near_equal(J[area_start:area_end, r_start:r_end], dcircle_area_dr)
+
+    def test_linear_constraint_check(self):
+        prob = self._prob
+
+        dfdx = prob.get_callback("dfdx", input_vars=["y", "x"], output_vars=["y", "x"])
+
+        input_names_expected = ["x", "y"]
+        input_names = dfdx.input_var_names
+        self.assertEqual(len(input_names), len(input_names_expected))
+        self.assertTrue(all(name in input_names_expected for name in input_names))
+
+        # This doesn't include linear constraints.
+        # Not sure what to do about that.
+        output_names_expected = ["x", "y"]
+        output_names = dfdx.output_var_names
+        self.assertEqual(len(output_names), len(output_names_expected))
+        self.assertTrue(all(name in output_names_expected for name in output_names))
+
+        x0 = dfdx.create_input_vector()
+        # Why does this have a dense column in the first one?
+        # print(dfdx(x0))
 
 if __name__ == "__main__":
     unittest.main()
