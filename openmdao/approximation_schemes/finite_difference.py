@@ -363,9 +363,9 @@ class FiniteDifference(ApproximationScheme):
             Perturbation amount.
         total : bool
             If True total derivatives are being approximated, else partials.
-        loc_idx : range
+        loc_idx : int
             Current index of variable being stepped: only used when step_calc is rel_element.
-        rel_element : int
+        rel_element : bool
             If True, then each element has a different delta.
 
         Returns
