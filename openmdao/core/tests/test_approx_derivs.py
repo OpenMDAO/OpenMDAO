@@ -2337,8 +2337,8 @@ class TestFDRelative(unittest.TestCase):
         class MatMultComp(om.ExplicitComponent):
 
             def setup(self):
-                self.add_input('z', val=np.ones(2))
                 self.add_input('x', val=np.ones(3))
+                self.add_input('z', val=np.ones(2))
                 self.add_output('y', val=np.zeros(3))
                 self.cache_x = []
                 self.cache_z = []
