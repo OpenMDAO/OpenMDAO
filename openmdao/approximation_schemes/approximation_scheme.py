@@ -442,7 +442,7 @@ class ApproximationScheme(object):
             [[Vector, inds]]
         """
         if self._totals_directions:
-            yield vec_ind_list, vec_ind_list[0][1]
+            yield vec_ind_list, vec_ind_list[0][1], 0
         else:
             entry = [[None, None]]
             ent0 = entry[0]

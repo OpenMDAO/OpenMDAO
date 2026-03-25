@@ -307,7 +307,7 @@ class FiniteDifference(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         loc_idx : int
-            Current index of variable being stepped: only used when calc_type is rel_element.
+            Current index of variable being stepped: only used when step_calc is rel_element.
 
         Returns
         -------
@@ -364,9 +364,9 @@ class FiniteDifference(ApproximationScheme):
         total : bool
             If True total derivatives are being approximated, else partials.
         loc_idx : range
-            Range of vector indices for this wrt variable.
+            Current index of variable being stepped: only used when step_calc is rel_element.
         rel_element : int
-            Current index of variable being stepped: only used when calc_type is rel_element.
+            If True, then each element has a different delta.
 
         Returns
         -------
