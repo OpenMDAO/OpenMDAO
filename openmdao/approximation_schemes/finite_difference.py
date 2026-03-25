@@ -322,13 +322,7 @@ class FiniteDifference(ApproximationScheme):
                 current_vec = system._outputs if total else system._residuals
                 # copy data from outputs (if doing total derivs) or residuals (if doing partials)
                 results_array[:] = current_vec.asarray()
-
-                for vec, idxs in idx_info:
-                    if vec is not None and idxs is not None:
-
-                        results_array *= current_coeff[loc_idx]
-                        # We don't allow mixed fd forms, so first one is all we need.
-                        break
+                results_array *= current_coeff[loc_idx]
 
             else:
                 results_array[:] = 0.
@@ -347,10 +341,7 @@ class FiniteDifference(ApproximationScheme):
                                           rel_element=rel_element)
 
             if rel_element:
-                for vec, idxs in idx_info:
-                    if vec is not None and idxs is not None:
-                        results *= coeff[loc_idx]
-                        break
+                results *= coeff[loc_idx]
             else:
                 results *= coeff
 
