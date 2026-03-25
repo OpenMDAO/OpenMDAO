@@ -315,7 +315,8 @@ class FiniteDifference(ApproximationScheme):
             Copy of the outputs or residuals array after running the perturbed system.
         """
         deltas, coeffs, current_coeff = data
-        rel_element = isinstance(current_coeff, np.ndarray) and current_coeff.size > 1
+        vec_curr = isinstance(current_coeff, np.ndarray)
+        rel_element = vec_curr and current_coeff.size > 1
 
         if rel_element:
             if current_coeff[loc_idx]:
@@ -327,7 +328,7 @@ class FiniteDifference(ApproximationScheme):
             else:
                 results_array[:] = 0.
 
-        elif current_coeff:
+        elif np.any(current_coeff != 0.0):
             current_vec = system._outputs if total else system._residuals
             # copy data from outputs (if doing total derivs) or residuals (if doing partials)
             results_array[:] = current_vec.asarray()
@@ -341,7 +342,7 @@ class FiniteDifference(ApproximationScheme):
             # Support rel_element stepsizing
             if rel_element:
                 local_delta = delta[loc_idx].item()
-            elif isinstance(delta, np.ndarray) and len(delta) > 0:
+            elif vec_curr and isinstance(delta, np.ndarray) and len(delta) > 0:
                 local_delta = delta[0]
             else:
                 local_delta = delta
