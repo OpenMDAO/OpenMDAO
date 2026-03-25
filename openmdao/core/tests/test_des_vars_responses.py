@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 
 import openmdao.api as om
-from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals
+from openmdao.utils.assert_utils import assert_near_equal, assert_check_totals, assert_warning
 from openmdao.utils.mpi import MPI
 from openmdao.test_suite.components.sellar import SellarDerivatives, SellarDis1withDerivatives, \
      SellarDis2withDerivatives
@@ -729,6 +729,18 @@ class TestConstraintOnModel(unittest.TestCase):
 
         msg = "<class SellarDerivatives>: Constraint 'con1' cannot be both equality and inequality."
         self.assertEqual(str(context.exception), msg)
+
+    def test_error_con_no_type(self):
+        prob = om.Problem()
+
+        prob.model = SellarDerivatives()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+
+        expected_msg = ("<class SellarDerivatives>: Constraint 'con1' requires one of arguments "
+                        "'lower', 'upper', or 'equals' to be specified.")
+
+        with assert_warning(om.OpenMDAOWarning, expected_msg):
+            prob.model.add_constraint('con1', ref=1.0)
 
 
 class exampleComp(om.ExplicitComponent):
