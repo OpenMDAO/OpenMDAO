@@ -3664,6 +3664,10 @@ class System(object, metaclass=SystemMetaclass):
         The arguments (:code:`lower`, :code:`upper`, :code:`equals`) can not be strings or variable
         names.
         """
+        if lower is None and upper is None and equals is None:
+            issue_warning(f"{self.msginfo}: Constraint '{name}' requires one of arguments"
+                          " 'lower', 'upper', or 'equals' to be specified.")
+        
         self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear, units=units,
