@@ -2336,6 +2336,9 @@ class TestFDRelative(unittest.TestCase):
 
         class MatMultComp(om.ExplicitComponent):
 
+            def initialize(self):
+                self.options.declare('form')
+
             def setup(self):
                 self.add_input('x', val=np.ones(3))
                 self.add_input('z', val=np.ones(2))
@@ -2344,16 +2347,18 @@ class TestFDRelative(unittest.TestCase):
                 self.cache_z = []
 
             def setup_partials(self):
-                self.declare_partials('*', '*', method='fd', step=0.1, step_calc='rel_element', form='central')
+                self.declare_partials('*', '*', method='fd', step=0.1, step_calc='rel_element', form=self.options['form'])
 
             def compute(self, inputs, outputs):
                 outputs['y'] = 2 * inputs['x'] + np.sum(inputs['z'])
                 self.cache_x.append(inputs['x'].copy())
                 self.cache_z.append(inputs['z'].copy())
 
+        # Do central
+
         p = om.Problem()
         model = p.model
-        comp = model.add_subsystem('comp', MatMultComp())
+        comp = model.add_subsystem('comp', MatMultComp(form='central'))
 
         p.setup(mode='fwd')
 
@@ -2383,6 +2388,33 @@ class TestFDRelative(unittest.TestCase):
 
         assert_near_equal(z_vals[9], np.array([13.0, 24.2]))
         assert_near_equal(z_vals[10], np.array([13.0, 19.8]))
+
+        # Do forward
+
+        p = om.Problem()
+        model = p.model
+        comp = model.add_subsystem('comp', MatMultComp(form='forward'))
+
+        p.setup(mode='fwd')
+
+        # Make it obvious that we are stepping correctly.
+        model.set_val('comp.x', np.array([3.0, 40.0, 500.0]))
+        model.set_val('comp.z', np.array([13.0, 22.0]))
+
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x', 'comp.z'], return_format='array')
+        x_vals = comp.cache_x
+        z_vals = comp.cache_z
+
+        # All steps are 10%, forward then back.
+
+        assert_near_equal(x_vals[1], np.array([3.3, 40.0, 500.0]))
+        assert_near_equal(x_vals[2], np.array([3.0, 44.0, 500.0]))
+        assert_near_equal(x_vals[3], np.array([3.0, 40.0, 550.0]))
+
+        assert_near_equal(z_vals[4], np.array([14.3, 22.0]))
+        assert_near_equal(z_vals[5], np.array([13.0, 24.2]))
 
     def test_minimum_step(self):
         # Test that minimum_step prevents us from taking a zero step.
