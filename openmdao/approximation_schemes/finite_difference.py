@@ -322,7 +322,6 @@ class FiniteDifference(ApproximationScheme):
                 current_vec = system._outputs if total else system._residuals
                 # copy data from outputs (if doing total derivs) or residuals (if doing partials)
                 results_array[:] = current_vec.asarray()
-                print('results_array', loc_idx, current_coeff, results_array)
                 results_array *= current_coeff[loc_idx]
 
             else:
