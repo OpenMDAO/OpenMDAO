@@ -306,8 +306,8 @@ class FiniteDifference(ApproximationScheme):
             Where the results will be stored.
         total : bool
             If True total derivatives are being approximated, else partials.
-        loc_idx : range
-            Range of vector indices for this wrt variable.
+        loc_idx : int
+            Current index of variable being stepped: only used when calc_type is rel_element.
 
         Returns
         -------
@@ -315,13 +315,9 @@ class FiniteDifference(ApproximationScheme):
             Copy of the outputs or residuals array after running the perturbed system.
         """
         deltas, coeffs, current_coeff = data
-        rel_element = False
-        print(loc_idx, idx_info)
+        rel_element = isinstance(current_coeff, np.ndarray) and current_coeff.size > 1
 
-        if isinstance(current_coeff, np.ndarray) and current_coeff.size > 1:
-            # rel_element - each element has its own relative step.
-            rel_element = True
-
+        if rel_element:
             if current_coeff[0]:
                 current_vec = system._outputs if total else system._residuals
                 # copy data from outputs (if doing total derivs) or residuals (if doing partials)
@@ -378,8 +374,8 @@ class FiniteDifference(ApproximationScheme):
             If True total derivatives are being approximated, else partials.
         loc_idx : range
             Range of vector indices for this wrt variable.
-        rel_element : bool
-            If True, then each element has a different delta.
+        rel_element : int
+            Current index of variable being stepped: only used when calc_type is rel_element.
 
         Returns
         -------
