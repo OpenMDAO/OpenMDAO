@@ -2331,6 +2331,48 @@ class TestFDRelative(unittest.TestCase):
         # Central diff is super accurate on this.
         assert_near_equal(deriv, x, 1e-6)
 
+    def test_rel_element_steps(self):
+        # This test explicitly checks that the steps are the correct size.
+
+        class MatMultComp(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=np.ones(3))
+                self.add_output('y', val=np.zeros(3))
+                self.cache = []
+
+            def setup_partials(self):
+                self.declare_partials('*', '*', method='fd', step=0.1, step_calc='rel_element', form='central')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = 2 * inputs['x']
+                self.cache.append(inputs['x'].copy())
+
+        p = om.Problem()
+        model = p.model
+        comp = model.add_subsystem('comp', MatMultComp())
+
+        p.setup(mode='fwd')
+
+        # Make it obvious that we are stepping correctly.
+        model.set_val('comp.x', np.array([3.0, 40.0, 500.0]))
+
+        p.run_model()
+
+        J = p.compute_totals(of=['comp.y'], wrt=['comp.x'], return_format='array')
+        x_vals = comp.cache
+
+        # All steps are 10%, forward then back.
+
+        assert_near_equal(x_vals[1], np.array([3.3, 40.0, 500.0]))
+        assert_near_equal(x_vals[2], np.array([2.7, 40.0, 500.0]))
+
+        assert_near_equal(x_vals[3], np.array([3.0, 44.0, 500.0]))
+        assert_near_equal(x_vals[4], np.array([3.0, 36.0, 500.0]))
+
+        assert_near_equal(x_vals[5], np.array([3.0, 40.0, 550.0]))
+        assert_near_equal(x_vals[6], np.array([3.0, 40.0, 450.0]))
+
     def test_minimum_step(self):
         # Test that minimum_step prevents us from taking a zero step.
 
