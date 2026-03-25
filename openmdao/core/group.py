@@ -2999,12 +2999,8 @@ class Group(System):
         wrt = []
         for name, m in self._owns_approx_wrt.items():
             src = m['source']
-            if src in ivc:
-                wrt.append(src)
-            else:
-                raise RuntimeError("When computing total derivatives for the model, the "
-                                   f"wrt variable '{name}' is not an independent variable "
-                                   "or does not have an independant variable as a source.")
+            wrt.append(src)
+
 
         of = [m['source'] for m in self._owns_approx_of.values()]
 

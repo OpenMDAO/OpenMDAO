@@ -290,7 +290,7 @@ class FiniteDifference(ApproximationScheme):
         """
         return array.real
 
-    def _run_point(self, system, idx_info, data, results_array, total, idx_range=range(1)):
+    def _run_point(self, system, idx_info, data, results_array, total, loc_idx=0):
         """
         Alter the specified inputs by the given deltas, run the system, and return the results.
 
@@ -306,7 +306,7 @@ class FiniteDifference(ApproximationScheme):
             Where the results will be stored.
         total : bool
             If True total derivatives are being approximated, else partials.
-        idx_range : range
+        loc_idx : range
             Range of vector indices for this wrt variable.
 
         Returns
@@ -316,8 +316,9 @@ class FiniteDifference(ApproximationScheme):
         """
         deltas, coeffs, current_coeff = data
         rel_element = False
+        print(loc_idx, idx_info)
 
-        if isinstance(current_coeff, np.ndarray) and current_coeff.size > 0:
+        if isinstance(current_coeff, np.ndarray) and current_coeff.size > 1:
             # rel_element - each element has its own relative step.
             rel_element = True
 
@@ -329,7 +330,7 @@ class FiniteDifference(ApproximationScheme):
                 for vec, idxs in idx_info:
                     if vec is not None and idxs is not None:
 
-                        results_array *= current_coeff[idxs - idx_range[0]]
+                        results_array *= current_coeff[loc_idx]
                         # We don't allow mixed fd forms, so first one is all we need.
                         break
 
@@ -346,13 +347,13 @@ class FiniteDifference(ApproximationScheme):
 
         # Run the Finite Difference
         for delta, coeff in zip(deltas, coeffs):
-            results = self._run_sub_point(system, idx_info, delta, total, idx_range=idx_range,
+            results = self._run_sub_point(system, idx_info, delta, total, loc_idx=loc_idx,
                                           rel_element=rel_element)
 
             if rel_element:
                 for vec, idxs in idx_info:
                     if vec is not None and idxs is not None:
-                        results *= coeff[idxs - idx_range[0]]
+                        results *= coeff[loc_idx]
                         break
             else:
                 results *= coeff
@@ -361,7 +362,7 @@ class FiniteDifference(ApproximationScheme):
 
         return results_array
 
-    def _run_sub_point(self, system, idx_info, delta, total, idx_range, rel_element=False):
+    def _run_sub_point(self, system, idx_info, delta, total, loc_idx, rel_element=False):
         """
         Alter the specified inputs by the given delta, run the system, and return the results.
 
@@ -375,7 +376,7 @@ class FiniteDifference(ApproximationScheme):
             Perturbation amount.
         total : bool
             If True total derivatives are being approximated, else partials.
-        idx_range : range
+        loc_idx : range
             Range of vector indices for this wrt variable.
         rel_element : bool
             If True, then each element has a different delta.
@@ -390,7 +391,7 @@ class FiniteDifference(ApproximationScheme):
 
                 # Support rel_element stepsizing
                 if rel_element:
-                    local_delta = delta[idxs - idx_range[0]]
+                    local_delta = delta[loc_idx]
                 else:
                     local_delta = delta
 
