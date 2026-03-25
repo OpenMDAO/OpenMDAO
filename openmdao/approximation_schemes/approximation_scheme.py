@@ -439,7 +439,7 @@ class ApproximationScheme(object):
         Yields
         ------
         list
-            [[Vector, inds, loc_idx]]
+            [[Vector, inds, int]]
         """
         if self._totals_directions:
             yield vec_ind_list, vec_ind_list[0][1], 0
