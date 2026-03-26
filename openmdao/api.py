@@ -101,7 +101,7 @@ from openmdao.drivers.sampling.pyDOE_generators import \
     GeneralizedSubsetGenerator as GeneralizedSubsetAnalysisGenerator
 
 # Autoscalers
-from openmdao.drivers.autoscalers import Autoscaler
+from openmdao.drivers.autoscalers.autoscaler import Autoscaler
 
 # System-Building Tools
 from openmdao.utils.options_dictionary import OptionsDictionary

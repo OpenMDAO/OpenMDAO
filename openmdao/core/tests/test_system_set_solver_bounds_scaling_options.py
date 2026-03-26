@@ -305,10 +305,6 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         prob.final_setup()
         des_vars_using_add_design_var = prob.model.get_design_vars()
 
-        from pprint import pprint
-
-        pprint(des_vars_using_add_design_var)
-
         # then set the options using set_design_var_options
         prob = Problem()
         prob.model = SellarDerivatives()
@@ -320,7 +316,6 @@ class TestSystemSetDesignVarOptions(unittest.TestCase):
         prob.final_setup()
         des_vars_using_set_design_var_options = prob.model.get_design_vars()
 
-        self.maxDiff = None
         self.assertEqual(des_vars_using_add_design_var, des_vars_using_set_design_var_options)
 
         # Now do the same using scaler and adder

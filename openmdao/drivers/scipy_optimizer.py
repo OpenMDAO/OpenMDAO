@@ -62,8 +62,6 @@ _unsupported_optimizers = {'dogleg', 'trust-ncg'}
 # In principle now everything can work with "old-style"
 # These settings have no effect to the optimizers implemented before SciPy 1.1
 _supports_new_style = {'trust-constr', 'differential_evolution'}
-# if Version(scipy_version) >= Version("1.4"):
-#     _supports_new_style.add('differential_evolution')
 if Version(scipy_version) >= Version("1.14"):
     _supports_new_style.add('COBYQA')
 if Version(scipy_version) >= Version("1.11.0"):

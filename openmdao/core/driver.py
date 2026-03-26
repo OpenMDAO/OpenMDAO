@@ -11,7 +11,7 @@ import weakref
 import numpy as np
 import scipy.sparse as sp
 
-from openmdao.drivers.autoscalers import Autoscaler
+from openmdao.drivers.autoscalers.autoscaler import Autoscaler
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
 from openmdao.core.constants import INT_DTYPE, INF_BOUND, _SetupStatus
@@ -663,22 +663,6 @@ class Driver(object, metaclass=DriverMetaclass):
                 if not problem.model._use_derivatives:
                     issue_warning("Derivatives are turned off.  Skipping simul deriv coloring.",
                                   category=DerivativesWarning)
-
-        self._autoscaler.setup(driver=self)
-
-        # For autoscalers that do meaningful work in configure() and want the scaling report
-        # to reflect post-setup scaling, register a one-shot hook on configure().
-        # For the base Autoscaler (configure is a no-op), the scaling report fires via the
-        # existing Driver._compute_totals hook registered by _scaling_report_register().
-        if self._autoscaler.report_after_setup:
-            from openmdao.utils.hooks import _register_hook, _setup_hooks
-            from openmdao.visualization.scaling_viewer.scaling_report import (
-                _run_scaling_report_for_autoscaler,
-            )
-            _register_hook('configure', class_name='Autoscaler',
-                           inst_id=self._autoscaler._get_inst_id(),
-                           post=_run_scaling_report_for_autoscaler, ncalls=1)
-            _setup_hooks(self._autoscaler)
 
         # Pre-allocate optimizer vectors for all drivers
         try:
@@ -2389,6 +2373,8 @@ class Driver(object, metaclass=DriverMetaclass):
         status = -1 if problem is None else problem._metadata['setup_status']
         if status < _SetupStatus.POST_FINAL_SETUP:
             problem.final_setup()
+        
+        self._autoscaler.setup(driver=self, model_has_run=False)
 
         desvar_vals = {dv: val for dv, val in self.get_design_var_values().items()
                        if not any(fnmatchcase(dv, pat) for pat in exclude_desvars)}

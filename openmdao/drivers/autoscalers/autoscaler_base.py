@@ -1,9 +1,7 @@
-import weakref
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from openmdao.drivers.autoscalers.autoscaler_base import AutoscalerBase
 from openmdao.core.constants import INF_BOUND
 from openmdao.vectors.optimizer_vector import OptimizerVector
 
@@ -11,7 +9,7 @@ if TYPE_CHECKING:
     from openmdao.core.driver import Driver
 
 
-class Autoscaler(AutoscalerBase):
+class AutoscalerBase:
     """Transform optimizer variables between model and optimizer spaces.
 
     Base class of autoscalers that transform optimizer variables between model and optimizer
@@ -47,21 +45,13 @@ class Autoscaler(AutoscalerBase):
         Return True if setup of the autoscaler requires the
         model to be in an executed state.
 
-    apply_design_var_scaling(vec)
-        Scale the design variable vector from model space to the optimizer space.
-        Modifies vec in-place.
-
-    apply_design_var_unscaling(vec)
+    apply_vec_scaling(vec)
         Scale a vector from model space to optimizer space.
         Modifies vec in-place.
 
-    apply_constraint_scaling(vec)
-        Scale the objective vector from model space to the optimizer space.
-        Modifies vec in-place.
-
-    apply_objective_scaling(vec)
-        Scale the objective vector from model space to the optimizer space.
-        Modifies vec in-place.
+    apply_vec_unscaling(vec, name)
+        Return an unscaled copy of a single variable from optimizer space to model space.
+        Does not modify vec; returns a new array.
 
     apply_mult_unscaling(desvar_multipliers, con_multipliers)
         Unscale Lagrange multipliers from optimizer space to physical space.
@@ -134,38 +124,8 @@ class Autoscaler(AutoscalerBase):
             True if setup is being called after the model has been run. If not,
             and setup requires run model, it will be executed within setup.
         """
-        from openmdao.core.driver import RecordingDebugging
-
-        if self.setup_requires_run_model and not model_has_run:
-            with RecordingDebugging(driver._get_name(), driver.iter_count, self):
-                with driver._problem().model._relevance.nonlinear_active('iter'):
-                    driver._run_solve_nonlinear()
-                driver.iter_count += 1
-        
-        self._driver_ref = weakref.ref(driver)
-        self._var_meta : dict[str, dict[str, dict]] = {
-            'design_var': driver._designvars,
-            'constraint': driver._cons,
-            'objective': driver._objs
-        }
-
-        self._has_scaling = False
-
-        for voi_type in ['design_var', 'constraint', 'objective']:
-            for meta in self._var_meta[voi_type].values():
-                scaler, adder = meta['total_scaler'], meta['total_adder']
-                self._has_scaling = self._has_scaling \
-                    or (scaler is not None) \
-                    or (adder is not None)
-
-        # Compute and cache scaled bounds vectors for design vars and constraints
-        self._scaled_lower = {}
-        self._scaled_upper = {}
-        self._scaled_equals = {}
-        for voi_type in ['design_var', 'constraint']:
-            self._scaled_lower[voi_type], \
-                self._scaled_upper[voi_type], \
-                self._scaled_equals[voi_type] = self._compute_scaled_bounds(voi_type)
+        raise NotImplementedError(f'Class {type(self).__name__} does not '
+                                  'implement setup.')
 
     @property
     def has_scaling(self) -> bool:
@@ -177,7 +137,8 @@ class Autoscaler(AutoscalerBase):
         bool
             True if any scaling is applied, otherwise False.
         """
-        return self._has_scaling
+        raise NotImplementedError(f'Class {type(self).__name__} does not '
+                                  'implement has_scaling.')
     
     @property
     def setup_requires_run_model(self) -> bool:
@@ -188,14 +149,15 @@ class Autoscaler(AutoscalerBase):
         various inputs and outputs of the model.
 
         This property is used to tell the driver that the run_model needs to be
-        called before configuring the driver.
+        called before configuring the autoscaler.
 
         Returns
         -------
         bool
             True if the driver must execute run_model before the autoscaler's configure method.
         """
-        return False
+        raise NotImplementedError(f'Class {type(self).__name__} does not '
+                                  'implement setup_requires_run_model.')
 
     @property
     def report_after_setup(self) -> bool:
@@ -369,9 +331,8 @@ class Autoscaler(AutoscalerBase):
             Scaled equality values. Non-equality constraint entries contain np.nan as
             a sentinel. None when voi_type='design_var'.
         """
-        return (self._scaled_lower[voi_type],
-                self._scaled_upper[voi_type],
-                self._scaled_equals[voi_type])
+        raise NotImplementedError(f'Class {type(self).__name__} does not '
+                                  'implement get_bounds_scaling.')
 
     def _apply_vec_unscaling(self, vec: 'OptimizerVector'):
         """
@@ -415,7 +376,8 @@ class Autoscaler(AutoscalerBase):
         vec : OptimizerVector
             An OptimizerVector with voi_type='design_var'.
         """
-        self._apply_vec_unscaling(vec)
+        raise NotImplementedError(f'Class {type(self).__name__} does not '
+                                  'implement apply_design_var_unscaling.')
 
     def apply_design_var_scaling(self, vec: 'OptimizerVector'):
         """
@@ -426,22 +388,24 @@ class Autoscaler(AutoscalerBase):
         vec : OptimizerVector
             An OptimizerVector with voi_type='design_var'.
         """
-        self._apply_vec_scaling(vec)
+        raise NotImplementedError(f'Class {type(self).__name__} does not '
+                                  'implement apply_design_var_scaling.')
 
     def apply_constraint_scaling(self, vec: 'OptimizerVector'):
         """
-        Scale the constraints from the model space to the optimizer space.
+        Unscale the design variables from the optimizer space to the model space.
 
         Parameters
         ----------
         vec : OptimizerVector
-            An OptimizerVector with voi_type='constraint'.
+            An OptimizerVector with voi_type='design_var'.
         """
-        self._apply_vec_scaling(vec)
+        raise NotImplementedError(f'Class {type(self).__name__} does not '
+                                  'implement apply_constraint_scaling.')
 
     def apply_objective_scaling(self, vec: 'OptimizerVector'):
         """
-        Scale the objective from the model space to the optimizer space.
+        Unscale the design variables from the optimizer space to the model space.
 
         Notes
         -----
@@ -456,7 +420,8 @@ class Autoscaler(AutoscalerBase):
         vec : OptimizerVector
             An OptimizerVector with voi_type='objective'.
         """
-        self._apply_vec_scaling(vec)
+        raise NotImplementedError(f'Class {type(self).__name__} does not '
+                                  'implement apply_objective_scaling.')
     
     def _apply_vec_scaling(self, vec: 'OptimizerVector'):
         """
@@ -563,27 +528,8 @@ class Autoscaler(AutoscalerBase):
             A reference to the con_multipliers given on input. The values of the multipliers
             were unscaled in-place.
         """
-        if not self._has_scaling:
-            return desvar_multipliers, con_multipliers
-
-        # Get the objective scaler from cached combined scalers
-        obj_meta = self._var_meta['objective']
-        obj_name = list(obj_meta.keys())[0]
-        obj_scaler = obj_meta[obj_name]['total_scaler'] or 1.0
-
-        if desvar_multipliers:
-            for name, mult in desvar_multipliers.items():
-                # Get the design variable scaler from cached combined scalers
-                scaler = self._var_meta['design_var'][name]['total_scaler'] or 1.0
-                mult *= scaler / obj_scaler
-
-        if con_multipliers:
-            for name, mult in con_multipliers.items():
-                # Get the constraint scaler from cached combined scalers
-                scaler = self._var_meta['constraint'][name]['total_scaler'] or 1.0
-                mult *= scaler / obj_scaler
-
-        return desvar_multipliers, con_multipliers
+        raise NotImplementedError(f'Class {type(self).__name__} does not '
+                                  'implement apply_mult_scaling.')
 
     def apply_jac_scaling(self, jac_dict):
         """
@@ -613,62 +559,5 @@ class Autoscaler(AutoscalerBase):
         When a scaler is None (identity transformation), it's treated as 1.0 for
         multiplication and division.
         """
-        if not self._has_scaling:
-            return
-
-        for key, jac_block in jac_dict.items():
-            # Handle both nested dict and flat dict formats
-            if isinstance(key, tuple):
-                # Flat dict format: key is (output_name, input_name)
-                out_name, in_name = key
-            else:
-                # Nested dict format: key is output_name, need to iterate inner dicts
-                out_name = key
-                for in_name, block in jac_block.items():
-                    # Determine output scaler
-                    if out_name in self._var_meta['objective']:
-                        out_scaler = self._var_meta['objective'][out_name]['total_scaler']
-                    elif out_name in self._var_meta['constraint']:
-                        out_scaler = self._var_meta['constraint'][out_name]['total_scaler']
-                    else:
-                        # Unknown output, skip scaling this row
-                        continue
-
-                    # Determine input scaler
-                    if in_name in self._var_meta['design_var']:
-                        in_scaler = self._var_meta['design_var'][in_name]['total_scaler']
-                    else:
-                        # Unknown input, skip scaling this entry
-                        continue
-
-                    # Scale the Jacobian block in-place: J_scaled = J_model * out_scaler / in_scaler
-                    # Use in-place operations to preserve view relationship with underlying array
-                    if out_scaler is not None:
-                        block[...] = (out_scaler * block.T).T
-                    if in_scaler is not None:
-                        block *= 1.0 / in_scaler
-                continue
-
-            # Handle flat dict format (key is a tuple)
-            # Determine output scaler
-            if out_name in self._var_meta['objective']:
-                out_scaler = self._var_meta['objective'][out_name]['total_scaler']
-            elif out_name in self._var_meta['constraint']:
-                out_scaler = self._var_meta['constraint'][out_name]['total_scaler']
-            else:
-                # Unknown output, skip scaling this entry
-                continue
-
-            # Determine input scaler
-            if in_name in self._var_meta['design_var']:
-                in_scaler = self._var_meta['design_var'][in_name]['total_scaler']
-            else:
-                # Unknown input, skip scaling this entry
-                continue
-
-            # Scale the Jacobian block in-place: J_scaled = J_model * out_scaler / in_scaler
-            # Must use in-place operations to preserve view relationship with underlying array
-            if out_scaler is not None:
-                jac_block[...] = (out_scaler * jac_block.T).T
-            if in_scaler is not None:
-                jac_block *= 1.0 / in_scaler
+        raise NotImplementedError(f'Class {type(self).__name__} does not '
+                                  'implement apply_jac_scaling.')

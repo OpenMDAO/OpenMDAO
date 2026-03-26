@@ -2722,7 +2722,7 @@ class TestSqliteRecorder(unittest.TestCase):
         expected_data = ((case_name, (t0, t1), expected_derivs),)
         assertProblemDerivDataRecorded(self, prob.get_outputs_dir() / self.filename, expected_data, self.eps)
 
-    def test_simple_paraboloid_scaled_desvars(self):
+    def test_simple_paraboloid_unscaled_desvars(self):
         prob = om.Problem()
         model = prob.model
 

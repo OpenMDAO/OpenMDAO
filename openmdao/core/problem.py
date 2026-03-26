@@ -847,7 +847,7 @@ class Problem(object, metaclass=ProblemMetaclass):
         ----------
         of : list of str
             Variables whose derivatives will be computed.
-        wrt : list of str
+        wrt : list of str 
             Derivatives will be computed with respect to these variables.
         mode : str
             Derivative direction ('fwd' or 'rev').

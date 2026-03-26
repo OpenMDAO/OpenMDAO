@@ -2069,7 +2069,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 self.assertTrue(key in case_type._cases)
                 self.assertEqual(key, case_type._cases[key].name)
 
-    def test_simple_paraboloid_scaled_desvars(self):
+    def test_simple_paraboloid_unscaled_desvars(self):
 
         prob = om.Problem()
         model = prob.model

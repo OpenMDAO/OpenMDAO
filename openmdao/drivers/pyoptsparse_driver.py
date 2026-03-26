@@ -632,14 +632,9 @@ class pyOptSparseDriver(Driver):
                 else:
                     print(sol)
 
-        # Pull optimal parameters back into framework and re-run, so that
-        # framework is left in the right final state
-        dv_dict = sol.getDVs()
-
         # Set the design variable vector with scaled values, then use _set_design_vars to
         # properly unscale and set them in the model
-        dv_vec = self._vectors['design_var']
-        dv_vec.set_data(dv_dict, driver_scaling=True)
+        self._vectors['design_var'].set_data(sol.getDVs(), driver_scaling=True)
         self._set_design_vars(driver_scaling=True)
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
