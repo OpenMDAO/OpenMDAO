@@ -33,6 +33,7 @@ class BrentSolver(NonlinearSolver):
         super().__init__(**kwargs)
 
         self.state_target = ''
+        self.norm = 1.0
 
     def _declare_options(self):
         """
@@ -127,6 +128,7 @@ class BrentSolver(NonlinearSolver):
         print_flag = system.comm.rank == 0 or os.environ.get('USE_PROC_FILES')
 
         prefix = self._solver_info.prefix + self.SOLVER
+        norm = self.norm
 
         # Solver terminated early because a Nan in the norm doesn't satisfy the while-loop
         # conditionals.
@@ -166,7 +168,10 @@ class BrentSolver(NonlinearSolver):
             'rtol': self.options['rtol'],
         }
 
-        brentq(self._eval, **kwargs)
+        xstar = brentq(self._eval, **kwargs)
+
+        # Run the final point because last brentq point is a bracketing point.
+        self._eval(xstar, system)
 
     def _eval(self, x, system):
         """Callback function for evaluating f(x)"""
@@ -190,6 +195,7 @@ class BrentSolver(NonlinearSolver):
                 norm0 = 1
             rec.rel = norm / norm0
 
+        self.norm = norm
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
         return system._residuals[self.state_target]
