@@ -687,6 +687,8 @@ class Driver(object, metaclass=DriverMetaclass):
             'objective': obj_vec,
         }
 
+        self._autoscaler.setup(driver=self)
+
     def _split_dvs(self, model):
         """
         Determine which design vars are relevant to linear constraints vs nonlinear constraints.
@@ -1394,8 +1396,6 @@ class Driver(object, metaclass=DriverMetaclass):
         self.result.reset()
         with RecordingDebugging(self._get_name(), self.iter_count, self):
             self._run_solve_nonlinear()
-
-        self._autoscaler.setup(driver=self)
 
         self.iter_count += 1
 
@@ -2374,8 +2374,6 @@ class Driver(object, metaclass=DriverMetaclass):
         if status < _SetupStatus.POST_FINAL_SETUP:
             problem.final_setup()
         
-        self._autoscaler.setup(driver=self, model_has_run=False)
-
         desvar_vals = {dv: val for dv, val in self.get_design_var_values().items()
                        if not any(fnmatchcase(dv, pat) for pat in exclude_desvars)}
 

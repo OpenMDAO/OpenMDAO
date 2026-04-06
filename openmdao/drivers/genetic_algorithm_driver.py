@@ -298,9 +298,6 @@ class SimpleGADriver(Driver):
         Pm = self.options['Pm']  # if None, it will be calculated in execute_ga()
         Pc = self.options['Pc']
 
-        # Setup the autoscaler
-        self._autoscaler.setup(driver=self, model_has_run=False)
-
         self._check_for_missing_objective()
         self._check_for_invalid_desvar_values()
 

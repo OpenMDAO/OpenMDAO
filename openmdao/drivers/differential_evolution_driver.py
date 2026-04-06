@@ -269,9 +269,6 @@ class DifferentialEvolutionDriver(Driver):
         self._check_for_missing_objective()
         self._check_for_invalid_desvar_values()
 
-        # Setup the autoscaler
-        self._autoscaler.setup(driver=self, model_has_run=False)
-
         # Size design variables.
         desvars = self._designvars
         desvar_vals = self.get_design_var_values()

@@ -14,83 +14,8 @@ if TYPE_CHECKING:
 class Autoscaler(AutoscalerBase):
     """Transform optimizer variables between model and optimizer spaces.
 
-    Base class of autoscalers that transform optimizer variables between model and optimizer
-    spaces.
-
-    Autoscalers apply scaling transformations to **continuous** design variables, constraints,
-    and objectives, converting between physical (model) space and optimizer (scaled) space.
-    They also handle transformation of Lagrange multipliers from optimizer space back to
-    physical (model) space and of jacobians from model space to optimizer space.
-
-    Discrete design variables, constraints, and objectives are not scaled/unscaled by
-    autoscalers.
-
-    This autoscaler performs an affine scaling:
-        x_scaled = (x_model' + adder) * scaler
-
-    Here x_model' is assumed to be the value of the variable in the model but converted
-    to the units specified for the variable of interest (design variable, constraint, or
-    objective). If the units of the VOI are `None`, then x_model' is the same as the value
-    of the associated output in the model.
-
-    If implementing specialized autoscaler algorithms that derive from this class, the
-    developer could choose to utilize or ignore the scaling applied with the optimizer
-    variables via scaler/adder/ref0/ref.
-
-    Subclasses must implement the following methods:
-
-    setup(driver)
-        Initialize the autoscaler with driver metadata.
-        Called once at the start of the driver.run method.
-    
-    setup_requires_run_model()
-        Return True if setup of the autoscaler requires the
-        model to be in an executed state.
-
-    apply_design_var_scaling(vec)
-        Scale the design variable vector from model space to the optimizer space.
-        Modifies vec in-place.
-
-    apply_design_var_unscaling(vec)
-        Scale a vector from model space to optimizer space.
-        Modifies vec in-place.
-
-    apply_constraint_scaling(vec)
-        Scale the objective vector from model space to the optimizer space.
-        Modifies vec in-place.
-
-    apply_objective_scaling(vec)
-        Scale the objective vector from model space to the optimizer space.
-        Modifies vec in-place.
-
-    apply_mult_unscaling(desvar_multipliers, con_multipliers)
-        Unscale Lagrange multipliers from optimizer space to physical space.
-        Modifies the input dictionaries in-place.
-    
-    apply_jac_scaling(jac_dict)
-        Scale the computed total jacobian from the model/physical space to optimizer space.
-
-    This flexible interface allows autoscalers to choose any implementation strategy,
-    from simple loops to complex matrix operations.
-
-    Attributes
-    ----------
-    _var_meta : dict[str, dict[str, dict]]
-        Dictionary mapping variable of interest (VOI) type ('design_var', 'constraint',
-        'objective') to the corresponding metadata dictionaries from the driver.
-    _has_scaling : bool
-        Flag indicating whether any scaling is applied to design variables, constraints,
-        or objectives.
-    _scaled_lower : dict
-        Dictionary mapping VOI type to scaled lower bound arrays for design variables and
-        constraints.
-    _scaled_upper : dict
-        Dictionary mapping VOI type to scaled upper bound arrays for design variables and
-        constraints.
-    _scaled_equals : dict
-        Dictionary mapping VOI type to scaled equality constraint value arrays.
-    _driver_ref : weakref or None
-        Weak reference to the driver this autoscaler belongs to. Set during setup().
+    This is the default Autoscaler in OpenMDAO that scales optimization variables based
+    on the user-provided scaler/adder/ref0/ref.
 
     """
 
@@ -122,7 +47,7 @@ class Autoscaler(AutoscalerBase):
             return None
         return f'{driver._get_inst_id()}.autoscaler'
 
-    def setup(self, driver: 'Driver', model_has_run=False):
+    def setup(self, driver: 'Driver'):
         """
         Perform setup of autoscaler during final setup of the problem.
 
@@ -136,7 +61,7 @@ class Autoscaler(AutoscalerBase):
         """
         from openmdao.core.driver import RecordingDebugging
 
-        if self.setup_requires_run_model and not model_has_run:
+        if self.setup_requires_run_model:
             with RecordingDebugging(driver._get_name(), driver.iter_count, self):
                 with driver._problem().model._relevance.nonlinear_active('iter'):
                     driver._run_solve_nonlinear()

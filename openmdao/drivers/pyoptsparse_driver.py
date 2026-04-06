@@ -335,7 +335,6 @@ class pyOptSparseDriver(Driver):
                                ' but the selected optimizer ({0}) does not support'
                                ' multiple objectives.'.format(self.options['optimizer']))
 
-        self._model_ran = False
         self._setup_tot_jac_sparsity()
 
     def run(self):
@@ -383,7 +382,6 @@ class pyOptSparseDriver(Driver):
             self.iter_count += 1
 
         self._model_ran = model_ran
-        self._autoscaler.setup(self, model_has_run=model_ran)
         self._coloring_info.run_model = not model_ran
 
         comm = None if isinstance(problem.comm, FakeComm) else problem.comm

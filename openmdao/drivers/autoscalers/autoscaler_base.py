@@ -45,13 +45,21 @@ class AutoscalerBase:
         Return True if setup of the autoscaler requires the
         model to be in an executed state.
 
-    apply_vec_scaling(vec)
-        Scale a vector from model space to optimizer space.
+    apply_design_var_scaling(vec)
+        Scale the design variables from model space to optimizer space.
         Modifies vec in-place.
 
-    apply_vec_unscaling(vec, name)
-        Return an unscaled copy of a single variable from optimizer space to model space.
+    apply_design_var_unscaling(vec)
+        Unscale the design variables from the optimizer space to the model space.
         Does not modify vec; returns a new array.
+    
+    apply_constraint_scaling(vec)
+        Scale the constraints from model space to optimizer space.
+        Modifies vec in-place.
+    
+    apply_objective_scaling(vec)
+        Scale the objectives from model space to optimizer space.
+        Modifies vec in-place.
 
     apply_mult_unscaling(desvar_multipliers, con_multipliers)
         Unscale Lagrange multipliers from optimizer space to physical space.
@@ -112,7 +120,7 @@ class AutoscalerBase:
             return None
         return f'{driver._get_inst_id()}.autoscaler'
 
-    def setup(self, driver: 'Driver', model_has_run=False):
+    def setup(self, driver: 'Driver'):
         """
         Perform setup of autoscaler during final setup of the problem.
 
@@ -120,9 +128,6 @@ class AutoscalerBase:
         ----------
         driver : Driver
             The driver associated with this autoscaler.
-        model_has_run: bool
-            True if setup is being called after the model has been run. If not,
-            and setup requires run model, it will be executed within setup.
         """
         raise NotImplementedError(f'Class {type(self).__name__} does not '
                                   'implement setup.')
@@ -334,39 +339,6 @@ class AutoscalerBase:
         raise NotImplementedError(f'Class {type(self).__name__} does not '
                                   'implement get_bounds_scaling.')
 
-    def _apply_vec_unscaling(self, vec: 'OptimizerVector'):
-        """
-        Unscale the optmization variables from the optimizer space to the model space, in place.
-
-        This method will generally be applied to each design variable at every iteration.
-
-        Parameters
-        ----------
-        vec : OptimizerVector
-            A vector of the scaled optimization variables.
-
-        Returns
-        -------
-        OptimizerVector
-            The unscaled optimization vector.
-        """
-        if not vec.driver_scaling:
-            return vec
-        
-        for name in vec:
-            # Use cached combined scaler/adder - includes both unit conversion and user scaling
-            scaler = self._var_meta[vec.voi_type][name]['total_scaler']
-            adder = self._var_meta[vec.voi_type][name]['total_adder']
-
-            # Unscale: x_model = x_optimizer / scaler - adder
-            if scaler is not None:
-                vec[name] /= scaler
-            if adder is not None:
-                vec[name] -= adder
-        vec._driver_scaling = False
-
-        return vec
-
     def apply_design_var_unscaling(self, vec: 'OptimizerVector'):
         """
         Unscale the design variables from the optimizer space to the model space.
@@ -423,26 +395,6 @@ class AutoscalerBase:
         raise NotImplementedError(f'Class {type(self).__name__} does not '
                                   'implement apply_objective_scaling.')
     
-    def _apply_vec_scaling(self, vec: 'OptimizerVector'):
-        """
-        Scale the vector from the model space to the optimizer space.
-
-        Scaling is applied to the optimizer vector in-place.
-        """
-        if vec.driver_scaling:
-            return vec
-        for name in vec:
-            # Use cached combined scaler/adder - includes both unit conversion and user scaling
-            scaler = self._var_meta[vec.voi_type][name]['total_scaler']
-            adder = self._var_meta[vec.voi_type][name]['total_adder']
-
-            # Scale: x_optimizer = (x_model + adder) * scaler
-            if adder is not None:
-                vec[name] += adder
-            if scaler is not None:
-                vec[name] *= scaler
-        vec._driver_scaling = True
-
     def apply_mult_unscaling(self, desvar_multipliers, con_multipliers):
         """
         Unscale the Lagrange multipliers from optimizer space to model space.

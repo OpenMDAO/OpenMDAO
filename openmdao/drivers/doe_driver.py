@@ -166,11 +166,6 @@ class DOEDriver(Driver):
         self.iter_count = 0
         self._quantities = []
 
-        # Setup the autoscaler.
-        # We don't need it for scaling but the general
-        # get_objective_values() behavior depends upon it.
-        self._autoscaler.setup(driver=self)
-
         # set driver name with current generator
         self._set_name()
 
