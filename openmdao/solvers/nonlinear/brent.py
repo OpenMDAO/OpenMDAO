@@ -99,7 +99,6 @@ class BrentSolver(NonlinearSolver):
         """
         system = self._system()
 
-        maxiter = self.options['maxiter']
         atol = self.options['atol']
         rtol = self.options['rtol']
         iprint = self.options['iprint']
@@ -176,7 +175,7 @@ class BrentSolver(NonlinearSolver):
     def _eval(self, x, system):
         """Callback function for evaluating f(x)"""
 
-        system.set_val(self.state_target, val=x)
+        system._outputs[self.state_target] = x
         norm0 = self._norm0
 
         # Run the model.

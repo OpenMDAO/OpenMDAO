@@ -78,7 +78,7 @@ class TestBrentSolver(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(self, p.get_val('x'), 2.06720359226, 1e-6)
+        assert_near_equal(self, p.get_val('x'), 2.06720359226, 1e-8)
 
     #def test_brent_analysis_error(self):
 
