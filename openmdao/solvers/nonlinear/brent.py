@@ -96,6 +96,8 @@ class BrentSolver(NonlinearSolver):
     def _solve(self):
         """
         Run the iterative solver.
+
+        The base class is overridden because scipy brentq controls the iteration.
         """
         system = self._system()
 
