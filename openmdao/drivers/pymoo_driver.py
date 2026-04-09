@@ -54,19 +54,23 @@ See the pymoo documentation at https://pymoo.org/index.html for detailed informa
 on algorithm-specific options and capabilities.
 """
 import sys
+import importlib
 import numpy as np
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.constants import INF_BOUND
 try:
-    import pymoo as pm
-    problem = pm.core.problem.ElementwiseProblem
+    import pymoo
+    from pymoo.core.problem import ElementwiseProblem as problem
+    from pymoo.optimize import minimize
 except ImportError:
     pm = None
     problem = object
+    minimize = None
 except Exception as err:
     pm = err
     problem = object
+    minimize = None
 
 
 # Algorithms that support constraints
@@ -196,6 +200,11 @@ class pymooProblem(problem):
             Unused keyword arguments passed by pymoo.
         """
         model = self.driver._problem().model
+
+        # Start empty and need to be populated
+        out['F'] = np.empty(self.obj_info['size'])
+        out['G'] = np.empty(len(self.ieq_con_info['bound']))
+        out['H'] = np.empty(len(self.eq_con_info['equals']))
 
         try:
             self._update_desvar_values(x)
@@ -328,13 +337,13 @@ class pymooDriver(Driver):
         **kwargs : dict of keyword arguments
             Keyword arguments that will be mapped into the Driver options.
         """
-        if pm is None:
+        if pymoo is None:
             raise RuntimeError('pymooDriver is not available, pymoo is not'
                                ' installed.')
 
-        if isinstance(pm, Exception):
+        if isinstance(pymoo, Exception):
             # there is some other issue with the pymoo installation
-            raise pm
+            raise pymoo
 
         super().__init__(**kwargs)
 
@@ -476,18 +485,6 @@ class pymooDriver(Driver):
             x_info['upper'][current_indices] = meta['upper']
             current_idx += size
 
-        # Check for constraints that don't depend on any design variables
-        # relevance._no_dv_responses contains outputs that are not affected by any design variables
-        relevance = model._relevance
-        bad_resps = [n for n in relevance._no_dv_responses if n in self._cons]
-        bad_cons = [n for n, m in self._cons.items() if m['source'] in bad_resps]
-        if bad_cons:
-            issue_warning(f'Constraint(s) {sorted(bad_cons)} do not depend on any design '
-                          'variables and were not added to the optimization.')
-            for name in bad_cons:
-                del self._cons[name]
-                del self._responses[name]
-
         # Determine total number of constraints
         neqcons = 0
         nieqcons = 0
@@ -512,7 +509,6 @@ class pymooDriver(Driver):
         current_eq_idx = 0
         current_ieq_idx = 0
         if opt in _constraint_optimizers:
-
             for name, meta in self._cons.items():
                 if meta['indices'] is not None:
                     size = meta['indices'].indexed_src_size
@@ -577,7 +573,7 @@ class pymooDriver(Driver):
             run_settings = {**self.run_settings}
             if "verbose" not in self.run_settings:
                 run_settings['verbose'] = self.options['disp']
-            self.pymoo_results = pm.optimize.minimize(
+            self.pymoo_results = minimize(
                 problem=self._moo_prob,
                 algorithm=optimizer,
                 **run_settings,
@@ -636,9 +632,9 @@ class pymooDriver(Driver):
             The pymoo algorithm class corresponding to ``alg_name``.
         """
         if alg_name in _single_obj_optimizers:
-            from pymoo.algorithms.soo import nonconvex as alg_lib
+            base = 'pymoo.algorithms.soo.nonconvex'
         else:
-            from pymoo.algorithms import moo as alg_lib
+            base = 'pymoo.algorithms.moo'
 
         # The script where the algorithm classes are located are all just a
         # lowercase of the algorithm name, except for the specifically called
@@ -649,9 +645,106 @@ class pymooDriver(Driver):
             'AGEMOEA': 'age',
             'SMSEMOA': 'sms',
         }
-        if alg_name not in non_default_mapping:
-            alg_class = getattr(getattr(alg_lib, alg_name.lower()), alg_name)
-        else:
-            alg_class = getattr(getattr(alg_lib, non_default_mapping[alg_name]), alg_name)
+        module_name = non_default_mapping.get(alg_name, alg_name.lower())
+        module = importlib.import_module(f'{base}.{module_name}')
+        alg_class = getattr(module, alg_name)
 
         return alg_class
+
+
+import openmdao.api as om
+
+
+class Paraboloid(om.ExplicitComponent):
+    """
+    Evaluates a paraboloid function for testing.
+
+    Computes f(x,y) = (x[0] + x[1] - 3)^2 + x[0]*y + (y + 4)^2 - 3
+
+    where x is a 3-element array.
+    """
+
+    def setup(self):
+        self.add_input('x', val=np.zeros(2))
+        self.add_input('y', val=0.0)
+        self.add_output('f_xy', val=0.0)
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        y = inputs['y']
+
+        outputs['f_xy'] = ((x[0] + x[1] - 3.0)**2 + x[0] * y + (y + 4.0)**2 - 3.0)
+
+
+class Con(om.ExplicitComponent):
+    """
+    Simple constraint component for testing.
+
+    Computes g = x[0] + x[1] + y where x is a 2-element array.
+    """
+
+    def setup(self):
+        self.add_input('x', val=np.zeros(2))
+        self.add_input('y', val=0.0)
+        self.add_output('g', val=0.0)
+
+    def compute(self, inputs, outputs):
+        outputs['g'] = inputs['x'][0] + inputs['x'][1] + inputs['y']
+
+
+if __name__ == '__main__':
+    from pymoo.operators.mutation.pm import PolynomialMutation
+    from pymoo.operators.crossover.sbx import SBX
+
+    # build the model
+    prob = om.Problem()
+    prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
+
+    # define the component whose output will be constrained
+    prob.model.add_subsystem('const', Con(), promotes_inputs=['x', 'y'])
+
+    # Design variables 'x', 'y', and 'z' span components (connected due to our
+    # promotion), so we need to provide a common initial value for them. For
+    # these variables we have to use "set_input_defaults" because the variable
+    # connects to both "const" and "parab", but the initial values from "const"
+    # and "parab" are both different. So before we are able to use prob.set_val()
+    # for these variables we first have to call "set_input_defaults". Note
+    # that we would also have to do this and specify the units of the common
+    # initial value if "const" and "parab" had different units for them so that
+    # way it knows which units to use if "set_val" is ever used. I'm pretty
+    # sure that if a promoted variable name does not span multiple components
+    # (like "w") then this doesn't do anything and have to set whatever initial
+    # value I want with set_val.
+    prob.model.set_input_defaults('x', np.array([3.0, 3.0]))
+    prob.model.set_input_defaults('y', -4.0)
+
+    # setup the optimization
+    prob.driver = pymooDriver()
+    prob.driver.options['optimizer'] = 'GA'
+    # Optimizer specific settings
+    prob.driver.opt_settings = {
+        'pop_size': 200,
+        'eliminate_duplicates': True,
+        'mutation': PolynomialMutation(prob=0.2, eta=30),
+        'crossover': SBX(prob=0.9, prob_var=0.5, eta=20)
+    }
+    prob.driver.run_settings = {
+        'termination': ('n_gen', 300),
+        'seed': 1,
+    }
+    prob.model.add_design_var('x', lower=-50, upper=50)
+    prob.model.add_design_var('y', lower=-50, upper=50)
+    prob.model.add_objective('parab.f_xy')
+
+    # to add the constraint to the model
+    prob.model.add_constraint('const.g', lower=0., upper=10.)
+    # prob.model.add_constraint('y', equals=10.)
+
+    prob.setup()
+
+    prob.run_driver()
+
+    print(prob.get_val('x'))
+    print(prob.get_val('y'))
+    print(prob.get_val('parab.f_xy'))
+    print(prob.get_val('const.g'))
