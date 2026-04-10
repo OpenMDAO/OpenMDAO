@@ -57,7 +57,6 @@ import sys
 import importlib
 import numpy as np
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.constants import INF_BOUND
 try:
     import pymoo
@@ -137,6 +136,8 @@ class pymooProblem(problem):
         Equality constraint metadata.
     obj_info : dict
         Objective metadata.
+    fail : bool
+        Flag set to True if an exception occurred during evaluation.
     """
 
     def __init__(self, driver, x_info, ieq_con_info, eq_con_info, obj_info):
@@ -161,6 +162,7 @@ class pymooProblem(problem):
         self.ieq_con_info = ieq_con_info
         self.eq_con_info = eq_con_info
         self.obj_info = obj_info
+        self.fail = False
 
         super().__init__(
             # Integer value representing the number of design variables.
@@ -225,9 +227,9 @@ class pymooProblem(problem):
             for name, indices, is_upper in ieq_zip:
                 bound = self.ieq_con_info['bound'][indices]
                 if is_upper:
-                    out['G'][indices] = bound - con_vals[name].flatten()
-                else:
                     out['G'][indices] = con_vals[name].flatten() - bound
+                else:
+                    out['G'][indices] = bound - con_vals[name].flatten()
             for name, indices in eq_zip:
                 equals = self.eq_con_info['equals'][indices]
                 out['H'][indices] = equals - con_vals[name].flatten()
@@ -441,9 +443,9 @@ class pymooDriver(Driver):
         Returns
         -------
         bool
-            True if the optimization found a feasible solution, False otherwise.
+            Failure flag; True if the optimization failed to find a feasible
+            solution, False if successful.
         """
-        success = False
         self.result.reset()
         prob = self._problem()
         opt = self.options['optimizer']
@@ -558,7 +560,7 @@ class pymooDriver(Driver):
 
         # Run optimization
         try:
-            # Build modOpt Problem wrapper
+            # Build pymoo problem wrapper
             self._moo_prob = pymooProblem(
                 driver=self,
                 x_info=x_info,
@@ -580,12 +582,15 @@ class pymooDriver(Driver):
             )
 
             # Extract optimal design variables and success flag from optimizer result
-            # Different optimizers return results in different formats
+            # Pymoo sets result.X to None when no feasible solution is found.
+            # Feasibility is determined per-individual using cv_eps=0.0 (exact),
+            # though equality constraint violations up to 1e-4 are already absorbed
+            # into the CV calculation by pymoo's default cv_eq config.
             x_opt = self.pymoo_results.X
             F_opt = self.pymoo_results.F
-            success = self.pymoo_results.X is not None
+            self.fail = x_opt is None
             if opt in _single_obj_optimizers:
-                if success:
+                if x_opt is not None:
                     # Update OpenMDAO design variables with optimal values
                     for name, indices in zip(x_info['vars'], x_info['indices']):
                         self.set_design_var(name, x_opt[indices])
@@ -615,7 +620,7 @@ class pymooDriver(Driver):
         if self._exc_info is not None:
             self._reraise()
 
-        return success
+        return self.fail
 
     def get_algorithm(self, alg_name):
         """
