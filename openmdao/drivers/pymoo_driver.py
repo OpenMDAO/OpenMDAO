@@ -399,7 +399,7 @@ class pymooDriver(Driver):
         self.supports['linear_constraints'] = True
         self.supports['linear_only_designvars'] = True
         self.supports['multiple_objectives'] = True
-        self.supports['integer_design_vars'] = False
+        self.supports['integer_design_vars'] = True
 
         # What we don't support
         self.supports['active_set'] = False
