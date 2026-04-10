@@ -49,6 +49,11 @@ Run-level settings accepted by pymoo's ``algorithm.setup()`` (e.g. ``seed``,
 For multi-objective optimizations the Pareto front is stored on the driver in
 ``driver.pareto['X']`` and ``driver.pareto['F']`` after ``run_driver()`` completes.
 
+Population-level MPI parallelism is available by setting ``run_parallel=True``.
+Ranks are divided into groups of ``procs_per_model`` (default 1), where each group
+cooperates on a single model evaluation. MPI parallelism is only beneficial when
+individual model evaluations are computationally expensive.
+
 For additional processing, the pymoo results object can be accessed at the
 ``pymoo``_results attribute on the driver.
 
@@ -60,6 +65,7 @@ import importlib
 import numpy as np
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.constants import INF_BOUND
+from openmdao.utils.mpi import MPI
 try:
     import pymoo
     from pymoo.core.problem import ElementwiseProblem as problem
@@ -113,6 +119,136 @@ CITATIONS = """
 """
 
 
+class MPIElementwiseRunner:
+    """
+    Elementwise evaluation runner that distributes population members across MPI ranks.
+
+    **Background**
+
+    pymoo's ``ElementwiseProblem._evaluate`` evaluates one individual at a time.
+    The elementwise runner is what calls ``_evaluate`` repeatedly to cover the whole
+    population. The default runner, ``LoopedElementwiseEvaluation``, does this
+    sequentially on a single process::
+
+        return [f(x) for x in X]
+
+    This runner replaces that loop with a parallel pattern using MPI.
+
+    **How it works**
+
+    The total MPI ranks are divided into *groups* of ``procs_per_model`` ranks each.
+    With 8 total ranks and ``procs_per_model=2``, there are 4 groups:
+
+    - Group 0: ranks 0 and 4
+    - Group 1: ranks 1 and 5
+    - Group 2: ranks 2 and 6
+    - Group 3: ranks 3 and 7
+
+    The group a rank belongs to is called its *color*: ``color = rank % n_groups``.
+    All ranks in the same group share a model sub-communicator (set up in
+    ``_setup_comm`` before ``Problem.setup()`` runs) so that models with parallel
+    components (e.g. ``ParallelGroup``) receive the right communicator.
+
+    At each generation, individuals in the population are distributed round-robin
+    across groups. With 100 individuals and 4 groups:
+
+    - Group 0 (ranks 0, 4) evaluates individuals 0, 4, 8, ..., 96
+    - Group 1 (ranks 1, 5) evaluates individuals 1, 5, 9, ..., 97
+    - Group 2 (ranks 2, 6) evaluates individuals 2, 6, 10, ..., 98
+    - Group 3 (ranks 3, 7) evaluates individuals 3, 7, 11, ..., 99
+
+    All ranks in a group call ``f(x)`` for the same individual, cooperating through
+    the model sub-communicator. After evaluation, only the root rank of each group
+    (i.e. ``rank < n_groups``) contributes its results to the ``allgather``, which
+    broadcasts the complete population results to all ranks. pymoo then runs its
+    selection/crossover/mutation identically on all ranks and moves to the next
+    generation.
+
+    When ``procs_per_model=1`` (the default), every rank is its own group — this
+    reduces to simple round-robin across all ranks with no sub-communicator overhead.
+
+    Parameters
+    ----------
+    comm : MPI.Comm
+        The full problem-level communicator (not the model sub-communicator).
+    procs_per_model : int
+        Number of MPI ranks that cooperate on a single model evaluation.
+
+    Attributes
+    ----------
+    comm : MPI.Comm
+        The full problem-level communicator.
+    n_groups : int
+        Number of parallel evaluation groups (``comm.size // procs_per_model``).
+    color : int
+        The group index this rank belongs to (``comm.rank % n_groups``).
+    """
+
+    def __init__(self, comm, procs_per_model=1):
+        """
+        Initialize the MPIElementwiseRunner.
+
+        Parameters
+        ----------
+        comm : MPI.Comm
+            The full problem-level communicator (not the model sub-communicator).
+        procs_per_model : int
+            Number of MPI ranks that cooperate on a single model evaluation.
+        """
+        self.comm = comm
+        self.n_groups = comm.size // procs_per_model
+        # color identifies which evaluation group this rank belongs to.
+        # Ranks with the same color share a model sub-communicator and always
+        # evaluate the same individual together.
+        self.color = comm.rank % self.n_groups
+
+    def __call__(self, f, X):
+        """
+        Evaluate each individual in X, distributing work across MPI groups.
+
+        ``f`` is pymoo's ``ElementwiseEvaluationFunction``, which calls
+        ``pymooProblem._evaluate(x, out)`` for a single individual and returns
+        the populated ``out`` dict containing 'F', 'G', and 'H' values.
+
+        Parameters
+        ----------
+        f : callable
+            Pymoo's per-individual evaluation function. Calling ``f(x)`` sets the
+            design variables on the local model, runs it, and returns a dict with
+            keys 'F' (objectives), 'G' (inequality constraints), 'H' (equality
+            constraints).
+        X : list
+            List of individual design points for the current population.
+
+        Returns
+        -------
+        list
+            Evaluated output dicts in the same order as X, assembled from all groups.
+        """
+        n = len(X)
+
+        # Round-robin by group: all ranks in the same group evaluate the same
+        # individuals together via their shared model sub-communicator.
+        local_indices = list(range(self.color, n, self.n_groups))
+        local_results = [(i, f(X[i])) for i in local_indices]
+
+        # Only the root rank of each group (rank < n_groups) contributes to the
+        # allgather. Since every rank in a group evaluated the same individuals,
+        # the non-root ranks would produce duplicate results. allgather (not gather)
+        # is used so that ALL ranks end up with the full population — pymoo needs
+        # to run its selection/crossover/mutation on every rank.
+        allgather_input = local_results if self.comm.rank < self.n_groups else []
+        all_results = self.comm.allgather(allgather_input)
+
+        # Reconstruct results in original population order.
+        ordered = [None] * n
+        for rank_results in all_results:
+            for i, result in rank_results:
+                ordered[i] = result
+
+        return ordered
+
+
 class pymooProblem(problem):
     """
     Pymoo ElementwiseProblem that delegates function evaluation to an OpenMDAO driver.
@@ -136,6 +272,10 @@ class pymooProblem(problem):
         Equality constraint metadata with keys 'vars', 'indices', 'equals'.
     obj_info : dict
         Objective metadata with keys 'vars', 'indices', 'size'.
+    runner : callable or None
+        Pymoo elementwise runner. Pass an ``MPIElementwiseRunner`` instance for
+        population-level MPI parallelism. If None, uses pymoo's default sequential
+        ``LoopedElementwiseEvaluation``.
 
     Attributes
     ----------
@@ -153,7 +293,7 @@ class pymooProblem(problem):
         Flag set to True if an exception occurred during evaluation.
     """
 
-    def __init__(self, driver, x_info, ieq_con_info, eq_con_info, obj_info):
+    def __init__(self, driver, x_info, ieq_con_info, eq_con_info, obj_info, runner=None):
         """
         Initialize the pymooProblem.
 
@@ -169,6 +309,10 @@ class pymooProblem(problem):
             Equality constraint metadata with keys 'vars', 'indices', 'equals'.
         obj_info : dict
             Objective metadata with keys 'vars', 'indices', 'size'.
+        runner : callable or None
+            Pymoo elementwise runner. Pass an ``MPIElementwiseRunner`` instance for
+            population-level MPI parallelism. If None, uses pymoo's default sequential
+            ``LoopedElementwiseEvaluation``.
         """
         self.driver = driver
         self.x_info = x_info
@@ -198,9 +342,17 @@ class pymooProblem(problem):
                         vars_dict[key] = Integer(bounds=(int(lb), int(ub)))
                     else:
                         vars_dict[key] = Real(bounds=(lb, ub))
-            super().__init__(vars=vars_dict, n_obj=n_obj,
-                             n_ieq_constr=n_ieq_constr, n_eq_constr=n_eq_constr)
+
+            runner_kwargs = {'elementwise_runner': runner} if runner is not None else {}
+            super().__init__(
+                vars=vars_dict,
+                n_obj=n_obj,
+                n_ieq_constr=n_ieq_constr,
+                n_eq_constr=n_eq_constr,
+                **runner_kwargs
+            )
         else:
+            runner_kwargs = {'elementwise_runner': runner} if runner is not None else {}
             super().__init__(
                 n_var=len(x_info['upper']),
                 n_obj=n_obj,
@@ -208,6 +360,7 @@ class pymooProblem(problem):
                 n_eq_constr=n_eq_constr,
                 xl=x_info['lower'],
                 xu=x_info['upper'],
+                **runner_kwargs,
             )
 
     def _evaluate(self, x, out, *args, **kwargs):
@@ -334,6 +487,12 @@ class pymooDriver(Driver):
     ``MixedVariableGA`` optimizer, which uses pymoo's mixed-variable-aware sampling
     and mating operators. All other optimizers require continuous design variables only.
 
+    Population-level MPI parallelism is enabled by setting ``run_parallel=True``.
+    Ranks are divided into groups of ``procs_per_model`` (default 1). Each group
+    cooperates on one model evaluation, enabling models with parallel components
+    (e.g. ``ParallelGroup``) to each receive their own sub-communicator. With 8
+    ranks and ``procs_per_model=2``, 4 individuals are evaluated simultaneously.
+
     pymooDriver supports the following:
         equality_constraints (algorithm-dependent)
         inequality_constraints (algorithm-dependent)
@@ -370,6 +529,10 @@ class pymooDriver(Driver):
         control relevance filtering on subsequent evaluations.
     _moo_prob : pymooProblem or None
         The pymoo problem wrapper built during ``run()``.
+    _problem_comm : MPI.Comm or None
+        The full problem-level communicator across all ranks. Stored in
+        ``_setup_comm`` before ``Problem.setup()`` runs. Used by the MPI runner
+        to coordinate population distribution across all ranks.
     """
 
     def __init__(self, **kwargs):
@@ -422,6 +585,11 @@ class pymooDriver(Driver):
         self.alg_class = None
         self.pareto = {'X': None, 'F': None}
 
+        # Full communicator across all ranks, stored in _setup_comm before
+        # Problem.setup() runs. Used by the MPI runner to coordinate population
+        # distribution.
+        self._problem_comm = None
+
         self.cite = CITATIONS
 
     def _declare_options(self):
@@ -433,6 +601,107 @@ class pymooDriver(Driver):
         self.options.declare('disp', default=True, types=(int, bool),
                              desc='Controls optimizer output verbosity. Not used '
                                   'if "verbose" is manually set in "self.run_settings".')
+        self.options.declare('run_parallel', types=bool, default=False,
+                             desc='Set to True to execute the points in a generation in parallel.')
+        self.options.declare('procs_per_model', default=1, lower=1,
+                             desc='Number of processors to give each model under MPI.')
+
+    def _setup_comm(self, comm):
+        """
+        Split the communicator into model sub-communicators for parallel evaluation.
+
+        OpenMDAO calls this method during ``Problem.setup()`` **before** the model
+        is set up. By returning a sub-communicator here, we ensure the model —
+        including any ``ParallelGroup`` components — is initialized with the
+        correct sub-communicator rather than the full one.
+
+        **How the split works**
+
+        With ``N`` total ranks and ``procs_per_model=P``, there are ``N/P`` groups.
+        Each group gets its own sub-communicator by splitting on a *color* value::
+
+            n_groups = N // P
+            color    = rank % n_groups
+
+        For example, with 8 ranks and ``procs_per_model=2`` (n_groups=4):
+
+        - color 0 → ranks 0, 4  → model sub-comm for group 0
+        - color 1 → ranks 1, 5  → model sub-comm for group 1
+        - color 2 → ranks 2, 6  → model sub-comm for group 2
+        - color 3 → ranks 3, 7  → model sub-comm for group 3
+
+        The returned sub-communicator is what the model uses internally. The full
+        communicator is stored as ``_problem_comm`` for use by the runner when
+        distributing the population.
+
+        Parameters
+        ----------
+        comm : MPI.Comm or None
+            The full communicator for the Problem.
+
+        Returns
+        -------
+        MPI.Comm or None
+            The sub-communicator for the model on this rank. When not running in
+            parallel, returns ``comm`` unchanged.
+        """
+        self._problem_comm = comm
+
+        if not MPI:
+            if self.options['run_parallel']:
+                raise RuntimeError(
+                    f'{self.msginfo}: run_parallel=True requires MPI but MPI is not available.'
+                )
+            if self.options['procs_per_model'] != 1:
+                raise RuntimeError(
+                    f'{self.msginfo}: procs_per_model != 1 requires MPI but MPI is not available.'
+                )
+
+        if MPI and self.options['run_parallel']:
+            procs_per_model = self.options['procs_per_model']
+            full_size = comm.size
+            n_groups = full_size // procs_per_model
+
+            if full_size != n_groups * procs_per_model:
+                raise RuntimeError(
+                    f'{self.msginfo}: Total number of processors ({full_size}) is not '
+                    f'evenly divisible by procs_per_model ({procs_per_model}). '
+                    f'Provide a number of processors that is a multiple of '
+                    f'{procs_per_model}.'
+                )
+
+            color = comm.rank % n_groups
+            model_comm = comm.Split(color)
+
+            return model_comm
+
+        return comm
+
+    def _setup_recording(self):
+        """
+        Set up case recording, restricting which ranks write records under MPI.
+
+        When running in parallel, only the root rank of each model group records
+        to avoid duplicate case entries. When not running in parallel, only rank 0
+        records.
+        """
+        if MPI:
+            run_parallel = self.options['run_parallel']
+            procs_per_model = self.options['procs_per_model']
+
+            for recorder in self._rec_mgr:
+                if run_parallel:
+                    if procs_per_model == 1:
+                        recorder.record_on_process = True
+                    else:
+                        n_groups = self._problem_comm.size // procs_per_model
+                        if self._problem_comm.rank < n_groups:
+                            recorder.record_on_process = True
+
+                elif self._problem_comm.rank == 0:
+                    recorder.record_on_process = True
+
+        super()._setup_recording()
 
     def _get_name(self):
         """
@@ -616,6 +885,14 @@ class pymooDriver(Driver):
             current_idx += size
         obj_info['size'] = current_idx
 
+        # _problem_comm is the full communicator; the model may be running on a
+        # sub-communicator if procs_per_model > 1.
+        if MPI and self.options['run_parallel']:
+            runner = MPIElementwiseRunner(self._problem_comm,
+                                          self.options['procs_per_model'])
+        else:
+            runner = None  # use pymoo's default LoopedElementwiseEvaluation
+
         # Run optimization
         try:
             # Build pymoo problem wrapper
@@ -625,14 +902,20 @@ class pymooDriver(Driver):
                 ieq_con_info=ieq_con_info,
                 eq_con_info=eq_con_info,
                 obj_info=obj_info,
+                runner=runner,
             )
 
             # Instantiate and run optimizer
             optimizer = self.alg_class(**self.alg_settings)
 
+            # Make sure only the main rank prints from pymoo
             run_settings = {**self.run_settings}
-            if "verbose" not in self.run_settings:
-                run_settings['verbose'] = self.options['disp']
+            if prob.comm.rank == 0:
+                if "verbose" not in self.run_settings:
+                    run_settings['verbose'] = self.options['disp']
+            else:
+                run_settings['verbose'] = False
+
             self.pymoo_results = minimize(
                 problem=self._moo_prob,
                 algorithm=optimizer,
@@ -720,101 +1003,3 @@ class pymooDriver(Driver):
         module_name = non_default_mapping.get(alg_name, alg_name.lower())
         module = importlib.import_module(f'{base}.{module_name}')
         return getattr(module, alg_name)
-
-
-import openmdao.api as om
-
-
-class Paraboloid(om.ExplicitComponent):
-    """
-    Evaluates a paraboloid function for testing.
-
-    Computes f(x,y) = (x[0] + x[1] - 3)^2 + x[0]*y + (y + 4)^2 - 3
-
-    where x is a 3-element array.
-    """
-
-    def setup(self):
-        self.add_input('x', val=np.zeros(2))
-        self.add_input('y', val=0.0)
-        self.add_output('f_xy', val=0.0)
-
-    def compute(self, inputs, outputs):
-        x = inputs['x']
-        y = inputs['y']
-
-        outputs['f_xy'] = ((x[0] + x[1] - 3.0)**2 + x[0] * y + (y + 4.0)**2 - 3.0)
-
-
-class Con(om.ExplicitComponent):
-    """
-    Simple constraint component for testing.
-
-    Computes g = x[0] + x[1] + y where x is a 2-element array.
-    """
-
-    def setup(self):
-        self.add_input('x', val=np.zeros(2))
-        self.add_input('y', val=0.0)
-        self.add_output('g', val=0.0)
-
-    def compute(self, inputs, outputs):
-        outputs['g'] = inputs['x'][0] + inputs['x'][1] + inputs['y']
-
-
-if __name__ == '__main__':
-    from pymoo.operators.mutation.pm import PolynomialMutation
-    from pymoo.operators.crossover.sbx import SBX
-
-    # build the model
-    prob = om.Problem()
-    prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y'])
-
-    # define the component whose output will be constrained
-    prob.model.add_subsystem('const', Con(), promotes_inputs=['x', 'y'])
-
-    # Design variables 'x', 'y', and 'z' span components (connected due to our
-    # promotion), so we need to provide a common initial value for them. For
-    # these variables we have to use "set_input_defaults" because the variable
-    # connects to both "const" and "parab", but the initial values from "const"
-    # and "parab" are both different. So before we are able to use prob.set_val()
-    # for these variables we first have to call "set_input_defaults". Note
-    # that we would also have to do this and specify the units of the common
-    # initial value if "const" and "parab" had different units for them so that
-    # way it knows which units to use if "set_val" is ever used. I'm pretty
-    # sure that if a promoted variable name does not span multiple components
-    # (like "w") then this doesn't do anything and have to set whatever initial
-    # value I want with set_val.
-    prob.model.set_input_defaults('x', np.array([3.0, 3.0]))
-    prob.model.set_input_defaults('y', -4.0)
-
-    # setup the optimization
-    prob.driver = pymooDriver()
-    prob.driver.options['optimizer'] = 'GA'
-    # Optimizer specific settings
-    prob.driver.opt_settings = {
-        'pop_size': 200,
-        'eliminate_duplicates': True,
-        'mutation': PolynomialMutation(prob=0.2, eta=30),
-        'crossover': SBX(prob=0.9, prob_var=0.5, eta=20)
-    }
-    prob.driver.run_settings = {
-        'termination': ('n_gen', 300),
-        'seed': 1,
-    }
-    prob.model.add_design_var('x', lower=-50, upper=50)
-    prob.model.add_design_var('y', lower=-50, upper=50)
-    prob.model.add_objective('parab.f_xy')
-
-    # to add the constraint to the model
-    prob.model.add_constraint('const.g', lower=0., upper=10.)
-    # prob.model.add_constraint('y', equals=10.)
-
-    prob.setup()
-
-    prob.run_driver()
-
-    print(prob.get_val('x'))
-    print(prob.get_val('y'))
-    print(prob.get_val('parab.f_xy'))
-    print(prob.get_val('const.g'))
