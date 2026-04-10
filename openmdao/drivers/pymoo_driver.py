@@ -18,6 +18,8 @@ Single-Objective:
     - SRES: Stochastic Ranking Evolution Strategy
     - ISRES: Improved Stochastic Ranking Evolution Strategy
     - NRBO: Newton-Raphson Based Optimizer
+    - MixedVariableGA: Genetic Algorithm with support for discrete (integer) and
+      mixed integer design variables
 
 Multi-Objective:
     - NSGA2: Non-dominated Sorting Genetic Algorithm II
@@ -61,26 +63,34 @@ from openmdao.core.constants import INF_BOUND
 try:
     import pymoo
     from pymoo.core.problem import ElementwiseProblem as problem
+    from pymoo.core.variable import Real, Integer
     from pymoo.optimize import minimize
 except ImportError:
     pm = None
     problem = object
     minimize = None
+    Real = None
+    Integer = None
 except Exception as err:
     pm = err
     problem = object
     minimize = None
+    Real = None
+    Integer = None
 
 
 # Algorithms that support constraints
 _constraint_optimizers = {'GA', 'DE', 'BRKGA', 'NelderMead', 'PatternSearch',
                           'ES', 'SRES', 'ISRES', 'NRBO', 'NSGA2', 'RNSGA2',
                           'PINSGA2', 'NSGA3', 'UNSGA3', 'RNSGA3', 'CTAEA',
-                          'SMSEMOA', 'CMOPSO', 'MOPSO_CD'}
+                          'SMSEMOA', 'CMOPSO', 'MOPSO_CD', 'MixedVariableGA'}
 
 # Algorithms that only support a single objective
 _single_obj_optimizers = {'GA', 'DE', 'BRKGA', 'NelderMead', 'PatternSearch',
-                          'CMAES', 'ES', 'SRES', 'ISRES', 'NRBO'}
+                          'CMAES', 'ES', 'SRES', 'ISRES', 'NRBO', 'MixedVariableGA'}
+
+# Algorithms that support discrete (integer) and mixed integer design variables
+_mixed_var_optimizers = {'MixedVariableGA'}
 
 # Algorithms that support multiple objectives
 _multi_obj_optimizers = {'NSGA2', 'RNSGA2', 'PINSGA2', 'NSGA3', 'UNSGA3', 'RNSGA3',
@@ -110,6 +120,9 @@ class pymooProblem(problem):
     Wraps an OpenMDAO problem as a pymoo optimization problem, translating between
     pymoo's interface and OpenMDAO's driver interface. Inequality constraints are
     converted to the pymoo convention (g <= 0) and equality constraints to (h == 0).
+    When ``MixedVariableGA`` is selected or discrete (integer) design variables
+    are present, pymoo's ``vars`` dict interface is used so that pymoo samples
+    and mutates variable types correctly.
 
     Parameters
     ----------
@@ -164,22 +177,38 @@ class pymooProblem(problem):
         self.obj_info = obj_info
         self.fail = False
 
-        super().__init__(
-            # Integer value representing the number of design variables.
-            n_var=len(x_info['upper']),
-            # Integer value representing the number of objectives.
-            n_obj=obj_info['size'],
-            # Integer value representing the number of inequality constraints.
-            n_ieq_constr=len(ieq_con_info['bound']),
-            # Integer value representing the number of equality constraints.
-            n_eq_constr=len(eq_con_info['equals']),
-            # Float or np.ndarray of length n_var representing the lower bounds of
-            # the design variables.
-            xl=x_info['lower'],
-            # Float or np.ndarray of length n_var representing the upper bounds of
-            # the design variables.
-            xu=x_info['upper'],
-        )
+        n_obj = obj_info['size']
+        n_ieq_constr = len(ieq_con_info['bound'])
+        n_eq_constr = len(eq_con_info['equals'])
+
+        use_vars_dict = (driver._designvars_discrete or
+                         driver.options['optimizer'] in _mixed_var_optimizers)
+        if use_vars_dict:
+            # Build a vars dict so pymoo samples integers and reals correctly.
+            # Required for MixedVariableGA regardless of whether discrete variables
+            # are present. Each scalar element of each design variable gets its own
+            # entry using the key '{om_name}__{i}'.
+            vars_dict = {}
+            for name, indices in zip(x_info['vars'], x_info['indices']):
+                lower = x_info['lower'][indices]
+                upper = x_info['upper'][indices]
+                for i, (lb, ub) in enumerate(zip(lower, upper)):
+                    key = f'{name}__{i}'
+                    if name in driver._designvars_discrete:
+                        vars_dict[key] = Integer(bounds=(int(lb), int(ub)))
+                    else:
+                        vars_dict[key] = Real(bounds=(lb, ub))
+            super().__init__(vars=vars_dict, n_obj=n_obj,
+                             n_ieq_constr=n_ieq_constr, n_eq_constr=n_eq_constr)
+        else:
+            super().__init__(
+                n_var=len(x_info['upper']),
+                n_obj=n_obj,
+                n_ieq_constr=n_ieq_constr,
+                n_eq_constr=n_eq_constr,
+                xl=x_info['lower'],
+                xu=x_info['upper'],
+            )
 
     def _evaluate(self, x, out, *args, **kwargs):
         """
@@ -192,8 +221,9 @@ class pymooProblem(problem):
 
         Parameters
         ----------
-        x : np.ndarray
-            Current design variable values as a flat array.
+        x : np.ndarray or dict
+            Current design variable values. A dict keyed by ``'{om_name}__{i}'``
+            when using ``MixedVariableGA``, or a flat array for all other optimizers.
         out : dict
             Pymoo output dictionary to populate with F, G, and H values.
         *args : list
@@ -247,11 +277,18 @@ class pymooProblem(problem):
 
         Parameters
         ----------
-        x : np.ndarray
-            Flat array of current design variable values.
+        x : np.ndarray or dict
+            Current design variable values. A dict keyed by ``'{om_name}__{i}'``
+            when using ``MixedVariableGA`` (including continuous-only problems),
+            or a flat array for all other optimizers.
         """
-        for name, indices in zip(self.x_info['vars'], self.x_info['indices']):
-            self.driver.set_design_var(name, x[indices])
+        if isinstance(x, dict):
+            for name, indices in zip(self.x_info['vars'], self.x_info['indices']):
+                vals = np.array([x[f'{name}__{i}'] for i in range(len(indices))])
+                self.driver.set_design_var(name, vals)
+        else:
+            for name, indices in zip(self.x_info['vars'], self.x_info['indices']):
+                self.driver.set_design_var(name, x[indices])
 
     def _run_model(self):
         """
@@ -293,12 +330,17 @@ class pymooDriver(Driver):
     model is set to the optimal point after ``run_driver()`` completes. For
     multi-objective problems the full Pareto front is stored in ``driver.pareto``.
 
+    Discrete (integer) and mixed integer design variables are supported via the
+    ``MixedVariableGA`` optimizer, which uses pymoo's mixed-variable-aware sampling
+    and mating operators. All other optimizers require continuous design variables only.
+
     pymooDriver supports the following:
         equality_constraints (algorithm-dependent)
         inequality_constraints (algorithm-dependent)
         two_sided_constraints (algorithm-dependent)
         linear_constraints (algorithm-dependent)
         multiple_objectives (algorithm-dependent)
+        integer_design_vars (MixedVariableGA only)
 
     Parameters
     ----------
@@ -357,10 +399,10 @@ class pymooDriver(Driver):
         self.supports['linear_constraints'] = True
         self.supports['linear_only_designvars'] = True
         self.supports['multiple_objectives'] = True
+        self.supports['integer_design_vars'] = False
 
         # What we don't support
         self.supports['active_set'] = False
-        self.supports['integer_design_vars'] = False
         self.supports['distributed_design_vars'] = False
         self.supports['gradients'] = False
         self.supports._read_only = True
@@ -426,12 +468,19 @@ class pymooDriver(Driver):
         self.supports['equality_constraints'] = opt in _constraint_optimizers
         self.supports['linear_constraints'] = opt in _constraint_optimizers
         self.supports['multiple_objectives'] = opt in _multi_obj_optimizers
+        self.supports['integer_design_vars'] = opt in _mixed_var_optimizers
         self.supports._read_only = True
 
         # Validate problem formulation
         if not self.supports['multiple_objectives'] and len(self._objs) > 1:
             msg = 'The {} algorithm in {} currently does not support multiple objectives.'
             raise RuntimeError(msg.format(opt, self.msginfo))
+
+        if self._designvars_discrete and opt not in _mixed_var_optimizers:
+            raise RuntimeError(
+                f'{self.msginfo}: Optimizer {opt!r} does not support discrete design '
+                f'variables. Use MixedVariableGA for mixed integer problems.'
+            )
 
         self._model_ran = False
         self.alg_class = self.get_algorithm(opt)
@@ -463,12 +512,17 @@ class pymooDriver(Driver):
             self.iter_count += 1
         self._model_ran = model_ran
         self._con_cache = self.get_constraint_values()
+        desvar_vals = self.get_design_var_values()
 
         # Determine total number of design variables for error and x_info initialization
+        # For descrete variables, the size key will show as zero so need to check manually
         ndesvar = 0
         for name, meta in self._designvars.items():
-            size = meta['global_size'] if meta['distributed'] else meta['size']
-            ndesvar += size
+            if name in self._designvars_discrete:
+                val = desvar_vals[name]
+                ndesvar += 1 if np.ndim(val) == 0 else len(val)
+            else:
+                ndesvar += meta['global_size'] if meta['distributed'] else meta['size']
 
         if ndesvar == 0:
             raise RuntimeError('Problem has no design variables.')
@@ -480,7 +534,11 @@ class pymooDriver(Driver):
         for name, meta in self._designvars.items():
             x_info['vars'].append(name)
 
-            size = meta['global_size'] if meta['distributed'] else meta['size']
+            if name in self._designvars_discrete:
+                val = desvar_vals[name]
+                size = 1 if np.ndim(val) == 0 else len(val)
+            else:
+                size = meta['global_size'] if meta['distributed'] else meta['size']
             current_indices = list(range(current_idx, current_idx + size))
             x_info['indices'].append(current_indices)
             x_info['lower'][current_indices] = meta['lower']
@@ -592,8 +650,13 @@ class pymooDriver(Driver):
             if opt in _single_obj_optimizers:
                 if x_opt is not None:
                     # Update OpenMDAO design variables with optimal values
-                    for name, indices in zip(x_info['vars'], x_info['indices']):
-                        self.set_design_var(name, x_opt[indices])
+                    if isinstance(x_opt, dict):
+                        for name, indices in zip(x_info['vars'], x_info['indices']):
+                            vals = np.array([x_opt[f'{name}__{i}'] for i in range(len(indices))])
+                            self.set_design_var(name, vals)
+                    else:
+                        for name, indices in zip(x_info['vars'], x_info['indices']):
+                            self.set_design_var(name, x_opt[indices])
 
                     # Final model evaluation at optimal point
                     with RecordingDebugging(self._get_name(), self.iter_count, self):
@@ -636,6 +699,10 @@ class pymooDriver(Driver):
         type
             The pymoo algorithm class corresponding to ``alg_name``.
         """
+        if alg_name in _mixed_var_optimizers:
+            module = importlib.import_module('pymoo.core.mixed')
+            return getattr(module, alg_name)
+
         if alg_name in _single_obj_optimizers:
             base = 'pymoo.algorithms.soo.nonconvex'
         else:
@@ -652,9 +719,7 @@ class pymooDriver(Driver):
         }
         module_name = non_default_mapping.get(alg_name, alg_name.lower())
         module = importlib.import_module(f'{base}.{module_name}')
-        alg_class = getattr(module, alg_name)
-
-        return alg_class
+        return getattr(module, alg_name)
 
 
 import openmdao.api as om
