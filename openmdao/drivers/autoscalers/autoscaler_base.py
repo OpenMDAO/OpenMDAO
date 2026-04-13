@@ -1,8 +1,6 @@
 from typing import TYPE_CHECKING
 
-import numpy as np
 
-from openmdao.core.constants import INF_BOUND
 from openmdao.vectors.optimizer_vector import OptimizerVector
 
 if TYPE_CHECKING:
@@ -184,131 +182,6 @@ class AutoscalerBase:
         """
         return False
 
-    def _scale_bound(self, val, adder, scaler, size, is_lower):
-        """
-        Apply scaling to a single bound value, preserving infinite bounds.
-
-        Parameters
-        ----------
-        val : float or ndarray
-            Bound value in physical (model) units.
-        adder : float, ndarray, or None
-            Combined additive scaling factor.
-        scaler : float, ndarray, or None
-            Combined multiplicative scaling factor.
-        size : int
-            Number of elements for the variable.
-        is_lower : bool
-            True if this is a lower bound; controls which infinity sentinel is used.
-
-        Returns
-        -------
-        ndarray
-            Scaled bound array of length `size`.
-        """
-        if np.isscalar(val):
-            val_arr = np.full(size, val, dtype=float)
-        else:
-            if val is None:
-                if is_lower:
-                    val = -INF_BOUND
-                else:
-                    val = INF_BOUND
-
-            val_arr = np.asarray(val, dtype=float)
-                
-            if val_arr.size != size:
-                val_arr = np.broadcast_to(val_arr, (size,)).copy()
-            else:
-                val_arr = val_arr.copy()
-
-        # Identify unbounded (infinite) elements before scaling
-        inf_mask = (val_arr <= -INF_BOUND) if is_lower else (val_arr >= INF_BOUND)
-
-        if not inf_mask.all():
-            finite = ~inf_mask
-            if adder is not None:
-                val_arr[finite] += adder if np.isscalar(adder) else np.asarray(adder)[finite]
-            if scaler is not None:
-                val_arr[finite] *= scaler if np.isscalar(scaler) else np.asarray(scaler)[finite]
-
-        # Restore sentinel for unbounded elements (scaling may have perturbed them)
-        val_arr[inf_mask] = -INF_BOUND if is_lower else INF_BOUND
-
-        val_arr = val_arr.ravel()
-
-        return val_arr
-
-    def _compute_scaled_bounds(self, voi_type):
-        """
-        Compute scaled bounds OptimizerVectors for design variables or constraints.
-
-        Called once during setup() to build and cache scaled bounds. Bounds are read
-        from metadata in physical (model) units and transformed to driver (optimizer)
-        units using the combined scaler and adder for each variable.
-
-        Parameters
-        ----------
-        voi_type : str
-            One of 'design_var' or 'constraint'.
-
-        Returns
-        -------
-        lower : OptimizerVector
-            Scaled lower bounds. Unbounded entries contain -INF_BOUND.
-        upper : OptimizerVector
-            Scaled upper bounds. Unbounded entries contain INF_BOUND.
-        equals : OptimizerVector or None
-            Scaled equality values. Non-equality constraint entries contain np.nan.
-            None when voi_type='design_var'.
-        """
-        vecmeta = {}
-        total_size = 0
-
-        for name, meta in self._var_meta[voi_type].items():
-            if meta.get('discrete', False):
-                continue
-            size = meta.get('global_size', meta.get('size', 0)) \
-                if meta.get('distributed', False) else meta.get('size', 0)
-            vecmeta[name] = {
-                'start_idx': total_size,
-                'end_idx': total_size + size,
-                'size': size,
-            }
-            total_size += size
-
-        lower_data = np.empty(total_size)
-        upper_data = np.empty(total_size)
-        equals_data = np.full(total_size, np.nan) if voi_type == 'constraint' else None
-
-        for name, vmeta in vecmeta.items():
-            meta = self._var_meta[voi_type][name]
-            if meta.get('discrete', False):
-                continue
-            size = vmeta['size']
-            start = vmeta['start_idx']
-            end = vmeta['end_idx']
-            adder = self._var_meta[voi_type][name]['total_adder']
-            scaler = self._var_meta[voi_type][name]['total_scaler']
-
-            lower_data[start:end] = self._scale_bound(
-                meta.get('lower', -INF_BOUND), adder, scaler, size, is_lower=True)
-            upper_data[start:end] = self._scale_bound(
-                meta.get('upper', INF_BOUND), adder, scaler, size, is_lower=False)
-
-            if voi_type == 'constraint':
-                eq = meta.get('equals')
-                if eq is not None:
-                    equals_data[start:end] = self._scale_bound(
-                        eq, adder, scaler, size, is_lower=False)
-
-        lower_vec = OptimizerVector(voi_type, lower_data, vecmeta)
-        upper_vec = OptimizerVector(voi_type, upper_data, vecmeta)
-        equals_vec = OptimizerVector(voi_type, equals_data, vecmeta) \
-            if voi_type == 'constraint' else None
-
-        return lower_vec, upper_vec, equals_vec
-
     def get_bounds_scaling(self, voi_type):
         """
         Return pre-computed scaled bounds vectors for the given variable type.
@@ -384,7 +257,7 @@ class AutoscalerBase:
         Use caution in the definition of this method. OpenMDAO **always** minimizes
         the objective, and negates the sign of the objective when maximizing (generally
         by setting scaler or ref to a negative value). If your implementation changes
-        the sign of the objective, you max accidentally change an objective minimization
+        the sign of the objective, you may accidentally change an objective minimization
         to a maximization or vice-versa.
 
         Parameters

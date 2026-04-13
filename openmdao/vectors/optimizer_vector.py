@@ -25,10 +25,10 @@ class OptimizerVector(object):
         Flat numpy array containing variable values.
     metadata : dict
         Metadata dict mapping variable names to index information. Each entry should contain
-        'start_idx', 'end_idx', and 'size' keys.
+        'slice' and 'size' keys.
     driver_scaling : bool
         True if the data provided is in driver/optimizer-scaled space.
-        
+
     Attributes
     ----------
     voi_type : str ('design_var', 'constraint', or 'objective')
@@ -37,7 +37,7 @@ class OptimizerVector(object):
         Flat numpy array containing variable values.
     _meta : dict
         Metadata dict mapping variable names to index information. Each entry should contain
-        'start_idx', 'end_idx', and 'size' keys.
+        'slice' and 'size' keys.
     _filters : dict[tuple, ndarray]
         Cache for computed filter indices. Keys are tuples of sorted (key, value)
         filter criteria, values are integer arrays of indices into _data.
@@ -85,7 +85,7 @@ class OptimizerVector(object):
         if name not in self._meta:
             raise KeyError(f"Variable '{name}' not found in OpimizerVector")
         info = self._meta[name]
-        return self._data[info['start_idx']:info['end_idx']].reshape(-1)
+        return self._data[info['slice']].reshape(-1)
 
     def __setitem__(self, name, value):
         """
@@ -106,7 +106,7 @@ class OptimizerVector(object):
         if name not in self._meta:
             raise KeyError(f"Variable '{name}' not found in OptimizerVector")
         info = self._meta[name]
-        self._data[info['start_idx']:info['end_idx']] = np.asarray(value).flat
+        self._data[info['slice']] = np.asarray(value).flat
 
     def __contains__(self, name):
         """
@@ -218,7 +218,8 @@ class OptimizerVector(object):
         for meta in self._meta.values():
             # Check if all filter criteria match this variable's metadata
             if all(meta.get(key) == value for key, value in filters.items()):
-                ranges.append((meta['start_idx'], meta['end_idx']))
+                s = meta['slice']
+                ranges.append((s.start, s.stop))
 
         if not ranges:
             return np.array([], dtype=np.intp)
@@ -227,7 +228,7 @@ class OptimizerVector(object):
         return np.concatenate([np.arange(start, end, dtype=np.intp)
                               for start, end in ranges])
 
-    def set_data(self, val, driver_scaling=True, order='C'):
+    def set_data(self, val, driver_scaling=True):
         """
         Set the values of the internal vector.
 
@@ -241,15 +242,13 @@ class OptimizerVector(object):
             as an array-like value or as a dict (as in pyoptsparse) that maps
             names to associated values.
         driver_scaling : bool
-            If True, set the
-        order : str
-            The order in which val is flattened, as accepted by
+            If True, set the data to the optimization-scaled values.
         """
         if isinstance(val, dict):
             for n, v in val.items():
                 self[n] = v
         else:
-            self._data[:] = np.asarray(val).ravel(order=order)
+            self._data[:] = np.asarray(val).ravel()
         self._driver_scaling = driver_scaling
     
     @classmethod
@@ -297,8 +296,7 @@ class OptimizerVector(object):
             size = meta['global_size'] if meta['distributed'] else meta['size']
 
             vecmeta[name] = {
-                'start_idx': idx,
-                'end_idx': idx + size,
+                'slice': slice(idx, idx + size),
                 'size': size,
             }
 
@@ -438,13 +436,13 @@ class OptimizerVector(object):
         indices = self._filters[cache_key]
         return self._data[indices]
 
-    def _from_dict(self, var_dict):
+    def _update_from_dict(self, var_dict):
         """
         Populate this OptimizerVector from a dictionary of variables in-place.
 
         This method populates the underlying flat array by extracting values from a
         dictionary interface (as used by pyOptSparseDriver), ordering them according to
-        the metadata index information.
+        the metadata slice information.
 
         Parameters
         ----------
@@ -472,7 +470,7 @@ class OptimizerVector(object):
                 raise KeyError(f"Variable '{name}' in metadata not found in var_dict")
 
             value = np.asarray(var_dict[name]).ravel()
-            expected_size = meta['end_idx'] - meta['start_idx']
+            expected_size = meta['size']
 
             if value.size != expected_size:
                 raise ValueError(
@@ -480,7 +478,7 @@ class OptimizerVector(object):
                     f"got {value.size}"
                 )
 
-            self._data[meta['start_idx']:meta['end_idx']] = value
+            self._data[meta['slice']] = value
 
     def _to_dict(self, get_remote=True, **filters):
         """
@@ -569,74 +567,3 @@ class OptimizerVector(object):
             True if the vector is currently in driver/optimizer-scaled space, otherwise False.
         """
         self._driver_scaling = b
-
-
-# TODO: Remove these if unused
-# class DesignVarVector(OptimizerVector):
-#     """
-#     An design variable-specific implementation of OptimizerVector
-
-#     Parameters
-#     ----------
-#     data : ndarray
-#         Flat numpy array containing variable values.
-#     metadata : dict
-#         Metadata dict mapping variable names to index information. Each entry should contain
-#         'start_idx', 'end_idx', and 'size' keys.
-#     driver_scaling : bool
-#         True if the data provided is in driver/optimizer-scaled space.
-#     """
-
-#     def __init__(self, data, metadata, driver_scaling=False):
-#         """Initialize DesignVarVector with data array and metadata."""
-#         super().__init__('objective', data, metadata, driver_scaling)
-
-#     def apply_scaling(self, driver):
-#         driver._autoscaler.apply_design_var_scaling(self)
-
-#     def apply_unscaling(self, driver):
-#         driver._autoscaler.apply_design_var_unscaling(self)
-
-# class Constraint(OptimizerVector):
-#     """
-#     An constraint-specific implementation of OptimizerVector
-
-#     Parameters
-#     ----------
-#     data : ndarray
-#         Flat numpy array containing variable values.
-#     metadata : dict
-#         Metadata dict mapping variable names to index information. Each entry should contain
-#         'start_idx', 'end_idx', and 'size' keys.
-#     driver_scaling : bool
-#         True if the data provided is in driver/optimizer-scaled space.
-#     """
-
-#     def __init__(self, data, metadata, driver_scaling=False):
-#         """Initialize ConstraintVector with data array and metadata."""
-#         super().__init__('constraint', data, metadata, driver_scaling)
-
-#     def apply_scaling(self, driver):
-#         driver._autoscaler.apply_constraint_scaling(self)
-
-# class ObjectiveVector(OptimizerVector):
-#     """
-#     An objective-specific implementation of OptimizerVector
-
-#     Parameters
-#     ----------
-#     data : ndarray
-#         Flat numpy array containing variable values.
-#     metadata : dict
-#         Metadata dict mapping variable names to index information. Each entry should contain
-#         'start_idx', 'end_idx', and 'size' keys.
-#     driver_scaling : bool
-#         True if the data provided is in driver/optimizer-scaled space.
-#     """
-
-#     def __init__(self, data, metadata, driver_scaling=False):
-#         """Initialize ObjectiveVector with data array and metadata."""
-#         super().__init__('objective', data, metadata, driver_scaling)
-
-#     def apply_scaling(self, driver):
-#         driver._autoscaler.apply_objective_scaling(self)

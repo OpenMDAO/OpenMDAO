@@ -15,15 +15,15 @@ class TestOptimizerVector(unittest.TestCase):
         """Set up test data."""
         self.data = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], dtype=float)
         self.metadata = {
-            'x': {'start_idx': 0, 'end_idx': 2, 'size': 2},
-            'y': {'start_idx': 2, 'end_idx': 4, 'size': 2},
-            'z': {'start_idx': 4, 'end_idx': 6, 'size': 2},
+            'x': {'slice': slice(0, 2), 'size': 2},
+            'y': {'slice': slice(2, 4), 'size': 2},
+            'z': {'slice': slice(4, 6), 'size': 2},
         }
 
     def test_getitem_scalar(self):
         """Test getting a scalar variable."""
         data = np.array([1.5, 2.5, 3.5])
-        metadata = {'x': {'start_idx': 0, 'end_idx': 1, 'size': 1}}
+        metadata = {'x': {'slice': slice(0, 1), 'size': 1}}
         vec = OptimizerVector('design_var', data, metadata)
 
         result = vec['x']
@@ -51,7 +51,7 @@ class TestOptimizerVector(unittest.TestCase):
     def test_setitem_scalar(self):
         """Test setting a scalar variable."""
         data = np.array([1.5, 2.5, 3.5])
-        metadata = {'x': {'start_idx': 0, 'end_idx': 1, 'size': 1}}
+        metadata = {'x': {'slice': slice(0, 1), 'size': 1}}
         vec = OptimizerVector('design_var', data, metadata)
 
         vec['x'] = 10.0
@@ -70,7 +70,7 @@ class TestOptimizerVector(unittest.TestCase):
     def test_setitem_scalar_from_array(self):
         """Test setting a scalar variable from an array."""
         data = np.array([1.5, 2.5, 3.5])
-        metadata = {'x': {'start_idx': 0, 'end_idx': 1, 'size': 1}}
+        metadata = {'x': {'slice': slice(0, 1), 'size': 1}}
         vec = OptimizerVector('design_var', data, metadata)
 
         vec['x'] = np.array([99.0])
@@ -158,11 +158,11 @@ class TestOptimizerVectorAsarray(unittest.TestCase):
         """Set up test data with metadata for filtering."""
         self.data = np.arange(10, dtype=float)
         self.metadata = {
-            'linear_eq1': {'start_idx': 0, 'end_idx': 2, 'size': 2, 'linear': True, 'equals': 5.0},
-            'linear_ineq1': {'start_idx': 2, 'end_idx': 4, 'size': 2, 'linear': True, 'equals': None},
-            'nonlinear_eq1': {'start_idx': 4, 'end_idx': 6, 'size': 2, 'linear': False, 'equals': 3.0},
-            'nonlinear_ineq1': {'start_idx': 6, 'end_idx': 8, 'size': 2, 'linear': False, 'equals': None},
-            'nonlinear_ineq2': {'start_idx': 8, 'end_idx': 10, 'size': 2, 'linear': False, 'equals': None},
+            'linear_eq1': {'slice': slice(0, 2), 'size': 2, 'linear': True, 'equals': 5.0},
+            'linear_ineq1': {'slice': slice(2, 4), 'size': 2, 'linear': True, 'equals': None},
+            'nonlinear_eq1': {'slice': slice(4, 6), 'size': 2, 'linear': False, 'equals': 3.0},
+            'nonlinear_ineq1': {'slice': slice(6, 8), 'size': 2, 'linear': False, 'equals': None},
+            'nonlinear_ineq2': {'slice': slice(8, 10), 'size': 2, 'linear': False, 'equals': None},
         }
 
     def test_asarray_no_filter(self):
@@ -263,12 +263,12 @@ class TestOptimizerVectorMetadata(unittest.TestCase):
     def test_metadata_property(self):
         """Test metadata property returns the metadata dict."""
         data = np.array([1.0, 2.0])
-        metadata = {'x': {'start_idx': 0, 'end_idx': 2, 'size': 2}}
+        metadata = {'x': {'slice': slice(0, 2), 'size': 2}}
         vec = OptimizerVector('design_var', data, metadata)
 
         returned_meta = vec.metadata
         self.assertIs(returned_meta, metadata)
-        self.assertEqual(returned_meta['x']['start_idx'], 0)
+        self.assertEqual(returned_meta['x']['slice'].start, 0)
 
 
 class TestOptimizerVectorEdgeCases(unittest.TestCase):
@@ -287,7 +287,7 @@ class TestOptimizerVectorEdgeCases(unittest.TestCase):
     def test_single_element(self):
         """Test OptimizerVector with single element."""
         data = np.array([42.0])
-        metadata = {'x': {'start_idx': 0, 'end_idx': 1, 'size': 1}}
+        metadata = {'x': {'slice': slice(0, 1), 'size': 1}}
         vec = OptimizerVector('design_var', data, metadata)
 
         self.assertEqual(len(vec), 1)
@@ -301,7 +301,7 @@ class TestOptimizerVectorEdgeCases(unittest.TestCase):
         data_flat = data.flatten()
 
         metadata = {
-            'tensor': {'start_idx': 0, 'end_idx': size, 'size': size},
+            'tensor': {'slice': slice(0, size), 'size': size},
         }
 
         vec = OptimizerVector('design_var', data_flat, metadata)
@@ -313,8 +313,8 @@ class TestOptimizerVectorEdgeCases(unittest.TestCase):
         """Test setting values with different dtypes."""
         data = np.array([1.0, 2.0, 3.0, 4.0])
         metadata = {
-            'x': {'start_idx': 0, 'end_idx': 2, 'size': 2},
-            'y': {'start_idx': 2, 'end_idx': 4, 'size': 2},
+            'x': {'slice': slice(0, 2), 'size': 2},
+            'y': {'slice': slice(2, 4), 'size': 2},
         }
         vec = OptimizerVector('design_var', data, metadata)
 
@@ -330,9 +330,9 @@ class TestOptimizerVectorEdgeCases(unittest.TestCase):
         """Test multiple variables with same size."""
         data = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
         metadata = {
-            'a': {'start_idx': 0, 'end_idx': 2, 'size': 2},
-            'b': {'start_idx': 2, 'end_idx': 4, 'size': 2},
-            'c': {'start_idx': 4, 'end_idx': 6, 'size': 2},
+            'a': {'slice': slice(0, 2), 'size': 2},
+            'b': {'slice': slice(2, 4), 'size': 2},
+            'c': {'slice': slice(4, 6), 'size': 2},
         }
         vec = OptimizerVector('design_var', data, metadata)
 

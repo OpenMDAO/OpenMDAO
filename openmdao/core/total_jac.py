@@ -1413,12 +1413,12 @@ class _TotalJacInfo(object):
 
         if is_flat:
             for (out_name, in_name), block in jac_dict.items():
-                # Apply row scaling if the output is unit-active
+                # Apply row scaling if the output has unit scaling
                 out_scaler = self._resp_unit_scalers.get(out_name)
                 if out_scaler:
-                    block[...] = (out_scaler * block.T).T
+                    block[...] = out_scaler
                 
-                # Apply column scaling if the input is unit-active
+                # Apply column scaling if the input has unit scaling
                 in_scaler = self._desvar_unit_scalers.get(in_name)
                 if in_scaler:
                     block *= (1.0 / in_scaler)
@@ -1429,7 +1429,7 @@ class _TotalJacInfo(object):
                 
                 for in_name, block in in_dict.items():
                     if out_scaler:
-                        block[...] = (out_scaler * block.T).T
+                        block[...] = out_scaler
                     
                     in_scaler = self._desvar_unit_scalers.get(in_name)
                     if in_scaler:

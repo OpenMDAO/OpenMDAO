@@ -958,7 +958,7 @@ class Driver(object, metaclass=DriverMetaclass):
         rank : int or None
             If not None, gather value to this rank only.
         driver_units : bool
-            If True, return the given variable interest in the units specified for the
+            If True, return the given variable of interest in the units specified for the
             design variable, constraint, or objective.
 
         Returns

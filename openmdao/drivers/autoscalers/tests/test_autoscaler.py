@@ -26,7 +26,7 @@ class TestAutoscaler(unittest.TestCase):
         autoscaler.setup(driver)
 
         # Create design variable vector in model space
-        meta = {'x': {'start_idx': 0, 'end_idx': 1, 'size': 1}}
+        meta = {'x': {'slice': slice(0, 1), 'size': 1}}
         model_value = np.array([3.0])  # Model space value
         dv_vector = OptimizerVector('design_var', model_value.copy(), meta)
 
@@ -52,7 +52,7 @@ class TestAutoscaler(unittest.TestCase):
         autoscaler.setup(driver)
 
         # Create design variable vector in optimizer space
-        meta = {'x': {'start_idx': 0, 'end_idx': 1, 'size': 1}}
+        meta = {'x': {'slice': slice(0, 1), 'size': 1}}
         optimizer_value = np.array([8.0])  # Optimizer space value
         dv_vector = OptimizerVector('design_var', optimizer_value.copy(), meta, driver_scaling=True)
 
@@ -74,7 +74,7 @@ class TestAutoscaler(unittest.TestCase):
         autoscaler = Autoscaler()
         autoscaler.setup(driver)
 
-        meta = {'x': {'start_idx': 0, 'end_idx': 1, 'size': 1}}
+        meta = {'x': {'slice': slice(0, 1), 'size': 1}}
         original_value = np.array([3.0])
         dv_vector = OptimizerVector('design_var', original_value.copy(), meta)
 
@@ -97,7 +97,7 @@ class TestAutoscaler(unittest.TestCase):
         autoscaler = Autoscaler()
         autoscaler.setup(driver)
 
-        meta = {'x': {'start_idx': 0, 'end_idx': 1, 'size': 1}}
+        meta = {'x': {'slice': slice(0, 1), 'size': 1}}
         model_value = np.array([3.0])
         dv_vector = OptimizerVector('design_var', model_value.copy(), meta)
 
@@ -120,7 +120,7 @@ class TestAutoscaler(unittest.TestCase):
         autoscaler = Autoscaler()
         autoscaler.setup(driver)
 
-        meta = {'x': {'start_idx': 0, 'end_idx': 1, 'size': 1}}
+        meta = {'x': {'slice': slice(0, 1), 'size': 1}}
         model_value = np.array([3.0])
         dv_vector = OptimizerVector('design_var', model_value.copy(), meta)
 
@@ -143,7 +143,7 @@ class TestAutoscaler(unittest.TestCase):
         autoscaler = Autoscaler()
         autoscaler.setup(driver)
 
-        meta = {'x': {'start_idx': 0, 'end_idx': 1, 'size': 1}}
+        meta = {'x': {'slice': slice(0, 1), 'size': 1}}
         data = np.array([3.0])
         dv_vector = OptimizerVector('design_var', data, meta)
 
@@ -175,8 +175,8 @@ class TestAutoscaler(unittest.TestCase):
         autoscaler.setup(driver)
 
         meta = {
-            'x1': {'start_idx': 0, 'end_idx': 1, 'size': 1},
-            'x2': {'start_idx': 1, 'end_idx': 2, 'size': 1}
+            'x1': {'slice': slice(0, 1), 'size': 1},
+            'x2': {'slice': slice(1, 2), 'size': 1}
         }
         data = np.array([3.0, 10.0])
         dv_vector = OptimizerVector('design_var', data, meta)
@@ -202,7 +202,7 @@ class TestAutoscaler(unittest.TestCase):
         autoscaler = Autoscaler()
         autoscaler.setup(driver)
 
-        meta = {'x': {'start_idx': 0, 'end_idx': 1, 'size': 1}}
+        meta = {'x': {'slice': slice(0, 1), 'size': 1}}
         original_value = np.array([3.0])
         dv_vector = OptimizerVector('design_var', original_value.copy(), meta)
         original_data = dv_vector.asarray().copy()
@@ -231,8 +231,8 @@ class TestAutoscaler(unittest.TestCase):
         autoscaler.setup(driver)
 
         meta = {
-            'c1': {'start_idx': 0, 'end_idx': 1, 'size': 1},
-            'c2': {'start_idx': 1, 'end_idx': 2, 'size': 1}
+            'c1': {'slice': slice(0, 1), 'size': 1},
+            'c2': {'slice': slice(1, 2), 'size': 1}
         }
         data = np.array([5.0, 10.0])
         cons_vector = OptimizerVector('constraint', data, meta)
@@ -259,7 +259,7 @@ class TestAutoscaler(unittest.TestCase):
         autoscaler.setup(driver)
 
         meta = {
-            'obj': {'start_idx': 0, 'end_idx': 1, 'size': 1}
+            'obj': {'slice': slice(0, 1), 'size': 1}
         }
         data = np.array([100.0])
         objs_vector = OptimizerVector('objective', data, meta)
@@ -494,7 +494,7 @@ class TestScalingWithArrayValues(unittest.TestCase):
         autoscaler = Autoscaler()
         autoscaler.setup(driver)
 
-        meta = {'x': {'start_idx': 0, 'end_idx': 2, 'size': 2}}
+        meta = {'x': {'slice': slice(0, 2), 'size': 2}}
         model_value = np.array([10.0, 20.0])
         dv_vector = OptimizerVector('design_var', model_value.copy(), meta)
 
@@ -519,7 +519,7 @@ class TestScalingWithArrayValues(unittest.TestCase):
         autoscaler = Autoscaler()
         autoscaler.setup(driver)
 
-        meta = {'x': {'start_idx': 0, 'end_idx': 2, 'size': 2}}
+        meta = {'x': {'slice': slice(0, 2), 'size': 2}}
         optimizer_value = np.array([22.0, 61.5])
         dv_vector = OptimizerVector('design_var', optimizer_value, meta, driver_scaling=True)
 

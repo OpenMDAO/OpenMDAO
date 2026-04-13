@@ -373,7 +373,7 @@ class Autoscaler(AutoscalerBase):
         Use caution in the definition of this method. OpenMDAO **always** minimizes
         the objective, and negates the sign of the objective when maximizing (generally
         by setting scaler or ref to a negative value). If your implementation changes
-        the sign of the objective, you max accidentally change an objective minimization
+        the sign of the objective, you may accidentally change an objective minimization
         to a maximization or vice-versa.
 
         Parameters
