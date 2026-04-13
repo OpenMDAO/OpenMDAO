@@ -41,7 +41,7 @@ class BrentSolver(NonlinearSolver):
         """
         super()._declare_options()
 
-        self.options.declare('state_target', types=str, default='',
+        self.options.declare('state_target', types=str, allow_none=True, default=None,
                              desc='Name of the implicit state to be solved')
 
         self.options.declare('lower_bound', default=0.0,
@@ -67,8 +67,8 @@ class BrentSolver(NonlinearSolver):
         """
         super()._setup_solvers(system, depth)
 
-        if self.options['state_target'].strip() == '':
-            msg = f"{self.msginfo}: 'state_target' option in Brent solver of {pathname} must be specified."
+        if self.options['state_target'] is None:
+            msg = f"{self.msginfo}: 'state_target' option in Brent solver must be specified."
             raise ValueError(msg)
 
         self.state_target = self.options['state_target']
@@ -104,9 +104,6 @@ class BrentSolver(NonlinearSolver):
         atol = self.options['atol']
         rtol = self.options['rtol']
         iprint = self.options['iprint']
-        stall_limit = self.options['stall_limit']
-        stall_tol = self.options['stall_tol']
-        stall_tol_type = self.options['stall_tol_type']
 
         self._mpi_print_header()
 
@@ -116,11 +113,6 @@ class BrentSolver(NonlinearSolver):
         self._norm0 = norm0
 
         self._mpi_print(self._iter_count, norm, norm / norm0)
-
-        stalled = False
-        stall_count = 0
-        if stall_limit > 0:
-            stall_norm = norm0
 
         # Brentq is external and controls convergence.
         self._run_all_iterations()
@@ -135,12 +127,6 @@ class BrentSolver(NonlinearSolver):
         # conditionals.
         if np.isinf(norm) or np.isnan(norm):
             self._inf_nan_failure()
-
-        # solver stalled.
-        elif stalled:
-            msg = (f"Solver '{self.SOLVER}' on system '{system.pathname}' stalled after "
-                   f"{self._iter_count} iterations.")
-            self.report_failure(msg)
 
         # Solver hit maxiter without meeting desired tolerances.
         elif norm > atol and norm / norm0 > rtol:

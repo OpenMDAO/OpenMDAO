@@ -48,26 +48,22 @@ class TestBrentSolver(unittest.TestCase):
         )
         self.prob = prob
 
-    #def test_deprecated_option(self):
-        #with warnings.catch_warnings(record=True) as w:
-            ## Cause all warnings to always be triggered.
-            #warnings.simplefilter("always")
+    def test_no_state_var_err(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', CompTest(), promotes=['*'])
+        model.nonlinear_solver = om.BrentSolver(
+            maxiter=100,
+            atol=1e-8,
+            rtol=1e-8,
+        )
+        prob.setup(check=False)
 
-            ## Trigger a warning.
-            #self.prob.root.nl_solver.options['max_iter'] = 100
+        with self.assertRaises(ValueError) as context:
+            prob.final_setup()
 
-            #self.assertEqual(len(w), 1)
-            #self.assertEqual(str(w[0].message),
-                     #"Option 'max_iter' is deprecated. Use 'maxiter' instead.")
-
-    #def test_no_state_var_err(self):
-
-        #try:
-            #self.prob.setup(check=False)
-        #except ValueError as err:
-            #self.assertEqual(str(err), "'state_var' option in Brent solver of root must be specified")
-        #else:
-            #self.fail('ValueError Expected')
+        msg = "BrentSolver in <model> <class Group>: 'state_target' option in Brent solver must be specified."
+        self.assertEqual(str(context.exception), msg)
 
     def test_brent_converge(self):
 
@@ -78,7 +74,7 @@ class TestBrentSolver(unittest.TestCase):
 
         p.run_model()
 
-        assert_near_equal(self, p.get_val('x'), 2.06720359226, 1e-8)
+        assert_near_equal(p.get_val('x')[0], 2.06720359226, 1e-8)
 
     #def test_brent_analysis_error(self):
 
