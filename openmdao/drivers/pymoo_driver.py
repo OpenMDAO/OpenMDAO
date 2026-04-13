@@ -18,6 +18,13 @@ Single-Objective:
     - SRES: Stochastic Ranking Evolution Strategy
     - ISRES: Improved Stochastic Ranking Evolution Strategy
     - NRBO: Newton-Raphson Based Optimizer
+    - DIRECT: DIRECT (Dividing RECTangles) deterministic global optimizer
+    - G3PCX: Generalized Generation Gap with Parent-Centric Crossover (no constraint support)
+    - NicheGA: Niching Genetic Algorithm
+    - PSO: Particle Swarm Optimization (no constraint support)
+    - EPPSO: Extended and Parallelised PSO (no constraint support)
+    - RandomSearch: Random Search (no constraint support)
+    - Optuna: Optuna-based optimizer (requires the ``optuna`` package)
     - MixedVariableGA: Genetic Algorithm with support for discrete (integer) and
       mixed integer design variables
 
@@ -30,11 +37,15 @@ Multi-Objective:
     - RNSGA3: Reference Point Based NSGA-III
     - MOEAD: Multi-Objective Evolutionary Algorithm Based on Decomposition
     - AGEMOEA: Adaptive Geometry Estimation based MOEA
+    - AGEMOEA2: Improved Adaptive Geometry Estimation based MOEA (no constraint support)
     - CTAEA: Constrained Two-Archive Evolutionary Algorithm
     - SMSEMOA: S-Metric Selection EMOA
     - RVEA: Reference Vector Guided Evolutionary Algorithm
     - CMOPSO: Constrained Multi-Objective Particle Swarm Optimization
     - MOPSO_CD: Multi-Objective Particle Swarm Optimization with Crowding Distance
+    - DNSGA2: Dynamic NSGA-II (unconstrained only)
+    - KGB: KGB-DMOEA (unconstrained only)
+    - SPEA2: Strength Pareto Evolutionary Algorithm 2
 
 Notes
 -----
@@ -85,23 +96,29 @@ except Exception as err:
     Integer = None
 
 
-# Algorithms that support constraints
+# Algorithms that support constraints.
+# Not all algorithms are explicilty mentioned in the documentation as supporting
+# constraints or not, so I had to make an educated guess based on what was in the
+# algorithm.
 _constraint_optimizers = {'GA', 'DE', 'BRKGA', 'NelderMead', 'PatternSearch',
-                          'ES', 'SRES', 'ISRES', 'NRBO', 'NSGA2', 'RNSGA2',
-                          'PINSGA2', 'NSGA3', 'UNSGA3', 'RNSGA3', 'CTAEA',
-                          'SMSEMOA', 'CMOPSO', 'MOPSO_CD', 'MixedVariableGA'}
+                          'ES', 'SRES', 'ISRES', 'NRBO', 'DIRECT', 'NicheGA',
+                          'Optuna', 'NSGA2', 'RNSGA2', 'PINSGA2', 'NSGA3',
+                          'UNSGA3', 'RNSGA3', 'CTAEA', 'SMSEMOA', 'CMOPSO',
+                          'MOPSO_CD', 'SPEA2', 'MixedVariableGA'}
 
 # Algorithms that only support a single objective
 _single_obj_optimizers = {'GA', 'DE', 'BRKGA', 'NelderMead', 'PatternSearch',
-                          'CMAES', 'ES', 'SRES', 'ISRES', 'NRBO', 'MixedVariableGA'}
+                          'CMAES', 'ES', 'SRES', 'ISRES', 'NRBO', 'DIRECT',
+                          'G3PCX', 'NicheGA', 'PSO', 'EPPSO', 'RandomSearch',
+                          'Optuna', 'MixedVariableGA'}
 
 # Algorithms that support discrete (integer) and mixed integer design variables
 _mixed_var_optimizers = {'MixedVariableGA'}
 
 # Algorithms that support multiple objectives
 _multi_obj_optimizers = {'NSGA2', 'RNSGA2', 'PINSGA2', 'NSGA3', 'UNSGA3', 'RNSGA3',
-                         'MOEAD', 'AGEMOEA', 'CTAEA', 'SMSEMOA', 'RVEA', 'CMOPSO',
-                         'MOPSO_CD'}
+                         'MOEAD', 'AGEMOEA', 'AGEMOEA2', 'CTAEA', 'SMSEMOA', 'RVEA',
+                         'CMOPSO', 'MOPSO_CD', 'DNSGA2', 'KGB', 'SPEA2'}
 
 # All available optimizers
 _all_optimizers = _single_obj_optimizers | _multi_obj_optimizers
@@ -998,7 +1015,11 @@ class pymooDriver(Driver):
             'NelderMead': 'nelder',
             'PatternSearch': 'pattern',
             'AGEMOEA': 'age',
+            'AGEMOEA2': 'age2',
             'SMSEMOA': 'sms',
+            'NicheGA': 'ga_niching',
+            'EPPSO': 'pso_ep',
+            'RandomSearch': 'random_search',
         }
         module_name = non_default_mapping.get(alg_name, alg_name.lower())
         module = importlib.import_module(f'{base}.{module_name}')
