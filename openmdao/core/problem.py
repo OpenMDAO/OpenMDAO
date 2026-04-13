@@ -1282,6 +1282,7 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         if status >= _SetupStatus.POST_SETUP2:
             if self._metadata['setup_status'] < _SetupStatus.POST_SETUP2:
+                self._metadata['static_mode'] = False
                 self.model._setup_part2()
                 self._metadata['setup_status'] = _SetupStatus.POST_SETUP2
 
