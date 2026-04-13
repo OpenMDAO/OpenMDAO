@@ -34,6 +34,23 @@ class CompTest(om.ImplicitComponent):
         residuals['x'] = a * fact + b * x - c
 
 
+class BracketTestComponent(om.ImplicitComponent):
+
+    def setup(self):
+        self.add_input('a', val=.3)
+        self.add_input('ap', val=.01)
+        self.add_input('lambda_r', val=7.)
+
+        self.add_output('phi', val=0.0)
+
+    def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None, discrete_outputs=None):
+        a = inputs['a']
+        ap = inputs['ap']
+        lambda_r = inputs['lambda_r']
+        phi = outputs['phi']
+
+        residuals['phi'] = np.sin(phi) / (1 - a) - np.cos(phi) / lambda_r / (1 + ap)
+
 class TestBrentSolver(unittest.TestCase):
 
     def test_no_state_var_err(self):
@@ -83,7 +100,7 @@ class TestBrentSolver(unittest.TestCase):
         )
 
         prob.setup()
-        prob.set_solver_print(2)
+        prob.set_solver_print(0)
 
         prob.run_model()
 
@@ -128,119 +145,23 @@ class TestBrentSolver(unittest.TestCase):
 
         prob.run_model()
 
-        assert_near_equal(prob.get_val('x')[0], 2.06720359226, 1e-8)
+        assert_near_equal(prob.get_val('x')[0], -3.7451537261581453, 1e-8)
 
+    def test_bracket(self):
+        prob = om.Problem()
+        model = prob.model
 
-        #p.root.add('lower', ExecComp('low = 2*a'), promotes=['low', 'a'])
-        #p.root.add('upper', ExecComp('high = 2*b'), promotes=['high', 'b'])
+        model.add_subsystem('comp', BracketTestComponent(), promotes=['*'])
 
-        #sub = p.root.add('sub', Group(), promotes=['x','low', 'high'])
-        #sub.add('comp', CompTest(), promotes=['a','x','n','b','c'])
-        #sub.add('dummy1', ExecComp('d=low'), promotes=['low'])
-        #sub.add('dummy2', ExecComp('d=high'), promotes=['high'])
-        #sub.nl_solver = Brent()
-
-        #sub.nl_solver.options['state_var'] = 'x'
-        ## sub.nl_solver.options['lower_bound'] = -10.
-        ## sub.nl_solver.options['upper_bound'] = 110.
-        #sub.nl_solver.options['var_lower_bound'] = 'flow' # bad value for testing error
-        #sub.nl_solver.options['var_upper_bound'] = 'high'
-
-        #try:
-            #p.setup(check=False)
-        #except ValueError as err:
-            #self.assertEqual(str(err), "'var_lower_bound' variable 'flow' was not found as a parameter on any component in sub")
-        #else:
-            #self.fail('ValueError expected')
-        #sub.ln_solver=ScipyGMRES()
-
-        #sub.nl_solver.options['var_lower_bound'] = 'low' # correct value
-
-        #p.setup(check=False)
-        #p['a'] = -5.
-        #p['b'] = 55.
-        #p.run()
-
-        #assert_rel_error(self, p.root.resids['x'], 0, .0001)
-        #assert_rel_error(self, p.root.unknowns['x'], 2.06720359226, .0001)
-
-    #def test_brent_analysis_error(self):
-
-        #p = self.prob
-        #p.root.nl_solver.options['state_var'] = 'x'
-        #p.root.nl_solver.options['err_on_maxiter'] = True
-        #p.root.nl_solver.options['maxiter'] = 2
-
-        #p.root.ln_solver=ScipyGMRES()
-        #p.setup(check=False)
-
-        #try:
-            #p.run()
-        #except AnalysisError as err:
-            #self.assertEqual(str(err), "Failed to converge after 2 iterations.")
-        #else:
-            #self.fail("expected AnalysisError")
-
-    #def test_data_pass_bounds_idx(self):
-
-        #p = Problem()
-        #p.root = Group()
-
-        #p.root.add('lower', ExecComp('low = 2*a'), promotes=['low', 'a'])
-        #p.root.add('upper', ExecComp('high = 2*b'), promotes=['high', 'b'])
-
-        #sub = p.root.add('sub', Group(), promotes=['x','low', 'high'])
-        #sub.add('comp', IndexCompTest(), promotes=['a','x','n','b','c'])
-        #sub.add('dummy1', ExecComp('d=low'), promotes=['low'])
-        #sub.add('dummy2', ExecComp('d=high'), promotes=['high'])
-        #sub.nl_solver = Brent()
-
-        #sub.nl_solver.options['state_var'] = 'x'
-        #sub.nl_solver.options['state_var_idx'] = 2
-        #sub.nl_solver.options['var_lower_bound'] = 'low'
-        #sub.nl_solver.options['var_upper_bound'] = 'high'
-        #sub.ln_solver=ScipyGMRES()
-
-        #p.setup(check=False)
-        #p['a'] = -5.
-        #p['b'] = 55.
-        #p.run()
-
-        #assert_rel_error(self, p.root.resids['x'][2], 0, .0001)
-        #assert_rel_error(self, p.root.unknowns['x'][2], 2.06720359226, .0001)
-
-
-#class BracketTestComponent(Component):
-
-    #def __init__(self):
-        #super(BracketTestComponent, self).__init__()
-
-        ## in
-        #self.add_param('a', .3)
-        #self.add_param('ap', .01)
-        #self.add_param('lambda_r', 7.)
-
-        ## states
-        #self.add_state('phi', 0.)
-
-    #def solve_nonlinear(self, p, u, r):
-        #pass
-
-    #def apply_nonlinear(self, p, u, r):
-
-        #r['phi'] = np.sin(u['phi'])/(1-p['a']) - np.cos(u['phi'])/p['lambda_r']/(1+p['ap'])
-        ## print u['phi'], p['a'], p['lambda_r'], 1+p['ap'], r['phi']
-
-
-#class TestBrentBracketFunc(unittest.TestCase):
-
-    #def test_bracket(self):
-
-        #p = Problem()
-        #p.root = Group()
-        #p.root.add('comp', BracketTestComponent(), promotes=['phi', 'a', 'ap', 'lambda_r'])
-        #p.root.nl_solver = Brent()
-        #p.root.ln_solver = ScipyGMRES()
+        eps = 1e-6
+        model.nonlinear_solver = om.BrentSolver(
+            state_target='phi',
+            maxiter=100,
+            atol=1e-8,
+            rtol=1e-8,
+            lower_bound=eps,
+            upper_bound=np.pi/2 - eps,
+        )
 
         #eps = 1e-6
         #p.root.nl_solver.options['lower_bound'] = eps
