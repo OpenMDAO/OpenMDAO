@@ -229,8 +229,7 @@ class Autoscaler(AutoscalerBase):
             size = meta.get('global_size', meta.get('size', 0)) \
                 if meta.get('distributed', False) else meta.get('size', 0)
             vecmeta[name] = {
-                'start_idx': total_size,
-                'end_idx': total_size + size,
+                'slice': slice(total_size, total_size + size),
                 'size': size,
             }
             total_size += size
@@ -244,20 +243,19 @@ class Autoscaler(AutoscalerBase):
             if meta.get('discrete', False):
                 continue
             size = vmeta['size']
-            start = vmeta['start_idx']
-            end = vmeta['end_idx']
+            s = vmeta['slice']
             adder = self._var_meta[voi_type][name]['total_adder']
             scaler = self._var_meta[voi_type][name]['total_scaler']
 
-            lower_data[start:end] = self._scale_bound(
+            lower_data[s] = self._scale_bound(
                 meta.get('lower', -INF_BOUND), adder, scaler, size, is_lower=True)
-            upper_data[start:end] = self._scale_bound(
+            upper_data[s] = self._scale_bound(
                 meta.get('upper', INF_BOUND), adder, scaler, size, is_lower=False)
 
             if voi_type == 'constraint':
                 eq = meta.get('equals')
                 if eq is not None:
-                    equals_data[start:end] = self._scale_bound(
+                    equals_data[s] = self._scale_bound(
                         eq, adder, scaler, size, is_lower=False)
 
         lower_vec = OptimizerVector(voi_type, lower_data, vecmeta)
