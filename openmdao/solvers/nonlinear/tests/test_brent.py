@@ -36,18 +36,6 @@ class CompTest(om.ImplicitComponent):
 
 class TestBrentSolver(unittest.TestCase):
 
-    def setUp(self):
-        prob = om.Problem()
-        model = prob.model
-        model.add_subsystem('comp', CompTest(), promotes=['*'])
-        model.nonlinear_solver = om.BrentSolver(
-            state_target='x',
-            maxiter=100,
-            atol=1e-8,
-            rtol=1e-8,
-        )
-        self.prob = prob
-
     def test_no_state_var_err(self):
         prob = om.Problem()
         model = prob.model
@@ -65,55 +53,83 @@ class TestBrentSolver(unittest.TestCase):
         msg = "BrentSolver in <model> <class Group>: 'state_target' option in Brent solver must be specified."
         self.assertEqual(str(context.exception), msg)
 
+    def test_state_var_not_found(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', CompTest(), promotes=['*'])
+        model.nonlinear_solver = om.BrentSolver(
+            state_target='fake',
+            maxiter=100,
+            atol=1e-8,
+            rtol=1e-8,
+        )
+        prob.setup(check=False)
+
+        with self.assertRaises(ValueError) as context:
+            prob.final_setup()
+
+        msg = "BrentSolver in <model> <class Group>: 'state_target' variable 'fake' not found."
+        self.assertEqual(str(context.exception), msg)
+
     def test_brent_converge(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', CompTest(), promotes=['*'])
+        model.nonlinear_solver = om.BrentSolver(
+            state_target='x',
+            maxiter=100,
+            atol=1e-8,
+            rtol=1e-8,
+        )
 
-        p = self.prob
+        prob.setup()
+        prob.set_solver_print(2)
 
-        p.setup()
-        p.set_solver_print(2)
+        prob.run_model()
 
-        p.run_model()
+        assert_near_equal(prob.get_val('x')[0], 2.06720359226, 1e-8)
 
-        assert_near_equal(p.get_val('x')[0], 2.06720359226, 1e-8)
+    def test_data_pass_bounds(self):
+        prob = om.Problem()
+        model = prob.model
 
-    #def test_brent_analysis_error(self):
+        model.add_subsystem('lower', om.ExecComp('low = 2*a'), promotes=['*'])
+        model.add_subsystem('upper', om.ExecComp('high = 2*b'), promotes=['*'])
 
-        #p = self.prob
-        #p.root.nl_solver.options['state_var'] = 'x'
-        #p.root.nl_solver.options['err_on_maxiter'] = True
-        #p.root.nl_solver.options['maxiter'] = 2
+        model.add_subsystem('comp', CompTest(), promotes=['*'])
+        model.nonlinear_solver = om.BrentSolver(
+            state_target='x',
+            maxiter=100,
+            atol=1e-8,
+            rtol=1e-8,
+            lower_bound_target='flow',  # bad value for testing error
+            lower_bound=-1e-10,  # Assuring that these are ignored.
+            upper_bound=1e-10,  # Assuring that these are ignored.
+        )
 
-        #p.root.ln_solver=ScipyGMRES()
-        #p.setup(check=False)
+        prob.setup()
+        prob.set_solver_print(0)
 
-        #try:
-            #p.run()
-        #except AnalysisError as err:
-            #self.assertEqual(str(err), "Failed to converge after 2 iterations.")
-        #else:
-            #self.fail("expected AnalysisError")
+        with self.assertRaises(ValueError) as context:
+            prob.final_setup()
 
-    #def test_brent_converge_index(self):
+        msg = "BrentSolver in <model> <class Group>: 'lower_bound_target' variable 'flow' not found."
+        self.assertEqual(str(context.exception), msg)
 
-        #p = Problem()
-        #p.root = Group()
-        #p.root.add('comp', IndexCompTest(), promotes=['a','x','n','b','c'])
-        #p.root.nl_solver = Brent()
+        # Now set the correct locations for upper/lower bounds.
 
-        #p.root.nl_solver.options['state_var'] = 'x'
-        #p.root.nl_solver.options['state_var_idx'] = 2
-        #p.root.ln_solver = ScipyGMRES()
-        #p.setup(check=False)
+        model.nonlinear_solver.options['lower_bound_target'] = 'low'
+        model.nonlinear_solver.options['upper_bound_target'] = 'high'
 
-        #p.run()
+        prob.setup()
 
-        #assert_rel_error(self, p.root.unknowns['x'][2], 2.06720359226, .0001)
-        #assert_rel_error(self, p.root.resids['x'][2], 0, .0001)
+        prob.set_val('a', -5.0)
+        prob.set_val('b', 55.0)
 
-    #def test_data_pass_bounds(self):
+        prob.run_model()
 
-        #p = Problem()
-        #p.root = Group()
+        assert_near_equal(prob.get_val('x')[0], 2.06720359226, 1e-8)
+
 
         #p.root.add('lower', ExecComp('low = 2*a'), promotes=['low', 'a'])
         #p.root.add('upper', ExecComp('high = 2*b'), promotes=['high', 'b'])
@@ -147,6 +163,23 @@ class TestBrentSolver(unittest.TestCase):
 
         #assert_rel_error(self, p.root.resids['x'], 0, .0001)
         #assert_rel_error(self, p.root.unknowns['x'], 2.06720359226, .0001)
+
+    #def test_brent_analysis_error(self):
+
+        #p = self.prob
+        #p.root.nl_solver.options['state_var'] = 'x'
+        #p.root.nl_solver.options['err_on_maxiter'] = True
+        #p.root.nl_solver.options['maxiter'] = 2
+
+        #p.root.ln_solver=ScipyGMRES()
+        #p.setup(check=False)
+
+        #try:
+            #p.run()
+        #except AnalysisError as err:
+            #self.assertEqual(str(err), "Failed to converge after 2 iterations.")
+        #else:
+            #self.fail("expected AnalysisError")
 
     #def test_data_pass_bounds_idx(self):
 
