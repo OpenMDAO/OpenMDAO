@@ -1282,7 +1282,14 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         if status >= _SetupStatus.POST_SETUP2:
             if self._metadata['setup_status'] < _SetupStatus.POST_SETUP2:
-                self.model._setup_part2()
+                self._metadata['static_mode'] = False
+                try:
+                    self.model._setup_part2()
+                    self._check_collected_errors()
+                finally:
+                    # whenever we're outside of model._setup, static mode should be True so that
+                    # anything added outside of _setup will persist.
+                    self._metadata['static_mode'] = True
                 self._metadata['setup_status'] = _SetupStatus.POST_SETUP2
 
         if status >= _SetupStatus.POST_FINAL_SETUP:
