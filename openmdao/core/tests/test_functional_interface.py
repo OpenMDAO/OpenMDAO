@@ -790,6 +790,59 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
         assert_near_equal(J[area_start:area_end, y_start:y_end], dcircle_area_dy)
         assert_near_equal(J[area_start:area_end, r_start:r_end], dcircle_area_dr)
 
+    def test_constraints_with_indices(self):
+        prob = self._prob
+
+        # l_conx.g[0] is a constraint.
+        # But here I'm asking for the whole variable.
+        dfdx = prob.get_callback("dfdx", input_vars=["x", "y"], output_vars=["l_conx.g", "circle.area"])
+
+        input_names_expected = ["x", "y"]
+        input_names = dfdx.input_var_names
+        self.assertEqual(len(input_names), len(input_names_expected))
+        self.assertTrue(all(name in input_names_expected for name in input_names))
+
+        # This doesn't include linear constraints, namely the constraint on the first index of y.
+        # Not sure what to do about that.
+        output_names_expected = ["l_conx.g", "circle.area"]
+        output_names = dfdx.output_var_names
+        self.assertEqual(len(output_names), len(output_names_expected))
+        self.assertTrue(all(name in output_names_expected for name in output_names))
+
+        # Now check the variables.
+        # First, check that the indices worked properly.
+        x0 = dfdx.create_input_vector()
+        y0 = dfdx.create_output_vector()
+
+        # Check the `x` input var.
+        x_expected = prob.get_val("x").flatten()
+        x_start, x_end = dfdx._input_metadata["x"]["offsets"]
+        assert_near_equal(x0[x_start:x_end], x_expected)
+        assert_near_equal(dfdx.get_input_val("x"), x_expected)
+
+        # Check the `y` input var.
+        y_expected = prob.get_val("y").flatten()
+        y_start, y_end = dfdx._input_metadata["y"]["offsets"]
+        assert_near_equal(x0[y_start:y_end], y_expected)
+        assert_near_equal(dfdx.get_input_val("y"), y_expected)
+
+        # Check the `l_conx.g` output var.
+        lconxg_expected = prob.get_val("l_conx.g").flatten()
+        lconxg_start, lconxg_end = dfdx._output_metadata["l_conx.g"]["offsets"]
+        assert_near_equal(y0[lconxg_start:lconxg_end], lconxg_expected)
+        assert_near_equal(dfdx.get_output_val("l_conx.g"), lconxg_expected)
+        SIZE = self._SIZE
+        # Make sure we got the entire `l_conx.g` variable, not just the single one used for the constraint.
+        self.assertTrue(lconxg_end - lconxg_start, SIZE)
+
+        # Check the `circle.area` output var.
+        area_expected = prob.get_val("circle.area")
+        area_start, area_end = dfdx._output_metadata["circle.area"]["offsets"]
+        assert_near_equal(y0[area_start:area_end], area_expected)
+        assert_near_equal(dfdx.get_output_val("circle.area"), area_expected)
+
+
+
     def test_linear_constraint_check(self):
         prob = self._prob
 
@@ -810,6 +863,8 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
         x0 = dfdx.create_input_vector()
         # Why does this have a dense column in the first one?
         # print(dfdx(x0))
+
+
 
 if __name__ == "__main__":
     unittest.main()
