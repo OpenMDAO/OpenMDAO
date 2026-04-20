@@ -158,6 +158,7 @@ petscdirectsolver = "openmdao.solvers.linear.petsc_direct_solver:PETScDirectSolv
 [project.entry-points.openmdao_nl_solver]
 armijogoldsteinls = "openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS"
 boundsenforcels = "openmdao.solvers.linesearch.backtracking:BoundsEnforceLS"
+brentsolver = "openmdao.solvers.nonlinear.brent:BrentSolver"
 broydensolver = "openmdao.solvers.nonlinear.broyden:BroydenSolver"
 newtonsolver = "openmdao.solvers.nonlinear.newton:NewtonSolver"
 nonlinearblockgs = "openmdao.solvers.nonlinear.nonlinear_block_gs:NonlinearBlockGS"

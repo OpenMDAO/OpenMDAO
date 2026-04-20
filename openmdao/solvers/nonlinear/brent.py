@@ -5,6 +5,7 @@ Based on implementation of the Brent algorithm in OpenMDAO 2.0 using brentq from
 """
 import os
 
+import networkx as nx
 import numpy as np
 from scipy.optimize import brentq
 
@@ -103,6 +104,31 @@ class BrentSolver(NonlinearSolver):
         self.lower_target = lower = self.options['lower_bound_target']
         if lower is not None and lower not in system._outputs:
             msg = f"{self.msginfo}: 'lower_bound_target' variable '{lower}' not found."
+            raise ValueError(msg)
+
+        # Make sure we only have one state.
+        valid = True
+        n_imp = 0
+        from openmdao.core.implicitcomponent import ImplicitComponent
+        for sub in system.system_iter(recurse=False, typ=ImplicitComponent):
+            if n_imp > 0:
+                # Found more than 1 implicitcomponent
+                valid = False
+                break
+            n_imp = len(sub._outputs)
+            if n_imp > 1:
+                # This implicitcomponent has more than 1 state
+                valid = False
+                break
+
+        if not valid:
+            msg = f"{self.msginfo}: Brent can only solve 1 single implicit state."
+            raise ValueError(msg)
+
+        # Check for cycles
+        graph = system.compute_sys_graph()
+        if not nx.is_directed_acyclic_graph(graph):
+            msg = f"{self.msginfo}: Brent does not support cycles."
             raise ValueError(msg)
 
     def _solve(self):

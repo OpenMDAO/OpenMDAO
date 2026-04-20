@@ -106,6 +106,47 @@ class TestBrentSolver(unittest.TestCase):
 
         assert_near_equal(prob.get_val('x')[0], 2.06720359226, 1e-8)
 
+    def test_cycle_error(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp1', CompTest(), promotes=['*'])
+        model.add_subsystem(
+            'comp2',
+            om.ExecComp('a = 0.1 * x'),
+            promotes=['*']
+        )
+        model.nonlinear_solver = om.BrentSolver(
+            state_target='x',
+        )
+
+        prob.setup()
+        prob.set_solver_print(2)
+
+        #prob.final_setup()
+        #prob.model.display_conn_graph()
+
+        with self.assertRaises(ValueError) as context:
+            prob.run_model()
+        msg = "BrentSolver in <model> <class Group>: Brent does not support cycles."
+        self.assertEqual(str(context.exception), msg)
+
+    def test_multiple_state_error(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp1', CompTest(), promotes=['*'])
+        model.add_subsystem('comp2', CompTest(), promotes_inputs=['*'])
+        model.nonlinear_solver = om.BrentSolver(
+            state_target='x',
+        )
+
+        prob.setup()
+        prob.set_solver_print(2)
+
+        with self.assertRaises(ValueError) as context:
+            prob.run_model()
+        msg = "BrentSolver in <model> <class Group>: Brent can only solve 1 single implicit state."
+        self.assertEqual(str(context.exception), msg)
+
     def test_data_pass_bounds(self):
         prob = om.Problem()
         model = prob.model
