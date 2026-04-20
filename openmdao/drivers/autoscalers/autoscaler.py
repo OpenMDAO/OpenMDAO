@@ -20,32 +20,7 @@ class Autoscaler(AutoscalerBase):
     """
 
     def __init__(self):
-        self._var_meta : dict[str, dict[str, dict]] = {}
-        self._has_scaling : bool = False
-        self._scaled_lower = {}
-        self._scaled_upper = {}
-        self._scaled_equals = {}
-        self._driver_ref = None
-
-    def _get_inst_id(self):
-        """
-        Return a unique identifier for this autoscaler instance.
-
-        Used by the hooks and reports systems to identify this specific autoscaler instance.
-        The identifier is derived from the owning driver's instance id.
-
-        Returns
-        -------
-        str or None
-            A string of the form '<driver_inst_id>.autoscaler', or None if setup has not
-            been called yet.
-        """
-        if self._driver_ref is None:
-            return None
-        driver = self._driver_ref()
-        if driver is None:
-            return None
-        return f'{driver._get_inst_id()}.autoscaler'
+        super().__init__()
 
     def setup(self, driver: 'Driver'):
         """
