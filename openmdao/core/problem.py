@@ -176,7 +176,7 @@ class _FunctionalCallback(object):
                 input_var_indices = None
 
             if output_vars:
-                # Extract just the names to pass to `_TotalJacInfo` constructor.
+                # Extract just the names and indices to pass to `_TotalJacInfo` constructor.
                 output_var_names = []
                 output_var_indices = []
                 for entry in output_vars:
@@ -201,18 +201,32 @@ class _FunctionalCallback(object):
             if not input_vars:
                 # User didn't provide any input var data, so create one from what `_TotalJacInfo`
                 # decided.
+                # input_vars = [
+                #     {vname: {
+                #         "indices": vmeta["indices"]
+                #     } for vname, vmeta in tji.input_meta["fwd"].items()}
+                # ]
                 input_vars = [
                     {vname: {
-                        "indices": vmeta["indices"]
+                        "indices": vmeta["indices"],
+                        "name": vmeta["name"],
+                        # "alias": vmeta["alias"],
                     } for vname, vmeta in tji.input_meta["fwd"].items()}
                 ]
             if not output_vars:
                 # User didn't provide any output var data, so create one from what `_TotalJacInfo`
                 # decided.
+                # output_vars = [
+                #     {vname: {
+                #         "indices": vmeta["indices"]
+                #     } for vname, vmeta in tji.output_meta["fwd"].items()}
+                # ]
                 output_vars = [
-                    {vname: {
-                        "indices": vmeta["indices"]
-                    } for vname, vmeta in tji.output_meta["fwd"].items()}
+                    {valias: {
+                        "indices": vmeta["indices"],
+                        "name": vmeta["name"],
+                        # "alias": vmeta["alias"],
+                    } for valias, vmeta in tji.output_meta["fwd"].items()}
                 ]
 
         input_metadata, input_len = self._process_var_arguments(input_vars)
@@ -231,22 +245,23 @@ class _FunctionalCallback(object):
             if isinstance(entry, Mapping):
                 # Object is dict-like, so iterate over the mapping from variable names to variable
                 # metadata.
-                for vname, vmeta in entry.items():
-                    vmetas[vname], offset = self._get_var_metadata_with_defaults(vname, vmeta,
-                                                                                 offset)
+                for valias, vmeta in entry.items():
+                    vmetas[valias], offset = self._get_var_metadata_with_defaults(valias, vmeta,
+                                                                                  offset)
             else:
                 # Assume object is a string of a variable name, with no metadata.
-                vname = entry
+                valias = entry
                 vmeta = {}
-                vmetas[vname], offset = self._get_var_metadata_with_defaults(vname, vmeta, offset)
+                vmetas[valias], offset = self._get_var_metadata_with_defaults(valias, vmeta, offset)
 
         return vmetas, offset
 
-    def _get_var_metadata_with_defaults(self, vname, vmeta, offset):
+    def _get_var_metadata_with_defaults(self, valias, vmeta, offset):
         problem = self.problem
+        name = vmeta.get("name", valias)
         units = vmeta.get("units", None)
         indices = vmeta.get("indices", None)
-        val = problem.get_val(vname, units=units, indices=indices)
+        val = problem.get_val(name, units=units, indices=indices)
         try:
             # Assume val is an ndarray.
             shape = val.shape
@@ -258,27 +273,30 @@ class _FunctionalCallback(object):
 
         offset_new = offset + val_size
         offsets = (offset, offset_new)
-        return {"units": units, "indices": indices, "shape": shape, "offsets": offsets}, offset_new
+        return {"name": name, "units": units, "indices": indices,
+                "shape": shape, "offsets": offsets}, offset_new
 
     def _vector_to_problem(self, vec, metadata):
         problem = self._problem
 
-        for vname, vmetadata in metadata.items():
+        for valias, vmetadata in metadata.items():
+            name = vmetadata["name"]
             units = vmetadata["units"]
             indices = vmetadata["indices"]
             shape = vmetadata["shape"]
             idx0, idx1 = vmetadata["offsets"]
             val = vec[idx0:idx1].reshape(shape)
-            problem.set_val(vname, val, indices=indices, units=units)
+            problem.set_val(name, val, indices=indices, units=units)
 
     def _problem_to_vector(self, vec, metadata):
         problem = self._problem
 
-        for vname, vmetadata in metadata.items():
+        for valias, vmetadata in metadata.items():
+            name = vmetadata["name"]
             units = vmetadata["units"]
             indices = vmetadata["indices"]
             idx0, idx1 = vmetadata["offsets"]
-            val = problem.get_val(vname, indices=indices, units=units)
+            val = problem.get_val(name, indices=indices, units=units)
             vec[idx0:idx1] = val.flat
 
     def _totals_to_jacobian(self, J, totals):
@@ -286,6 +304,8 @@ class _FunctionalCallback(object):
         output_metadata = self._output_metadata
 
         # Not sure about sparse Jacobians.
+        # `_TotalJacInfo.compute_totals` appears to use constraint/objective
+        # aliases, so no need to go from alias to name here.
         for (vout, vin), val in totals.items():
             offset_in0, offset_in1 = input_metadata[vin]["offsets"]
             offset_out0, offset_out1 = output_metadata[vout]["offsets"]
@@ -327,6 +347,7 @@ class _FunctionalCallback(object):
 
         if self.form in ("dfdx", "fdfdx"):
             totals = self._total_jac_info.compute_totals()
+            # `_TotalJacInfo.compute_totals` appears to use constraint/objective aliases.
             self._totals_to_jacobian(J, totals)
 
         if self.form == "f":

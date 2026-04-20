@@ -841,8 +841,6 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
         assert_near_equal(y0[area_start:area_end], area_expected)
         assert_near_equal(dfdx.get_output_val("circle.area"), area_expected)
 
-
-
     def test_linear_constraint_check(self):
         prob = self._prob
 
@@ -865,6 +863,182 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
         # print(dfdx(x0))
 
 
+class IndicesTestComp(om.ExplicitComponent):
+
+    def setup(self):
+        self.add_input('x', val=0.0, shape=(2,))
+        self.add_output('f', val=0.0, shape=(2,))
+
+    def setup_partials(self):
+        self.declare_partials(of='*', wrt='*', method='cs')
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+
+        f = outputs['f']
+        f[0] = (x[0] + 2)**2 + (x[1] + 3)**2 - 4
+        # f[1] = (x[0] + 1)**2 + (x[1] + 2)**2 - 3
+        f[1] = 2*x[0] + 3*x[1]
+
+
+@use_tempdirs
+class TestWithIndices(unittest.TestCase):
+
+    def setUp(self):
+        comp = IndicesTestComp()
+        prob = self._prob = om.Problem()
+        prob.model.add_subsystem("comp", comp, promotes_inputs=["x"], promotes_outputs=["f"])
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.driver.options['optimizer'] = 'SLSQP'
+
+    def test_no_constraint(self):
+        prob = self._prob
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_objective('f', index=0)
+        prob.setup(force_alloc_complex=True)
+        # Need to run final_setup to avoid an error when creating the "_TotalJacInfo" object.
+        prob.final_setup()
+
+        prob.set_val('x', [0.0, 0.0])
+        prob.run_model()
+        prob.run_driver()
+
+        assert_near_equal(prob.get_val('x'), [-2, -3])
+        assert_near_equal(prob.get_val('f', indices=[0]), -4)
+
+        # When explicitly asking for an output variable that's an objective we want to get the entire output, not just the index that was used in `prob.model.add_objective`.
+        fdfdx = prob.get_callback("fdfdx", input_vars=["x"], output_vars=["f"])
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [-2, -3])
+        f, dfdx = fdfdx(x)
+        assert_near_equal(f, prob.get_val('f'))
+
+        # We asked for just one index for `f`, so that should be all we get.
+        fdfdx = prob.get_callback("fdfdx", input_vars=["x"], output_vars=[{"f": {'indices': [0]}}])
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [-2, -3])
+        f, dfdx = fdfdx(x)
+        dfdx_expected = np.zeros((1, 2))
+        dfdx_expected[0, 0] = 2*(x[0] + 2)
+        dfdx_expected[0, 1] = 2*(x[1] + 3)
+        assert_near_equal(f, prob.get_val('f', indices=[0]))
+
+        # We asked for just one index for `f`, so that should be all we get.
+        fdfdx = prob.get_callback("fdfdx", input_vars=["x"], output_vars=[{"f": {'indices': [1]}}])
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [-2, -3])
+        f, dfdx = fdfdx(x)
+        dfdx_expected = np.zeros((1, 2))
+        dfdx_expected[0, 0] = 2
+        dfdx_expected[0, 1] = 3
+        assert_near_equal(f, prob.get_val('f', indices=[1]))
+        assert_near_equal(dfdx, dfdx_expected)
+
+        # We asked for just one index for `f` and `x`, so that should be all we get.
+        fdfdx = prob.get_callback("fdfdx", input_vars=[{"x": {"indices": [0]}}], output_vars=[{"f": {'indices': [0]}}])
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [-2])
+        f, dfdx = fdfdx(x)
+        dfdx_expected = np.zeros((1, 1))
+        dfdx_expected[0, 0] = 2*(x[0] + 2)
+        assert_near_equal(f, prob.get_val('f', indices=[0]))
+        assert_near_equal(dfdx, dfdx_expected)
+
+        # We asked for just one index for `f` and `x`, so that should be all we get.
+        fdfdx = prob.get_callback("fdfdx", input_vars=[{"x": {"indices": [0]}}], output_vars=[{"f": {'indices': [1]}}])
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [-2])
+        f, dfdx = fdfdx(x)
+        dfdx_expected = np.zeros((1, 1))
+        dfdx_expected[0, 0] = 2
+        assert_near_equal(f, prob.get_val('f', indices=[1]))
+        assert_near_equal(dfdx, dfdx_expected)
+
+        # Didn't ask for anything specific, so should just get design variables and the single objective.
+        fdfdx = prob.get_callback("fdfdx")
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [-2, -3])
+        f, dfdx = fdfdx(x)
+        dfdx_expected = np.zeros((1, 2))
+        dfdx_expected[0, 0] = 2*(x[0] + 2)
+        dfdx_expected[0, 1] = 2*(x[1] + 3)
+        assert_near_equal(f, prob.get_val('f', indices=[0]))
+        assert_near_equal(dfdx, dfdx_expected)
+
+    def test_with_constraint(self):
+        prob = self._prob
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_objective('f', index=0, alias="f_objective")
+        prob.model.add_constraint('f', indices=[1], equals=13.0, alias="f_constraint")
+        prob.setup(force_alloc_complex=True)
+        # Need to run final_setup to avoid an error when creating the "_TotalJacInfo" object.
+        prob.final_setup()
+
+        prob.set_val('x', [0.0, 0.0])
+        prob.run_model()
+        prob.run_driver()
+
+        # x[0] = 2/13*f[1] = 2/13*13 = 2
+        # x[1] = (f[1] - 2*x[0])/3 = (13 - 2*2)/3 = 9/3 = 3
+        # f[0] = (x[0] + 2)**2 + (x[1] + 3)**2 - 4 = (2 + 2)**2 + (3 + 3)**2 - 4 = 4**2 + 6**2 - 4 = 48
+        assert_near_equal(prob.get_val('x'), [2, 3])
+        assert_near_equal(prob.get_val('f', indices=[0]), 48)
+        assert_near_equal(prob.get_val('f', indices=[1]), 13)
+
+        # Didn't ask for anything specific, so should get everything.
+        fdfdx = prob.get_callback("fdfdx")
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [2, 3])
+        f, dfdx = fdfdx(x)
+        dfdx_expected = np.zeros((2, 2))
+        dfdx_expected[0, 0] = 2*(x[0] + 2)
+        dfdx_expected[0, 1] = 2*(x[1] + 3)
+        dfdx_expected[1, 0] = 2
+        dfdx_expected[1, 1] = 3
+        assert_near_equal(f, prob.get_val('f'))
+        assert_near_equal(dfdx, dfdx_expected)
+
+        # Asking for both the input and output variables should give us everything.
+        fdfdx = prob.get_callback("fdfdx", input_vars=["x"], output_vars=["f"])
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [2, 3])
+        f, dfdx = fdfdx(x)
+        dfdx_expected = np.zeros((2, 2))
+        dfdx_expected[0, 0] = 2*(x[0] + 2)
+        dfdx_expected[0, 1] = 2*(x[1] + 3)
+        dfdx_expected[1, 0] = 2
+        dfdx_expected[1, 1] = 3
+        assert_near_equal(f, prob.get_val('f'))
+        assert_near_equal(dfdx, dfdx_expected)
+
+        # Asking for just one input here.
+        fdfdx = prob.get_callback("fdfdx", input_vars=[{"x": {"indices": [0]}}])
+        x = fdfdx.create_input_vector()
+        # assert_near_equal(x, [2, 3])
+        assert_near_equal(x, [2])
+        f, dfdx = fdfdx(x)
+        # dfdx_expected = np.zeros((2, 2))
+        dfdx_expected = np.zeros((2, 1))
+        dfdx_expected[0, 0] = 2*(x[0] + 2)
+        # dfdx_expected[0, 1] = 2*(x[1] + 3)
+        dfdx_expected[1, 0] = 2
+        # dfdx_expected[1, 1] = 3
+        assert_near_equal(f, prob.get_val('f'))
+        assert_near_equal(dfdx, dfdx_expected)
+
+        # Asking for just one output here.
+        fdfdx = prob.get_callback("fdfdx", output_vars=[{"f": {"indices": [0]}}])
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [2, 3])
+        f, dfdx = fdfdx(x)
+        dfdx_expected = np.zeros((1, 2))
+        dfdx_expected[0, 0] = 2*(x[0] + 2)
+        dfdx_expected[0, 1] = 2*(x[1] + 3)
+        # dfdx_expected[1, 0] = 2
+        # dfdx_expected[1, 1] = 3
+        assert_near_equal(f, prob.get_val('f', indices=[0]))
+        assert_near_equal(dfdx, dfdx_expected)
 
 if __name__ == "__main__":
     unittest.main()
