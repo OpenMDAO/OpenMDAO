@@ -3,6 +3,7 @@
 import unittest
 
 import numpy as np
+from scipy.optimize import brentq
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
@@ -244,34 +245,23 @@ class TestBrentSolver(unittest.TestCase):
             upper_bound=np.pi/2 - eps,
         )
 
-        #eps = 1e-6
-        #p.root.nl_solver.options['lower_bound'] = eps
-        #p.root.nl_solver.options['upper_bound'] = np.pi/2 - eps
-        #p.root.nl_solver.options['state_var'] = 'phi'
+        prob.setup()
+        prob.set_solver_print(level=2)
+        prob.run_model()
 
-        ## def resize(lower, upper, iter):
-        ##     if lower == eps and upper == np.pi/2 - eps:
-        ##         return -np.pi/4, -eps, True
-        ##     elif lower == -np.pi/4 and upper == -eps:
-        ##         return np.pi/2+eps, np.pi-eps, True
-        ##     else:
-        ##         return lower, upper, False
+        # manually compute the right answer
+        def manual_f(phi, p):
+            r = np.sin(phi)/(1-p['a']) - np.cos(phi)/p['lambda_r']/(1+p['ap'])
+            return r
 
-        ## p.root.nl_solver.f_resize_bracket = resize
+        inputs = {
+            'a': prob.get_val('a'),
+            'ap': prob.get_val('ap'),
+            'lambda_r': prob.get_val('lambda_r'),
+        }
+        phi_star = brentq(manual_f, eps, np.pi/2-eps, args=inputs)
 
-        #p.setup(check=False)
-        #p.run()
-        ## manually compute the right answer
-        #def manual_f(phi, params):
-            #r = np.sin(phi)/(1-p['a']) - np.cos(phi)/p['lambda_r']/(1+p['ap'])
-            ## print phi, p['a'], p['lambda_r'], 1+p['ap'], r
-            #return r
-
-        ## run manually
-        #phi_star = brentq(manual_f, eps, np.pi/2-eps, args=(p.root.params,))
-
-
-        #assert_rel_error(self, p.root.unknowns['phi'], phi_star, 1e-10)
+        assert_near_equal(prob.get_val('phi')[0], phi_star, 1e-10)
 
 
 if __name__ == '__main__':
