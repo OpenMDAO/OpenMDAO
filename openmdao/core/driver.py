@@ -1938,59 +1938,6 @@ class Driver(object, metaclass=DriverMetaclass):
 
         return active_cons, active_dvs
 
-    # def _unscale_lagrange_multipliers(self, multipliers, assume_dv=False):
-    #     """
-    #     Unscale the Lagrange multipliers from optimizer scaling to physical/model scaling.
-
-    #     This method assumes that the optimizer is in a converged state, satisfying both the
-    #     primal constraints as well as the optimality conditions.
-
-    #     Parameters
-    #     ----------
-    #     active_constraints : Sequence[str]
-    #         Active constraints/dvs in the optimization, determined using the
-    #         get_active_cons_and_dvs method.
-    #     multipliers : dict[str: ArrayLike]
-    #         The Lagrange multipliers, in Driver-scaled units.
-    #     assume_dv : bool
-    #         This function can unscale the multipliers of either design variables or constraints.
-    #         Since variables can be both a design variable and a constraint, this flag
-    #         disambiguates the type of multiplier we're handling so the appropriate scaling
-    #         factors can be used.
-
-    #     Returns
-    #     -------
-    #     dict
-    #         The Lagrange multipliers in model/physical units.
-    #     """
-    #     if len(self._objs) != 1:
-    #         raise ValueError('Lagrange Multplier estimation requires that there '
-    #                          f'be a single objective, but there are {len(self._objs)}.')
-
-    #     obj_meta = list(self._objs.values())[0]
-    #     obj_ref = obj_meta['ref']
-    #     obj_ref0 = obj_meta['ref0']
-
-    #     if obj_ref is None:
-    #         obj_ref = 1.0
-    #     if obj_ref0 is None:
-    #         obj_ref0 = 0.0
-
-    #     obj_scaler = obj_meta['total_scaler'] or 1.0
-
-    #     unscaled_multipliers = {}
-
-    #     for name, val in multipliers.items():
-    #         if name in self._designvars and assume_dv:
-    #             scaler = self._designvars[name]['total_scaler']
-    #         else:
-    #             scaler = self._responses[name]['total_scaler']
-    #         scaler = scaler or 1.0
-
-    #         unscaled_multipliers[name] = val * scaler / obj_scaler
-
-    #     return unscaled_multipliers
-
     def compute_lagrange_multipliers(self, driver_scaling=False, feas_tol=1.0E-6,
                                      use_sparse_solve=True):
         """
