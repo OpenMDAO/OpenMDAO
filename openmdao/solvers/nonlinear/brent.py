@@ -268,8 +268,9 @@ class BrentSolver(NonlinearSolver):
             issue_warning(f"RuntimError from scipy brentq.  Error was: {err}")
 
     def _eval(self, x, system):
-        """Callback function for evaluating f(x)"""
-
+        """
+        Call from scipy to evaluate the model at the requested point.
+        """
         system._outputs[self.state_target] = x
         norm0 = self._norm0
 
