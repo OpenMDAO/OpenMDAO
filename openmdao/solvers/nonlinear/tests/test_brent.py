@@ -109,7 +109,11 @@ class TestBrentSolver(unittest.TestCase):
     def test_cycle_error(self):
         prob = om.Problem()
         model = prob.model
-        model.add_subsystem('comp1', CompTest(), promotes=['*'])
+        model.add_subsystem(
+            'comp1',
+            om.ExecComp('x = 0.1 * a'),
+            promotes=['*']
+        )
         model.add_subsystem(
             'comp2',
             om.ExecComp('a = 0.1 * x'),
@@ -120,10 +124,7 @@ class TestBrentSolver(unittest.TestCase):
         )
 
         prob.setup()
-        prob.set_solver_print(2)
-
-        #prob.final_setup()
-        #prob.model.display_conn_graph()
+        prob.set_solver_print(0)
 
         with self.assertRaises(ValueError) as context:
             prob.run_model()

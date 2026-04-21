@@ -13,6 +13,16 @@ from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
 
 
+CITATION = """@BOOK{Brent1973-dm,
+  title     = "Algorithms for Minimization Without Derivatives",
+  author    = "Brent, R P",
+  publisher = "Prentice-Hall",
+  pages     = "3-4",
+  year      =  1973,
+  address   = "Englewood Cliffs, NJ"
+}"""
+
+
 class BrentSolver(NonlinearSolver):
     """
     Brent solver.
@@ -52,6 +62,8 @@ class BrentSolver(NonlinearSolver):
 
         self.norm = 1.0
 
+        self.cite = CITATION
+
     def _declare_options(self):
         """
         Declare options before kwargs are processed in the init method.
@@ -72,6 +84,12 @@ class BrentSolver(NonlinearSolver):
         self.options.declare('upper_bound_target', allow_none=True, default=None,
                              desc='Openmdao path to the upper bound. When specified, this takes '
                              'precedence over the value specified in upper_bound.')
+
+        # Remove unsupported options.
+        self.options.undeclare('stall_limit')
+        self.options.undeclare('stall_tol')
+        self.options.undeclare('stall_tol_type')
+        self.options.undeclare("err_on_non_converge")
 
     def _setup_solvers(self, system, depth):
         """
@@ -125,9 +143,11 @@ class BrentSolver(NonlinearSolver):
             msg = f"{self.msginfo}: Brent can only solve 1 single implicit state."
             raise ValueError(msg)
 
-        # Check for cycles
+        # Check for cycles without an implicit state. Such a cycle could work in theory if the
+        # user knew where openmdao broke the cycle, but it is better to break the cycle and
+        # insert a balance.
         graph = system.compute_sys_graph()
-        if not nx.is_directed_acyclic_graph(graph):
+        if not nx.is_directed_acyclic_graph(graph) and n_imp == 0:
             msg = f"{self.msginfo}: Brent does not support cycles."
             raise ValueError(msg)
 
