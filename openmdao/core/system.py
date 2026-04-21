@@ -1079,13 +1079,13 @@ class System(object, metaclass=SystemMetaclass):
             if isinstance(total_scaler, np.ndarray):
                 if np.all(total_scaler == 1.0):
                     total_scaler = None
-            elif total_scaler == 1.0 if total_scaler is not None else False:
+            elif total_scaler is not None and total_scaler == 1.0:
                 total_scaler = None
 
             if isinstance(total_adder, np.ndarray):
                 if not np.any(total_adder):
                     total_adder = None
-            elif total_adder == 0.0 if total_adder is not None else False:
+            elif total_adder is not None and total_adder == 0.0:
                 total_adder = None
     
             new_desvar_metadata.update({'ref0': ref0, 'ref': ref, 'scaler': scaler, 'adder': adder,
@@ -1257,13 +1257,13 @@ class System(object, metaclass=SystemMetaclass):
             if isinstance(scaler, np.ndarray):
                 if np.all(scaler == 1.0):
                     scaler = None
-            elif scaler == 1.0 if scaler is not None else False:
+            elif scaler is not None and scaler == 1.0:
                 scaler = None
 
             if isinstance(adder, np.ndarray):
                 if not np.any(adder):
                     adder = None
-            elif adder == 0.0 if adder is not None else False:
+            elif adder is not None and adder == 0.0:
                 adder = None
 
             new_cons_metadata.update({'ref0': ref0, 'ref': ref, 'scaler': scaler, 'adder': adder,
@@ -1376,13 +1376,13 @@ class System(object, metaclass=SystemMetaclass):
         if isinstance(scaler, np.ndarray):
             if np.all(scaler == 1.0):
                 scaler = None
-        elif scaler == 1.0 if scaler is not None else False:
+        elif scaler is not None and scaler == 1.0:
             scaler = None
 
         if isinstance(adder, np.ndarray):
             if not np.any(adder):
                 adder = None
-        elif adder == 0.0 if adder is not None else False:
+        elif adder is not None and adder == 0.0:
             adder = None
 
         new_obj_metadata = {
