@@ -255,9 +255,9 @@ class TestBrentSolver(unittest.TestCase):
             return r
 
         inputs = {
-            'a': prob.get_val('a'),
-            'ap': prob.get_val('ap'),
-            'lambda_r': prob.get_val('lambda_r'),
+            'a': prob.get_val('a')[0],
+            'ap': prob.get_val('ap')[0],
+            'lambda_r': prob.get_val('lambda_r')[0],
         }
         phi_star = brentq(manual_f, eps, np.pi/2-eps, args=inputs)
 

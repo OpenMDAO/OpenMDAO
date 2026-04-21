@@ -240,11 +240,11 @@ class BrentSolver(NonlinearSolver):
 
         lower = self.options['lower_bound']
         if self.lower_target is not None:
-            lower = system._outputs[self.lower_target]
+            lower = system._outputs[self.lower_target][0]
 
         upper = self.options['upper_bound']
         if self.upper_target is not None:
-            upper = system._outputs[self.upper_target]
+            upper = system._outputs[self.upper_target][0]
 
         kwargs = {
             'maxiter': self.options['maxiter'],
@@ -292,4 +292,4 @@ class BrentSolver(NonlinearSolver):
         self.norm = norm
         self._mpi_print(self._iter_count, norm, norm / norm0)
 
-        return system._residuals[self.state_target]
+        return system._residuals[self.state_target][0]
