@@ -44,14 +44,6 @@ class OptimizerVector(object):
         Used by asarray() to avoid recomputing indices for repeated filter calls.
     _dist_driver_vars : dict[str, tuple]
         Mapping of distributed driver variables to (local_indices, sizes, _)
-
-    Examples
-    --------
-    >>> vec = OpimizerVector('design_var', numpy_array, metadata)
-    >>> x_value = vec['x']  # Get design variable by name
-    >>> vec['x'] = 2.5  # Set design variable by name
-    >>> for name, value in vec.items():  # Iterate over variables
-    ...     print(f"{name}: {value}")
     """
 
     def __init__(self, voi_type, data, metadata, driver_scaling=False):
@@ -412,12 +404,6 @@ class OptimizerVector(object):
             The underlying data array. If no filters provided, returns a view
             of the full array. If filters provided, returns a filtered copy.
 
-        Examples
-        --------
-        >>> vec.asarray()  # Full array (view)
-        >>> vec.asarray(linear=False)  # Only nonlinear constraints (copy)
-        >>> vec.asarray(linear=False, equals=None)  # Nonlinear inequalities (copy)
-
         Notes
         -----
         Filter results are cached in self._filters for performance. Repeated
@@ -457,13 +443,6 @@ class OptimizerVector(object):
         ValueError
             If the size of a variable in var_dict doesn't match the size in metadata.
 
-        Examples
-        --------
-        >>> vec = OptimizerVector('design_var', np.zeros(3), metadata)
-        >>> dv_dict = {'x': np.array([1.0, 2.0]), 'y': np.array([3.0])}
-        >>> vec._from_dict(dv_dict)
-        >>> vec.asarray()
-        array([1., 2., 3.])
         """
         for name, meta in self._meta.items():
             if name not in var_dict:
@@ -505,16 +484,6 @@ class OptimizerVector(object):
             Dictionary mapping variable names (str) to numpy array values. Each value is
             a copy, not a view, so modifications to the dictionary won't affect this vector.
             When filters are provided, only matching variables are included.
-
-        Examples
-        --------
-        >>> vec = OptimizerVector('design_var', np.array([1., 2., 3.]), metadata)
-        >>> dv_dict = vec._to_dict()  # All variables
-        >>> dv_dict['x']
-        array([1., 2.])
-
-        >>> # Get only nonlinear constraints
-        >>> con_dict = vec._to_dict(linear=False)
         """
         result = {}
         for name, meta in self._meta.items():
