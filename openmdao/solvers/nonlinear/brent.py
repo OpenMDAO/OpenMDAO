@@ -37,7 +37,7 @@ class BrentSolver(NonlinearSolver):
     **kwargs : dict
         Options dictionary.
 
-    Parameters
+    Attributes
     ----------
     state_target : str
         Relative openmdao varpath to the state.
@@ -47,6 +47,8 @@ class BrentSolver(NonlinearSolver):
     lower_target : str or None
         Relative openmdao varpath to the lower bound.  Only used if the lower bound is computed
         somewhere in the model.
+    norm : float
+        The current norm.
     """
 
     SOLVER = 'NL: BRENT'
