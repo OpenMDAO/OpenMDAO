@@ -53,6 +53,24 @@ class BracketTestComponent(om.ImplicitComponent):
 
 class TestBrentSolver(unittest.TestCase):
 
+    def test_basic_brent_converge(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', CompTest(), promotes=['*'])
+        model.nonlinear_solver = om.BrentSolver(
+            state_target='x',
+            maxiter=100,
+            atol=1e-8,
+            rtol=1e-8,
+        )
+
+        prob.setup()
+        prob.set_solver_print(0)
+
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('x')[0], 2.06720359226, 1e-8)
+
     def test_no_state_var_err(self):
         prob = om.Problem()
         model = prob.model
@@ -87,24 +105,6 @@ class TestBrentSolver(unittest.TestCase):
 
         msg = "BrentSolver in <model> <class Group>: 'state_target' variable 'fake' not found."
         self.assertEqual(str(context.exception), msg)
-
-    def test_brent_converge(self):
-        prob = om.Problem()
-        model = prob.model
-        model.add_subsystem('comp', CompTest(), promotes=['*'])
-        model.nonlinear_solver = om.BrentSolver(
-            state_target='x',
-            maxiter=100,
-            atol=1e-8,
-            rtol=1e-8,
-        )
-
-        prob.setup()
-        prob.set_solver_print(0)
-
-        prob.run_model()
-
-        assert_near_equal(prob.get_val('x')[0], 2.06720359226, 1e-8)
 
     def test_cycle_error(self):
         prob = om.Problem()
@@ -141,12 +141,29 @@ class TestBrentSolver(unittest.TestCase):
         )
 
         prob.setup()
-        prob.set_solver_print(2)
+        prob.set_solver_print(0)
 
         with self.assertRaises(ValueError) as context:
             prob.run_model()
         msg = "BrentSolver in <model> <class Group>: Brent can only solve 1 single implicit state."
         self.assertEqual(str(context.exception), msg)
+
+    def test_bad_bounds(self):
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', CompTest(), promotes=['*'])
+        model.nonlinear_solver = om.BrentSolver(
+            state_target='x',
+            lower_bound=30,
+            upper_bound=40,
+        )
+
+        prob.setup()
+        prob.set_solver_print(0)
+
+        # Note: don't check the message because it comes from scipy. Just make sure we are covered.
+        with self.assertRaises(ValueError):
+            prob.run_model()
 
     def test_data_pass_bounds(self):
         prob = om.Problem()
@@ -188,6 +205,28 @@ class TestBrentSolver(unittest.TestCase):
         prob.run_model()
 
         assert_near_equal(prob.get_val('x')[0], -3.7451537261581453, 1e-8)
+
+    def test_err_on_non_converge(self):
+        # Raise AnalysisError when it fails to converge
+
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('comp', CompTest(), promotes=['*'])
+        model.nonlinear_solver = om.BrentSolver(
+            state_target='x',
+            maxiter=1,
+            err_on_non_converge=True,
+        )
+
+        prob.setup()
+        prob.set_solver_print(level=0)
+
+        with self.assertRaises(om.AnalysisError) as context:
+            prob.run_driver()
+
+        # Note, extra iterations are brackets.
+        msg = "Solver 'NL: BRENT' on system '' failed to converge in 3 iterations."
+        self.assertEqual(str(context.exception), msg)
 
     def test_bracket(self):
         prob = om.Problem()

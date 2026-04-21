@@ -11,6 +11,7 @@ from scipy.optimize import brentq
 
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.solvers.solver import NonlinearSolver
+from openmdao.utils.om_warnings import issue_warning
 
 
 CITATION = """@BOOK{Brent1973-dm,
@@ -89,7 +90,6 @@ class BrentSolver(NonlinearSolver):
         self.options.undeclare('stall_limit')
         self.options.undeclare('stall_tol')
         self.options.undeclare('stall_tol_type')
-        self.options.undeclare("err_on_non_converge")
 
     def _setup_solvers(self, system, depth):
         """
@@ -254,10 +254,16 @@ class BrentSolver(NonlinearSolver):
             'rtol': self.options['rtol'],
         }
 
-        xstar = brentq(self._eval, **kwargs)
+        try:
+            xstar = brentq(self._eval, **kwargs)
 
-        # Run the final point because last brentq point is a bracketing point.
-        self._eval(xstar, system)
+            # Run the final point because last brentq point is a bracketing point.
+            self._eval(xstar, system)
+
+        except RuntimeError as err:
+            # Let OpenMDAO handle nonconvergence.
+            # Print actual error text in case it has some useful info from scipy.
+            issue_warning(f"RuntimError from scipy brentq.  Error was: {err}")
 
     def _eval(self, x, system):
         """Callback function for evaluating f(x)"""
