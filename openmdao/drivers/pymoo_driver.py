@@ -922,8 +922,18 @@ class pymooDriver(Driver):
                 runner=runner,
             )
 
+            # Build algorithm settings. For CMAES, redirect its output files
+            # (written by the underlying cma package) to the problem's outputs
+            # directory unless the user has already specified a custom prefix
+            # via alg_settings. To disable file output entirely, set
+            # alg_settings['verb_log'] = 0.
+            alg_settings = dict(self.alg_settings)
+            if opt == 'CMAES' and 'verb_filenameprefix' not in alg_settings:
+                outputs_dir = prob.get_outputs_dir(mkdir=True)
+                alg_settings['verb_filenameprefix'] = str(outputs_dir / 'cmaes_')
+
             # Instantiate and run optimizer
-            optimizer = self.alg_class(**self.alg_settings)
+            optimizer = self.alg_class(**alg_settings)
 
             # Make sure only the main rank prints from pymoo
             run_settings = {**self.run_settings}
