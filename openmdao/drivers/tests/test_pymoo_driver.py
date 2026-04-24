@@ -18,8 +18,12 @@ except ImportError:
 
 try:
     import cma  # noqa: F401
+    # Verify cma is compatible with the installed NumPy version.
+    # cma < 3.4 uses np.array(..., copy=False) which raises ValueError on NumPy >= 2.0.
+    from cma.transformations import BoxConstraintsLinQuadTransformation
+    BoxConstraintsLinQuadTransformation([[0.0, 1.0]])
     CMA_INSTALLED = True
-except ImportError:
+except Exception:
     CMA_INSTALLED = False
 
 
@@ -104,7 +108,7 @@ class TestMPIIsolatedParallelism(unittest.TestCase):
         self.assertGreater(max(all_iters), min(all_iters),
                            f'expected unequal iter_counts, got {all_iters}')
 
-        all_f = prob.comm.allgather(float(prob.get_val('comp.f')))
+        all_f = prob.comm.allgather(prob.get_val('comp.f').item())
         for f_val in all_f:
             assert_near_equal(f_val, all_f[0], tolerance=1e-10)
         assert_near_equal(all_f[0], 0.397887, tolerance=0.1)
@@ -232,7 +236,7 @@ class TestMPICombinedParallelism(unittest.TestCase):
         self.assertNotEqual(all_iters[0], all_iters[1],
                             f'expected unequal iter_counts across groups, got {all_iters}')
 
-        all_f = prob.comm.allgather(float(prob.get_val('comp.f')))
+        all_f = prob.comm.allgather(prob.get_val('comp.f').item())
         for f_val in all_f:
             assert_near_equal(f_val, all_f[0], tolerance=1e-10)
         assert_near_equal(all_f[0], 2 * 0.397887, tolerance=0.1)
@@ -1180,7 +1184,7 @@ class TestPymooDriver(unittest.TestCase):
 
             prob.setup()
             prob.run_driver()
-            return float(prob.get_val('x'))
+            return prob.get_val('x').item()
 
         result_a = run_with_seed(42)
         result_b = run_with_seed(42)
