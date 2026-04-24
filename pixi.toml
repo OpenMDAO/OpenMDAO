@@ -91,6 +91,11 @@ pydoe3 = "*"
 pyoptsparse = ">=2.14.0"
 cyipopt = "*"
 
+[feature.opt.pypi-dependencies]
+modopt = {git = "https://github.com/lsdolab/modopt.git", branch = "main", extras = ["open_source_optimizers"]}
+build_pyoptsparse = { git = "https://github.com/OpenMDAO/build_pyoptsparse.git" }
+pymoo = ">=0.6.1"
+
 # Jax not available for windows on conda-forge
 [feature.jax.pypi-dependencies]
 jax = "*"
