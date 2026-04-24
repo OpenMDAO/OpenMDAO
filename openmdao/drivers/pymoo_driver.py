@@ -83,13 +83,13 @@ try:
     from pymoo.core.variable import Real, Integer
     from pymoo.optimize import minimize
 except ImportError:
-    pm = None
+    pymoo = None
     problem = object
     minimize = None
     Real = None
     Integer = None
 except Exception as err:
-    pm = err
+    pymoo = err
     problem = object
     minimize = None
     Real = None
