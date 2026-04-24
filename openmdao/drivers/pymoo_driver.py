@@ -594,9 +594,6 @@ class pymooDriver(Driver):
         # into the algorithm setup.
         self.run_settings = {}
 
-        self._check_obj_grad = False
-        self._check_nl_jac = False
-        self._total_jac_sparsity = None
         self._model_ran = False
         self._moo_prob = None
         self.alg_class = None
@@ -784,7 +781,6 @@ class pymooDriver(Driver):
         self.result.reset()
         prob = self._problem()
         opt = self.options['optimizer']
-        model = prob.model
         self.iter_count = 0
         self._desvar_array_cache = None
 
