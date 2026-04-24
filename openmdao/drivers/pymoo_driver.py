@@ -66,7 +66,7 @@ cooperates on a single model evaluation. MPI parallelism is only beneficial when
 individual model evaluations are computationally expensive.
 
 For additional processing, the pymoo results object can be accessed at the
-``pymoo``_results attribute on the driver.
+``pymoo_results`` attribute on the driver.
 
 See the pymoo documentation at https://pymoo.org/index.html for detailed information
 on algorithm-specific options and capabilities.

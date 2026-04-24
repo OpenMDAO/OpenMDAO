@@ -31,6 +31,7 @@ from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.concurrent_utils import concurrent_eval
 from openmdao.utils.mpi import MPI
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.utils.om_warnings import warn_deprecation
 
 
 class SimpleGADriver(Driver):
@@ -102,6 +103,9 @@ class SimpleGADriver(Driver):
         self._concurrent_color = 0
 
         self._nfit = 0  # Number of successful function evaluations
+
+        warn_deprecation('The `SimpleGADriver` is deprecated. Please use '
+                        '`pymooDriver` for population based optimizations.')
 
     def _declare_options(self):
         """
