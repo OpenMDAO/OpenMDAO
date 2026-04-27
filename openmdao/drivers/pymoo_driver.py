@@ -542,13 +542,9 @@ class pymooDriver(Driver):
         across all Pareto solutions), 'X_raw' (raw design variable array from
         pymoo, shape (n_solutions, n_vars)), and 'F_raw' (raw objective array
         from pymoo, shape (n_solutions, n_objs)). Populated only when a
-        multi-objective optimizer is used. The raw arrays are useful for passing
-        directly to pymoo visualization utilities.
-        Example::
-
-            prob.driver.pareto['X']['my_dv']   # values for one design variable
-            prob.driver.pareto['F']['my_obj']  # values for one objective
-            prob.driver.pareto['X_raw']        # full array for pymoo plotting
+        multi-objective optimizer is used. Individual variables are accessed as
+        ``pareto['X']['dv_name']`` and ``pareto['F']['obj_name']``. The raw
+        arrays are intended for use with pymoo visualization utilities.
     alg_class : type
         The pymoo algorithm class resolved from the 'optimizer' option.
     _model_ran : bool
