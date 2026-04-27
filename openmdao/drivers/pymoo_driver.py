@@ -60,10 +60,9 @@ Run-level settings accepted by pymoo's ``algorithm.setup()`` (e.g. ``seed``,
 For multi-objective optimizations the Pareto front is stored on the driver in
 ``driver.pareto['X']`` and ``driver.pareto['F']`` after ``run_driver()`` completes.
 
-Population-level MPI parallelism is available by setting ``run_parallel=True``.
-Ranks are divided into groups of ``procs_per_model`` (default 1), where each group
-cooperates on a single model evaluation. MPI parallelism is only beneficial when
-individual model evaluations are computationally expensive.
+Population-level MPI parallelism is enabled automatically when more than one MPI
+rank is available. Ranks are divided into groups of ``procs_per_model`` (default 1),
+where each group cooperates on a single model evaluation.
 
 For additional processing, the pymoo results object can be accessed at the
 ``pymoo_results`` attribute on the driver.
@@ -504,9 +503,9 @@ class pymooDriver(Driver):
     ``MixedVariableGA`` optimizer, which uses pymoo's mixed-variable-aware sampling
     and mating operators. All other optimizers require continuous design variables only.
 
-    Population-level MPI parallelism is enabled by setting ``run_parallel=True``.
-    Ranks are divided into groups of ``procs_per_model`` (default 1). Each group
-    cooperates on one model evaluation, enabling models with parallel components
+    Population-level MPI parallelism is enabled automatically when more than one MPI
+    rank is available. Ranks are divided into groups of ``procs_per_model`` (default 1).
+    Each group cooperates on one model evaluation, enabling models with parallel components
     (e.g. ``ParallelGroup``) to each receive their own sub-communicator. With 8
     ranks and ``procs_per_model=2``, 4 individuals are evaluated simultaneously.
 
@@ -615,8 +614,6 @@ class pymooDriver(Driver):
         self.options.declare('disp', default=True, types=(int, bool),
                              desc='Controls optimizer output verbosity. Not used '
                                   'if "verbose" is manually set in "self.run_settings".')
-        self.options.declare('run_parallel', types=bool, default=False,
-                             desc='Set to True to execute the points in a generation in parallel.')
         self.options.declare('procs_per_model', default=1, lower=1,
                              desc='Number of processors to give each model under MPI.')
 
@@ -629,24 +626,19 @@ class pymooDriver(Driver):
         including any ``ParallelGroup`` components — is initialized with the
         correct sub-communicator rather than the full one.
 
-        **How the split works**
-
-        With ``N`` total ranks and ``procs_per_model=P``, there are ``N/P`` groups.
-        Each group gets its own sub-communicator by splitting on a *color* value::
+        When MPI is available and more than one rank is present, the communicator
+        is always split based on ``procs_per_model``. With ``N`` total ranks and
+        ``procs_per_model=P``, there are ``N/P`` evaluation groups. Each group
+        gets its own sub-communicator by splitting on a *color* value::
 
             n_groups = N // P
             color    = rank % n_groups
 
-        For example, with 8 ranks and ``procs_per_model=2`` (n_groups=4):
-
-        - color 0 → ranks 0, 4  → model sub-comm for group 0
-        - color 1 → ranks 1, 5  → model sub-comm for group 1
-        - color 2 → ranks 2, 6  → model sub-comm for group 2
-        - color 3 → ranks 3, 7  → model sub-comm for group 3
-
-        The returned sub-communicator is what the model uses internally. The full
-        communicator is stored as ``_problem_comm`` for use by the runner when
-        distributing the population.
+        With ``procs_per_model=1`` (default) each rank is its own group, so
+        individuals in the population are evaluated concurrently across all ranks.
+        With ``procs_per_model=P > 1`` each group of P ranks cooperates on a
+        single model evaluation, enabling models with ``ParallelGroup`` components
+        to use their own sub-communicator.
 
         Parameters
         ----------
@@ -662,34 +654,33 @@ class pymooDriver(Driver):
         self._problem_comm = comm
 
         if not MPI:
-            if self.options['run_parallel']:
-                raise RuntimeError(
-                    f'{self.msginfo}: run_parallel=True requires MPI but MPI is not available.'
-                )
             if self.options['procs_per_model'] != 1:
-                raise RuntimeError(
-                    f'{self.msginfo}: procs_per_model != 1 requires MPI but MPI is not available.'
-                )
+                raise RuntimeError(f'{self.msginfo}: procs_per_model != 1 requires '
+                                   'MPI but MPI is not being used.')
+            return comm
 
-        if MPI and self.options['run_parallel']:
-            procs_per_model = self.options['procs_per_model']
-            full_size = comm.size
-            n_groups = full_size // procs_per_model
+        if comm.size == 1:
+            return comm
 
-            if full_size != n_groups * procs_per_model:
-                raise RuntimeError(
-                    f'{self.msginfo}: Total number of processors ({full_size}) is not '
-                    f'evenly divisible by procs_per_model ({procs_per_model}). '
-                    f'Provide a number of processors that is a multiple of '
-                    f'{procs_per_model}.'
-                )
+        procs_per_model = self.options['procs_per_model']
+        full_size = comm.size
+        if procs_per_model > full_size:
+            raise RuntimeError(
+                f'{self.msginfo}: procs_per_model ({procs_per_model}) is greater than '
+                f'the total number of MPI processors ({full_size}).'
+            )
 
-            color = comm.rank % n_groups
-            model_comm = comm.Split(color)
+        n_groups = full_size // procs_per_model
+        if full_size != n_groups * procs_per_model:
+            raise RuntimeError(
+                f'{self.msginfo}: Total number of processors ({full_size}) is not '
+                f'evenly divisible by procs_per_model ({procs_per_model}). '
+                f'Provide a number of processors that is a multiple of '
+                f'{procs_per_model}.'
+            )
 
-            return model_comm
-
-        return comm
+        color = comm.rank % n_groups
+        return comm.Split(color)
 
     def _setup_recording(self):
         """
@@ -700,20 +691,15 @@ class pymooDriver(Driver):
         records.
         """
         if MPI:
-            run_parallel = self.options['run_parallel']
             procs_per_model = self.options['procs_per_model']
 
             for recorder in self._rec_mgr:
-                if run_parallel:
-                    if procs_per_model == 1:
-                        recorder.record_on_process = True
-                    else:
-                        n_groups = self._problem_comm.size // procs_per_model
-                        if self._problem_comm.rank < n_groups:
-                            recorder.record_on_process = True
-
-                elif self._problem_comm.rank == 0:
+                if procs_per_model == 1:
                     recorder.record_on_process = True
+                else:
+                    n_groups = self._problem_comm.size // procs_per_model
+                    if self._problem_comm.rank < n_groups:
+                        recorder.record_on_process = True
 
         super()._setup_recording()
 
@@ -898,9 +884,11 @@ class pymooDriver(Driver):
             current_idx += size
         obj_info['size'] = current_idx
 
-        # _problem_comm is the full communicator; the model may be running on a
-        # sub-communicator if procs_per_model > 1.
-        if MPI and self.options['run_parallel']:
+        # Use the MPI runner only when there are multiple evaluation groups, i.e.
+        # when cases are actually being evaluated in parallel across ranks.
+        n_groups = (self._problem_comm.size // self.options['procs_per_model']
+                    if MPI else 1)
+        if n_groups > 1:
             runner = MPIElementwiseRunner(self._problem_comm,
                                           self.options['procs_per_model'])
         else:

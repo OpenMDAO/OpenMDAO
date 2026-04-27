@@ -63,15 +63,15 @@ class TestMPIIsolatedParallelism(unittest.TestCase):
     """
     Test population parallelism and model parallelism independently, one at a time.
 
-    With two ranks only one mode can be active: either n_groups=2/procs_per_model=1
-    (population parallelism) or n_groups=1/procs_per_model=2 (model parallelism).
-    Tests exercising both simultaneously require four ranks and are in
-    TestMPICombinedParallelism.
+    With two ranks only one mode can be active: either procs_per_model=1 giving
+    n_groups=2 (population parallelism) or procs_per_model=2 giving n_groups=1
+    (model parallelism). Tests exercising both simultaneously require four ranks
+    and are in TestMPICombinedParallelism.
     """
 
     N_PROCS = 2
 
-    def test_run_parallel_branin(self):
+    def test_population_parallelism_branin(self):
         """
         Test population parallelism with procs_per_model=1 (n_groups=2).
 
@@ -90,7 +90,6 @@ class TestMPIIsolatedParallelism(unittest.TestCase):
 
         prob.driver = om.pymooDriver()
         prob.driver.options['optimizer'] = 'GA'
-        prob.driver.options['run_parallel'] = True
         prob.driver.options['disp'] = False
         prob.driver.alg_settings['pop_size'] = 25  # odd: unequal split across 2 groups
         prob.driver.run_settings['seed'] = 1
@@ -146,7 +145,6 @@ class TestMPIIsolatedParallelism(unittest.TestCase):
 
         prob.driver = om.pymooDriver()
         prob.driver.options['optimizer'] = 'GA'
-        prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 2
         prob.driver.options['disp'] = False
         prob.driver.alg_settings['pop_size'] = 25
@@ -166,6 +164,24 @@ class TestMPIIsolatedParallelism(unittest.TestCase):
 
         assert_near_equal(prob.get_val('comp.f'), 2 * 0.397887, tolerance=0.1)
 
+    def test_procs_per_model_greater_than_nprocs_raises(self):
+        """Test that procs_per_model greater than the total MPI rank count raises RuntimeError."""
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExecComp('f = x**2'), promotes=['*'])
+        prob.model.add_design_var('x', lower=-5.0, upper=5.0)
+        prob.model.add_objective('f')
+
+        prob.driver = om.pymooDriver()
+        prob.driver.options['optimizer'] = 'GA'
+        prob.driver.options['procs_per_model'] = 3  # greater than N_PROCS=2
+        prob.driver.options['disp'] = False
+
+        with self.assertRaises(RuntimeError) as ctx:
+            prob.setup()
+
+        self.assertIn('procs_per_model', str(ctx.exception))
+        self.assertIn('3', str(ctx.exception))
+
 
 @unittest.skipUnless(MPI and PETScVector, 'MPI and PETSc are required.')
 @unittest.skipUnless(PYMOO_INSTALLED, 'pymoo is not installed.')
@@ -180,7 +196,7 @@ class TestMPICombinedParallelism(unittest.TestCase):
 
     N_PROCS = 4
 
-    def test_run_parallel_with_procs_per_model(self):
+    def test_population_and_model_parallelism(self):
         """
         Test population parallelism and model parallelism simultaneously.
 
@@ -213,7 +229,6 @@ class TestMPICombinedParallelism(unittest.TestCase):
 
         prob.driver = om.pymooDriver()
         prob.driver.options['optimizer'] = 'GA'
-        prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 2
         prob.driver.options['disp'] = False
         prob.driver.alg_settings['pop_size'] = 25  # odd: unequal split across 2 groups
@@ -249,7 +264,6 @@ class TestMPICombinedParallelism(unittest.TestCase):
 
         prob.driver = om.pymooDriver()
         prob.driver.options['optimizer'] = 'GA'
-        prob.driver.options['run_parallel'] = True
         prob.driver.options['procs_per_model'] = 3
         prob.driver.options['disp'] = False
 
@@ -872,34 +886,9 @@ class TestPymooDriver(unittest.TestCase):
 
         self.assertIn('intentional failure in compute', str(ctx.exception))
 
-    def test_run_parallel_without_mpi_raises(self):
-        """
-        Test that run_parallel=True raises RuntimeError when MPI is not available.
-
-        Population-level parallelism requires MPI. When MPI is not installed,
-        _setup_comm should raise RuntimeError mentioning 'run_parallel'.
-        """
-        if MPI:
-            raise unittest.SkipTest('MPI is available; this test requires no MPI.')
-
-        prob = om.Problem()
-        prob.model.add_subsystem('comp', om.ExecComp('f = x**2'), promotes=['*'])
-        prob.model.add_design_var('x', lower=-5.0, upper=5.0)
-        prob.model.add_objective('f')
-
-        prob.driver = om.pymooDriver()
-        prob.driver.options['optimizer'] = 'GA'
-        prob.driver.options['run_parallel'] = True
-        prob.driver.options['disp'] = False
-
-        with self.assertRaises(RuntimeError) as ctx:
-            prob.setup()
-
-        self.assertIn('run_parallel', str(ctx.exception))
-
     def test_procs_per_model_without_mpi_raises(self):
         """
-        Test that procs_per_model != 1 raises RuntimeError when MPI is not available.
+        Test that procs_per_model != 1 raises RuntimeError when MPI is not being used.
 
         Sub-communicator splitting requires MPI. Setting procs_per_model > 1
         without MPI should raise RuntimeError mentioning 'procs_per_model'.
