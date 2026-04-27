@@ -58,7 +58,9 @@ Run-level settings accepted by pymoo's ``algorithm.setup()`` (e.g. ``seed``,
 ``run_settings`` dict, which is unpacked into ``pymoo.optimize.minimize()``.
 
 For multi-objective optimizations the Pareto front is stored on the driver in
-``driver.pareto['X']`` and ``driver.pareto['F']`` after ``run_driver()`` completes.
+``driver.pareto`` after ``run_driver()`` completes. ``driver.pareto['X']`` and
+``driver.pareto['F']`` are dicts keyed by design variable and objective name
+respectively, so individual variables can be extracted by name.
 
 Population-level MPI parallelism is enabled automatically when more than one MPI
 rank is available. Ranks are divided into groups of ``procs_per_model`` (default 1),
@@ -535,9 +537,18 @@ class pymooDriver(Driver):
         optimization completes.
     pareto : dict
         Pareto front results for multi-objective optimizations. Contains keys
-        'X' (design variable array, shape (n_solutions, n_vars)) and 'F'
-        (objective array, shape (n_solutions, n_objs)). Populated only when a
-        multi-objective optimizer is used.
+        'X' (dict mapping each design variable name to its values across all
+        Pareto solutions), 'F' (dict mapping each objective name to its values
+        across all Pareto solutions), 'X_raw' (raw design variable array from
+        pymoo, shape (n_solutions, n_vars)), and 'F_raw' (raw objective array
+        from pymoo, shape (n_solutions, n_objs)). Populated only when a
+        multi-objective optimizer is used. The raw arrays are useful for passing
+        directly to pymoo visualization utilities.
+        Example::
+
+            prob.driver.pareto['X']['my_dv']   # values for one design variable
+            prob.driver.pareto['F']['my_obj']  # values for one objective
+            prob.driver.pareto['X_raw']        # full array for pymoo plotting
     alg_class : type
         The pymoo algorithm class resolved from the 'optimizer' option.
     _model_ran : bool
@@ -596,7 +607,7 @@ class pymooDriver(Driver):
         self._model_ran = False
         self._moo_prob = None
         self.alg_class = None
-        self.pareto = {'X': None, 'F': None}
+        self.pareto = {'X': None, 'F': None, 'X_raw': None, 'F_raw': None}
 
         # Full communicator across all ranks, stored in _setup_comm before
         # Problem.setup() runs. Used by the MPI runner to coordinate population
@@ -960,8 +971,16 @@ class pymooDriver(Driver):
 
             # For pareto frontiers, just leave the model in whatever its last state was
             else:
-                self.pareto['X'] = x_opt
-                self.pareto['F'] = F_opt
+                self.pareto['X_raw'] = x_opt
+                self.pareto['F_raw'] = F_opt
+                if x_opt is not None:
+                    self.pareto['X'] = {}
+                    for name, indices in zip(x_info['vars'], x_info['indices']):
+                        self.pareto['X'][name] = x_opt[:, indices]
+
+                    self.pareto['F'] = {}
+                    for name, indices in zip(obj_info['vars'], obj_info['indices']):
+                        self.pareto['F'][name] = F_opt[:, indices]
 
             if run_settings['verbose']:
                 if prob.comm.rank == 0:

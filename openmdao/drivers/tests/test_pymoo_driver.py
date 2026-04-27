@@ -592,10 +592,13 @@ class TestPymooDriver(unittest.TestCase):
         self.assertIsNotNone(prob.driver.pareto['X'])
         self.assertIsNotNone(prob.driver.pareto['F'])
 
-        # Each Pareto solution has one design variable and two objectives.
-        self.assertEqual(prob.driver.pareto['X'].shape[1], 1)
-        self.assertEqual(prob.driver.pareto['F'].shape[1], 2)
-        self.assertGreater(len(prob.driver.pareto['X']), 0)
+        # One design variable, two objectives.
+        self.assertEqual(len(prob.driver.pareto['X']), 1)
+        self.assertEqual(len(prob.driver.pareto['F']), 2)
+        self.assertIn('x', prob.driver.pareto['X'])
+        self.assertIn('f1', prob.driver.pareto['F'])
+        self.assertIn('f2', prob.driver.pareto['F'])
+        self.assertGreater(len(prob.driver.pareto['X']['x']), 0)
 
     def test_multi_objective_pareto_feasibility(self):
         """
@@ -627,7 +630,7 @@ class TestPymooDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
-        x_pareto = prob.driver.pareto['X'].flatten()
+        x_pareto = prob.driver.pareto['X']['x']
         self.assertTrue(np.all(x_pareto >= -5.1))
         self.assertTrue(np.all(x_pareto <= 5.1))
 
@@ -666,7 +669,7 @@ class TestPymooDriver(unittest.TestCase):
         prob.run_driver()
 
         self.assertIsNotNone(prob.driver.pareto['X'])
-        x_pareto = prob.driver.pareto['X'].flatten()
+        x_pareto = prob.driver.pareto['X']['x']
         self.assertTrue(np.all(x_pareto <= 3.1))
 
     def test_mixed_integer_branin(self):
