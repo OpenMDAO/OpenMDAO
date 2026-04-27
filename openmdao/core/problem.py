@@ -201,31 +201,19 @@ class _FunctionalCallback(object):
             if not input_vars:
                 # User didn't provide any input var data, so create one from what `_TotalJacInfo`
                 # decided.
-                # input_vars = [
-                #     {vname: {
-                #         "indices": vmeta["indices"]
-                #     } for vname, vmeta in tji.input_meta["fwd"].items()}
-                # ]
                 input_vars = [
                     {vname: {
                         "indices": vmeta["indices"],
                         "name": vmeta["name"],
-                        # "alias": vmeta["alias"],
                     } for vname, vmeta in tji.input_meta["fwd"].items()}
                 ]
             if not output_vars:
                 # User didn't provide any output var data, so create one from what `_TotalJacInfo`
                 # decided.
-                # output_vars = [
-                #     {vname: {
-                #         "indices": vmeta["indices"]
-                #     } for vname, vmeta in tji.output_meta["fwd"].items()}
-                # ]
                 output_vars = [
                     {valias: {
                         "indices": vmeta["indices"],
                         "name": vmeta["name"],
-                        # "alias": vmeta["alias"],
                     } for valias, vmeta in tji.output_meta["fwd"].items()}
                 ]
 
