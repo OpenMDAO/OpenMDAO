@@ -19,6 +19,7 @@ from openmdao.test_suite.components.sellar_feature import SellarMDA
 from openmdao.utils.general_utils import run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.mpi import MPI
 try:
     from parameterized import parameterized
@@ -71,6 +72,15 @@ class TestErrors(unittest.TestCase):
                          "which can be installed with one of the following commands:\n"
                          "    pip install openmdao[doe]\n"
                          "    pip install pyDOE3")
+
+
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    def test_deprecation_warning(self):
+        """Test that DifferentialEvolutionDriver raises a deprecation warning on instantiation."""
+        msg = ('The `DifferentialEvolutionDriver` is deprecated. Please use '
+               '`pymooDriver` for population based optimizations.')
+        with assert_warning(OMDeprecationWarning, msg):
+            om.DifferentialEvolutionDriver()
 
 
 @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
