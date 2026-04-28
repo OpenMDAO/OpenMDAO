@@ -2955,8 +2955,14 @@ class System(object, metaclass=SystemMetaclass):
             if str(err).startswith(self.msginfo):
                 raise
             else:
-                raise err_type(
-                    f"{self.msginfo}: Error calling {fname}(), {err}").with_traceback(trace)
+                new_msg = f"{self.msginfo}: Error calling {fname}(), {err}"
+                try:
+                    new_err = err_type(new_msg)
+                except TypeError:
+                    # OutOfBoundsError requires idx, value, lower, upper).
+                    # Fall back to RuntimeError so the diagnostic message is not lost.
+                    raise RuntimeError(new_msg).with_traceback(trace) from None
+                raise new_err.with_traceback(trace)
         finally:
             self._inputs.read_only = False
             self._outputs.read_only = False
