@@ -1331,6 +1331,158 @@ class TestPymooDriver(unittest.TestCase):
         self.assertIn('pymoo', prob.driver.cite)
         self.assertIn('Blank', prob.driver.cite)
 
+    def test_simple_paraboloid_scaled_desvars(self):
+        """
+        Test GA optimization on the Paraboloid with design variable scaling.
+
+        Applies ref=0.02 to both design variables, which maps the [-50, 50] physical
+        bounds to [-2500, 2500] in optimizer space.  The autoscaler passes the scaled
+        bounds to pymoo and unscales the returned solution before writing it back to
+        the model.  The constrained optimum should still be found at the correct
+        physical values x=7.167, y=-7.833.
+        """
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = -x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.pymooDriver()
+        prob.driver.options['optimizer'] = 'GA'
+        prob.driver.options['disp'] = False
+        prob.driver.alg_settings['pop_size'] = 50
+        prob.driver.run_settings['seed'] = 1
+        prob.driver.run_settings['termination'] = ('n_gen', 500)
+
+        model.add_design_var('x', lower=-50.0, upper=50.0, ref=0.02)
+        model.add_design_var('y', lower=-50.0, upper=50.0, ref=0.02)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertLessEqual(prob.get_val('c'), -15.0 + 0.5)
+        assert_near_equal(prob.get_val('x'), 7.16667, tolerance=0.05)
+        assert_near_equal(prob.get_val('y'), -7.833334, tolerance=0.05)
+
+    def test_simple_paraboloid_scaled_constraint(self):
+        """
+        Test GA optimization on the Paraboloid with constraint scaling.
+
+        Applies ref=10.0 to the inequality constraint, so pymoo sees the constraint
+        value divided by 10.  The constraint bound passed to pymoo is also scaled by
+        the autoscaler.  The physical constrained optimum x=7.167, y=-7.833 should
+        still be recovered.
+        """
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = -x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.pymooDriver()
+        prob.driver.options['optimizer'] = 'GA'
+        prob.driver.options['disp'] = False
+        prob.driver.alg_settings['pop_size'] = 50
+        prob.driver.run_settings['seed'] = 1
+        prob.driver.run_settings['termination'] = ('n_gen', 500)
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0, ref=10.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertLessEqual(prob.get_val('c'), -15.0 + 0.5)
+        assert_near_equal(prob.get_val('x'), 7.16667, tolerance=0.05)
+        assert_near_equal(prob.get_val('y'), -7.833334, tolerance=0.05)
+
+    def test_simple_paraboloid_scaled_objective(self):
+        """
+        Test GA optimization on the Paraboloid with objective scaling.
+
+        Applies ref=10.0 to f_xy so that pymoo minimizes f_xy/10.  Minimizing a
+        positively scaled objective is equivalent to minimizing the original, so the
+        constrained optimum x=7.167, y=-7.833 should still be found.
+        """
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = -x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.pymooDriver()
+        prob.driver.options['optimizer'] = 'GA'
+        prob.driver.options['disp'] = False
+        prob.driver.alg_settings['pop_size'] = 50
+        prob.driver.run_settings['seed'] = 1
+        prob.driver.run_settings['termination'] = ('n_gen', 500)
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy', ref=10.0)
+        model.add_constraint('c', upper=-15.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertLessEqual(prob.get_val('c'), -15.0 + 0.5)
+        assert_near_equal(prob.get_val('x'), 7.16667, tolerance=0.05)
+        assert_near_equal(prob.get_val('y'), -7.833334, tolerance=0.05)
+
+    def test_pareto_scaled_desvars_in_physical_space(self):
+        """
+        Test that Pareto front design variable values are in physical space after scaling.
+
+        Uses NSGA2 on the two-objective problem f1=(x+5)^2, f2=(x-5)^2 with ref=0.1
+        on x (scaler=10).  The true Pareto front is x in [-5, 5] in physical space.
+        If unscaling is applied correctly, pareto['X']['x'] should lie in [-5, 5].
+        If unscaling were omitted the stored values would instead be in [-50, 50].
+        """
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp',
+                            om.ExecComp(['f1 = (x+5.0)**2', 'f2 = (x-5.0)**2']),
+                            promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = om.pymooDriver()
+        prob.driver.options['optimizer'] = 'NSGA2'
+        prob.driver.options['disp'] = False
+        prob.driver.alg_settings['pop_size'] = 50
+        prob.driver.run_settings['seed'] = 1
+        prob.driver.run_settings['termination'] = ('n_gen', 100)
+
+        model.add_design_var('x', lower=-10.0, upper=10.0, ref=0.1)
+        model.add_objective('f1')
+        model.add_objective('f2')
+
+        prob.setup()
+        prob.run_driver()
+
+        x_pareto = prob.driver.pareto['X']['x']
+        # The Pareto front lies in x in [-5, 5] (physical space).
+        # Incorrect scaling would leave values in [-50, 50] (optimizer space).
+        self.assertTrue(np.all(x_pareto >= -5.1))
+        self.assertTrue(np.all(x_pareto <= 5.1))
+
 
 if __name__ == '__main__':
     unittest.main()

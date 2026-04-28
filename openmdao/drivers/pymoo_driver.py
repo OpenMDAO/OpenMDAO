@@ -446,6 +446,11 @@ class pymooProblem(problem):
         """
         Update OpenMDAO design variables from pymoo's design vector.
 
+        Values from pymoo are in optimizer-scaled space (because scaled bounds were
+        passed to pymoo). They are written into the driver's design-variable vector
+        and then unscaled into model space via ``_set_design_vars(driver_scaling=True)``,
+        mirroring the pattern used in ``ScipyOptimizeDriver._objfunc``.
+
         Parameters
         ----------
         x : np.ndarray or dict
@@ -453,13 +458,26 @@ class pymooProblem(problem):
             when using ``MixedVariableGA`` (including continuous-only problems),
             or a flat array for all other optimizers.
         """
+        driver = self.driver
+        dv_vec = driver._vectors['design_var']
+
         if isinstance(x, dict):
+            # MixedVariableGA path: x is a dict, may include discrete variables.
+            # Populate continuous variable slices of dv_vec; set discrete vars directly.
+            continuous_names = []
             for name, indices in zip(self.x_info['vars'], self.x_info['indices']):
                 vals = np.array([x[f'{name}__{i}'] for i in range(len(indices))])
-                self.driver.set_design_var(name, vals)
+                if name in driver._designvars_discrete:
+                    driver.set_design_var(name, vals)
+                else:
+                    dv_vec[name] = vals
+                    continuous_names.append(name)
+            dv_vec.driver_scaling = True
+            driver._set_design_vars(desvar_names=continuous_names, driver_scaling=True)
         else:
-            for name, indices in zip(self.x_info['vars'], self.x_info['indices']):
-                self.driver.set_design_var(name, x[indices])
+            # Flat-array path: no discrete variables, x aligns 1-to-1 with dv_vec.
+            dv_vec.set_data(x, driver_scaling=True)
+            driver._set_design_vars(driver_scaling=True)
 
     def _run_model(self):
         """
@@ -805,6 +823,7 @@ class pymooDriver(Driver):
         # Collect design variable information (initial values and bounds)
         x_info = {'vars': [], 'upper': np.full(ndesvar, 1e30),
                   'lower': np.full(ndesvar, -1e30), 'indices': []}
+        lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
         current_idx = 0
         for name, meta in self._designvars.items():
             x_info['vars'].append(name)
@@ -816,8 +835,12 @@ class pymooDriver(Driver):
                 size = meta['global_size'] if meta['distributed'] else meta['size']
             current_indices = list(range(current_idx, current_idx + size))
             x_info['indices'].append(current_indices)
-            x_info['lower'][current_indices] = meta['lower']
-            x_info['upper'][current_indices] = meta['upper']
+            if name in self._designvars_discrete:
+                x_info['lower'][current_indices] = meta['lower']
+                x_info['upper'][current_indices] = meta['upper']
+            else:
+                x_info['lower'][current_indices] = lower_dv[name]
+                x_info['upper'][current_indices] = upper_dv[name]
             current_idx += size
 
         # Determine total number of constraints
@@ -844,6 +867,7 @@ class pymooDriver(Driver):
         current_eq_idx = 0
         current_ieq_idx = 0
         if opt in _constraint_optimizers:
+            lower_con, upper_con, equals_con = self._autoscaler.get_bounds_scaling('constraint')
             for name, meta in self._cons.items():
                 if meta['indices'] is not None:
                     size = meta['indices'].indexed_src_size
@@ -855,7 +879,7 @@ class pymooDriver(Driver):
                     current_eq_indices = list(range(current_eq_idx, current_eq_idx + size))
                     eq_con_info['vars'].append(name)
                     eq_con_info['indices'].append(current_eq_indices)
-                    eq_con_info['equals'][current_eq_indices] = meta['equals']
+                    eq_con_info['equals'][current_eq_indices] = equals_con[name]
                     current_eq_idx += size
 
                 else:
@@ -865,7 +889,7 @@ class pymooDriver(Driver):
                         ieq_con_info['vars'].append(name)
                         ieq_con_info['indices'].append(current_ieq_indices)
                         ieq_con_info['is_upper'].append(True)
-                        ieq_con_info['bound'][current_ieq_indices] = meta['upper']
+                        ieq_con_info['bound'][current_ieq_indices] = upper_con[name]
                         current_ieq_idx += size
 
                     if np.any(meta['lower'] > -INF_BOUND):
@@ -873,7 +897,7 @@ class pymooDriver(Driver):
                         ieq_con_info['vars'].append(name)
                         ieq_con_info['indices'].append(current_ieq_indices)
                         ieq_con_info['is_upper'].append(False)
-                        ieq_con_info['bound'][current_ieq_indices] = meta['lower']
+                        ieq_con_info['bound'][current_ieq_indices] = lower_con[name]
                         current_ieq_idx += size
 
         # Collect objective information
@@ -950,14 +974,23 @@ class pymooDriver(Driver):
             self.fail = x_opt is None
             if opt in _single_obj_optimizers:
                 if x_opt is not None:
-                    # Update OpenMDAO design variables with optimal values
+                    # Update OpenMDAO design variables with optimal values.
+                    # x_opt is in optimizer-scaled space; unscale before writing to model.
+                    dv_vec = self._vectors['design_var']
                     if isinstance(x_opt, dict):
+                        continuous_names = []
                         for name, indices in zip(x_info['vars'], x_info['indices']):
                             vals = np.array([x_opt[f'{name}__{i}'] for i in range(len(indices))])
-                            self.set_design_var(name, vals)
+                            if name in self._designvars_discrete:
+                                self.set_design_var(name, vals)
+                            else:
+                                dv_vec[name] = vals
+                                continuous_names.append(name)
+                        dv_vec.driver_scaling = True
+                        self._set_design_vars(desvar_names=continuous_names, driver_scaling=True)
                     else:
-                        for name, indices in zip(x_info['vars'], x_info['indices']):
-                            self.set_design_var(name, x_opt[indices])
+                        dv_vec.set_data(x_opt, driver_scaling=True)
+                        self._set_design_vars(driver_scaling=True)
 
                     # Final model evaluation at optimal point
                     with RecordingDebugging(self._get_name(), self.iter_count, self):
@@ -971,8 +1004,21 @@ class pymooDriver(Driver):
                 self.pareto['F_raw'] = F_opt
                 if x_opt is not None:
                     self.pareto['X'] = {}
+                    # Pre-allocate output arrays for continuous variables.
                     for name, indices in zip(x_info['vars'], x_info['indices']):
-                        self.pareto['X'][name] = x_opt[:, indices]
+                        if name in self._designvars_discrete:
+                            self.pareto['X'][name] = x_opt[:, indices]
+                        else:
+                            self.pareto['X'][name] = np.empty((x_opt.shape[0], len(indices)))
+
+                    # Unscale each Pareto solution via the autoscaler, then read back.
+                    dv_vec = self._vectors['design_var']
+                    for sol_idx in range(x_opt.shape[0]):
+                        dv_vec.set_data(x_opt[sol_idx], driver_scaling=True)
+                        self._autoscaler.apply_design_var_unscaling(dv_vec)
+                        for name, indices in zip(x_info['vars'], x_info['indices']):
+                            if name not in self._designvars_discrete:
+                                self.pareto['X'][name][sol_idx] = dv_vec[name]
 
                     self.pareto['F'] = {}
                     for name, indices in zip(obj_info['vars'], obj_info['indices']):
