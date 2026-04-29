@@ -24,7 +24,6 @@ import unittest
 
 import openmdao.api as om
 from openmdao.components.interp_util.outofbounds_error import OutOfBoundsError
-from openmdao.utils.assert_utils import assert_warning
 from openmdao.utils.testing_utils import use_tempdirs
 
 
@@ -78,12 +77,13 @@ class TestCallUserFunctionOutOfBounds(unittest.TestCase):
         #
         # After the fix it should raise RuntimeError (or OutOfBoundsError) with
         # a message that mentions both the component and the original error.
-        with self.assertRaises((RuntimeError, OutOfBoundsError)) as ctx:
+        with self.assertRaises((OutOfBoundsError)) as ctx:
             p.run_model()
 
         # The error message must contain the component path so the user can
-        # identify which component is out of bounds.
-        self.assertIn('comp', str(ctx.exception))
+        # identify which component is out of bounds. This is stored in the
+        # notes of the exception by the call_user_function wrapper.
+        self.assertIn('comp', '\n'.join(ctx.exception.__notes__))
 
         # The error message must also carry the original out-of-bounds description.
         self.assertIn('outside the interpolation range', str(ctx.exception))

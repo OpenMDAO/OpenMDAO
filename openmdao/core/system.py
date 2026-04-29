@@ -2950,19 +2950,13 @@ class System(object, metaclass=SystemMetaclass):
 
         try:
             yield
-        except Exception:
-            err_type, err, trace = sys.exc_info()
+        except Exception as err:
+            # err_type, err, trace = sys.exc_info()
             if str(err).startswith(self.msginfo):
                 raise
             else:
-                new_msg = f"{self.msginfo}: Error calling {fname}(), {err}"
-                try:
-                    new_err = err_type(new_msg)
-                except TypeError:
-                    # OutOfBoundsError requires idx, value, lower, upper).
-                    # Fall back to RuntimeError so the diagnostic message is not lost.
-                    raise RuntimeError(new_msg).with_traceback(trace) from None
-                raise new_err.with_traceback(trace)
+                err.add_note(f'{self.msginfo}: Encountered error calling {fname}')
+                raise
         finally:
             self._inputs.read_only = False
             self._outputs.read_only = False
