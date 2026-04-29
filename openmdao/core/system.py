@@ -2951,7 +2951,6 @@ class System(object, metaclass=SystemMetaclass):
         try:
             yield
         except Exception as err:
-            # err_type, err, trace = sys.exc_info()
             if str(err).startswith(self.msginfo):
                 raise
             else:
