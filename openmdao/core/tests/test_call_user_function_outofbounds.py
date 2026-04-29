@@ -80,14 +80,9 @@ class TestCallUserFunctionOutOfBounds(unittest.TestCase):
         with self.assertRaises((OutOfBoundsError)) as ctx:
             p.run_model()
 
-        # The error message must contain the component path so the user can
-        # identify which component is out of bounds. This is stored in the
-        # notes of the exception by the call_user_function wrapper.
-        self.assertIn('comp', '\n'.join(ctx.exception.__notes__))
-
-        # The error message must also carry the original out-of-bounds description.
-        self.assertIn('outside the interpolation range', str(ctx.exception))
-
+        self.assertEqual("'comp' <class RaisesOutOfBoundsComp>: Error calling compute(), "
+                         "Input x=2.0 is outside the interpolation range [0.0, 1.0].",
+                         str(ctx.exception))
 
 if __name__ == '__main__':
     unittest.main()

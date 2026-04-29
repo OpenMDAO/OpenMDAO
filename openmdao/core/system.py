@@ -2954,8 +2954,9 @@ class System(object, metaclass=SystemMetaclass):
             if str(err).startswith(self.msginfo):
                 raise
             else:
-                err.add_note(f'{self.msginfo}: Encountered error calling {fname}')
-                raise
+                msg = err.args[0] if err.args else ''
+                err.args = (f"{self.msginfo}: Error calling {fname}(), " + msg,) + err.args[1:]
+                raise 
         finally:
             self._inputs.read_only = False
             self._outputs.read_only = False
