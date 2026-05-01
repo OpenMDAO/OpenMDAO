@@ -55,14 +55,14 @@ jobs:
         COVERAGE: [false]
         include:
 
-          # Windows - default with coverage
+          # Windows - default
           - OS: windows-latest
             PIXI_ENVIRONMENT: default
             BANDIT: false
             RUFF: false
-            COVERAGE: true
+            COVERAGE: default
 
-          # Windows - only minimal
+          # Windows - minimal
           - OS: windows-latest
             PIXI_ENVIRONMENT: minimal
             BANDIT: false

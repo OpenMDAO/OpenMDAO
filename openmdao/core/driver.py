@@ -11,9 +11,10 @@ import weakref
 import numpy as np
 import scipy.sparse as sp
 
+from openmdao.drivers.autoscalers.autoscaler import Autoscaler
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import INT_DTYPE, _SetupStatus
+from openmdao.core.constants import INT_DTYPE, INF_BOUND, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
@@ -23,9 +24,11 @@ from openmdao.utils.options_dictionary import OptionsDictionary
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.array_utils import sizes2offsets
 from openmdao.vectors.vector import _full_slice, _flat_full_indexer
+from openmdao.vectors.optimizer_vector import OptimizerVector
 from openmdao.utils.indexer import indexer
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, \
     DriverWarning, OMDeprecationWarning, warn_deprecation
+from openmdao.utils.units import convert_units
 
 
 class DriverResult():
@@ -265,6 +268,10 @@ class Driver(object, metaclass=DriverMetaclass):
         Variables to record based on recording options.
     _in_find_feasible : bool
         True if the driver is currently executing find_feasible.
+    _vectors : dict
+        The optimizer vectors used to cache design variables, constraints, and objectives.
+    _autoscaler : Autoscaler
+        The autoscaler instance used to scale/unscale values for the optimizer.
     """
 
     def __init__(self, **kwargs):
@@ -283,6 +290,10 @@ class Driver(object, metaclass=DriverMetaclass):
         self._lin_dvs = None
         self._nl_dvs = None
         self._in_find_feasible = False
+
+        # Optimization-specific attributes
+        self._vectors = None
+        self._autoscaler = Autoscaler()
 
         # Driver options
         self.options = OptionsDictionary(parent_name=type(self).__name__)
@@ -363,7 +374,6 @@ class Driver(object, metaclass=DriverMetaclass):
         self._declare_options()
         self.options.update(kwargs)
         self.result = DriverResult(self)
-        self._has_scaling = False
         self._filtered_vars_to_record = None
 
     def _get_inst_id(self):
@@ -435,6 +445,69 @@ class Driver(object, metaclass=DriverMetaclass):
             Reference to the containing problem.
         """
         self._problem = weakref.ref(problem)
+
+    @property
+    def autoscaler(self):
+        """
+        Get the Autoscaler used by this driver.
+
+        Returns
+        -------
+        Autoscaler
+            The Autoscaler instance used by this driver, or None if not initialized.
+        """
+        return self._autoscaler
+
+    @autoscaler.setter
+    def autoscaler(self, autoscaler):
+        """
+        Set the Autoscaler to be used by this driver.
+
+        Parameters
+        ----------
+        autoscaler : Autoscaler
+            The Autoscaler instance to use.
+        """
+        self._autoscaler = autoscaler
+    
+    @property
+    def _has_scaling(self):
+        """
+        Returns True if the Driver will perform scaling.
+
+        Returns
+        -------
+        bool
+            True if the Autoscaler will perform scaling, otherwise False.
+        """
+        return self._autoscaler._has_scaling
+
+    def _set_design_vars(self, desvar_names=None, driver_scaling=True):
+        """
+        Set design variable values into the model from the internal design var vector.
+
+        Parameters
+        ----------
+        desvar_names : Iterable[str] or None
+            If None, assume all design variables in the model are to be set. Otherwise,
+            only set the design variables of the given names. This is used by find_feasible
+            when we may exclude some design variables from the feasibility search.
+        driver_scaling : bool
+            Specifies that design variables need to be unscaled before setting them in the model.
+            Default is True.
+        """
+        meta = self._designvars
+        desvar_vec = self._vectors['design_var']
+
+        if driver_scaling:
+            self._autoscaler.apply_design_var_unscaling(desvar_vec)
+
+        desvar_names = desvar_names if desvar_names is not None else meta.keys()
+
+        for name in desvar_names:
+            value = desvar_vec[name]
+            units = meta[name].get('units')
+            self.set_design_var(name, value, set_remote=True, driver_scaling=False, units=units)
 
     def _setup_driver(self, problem):
         """
@@ -591,6 +664,31 @@ class Driver(object, metaclass=DriverMetaclass):
                     issue_warning("Derivatives are turned off.  Skipping simul deriv coloring.",
                                   category=DerivativesWarning)
 
+        # Pre-allocate optimizer vectors for all drivers
+        try:
+            dv_vec = OptimizerVector.create_from_model(voi_type='design_var',
+                                                       driver=self, driver_scaling=False)
+        except (ValueError, KeyError, TypeError):
+            # Some drivers (e.g., DOEDriver) may have unsupported variable types
+            dv_vec = None
+
+        con_vec = OptimizerVector.create_from_model(voi_type='constraint',
+                                                        driver=self, driver_scaling=False)
+
+        try:
+            obj_vec = OptimizerVector.create_from_model(voi_type='objective',
+                                                        driver=self, driver_scaling=False)
+        except (ValueError, KeyError, TypeError):
+            obj_vec = None
+
+        self._vectors = {
+            'design_var': dv_vec,
+            'constraint': con_vec,
+            'objective': obj_vec,
+        }
+
+        self._autoscaler.setup(driver=self)
+
     def _split_dvs(self, model):
         """
         Determine which design vars are relevant to linear constraints vs nonlinear constraints.
@@ -678,13 +776,18 @@ class Driver(object, metaclass=DriverMetaclass):
                 val = np.array([_val]) if np.ndim(_val) == 0 else _val  # Handle discrete desvars
                 idxs = meta['indices']() if meta['indices'] else None
                 flat_idxs = meta['flat_indices']
-                scaler = meta['scaler'] if meta['scaler'] is not None else 1.
-                adder = meta['adder'] if meta['adder'] is not None else 0.
-                lower = meta['lower'] / scaler - adder
-                upper = meta['upper'] / scaler - adder
+                lower = meta['lower']
+                upper = meta['upper']
                 flat_val = val.ravel()[idxs] if flat_idxs else val[idxs].ravel()
-
-                if (flat_val < lower).any() or (flat_val > upper).any():
+                fail_lower = False
+                fail_upper = False
+                if lower is not None:
+                    if (flat_val < lower).any():
+                        fail_lower = True
+                if upper is not None:
+                    if (flat_val > upper).any():
+                        fail_upper = True
+                if fail_lower or fail_upper:
                     invalid_desvar_data.append((var, val, lower, upper))
             if invalid_desvar_data:
                 s = 'The following design variable initial conditions are out of their ' \
@@ -830,8 +933,8 @@ class Driver(object, metaclass=DriverMetaclass):
 
         return self.result
 
-    def _get_voi_val(self, name, meta, remote_vois, driver_scaling=True,
-                     get_remote=True, rank=None):
+    def _get_voi_val(self, name, meta, remote_vois,
+                     get_remote=True, rank=None, driver_units=False):
         """
         Get the value of a variable of interest (objective, constraint, or design var).
 
@@ -846,10 +949,6 @@ class Driver(object, metaclass=DriverMetaclass):
         remote_vois : dict
             Dict containing (owning_rank, size) for all remote vois of a particular
             type (design var, constraint, or objective).
-        driver_scaling : bool
-            When True, return values that are scaled according to either the adder and scaler or
-            the ref and ref0 values that were specified when add_design_var, add_objective, and
-            add_constraint were called on the model. Default is True.
         get_remote : bool or None
             If True, retrieve the value even if it is on a remote process.  Note that if the
             variable is remote on ANY process, this function must be called on EVERY process
@@ -858,6 +957,9 @@ class Driver(object, metaclass=DriverMetaclass):
             of the value that's on the current process for a distributed variable.
         rank : int or None
             If not None, gather value to this rank only.
+        driver_units : bool
+            If True, return the given variable of interest in the units specified for the
+            design variable, constraint, or objective.
 
         Returns
         -------
@@ -933,16 +1035,10 @@ class Driver(object, metaclass=DriverMetaclass):
                 val = get(src_name, flat=True).copy()
             else:
                 val = get(src_name, flat=True)[indices.as_array()]
-
-        if self._has_scaling and driver_scaling:
-            # Scale design variable values
-            adder = meta['total_adder']
-            if adder is not None:
-                val += adder
-
-            scaler = meta['total_scaler']
-            if scaler is not None:
-                val *= scaler
+        
+        if driver_units and meta['units'] is not None:
+            src_units = model._var_abs2meta['output'][src_name]['units']
+            val = convert_units(val, src_units, meta['units'])
 
         return val
 
@@ -994,11 +1090,17 @@ class Driver(object, metaclass=DriverMetaclass):
         dict
            Dictionary containing values of each design variable.
         """
-        return {n: self._get_voi_val(n, dvmeta, self._remote_dvs, get_remote=get_remote,
-                                     driver_scaling=driver_scaling)
-                for n, dvmeta in self._designvars.items()}
+        dv_vec = self._vectors['design_var']
+        dv_vec.update_from_model(driver=self, driver_scaling=driver_scaling)
 
-    def set_design_var(self, name, value, set_remote=True):
+        dvs = dv_vec._to_dict(get_remote=get_remote)
+
+        discrete_dvs = {n: self._get_voi_val(n, dvmeta, self._remote_dvs, get_remote=get_remote)
+                        for n, dvmeta in self._designvars.items() if dvmeta['discrete']}
+        dvs.update(discrete_dvs)
+        return dvs
+
+    def set_design_var(self, name, value, set_remote=True, driver_scaling=False, units=None):
         """
         Set the value of a design variable.
 
@@ -1007,12 +1109,16 @@ class Driver(object, metaclass=DriverMetaclass):
         Parameters
         ----------
         name : str
-            Global pathname of the design variable.
+            Promoted name or alias of the design variable.
         value : float or ndarray
-            Value for the design variable.
+            Value for the design variable in driver scaling/units.
         set_remote : bool
             If True, set the global value of the variable (value must be of the global size).
             If False, set the local value of the variable (value must be of the local size).
+        driver_scaling : bool
+            If True, assume the value provided is in optimizer-scaled space.
+        units : str or None
+            Units of the value, **after** unscaling from the optimizer-scaled space, if applicable.
         """
         problem = self._problem()
         meta = self._designvars[name]
@@ -1060,15 +1166,9 @@ class Driver(object, metaclass=DriverMetaclass):
                 # provided value is the local value
                 desvar[loc_idxs] = np.atleast_1d(value)
 
-            # Undo driver scaling when setting design var values into model.
-            if self._has_scaling:
-                scaler = meta['total_scaler']
-                if scaler is not None:
-                    desvar[loc_idxs] *= 1.0 / scaler
-
-                adder = meta['total_adder']
-                if adder is not None:
-                    desvar[loc_idxs] -= adder
+            if meta['units'] is not None:
+                src_units = problem.model._var_abs2meta['output'][src_name]['units']
+                desvar[loc_idxs] = convert_units(desvar[loc_idxs], meta['units'], src_units)
 
     def get_objective_values(self, driver_scaling=True):
         """
@@ -1086,9 +1186,15 @@ class Driver(object, metaclass=DriverMetaclass):
         dict
            Dictionary containing values of each objective.
         """
-        return {n: self._get_voi_val(n, obj, self._remote_objs,
-                                     driver_scaling=driver_scaling)
-                for n, obj in self._objs.items()}
+        obj_vec = self._vectors['objective']
+        obj_vec.update_from_model(driver=self, driver_scaling=driver_scaling)
+        
+        objs = obj_vec._to_dict()
+        discrete_objs = {n: self._get_voi_val(n, obj_meta, self._remote_dvs, get_remote=True)
+                         for n, obj_meta in self._objs.items() if obj_meta['discrete']}
+        objs.update(discrete_objs)
+
+        return objs
 
     def get_constraint_values(self, ctype='all', lintype='all', driver_scaling=True,
                               viol=False):
@@ -1120,6 +1226,10 @@ class Driver(object, metaclass=DriverMetaclass):
         dict
            Dictionary containing values of each constraint.
         """
+        # Note we populate the vector in an unscaled state for getting violations
+        con_vec = self._vectors['constraint']
+        con_vec.update_from_model(driver=self, driver_scaling=driver_scaling and not viol)
+        
         con_dict = {}
         it = self._cons.items()
         if lintype == 'linear':
@@ -1133,28 +1243,24 @@ class Driver(object, metaclass=DriverMetaclass):
 
         for name, meta in it:
             if viol:
-                con_val = self._get_voi_val(name, meta, self._remote_cons,
-                                            driver_scaling=True)
-                size = con_val.size
-                con_dict[name] = np.zeros(size)
+                con_val = con_vec[name]
                 if meta['equals'] is not None:
-                    con_dict[name][...] = con_val - meta['equals']
+                    con_val -= meta['equals']
                 else:
                     lower_viol_idxs = np.where(con_val < meta['lower'])[0]
                     upper_viol_idxs = np.where(con_val > meta['upper'])[0]
-                    con_dict[name][lower_viol_idxs] = con_val[lower_viol_idxs] - meta['lower']
-                    con_dict[name][upper_viol_idxs] = con_val[upper_viol_idxs] - meta['upper']
+                    non_viol_idxs = np.where((con_val >= meta['lower'])
+                                             & (con_val <= meta['upper']))[0]
+                    con_val[lower_viol_idxs] -= meta['lower']
+                    con_val[upper_viol_idxs] -=  meta['upper']
+                    con_val[non_viol_idxs] = 0.0
 
-                # We got the voi value in driver-scaled units.
-                # Unscale if necessary.
-                if not driver_scaling:
-                    scaler = meta['total_scaler']
-                    if scaler is not None:
-                        con_dict[name] /= scaler
+            con_dict[name] = con_vec[name].copy()
 
-            else:
-                con_dict[name] = self._get_voi_val(name, meta, self._remote_cons,
-                                                   driver_scaling=driver_scaling)
+        # If we computed violations, those were unscaled.
+        # Now scale them.
+        if driver_scaling and viol:
+            self._autoscaler.apply_constraint_scaling(con_vec)
 
         return con_dict
 
@@ -1214,7 +1320,7 @@ class Driver(object, metaclass=DriverMetaclass):
 
         desvar_size = sum(meta['global_size'] for meta in desvars.values())
 
-        self._has_scaling = model._setup_driver_units()
+        model._setup_driver_units()
 
         return response_size, desvar_size
 
@@ -1762,9 +1868,12 @@ class Driver(object, metaclass=DriverMetaclass):
         constraints = self._cons
 
         # We obtain the driver scaled values so that feasibility check is performed
-        # with driver scaling.
+        # with driver scaling. This matters as tolerances apply to scaled values.
         dv_vals = self.get_design_var_values(driver_scaling=True)
         con_vals = self.get_constraint_values(driver_scaling=True)
+
+        lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
+        lower_con, upper_con, _ = self._autoscaler.get_bounds_scaling('constraint')
 
         for constraint, con_options in constraints.items():
             constraint_value = con_vals[constraint]
@@ -1776,8 +1885,8 @@ class Driver(object, metaclass=DriverMetaclass):
                                            'active_bounds': np.zeros(con_size, dtype=int)}
             else:
                 # Inequality constraint, determine active indices and bounds
-                constraint_upper = con_options.get("upper", np.inf)
-                constraint_lower = con_options.get("lower", -np.inf)
+                constraint_upper = upper_con[constraint]
+                constraint_lower = lower_con[constraint]
 
                 if np.all(np.isinf(constraint_upper)):
                     upper_idxs = np.empty()
@@ -1804,8 +1913,9 @@ class Driver(object, metaclass=DriverMetaclass):
         for des_var, des_var_options in des_vars.items():
             des_var_value = dv_vals[des_var]
             des_var_size = des_var_options['size']
-            des_var_upper = np.ravel(des_var_options.get("upper", np.inf))
-            des_var_lower = np.ravel(des_var_options.get("lower", -np.inf))
+
+            des_var_upper = upper_dv[des_var]
+            des_var_lower = lower_dv[des_var]
 
             if assume_dvs_active:
                 active_dvs[des_var] = {'indices': np.arange(des_var_size, dtype=int),
@@ -1827,59 +1937,6 @@ class Driver(object, metaclass=DriverMetaclass):
                                            'active_bounds': np.asarray(active_bounds, dtype=int)}
 
         return active_cons, active_dvs
-
-    def _unscale_lagrange_multipliers(self, multipliers, assume_dv=False):
-        """
-        Unscale the Lagrange multipliers from optimizer scaling to physical/model scaling.
-
-        This method assumes that the optimizer is in a converged state, satisfying both the
-        primal constraints as well as the optimality conditions.
-
-        Parameters
-        ----------
-        active_constraints : Sequence[str]
-            Active constraints/dvs in the optimization, determined using the
-            get_active_cons_and_dvs method.
-        multipliers : dict[str: ArrayLike]
-            The Lagrange multipliers, in Driver-scaled units.
-        assume_dv : bool
-            This function can unscale the multipliers of either design variables or constraints.
-            Since variables can be both a design variable and a constraint, this flag
-            disambiguates the type of multiplier we're handling so the appropriate scaling
-            factors can be used.
-
-        Returns
-        -------
-        dict
-            The Lagrange multipliers in model/physical units.
-        """
-        if len(self._objs) != 1:
-            raise ValueError('Lagrange Multplier estimation requires that there '
-                             f'be a single objective, but there are {len(self._objs)}.')
-
-        obj_meta = list(self._objs.values())[0]
-        obj_ref = obj_meta['ref']
-        obj_ref0 = obj_meta['ref0']
-
-        if obj_ref is None:
-            obj_ref = 1.0
-        if obj_ref0 is None:
-            obj_ref0 = 0.0
-
-        obj_scaler = obj_meta['total_scaler'] or 1.0
-
-        unscaled_multipliers = {}
-
-        for name, val in multipliers.items():
-            if name in self._designvars and assume_dv:
-                scaler = self._designvars[name]['total_scaler']
-            else:
-                scaler = self._responses[name]['total_scaler']
-            scaler = scaler or 1.0
-
-            unscaled_multipliers[name] = val * scaler / obj_scaler
-
-        return unscaled_multipliers
 
     def compute_lagrange_multipliers(self, driver_scaling=False, feas_tol=1.0E-6,
                                      use_sparse_solve=True):
@@ -2026,8 +2083,8 @@ class Driver(object, metaclass=DriverMetaclass):
             offset += active_size
 
         if not driver_scaling:
-            dv_multipliers = self._unscale_lagrange_multipliers(dv_multipliers, assume_dv=True)
-            con_multipliers = self._unscale_lagrange_multipliers(con_multipliers, assume_dv=False)
+            dv_multipliers, con_multipliers = self._autoscaler.apply_mult_unscaling(dv_multipliers,
+                                                                                    con_multipliers)
 
         for key, val in dv_multipliers.items():
             active_dvs[key]['multipliers'] = val
@@ -2094,13 +2151,16 @@ class Driver(object, metaclass=DriverMetaclass):
             A flat vector of constraint violations, ordered with the linear constraints first.
         """
         model = self._problem().model
+        dv_vec = self._vectors['design_var']
 
         try:
             # Pass in new inputs
             if MPI and model.comm.size > 1:
                 model.comm.Bcast(x_new, root=0)
 
-            self._scipy_update_design_vars(x_new, desvar_names)
+            dv_vec.set_data(x_new, driver_scaling=True)
+            self._set_design_vars(desvar_names=desvar_names, driver_scaling=True)
+            # self._scipy_update_design_vars(x_new, desvar_names)
 
             with RecordingDebugging(self._get_name(), self.iter_count, self):
                 self.iter_count += 1
@@ -2124,7 +2184,7 @@ class Driver(object, metaclass=DriverMetaclass):
         except Exception:
             if self._exc_info is None:  # only record the first one
                 self._exc_info = sys.exc_info()
-            return np.zeros(np.sum([c['size'] for c in self._cons.values()]))
+            return np.zeros(np.sum([c['size'] for c in self._cons.values()], dtype=int))
 
     def _compute_con_viol_grad(self, x_new, desvar_names, con_row_map,
                                driver_scaling=True, lin_con_grad=None):
@@ -2260,7 +2320,7 @@ class Driver(object, metaclass=DriverMetaclass):
         status = -1 if problem is None else problem._metadata['setup_status']
         if status < _SetupStatus.POST_FINAL_SETUP:
             problem.final_setup()
-
+        
         desvar_vals = {dv: val for dv, val in self.get_design_var_values().items()
                        if not any(fnmatchcase(dv, pat) for pat in exclude_desvars)}
 
@@ -2295,26 +2355,20 @@ class Driver(object, metaclass=DriverMetaclass):
             i = 0
             bounds = []
 
+            lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
+
             for name, val in desvar_vals.items():
                 meta = self._designvars[name]
                 size = meta['global_size'] if meta['distributed'] else meta['size']
 
-                meta_low = meta['lower']
-                meta_high = meta['upper']
+                meta_low = lower_dv[name]
+                meta_high = upper_dv[name]
                 for j in range(size):
+                    p_low = meta_low[j]
+                    p_high = meta_high[j]
 
-                    if isinstance(meta_low, np.ndarray):
-                        p_low = meta_low[j]
-                    else:
-                        p_low = meta_low
-
-                    if isinstance(meta_high, np.ndarray):
-                        p_high = meta_high[j]
-                    else:
-                        p_high = meta_high
-
-                    p_low = -np.inf if p_low < -1.0E16 else p_low
-                    p_high = np.inf if p_high > 1.0E16 else p_high
+                    p_low = -np.inf if p_low <= -INF_BOUND else p_low
+                    p_high = np.inf if p_high >= INF_BOUND else p_high
 
                     # If lower and upper are equal at any indices, add some slack
                     equal_idxs = np.where(np.atleast_1d(np.abs(p_high - p_low)) < 1.0E-16)[0]

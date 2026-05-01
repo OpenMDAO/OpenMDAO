@@ -1273,8 +1273,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['z'][1], 0.0, 1e-3)
         assert_near_equal(prob['x'], 0.0, 1e-3)
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
-                         "scipy >= 1.1 is required.")
     def test_trust_constr(self):
 
         class Rosenbrock(om.ExplicitComponent):
@@ -1315,8 +1313,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
-                         "scipy >= 1.1 is required.")
     def test_trust_constr_hess_option(self):
 
         class Rosenbrock(om.ExplicitComponent):
@@ -1358,8 +1354,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.1"),
-                         "scipy >= 1.1 is required.")
     def test_trust_constr_equality_con(self):
 
         class Rosenbrock(om.ExplicitComponent):
@@ -1399,8 +1393,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_near_equal(prob['con.c'], 1., 1e-3)
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
-                         "scipy >= 1.2 is required.")
     def test_trust_constr_inequality_con(self):
 
         class Sphere(om.ExplicitComponent):
@@ -1437,8 +1429,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_near_equal(prob['c'], 1.0, 1e-2)
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
-                         "scipy >= 1.2 is required.")
     def test_trust_constr_bounds(self):
         class Rosenbrock(om.ExplicitComponent):
 
@@ -1833,8 +1823,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], np.array([0.234171, -0.1000]), 1e-3)
         assert_near_equal(prob['f'], -0.907267, 1e-3)
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
-                         "scipy >= 1.2 is required.")
     def test_dual_annealing_rastrigin(self):
         # Example from the Scipy documentation
 
@@ -1941,8 +1929,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], -np.ones(size), 1e-2)
         assert_near_equal(prob['f'], 3.0, 1e-2)
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.4"),
-                         "scipy >= 1.4 is required.")
     def test_differential_evolution_constrained_linear(self):
         # Source of example:
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
@@ -1976,8 +1962,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-3)
         assert_near_equal(prob['f'], 0.0011352416852625719, 1e-3)
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.4"),
-                         "scipy >= 1.4 is required.")
     def test_differential_evolution_constrained_nonlinear(self):
         # Source of example:
         # https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.differential_evolution.html
@@ -2011,8 +1995,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], [0.96632622, 0.93367155], 1e-3)
         assert_near_equal(prob['f'], 0.0011352416852625719, 1e-3)
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.4"),
-                         "scipy >= 1.4 is required.")
     def test_differential_evolution_constrained_linear_nonlinear(self):
         # test of the differential evolution optimizer with both
         # a linear and a nonlinear constraint
@@ -2046,8 +2028,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['x'], [0.94999253, 0.90250721], 1e-2)
         assert_near_equal(prob['f'], 0.00250079, 1e-2)
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
-                         "scipy >= 1.2 is required.")
     def test_shgo_rosenbrock(self):
         # Source of example:
         # https://stefan-endres.github.io/shgo/
@@ -2277,8 +2257,6 @@ class TestScipyOptimizeDriver(unittest.TestCase):
                          'The following constraints or objectives cannot be impacted by the design'
                          ' variables of the problem at the current design point:\n  parab.f_z, inds=[(1, 1, 0)]\n')
 
-    @unittest.skipUnless(ScipyVersion >= Version("1.2"),
-                         "scipy >= 1.2 is required.")
     def test_feature_shgo_rastrigin(self):
         # Source of example: https://stefan-endres.github.io/shgo/
 
