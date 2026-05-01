@@ -132,7 +132,9 @@ def _default_prob_name():
 
 class _FunctionalCallback(object):
 
-    def __init__(self, prob, form, input_vars, output_vars, driver_scaling):
+    def __init__(self, prob, form, input_vars, output_vars,
+                 # driver_scaling,
+                 ):
         self._problem = prob
 
         valid_forms = ("f", "dfdx", "fdfdx")
@@ -142,9 +144,24 @@ class _FunctionalCallback(object):
         self._form = form
 
         (self._total_jac_info, self._input_len, self._input_metadata, self._output_len,
-         self._output_metadata) = self._process_vars(input_vars, output_vars, driver_scaling)
+         self._output_metadata) = self._process_vars(input_vars, output_vars,
+                                                     # driver_scaling,
+                                                     )
+        self._maybe_warn_about_units(self._input_metadata)
+        self._maybe_warn_about_units(self._output_metadata)
 
-    def _process_vars(self, input_vars, output_vars, driver_scaling):
+    def _maybe_warn_about_units(self, meta_data):
+        if self.form != "f":
+            for vname, vdata in meta_data.items():
+                units = vdata["units"]
+                if units is not None:
+                    issue_warning("functional API does not support units properly when "
+                                  f"calculating total derivatives (var {vname} requested with "
+                                  f"units {units})")
+
+    def _process_vars(self, input_vars, output_vars,
+                      # driver_scaling,
+                      ):
         # First, decided on what names we'll be working with.
         if self.form == "f":
             # For the "f" form, we won't be working with derivatives and can't rely on
@@ -160,43 +177,56 @@ class _FunctionalCallback(object):
                 # Extract just the names and indices to pass to `_TotalJacInfo` constructor.
                 input_var_names = []
                 input_var_indices = []
+                # input_var_indices_are_flat = []
                 for entry in input_vars:
                     if isinstance(entry, str):
                         input_var_names.append(entry)
                         input_var_indices.append(None)
+                        # input_var_indices_are_flat.append(False)
                     elif isinstance(entry, Mapping):
                         for k, meta in entry.items():
                             input_var_names.append(k)
                             input_var_indices.append(meta.get("indices", None))
+                            # input_var_indices_are_flat.append(meta.get("flat_indices", False))
                     else:
                         raise ValueError((f"{self.msginfo}: invalid entry {entry} in "
                                            "input_vars argument"))
             else:
                 input_var_names = None
                 input_var_indices = None
+                # input_var_indices_are_flat = None
 
             if output_vars:
                 # Extract just the names and indices to pass to `_TotalJacInfo` constructor.
                 output_var_names = []
                 output_var_indices = []
+                # output_var_indices_are_flat = []
                 for entry in output_vars:
                     if isinstance(entry, str):
                         output_var_names.append(entry)
                         output_var_indices.append(None)
+                        # output_var_indices_are_flat.append(False)
                     elif isinstance(entry, Mapping):
                         for k, meta in entry.items():
                             output_var_names.append(k)
                             output_var_indices.append(meta.get("indices", None))
+                            # output_var_indices_are_flat.append(meta.get("flat_indices", False))
                     else:
                         raise ValueError((f"{self.msginfo}: invalid entry {entry} in "
                                            "output_vars argument"))
             else:
                 output_var_names = None
                 output_var_indices = None
+                # output_var_indices_are_flat = None
 
             tji = _TotalJacInfo(self.problem, output_var_names, input_var_names,
                                 of_indices=output_var_indices, wrt_indices=input_var_indices,
-                                return_format='flat_dict', driver_scaling=driver_scaling)
+                                return_format='flat_dict',
+                                driver_scaling=False,
+                                # of_indices_are_flat=output_var_indices_are_flat,
+                                # wrt_indices_are_flat=input_var_indices_are_flat,
+                                do_special_functional_api_thing=True,
+                                )
 
             if not input_vars:
                 # User didn't provide any input var data, so create one from what `_TotalJacInfo`
@@ -248,6 +278,7 @@ class _FunctionalCallback(object):
         problem = self.problem
         name = vmeta.get("name", valias)
         units = vmeta.get("units", None)
+
         indices = vmeta.get("indices", None)
         val = problem.get_val(name, units=units, indices=indices)
         try:
@@ -2707,8 +2738,12 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
 
-    def get_callback(self, form, input_vars=None, output_vars=None, driver_scaling=False):
-        return _FunctionalCallback(self, form, input_vars, output_vars, driver_scaling)
+    def get_callback(self, form, input_vars=None, output_vars=None,
+                     # driver_scaling=False,
+                     ):
+        return _FunctionalCallback(self, form, input_vars, output_vars,
+                                   # driver_scaling,
+                                   )
 
     def get_coloring_dir(self, mode, mkdir=False):
         """

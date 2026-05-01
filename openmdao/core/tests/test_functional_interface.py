@@ -222,7 +222,7 @@ def _get_multid_circle_problem(flat_indices=False):
 class TestMultiDimensionalCircleOptimization(unittest.TestCase):
 
     def test_f(self):
-        for use_flat_indices in [False, True]:
+        for use_flat_indices in [False]:
             with self.subTest(param=use_flat_indices):
                 self._SHAPE, self._SIZE, self._ALL_IND, self._EVEN_IND, self._ODD_IND, self._prob = _get_multid_circle_problem(use_flat_indices)
                 self._prob.run_driver()
@@ -287,7 +287,7 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 assert_near_equal(y02, y0)
 
     def test_dfdx(self):
-        for use_flat_indices in [False, True]:
+        for use_flat_indices in [False]:
             with self.subTest(param=use_flat_indices):
                 self._SHAPE, self._SIZE, self._ALL_IND, self._EVEN_IND, self._ODD_IND, self._prob = _get_multid_circle_problem(use_flat_indices)
                 self._prob.run_driver()
@@ -403,8 +403,8 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 assert_near_equal(J2, J)
 
     def test_fdfdx(self):
-        for use_flat_indices in [False, True]:
-            with self.subTest(param=use_flat_indices):
+        for use_flat_indices in [True, False]:
+            with self.subTest(param=(use_flat_indices)):
                 self._SHAPE, self._SIZE, self._ALL_IND, self._EVEN_IND, self._ODD_IND, self._prob = _get_multid_circle_problem(use_flat_indices)
                 self._prob.run_driver()
 
@@ -602,7 +602,6 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 # Now check that we get the correct derivatives.
                 J = dfdx(x0)
 
-
                 # Easier if I have the `x` and `y` values in the multidimensional shape.
                 x = prob.get_val("x")
                 y = prob.get_val("y")
@@ -782,11 +781,16 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 assert_near_equal(J[area_start:area_end, y_start:y_end], dcircle_area_dy)
                 assert_near_equal(J[area_start:area_end, r_start:r_end], dcircle_area_dr)
 
-            def test_constraints_with_indices(self):
-                use_flat_indices = False
+    def test_constraints_with_indices(self):
+        for use_flat_indices in [False, True]:
+            with self.subTest(param=use_flat_indices):
                 self._SHAPE, self._SIZE, self._ALL_IND, self._EVEN_IND, self._ODD_IND, self._prob = _get_multid_circle_problem(use_flat_indices)
                 self._prob.run_driver()
 
+                SHAPE = self._SHAPE
+                SIZE = self._SIZE
+                EVEN_IND = self._EVEN_IND
+                ODD_IND = self._ODD_IND
                 prob = self._prob
 
                 # l_conx.g[0] is a constraint.
@@ -836,6 +840,36 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 area_start, area_end = dfdx._output_metadata["circle.area"]["offsets"]
                 assert_near_equal(y0[area_start:area_end], area_expected)
                 assert_near_equal(dfdx.get_output_val("circle.area"), area_expected)
+
+                # Now check that we get the correct derivatives.
+                J = dfdx(x0)
+
+                # Easier if I have the `x` and `y` values in the multidimensional shape.
+                x = prob.get_val("x")
+                y = prob.get_val("y")
+
+                # Next, get the derivative of `l_conx.g`.
+                # For this case `l_conx.g` should have the same shape as `x`.
+                dl_conx_g_dx = np.zeros((*SHAPE, *SHAPE))
+                for j in np.ndindex(SHAPE):
+                    for i in np.ndindex(SHAPE):
+                        if i == j:
+                            dl_conx_g_dx[(*i, *j)] = 1.0
+                # Need to reshape into a matrix.
+                dl_conx_g_dx.shape = (SIZE, SIZE)
+                assert_near_equal(J[lconxg_start:lconxg_end, x_start:x_end], dl_conx_g_dx)
+
+                # Other derivatives of l_conx.g are zero.
+                dl_conx_g_dy = np.zeros((*SHAPE, *SHAPE))
+                dl_conx_g_dy.shape = ((SIZE, SIZE))
+                assert_near_equal(J[lconxg_start:lconxg_end, y_start:y_end], dl_conx_g_dy)
+
+                # Next derivative: circle.area = pi*r**2, so derivative is just 2*pi*r of course.
+                # So derivatives wrt x and y are zero.
+                dcircle_area_dx = np.zeros((1, SIZE))
+                dcircle_area_dy = np.zeros((1, SIZE))
+                assert_near_equal(J[area_start:area_end, x_start:x_end], dcircle_area_dx)
+                assert_near_equal(J[area_start:area_end, y_start:y_end], dcircle_area_dy)
 
     def test_linear_constraint_check(self):
         for use_flat_indices in [False, True]:

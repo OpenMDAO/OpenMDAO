@@ -85,7 +85,9 @@ class _TotalJacInfo(object):
 
     def __init__(self, problem, of, wrt, return_format, approx=False,
                  debug_print=False, driver_scaling=True, get_remote=True, directional=False,
-                 coloring_info=None, driver=None, of_indices=None, wrt_indices=None):
+                 coloring_info=None, driver=None, of_indices=None, wrt_indices=None,
+                 do_special_functional_api_thing=False,
+                 ):
         """
         Initialize object.
 
@@ -125,6 +127,8 @@ class _TotalJacInfo(object):
         wrt_indices : iter of int or None
             Indices into the list of 'wrt' variables selecting which of those variables are included
             in the returned total derivatives. If None, the entire variable is included.
+        do_special_functional_api_thing : bool
+            If True, handle `of` and `wrt` variables the way the functional API wants
         """
         if driver is None:
             driver = problem.driver
@@ -161,12 +165,34 @@ class _TotalJacInfo(object):
             raise RuntimeError("Derivative support has been turned off but compute_totals "
                                "was called.")
 
-        of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of, wrt)
+        if do_special_functional_api_thing:
+            if (orig_of is None) and (orig_wrt is None):
+                # Use driver to get of and wrt metadata.
+                (of_metadata, wrt_metadata,
+                    has_custom_derivs) = model._get_totals_metadata(driver, of, wrt)
+            elif (orig_of is None):
+                # Use driver to get of metadata, but not for wrt.
+                of_metadata, has_custom_derivs = model._get_totals_of_metadata(driver, of)
+                wrt_metadata, has_custom_derivs = model._get_totals_wrt_metadata(False, wrt)
+            elif (orig_wrt is None):
+                # Use driver to get wrt metadata, but not forof.
+                of_metadata, has_custom_derivs = model._get_totals_of_metadata(False, of)
+                wrt_metadata, has_custom_derivs = model._get_totals_wrt_metadata(driver, wrt)
+            else:
+                # Don't use driver for anything.
+                of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(False,
+                                                                                          of, wrt)
+        else:
+            of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of,
+                                                                                      wrt)
 
         # DJI: This block added by Claude.
-        if of_indices is not None:
+        if (of_indices is not None) and (orig_of is not None):
             conn_graph = model.get_conn_graph()
             # of_metadata = dict(of_metadata)  # shallow copy so we don't mutate the original
+            # flat_iter = of_indices_are_flat if of_indices_are_flat is not None \
+            #     else repeat(False)
+            # for vname, new_idxs, is_flat in zip(of_metadata, of_indices, flat_iter):
             for vname, new_idxs in zip(of_metadata, of_indices):
                 if new_idxs is None:
                     continue
@@ -174,15 +200,19 @@ class _TotalJacInfo(object):
                 meta = of_metadata[vname]
                 src_shape = conn_graph.nodes[('o', meta['source'])]['attrs'].global_shape
                 new_idx_tuple = tuple(i for i in np.atleast_1d(new_idxs))
+                # idxer = make_indexer(new_idx_tuple, flat_src=is_flat)
                 idxer = make_indexer(new_idx_tuple)
                 idxer.set_src_shape(src_shape)
                 meta['indices'] = idxer
                 meta['size'] = meta['global_size'] = idxer.indexed_src_size
 
         # DJI: This block added by Claude.
-        if wrt_indices is not None:
+        if (wrt_indices is not None) and (orig_wrt is not None):
             conn_graph = model.get_conn_graph()
             # wrt_metadata = dict(wrt_metadata)  # shallow copy so we don't mutate the original
+            # flat_iter = wrt_indices_are_flat if wrt_indices_are_flat is not None \
+            #     else repeat(False)
+            # for vname, new_idxs, is_flat in zip(wrt_metadata, wrt_indices, flat_iter):
             for vname, new_idxs in zip(wrt_metadata, wrt_indices):
                 if new_idxs is None:
                     continue
@@ -190,6 +220,7 @@ class _TotalJacInfo(object):
                 meta = wrt_metadata[vname]
                 src_shape = conn_graph.nodes[('o', meta['source'])]['attrs'].global_shape
                 new_idx_tuple = tuple(i for i in np.atleast_1d(new_idxs))
+                # idxer = make_indexer(new_idx_tuple, flat_src=is_flat)
                 idxer = make_indexer(new_idx_tuple)
                 idxer.set_src_shape(src_shape)
                 meta['indices'] = idxer

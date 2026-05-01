@@ -3770,6 +3770,116 @@ class Group(System):
 
         return out
 
+    def _get_totals_of_metadata(self, driver=None, of=None):
+        if isinstance(of, str):
+            of = [of]
+        # if isinstance(wrt, str):
+        #     wrt = [wrt]
+
+        if not driver:
+            # if of is None or wrt is None:
+            if of is None:
+                raise RuntimeError("driver must be specified if of variables are not "
+                                   "provided.")
+
+            if driver is False:  # force to not use any existing desvar or response metadata
+                # return self._active_responses(of, responses=False), \
+                #     self._active_desvars(wrt, designvars=False), True
+                return self._active_responses(of, responses=False), True
+
+            return self._active_responses(of), True
+
+        has_custom_derivs = False
+        # list_wrt = list(wrt) if wrt is not None else []
+        # list_of = list(of) if of is not None else []
+
+        # lincons = [d for d, meta in driver._cons.items() if meta['linear']]
+        # if lincons and list_of == lincons:  # this is for a linear jacobian
+        #     driver_wrt = list(driver._get_lin_dvs())
+        # else:
+        #     driver_wrt = list(driver._get_nl_dvs())
+
+        # if wrt is None:
+        #     wrt = driver_wrt
+        #     if not wrt:
+        #         raise RuntimeError("No design variables were passed to compute_totals and "
+        #                            "the driver is not providing any.")
+        # else:
+        #     if list_wrt != driver_wrt:
+        #         wrt_src_names = [driver._designvars[n]['source'] for n in driver_wrt]
+        #         if list_wrt != wrt_src_names:
+        #             has_custom_derivs = True
+
+        driver_ordered_nl_resp_names = driver._get_ordered_nl_responses()
+        if of is None:
+            of = driver_ordered_nl_resp_names
+            if not of:
+                raise RuntimeError("No response variables were passed to compute_totals and "
+                                   "the driver is not providing any.")
+        else:
+            of_src_names = [m['source'] for n, m in driver._responses.items()
+                            if n in driver_ordered_nl_resp_names]
+            of = list(of)
+            if of != driver_ordered_nl_resp_names and of != of_src_names:
+                has_custom_derivs = True
+
+        return self._active_responses(of, driver._responses), has_custom_derivs
+
+    def _get_totals_wrt_metadata(self, driver=None, wrt=None):
+        # if isinstance(of, str):
+        #     of = [of]
+        if isinstance(wrt, str):
+            wrt = [wrt]
+
+        if not driver:
+            # if of is None or wrt is None:
+            if wrt is None:
+                raise RuntimeError("driver must be specified if wrt variables are not "
+                                   "provided.")
+
+            if driver is False:  # force to not use any existing desvar or response metadata
+                return self._active_desvars(wrt, designvars=False), True
+
+            return self._active_desvars(wrt), True
+
+        has_custom_derivs = False
+        list_wrt = list(wrt) if wrt is not None else []
+        # list_of = list(of) if of is not None else []
+
+        # DJI: Ignoring the detail of linear constraints for now.
+        # lincons = [d for d, meta in driver._cons.items() if meta['linear']]
+        # if lincons and list_of == lincons:  # this is for a linear jacobian
+        #     driver_wrt = list(driver._get_lin_dvs())
+        # else:
+        #     driver_wrt = list(driver._get_nl_dvs())
+        driver_wrt = list(driver._get_nl_dvs())
+
+        if wrt is None:
+            wrt = driver_wrt
+            if not wrt:
+                raise RuntimeError("No design variables were passed to compute_totals and "
+                                   "the driver is not providing any.")
+        else:
+            if list_wrt != driver_wrt:
+                wrt_src_names = [driver._designvars[n]['source'] for n in driver_wrt]
+                if list_wrt != wrt_src_names:
+                    has_custom_derivs = True
+
+        # driver_ordered_nl_resp_names = driver._get_ordered_nl_responses()
+        # if of is None:
+        #     of = driver_ordered_nl_resp_names
+        #     if not of:
+        #         raise RuntimeError("No response variables were passed to compute_totals and "
+        #                            "the driver is not providing any.")
+        # else:
+        #     of_src_names = [m['source'] for n, m in driver._responses.items()
+        #                     if n in driver_ordered_nl_resp_names]
+        #     of = list(of)
+        #     if of != driver_ordered_nl_resp_names and of != of_src_names:
+        #         has_custom_derivs = True
+
+        return self._active_desvars(wrt, driver._designvars), has_custom_derivs
+
     def _get_totals_metadata(self, driver=None, of=None, wrt=None):
         if isinstance(of, str):
             of = [of]
