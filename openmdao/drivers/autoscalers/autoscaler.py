@@ -19,9 +19,6 @@ class Autoscaler(AutoscalerBase):
 
     """
 
-    def __init__(self):
-        super().__init__()
-
     def setup(self, driver: 'Driver'):
         """
         Perform setup of autoscaler during final setup of the problem.
