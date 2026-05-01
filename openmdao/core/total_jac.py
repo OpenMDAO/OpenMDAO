@@ -80,6 +80,10 @@ class _TotalJacInfo(object):
         Dict of relevance dictionaries for each var of interest.
     add_coloring_noise : bool
         If True, add noise to the seed during coloring (sparsity) generation.
+    _desvar_unit_scalers : dict[str, float]
+        A dict mapping any design variables with units to the scaler for their given units.
+    _resp_unit_scalers : dict[str, float]
+        A dict mapping any response with units to the scaler for their given units.
     """
 
     def __init__(self, problem, of, wrt, return_format, approx=False,
@@ -119,8 +123,7 @@ class _TotalJacInfo(object):
             The driver that owns the total jacobian.  If None, use the driver from the problem.
             If False, this total jacobian will be computed directly by the problem.
         """
-        if driver is None:
-            driver = problem.driver
+        self._driver = driver = problem.driver if driver is None else driver
         self.model = model = problem.model
 
         # reset the of and wrt caches just in case we've previously built a total jac with
@@ -141,6 +144,8 @@ class _TotalJacInfo(object):
         self.coloring_info = coloring_info
         self.nsolves = 0
         self.add_coloring_noise = problem._metadata['randomize_seeds']
+        self._desvar_unit_scalers = {}
+        self._resp_unit_scalers = {}
 
         try:
             self._linear_only_dvs = set(driver._lin_dvs).difference(driver._nl_dvs)
@@ -363,6 +368,10 @@ class _TotalJacInfo(object):
         else:
             self.J_final = self.J_dict = self._get_dict_J(J, wrt_metadata, of_metadata,
                                                           return_format)
+        
+        # Store which VOIs require unit scaling if we're computing an optimization jacobian.
+        if not has_custom_derivs:
+            self._identify_unit_active_vars()
 
     def _check_discrete_dependence(self):
         model = self.model
@@ -1363,6 +1372,69 @@ class _TotalJacInfo(object):
                     self._jac_setter_dist(i, mode)
                 break  # only need a single row of jac for directional
 
+    def _identify_unit_active_vars(self):
+        """
+        Identify which rows and columns of the jacobian involve unit conversion.
+        
+        This stores self._unit_active_outputs and self._unit_active_inputs,
+        which are dictionaries of name: unit_scaler combinations.
+        """
+        self._resp_unit_scalers = {} # {name: scaler}
+        self._desvar_unit_scalers = {}  # {name: scaler}
+
+        # Check Outputs (Objectives/Constraints)
+        for name, meta in self._driver._cons.items():
+            scaler = meta.get('unit_scaler', 1.0)
+            if scaler != 1.0 and scaler is not None:
+                self._resp_unit_scalers[name] = scaler
+
+        for name, meta in self._driver._objs.items():
+            scaler = meta.get('unit_scaler', 1.0)
+            if scaler != 1.0 and scaler is not None:
+                self._resp_unit_scalers[name] = scaler
+
+        # Check Inputs (Design Variables)
+        for name, meta in self._driver._designvars.items():
+            scaler = meta.get('unit_scaler', 1.0)
+            if scaler != 1.0 and scaler is not None:
+                self._desvar_unit_scalers[name] = scaler
+
+    def _apply_unit_scaling(self, jac_dict):
+        """
+        Perform unit scaling on the blocks that require it.
+        """
+        if not self._resp_unit_scalers and not self._desvar_unit_scalers:
+            return
+        
+        if not jac_dict:
+            return
+            
+        is_flat = isinstance(next(iter(jac_dict)), tuple)
+
+        if is_flat:
+            for (out_name, in_name), block in jac_dict.items():
+                # Apply row scaling if the output has unit scaling
+                out_scaler = self._resp_unit_scalers.get(out_name)
+                if out_scaler:
+                    block[...] = out_scaler
+                
+                # Apply column scaling if the input has unit scaling
+                in_scaler = self._desvar_unit_scalers.get(in_name)
+                if in_scaler:
+                    block *= (1.0 / in_scaler)
+        else:
+            # Nested dictionary: jac_dict[out_name][in_name]
+            for out_name, in_dict in jac_dict.items():
+                out_scaler = self._resp_unit_scalers.get(out_name)
+                
+                for in_name, block in in_dict.items():
+                    if out_scaler:
+                        block[...] = out_scaler
+                    
+                    in_scaler = self._desvar_unit_scalers.get(in_name)
+                    if in_scaler:
+                        block *= (1.0 / in_scaler)
+
     def compute_totals(self, progress_out_stream=None):
         """
         Compute derivatives of desired quantities with respect to desired inputs.
@@ -1475,10 +1547,12 @@ class _TotalJacInfo(object):
                             # reset any Problem level data for the current iteration
                             self.model._problem_meta['parallel_deriv_color'] = None
                             self.model._problem_meta['seed_vars'] = None
+                
+                self._apply_unit_scaling(self.J_dict)
 
                 # Driver scaling.
                 if self.has_scaling:
-                    self._do_driver_scaling(self.J_dict)
+                    self._driver._autoscaler.apply_jac_scaling(self.J_dict)
 
                 # if some of the wrt vars are distributed in fwd mode, we bcast from the rank
                 # where each part of the distrib var exists
@@ -1576,10 +1650,13 @@ class _TotalJacInfo(object):
             if debug_print:
                 print(f'Elapsed time to approx totals: {time.perf_counter() - t0} secs\n',
                       flush=True)
+            
+            # Unit scaling
+            self._apply_unit_scaling(totals)
 
             # Driver scaling.
             if self.has_scaling:
-                self._do_driver_scaling(totals)
+                self._driver._autoscaler.apply_jac_scaling(totals)
 
             if return_format == 'array':
                 totals = self.J  # change back to array version
@@ -1725,51 +1802,6 @@ class _TotalJacInfo(object):
             Direction of derivative solution.
         """
         self.lin_sol_cache[key][:] = self.output_vec[mode].asarray()
-
-    def _do_driver_scaling(self, J):
-        """
-        Apply scalers to the jacobian if the driver defined any.
-
-        Parameters
-        ----------
-        J : dict
-            Jacobian to be scaled.
-        """
-        # use promoted names for design vars and responses
-        desvars = self.input_meta['fwd']
-        responses = self.output_meta['fwd']
-
-        if self.return_format in ('dict', 'array'):
-            for prom_out, odict in J.items():
-                oscaler = responses[prom_out].get('total_scaler')
-
-                for prom_in, val in odict.items():
-                    iscaler = desvars[prom_in].get('total_scaler')
-
-                    # Scale response side
-                    if oscaler is not None:
-                        val[:] = (oscaler * val.T).T
-
-                    # Scale design var side
-                    if iscaler is not None:
-                        val *= 1.0 / iscaler
-
-        elif self.return_format == 'flat_dict':
-            for tup, val in J.items():
-                prom_out, prom_in = tup
-                oscaler = responses[prom_out]['total_scaler']
-                iscaler = desvars[prom_in]['total_scaler']
-
-                # Scale response side
-                if oscaler is not None:
-                    val[:] = (oscaler * val.T).T
-
-                # Scale design var side
-                if iscaler is not None:
-                    val *= 1.0 / iscaler
-        else:
-            raise RuntimeError("Derivative scaling by the driver only supports 'dict', "
-                               "'array' and 'flat_array' formats at present.")
 
     def _print_derivatives(self):
         """

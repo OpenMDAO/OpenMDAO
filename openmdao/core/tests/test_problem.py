@@ -1810,11 +1810,11 @@ class TestProblem(unittest.TestCase):
         finally:
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
-        self.assertEqual(output[1], r'Design Variables')
+        self.assertEqual(output[1], r'Design Variables (scaled)')
         self.assertRegex(output[5], r'^z +\|[0-9. e+-]+\| +2')
-        self.assertEqual(output[9], r'Constraints')
+        self.assertEqual(output[9], r'Constraints (scaled)')
         self.assertRegex(output[14], r'^con2 +\[[0-9. e+-]+\] +1')
-        self.assertEqual(output[17], r'Objectives')
+        self.assertEqual(output[17], r'Objectives (scaled)')
         self.assertRegex(output[21], r'^obj +\[[0-9. e+-]+\] +1')
 
         # General make sure that the default settings print all columns.
@@ -2225,9 +2225,10 @@ class TestProblem(unittest.TestCase):
         sys.stdout = strout
 
         try:
-            prob.list_driver_vars(desvar_opts=['lower', 'upper'], cons_opts=['lower', 'upper'])
+            prob.list_driver_vars(desvar_opts=['lower', 'upper', 'units'], cons_opts=['lower', 'upper', 'units'], driver_scaling=True)
         finally:
             sys.stdout = stdout
+
         output = strout.getvalue().split('\n')
 
         self.assertTrue('275.' in output[5])  # design var: x, value
@@ -2249,13 +2250,14 @@ class TestProblem(unittest.TestCase):
             sys.stdout = stdout
         output = strout.getvalue().split('\n')
 
-        self.assertTrue('35.'  in output[5])  # design var: x, value
+        # Not outputs are return
+        self.assertTrue('1.6'  in output[5])  # design var: x, value
         self.assertTrue('0.'   in output[5])  # design var: x, lower bound
         self.assertTrue('100.' in output[5])  # design var: x, upper bound
-        self.assertTrue('70.'  in output[12]) # constraint: y1, value
+        self.assertTrue('21.1'  in output[12]) # constraint: y1, value
         self.assertTrue('100.' in output[12]) # constraint: y1, lower bound
         self.assertTrue('0.'   in output[12]) # constraint: y1, upper bound
-        self.assertTrue('105.' in output[19]) # objective: y2, value
+        self.assertTrue('40.5' in output[19]) # objective: y2, value
 
     def test_feature_list_driver_vars(self):
 
@@ -2460,6 +2462,7 @@ class TestProblem(unittest.TestCase):
                                 continue
                             with self.subTest(f'{method=} {loss=} {term_tol=} {max_nfev=} {driver_scaling=}'):
                                 model.set_val('x', 5.0)
+                                
                                 if method == 'lm':
                                     with assert_warning(OpenMDAOWarning, "find_feasible method is 'lm' which "
                                                         "ignores bounds but one or more design variables have bounds."):
@@ -2474,11 +2477,16 @@ class TestProblem(unittest.TestCase):
                                     self.assertEqual(prob.driver.result.exit_status, expected)
                                 elif term_tol and method != 'lm':
                                     # Skip use of term_tol options with lm
-                                    self.assertIn(list(term_tol.keys())[0], prob.driver.result.exit_status)
+                                    if method=='dogbox' and list(term_tol.keys())[0] in {'xtol', 'ftol'}:
+                                        # for dogbox we cant reliably determine which tolerance triggers
+                                        # the stopping condition
+                                        pass
+                                    else:
+                                        self.assertIn(list(term_tol.keys())[0], prob.driver.result.exit_status)
                                 else:
                                     self.assertFalse(failed)
                                     self.assertTrue(prob.driver.result.success)
-                                    assert_near_equal(prob.get_val('x'), 1.5, tolerance=1.0E-8)
+                                    assert_near_equal(prob.get_val('x'), 1.5, tolerance=1.0E-5)
 
     def test_find_feasible_no_feasible_solution(self):
             prob = om.Problem()

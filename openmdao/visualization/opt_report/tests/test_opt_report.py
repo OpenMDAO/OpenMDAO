@@ -343,7 +343,7 @@ class TestOptimizationReport(unittest.TestCase):
         model.add_constraint('con1', upper=0.0)
 
         prob.setup(check=False, mode='rev')
-        prob.final_setup()
+        prob.run_driver()
         opt_report(prob)
 
     @require_pyoptsparse('SLSQP')
@@ -361,7 +361,7 @@ class TestOptimizationReport(unittest.TestCase):
         model.add_constraint('con1', upper=0.0)
 
         prob.setup(check=False, mode='rev')
-        prob.final_setup()
+        prob.run_driver()
         opt_report(prob)
 
     @require_pyoptsparse('SLSQP')
@@ -386,7 +386,7 @@ class TestOptimizationReport(unittest.TestCase):
         # model.add_constraint('con1', lower=-6, upper=-5.5)  # lower and upper - >> upper
 
         prob.setup(check=False, mode='rev')
-        prob.final_setup()
+        prob.run_driver()
         opt_report(prob)
 
     def test_opt_report_scalar_equality_constraint(self):
@@ -411,7 +411,7 @@ class TestOptimizationReport(unittest.TestCase):
         model.add_constraint('c', equals=1.0)  # constraint satisfied
 
         prob.setup()
-        prob.final_setup()
+        prob.run_driver()
         opt_report(prob)
 
     def test_opt_report_array_constraint(self):
@@ -471,7 +471,7 @@ class TestOptimizationReport(unittest.TestCase):
         prob.setup()
 
         prob['x'] = np.arange(size) - 100.0
-        prob.final_setup()
+        prob.run_driver()
         opt_report(prob)
 
     def test_opt_report_array_equality_constraint(self):
@@ -496,7 +496,7 @@ class TestOptimizationReport(unittest.TestCase):
         # model.add_constraint('areas', equals=np.array([1.0, 1.0, 1.0, 1.0]))  # All met
 
         prob.setup()
-        prob.final_setup()
+        prob.run_driver()
         opt_report(prob)
 
     def test_opt_report_ref_arrays(self):
