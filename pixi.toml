@@ -94,6 +94,7 @@ pydoe3 = "*"
 [feature.opt.dependencies]
 pyoptsparse = ">=2.14.0"
 cyipopt = "*"
+pymoo = ">=0.6.1"
 
 [feature.opt.pypi-dependencies]
 build_pyoptsparse = { git = "https://github.com/OpenMDAO/build_pyoptsparse.git" }

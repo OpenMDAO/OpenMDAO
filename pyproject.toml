@@ -138,6 +138,7 @@ differentialevolutiondriver = "openmdao.drivers.differential_evolution_driver:Di
 doedriver = "openmdao.drivers.doe_driver:DOEDriver"
 driver = "openmdao.core.driver:Driver"
 pyoptsparsedriver = "openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver"
+pymoodriver = "openmdao.drivers.pymoo_driver:pymooDriver"
 scipydriver = "openmdao.drivers.scipy_optimizer:ScipyOptimizeDriver"
 simplegadriver = "openmdao.drivers.genetic_algorithm_driver:SimpleGADriver"
 
