@@ -2912,13 +2912,13 @@ class System(object, metaclass=SystemMetaclass):
 
         try:
             yield
-        except Exception:
-            err_type, err, trace = sys.exc_info()
+        except Exception as err:
             if str(err).startswith(self.msginfo):
                 raise
             else:
-                raise err_type(
-                    f"{self.msginfo}: Error calling {fname}(), {err}").with_traceback(trace)
+                msg = err.args[0] if err.args else ''
+                err.args = (f"{self.msginfo}: Error calling {fname}(), " + msg,) + err.args[1:]
+                raise 
         finally:
             self._inputs.read_only = False
             self._outputs.read_only = False
