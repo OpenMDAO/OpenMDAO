@@ -2389,6 +2389,125 @@ class TestGroupPromotes(unittest.TestCase):
         p.run_model()
         # If working correctly, no exception raised.
 
+    def test_repromote_with_wildcard(self):
+
+        class OutComp(om.ExplicitComponent):
+
+            def initialize(self):
+                self.options.declare('prefix')
+
+            def setup(self):
+                pre = self.options['prefix'] + ':'
+                self.add_input('x', 3.0)
+
+                self.add_output(pre + 'y1', 1.0, units='m')
+                self.add_output(pre + 'y2', 1.0, units='ft')
+                self.add_output(pre + 'z3', 1.0, units='inch')
+                self.add_output(pre + 'z4', 1.0, units='mm')
+
+            def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
+                pre = self.options['prefix'] + ':'
+
+                x = inputs['x']
+                outputs[pre + 'y1'] = 3.0 * x
+                outputs[pre + 'y2'] = 30.0 * x
+                outputs[pre + 'z3'] = 300.0 * x
+                outputs[pre + 'z4'] = 3000.0 * x
+
+        class SubSub(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('comp1', OutComp(prefix='wing'),
+                                promotes_inputs=['*'],
+                                promotes_outputs=['*'])
+
+                self.add_subsystem('comp2', OutComp(prefix='fuse'),
+                                promotes_inputs=['*'],
+                                promotes_outputs=['fuse:z*', 'fuse:y*'])
+
+                self.add_subsystem('comp3', OutComp(prefix='tail'),
+                                promotes_inputs=['*'],
+                                promotes_outputs=['tail:z*', 'tail:y1', 'tail:y2'])
+
+                self.add_subsystem('comp4', OutComp(prefix='nac'),
+                                promotes_inputs=['*'],
+                                promotes_outputs=['nac:y*', 'nac:z3'])
+
+        class Sub(om.Group):
+
+            def setup(self):
+
+                self.add_subsystem('subsub', SubSub(),
+                                promotes_outputs=['wing:*', 'fuse:*', 'tail:*', 'nac:*'])
+
+            def configure(self):
+
+                # Wildcard promotes.
+                self.subsub.promotes('comp1', outputs=[('wing:z3', 'override:wing:z3')])
+
+                # Selective wildcard promotes.
+                self.subsub.promotes('comp2', outputs=[('fuse:z3', 'override:fuse:z3')])
+
+                # Mixed wildcard and individual promotes.
+                self.subsub.promotes('comp3', outputs=[('tail:z3', 'override:tail:z3')])
+
+                # Variable is specified in the original promote.
+                self.subsub.promotes('comp4', outputs=[('nac:z3', 'override:nac:z3')])
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('sub', Sub(), promotes=['*'])
+
+        prob.setup()
+
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('subsub.override:wing:z3'), 900., tolerance=1.0E-4)
+        assert_near_equal(prob.get_val('subsub.override:fuse:z3'), 900., tolerance=1.0E-4)
+        assert_near_equal(prob.get_val('subsub.override:tail:z3'), 900., tolerance=1.0E-4)
+        assert_near_equal(prob.get_val('subsub.override:nac:z3'), 900., tolerance=1.0E-4)
+
+    def test_repromote_with_wildcard2(self):
+
+        prob = om.Problem()
+
+        g1 = prob.model.add_subsystem('g1', om.Group())
+        g2 = g1.add_subsystem('g2', om.Group())
+        g3 = g2.add_subsystem('g3', om.Group())
+        g4 = g3.add_subsystem('g4', om.Group())
+
+        g4.add_subsystem('c1', om.ExecComp('y = a * x + b'), promotes=['*'])
+
+        # At this point we have g1.g2.g3.g4.[y, a, x, b]
+        # The promote call took c1 out of the promoted path.
+        # Now promote the variables up to the top.
+        g3.promotes('g4', any=['*'])
+        g2.promotes('g3', any=['*'])
+        g1.promotes('g2', any=['*'])
+        prob.model.promotes('g1', any=['a', 'b', 'x', '*y*'])
+        # This would previously result in an error before issue 2795 is fixed.
+        prob.model.promotes('g1', [('y', 'my_y'), ('a', 'my_a'), ('x', 'my_x'), ('b', 'my_b')])
+
+        prob.setup()
+
+        prob.set_val('my_a', 2.0)
+        prob.set_val('my_x', 3.0)
+        prob.set_val('my_b', 4.0)
+
+        prob.run_model()
+
+        y = prob.get_val('my_y')
+        a = prob.get_val('my_a')
+        x = prob.get_val('my_x')
+        b = prob.get_val('my_b')
+
+        assert_near_equal(y, 10.0, tolerance=1.0E-5)
+        assert_near_equal(a, 2.0, tolerance=1.0E-5)
+        assert_near_equal(x, 3.0, tolerance=1.0E-5)
+        assert_near_equal(b, 4.0, tolerance=1.0E-5)
+
 
 class MyComp(om.ExplicitComponent):
     def __init__(self, input_shape, src_indices=None, flat_src_indices=False):

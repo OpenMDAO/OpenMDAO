@@ -777,7 +777,7 @@ class TestJacobian(unittest.TestCase):
         with self.assertRaises(KeyError) as ctx:
             prob.compute_totals(of=['comp.y'], wrt=['p1.x'])
 
-        self.assertEqual(ctx.exception.args[0], '\'comp\' <class Undeclared>: Error calling compute_partials(), "Variable name pair (\'y\', \'x\') must first be declared."')
+        self.assertEqual(ctx.exception.args[0], '\'comp\' <class Undeclared>: Error calling compute_partials(), Variable name pair (\'y\', \'x\') must first be declared.')
 
     def test_one_src_2_tgts_with_src_indices_densejac(self):
         size = 4

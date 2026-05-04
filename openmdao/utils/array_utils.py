@@ -386,8 +386,12 @@ def array_connection_compatible(shape1, shape2):
         return True
 
     # Shapes are not connection-compatible if size is different
-    if shape_to_len(shape1) != shape_to_len(shape2):
+    size1 = shape_to_len(shape1)
+    if size1 != shape_to_len(shape2):
         return False
+
+    if size1 == 0:
+        return True  # if size is 0, don't worry about the shape
 
     ashape1 = np.asarray(shape1, dtype=INT_DTYPE)
     ashape2 = np.asarray(shape2, dtype=INT_DTYPE)

@@ -133,7 +133,7 @@
         <div id="obj-table"></div>
     </div>
     <div class="jac-info">
-        <h3>Jacobian Info</h3>
+        <h3>Jacobian Info (cond = <jac_cond>)</h3>
         <div id="tab-bar" class="tab">
             <button id="varjac-button" class="tablinks" onclick="showJac(event, 'variable')"></button>
         </div>
@@ -244,10 +244,13 @@ if (dv_tabledata.length > 0) {
                 numrow("value", "model_val"),
                 {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true,},
             ]},
+            {title: "units", field:"units", hozAlign:"center", headerFilter:false, visible:true,},
             numrow("ref", "ref"),
             numrow("ref0", "ref0"),
             numrow("scaler", "scaler"),
             numrow("adder", "adder"),
+            numrow("total_scaler", "total_scaler"),
+            numrow("total_adder", "total_adder"),
             numrow("upper", "upper"),
             numrow("lower", "lower"),
         ],
@@ -280,10 +283,13 @@ if (con_tabledata.length > 0) {
                 numrow("value", "model_val"),
                 {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true,},
             ]},
+            {title: "units", field:"units", hozAlign:"center", headerFilter:false, visible:true,},
             numrow("ref", "ref"),
             numrow("ref0", "ref0"),
             numrow("scaler", "scaler"),
             numrow("adder", "adder"),
+            numrow("total_scaler", "total_scaler"),
+            numrow("total_adder", "total_adder"),
             numrow("upper", "upper"),
             numrow("lower", "lower"),
             numrow("equals", "equals"),
@@ -320,10 +326,13 @@ if (obj_tabledata.length > 0) {
                 numrow("value", "model_val"),
                 {title: "units", field:"model_units", hozAlign:"center", headerFilter:false, visible:true,},
             ]},
+            {title: "units", field:"units", hozAlign:"center", headerFilter:false, visible:true,},
             numrow("ref", "ref"),
             numrow("ref0", "ref0"),
             numrow("scaler", "scaler"),
             numrow("adder", "adder"),
+            numrow("total_scaler", "total_scaler"),
+            numrow("total_adder", "total_adder"),
         ],
     });
 }

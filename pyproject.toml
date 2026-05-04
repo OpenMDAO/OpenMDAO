@@ -82,6 +82,7 @@ test = [
     "pydocstyle>=2.0.0",
     "testflo>=1.3.6",
     "websockets>8",
+    "coverage>=7.6.0"
 ]
 visualization = [
     "panel",
@@ -137,6 +138,7 @@ differentialevolutiondriver = "openmdao.drivers.differential_evolution_driver:Di
 doedriver = "openmdao.drivers.doe_driver:DOEDriver"
 driver = "openmdao.core.driver:Driver"
 pyoptsparsedriver = "openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver"
+pymoodriver = "openmdao.drivers.pymoo_driver:pymooDriver"
 scipydriver = "openmdao.drivers.scipy_optimizer:ScipyOptimizeDriver"
 simplegadriver = "openmdao.drivers.genetic_algorithm_driver:SimpleGADriver"
 
@@ -157,6 +159,7 @@ petscdirectsolver = "openmdao.solvers.linear.petsc_direct_solver:PETScDirectSolv
 [project.entry-points.openmdao_nl_solver]
 armijogoldsteinls = "openmdao.solvers.linesearch.backtracking:ArmijoGoldsteinLS"
 boundsenforcels = "openmdao.solvers.linesearch.backtracking:BoundsEnforceLS"
+brentsolver = "openmdao.solvers.nonlinear.brent:BrentSolver"
 broydensolver = "openmdao.solvers.nonlinear.broyden:BroydenSolver"
 newtonsolver = "openmdao.solvers.nonlinear.newton:NewtonSolver"
 nonlinearblockgs = "openmdao.solvers.nonlinear.nonlinear_block_gs:NonlinearBlockGS"

@@ -24,6 +24,7 @@ from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.concurrent_utils import concurrent_eval
 from openmdao.utils.mpi import MPI
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.utils.om_warnings import warn_deprecation
 
 
 class DifferentialEvolutionDriver(Driver):
@@ -96,6 +97,9 @@ class DifferentialEvolutionDriver(Driver):
         # Support for Parallel models.
         self._concurrent_pop_size = 0
         self._concurrent_color = 0
+
+        warn_deprecation('The `DifferentialEvolutionDriver` is deprecated. Please use '
+                        '`pymooDriver` for population based optimizations.')
 
     def _declare_options(self):
         """

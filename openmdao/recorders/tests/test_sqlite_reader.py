@@ -2069,7 +2069,7 @@ class TestSqliteCaseReader(unittest.TestCase):
                 self.assertTrue(key in case_type._cases)
                 self.assertEqual(key, case_type._cases[key].name)
 
-    def test_simple_paraboloid_scaled_desvars(self):
+    def test_simple_paraboloid_unscaled_desvars(self):
 
         prob = om.Problem()
         model = prob.model
@@ -2110,17 +2110,12 @@ class TestSqliteCaseReader(unittest.TestCase):
         driver_cases = cr.list_cases('driver', out_stream=None)
         last_case = cr.get_case(driver_cases[-1])
 
-        dvs = last_case.get_design_vars(scaled=False)
+        dvs = last_case.get_design_vars(scaled=False, driver_units=False)
         unscaled_x = dvs['x']
         unscaled_y = dvs['y']
 
-        dvs = last_case.get_design_vars(scaled=True)
-        scaled_x = dvs['x']
-        scaled_y = dvs['y']
-
-        adder, scaler = determine_adder_scaler(ref0, ref, None, None)
-        self.assertAlmostEqual((unscaled_x + adder) * scaler, scaled_x, places=12)
-        self.assertAlmostEqual((unscaled_y + adder) * scaler, scaled_y, places=12)
+        self.assertAlmostEqual(unscaled_x, prob.get_val('x'), places=12)
+        self.assertAlmostEqual(unscaled_y, prob.get_val('y'), places=12)
 
     def test_reading_all_case_types(self):
         prob = SellarProblem(SellarDerivativesGrouped, nonlinear_solver=om.NonlinearRunOnce,
@@ -3063,7 +3058,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         assert_near_equal(derivs['con|with->scaling', 'exec.a'].ravel(), 4.0/11.0)
 
         cons = case.get_constraints()
-        con_vals = driver.get_constraint_values()
+        con_vals = driver.get_constraint_values(driver_scaling=False)
 
         assert_near_equal(cons['exec.z'], con_vals['exec.z'])
         assert_near_equal(cons['ALIAS_TEST'], con_vals['ALIAS_TEST'])

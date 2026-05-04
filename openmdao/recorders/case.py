@@ -15,7 +15,7 @@ from openmdao.recorders.sqlite_recorder import blob_to_array
 from openmdao.utils.record_util import deserialize, get_source_system
 from openmdao.utils.variable_table import write_var_table, NA
 from openmdao.utils.general_utils import match_prom_or_abs
-from openmdao.utils.units import unit_conversion, simplify_unit
+from openmdao.utils.units import unit_conversion, simplify_unit, convert_units
 from openmdao.recorders.sqlite_recorder import format_version as current_version
 
 
@@ -318,9 +318,9 @@ class Case(object):
 
         raise KeyError('Variable name "{}" not found.'.format(name))
 
-    def get_design_vars(self, scaled=True, use_indices=True):
+    def get_design_vars(self, scaled=True, use_indices=True, driver_units=True):
         """
-        Get the values of the design variables, as seen by the driver, for this case.
+        Get the values of the design variables, with model scaling but driver units, for this case.
 
         Parameters
         ----------
@@ -328,15 +328,17 @@ class Case(object):
             If True, then return scaled values.
         use_indices : bool
             If True, apply indices.
+        driver_units : bool
+            If True, convert the result from model units to those specified for the design variable.
 
         Returns
         -------
         PromAbsDict
             Map of variables to their values.
         """
-        return self._get_variables_of_type('desvar', scaled, use_indices)
+        return self._get_variables_of_type('desvar', scaled, use_indices, driver_units)
 
-    def get_objectives(self, scaled=True, use_indices=True):
+    def get_objectives(self, scaled=True, use_indices=True, driver_units=True):
         """
         Get the values of the objectives, as seen by the driver, for this case.
 
@@ -346,15 +348,17 @@ class Case(object):
             If True, then return scaled values.
         use_indices : bool
             If True, apply indices.
+        driver_units : bool
+            If True, convert the result from model units to those specified for the objective.
 
         Returns
         -------
         PromAbsDict
             Map of variables to their values.
         """
-        return self._get_variables_of_type('objective', scaled, use_indices)
+        return self._get_variables_of_type('objective', scaled, use_indices, driver_units)
 
-    def get_constraints(self, scaled=True, use_indices=True):
+    def get_constraints(self, scaled=True, use_indices=True, driver_units=True):
         """
         Get the values of the constraints, as seen by the driver, for this case.
 
@@ -364,15 +368,17 @@ class Case(object):
             If True, then return scaled values.
         use_indices : bool
             If True, apply indices.
+        driver_units : bool
+            If True, convert the result from model units to those specified for the constraint.
 
         Returns
         -------
         PromAbsDict
             Map of variables to their values.
         """
-        return self._get_variables_of_type('constraint', scaled, use_indices)
+        return self._get_variables_of_type('constraint', scaled, use_indices, driver_units)
 
-    def get_responses(self, scaled=True, use_indices=True):
+    def get_responses(self, scaled=True, use_indices=True, driver_units=True):
         """
         Get the values of the responses, as seen by the driver, for this case.
 
@@ -382,13 +388,15 @@ class Case(object):
             If True, then return scaled values.
         use_indices : bool
             If True, apply indices.
+        driver_units : bool
+            If True, convert the result from model units to those specified for the response.
 
         Returns
         -------
         PromAbsDict
             Map of variables to their values.
         """
-        return self._get_variables_of_type('response', scaled, use_indices)
+        return self._get_variables_of_type('response', scaled, use_indices, driver_units)
 
     def get_io_metadata(self, iotypes=('input', 'output'), metadata_keys=None,
                         includes=None, excludes=None, is_indep_var=None, is_design_var=None,
@@ -1142,7 +1150,7 @@ class Case(object):
                         hierarchical=hierarchical, print_arrays=print_arrays,
                         out_stream=out_stream)
 
-    def _get_variables_of_type(self, var_type, scaled=False, use_indices=False):
+    def _get_variables_of_type(self, var_type, scaled=False, use_indices=False, driver_units=True):
         """
         Get the variables of a given type and their values.
 
@@ -1156,6 +1164,9 @@ class Case(object):
             If True, then return scaled values.
         use_indices : bool
             If True, apply indices.
+        driver_units : bool
+            If True, convert the variable from model units to units specified for the desvar,
+            objective, or constraint.
 
         Returns
         -------
@@ -1191,11 +1202,9 @@ class Case(object):
                     val = val.copy()
                 if use_indices and meta['indices'] is not None:
                     val = val.ravel()[meta['indices']]
-                if scaled:
-                    if meta['total_adder'] is not None:
-                        val += meta['total_adder']
-                    if meta['total_scaler'] is not None:
-                        val *= meta['total_scaler']
+                if driver_units and meta['units'] is not None:
+                    var_units = abs2meta[src]['units']
+                    val = convert_units(val, var_units, meta['units'])
                 ret_vars[name] = val
 
         return PromAbsDict(ret_vars, self._prom2abs['output'], self._abs2prom['output'],
