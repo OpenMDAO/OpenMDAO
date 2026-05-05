@@ -649,7 +649,7 @@ class modOptDriver(Driver):
 
         Different optimizers use different option names and scales for controlling output
         verbosity. This method translates the driver's 'disp' option to the appropriate
-        optimizer-specific settings.
+        optimizer-specific settings if user hasn't set them already.
 
         Parameters
         ----------
@@ -657,68 +657,66 @@ class modOptDriver(Driver):
             Name of the optimizer being used.
         """
         disp = self.options['disp']
+        opt_keys_lower = [k.lower() for k in self.opt_settings]
 
-        # Skip if user has already specified verbosity in opt_settings
-        verbosity_keys = {
-            'disp', 'iprint', 'print_level', 'verbose', 'verbosity',
-            'major print level', 'minor print level'
-        }
-        if any(key.lower() in [k.lower() for k in self.opt_settings.keys()]
-               for key in verbosity_keys):
-            return
-
-        # Map disp option to optimizer-specific settings
+        # Map disp option to optimizer-specific settings, skipping if the user
+        # has already specified the relevant key in opt_settings. Optimizer
+        # specific display setting by the user takes precedence over "disp" option.
+        # Don't include 'CVXOPT' and 'ConvexQPSolvers' since we dont support them rn
         if opt == 'IPOPT':
-            # IPOPT uses print_level (0-12 scale)
-            if isinstance(disp, int):
-                self.opt_settings['print_level'] = min(max(disp, 0), 12)
-            else:
-                self.opt_settings['print_level'] = 5 if disp else 0
+            if 'print_level' not in opt_keys_lower:
+                if isinstance(disp, int):
+                    self.opt_settings['print_level'] = min(max(disp, 0), 12)
+                else:
+                    self.opt_settings['print_level'] = 5 if disp else 0
 
         elif opt == 'SNOPT':
-            # SNOPT uses Major/Minor print levels
-            if isinstance(disp, int):
-                level = min(max(disp, 0), 10)
-                self.opt_settings['Major print level'] = level
-                self.opt_settings['Minor print level'] = level
-            else:
-                self.opt_settings['Major print level'] = 1 if disp else 0
-                self.opt_settings['Minor print level'] = 0
+            if 'major print level' not in opt_keys_lower \
+                    and 'minor print level' not in opt_keys_lower:
+                if isinstance(disp, int):
+                    level = min(max(disp, 0), 10)
+                    self.opt_settings['Major print level'] = level
+                    self.opt_settings['Minor print level'] = level
+                else:
+                    self.opt_settings['Major print level'] = 1 if disp else 0
+                    self.opt_settings['Minor print level'] = 0
 
         elif opt == 'TrustConstr':
-            # TrustConstr uses verbose (0-3 scale)
-            if isinstance(disp, int):
-                self.opt_settings['verbose'] = min(max(disp, 0), 3)
-            else:
-                self.opt_settings['verbose'] = 1 if disp else 0
+            if 'verbose' not in opt_keys_lower:
+                if isinstance(disp, int):
+                    self.opt_settings['verbose'] = min(max(disp, 0), 3)
+                else:
+                    self.opt_settings['verbose'] = 1 if disp else 0
 
-        elif opt in {'PySLSQP'}:
-            # PySLSQP uses iprint
-            if isinstance(disp, int):
-                self.opt_settings['iprint'] = disp
-            else:
-                self.opt_settings['iprint'] = 1 if disp else 0
+        elif opt == 'PySLSQP':
+            if 'iprint' not in opt_keys_lower:
+                if isinstance(disp, int):
+                    self.opt_settings['iprint'] = disp
+                else:
+                    self.opt_settings['iprint'] = 1 if disp else 0
 
-        elif opt in {'LBFGSB'}:
-            # LBFGSB uses iprint, but with different settings
-            if isinstance(disp, int):
-                self.opt_settings['iprint'] = disp
-            else:
-                self.opt_settings['iprint'] = 0 if disp else -1
+        elif opt == 'LBFGSB':
+            if 'iprint' not in opt_keys_lower:
+                if isinstance(disp, int):
+                    self.opt_settings['iprint'] = disp
+                else:
+                    self.opt_settings['iprint'] = 0 if disp else -1
 
-        elif opt in {'OpenSQP'}:
-            # Leave out OpenSQP because it does not have any setting for printing
-            # to console.
-            # TODO: Get modOpt folks to add a user setting for control OpenSQP prints
-            pass
+        elif opt == 'OpenSQP':
+            if 'verbosity' not in opt_keys_lower:
+                if isinstance(disp, int):
+                    self.opt_settings['verbosity'] = disp
+                else:
+                    self.opt_settings['verbosity'] = 1 if disp else 0
 
         else:
             # Most SciPy-based optimizers (SLSQP, COBYLA, COBYQA, BFGS, NelderMead)
             # use 'disp' as boolean
-            if isinstance(disp, int):
-                self.opt_settings['disp'] = disp > 0
-            else:
-                self.opt_settings['disp'] = disp
+            if 'disp' not in opt_keys_lower:
+                if isinstance(disp, int):
+                    self.opt_settings['disp'] = disp > 0
+                else:
+                    self.opt_settings['disp'] = disp
 
     def _setup_driver(self, problem):
         """
