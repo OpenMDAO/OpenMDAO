@@ -1003,17 +1003,17 @@ class modOptDriver(Driver):
             # Different optimizers return results in different formats
             if hasattr(result, 'x'):
                 x_opt = result.x
-                success = result.success
+                self.fail = not result.success
             elif 'x' in result:
                 x_opt = result['x']
-                success = result['success']
+                self.fail = not result['success']
             else:
                 # Fallback for optimizers with non-standard result format
                 x_opt = self._mo_prob.dvs['x'].get_data()
-                success = True
+                self.fail = False
                 print(f'{"-" * 40}\n {opt} does not return success status in '
                         f'a consistent, easily readable way, so defaulting to '
-                        f'success=True. \n{"-" * 40}\n')
+                        f'self.fail=False. \n{"-" * 40}\n')
 
             # Update OpenMDAO design variables with optimal values
             idx = 0
@@ -1043,7 +1043,7 @@ class modOptDriver(Driver):
         if self._exc_info is not None:
             self._reraise()
 
-        return success
+        return self.fail
 
     def _setup_tot_jac_sparsity(self, coloring=None):
         """
