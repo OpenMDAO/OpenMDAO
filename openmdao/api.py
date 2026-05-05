@@ -50,6 +50,7 @@ from openmdao.solvers.linear.scipy_iter_solver import ScipyKrylov
 from openmdao.solvers.linear.user_defined import LinearUserDefined
 from openmdao.solvers.linesearch.backtracking import ArmijoGoldsteinLS
 from openmdao.solvers.linesearch.backtracking import BoundsEnforceLS
+from openmdao.solvers.nonlinear.brent import BrentSolver
 from openmdao.solvers.nonlinear.broyden import BroydenSolver
 from openmdao.solvers.nonlinear.nonlinear_block_gs import NonlinearBlockGS
 from openmdao.solvers.nonlinear.nonlinear_block_jac import NonlinearBlockJac
@@ -80,6 +81,7 @@ except ImportError:  # pragma: no cover
     PETScVector = None
 
 # Drivers
+from openmdao.drivers.pymoo_driver import pymooDriver
 from openmdao.drivers.modopt_driver import modOptDriver
 from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
 from openmdao.drivers.scipy_optimizer import ScipyOptimizeDriver
@@ -100,6 +102,9 @@ from openmdao.drivers.sampling.pyDOE_generators import \
     PlackettBurmanGenerator as PlackettBurmanAnalysisGenerator, \
     FullFactorialGenerator as FullFactorialAnalysisGenerator, \
     GeneralizedSubsetGenerator as GeneralizedSubsetAnalysisGenerator
+
+# Autoscalers
+from openmdao.drivers.autoscalers.autoscaler import Autoscaler
 
 # System-Building Tools
 from openmdao.utils.options_dictionary import OptionsDictionary

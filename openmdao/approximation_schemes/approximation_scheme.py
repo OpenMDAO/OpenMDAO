@@ -439,20 +439,20 @@ class ApproximationScheme(object):
         Yields
         ------
         list
-            [[Vector, inds]]
+            [[Vector, inds, int]]
         """
         if self._totals_directions:
-            yield vec_ind_list, vec_ind_list[0][1]
+            yield vec_ind_list, vec_ind_list[0][1], 0
         else:
             entry = [[None, None]]
             ent0 = entry[0]
             for vec, vec_idxs in vec_ind_list:
                 if vec_idxs is None:
                     continue
-                for vinds in vec_idxs:
+                for loc_idx, vinds in enumerate(vec_idxs):
                     ent0[0] = vec
                     ent0[1] = vinds
-                    yield entry, vinds
+                    yield entry, vinds, loc_idx
 
     def _uncolored_column_iter(self, system, approx_groups):
         """
@@ -515,7 +515,7 @@ class ApproximationScheme(object):
             mult = self._get_multiplier(data)
 
             jidx_iter = iter(range(len(jcol_idxs)))
-            for vec_ind_info, vecidxs in self._vec_ind_iter(vec_ind_list):
+            for vec_ind_info, vecidxs, loc_idx in self._vec_ind_iter(vec_ind_list):
 
                 if fd_count % num_par_fd == system._par_fd_id:
                     # run the finite difference
@@ -524,11 +524,11 @@ class ApproximationScheme(object):
                         with system._relevance.seeds_active(fwd_seeds=seeds):
                             result = self._run_point(system, vec_ind_info,
                                                      app_data, results_array, total_or_semi,
-                                                     jcol_idxs)
+                                                     loc_idx)
                     else:
                         result = self._run_point(system, vec_ind_info,
                                                  app_data, results_array, total_or_semi,
-                                                 jcol_idxs)
+                                                 loc_idx)
 
                     result = self._transform_result(result)
 

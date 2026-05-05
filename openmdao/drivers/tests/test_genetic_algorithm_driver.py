@@ -20,6 +20,7 @@ from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.general_utils import run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 try:
     from parameterized import parameterized
 except ImportError:
@@ -73,6 +74,15 @@ class TestErrors(unittest.TestCase):
                          "which can be installed with one of the following commands:\n"
                          "    pip install openmdao[doe]\n"
                          "    pip install pyDOE3")
+
+
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    def test_deprecation_warning(self):
+        """Test that SimpleGADriver raises a deprecation warning on instantiation."""
+        msg = ('The `SimpleGADriver` is deprecated. Please use '
+               '`pymooDriver` for population based optimizations.')
+        with assert_warning(OMDeprecationWarning, msg):
+            om.SimpleGADriver()
 
 
 @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
@@ -1077,7 +1087,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         prob.setup()
         model.set_val("x", 0)
         prob.run_driver()
-        assert_near_equal(prob['x'], x_opt, 1e-4) 
+        assert_near_equal(prob['x'], x_opt, 1e-4)
         assert_near_equal(prob['parab.f'], f_opt, 1e-4)
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")

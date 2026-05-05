@@ -94,6 +94,7 @@ pydoe3 = "*"
 [feature.opt.dependencies]
 pyoptsparse = ">=2.14.0"
 cyipopt = "*"
+pymoo = ">=0.6.1"
 
 [feature.opt.pypi-dependencies]
 modopt = {git = "https://github.com/lsdolab/modopt.git", branch = "main", extras = ["open_source_optimizers"]}
