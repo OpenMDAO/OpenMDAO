@@ -284,8 +284,8 @@ class modOptProblem(problem):
 
         Parameters
         ----------
-        dvs : dict
-            Dictionary with the current design variable names and values.
+        dvs : <array_manager.core.native_formats.vector.Vector>
+            Vector with the current design variable names and values.
         obj : dict
             Dictionary to store the computed objective value.
         """
@@ -313,8 +313,8 @@ class modOptProblem(problem):
 
         Parameters
         ----------
-        dvs : dict
-            Dictionary with the current design variable names and values.
+        dvs : <array_manager.core.native_formats.vector.Vector>
+            Vector with the current design variable names and values.
         cons : dict
             Dictionary to store the computed constraint values.
         """
@@ -346,8 +346,8 @@ class modOptProblem(problem):
 
         Parameters
         ----------
-        dvs : dict
-            Dictionary with the current design variable names and values.
+        dvs : <array_manager.core.native_formats.vector.Vector>
+            Vector with the current design variable names and values.
         grad : dict
             Dictionary to store the gradient values. Keys are design variable names,
             values are gradient arrays with respect to the objective.
@@ -392,8 +392,8 @@ class modOptProblem(problem):
 
         Parameters
         ----------
-        dvs : dict
-            Dictionary with the current design variable names and values.
+        dvs : <array_manager.core.native_formats.vector.Vector>
+            Vector with the current design variable names and values.
         jac : dict
             Dictionary to store the computed constraint Jacobians.
         """
@@ -450,11 +450,15 @@ class modOptProblem(problem):
 
         Parameters
         ----------
-        dvs : dict
-            Dictionary with the current design variable names and values.
+        dvs : <array_manager.core.native_formats.vector.Vector>
+            Vector with the current design variable names and values.
         """
+        # dvs isn't a dictionary so we can't set _vectors['design_var'] directly
+        dv_vec = self.driver._vectors['design_var']
         for name in self.x_info.keys():
-            self.driver.set_design_var(name, dvs[name])
+            dv_vec[name] = dvs[name]
+        dv_vec.driver_scaling=True
+        self.driver._set_design_vars(list(self.x_info.keys()), driver_scaling=True)
 
     def _get_constraint_size(self, name):
         """
@@ -837,14 +841,15 @@ class modOptDriver(Driver):
 
         # Collect design variable information (initial values and bounds)
         x_info = OrderedDict()
+        lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
         use_bounds = (opt in _bounds_optimizers)
         for name, meta in self._designvars.items():
             x_info[name] = {}
             x_info[name]['init'] = desvar_vals[name]
 
             if use_bounds:
-                x_info[name]['lower'] = meta['lower']
-                x_info[name]['upper'] = meta['upper']
+                x_info[name]['lower'] = lower_dv[name]
+                x_info[name]['upper'] = upper_dv[name]
             else:
                 x_info[name]['lower'] = None
                 x_info[name]['upper'] = None
@@ -908,6 +913,7 @@ class modOptDriver(Driver):
                 self._lincongrad_cache = None
 
             # Process constraints and organize into linear and nonlinear categories
+            lower_con, upper_con, equals_con = self._autoscaler.get_bounds_scaling('constraint')
             for name, meta in self._cons.items():
                 if meta['indices'] is not None:
                     meta['size'] = size = meta['indices'].indexed_src_size
@@ -918,27 +924,27 @@ class modOptDriver(Driver):
                 if meta['linear']:
                     if meta['equals'] is not None:
                         lin_con_bounds[name] = {
-                            'lower': meta['equals'],
-                            'upper': meta['equals'],
+                            'lower': equals_con[name],
+                            'upper': equals_con[name],
                             'size': size
                         }
                     else:
                         lin_con_bounds[name] = {
-                            'lower': meta['lower'],
-                            'upper': meta['upper'],
+                            'lower': lower_con[name],
+                            'upper': upper_con[name],
                             'size': size
                         }
                 else:
                     if meta['equals'] is not None:
                         nl_con_bounds[name] = {
-                            'lower': meta['equals'],
-                            'upper': meta['equals'],
+                            'lower': equals_con[name],
+                            'upper': equals_con[name],
                             'size': size
                         }
                     else:
                         nl_con_bounds[name] = {
-                            'lower': meta['lower'],
-                            'upper': meta['upper'],
+                            'lower': lower_con[name],
+                            'upper': upper_con[name],
                             'size': size
                         }
 
@@ -1016,12 +1022,8 @@ class modOptDriver(Driver):
                         f'self.fail=False. \n{"-" * 40}\n')
 
             # Update OpenMDAO design variables with optimal values
-            idx = 0
-            for name in self._mo_prob.x_info.keys():
-                meta = self._designvars[name]
-                size = meta['global_size'] if meta['distributed'] else meta['size']
-                self.set_design_var(name, x_opt[idx : idx + size])
-                idx += size
+            self._vectors['design_var'].set_data(x_opt, driver_scaling=True)
+            self._set_design_vars(desvar_names=list(x_info.keys()), driver_scaling=True)
 
             # Final model evaluation at optimal point
             with RecordingDebugging(self._get_name(), self.iter_count, self):
