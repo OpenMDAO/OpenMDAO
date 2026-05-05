@@ -660,9 +660,8 @@ class modOptDriver(Driver):
 
         # Skip if user has already specified verbosity in opt_settings
         verbosity_keys = {
-            'disp', 'iprint', 'print_level', 'isumm', 'print_file',
-            'print_frequency', 'verbose', 'verbosity', 'major print level',
-            'minor print level'
+            'disp', 'iprint', 'print_level', 'verbose', 'verbosity',
+            'major print level', 'minor print level'
         }
         if any(key.lower() in [k.lower() for k in self.opt_settings.keys()]
                for key in verbosity_keys):
