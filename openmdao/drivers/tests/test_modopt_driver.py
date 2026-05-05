@@ -1671,5 +1671,123 @@ class TestModOptDriver(unittest.TestCase):
             prob.driver.supports['equality_constraints'] = False
 
 
+@unittest.skipUnless(MODOPT_INSTALLED, 'modOpt is not installed')
+@use_tempdirs
+class TestModOptOutputFiles(unittest.TestCase):
+    """Tests for optimizer output file directory routing."""
+
+    def _create_paraboloid_prob(self, optimizer):
+        """
+        Create a simple Paraboloid problem for output directory testing.
+
+        Parameters
+        ----------
+        optimizer : str
+            Name of the modOpt optimizer to use.
+
+        Returns
+        -------
+        prob : Problem
+            Configured but not yet run OpenMDAO problem.
+        """
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+        prob.set_solver_print(level=0)
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', upper=-15.0)
+        prob.driver = modOptDriver(optimizer=optimizer)
+        prob.driver.options['disp'] = False
+        prob.setup()
+        return prob
+
+    def run_and_test_default_output_dir(self, optimizer, output_files):
+        """
+        Run the optimizer and verify output files appear in the OpenMDAO outputs directory.
+
+        Parameters
+        ----------
+        optimizer : str
+            Name of the modOpt optimizer to use.
+        output_files : list of str
+            Expected output file names to check for.
+        """
+        prob = self._create_paraboloid_prob(optimizer)
+        prob.run_driver()
+        output_dir = prob.get_outputs_dir()
+        for fname in output_files:
+            self.assertTrue(len(list(output_dir.rglob(fname))) > 0,
+                            f'{fname} not found under {output_dir}')
+
+    def run_and_test_user_set_output_dir(self, optimizer, output_files):
+        """
+        Run the optimizer and verify output files appear in the user-specified directory.
+
+        Parameters
+        ----------
+        optimizer : str
+            Name of the modOpt optimizer to use.
+        output_files : list of str
+            Expected output file names to check for.
+        """
+        user_dir = pathlib.Path(f'user_outputs_{optimizer}')
+        user_dir.mkdir(exist_ok=True)
+
+        prob = self._create_paraboloid_prob(optimizer)
+        prob.driver.options['output_dir'] = str(user_dir)
+        prob.run_driver()
+
+        for fname in output_files:
+            self.assertTrue(len(list(user_dir.rglob(fname))) > 0,
+                            f'{fname} not found under {user_dir}')
+
+    def test_default_output_dir_SLSQP(self):
+        """Test default output directory routing for SLSQP."""
+        self.run_and_test_default_output_dir('SLSQP', ['modopt_results.out'])
+
+    def test_user_set_output_dir_SLSQP(self):
+        """Test user-specified output directory routing for SLSQP."""
+        self.run_and_test_user_set_output_dir('SLSQP', ['modopt_results.out'])
+
+    def test_default_output_dir_PySLSQP(self):
+        """Test default output directory routing for PySLSQP."""
+        self.run_and_test_default_output_dir('PySLSQP',
+                                             ['modopt_results.out', 'slsqp_summary.out'])
+
+    def test_user_set_output_dir_PySLSQP(self):
+        """Test user-specified output directory routing for PySLSQP."""
+        self.run_and_test_user_set_output_dir('PySLSQP',
+                                              ['modopt_results.out', 'slsqp_summary.out'])
+
+    @require_modopt_optimizer('IPOPT')
+    def test_default_output_dir_IPOPT(self):
+        """Test default output directory routing for IPOPT."""
+        self.run_and_test_default_output_dir('IPOPT',
+                                             ['modopt_results.out', 'ipopt_output.txt'])
+
+    @require_modopt_optimizer('IPOPT')
+    def test_user_set_output_dir_IPOPT(self):
+        """Test user-specified output directory routing for IPOPT."""
+        self.run_and_test_user_set_output_dir('IPOPT',
+                                              ['modopt_results.out', 'ipopt_output.txt'])
+
+    @require_modopt_optimizer('SNOPT')
+    def test_default_output_dir_SNOPT(self):
+        """Test default output directory routing for SNOPT."""
+        self.run_and_test_default_output_dir(
+            'SNOPT', ['modopt_results.out', 'SNOPT_print.out', 'SNOPT_summary.out'])
+
+    @require_modopt_optimizer('SNOPT')
+    def test_user_set_output_dir_SNOPT(self):
+        """Test user-specified output directory routing for SNOPT."""
+        self.run_and_test_user_set_output_dir(
+            'SNOPT', ['modopt_results.out', 'SNOPT_print.out', 'SNOPT_summary.out'])
+
+
 if __name__ == '__main__':
     unittest.main()

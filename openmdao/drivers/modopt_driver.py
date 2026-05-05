@@ -35,9 +35,12 @@ import sys
 import numpy as np
 import json
 from collections import OrderedDict
+
+from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.core.group import Group
+
 try:
     import modopt as mo
     problem = mo.Problem
@@ -49,7 +52,6 @@ except Exception as err:
     problem = object
 
 # TODO: Test MPI with distributed models (design variables must be replicated, not distributed)
-# TODO: Default optimizer file output locations and allow user to define a location
 # TODO: SNOPT with the pyoptsparse driver has to use internal FD, not the openmdao FD?
 #        - Assume the modopt wrapper already has this sorted out and I don't have to worry about it
 
@@ -628,7 +630,8 @@ class modOptDriver(Driver):
                              desc='Tolerance for zero row/column check.')
         self.options.declare('turn_off_outputs', default=False, types=bool,
                              desc='If True, prevents modOpt from generating any output files.')
-        self.options.declare('out_dir', default=None, types=(type(None), str),
+        self.options.declare('output_dir', types=(str, _ReprClass), default=_DEFAULT_REPORTS_DIR,
+                             allow_none=True,
                              desc='The directory to store all the output files generated '
                                   'from the optimization.')
 
@@ -814,19 +817,6 @@ class modOptDriver(Driver):
             else:
                 self.opt_settings['maxiter'] = self.options['maxiter']
 
-        # NOTE: modOpt optimizer output files cannot be redirected to output_dir due to
-        # architectural limitations. All optimizer outputs go to modOpt's default directory:
-        #   {problem_name}_outputs/{timestamp}/
-        #
-        # This affects IPOPT, SNOPT, PySLSQP, OpenSQP, and all other optimizers. The issue:
-        # - optimizer.out_dir is set during Optimizer.__init__() and cannot be overridden
-        # - modOpt blindly prepends out_dir to all file paths without checking if they're absolute,
-        #   causing invalid path concatenation when absolute paths are used
-        #
-        # Users can manually specify output filenames (not full paths) in opt_settings if needed,
-        # and those files will be created in modOpt's default output directory.
-        # Example: driver.opt_settings['output_file'] = 'my_ipopt_output.out'
-
         # Determine total number of design variables
         ndesvar = 0
         for name, meta in self._designvars.items():
@@ -984,20 +974,29 @@ class modOptDriver(Driver):
                 all_nl_relevant_dvs=all_nl_relevant_dvs,
             )
 
+            # Resolve output directory. modOpt raises ValueError if out_dir is set
+            # while turn_off_outputs=True, so pass None in that case.
+            if self.options['turn_off_outputs']:
+                out_dir = None
+            elif self.options['output_dir'] in (None, _DEFAULT_REPORTS_DIR):
+                out_dir = str(self._problem().get_outputs_dir(mkdir=True))
+            else:
+                out_dir = self.options['output_dir']
+
             # Instantiate and run optimizer
             optimizer_cls = getattr(mo, opt)
             if opt in _solver_options_optimizers:
                 optimizer = optimizer_cls(
                     problem=self._mo_prob,
                     turn_off_outputs=self.options['turn_off_outputs'],
-                    out_dir=self.options['out_dir'],
+                    out_dir=out_dir,
                     solver_options=self.opt_settings,
                 )
             else:
                 optimizer = optimizer_cls(
                     problem=self._mo_prob,
                     turn_off_outputs=self.options['turn_off_outputs'],
-                    out_dir=self.options['out_dir'],
+                    out_dir=out_dir,
                     **self.opt_settings,
                 )
             result = optimizer.solve()
