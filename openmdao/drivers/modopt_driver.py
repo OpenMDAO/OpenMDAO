@@ -43,8 +43,24 @@ from openmdao.utils.mpi import MPI
 from openmdao.core.group import Group
 
 try:
+    # modopt.core.visualization calls matplotlib.use('TkAgg') at import time.
+    # Save and restore the backend so modopt does not permanently change it,
+    # which would break OpenMDAO visualization tools in headless environments.
+    try:
+        import matplotlib as _mpl
+        _mpl_backend = _mpl.get_backend()
+    except ImportError:
+        _mpl_backend = None
+
     import modopt as mo
     problem = mo.Problem
+
+    if _mpl_backend is not None:
+        try:
+            import matplotlib as _mpl
+            _mpl.use(_mpl_backend)
+        except Exception:
+            pass
 except ImportError:
     mo = None
     problem = object
