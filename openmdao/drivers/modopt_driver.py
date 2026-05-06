@@ -39,6 +39,7 @@ from collections import OrderedDict
 from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.mpi import MPI
 from openmdao.core.group import Group
 
 try:
@@ -51,9 +52,6 @@ except Exception as err:
     mo = err
     problem = object
 
-# TODO: Test MPI with distributed models (design variables must be replicated, not distributed)
-# TODO: SNOPT with the pyoptsparse driver has to use internal FD, not the openmdao FD?
-#        - Assume the modopt wrapper already has this sorted out and I don't have to worry about it
 
 # Gradient-based algorithms from modOpt
 _gradient_optimizers = {
@@ -96,18 +94,15 @@ _all_optimizers = {
 }
 
 CITATIONS = """
-@misc{modopt,
+@article{modopt,
  author = {Joshy, Anugrah J. and Hwang, John T.},
  title = "{modOpt: A Modular development environment and library for optimization algorithms}",
- journal = "{Advances in Engineering Software},
+ journal = {Advances in Engineering Software},
  volume = {213},
  month = feb,
  year = {2026},
  articleno = {104084},
  doi = {10.1016/j.advengsoft.2025.104084}
- howpublished = {\\url{https://github.com/LSDOlab/modopt}},
- year = {2026},
- note = {Software package}
 }
 """
 
@@ -153,10 +148,14 @@ class modOptProblem(problem):
         Nonlinear constraint bounds.
     nl_con_jac_sparsity : dict
         Sparsity pattern for nonlinear constraint Jacobian.
+    all_nl_relevant_dvs : set
+        Set of all design variable names that are relevant to any nonlinear constraint.
     obj_name : str
         Name of the objective function.
     _con_cache : dict or None
         Cached constraint values to avoid redundant evaluations.
+    _all_constraint_names : list of str
+        Ordered list of all constraint names (linear followed by nonlinear).
     """
 
     def __init__(self, driver, x_info, lin_con_jac, lin_con_bounds,
@@ -202,9 +201,9 @@ class modOptProblem(problem):
 
     def initialize(self):
         """
-        Initialize the problem name.
+        Set the modOpt problem name.
 
-        This is called by the modOpt Problem base class.
+        Called by the modOpt Problem base class during initialization.
         """
         self.problem_name = 'modOpt_problem'
 
@@ -357,8 +356,6 @@ class modOptProblem(problem):
         model = self.driver._problem().model
 
         try:
-            self._update_desvar_values(dvs)
-
             totals = self.driver._problem().compute_totals(
                 of=[self.obj_name],
                 wrt=list(self.x_info),
@@ -402,8 +399,6 @@ class modOptProblem(problem):
         model = self.driver._problem().model
 
         try:
-            self._update_desvar_values(dvs)
-
             # Only need derivatives for the nonlinear constraints
             if self.nl_con_bounds and self.all_nl_relevant_dvs:
                 totals = self.driver._problem().compute_totals(
@@ -450,6 +445,9 @@ class modOptProblem(problem):
         """
         Update OpenMDAO design variables from modOpt's design vector.
 
+        Broadcasts design variable values from rank 0 to all ranks so that
+        all optimizer instances evaluate the model at identical design points.
+
         Parameters
         ----------
         dvs : <array_manager.core.native_formats.vector.Vector>
@@ -457,9 +455,10 @@ class modOptProblem(problem):
         """
         # dvs isn't a dictionary so we can't set _vectors['design_var'] directly
         dv_vec = self.driver._vectors['design_var']
-        for name in self.x_info.keys():
-            dv_vec[name] = dvs[name]
-        dv_vec.driver_scaling=True
+        x_new = np.concatenate([np.asarray(dvs[name]).flatten() for name in self.x_info.keys()])
+        if MPI:
+            self.driver._problem().model.comm.Bcast(x_new, root=0)
+        dv_vec.set_data(x_new, driver_scaling=True)
         self.driver._set_design_vars(list(self.x_info.keys()), driver_scaling=True)
 
     def _get_constraint_size(self, name):
@@ -484,8 +483,9 @@ class modOptProblem(problem):
         """
         Execute the OpenMDAO model with proper recording and relevance handling.
 
-        Only evaluates the full model on the first iteration (sets _model_ran flag).
-        Subsequent iterations use relevance filtering for efficiency.
+        On the first iteration relevance filtering is inactive so the full model
+        is evaluated. On subsequent iterations relevance filtering is active for
+        efficiency.
         """
         model = self.driver._problem().model
         with RecordingDebugging(self.driver._get_name(), self.driver.iter_count, self.driver):
@@ -551,8 +551,11 @@ class modOptDriver(Driver):
         Cached result of constraint evaluations.
     _lincongrad_cache : np.ndarray or None
         Pre-calculated gradients of linear constraints.
-    _desvar_array_cache : np.ndarray
-        Cached array for setting design variables.
+    _model_ran : bool
+        Flag indicating whether the model has been evaluated at least once,
+        used to activate relevance filtering on subsequent iterations.
+    _total_jac_sparsity : dict or None
+        User-specified total Jacobian sparsity pattern.
     _mo_prob : <modOpt Problem object>
         The modOpt problem object that is built and fed to the Optimizer.
     """
@@ -665,7 +668,7 @@ class modOptDriver(Driver):
         # Map disp option to optimizer-specific settings, skipping if the user
         # has already specified the relevant key in opt_settings. Optimizer
         # specific display setting by the user takes precedence over "disp" option.
-        # Don't include 'CVXOPT' and 'ConvexQPSolvers' since we dont support them rn
+        # CVXOPT and ConvexQPSolvers are rejected at runtime due to Hessian requirements
         if opt == 'IPOPT':
             if 'print_level' not in opt_keys_lower:
                 if isinstance(disp, int):
@@ -756,6 +759,18 @@ class modOptDriver(Driver):
                    'due to the requirement of Hessian information.')
             raise RuntimeError(msg.format(self.msginfo))
 
+        # OpenSQP requires qpsolvers and highspy as QP solver backends
+        if opt == 'OpenSQP':
+            for pkg in ('qpsolvers', 'highspy'):
+                try:
+                    __import__(pkg)
+                except ImportError:
+                    raise ImportError(
+                        f'{self.msginfo}: OpenSQP requires the {pkg} package which '
+                        f'does not come with modopt by default. '
+                        f'Install it with: pip install {pkg}'
+                    ) from None
+
         self._model_ran = False
         self._setup_tot_jac_sparsity()
 
@@ -787,7 +802,6 @@ class modOptDriver(Driver):
         self.iter_count = 0
         self._total_jac = None
         self._total_jac_linear = None
-        self._desvar_array_cache = None
 
         self._check_for_missing_objective()
         self._check_for_invalid_desvar_values()
@@ -1095,254 +1109,3 @@ class modOptDriver(Driver):
                     'coo': [rows, cols, np.zeros(rows.size)],
                     'shape': shape,
                 }
-
-
-import openmdao.api as om
-
-
-class Paraboloid(om.ExplicitComponent):
-    """
-    Evaluates a paraboloid function for testing.
-
-    Computes f(x,y) = (x[0] + x[2] - 3)^2 + x[0]*y + (y + 4)^2 - 3
-
-    where x is a 3-element array.
-    """
-
-    def setup(self):
-        self.add_input('x', val=np.zeros(3))
-        self.add_input('y', val=0.0)
-        self.add_input('z', val=0.0)
-        self.add_output('f_xy', val=0.0)
-
-    def setup_partials(self):
-        self.declare_partials(of='f_xy', wrt='y', method='fd')
-        self.declare_partials(of='f_xy', wrt='x', method='fd')
-        self.declare_partials(of='f_xy', wrt='z', method='fd')
-
-    # def compute_partials(self, inputs, partials, discrete_inputs):
-    #     partials['f_xy', 'x'] = 2 * (inputs['x'] - 3) + inputs['y']
-    #     partials['f_xy', 'y'] = 2 * (inputs['y'] + 4) + inputs['x']
-    #     partials['f_xy', 'z'] = 0.0
-
-    def compute(self, inputs, outputs):
-        x = inputs['x']
-        y = inputs['y']
-
-        outputs['f_xy'] = ((x[0] + x[2] - 3.0)**2 + x[0] * y + (y + 4.0)**2 - 3.0)
-
-
-class Con(om.ExplicitComponent):
-    """
-    Simple constraint component for testing.
-
-    Computes g = x[0] + x[2] + y + z where x is a 3-element array.
-    """
-
-    def setup(self):
-        self.add_input('x', val=np.zeros(3))
-        self.add_input('y', val=0.0)
-        self.add_input('z', val=0.0)
-        self.add_output('g', val=0.0)
-
-    def setup_partials(self):
-        self.declare_partials(of='g', wrt='y', method='fd')
-        self.declare_partials(of='g', wrt='x', method='fd', rows=[0, 0], cols=[0, 2])
-        self.declare_partials(of='g', wrt='z', method='fd')
-
-    def compute(self, inputs, outputs):
-        outputs['g'] = inputs['x'][0] + inputs['x'][2] + inputs['y'] + inputs['z']
-
-
-if __name__ == '__main__':
-
-    # # build the model
-    # prob = om.Problem()
-    # prob.model.add_subsystem('parab', Paraboloid(), promotes_inputs=['x', 'y', 'z'])
-
-    # # define the component whose output will be constrained
-    # prob.model.add_subsystem('const', Con(), promotes_inputs=['x', 'y', 'z'])
-
-    # # Design variables 'x', 'y', and 'z' span components (connected due to our
-    # # promotion), so we need to provide a common initial value for them. For
-    # # these variables we have to use "set_input_defaults" because the variable
-    # # connects to both "const" and "parab", but the initial values from "const"
-    # # and "parab" are both different. So before we are able to use prob.set_val()
-    # # for these variables we first have to call "set_input_defaults". Note
-    # # that we would also have to do this and specify the units of the common
-    # # initial value if "const" and "parab" had different units for them so that
-    # # way it knows which units to use if "set_val" is ever used. I'm pretty
-    # # sure that if a promoted variable name does not span multiple components
-    # # (like "w") then this doesn't do anything and have to set whatever initial
-    # # value I want with set_val.
-    # prob.model.set_input_defaults('x', np.array([3.0, 3.0, 3.0]))
-    # prob.model.set_input_defaults('y', -4.0)
-    # prob.model.set_input_defaults('z', 0.0)
-
-    # # setup the optimization
-    # prob.driver = ModOptDriver()
-    # prob.driver.options['optimizer'] = 'SLSQP'
-    # prob.driver.options['maxiter'] = 1000
-    # # Optimizer specific settings
-    # prob.driver.opt_settings = {
-    #     # 'opt_tol': 1e-6,
-    # }
-    # prob.model.add_design_var('x', lower=-50, upper=50)
-    # prob.model.add_design_var('y', lower=-50, upper=50)
-    # prob.model.add_design_var('z', lower=-5, upper=5)
-    # prob.model.add_objective('parab.f_xy')
-
-    # # to add the constraint to the model
-    # prob.model.add_constraint('const.g', lower=0., upper=10.)
-    # # prob.model.add_constraint('y', equals=10.)
-
-    # prob.driver.declare_coloring()
-    # prob.setup()
-
-    # prob.run_driver()
-
-    # print(prob.get_val('parab.f_xy'))
-    # print(prob.get_val('x'))
-    # print(prob.get_val('y'))
-
-
-
-    # p = om.Problem()
-
-    # exec = om.ExecComp(['y = a*x**2',
-    #                     'z = a + x**2'],
-    #                     a={'shape': (1,)},
-    #                     y={'shape': (101,)},
-    #                     x={'shape': (101,)},
-    #                     z={'shape': (101,)})
-
-    # p.model.add_subsystem('exec', exec)
-
-    # p.model.add_design_var('exec.a', lower=-1000, upper=1000)
-    # p.model.add_objective('exec.y', index=50)
-    # p.model.add_constraint('exec.z', indices=[0], equals=25)
-    # p.model.add_constraint('exec.z', indices=[-1], lower=20, alias="ALIAS_TEST")
-
-    # p.driver = ModOptDriver()
-    # p.driver.options['optimizer'] = "SLSQP"
-
-    # p.driver.declare_coloring(show_summary=True, show_sparsity=True)
-
-    # p.setup(mode='rev')
-
-    # p.set_val('exec.x', np.linspace(-10, 10, 101))
-
-    # p.run_model()
-    # p.run_driver()
-
-
-
-    class DynamicPartialsComp(om.ExplicitComponent):
-        """
-        Component with dynamic partial derivative coloring for testing.
-
-        Computes g = arctan(y / x) element-wise for arrays x and y.
-
-        Parameters
-        ----------
-        size : int
-            Size of the input and output arrays.
-
-        Attributes
-        ----------
-        num_computes : int
-            Counter for the number of times compute has been called.
-        """
-
-        def __init__(self, size):
-            super().__init__()
-            self.size = size
-            self.num_computes = 0
-
-        def setup(self):
-            self.add_input('y', np.ones(self.size))
-            self.add_input('x', np.ones(self.size))
-            self.add_output('g', np.ones(self.size))
-
-            self.declare_partials('*', '*', method='cs')
-
-            # turn on dynamic partial coloring
-            self.declare_coloring(wrt='*', method='cs', perturb_size=1e-5, num_full_jacs=1, tol=1e-20,
-                                show_summary=True, show_sparsity=True)
-
-        def compute(self, inputs, outputs):
-            outputs['g'] = np.arctan(inputs['y'] / inputs['x'])
-            self.num_computes += 1
-
-
-    SIZE = 10
-
-    p = om.Problem()
-    model = p.model
-
-    # DynamicPartialsComp is set up to do dynamic partial coloring
-    arctan_yox = model.add_subsystem('arctan_yox', DynamicPartialsComp(SIZE), promotes_inputs=['x', 'y'])
-
-    model.add_subsystem('circle', om.ExecComp('area=pi*r**2'), promotes_inputs=['r'])
-
-    model.add_subsystem('r_con', om.ExecComp('g=x**2 + y**2 - r', has_diag_partials=True,
-                                            g=np.ones(SIZE), x=np.ones(SIZE), y=np.ones(SIZE)),
-                        promotes_inputs=['x', 'y', 'r'])
-
-    thetas = np.linspace(0, np.pi/4, SIZE)
-    model.add_subsystem('theta_con', om.ExecComp('g = x - theta', has_diag_partials=True,
-                                                g=np.ones(SIZE), x=np.ones(SIZE),
-                                                theta=thetas))
-    model.add_subsystem('delta_theta_con', om.ExecComp('g = even - odd', has_diag_partials=True,
-                                                        g=np.ones(SIZE//2), even=np.ones(SIZE//2),
-                                                        odd=np.ones(SIZE//2)))
-
-    model.add_subsystem('l_conx', om.ExecComp('g=x-1', has_diag_partials=True, g=np.ones(SIZE), x=np.ones(SIZE)),
-                        promotes_inputs=['x'])
-
-    IND = np.arange(SIZE, dtype=int)
-    ODD_IND = IND[1::2]  # all odd indices
-    EVEN_IND = IND[0::2]  # all even indices
-
-    model.connect('arctan_yox.g', 'theta_con.x')
-    model.connect('arctan_yox.g', 'delta_theta_con.even', src_indices=EVEN_IND)
-    model.connect('arctan_yox.g', 'delta_theta_con.odd', src_indices=ODD_IND)
-
-    p.driver = modOptDriver()
-    p.driver.options['optimizer'] = "IPOPT"
-    p.driver.options['turn_off_outputs'] = True
-
-    #####################################
-    # set up dynamic total coloring here
-    p.driver.declare_coloring(show_summary=True, show_sparsity=True)
-    #####################################
-
-    model.add_design_var('x')
-    model.add_design_var('y')
-    model.add_design_var('r', lower=.5, upper=10)
-
-    # nonlinear constraints
-    model.add_constraint('r_con.g', equals=0)
-
-    model.add_constraint('theta_con.g', lower=-1e-5, upper=1e-5, indices=EVEN_IND)
-    model.add_constraint('delta_theta_con.g', lower=-1e-5, upper=1e-5)
-
-    # this constrains x[0] to be 1 (see definition of l_conx)
-    model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,])
-
-    # linear constraint
-    model.add_constraint('y', equals=0, indices=[0,], linear=True)
-
-    model.add_objective('circle.area', ref=-1)
-
-    p.setup(mode='fwd')
-
-    # the following were randomly generated using np.random.random(10)*2-1 to randomly
-    # disperse them within a unit circle centered at the origin.
-    p.set_val('x', np.array([ 0.55994437, -0.95923447,  0.21798656, -0.02158783,  0.62183717,
-                            0.04007379,  0.46044942, -0.10129622,  0.27720413, -0.37107886]))
-    p.set_val('y', np.array([ 0.52577864,  0.30894559,  0.8420792 ,  0.35039912, -0.67290778,
-                            -0.86236787, -0.97500023,  0.47739414,  0.51174103,  0.10052582]))
-    p.set_val('r', .7)
-
-    p.run_driver()

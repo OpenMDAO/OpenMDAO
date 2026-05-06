@@ -4,7 +4,6 @@ import copy
 import functools
 import pathlib
 import unittest
-import os.path
 from io import StringIO
 import sys
 
@@ -13,13 +12,10 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
-from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
 from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
-from openmdao.utils.general_utils import run_driver
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.testing_utils import use_tempdirs
-from openmdao.utils.om_warnings import OMDeprecationWarning
 from openmdao.utils.mpi import MPI
 
 
@@ -62,6 +58,15 @@ def require_modopt_optimizer(optimizer_name):
                     except ImportError:
                         pass
 
+                # OpenSQP requires highspy which is not always installed
+                try:
+                    import highspy  # noqa: F401
+                    require_modopt_optimizer._available_optimizers.add('OpenSQP')
+                except ImportError:
+                    pass
+
+                require_modopt_optimizer._initialized = True
+
             if optimizer_name not in require_modopt_optimizer._available_optimizers:
                 raise unittest.SkipTest(f"{optimizer_name} requires additional installation")
 
@@ -71,8 +76,7 @@ def require_modopt_optimizer(optimizer_name):
 
 require_modopt_optimizer._initialized = False
 require_modopt_optimizer._available_optimizers = {
-    'SLSQP', 'PySLSQP', 'COBYLA', 'COBYQA', 'BFGS', 'LBFGSB', 'TrustConstr',
-    'NelderMead', 'OpenSQP'
+    'SLSQP', 'PySLSQP', 'COBYLA', 'COBYQA', 'BFGS', 'LBFGSB', 'TrustConstr', 'NelderMead',
 }
 
 
@@ -254,9 +258,7 @@ class TestMPIScatter(unittest.TestCase):
         prob.run_driver()
 
         proc_vals = prob.comm.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
-        # f_xy is a scalar, so compare it separately
-        self.assertAlmostEqual(proc_vals[0][3], proc_vals[1][3])
-        np.testing.assert_array_almost_equal(proc_vals[0][:3], proc_vals[1][:3])
+        np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
 
     @unittest.skipUnless(MODOPT_INSTALLED, "modOpt is not installed")
     def test_opt_distcomp(self):
@@ -907,6 +909,40 @@ class TestModOptDriver(unittest.TestCase):
 
         self.assertIn('does not support multiple objectives', str(ctx.exception).lower())
 
+    def test_opensqp_missing_dependencies(self):
+        """
+        Test that a helpful ImportError is raised when OpenSQP dependencies are absent.
+
+        OpenSQP requires qpsolvers and highspy as QP solver backends. When either
+        is not installed the driver should raise a descriptive ImportError with
+        installation instructions rather than allowing an obscure
+        ModuleNotFoundError to propagate from deep within modopt's solve().
+        """
+        def make_prob():
+            prob = om.Problem()
+            model = prob.model
+            model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+            model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+            model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+            prob.set_solver_print(level=0)
+            prob.driver = modOptDriver(optimizer='OpenSQP')
+            prob.driver.options['turn_off_outputs'] = True
+            model.add_design_var('x', lower=-50.0, upper=50.0)
+            model.add_design_var('y', lower=-50.0, upper=50.0)
+            model.add_objective('f_xy')
+            return prob
+
+        for pkg in ('qpsolvers', 'highspy'):
+            with self.subTest(missing_package=pkg):
+                prob = make_prob()
+                prob.setup()
+                with unittest.mock.patch.dict(sys.modules, {pkg: None}):
+                    with self.assertRaises(ImportError) as ctx:
+                        prob.run_driver()
+
+                self.assertIn(pkg, str(ctx.exception))
+                self.assertIn(f'pip install {pkg}', str(ctx.exception))
+
     def test_invalid_desvar_values(self):
         """
         Test handling of NaN/Inf in design variables.
@@ -1266,49 +1302,6 @@ class TestModOptDriver(unittest.TestCase):
         assert_near_equal(prob['x'], 6.66666667, 1e-5)
         assert_near_equal(prob['y'], -7.3333333, 1e-5)
 
-    # @require_modopt_optimizer('TrustConstr')
-    # def test_trustconstr_constrained(self):
-    #     """
-    #     Test TrustConstr optimizer with general constraints.
-
-    #     Trust-region constrained algorithm supports equality and inequality
-    #     constraints along with bounds.
-    #     """
-    #     prob = om.Problem()
-    #     model = prob.model
-
-    #     model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-    #     model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-    #     model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-    #     model.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])
-
-    #     prob.set_solver_print(level=0)
-
-    #     prob.driver = modOptDriver(optimizer='TrustConstr')
-    #     prob.driver.opt_settings['ignore_exact_hessian'] = True
-    #     prob.driver.options['disp'] = False
-    #     prob.driver.options['maxiter'] = 1000
-    #     prob.driver.options['turn_off_outputs'] = True
-
-    #     model.add_design_var('x', lower=-50.0, upper=50.0)
-    #     model.add_design_var('y', lower=-50.0, upper=50.0)
-    #     model.add_objective('f_xy')
-    #     model.add_constraint('c', equals=0.0)
-
-    #     prob.setup()
-    #     prob.run_driver()
-
-    #     # Check expected responses are met
-    #     # assert_near_equal(prob['f_xy'], -27.0, 1e-4)
-    #     # assert_near_equal(prob['c'], 0.0, 1e-4)
-
-    #     print("\n\n")
-    #     print(prob['x'])
-    #     print(prob['y'])
-    #     print(prob['f_xy'])
-    #     print(prob['c'])
-    #     print("\n\n")
-
     @require_modopt_optimizer('COBYLA')
     def test_cobyla_gradient_free(self):
         """
@@ -1474,39 +1467,14 @@ class TestModOptDriver(unittest.TestCase):
         assert_near_equal(prob['f_xy'], -27.0, 1e-4)
         assert_near_equal(prob['c'], 0.0, 1e-4)
 
-    # @require_modopt_optimizer('IPOPT')
-    # def test_ipopt_basic(self):
-    #     """
-    #     Test OpenSQP optimizer with general constraints.
-    #     """
-    #     prob = om.Problem()
-    #     model = prob.model
-
-    #     model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-    #     model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-    #     model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-    #     model.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])
-
-    #     prob.set_solver_print(level=0)
-
-    #     prob.driver = modOptDriver(optimizer='IPOPT')
-    #     prob.driver.options['disp'] = False
-    #     prob.driver.options['turn_off_outputs'] = True
-    #     prob.driver.opt_settings['tol'] = 1e-6
-
-    #     model.add_design_var('x', lower=-50.0, upper=50.0)
-    #     model.add_design_var('y', lower=-50.0, upper=50.0)
-    #     model.add_objective('f_xy')
-    #     model.add_constraint('c', equals=0.0)
-
-    #     prob.setup()
-    #     prob.run_driver()
-
-    #     # Check expected responses are met
-    #     assert_near_equal(prob['f_xy'], -27.0, 1e-4)
-    #     assert_near_equal(prob['c'], 0.0, 1e-4)
-
     def test_driver_sparsity(self):
+        """
+        Test that total Jacobian sparsity is correctly populated via dynamic coloring.
+
+        Verifies that _con_subjacs is built with the correct COO sparsity structure
+        after declare_coloring is used, including correct zero-sparsity for
+        design variables that do not affect a given constraint.
+        """
         prob = om.Problem()
         prob.set_solver_print(level=0)
         prob.driver = driver = modOptDriver(optimizer='SLSQP')
