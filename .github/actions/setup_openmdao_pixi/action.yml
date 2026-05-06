@@ -26,6 +26,15 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    - name: Setup MSVC on Windows
+      if: runner.os == 'Windows'
+      uses: ilammy/msvc-dev-cmd@v1.13.0
+      with:
+        arch: x64
+      # Required for building pyslsqp for modopt from source on Windows. pyslsqp is a Fortran package
+      # that needs compilation, which requires the Microsoft C++ compiler (cl.exe). This must
+      # run before pixi environment setup so the compiler is available when dependencies are installed.
+
     - name: Determine pixi.toml source
       shell: bash -l {0}
       run: |
