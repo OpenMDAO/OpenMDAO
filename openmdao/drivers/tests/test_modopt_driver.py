@@ -322,6 +322,8 @@ class TestMPIScatter(unittest.TestCase):
         assert_near_equal(obj['f_sum'], 0.0, 2e-6)
         assert_near_equal(con['f_xy'], np.zeros(7), 1e-5)
 
+        prob.comm.Barrier()
+
 
 @unittest.skipUnless(MODOPT_INSTALLED, "modOpt is not installed")
 @use_tempdirs
