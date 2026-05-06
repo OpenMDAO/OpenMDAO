@@ -49,18 +49,34 @@ def require_modopt_optimizer(optimizer_name):
             # Build the full list of available optimizers the first time this
             # decorator is triggered
             if not require_modopt_optimizer._initialized:
-                for external_optimizer in ['SNOPT', 'IPOPT']:
-                    try:
-                        optimizer = getattr(mo, external_optimizer)
-                        optimizer(mo.ProblemLite(x0=np.array([0.0])),
-                                    turn_off_outputs=True)
-                        require_modopt_optimizer._available_optimizers.add(external_optimizer)
-                    except ImportError:
-                        pass
+                # SNOPT requires a license and separate installation
+                try:
+                    optimizer = getattr(mo, 'SNOPT')
+                    optimizer(mo.ProblemLite(x0=np.array([0.0])), turn_off_outputs=True)
+                    require_modopt_optimizer._available_optimizers.add('SNOPT')
+                except ImportError:
+                    pass
 
-                # OpenSQP requires highspy which is not always installed
+                # IPOPT requires cyipopt and casadi
+                try:
+                    import casadi  # noqa: F401
+                    optimizer = getattr(mo, 'IPOPT')
+                    optimizer(mo.ProblemLite(x0=np.array([0.0])), turn_off_outputs=True)
+                    require_modopt_optimizer._available_optimizers.add('IPOPT')
+                except ImportError:
+                    pass
+
+                # PySLSQP requires the pyslsqp package
+                try:
+                    from pyslsqp import optimize as _  # noqa: F401
+                    require_modopt_optimizer._available_optimizers.add('PySLSQP')
+                except ImportError:
+                    pass
+
+                # OpenSQP requires highspy and qpsolvers
                 try:
                     import highspy  # noqa: F401
+                    import qpsolvers  # noqa: F401
                     require_modopt_optimizer._available_optimizers.add('OpenSQP')
                 except ImportError:
                     pass
@@ -76,7 +92,7 @@ def require_modopt_optimizer(optimizer_name):
 
 require_modopt_optimizer._initialized = False
 require_modopt_optimizer._available_optimizers = {
-    'SLSQP', 'PySLSQP', 'COBYLA', 'COBYQA', 'BFGS', 'LBFGSB', 'TrustConstr', 'NelderMead',
+    'SLSQP', 'COBYLA', 'COBYQA', 'BFGS', 'LBFGSB', 'TrustConstr', 'NelderMead',
 }
 
 
@@ -913,7 +929,7 @@ class TestModOptDriver(unittest.TestCase):
         """
         Test that a helpful ImportError is raised when OpenSQP dependencies are absent.
 
-        OpenSQP requires qpsolvers and highspy as QP solver backends. When either
+        OpenSQP requires qpsolvers and highspy as QP solver backends. When qpsolvers
         is not installed the driver should raise a descriptive ImportError with
         installation instructions rather than allowing an obscure
         ModuleNotFoundError to propagate from deep within modopt's solve().
@@ -932,16 +948,13 @@ class TestModOptDriver(unittest.TestCase):
             model.add_objective('f_xy')
             return prob
 
-        for pkg in ('qpsolvers', 'highspy'):
-            with self.subTest(missing_package=pkg):
+        with unittest.mock.patch.dict(sys.modules, {'qpsolvers': None}):
+            with self.assertRaises(ImportError) as ctx:
                 prob = make_prob()
                 prob.setup()
-                with unittest.mock.patch.dict(sys.modules, {pkg: None}):
-                    with self.assertRaises(ImportError) as ctx:
-                        prob.run_driver()
 
-                self.assertIn(pkg, str(ctx.exception))
-                self.assertIn(f'pip install {pkg}', str(ctx.exception))
+        self.assertIn('qpsolvers', str(ctx.exception))
+        self.assertIn('pip install qpsolvers', str(ctx.exception))
 
     def test_invalid_desvar_values(self):
         """
@@ -1722,11 +1735,13 @@ class TestModOptOutputFiles(unittest.TestCase):
         """Test user-specified output directory routing for SLSQP."""
         self.run_and_test_user_set_output_dir('SLSQP', ['modopt_results.out'])
 
+    @require_modopt_optimizer('PySLSQP')
     def test_default_output_dir_PySLSQP(self):
         """Test default output directory routing for PySLSQP."""
         self.run_and_test_default_output_dir('PySLSQP',
                                              ['modopt_results.out', 'slsqp_summary.out'])
 
+    @require_modopt_optimizer('PySLSQP')
     def test_user_set_output_dir_PySLSQP(self):
         """Test user-specified output directory routing for PySLSQP."""
         self.run_and_test_user_set_output_dir('PySLSQP',
