@@ -276,6 +276,8 @@ class TestMPIScatter(unittest.TestCase):
         proc_vals = prob.comm.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
         np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
 
+        prob.comm.Barrier()
+
     @unittest.skipUnless(MODOPT_INSTALLED, "modOpt is not installed")
     def test_opt_distcomp(self):
         """
