@@ -26,14 +26,16 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - name: Setup MSVC on Windows
+    - name: Setup gfortran on Windows
       if: runner.os == 'Windows'
-      uses: ilammy/msvc-dev-cmd@v1.13.0
+      uses: fortran-lang/setup-fortran@v1
       with:
-        arch: x64
-      # Required for building pyslsqp for modopt from source on Windows. pyslsqp is a Fortran package
-      # that needs compilation, which requires the Microsoft C++ compiler (cl.exe). This must
-      # run before pixi environment setup so the compiler is available when dependencies are installed.
+        compiler: gcc
+      # Required for building pyslsqp for modopt from source on Windows. pyslsqp is a Fortran
+      # package that needs compilation. Without this step, MinGW's gfortran DLLs are not in PATH
+      # and Meson reports "executables created by fortran compiler are not runnable". Using
+      # fortran-lang/setup-fortran (not ilammy/msvc-dev-cmd) ensures a consistent MinGW toolchain
+      # for both Fortran and C, avoiding mixed-toolchain linker errors (e.g. missing quadmath.lib).
 
     - name: Determine pixi.toml source
       shell: bash -l {0}
