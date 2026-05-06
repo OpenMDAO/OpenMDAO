@@ -731,6 +731,10 @@ def _constraint_plot(kind, meta, val, width=300):
     try:
         mpl.use(_backend)
     except Exception:
+        # Restoring the backend can fail in headless environments if a third-party
+        # library (e.g. modopt) set an interactive backend such as TkAgg at import
+        # time. After running with Agg, matplotlib refuses to switch back to an
+        # interactive backend. Leaving Agg active is fine since we are headless.
         pass
 
     return html
