@@ -474,7 +474,14 @@ def _sparkline(kind, meta, val, width=300):
             _eq_constraint_sparkline(ax, meta, val)
     except (ValueError, IndexError):
         plt.close()
-        mpl.use(_backend)  # set it back
+        try:
+            mpl.use(_backend)  # set it back
+        except Exception:
+            # Restoring the backend can fail in headless environments if a third-party
+            # library (e.g. modopt) set an interactive backend such as TkAgg at import
+            # time. After running with Agg, matplotlib refuses to switch back to an
+            # interactive backend. Leaving Agg active is fine since we are headless.
+            pass
         return '<span class="plot-unavailable">Plot unavailable</span>'
 
     tmpfile = io.BytesIO()
@@ -484,7 +491,14 @@ def _sparkline(kind, meta, val, width=300):
     html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
 
     plt.close()
-    mpl.use(_backend)  # set it back
+    try:
+        mpl.use(_backend)  # set it back
+    except Exception:
+        # Restoring the backend can fail in headless environments if a third-party
+        # library (e.g. modopt) set an interactive backend such as TkAgg at import
+        # time. After running with Agg, matplotlib refuses to switch back to an
+        # interactive backend. Leaving Agg active is fine since we are headless.
+        pass
 
     return html
 
@@ -714,7 +728,10 @@ def _constraint_plot(kind, meta, val, width=300):
     html = f'<img width={width} src=\'data:image/png;base64,{encoded}\'>'
 
     plt.close()
-    mpl.use(_backend)
+    try:
+        mpl.use(_backend)
+    except Exception:
+        pass
 
     return html
 
