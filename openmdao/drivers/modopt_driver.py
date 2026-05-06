@@ -761,18 +761,6 @@ class modOptDriver(Driver):
                    'due to the requirement of Hessian information.')
             raise RuntimeError(msg.format(self.msginfo))
 
-        # OpenSQP requires qpsolvers and highspy as QP solver backends
-        if opt == 'OpenSQP':
-            for pkg in ('qpsolvers', 'highspy'):
-                try:
-                    __import__(pkg)
-                except ImportError:
-                    raise ImportError(
-                        f'{self.msginfo}: OpenSQP requires the {pkg} package which '
-                        f'does not come with modopt by default. '
-                        f'Install it with: pip install {pkg}'
-                    ) from None
-
         self._model_ran = False
         self._setup_tot_jac_sparsity()
 

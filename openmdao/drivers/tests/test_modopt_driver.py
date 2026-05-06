@@ -925,37 +925,6 @@ class TestModOptDriver(unittest.TestCase):
 
         self.assertIn('does not support multiple objectives', str(ctx.exception).lower())
 
-    def test_opensqp_missing_dependencies(self):
-        """
-        Test that a helpful ImportError is raised when OpenSQP dependencies are absent.
-
-        OpenSQP requires qpsolvers and highspy as QP solver backends. When qpsolvers
-        is not installed the driver should raise a descriptive ImportError with
-        installation instructions rather than allowing an obscure
-        ModuleNotFoundError to propagate from deep within modopt's solve().
-        """
-        def make_prob():
-            prob = om.Problem()
-            model = prob.model
-            model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-            model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
-            model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-            prob.set_solver_print(level=0)
-            prob.driver = modOptDriver(optimizer='OpenSQP')
-            prob.driver.options['turn_off_outputs'] = True
-            model.add_design_var('x', lower=-50.0, upper=50.0)
-            model.add_design_var('y', lower=-50.0, upper=50.0)
-            model.add_objective('f_xy')
-            return prob
-
-        with unittest.mock.patch.dict(sys.modules, {'qpsolvers': None}):
-            with self.assertRaises(ImportError) as ctx:
-                prob = make_prob()
-                prob.setup()
-
-        self.assertIn('qpsolvers', str(ctx.exception))
-        self.assertIn('pip install qpsolvers', str(ctx.exception))
-
     def test_invalid_desvar_values(self):
         """
         Test handling of NaN/Inf in design variables.
