@@ -39,7 +39,6 @@ from collections import OrderedDict
 from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 from openmdao.utils.om_warnings import issue_warning
-from openmdao.utils.mpi import MPI
 from openmdao.core.group import Group
 
 try:
@@ -327,7 +326,7 @@ class modOptProblem(problem):
         Compute constraint values.
 
         Uses cached constraint values if available, otherwise evaluates model.
-        Always calls _update_desvar_values to keep all MPI ranks synchronized on the Bcast.
+        Always calls _update_desvar_values to keep all MPI ranks synchronized.
 
         Parameters
         ----------
@@ -463,8 +462,7 @@ class modOptProblem(problem):
         """
         Update OpenMDAO design variables from modOpt's design vector.
 
-        Broadcasts design variable values from rank 0 to all ranks so that
-        all optimizer instances evaluate the model at identical design points.
+        Sets design variable values in OpenMDAO from modOpt's design vector.
 
         Parameters
         ----------
@@ -472,10 +470,10 @@ class modOptProblem(problem):
             Vector with the current design variable names and values.
         """
         # dvs isn't a dictionary so we can't set _vectors['design_var'] directly
+        # modopt runs on all ranks simultaneously and passes identical dvs to all
+        # callbacks, so no MPI broadcast is needed here.
         dv_vec = self.driver._vectors['design_var']
         x_new = np.concatenate([np.asarray(dvs[name]).flatten() for name in self.x_info.keys()])
-        if MPI:
-            self.driver._problem().model.comm.Bcast(x_new, root=0)
         dv_vec.set_data(x_new, driver_scaling=True)
         self.driver._set_design_vars(list(self.x_info.keys()), driver_scaling=True)
 
