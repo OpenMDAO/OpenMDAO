@@ -368,7 +368,8 @@ class modOptProblem(problem):
             if MPI:
                 comm = self.driver._problem().model.comm
                 for name, meta in self.driver._cons.items():
-                    comm.Bcast(vals[name], root=0)
+                    if name in vals and not meta.get('distributed', False):
+                        comm.Bcast(vals[name], root=0)
 
             for name in self._all_constraint_names:
                 cons[name] = vals[name].flatten()
@@ -1040,6 +1041,10 @@ class modOptDriver(Driver):
                     **self.opt_settings,
                 )
             result = optimizer.solve()
+
+            # Ensure all MPI ranks have finished the optimizer before proceeding.
+            if MPI:
+                prob.model.comm.Barrier()
 
             # Extract optimal design variables and success flag from optimizer result
             # Different optimizers return results in different formats
