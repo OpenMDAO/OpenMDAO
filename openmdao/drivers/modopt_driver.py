@@ -326,8 +326,6 @@ class modOptProblem(problem):
                 f_arr = np.array([f_new])
                 comm.Bcast(f_arr, root=0)
                 f_new = f_arr[0]
-                for name in self._con_cache:
-                    comm.Bcast(self._con_cache[name], root=0)
 
             obj[self.obj_name] = f_new
 
@@ -362,6 +360,15 @@ class modOptProblem(problem):
             else:
                 vals = self._con_cache
                 self._con_cache = None  # Clear cache after use
+
+            # Broadcast non-distributed constraint values from rank 0 so all
+            # ranks' optimizers see identical values. Applies to both cached and
+            # freshly computed values. Distributed constraints are skipped since
+            # each rank holds a different valid local portion.
+            if MPI:
+                comm = self.driver._problem().model.comm
+                for name, meta in self.driver._cons.items():
+                    comm.Bcast(vals[name], root=0)
 
             for name in self._all_constraint_names:
                 cons[name] = vals[name].flatten()
