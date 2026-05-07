@@ -327,6 +327,7 @@ class modOptProblem(problem):
         Compute constraint values.
 
         Uses cached constraint values if available, otherwise evaluates model.
+        Always calls _update_desvar_values to keep all MPI ranks synchronized on the Bcast.
 
         Parameters
         ----------
@@ -338,11 +339,10 @@ class modOptProblem(problem):
         model = self.driver._problem().model
 
         try:
-            # Use cached constraint values from compute_objective if available.
-            # Only update DVs (and Bcast) on a cache miss since both ranks always
-            # populate the cache together in compute_objective.
+            self._update_desvar_values(dvs)
+
+            # Use cached constraint values from compute_objective if available
             if self._con_cache is None:
-                self._update_desvar_values(dvs)
                 self._run_model()
                 vals = self.driver.get_constraint_values()
             else:
