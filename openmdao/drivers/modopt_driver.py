@@ -368,8 +368,7 @@ class modOptProblem(problem):
             if MPI:
                 comm = self.driver._problem().model.comm
                 for name, meta in self.driver._cons.items():
-                    if name in vals and not meta.get('distributed', False):
-                        comm.Bcast(vals[name], root=0)
+                    comm.Bcast(vals[name], root=0)
 
             for name in self._all_constraint_names:
                 cons[name] = vals[name].flatten()
