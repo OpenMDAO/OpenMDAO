@@ -316,8 +316,16 @@ class modOptProblem(problem):
             f_new = next(iter(self.driver.get_objective_values().values()))
             self._con_cache = self.driver.get_constraint_values()
 
+            # Broadcast objective and constraint values from rank 0 so all ranks'
+            # optimizers see identical values and follow the same code path.
+            # Without this, rank-specific model outputs can cause ranks to diverge
+            # within scipy's optimizer loop, leading to mismatched MPI collective
+            # calls and a deadlock.
             if MPI:
                 comm = self.driver._problem().model.comm
+                f_arr = np.array([f_new])
+                comm.Bcast(f_arr, root=0)
+                f_new = f_arr[0]
                 for name in self._con_cache:
                     comm.Bcast(self._con_cache[name], root=0)
 
