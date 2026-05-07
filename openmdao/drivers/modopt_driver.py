@@ -1041,13 +1041,6 @@ class modOptDriver(Driver):
                 )
             result = optimizer.solve()
 
-            # Ensure all MPI ranks have finished the optimizer before proceeding.
-            # One rank may exit optimizer.solve() slightly ahead of another due to
-            # OS scheduling, causing a race with the MPI collectives in the final
-            # _run_solve_nonlinear() call below.
-            if MPI:
-                prob.model.comm.Barrier()
-
             # Extract optimal design variables and success flag from optimizer result
             # Different optimizers return results in different formats
             if hasattr(result, 'x'):
