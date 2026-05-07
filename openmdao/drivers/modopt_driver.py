@@ -39,6 +39,7 @@ from collections import OrderedDict
 from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
 from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.mpi import MPI
 from openmdao.core.group import Group
 
 try:
@@ -314,6 +315,12 @@ class modOptProblem(problem):
             # Get the objective function evaluations
             f_new = next(iter(self.driver.get_objective_values().values()))
             self._con_cache = self.driver.get_constraint_values()
+
+            if MPI:
+                comm = self.driver._problem().model.comm
+                for name in self._con_cache:
+                    comm.Bcast(self._con_cache[name], root=0)
+
             obj[self.obj_name] = f_new
 
         except Exception:
@@ -470,10 +477,10 @@ class modOptProblem(problem):
             Vector with the current design variable names and values.
         """
         # dvs isn't a dictionary so we can't set _vectors['design_var'] directly
-        # modopt runs on all ranks simultaneously and passes identical dvs to all
-        # callbacks, so no MPI broadcast is needed here.
         dv_vec = self.driver._vectors['design_var']
         x_new = np.concatenate([np.asarray(dvs[name]).flatten() for name in self.x_info.keys()])
+        if MPI:
+            self.driver._problem().model.comm.Bcast(x_new, root=0)
         dv_vec.set_data(x_new, driver_scaling=True)
         self.driver._set_design_vars(list(self.x_info.keys()), driver_scaling=True)
 
@@ -1018,6 +1025,13 @@ class modOptDriver(Driver):
                     **self.opt_settings,
                 )
             result = optimizer.solve()
+
+            # Ensure all MPI ranks have finished the optimizer before proceeding.
+            # One rank may exit optimizer.solve() slightly ahead of another due to
+            # OS scheduling, causing a race with the MPI collectives in the final
+            # _run_solve_nonlinear() call below.
+            if MPI:
+                prob.model.comm.Barrier()
 
             # Extract optimal design variables and success flag from optimizer result
             # Different optimizers return results in different formats
