@@ -159,42 +159,42 @@ class ParaboloidAE(om.ExplicitComponent):
         self.grad_iter_count += 1
 
 
-class DummyComp(om.ExplicitComponent):
-    """
-    Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3 across MPI ranks.
-    """
-    def setup(self):
-        self.add_input('x', val=0.0)
-        self.add_input('y', val=0.0)
+# class DummyComp(om.ExplicitComponent):
+#     """
+#     Evaluates the equation f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3 across MPI ranks.
+#     """
+#     def setup(self):
+#         self.add_input('x', val=0.0)
+#         self.add_input('y', val=0.0)
 
-        self.add_output('c', val=0.0)
+#         self.add_output('c', val=0.0)
 
-        self.declare_partials('*', '*', method='cs')
+#         self.declare_partials('*', '*', method='cs')
 
-    def compute(self, inputs, outputs):
-        """
-        f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
+#     def compute(self, inputs, outputs):
+#         """
+#         f(x,y) = (x-3)^2 + xy + (y+4)^2 - 3
 
-        Optimal solution (minimum): x = 6.6667; y = -7.3333
-        """
-        x = inputs['x']
-        y = inputs['y']
+#         Optimal solution (minimum): x = 6.6667; y = -7.3333
+#         """
+#         x = inputs['x']
+#         y = inputs['y']
 
-        noise = 1e-10
-        if self.comm.rank == 0:
-            outputs['c'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
-        if self.comm.rank == 1:
-            outputs['c'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 + noise
+#         noise = 1e-10
+#         if self.comm.rank == 0:
+#             outputs['c'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0
+#         if self.comm.rank == 1:
+#             outputs['c'] = (x-3.0)**2 + x*y + (y+4.0)**2 - 3.0 + noise
 
-    def compute_partials(self, inputs, partials):
-        """
-        Jacobian for our paraboloid.
-        """
-        x = inputs['x']
-        y = inputs['y']
+#     def compute_partials(self, inputs, partials):
+#         """
+#         Jacobian for our paraboloid.
+#         """
+#         x = inputs['x']
+#         y = inputs['y']
 
-        partials['c', 'x'] = 2.0*x - 6.0 + y
-        partials['c', 'y'] = 2.0*y + 8.0 + x
+#         partials['c', 'x'] = 2.0*x - 6.0 + y
+#         partials['c', 'y'] = 2.0*y + 8.0 + x
 
 
 class DataSave(om.ExplicitComponent):
@@ -238,6 +238,8 @@ class TestNotInstalled(unittest.TestCase):
                          'modOptDriver is not available, modOpt is not installed.')
 
 
+# TODO: Currently don't support running with MPI! But when we get it working, we need
+# to comment these tests back in and remove the error test!
 @unittest.skipUnless(MPI, "MPI is required.")
 @use_tempdirs
 class TestMPIScatter(unittest.TestCase):
@@ -246,7 +248,7 @@ class TestMPIScatter(unittest.TestCase):
     N_PROCS = 2
 
     @unittest.skipUnless(MODOPT_INSTALLED, "modOpt is not installed")
-    def test_design_vars_on_all_procs_modopt(self):
+    def test_error_on_mpi(self):
         """
         Test that design variables are correctly synchronized across MPI ranks.
 
@@ -258,7 +260,6 @@ class TestMPIScatter(unittest.TestCase):
         model = prob.model
 
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
-        model.add_subsystem('con', DummyComp(), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -268,61 +269,92 @@ class TestMPIScatter(unittest.TestCase):
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
-        model.add_constraint('c', lower=-15.0)
 
-        prob.setup()
-        prob.run_driver()
+        with self.assertRaises(RuntimeError) as ctx:
+            prob.setup()
+            prob.run_driver()
 
-        proc_vals = prob.comm.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
-        np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
-        prob.comm.Barrier()
+        self.assertEqual(str(ctx.exception),
+                         'modOptDriver currently does not support running under MPI.')
 
-    @unittest.skipUnless(MODOPT_INSTALLED, "modOpt is not installed")
-    def test_opt_distcomp(self):
-        """
-        Test optimization with distributed array components.
+    # @unittest.skipUnless(MODOPT_INSTALLED, "modOpt is not installed")
+    # def test_design_vars_on_all_procs_modopt(self):
+    #     """
+    #     Test that design variables are correctly synchronized across MPI ranks.
 
-        Verifies that modOptDriver can optimize a problem with distributed
-        array components. The constraint values should be satisfied at optimum.
-        """
-        size = 7
+    #     Verifies that when design variables are distributed across all processes,
+    #     the optimization results are consistent across ranks. All processes should
+    #     see the same optimal design variable and objective values.
+    #     """
+    #     prob = om.Problem()
+    #     model = prob.model
 
-        prob = om.Problem()
-        model = prob.model
+    #     model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+    #     model.add_subsystem('con', DummyComp(), promotes=['*'])
 
-        ivc = om.IndepVarComp()
-        ivc.add_output('x', np.ones((size, )))
-        ivc.add_output('y', np.ones((size, )))
-        ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+    #     prob.set_solver_print(level=0)
 
-        model.add_subsystem('p', ivc, promotes=['*'])
-        model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
-        model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
-                                               f_sum=np.ones((size, )),
-                                               f_xy=np.ones((size, ))),
-                            promotes_outputs=['*'])
-        model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
+    #     prob.driver = modOptDriver(optimizer='SLSQP')
+    #     prob.driver.options['turn_off_outputs'] = True
 
-        model.add_design_var('x', lower=-50.0, upper=50.0)
-        model.add_design_var('y', lower=-50.0, upper=50.0)
-        model.add_constraint('f_xy', lower=0.0)
-        model.add_objective('f_sum', index=-1)
+    #     model.add_design_var('x', lower=-50.0, upper=50.0)
+    #     model.add_design_var('y', lower=-50.0, upper=50.0)
+    #     model.add_objective('f_xy')
+    #     model.add_constraint('c', lower=-15.0)
 
-        prob.set_solver_print(level=0)
+    #     prob.setup()
+    #     prob.run_driver()
 
-        prob.driver = modOptDriver(optimizer='SLSQP')
-        prob.driver.options['turn_off_outputs'] = True
+    #     proc_vals = prob.comm.allgather([prob['x'], prob['y'], prob['c'], prob['f_xy']])
+    #     np.testing.assert_array_almost_equal(proc_vals[0], proc_vals[1])
+    #     prob.comm.Barrier()
 
-        prob.setup(force_alloc_complex=True)
+#     @unittest.skipUnless(MODOPT_INSTALLED, "modOpt is not installed")
+#     def test_opt_distcomp(self):
+#         """
+#         Test optimization with distributed array components.
 
-        prob.run_driver()
+#         Verifies that modOptDriver can optimize a problem with distributed
+#         array components. The constraint values should be satisfied at optimum.
+#         """
+#         size = 7
 
-        con = prob.driver.get_constraint_values()
-        obj = prob.driver.get_objective_values()
+#         prob = om.Problem()
+#         model = prob.model
 
-        assert_near_equal(obj['f_sum'], 0.0, 2e-6)
-        assert_near_equal(con['f_xy'], np.zeros(7), 1e-5)
-        prob.comm.Barrier()
+#         ivc = om.IndepVarComp()
+#         ivc.add_output('x', np.ones((size, )))
+#         ivc.add_output('y', np.ones((size, )))
+#         ivc.add_output('a', -3.0 + 0.6 * np.arange(size))
+
+#         model.add_subsystem('p', ivc, promotes=['*'])
+#         model.add_subsystem("parab", DistParab(arr_size=size, deriv_type='dense'), promotes=['*'])
+#         model.add_subsystem('sum', om.ExecComp('f_sum = sum(f_xy)',
+#                                                f_sum=np.ones((size, )),
+#                                                f_xy=np.ones((size, ))),
+#                             promotes_outputs=['*'])
+#         model.promotes('sum', inputs=['f_xy'], src_indices=om.slicer[:])
+
+#         model.add_design_var('x', lower=-50.0, upper=50.0)
+#         model.add_design_var('y', lower=-50.0, upper=50.0)
+#         model.add_constraint('f_xy', lower=0.0)
+#         model.add_objective('f_sum', index=-1)
+
+#         prob.set_solver_print(level=0)
+
+#         prob.driver = modOptDriver(optimizer='SLSQP')
+#         prob.driver.options['turn_off_outputs'] = True
+
+#         prob.setup(force_alloc_complex=True)
+
+#         prob.run_driver()
+
+#         con = prob.driver.get_constraint_values()
+#         obj = prob.driver.get_objective_values()
+
+#         assert_near_equal(obj['f_sum'], 0.0, 2e-6)
+#         assert_near_equal(con['f_xy'], np.zeros(7), 1e-5)
+#         prob.comm.Barrier()
 
 
 @unittest.skipUnless(MODOPT_INSTALLED, "modOpt is not installed")
