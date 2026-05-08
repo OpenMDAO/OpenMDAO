@@ -1416,8 +1416,8 @@ class _TotalJacInfo(object):
                 # Apply row scaling if the output has unit scaling
                 out_scaler = self._resp_unit_scalers.get(out_name)
                 if out_scaler:
-                    block[...] = out_scaler
-                
+                    block *= out_scaler
+
                 # Apply column scaling if the input has unit scaling
                 in_scaler = self._desvar_unit_scalers.get(in_name)
                 if in_scaler:
@@ -1426,11 +1426,11 @@ class _TotalJacInfo(object):
             # Nested dictionary: jac_dict[out_name][in_name]
             for out_name, in_dict in jac_dict.items():
                 out_scaler = self._resp_unit_scalers.get(out_name)
-                
+
                 for in_name, block in in_dict.items():
                     if out_scaler:
-                        block[...] = out_scaler
-                    
+                        block *= out_scaler
+
                     in_scaler = self._desvar_unit_scalers.get(in_name)
                     if in_scaler:
                         block *= (1.0 / in_scaler)

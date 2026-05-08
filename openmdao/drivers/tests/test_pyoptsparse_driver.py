@@ -3586,5 +3586,53 @@ class TestLinearOnlyDVs(unittest.TestCase):
                                 jac_nrows / rev_colors)  # verify coloring is actually happening
         assert_check_totals(p.check_totals(method='cs', out_stream=None))
 
+@require_pyoptsparse(optimizer='SLSQP')
+class TestLinearConstraintUnits(unittest.TestCase):
+    """Regression tests for linear constraints with units different from the model's native units.
+
+    The bug being guarded against: _TotalJacInfo._apply_unit_scaling incorrectly replaced
+    Jacobian blocks with the unit scaler scalar (block[...] = scaler) instead of
+    multiplying (block *= scaler). This caused the y-intercept computation for linear
+    constraints to be wrong, leading to incorrect constraint bounds in SNOPT/pyoptsparse.
+    """
+
+    def test_nonlinear_constraint_with_units(self):
+        # Regression test for _TotalJacInfo._apply_unit_scaling incorrectly replacing
+        # Jacobian blocks (block[...] = scaler) rather than scaling them (block *= scaler).
+        # The bug corrupted the nonlinear constraint Jacobian when the constraint variable
+        # had units different from the model's native units, causing wrong gradients and
+        # optimizer failure to converge to the correct solution.
+        #
+        # c = 2*x (model native units: meters). Constraint c = 2 ft means x = 1 ft = 0.3048 m.
+        # d(c)/d(x) = 2.0 in model units; after unit scaling it becomes 2.0 * 3.2808 = 6.5617.
+        # With the old bug, it was replaced by 3.2808 (wrong gradient), corrupting the solve.
+        prob = om.Problem()
+        model = prob.model
+
+        comp = om.ExecComp(
+            ['f = (x - 5.0)**2', 'c = 2.0 * x'],
+            x={'val': 1.0, 'units': 'm'},
+            f={'units': 'm**2'},
+            c={'units': 'm'},
+        )
+        model.add_subsystem('comp', comp, promotes=['*'])
+
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP', print_results=False)
+
+        model.add_design_var('x', lower=0.0, upper=10.0, units='m')
+        model.add_objective('f')
+        # Nonlinear equality constraint: c = 2 ft (= 0.6096 m in model space),
+        # so x = 0.3048 m = 1 ft at the constrained optimum.
+        model.add_constraint('c', equals=2.0, units='ft')
+
+        prob.setup(force_alloc_complex=True)
+        prob.set_val('x', 1.0, units='m')
+        prob.run_driver()
+
+        # Optimum: c = 2 ft = 0.6096 m, so x = 0.3048 m = 1 ft
+        assert_near_equal(prob.get_val('x', units='m'), 0.3048, tolerance=1e-5)
+        assert_near_equal(prob.get_val('c', units='ft'), 2.0, tolerance=1e-5)
+
+
 if __name__ == "__main__":
     unittest.main()
