@@ -81,6 +81,13 @@ def require_modopt_optimizer(optimizer_name):
                 except ImportError:
                     pass
 
+                # COBYQA seems to not be available with the default install on some systems
+                try:
+                    from cobyqa import minimize as _
+                    require_modopt_optimizer._available_optimizers.add('COBYQA')
+                except ImportError:
+                    pass
+
                 require_modopt_optimizer._initialized = True
 
             if optimizer_name not in require_modopt_optimizer._available_optimizers:
@@ -92,7 +99,7 @@ def require_modopt_optimizer(optimizer_name):
 
 require_modopt_optimizer._initialized = False
 require_modopt_optimizer._available_optimizers = {
-    'SLSQP', 'COBYLA', 'COBYQA', 'BFGS', 'LBFGSB', 'TrustConstr', 'NelderMead',
+    'SLSQP', 'COBYLA', 'BFGS', 'LBFGSB', 'TrustConstr', 'NelderMead',
 }
 
 
@@ -854,6 +861,7 @@ class TestModOptDriver(unittest.TestCase):
         prob.driver = modOptDriver(optimizer='SLSQP')
         prob.driver.options['disp'] = False
         prob.driver.options['turn_off_outputs'] = True
+        prob.driver.opt_settings['maxiter'] = 200
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
@@ -885,6 +893,7 @@ class TestModOptDriver(unittest.TestCase):
         prob.driver = modOptDriver(optimizer='SLSQP')
         prob.driver.options['disp'] = False
         prob.driver.options['turn_off_outputs'] = True
+        prob.driver.opt_settings['maxiter'] = 200
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
