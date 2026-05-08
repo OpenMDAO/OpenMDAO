@@ -711,9 +711,10 @@ class TestModOptDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -724,17 +725,18 @@ class TestModOptDriver(unittest.TestCase):
         model.add_design_var('x', lower=-50.0, upper=50.0, scaler=0.1)
         model.add_design_var('y', lower=-50.0, upper=50.0, scaler=0.1)
         model.add_objective('f_xy')
+        model.add_constraint('c', lower=0.0, upper=10.0)
 
         prob.setup(mode='fwd')
         prob.run_driver()
 
         # Solution should still be correct despite scaling at point the scaled
         # and unscaled points
-        assert_near_equal(prob['x'], 6.66666667, 1e-4)
-        assert_near_equal(prob['y'], -7.3333333, 1e-4)
+        assert_near_equal(prob['x'], 7.0, 1e-4)
+        assert_near_equal(prob['y'], -7.0, 1e-4)
         assert_near_equal(
             prob.driver._mo_prob.x.get_data(),
-            np.array([0.666666667, -0.73333333]),
+            np.array([0.7, -0.7]),
             1e-4
         )
 
@@ -748,9 +750,10 @@ class TestModOptDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
@@ -761,17 +764,18 @@ class TestModOptDriver(unittest.TestCase):
         model.add_design_var('x', lower=-50.0, upper=50.0, scaler=0.1)
         model.add_design_var('y', lower=-50.0, upper=50.0, scaler=0.1)
         model.add_objective('f_xy')
+        model.add_constraint('c', lower=0.0, upper=10.0)
 
         prob.setup(mode='rev')
         prob.run_driver()
 
         # Solution should still be correct despite scaling at point the scaled
         # and unscaled points
-        assert_near_equal(prob['x'], 6.66666667, 1e-4)
-        assert_near_equal(prob['y'], -7.3333333, 1e-4)
+        assert_near_equal(prob['x'], 7.0, 1e-4)
+        assert_near_equal(prob['y'], -7.0, 1e-4)
         assert_near_equal(
             prob.driver._mo_prob.x.get_data(),
-            np.array([0.666666667, -0.73333333]),
+            np.array([0.7, -0.7]),
             1e-4
         )
 
@@ -786,8 +790,8 @@ class TestModOptDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])
 
@@ -800,14 +804,14 @@ class TestModOptDriver(unittest.TestCase):
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
-        model.add_constraint('c', equals=1.0, scaler=0.1)
+        model.add_constraint('c', lower=0.0, upper=10.0, scaler=0.1)
 
         prob.setup(mode='fwd')
         prob.run_driver()
 
         # Constraint should be satisfied at both the scaled and unscaled points
-        assert_near_equal(prob['c'], 1.0, 1e-4)
-        assert_near_equal(prob.driver._mo_prob.con.get_data(), 0.1, 1e-4)
+        assert_near_equal(prob['c'], 0.0, 1e-4)
+        assert_near_equal(prob.driver._mo_prob.con.get_data(), 0.0, 1e-4)
 
     def test_scaled_constraint_rev(self):
         """
@@ -819,8 +823,8 @@ class TestModOptDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
         model.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])
 
@@ -833,14 +837,14 @@ class TestModOptDriver(unittest.TestCase):
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
-        model.add_constraint('c', equals=1.0, scaler=0.1)
+        model.add_constraint('c', lower=0.0, upper=10.0, scaler=0.1)
 
         prob.setup(mode='rev')
         prob.run_driver()
 
         # Constraint should be satisfied at both the scaled and unscaled points
-        assert_near_equal(prob['c'], 1.0, 1e-4)
-        assert_near_equal(prob.driver._mo_prob.con.get_data(), 0.1, 1e-4)
+        assert_near_equal(prob['c'], 0.0, 1e-4)
+        assert_near_equal(prob.driver._mo_prob.con.get_data(), 0.0, 1e-4)
 
     def test_scaled_objective_fwd(self):
         """
@@ -852,27 +856,28 @@ class TestModOptDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
         prob.driver = modOptDriver(optimizer='SLSQP')
         prob.driver.options['disp'] = False
         prob.driver.options['turn_off_outputs'] = True
-        prob.driver.opt_settings['maxiter'] = 200
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy', scaler=0.1)
+        model.add_constraint('c', lower=0.0, upper=10.0)
 
         prob.setup(mode='fwd')
         prob.run_driver()
 
         # Solution should be correct at both the scaled and unscaled points
-        assert_near_equal(prob['f_xy'], 2783.1236497, 1e-4)
-        assert_near_equal(prob.driver._mo_prob.obj['f_xy'], 278.31236497, 1e-4)
+        assert_near_equal(prob['f_xy'], -27.0, 1e-4)
+        assert_near_equal(prob.driver._mo_prob.obj['f_xy'], -2.7, 1e-4)
 
     def test_scaled_objective_rev(self):
         """
@@ -884,27 +889,28 @@ class TestModOptDriver(unittest.TestCase):
         prob = om.Problem()
         model = prob.model
 
-        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
-        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('p1', om.IndepVarComp('x', 3.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', -4.0), promotes=['*'])
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])
 
         prob.set_solver_print(level=0)
 
         prob.driver = modOptDriver(optimizer='SLSQP')
         prob.driver.options['disp'] = False
         prob.driver.options['turn_off_outputs'] = True
-        prob.driver.opt_settings['maxiter'] = 200
 
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy', scaler=0.1)
+        model.add_constraint('c', lower=0.0, upper=10.0)
 
         prob.setup(mode='rev')
         prob.run_driver()
 
         # Solution should be correct at both the scaled and unscaled points
-        assert_near_equal(prob['f_xy'], 2783.1236497, 1e-4)
-        assert_near_equal(prob.driver._mo_prob.obj['f_xy'], 278.31236497, 1e-4)
+        assert_near_equal(prob['f_xy'], -27.0, 1e-4)
+        assert_near_equal(prob.driver._mo_prob.obj['f_xy'], -2.7, 1e-4)
 
     def test_missing_objective(self):
         """
