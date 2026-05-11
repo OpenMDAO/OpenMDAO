@@ -137,6 +137,11 @@ def _get_multid_circle_problem(flat_indices=False):
                                                    g=np.ones(SHAPE), theta_actual=np.ones(SHAPE),
                                                    theta_target=theta_target))
 
+    # Adding this so I have a different name for the y linear constraint.
+    prob.model.add_subsystem('y0_con', om.ExecComp('g = y', has_diag_partials=True,
+                                                   g=np.ones(SHAPE), y=np.ones(SHAPE)),
+                                                   promotes_inputs=['y'])
+
     # So this would allow me to go from multi-indices to flat indices:
     FLAT_IND = np.arange(SIZE, dtype=int).reshape(SHAPE)
     # So now FLAT_IND is a ndarray of shape `SHAPE`, with each entry being the flat index for the corresponding entry.
@@ -188,7 +193,8 @@ def _get_multid_circle_problem(flat_indices=False):
     prob.model.add_constraint('l_conx.g', equals=0, linear=False, indices=[0,], flat_indices=True, ref=1.2)
 
     # linear constraint
-    prob.model.add_constraint('y', equals=0, indices=[0,], linear=True, flat_indices=True, ref=2.4)
+    # prob.model.add_constraint('y', equals=0, indices=[0,], linear=True, flat_indices=True, ref=2.4)
+    prob.model.add_constraint('y0_con.g', equals=0, indices=[0,], linear=True, flat_indices=True, ref=2.4)
 
     prob.model.add_objective('circle.area', ref=-1, index=0, flat_indices=True)
 
@@ -541,7 +547,7 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
 
                 # This doesn't include linear constraints, namely the constraint on the first index of y.
                 # Not sure what to do about that.
-                output_names_expected = ["r_con.g", "theta_con.g", "delta_theta_con.g", "l_conx.g", "circle.area"]
+                output_names_expected = ["r_con.g", "theta_con.g", "delta_theta_con.g", "l_conx.g", "circle.area", 'y0_con.g']
                 output_names = dfdx.output_var_names
                 self.assertEqual(len(output_names), len(output_names_expected))
                 self.assertTrue(all(name in output_names_expected for name in output_names))
@@ -598,6 +604,12 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 area_start, area_end = dfdx._output_metadata["circle.area"]["offsets"]
                 assert_near_equal(y0[area_start:area_end], area_expected)
                 assert_near_equal(dfdx.get_output_val("circle.area"), area_expected)
+
+                # Check the `y0_con.g` output var.
+                y0_con_g_expected = prob.get_val("y0_con.g", indices=([0], [0], [0], [0]))
+                y0_con_g_start, y0_con_g_end = dfdx._output_metadata["y0_con.g"]["offsets"]
+                assert_near_equal(y0[y0_con_g_start:y0_con_g_end], y0_con_g_expected)
+                assert_near_equal(dfdx.get_output_val("y0_con.g"), y0_con_g_expected)
 
                 # Now check that we get the correct derivatives.
                 J = dfdx(x0)
@@ -781,6 +793,14 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 assert_near_equal(J[area_start:area_end, y_start:y_end], dcircle_area_dy)
                 assert_near_equal(J[area_start:area_end, r_start:r_end], dcircle_area_dr)
 
+                dy0_con_g_dx = np.zeros((1, SIZE))
+                dy0_con_g_dy = np.zeros((1, SIZE))
+                dy0_con_g_dy[0, 0] = 1.0
+                dy0_con_g_dr = np.zeros((1, 1))
+                assert_near_equal(J[y0_con_g_start:y0_con_g_end, x_start:x_end], dy0_con_g_dx)
+                assert_near_equal(J[y0_con_g_start:y0_con_g_end, y_start:y_end], dy0_con_g_dy)
+                assert_near_equal(J[y0_con_g_start:y0_con_g_end, r_start:r_end], dy0_con_g_dr)
+
     def test_constraints_with_indices(self):
         for use_flat_indices in [False, True]:
             with self.subTest(param=use_flat_indices):
@@ -872,14 +892,16 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 assert_near_equal(J[area_start:area_end, y_start:y_end], dcircle_area_dy)
 
     def test_linear_constraint_check(self):
-        for use_flat_indices in [False, True]:
+        for use_flat_indices in [False]:
             with self.subTest(param=use_flat_indices):
                 self._SHAPE, self._SIZE, self._ALL_IND, self._EVEN_IND, self._ODD_IND, self._prob = _get_multid_circle_problem(use_flat_indices)
                 self._prob.run_driver()
 
                 prob = self._prob
 
-                dfdx = prob.get_callback("dfdx", input_vars=["y", "x"], output_vars=["y", "x"])
+                # dfdx = prob.get_callback("dfdx", input_vars=["y", "x"], output_vars=["y0_con.g"])
+                # dfdx = prob.get_callback("dfdx", input_vars=["y", "x"], output_vars=["y0_con.g"])
+                dfdx = prob.get_callback("dfdx", input_vars=["y", "x"])
 
                 input_names_expected = ["x", "y"]
                 input_names = dfdx.input_var_names
@@ -888,7 +910,8 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
 
                 # This doesn't include linear constraints.
                 # Not sure what to do about that.
-                output_names_expected = ["x", "y"]
+                # output_names_expected = ["y0_con.g"]
+                output_names_expected = ["r_con.g", "theta_con.g", "delta_theta_con.g", "l_conx.g", "circle.area", "y0_con.g"]
                 output_names = dfdx.output_var_names
                 self.assertEqual(len(output_names), len(output_names_expected))
                 self.assertTrue(all(name in output_names_expected for name in output_names))

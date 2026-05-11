@@ -226,6 +226,7 @@ class _FunctionalCallback(object):
                                 # of_indices_are_flat=output_var_indices_are_flat,
                                 # wrt_indices_are_flat=input_var_indices_are_flat,
                                 do_special_functional_api_thing=True,
+                                always_include_linear=True,
                                 )
 
             if not input_vars:

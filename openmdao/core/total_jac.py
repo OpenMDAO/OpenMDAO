@@ -86,7 +86,7 @@ class _TotalJacInfo(object):
     def __init__(self, problem, of, wrt, return_format, approx=False,
                  debug_print=False, driver_scaling=True, get_remote=True, directional=False,
                  coloring_info=None, driver=None, of_indices=None, wrt_indices=None,
-                 do_special_functional_api_thing=False,
+                 do_special_functional_api_thing=False, always_include_linear=False,
                  ):
         """
         Initialize object.
@@ -129,6 +129,10 @@ class _TotalJacInfo(object):
             in the returned total derivatives. If None, the entire variable is included.
         do_special_functional_api_thing : bool
             If True, handle `of` and `wrt` variables the way the functional API wants
+        always_include_linear : bool
+            If True and `of` is None, include linear constraints in the set of response variables
+            in addition to the nonlinear responses provided by the driver.  Has no effect when
+            `of` is not None.  Defaults to False.
         """
         if driver is None:
             driver = problem.driver
@@ -160,6 +164,12 @@ class _TotalJacInfo(object):
 
         orig_of = of
         orig_wrt = wrt
+
+        # DJI: This block added by Claude.
+        if always_include_linear and of is None and driver:
+            lin_con_names = [name for name, meta in driver._cons.items() if meta['linear']]
+            if lin_con_names:
+                of = driver._get_ordered_nl_responses() + lin_con_names
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
