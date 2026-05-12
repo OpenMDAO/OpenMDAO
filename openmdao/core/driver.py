@@ -762,7 +762,7 @@ class Driver(object, metaclass=DriverMetaclass):
         Check for design variable values that exceed their bounds.
 
         This method's behavior is controlled by the OPENMDAO_INVALID_DESVAR environment variable,
-        which may take on values 'ignore', 'raise'', 'warn'.
+        which may take on values 'ignore', 'raise', 'warn'.
         - 'ignore' : Proceed without checking desvar bounds.
         - 'warn' : Issue a warning if one or more desvar values exceed bounds.
         - 'raise' : Raise an exception if one or more desvar values exceed bounds.
@@ -1102,7 +1102,7 @@ class Driver(object, metaclass=DriverMetaclass):
 
     def set_design_var(self, name, value, set_remote=True, units=None, **kwargs):
         """
-        Redirect to _set_design_var, as this public method is depreated.
+        Redirect to _set_design_var, as this public method is deprecated.
 
         'name' can be a promoted output name or an alias.
 
@@ -1122,7 +1122,7 @@ class Driver(object, metaclass=DriverMetaclass):
         """
         warn_deprecation('set_design_var is deprecated. Internally, drivers should use '
                          '_set_design_vars or _set_design_var as appropriate.\n'
-                         'Users wishing to presribe units to design variables should use set_val.',
+                         'Users wishing to prescribe units to design variables should use set_val.',
                          expires='3.45.0')
 
         if 'driver_scaling' in kwargs:
