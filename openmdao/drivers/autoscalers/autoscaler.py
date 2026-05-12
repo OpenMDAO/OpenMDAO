@@ -216,8 +216,8 @@ class Autoscaler(AutoscalerBase):
                 continue
             size = vmeta['size']
             s = vmeta['slice']
-            adder = self._var_meta[voi_type][name]['total_adder']
-            scaler = self._var_meta[voi_type][name]['total_scaler']
+            adder = meta['total_adder']
+            scaler = meta['total_scaler']
 
             lower_data[s] = self._scale_bound(
                 meta.get('lower', -INF_BOUND), adder, scaler, size, is_lower=True)

@@ -469,7 +469,7 @@ class Driver(object, metaclass=DriverMetaclass):
             The Autoscaler instance to use.
         """
         self._autoscaler = autoscaler
-    
+
     @property
     def _has_scaling(self):
         """
@@ -1035,9 +1035,9 @@ class Driver(object, metaclass=DriverMetaclass):
                 val = get(src_name, flat=True).copy()
             else:
                 val = get(src_name, flat=True)[indices.as_array()]
-        
+
         if driver_units and meta['units'] is not None:
-            src_units = model._var_abs2meta['output'][src_name]['units']
+            src_units = model._var_allprocs_abs2meta['output'][src_name]['units']
             val = convert_units(val, src_units, meta['units'])
 
         return val
@@ -1199,7 +1199,7 @@ class Driver(object, metaclass=DriverMetaclass):
                 src_units = problem.model._var_abs2meta['output'][src_name]['units']
                 desvar[loc_idxs] = convert_units(desvar[loc_idxs], units, src_units)
             if meta['units'] is not None:
-                src_units = problem.model._var_abs2meta['output'][src_name]['units']
+                src_units = problem.model._var_allprocs_abs2meta['output'][src_name]['units']
                 desvar[loc_idxs] = convert_units(desvar[loc_idxs], meta['units'], src_units)
 
     def get_objective_values(self, driver_scaling=True):
@@ -1220,7 +1220,7 @@ class Driver(object, metaclass=DriverMetaclass):
         """
         obj_vec = self._vectors['objective']
         obj_vec.update_from_model(driver=self, driver_scaling=driver_scaling)
-        
+
         objs = obj_vec._to_dict()
         discrete_objs = {n: self._get_voi_val(n, obj_meta, self._remote_dvs, get_remote=True)
                          for n, obj_meta in self._objs.items() if obj_meta['discrete']}
@@ -1261,7 +1261,7 @@ class Driver(object, metaclass=DriverMetaclass):
         # Note we populate the vector in an unscaled state for getting violations
         con_vec = self._vectors['constraint']
         con_vec.update_from_model(driver=self, driver_scaling=driver_scaling and not viol)
-        
+
         con_dict = {}
         it = self._cons.items()
         if lintype == 'linear':
@@ -2352,7 +2352,7 @@ class Driver(object, metaclass=DriverMetaclass):
         status = -1 if problem is None else problem._metadata['setup_status']
         if status < _SetupStatus.POST_FINAL_SETUP:
             problem.final_setup()
-        
+
         desvar_vals = {dv: val for dv, val in self.get_design_var_values().items()
                        if not any(fnmatchcase(dv, pat) for pat in exclude_desvars)}
 
