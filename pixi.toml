@@ -43,6 +43,7 @@ description = "OpenMDAO workspace"
 authors = ["OpenMDAO Team <https://github.com/OpenMDAO>"]
 channels = ["conda-forge"]
 platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+exclude-newer = "7d"  # Cooldown to mitigate supply chain attacks
 
 ###############################################
 # Base Dependencies
