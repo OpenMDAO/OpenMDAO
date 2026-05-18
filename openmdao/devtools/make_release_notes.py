@@ -33,7 +33,7 @@ from pydantic import BaseModel, Field
 PERSONAL_ACCESS_TOKEN = os.environ['GITHUB_PAT']
 
 # When creating a new cache, fetch PRs from this far back
-INITIAL_LOOKBACK_DAYS = 365
+INITIAL_LOOKBACK_DAYS = 180
 
 
 class PullRequest(BaseModel):
@@ -153,7 +153,7 @@ def fetch_initial_pulls(repo, lookback_days=INITIAL_LOOKBACK_DAYS, state='closed
 
         # Stop if we've gone past the lookback period
         if pr_merge_time < cutoff_date:
-            break
+            continue
 
         cache.add_pull(PullRequest.from_github_pr(pr))
         count += 1
@@ -234,6 +234,14 @@ def main():
         help='Show the absolute path of any cache files.'
     )
 
+    parser.add_argument(
+        '-d', '--lookback_days',
+        action='store',
+        type=int,
+        default=180,
+        help='Set the number of days to retrieve in the initial retrieval..'
+    )
+
     this_dir = Path(__file__).parent
 
     args = parser.parse_args()
@@ -259,8 +267,8 @@ def main():
 
     # Check if cache exists
     if not cache_file.exists():
-        print(f"Cache file not found. Creating initial cache from past {INITIAL_LOOKBACK_DAYS} days...\n")
-        cache = fetch_initial_pulls(repo, lookback_days=INITIAL_LOOKBACK_DAYS)
+        print(f"Cache file not found. Creating initial cache from past {args.lookback_days} days...\n")
+        cache = fetch_initial_pulls(repo, lookback_days=args.lookback_days)
     else:
         print(f"Loading existing cache from {cache_file}\n")
         cache = PullRequestCache.load(cache_file)

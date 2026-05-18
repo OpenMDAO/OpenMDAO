@@ -1926,6 +1926,7 @@ class Coloring(object):
                 if of not in sparsity:
                     sparsity[of] = {}
                 sparsity[of][wrt] = (nzrows, nzcols, shape)
+            return sparsity
 
     def _subjac_sparsity_iter(self):
         if self._row_vars and self._col_vars and self._row_var_sizes and self._col_var_sizes:

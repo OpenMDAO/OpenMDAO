@@ -2111,8 +2111,8 @@ class TestParallelDOE2proc(unittest.TestCase):
             if idx % 2 == rank:
                 values.append((case['x'], case['y'], case['f_xy']))
 
-        self.expect_text = "\n"+"\n".join([
-            "x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values
+        self.expect_text = "\n" + "\n".join([
+            f"x: {xyf[0].item():5.2f}, y: {xyf[1].item():5.2f}, f_xy: {xyf[2].item():6.2f}" for xyf in values
         ])
 
     def test_full_factorial(self):
@@ -2152,9 +2152,11 @@ class TestParallelDOE2proc(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             values.append((outputs['x'], outputs['y'], outputs['f_xy']))
 
-        self.assertEqual("\n"+"\n".join(["x: %5.2f, y: %5.2f, f_xy: %6.2f" % xyf for xyf in values]),
-                         self.expect_text)
+        val_str = "\n" + "\n".join([
+            f"x: {xyf[0].item():5.2f}, y: {xyf[1].item():5.2f}, f_xy: {xyf[2].item():6.2f}" for xyf in values])
 
+        self.assertEqual(val_str, self.expect_text)
+        
         del cr
 
         # Test for missing metadata db file error

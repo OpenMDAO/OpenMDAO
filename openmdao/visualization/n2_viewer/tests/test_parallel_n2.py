@@ -61,9 +61,9 @@ class N2ParallelTestCase(unittest.TestCase):
         Verify that allgather() is called from all ranks and doesn't sit there blocking.
         """
         om.n2(self.p, show_browser=False, outfile=OUTFILE)
-        self.p.comm.barrier()
         if self.p.comm.rank == 0:
             self.assertTrue(os.path.exists(OUTFILE), msg=f"{OUTFILE} not found")
+        self.p.comm.barrier()
 
     def tearDown(self):
         clean_outfile(OUTFILE)
@@ -90,9 +90,9 @@ class MultiN2ParallelTestCase(unittest.TestCase):
         Verify that an N2 file is generated for the problems on both comms
         """
         om.n2(self.p, show_browser=False, outfile=self.outFile)
-        MPI.COMM_WORLD.barrier()
         if self.localComm.rank == 0:
             self.assertTrue(os.path.exists(self.outFile), msg=f"{self.outFile} not found")
+        MPI.COMM_WORLD.barrier()
 
     def tearDown(self):
         clean_outfile(self.outFile)

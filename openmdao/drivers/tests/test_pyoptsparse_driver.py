@@ -2758,6 +2758,80 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(J[('exec.z', 'exec.a')].flatten(), np.array([1.]))
         assert_near_equal(J[('ALIAS_TEST', 'exec.a')].flatten(), np.array([1.]))
 
+    @require_pyoptsparse('IPOPT')
+    def test_driver_sparsity(self):
+        prob = om.Problem()
+        prob.driver = driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        driver.opt_settings['print_level'] = 0
+        driver.opt_settings['max_iter'] = 1000
+        driver.declare_coloring()
+        model = prob.model
+
+        shape = (1, 5)
+        ivc = model.add_subsystem('ivc', om.IndepVarComp())
+        ivc.add_output('x', np.ones(shape))
+        ivc.add_output('y', np.ones(shape))
+
+        model.add_subsystem(
+            'obj',
+            om.ExecComp(
+                'obj = sum(x + y)',
+                obj=1.,
+                x=np.ones(shape),
+                y=np.ones(shape),
+            )
+        )
+        model.add_subsystem(
+            'con',
+            om.ExecComp(
+                'w = x',
+                x=np.ones(shape),
+                w=np.ones(shape)
+            )
+        )
+
+        model.connect('ivc.x', 'obj.x')
+        model.connect('ivc.x', 'con.x')
+        model.connect('ivc.y', 'obj.y')
+
+        model.add_design_var('ivc.x', lower=0.0, upper=1.0)
+        model.add_design_var('ivc.y', lower=0.0, upper=1.0)
+
+        model.add_objective('obj.obj')
+        model.add_constraint('con.w', lower=0.0)
+
+        prob.setup()
+        prob.run_model()
+        prob.run_driver()
+
+        sparsity_truth = {
+            'con.w': {
+                'ivc.x': {
+                    'coo': [np.array([0, 1, 2, 3, 4]),
+                            np.array([0, 1, 2, 3, 4]),
+                            np.array([1., 1., 1., 1., 1.])],
+                    'shape': (5, 5)
+                },
+                'ivc.y': {
+                    'coo': [np.array([]), np.array([]), np.array([])],
+                    'shape': (5, 5)
+                }
+            }
+        }
+
+        # Check _con_subjacs, but it's a nested dict so check it in parts
+        subjacs = prob.driver._con_subjacs
+        self.assertListEqual(list(sparsity_truth.keys()), ['con.w'])
+        self.assertListEqual(list(sparsity_truth['con.w'].keys()), ['ivc.x', 'ivc.y'])
+        np.testing.assert_equal(
+            sparsity_truth['con.w']['ivc.x']['coo'],
+            subjacs['con.w']['ivc.x']['coo']
+        )
+        np.testing.assert_equal(
+            sparsity_truth['con.w']['ivc.y']['coo'],
+            subjacs['con.w']['ivc.y']['coo']
+        )
+
     def test_dynamic_coloring_w_multi_constraints(self):
 
         OPT, OPTIMIZER = set_pyoptsparse_opt('SNOPT', fallback=False)
@@ -3511,6 +3585,54 @@ class TestLinearOnlyDVs(unittest.TestCase):
         self.assertGreaterEqual(nsolves_nocolor / p.driver._total_jac.nsolves,
                                 jac_nrows / rev_colors)  # verify coloring is actually happening
         assert_check_totals(p.check_totals(method='cs', out_stream=None))
+
+@require_pyoptsparse(optimizer='SLSQP')
+class TestLinearConstraintUnits(unittest.TestCase):
+    """Regression tests for linear constraints with units different from the model's native units.
+
+    The bug being guarded against: _TotalJacInfo._apply_unit_scaling incorrectly replaced
+    Jacobian blocks with the unit scaler scalar (block[...] = scaler) instead of
+    multiplying (block *= scaler). This caused the y-intercept computation for linear
+    constraints to be wrong, leading to incorrect constraint bounds in SNOPT/pyoptsparse.
+    """
+
+    def test_nonlinear_constraint_with_units(self):
+        # Regression test for _TotalJacInfo._apply_unit_scaling incorrectly replacing
+        # Jacobian blocks (block[...] = scaler) rather than scaling them (block *= scaler).
+        # The bug corrupted the nonlinear constraint Jacobian when the constraint variable
+        # had units different from the model's native units, causing wrong gradients and
+        # optimizer failure to converge to the correct solution.
+        #
+        # c = 2*x (model native units: meters). Constraint c = 2 ft means x = 1 ft = 0.3048 m.
+        # d(c)/d(x) = 2.0 in model units; after unit scaling it becomes 2.0 * 3.2808 = 6.5617.
+        # With the old bug, it was replaced by 3.2808 (wrong gradient), corrupting the solve.
+        prob = om.Problem()
+        model = prob.model
+
+        comp = om.ExecComp(
+            ['f = (x - 5.0)**2', 'c = 2.0 * x'],
+            x={'val': 1.0, 'units': 'm'},
+            f={'units': 'm**2'},
+            c={'units': 'm'},
+        )
+        model.add_subsystem('comp', comp, promotes=['*'])
+
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP', print_results=False)
+
+        model.add_design_var('x', lower=0.0, upper=10.0, units='m')
+        model.add_objective('f')
+        # Nonlinear equality constraint: c = 2 ft (= 0.6096 m in model space),
+        # so x = 0.3048 m = 1 ft at the constrained optimum.
+        model.add_constraint('c', equals=2.0, units='ft')
+
+        prob.setup(force_alloc_complex=True)
+        prob.set_val('x', 1.0, units='m')
+        prob.run_driver()
+
+        # Optimum: c = 2 ft = 0.6096 m, so x = 0.3048 m = 1 ft
+        assert_near_equal(prob.get_val('x', units='m'), 0.3048, tolerance=1e-5)
+        assert_near_equal(prob.get_val('c', units='ft'), 2.0, tolerance=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main()

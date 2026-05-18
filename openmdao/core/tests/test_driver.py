@@ -74,7 +74,11 @@ class TestDriver(unittest.TestCase):
         self.assertEqual(dv['z'][0], 1.0)
         self.assertEqual(dv['z'][1], -0.5)
 
-        prob.driver.set_design_var('z', np.array((2.0, -2.0)))
+        # Check our internal vector
+        assert_near_equal(dv['z'], [1.0, -0.5])
+        prob.driver._vectors['design_var'].asarray()[:] = [2., -2.]
+
+        prob.driver._set_design_vars(driver_scaling=True)
         self.assertEqual(prob['z'][0], 7.0)
         self.assertEqual(prob['z'][1], -1.0)
 
@@ -509,14 +513,21 @@ class TestDriver(unittest.TestCase):
 
         prob.run_driver()
 
+        x = prob.get_val('x')
+        y2 = prob.get_val('y2')
+        y1 = prob.get_val('y1')
+
+        # dv, obj, and con are retrieved in driver scaling and units (degC)
+
         dv = prob.driver.get_design_var_values()
-        assert_near_equal(dv['x'][0], 3.0 * 5 / 9, 1e-8)
+        assert_near_equal(dv['x'][0], om.convert_units(x, 'degF', 'degC'), 1e-8)
 
         obj = prob.driver.get_objective_values(driver_scaling=True)
-        assert_near_equal(obj['y2'][0], 73.0 * 5 / 9, 1e-8)
+        print(y2, obj['y2'], flush=True)
+        assert_near_equal(obj['y2'][0], om.convert_units(y2, 'degF', 'degC'), 1e-8)
 
         con = prob.driver.get_constraint_values(driver_scaling=True)
-        assert_near_equal(con['y1'][0], 38.0 * 5 / 9, 1e-8)
+        assert_near_equal(con['y1'][0], om.convert_units(y1, 'degF', 'degC'), 1e-8)
 
         meta = model.get_design_vars()
         assert_near_equal(meta['x']['lower'], 0.0, 1e-7)
@@ -627,13 +638,14 @@ class TestDriver(unittest.TestCase):
         con = prob.driver.get_constraint_values(driver_scaling=True)
         assert_near_equal(con['y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
 
+        # Test that bounds are in their declared units.
         meta = model.get_design_vars()
-        assert_near_equal(meta['x']['lower'], ((0.0) + 77.0) * 3.5, 1e-7)
-        assert_near_equal(meta['x']['upper'], ((100.0) + 77.0) * 3.5, 1e-7)
+        assert_near_equal(meta['x']['lower'], 0.0, 1e-7)
+        assert_near_equal(meta['x']['upper'], 100.0, 1e-7)
 
         meta = model.get_constraints()
-        assert_near_equal(meta['y1']['lower'], ((0.0) + 77.0) * 3.5, 1e-7)
-        assert_near_equal(meta['y1']['upper'], ((100.0) + 77.0) * 3.5, 1e-7)
+        assert_near_equal(meta['y1']['lower'], 0.0, 1e-7)
+        assert_near_equal(meta['y1']['upper'], 100.0, 1e-7)
 
         stdout = sys.stdout
         strout = StringIO()
@@ -657,14 +669,25 @@ class TestDriver(unittest.TestCase):
         cases = cr.list_cases('driver', out_stream=None)
         case = cr.get_case(cases[0])
 
+        # Test the results in the VOI specified units
         dv = case.get_design_vars()
-        assert_near_equal(dv['x'][0], ((3.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+        assert_near_equal(dv['x'][0], om.convert_units(35.0, 'degF', 'degC'), 1e-8)
 
         obj = case.get_objectives()
-        assert_near_equal(obj['y2'][0], ((73.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+        assert_near_equal(obj['y2'][0], om.convert_units(105.0, 'degF', 'degC'), 1e-8)
 
         con = case.get_constraints()
-        assert_near_equal(con['y1'][0], ((38.0 * 5 / 9) + 77.0) * 3.5, 1e-8)
+        assert_near_equal(con['y1'][0], om.convert_units(70.0, 'degF', 'degC'), 1e-8)
+
+        # Test the results in the model units
+        dv = case.get_design_vars(driver_units=False)
+        assert_near_equal(dv['x'][0], 35.0, 1e-8)
+
+        obj = case.get_objectives(driver_units=False)
+        assert_near_equal(obj['y2'][0], 105.0, 1e-8)
+
+        con = case.get_constraints(driver_units=False)
+        assert_near_equal(con['y1'][0], 70.0, 1e-8)
 
     def test_units_compute_totals(self):
         p = om.Problem()

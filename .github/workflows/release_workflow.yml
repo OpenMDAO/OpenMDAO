@@ -11,10 +11,19 @@ on:
   # This might be useful if the automated publish fails for some reason (use with CARE!!)
   workflow_dispatch:
 
+    inputs:
+
+      publish_to_pypi:
+        type: boolean
+        description: 'Publish package to PyPI (use with CARE - defaults to false for testing only)'
+        required: false
+        default: false
+
 jobs:
   pypi-publish:
     name: Upload release to PyPI
     runs-on: ubuntu-latest
+    if: github.event_name == 'release' || inputs.publish_to_pypi
 
     environment: release
 
@@ -38,19 +47,38 @@ jobs:
         uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc
 
   test-pypi-release:
-    name: Test OpenMDAO PyPi Release
+    name: Test OpenMDAO PyPI Release
     needs: [pypi-publish]
-    runs-on: ubuntu-latest
+    if: needs.pypi-publish.result == 'success' || needs.pypi-publish.result == 'skipped'
+
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: false
+      matrix:
+        OS: [ubuntu-24.04, macos-latest, windows-latest]
+        PIXI_ENVIRONMENT: [default]
+
+    runs-on: ${{ matrix.OS }}
 
     steps:
-    - uses: benc-uk/workflow-dispatch@v1
-      with:
-        workflow: OpenMDAO Tests
-        repo: ${{ github.repository_owner }}/OpenMDAO
-        inputs: >
-          {
-            "run_name": "Test OpenMDAO PyPi release",
-            "use_pypi": true
-           }
-        token: ${{ secrets.ACCESS_TOKEN }}
-      if: github.event_name == 'release'
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Run OpenMDAO Tests
+        uses: ./.github/actions/run_openmdao_tests_pixi
+        with:
+          OS: ${{ matrix.OS }}
+          PIXI_ENVIRONMENT: ${{ matrix.PIXI_ENVIRONMENT }}
+          BANDIT: false
+          RUFF: false
+          SNOPT: true
+          COVERAGE: false
+          OPENMDAO_INSTALL_FROM: 'pypi'
+          frozen: 'true'
+          debug_enabled: false
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh_known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          snopt_location_77: ${{ secrets.SNOPT_LOCATION_77 }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}

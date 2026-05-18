@@ -1,3 +1,61 @@
+***********************************
+# Release Notes for OpenMDAO 3.43.0
+
+March 11, 2026
+
+OpenMDAO 3.43.0 cleans up the way connections are managed under the hood.
+There's now a `python -m openmdao conn_graph` command that will graphically show connections/promotions for a system.
+This more strict connection graph implementation has revealed some bugs in some of our more complex internal models that needed to be addressed.
+
+One of the pain points in OpenMDAO has been tying two inputs together.
+In some more dynamic models, a variable may be created as an output in some cases, and an input in others, requiring two different ways of dealing with it (`promotes` vs `connect`).
+Forcing users to use promotion also forced them to change the namespace of a variable.
+Since OpenMDAO now has a robust connection graph, we can allow input-to-input connections, at least syntactically.
+If a user calls `connect('input_a', 'input_b')`, then under the hood OpenMDAO will traverse the graph and until it finds the output that is ultimately connected to `input_a`, and also connect it to `input_b`.
+
+OpenMDAO 3.43.0 addresses a bug that was preventing sparse optimizers from getting the sparsity pattern from OpenMDAO's coloring.
+Users who utilize sparsity in their optimization should see performance improvements.
+
+On the pixi environment side, the "default" environment now includes MPI and is essentially equivalent to py313.
+We will no longer test the py313 environment but it remains in place for dependent workflows, users should switch
+to using "default" if possible.
+Also, we now have a py314 environment with Python 3.14. However, on OS X there is currently a conflict between
+mumps-mpi and mumps-seq that prevents us from installing both MPI and pyoptsparse.
+For now, installing py314 on OS X will provide pyoptsparse but not MPI.
+On other operating systems, everything is functioning as expected.
+
+Users of PETSc KSP solver can now set the solver's diverence tolerance - thank you @A-CGray.
+
+## New Features
+
+- Created a connection graph to manage manual, implicit, and promotion connections. [#3671](https://github.com/OpenMDAO/OpenMDAO/pull/3671)
+- Allow setting of PETSc KSP solver's divergence tolerance [#3686](https://github.com/OpenMDAO/OpenMDAO/pull/3686)
+- Added back the ability to exclude/include source docs from searching the docs [#3693](https://github.com/OpenMDAO/OpenMDAO/pull/3693)
+- Allow re-promotion of a variable to an alias if it was previously promoted without an alias. [#3692](https://github.com/OpenMDAO/OpenMDAO/pull/3692)
+- Pixi update for Python 3.14 support, default environment with MPI, and build-snopt task [#3726](https://github.com/OpenMDAO/OpenMDAO/pull/3726)
+
+## Bug Fixes
+
+- Fixes to "list_pre_post" when called from CLI [#3681](https://github.com/OpenMDAO/OpenMDAO/pull/3681)
+- Fixed erroneous shape mismatch error for some zero size distributed variables. [#3706](https://github.com/OpenMDAO/OpenMDAO/pull/3706)
+- Fixed search on OpenMDAO docs [#3689](https://github.com/OpenMDAO/OpenMDAO/pull/3689)
+- Fix for units error when target has units and source doesn't [#3710](https://github.com/OpenMDAO/OpenMDAO/pull/3710)
+- Fixed inputs report so that it provides the global shape of a variabl… [#3716](https://github.com/OpenMDAO/OpenMDAO/pull/3716)
+- Fixed missing return to `get_subjac_sparsity` [#3718](https://github.com/OpenMDAO/OpenMDAO/pull/3718)
+
+## Miscellaneous
+
+- Fix typo in Pixi environment documentation [#3676](https://github.com/OpenMDAO/OpenMDAO/pull/3676)
+- Use SNOPT with pixi-based tests. [#3680](https://github.com/OpenMDAO/OpenMDAO/pull/3680)
+- Correctly skip SNOPT testing when PR is submitted from a fork. [#3683](https://github.com/OpenMDAO/OpenMDAO/pull/3683)
+- Add reference to Julia docs in features/experimental/main [#3684](https://github.com/OpenMDAO/OpenMDAO/pull/3684)
+- Add test for PETSc KSP divtol behaviour [#3687](https://github.com/OpenMDAO/OpenMDAO/pull/3687)
+- Cleaned up coverage exception and massive error log on CI [#3688](https://github.com/OpenMDAO/OpenMDAO/pull/3688)
+- Add `[julia]` extra, and Julia docs [#3678](https://github.com/OpenMDAO/OpenMDAO/pull/3678)
+- Restore coverage testing on CI. [#3705](https://github.com/OpenMDAO/OpenMDAO/pull/3705)
+- Add CLAUDE.md [#3709](https://github.com/OpenMDAO/OpenMDAO/pull/3709)
+- Changed CI to only test oldest on ubuntu [#3721](https://github.com/OpenMDAO/OpenMDAO/pull/3721)
+- Fixed bad import in vscode launch file generator [#3722](https://github.com/OpenMDAO/OpenMDAO/pull/3722)
 
 ***********************************
 # Release Notes for OpenMDAO 3.42.0

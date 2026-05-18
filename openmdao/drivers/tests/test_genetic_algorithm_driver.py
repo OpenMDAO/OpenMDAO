@@ -20,6 +20,7 @@ from openmdao.test_suite.components.three_bar_truss import ThreeBarTruss
 from openmdao.utils.general_utils import run_driver
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.om_warnings import OMDeprecationWarning
 try:
     from parameterized import parameterized
 except ImportError:
@@ -73,6 +74,15 @@ class TestErrors(unittest.TestCase):
                          "which can be installed with one of the following commands:\n"
                          "    pip install openmdao[doe]\n"
                          "    pip install pyDOE3")
+
+
+    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    def test_deprecation_warning(self):
+        """Test that SimpleGADriver raises a deprecation warning on instantiation."""
+        msg = ('The `SimpleGADriver` is deprecated. Please use '
+               '`pymooDriver` for population based optimizations.')
+        with assert_warning(OMDeprecationWarning, msg):
+            om.SimpleGADriver()
 
 
 @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
@@ -1077,7 +1087,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         prob.setup()
         model.set_val("x", 0)
         prob.run_driver()
-        assert_near_equal(prob['x'], x_opt, 1e-4) 
+        assert_near_equal(prob['x'], x_opt, 1e-4)
         assert_near_equal(prob['parab.f'], f_opt, 1e-4)
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
@@ -1122,7 +1132,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
         # Optimal solution
         assert_near_equal(prob['comp.f'], 0.49399549, 1e-4)
-        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+        self.assertTrue(int(prob['p2.xI'].item()) in [3, -3])
 
     def test_two_branin_parallel_model(self):
         prob = om.Problem()
@@ -1166,7 +1176,7 @@ class MPITestSimpleGA(unittest.TestCase):
 
         # Optimal solution
         assert_near_equal(prob['comp.f'], 0.98799098, 1e-4)
-        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+        self.assertTrue(int(prob['p2.xI'].item()) in [3, -3])
 
     def test_mixed_integer_3bar_default_bits(self):
         # Tests bug where letting openmdao calculate the bits didn't preserve
@@ -1371,8 +1381,9 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
             print('p2.xI', prob['p2.xI'])
 
         # Optimal solution
+        print(f"Rank {prob.comm.rank} - p2.xI: {prob['p2.xI']} (Type: {type(prob['p2.xI'])})")
         assert_near_equal(prob.get_val('comp.f'), 0.98799098, 1e-6)
-        self.assertTrue(int(prob['p2.xI']) in [3, -3])
+        self.assertTrue(int(prob['p2.xI'].item()) in [3, -3])
         assert_near_equal(prob.get_val('p1.xC'), 11.94117647, 1e-6)
 
     def test_indivisible_error(self):

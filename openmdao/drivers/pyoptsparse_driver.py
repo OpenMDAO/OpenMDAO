@@ -335,7 +335,6 @@ class pyOptSparseDriver(Driver):
                                ' but the selected optimizer ({0}) does not support'
                                ' multiple objectives.'.format(self.options['optimizer']))
 
-        self._model_ran = False
         self._setup_tot_jac_sparsity()
 
     def run(self):
@@ -391,17 +390,20 @@ class pyOptSparseDriver(Driver):
 
         input_vals = self.get_design_var_values()
 
+        # Get scaled design variable bounds from autoscaler
+        lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
+
         for name, meta in self._designvars.items():
             # translate absolute var names to promoted names for pyoptsparse
             size = meta['global_size'] if meta['distributed'] else meta['size']
             if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.1'):
                 opt_prob.addVarGroup(name, size, type='c',
                                      value=input_vals[name],
-                                     lower=meta['lower'], upper=meta['upper'])
+                                     lower=lower_dv[name], upper=upper_dv[name])
             else:
                 opt_prob.addVarGroup(name, size, varType='c',
                                      value=input_vals[name],
-                                     lower=meta['lower'], upper=meta['upper'])
+                                     lower=lower_dv[name], upper=upper_dv[name])
 
         if pyoptsparse_version is None or pyoptsparse_version < Version('2.5.1'):
             opt_prob.finalizeDesignVariables()
@@ -454,12 +456,15 @@ class pyOptSparseDriver(Driver):
                 del self._cons[name]
                 del self._responses[name]
 
+        # Get scaled constraint bounds from autoscaler
+        lower_con, upper_con, equals_con = self._autoscaler.get_bounds_scaling('constraint')
+
         eqcons = {n: m for n, m in self._cons.items() if m['equals'] is not None}
         if eqcons:
             # Add all equality constraints
             for name, meta in eqcons.items():
                 size = meta['global_size'] if meta['distributed'] else meta['size']
-                lower = upper = meta['equals']
+                lower = upper = equals_con[name]
 
                 # set equality constraints as reverse seeds to see what dvs are relevant
                 with relevance.seeds_active(rev_seeds=meta['source']):
@@ -492,9 +497,9 @@ class pyOptSparseDriver(Driver):
             for name, meta in ineqcons.items():
                 size = meta['global_size'] if meta['distributed'] else meta['size']
 
-                # Bounds - double sided is supported
-                lower = meta['lower']
-                upper = meta['upper']
+                # Bounds - double sided is supported (scaled bounds from autoscaler)
+                lower = lower_con[name]
+                upper = upper_con[name]
 
                 # set inequality constraints as reverse seeds to see what dvs are relevant
                 with relevance.seeds_active(rev_seeds=(meta['source'],)):
@@ -625,11 +630,10 @@ class pyOptSparseDriver(Driver):
                 else:
                     print(sol)
 
-        # Pull optimal parameters back into framework and re-run, so that
-        # framework is left in the right final state
-        dv_dict = sol.getDVs()
-        for name in self._designvars:
-            self.set_design_var(name, dv_dict[name])
+        # Set the design variable vector with scaled values, then use _set_design_vars to
+        # properly unscale and set them in the model
+        self._vectors['design_var'].set_data(sol.getDVs(), driver_scaling=True)
+        self._set_design_vars(driver_scaling=True)
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             try:
@@ -700,6 +704,7 @@ class pyOptSparseDriver(Driver):
             0 for successful function evaluation
             1 for unsuccessful function evaluation
         """
+        dv_vec = self._vectors['design_var']
         model = self._problem().model
         fail = 0
 
@@ -711,11 +716,8 @@ class pyOptSparseDriver(Driver):
             signal.signal(sigusr, self._signal_handler)
 
         try:
-            for name in self._designvars:
-                self.set_design_var(name, dv_dict[name])
-
-            # print("Setting DV")
-            # print(dv_dict)
+            dv_vec.set_data(dv_dict, driver_scaling=True)
+            self._set_design_vars(driver_scaling=dv_vec.driver_scaling)
 
             # Check if we caught a termination signal while SNOPT was running.
             if self._user_termination_flag:
@@ -754,8 +756,8 @@ class pyOptSparseDriver(Driver):
                 self._exc_info = sys.exc_info()
             fail = 1
 
-        func_dict = self.get_objective_values()
-        func_dict.update(self.get_constraint_values(lintype='nonlinear'))
+        func_dict = self.get_objective_values(driver_scaling=True)
+        func_dict.update(self.get_constraint_values(lintype='nonlinear', driver_scaling=True))
 
         if fail > 0 and self._fill_NANs:
             for name in func_dict:
