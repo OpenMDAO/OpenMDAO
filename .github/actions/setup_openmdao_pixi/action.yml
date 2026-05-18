@@ -55,7 +55,7 @@ runs:
         fi
 
     - name: Setup Pixi
-      uses: prefix-dev/setup-pixi@v0.8.1
+      uses: prefix-dev/setup-pixi@v0.9.5
       with:
         manifest-path: ${{ env.PIXI_MANIFEST }}
         environments: ${{ inputs.environment }}
