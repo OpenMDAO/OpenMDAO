@@ -228,7 +228,7 @@ def _get_multid_circle_problem(flat_indices=False):
 class TestMultiDimensionalCircleOptimization(unittest.TestCase):
 
     def test_f(self):
-        for use_flat_indices in [False]:
+        for use_flat_indices in [False, True]:
             with self.subTest(param=use_flat_indices):
                 self._SHAPE, self._SIZE, self._ALL_IND, self._EVEN_IND, self._ODD_IND, self._prob = _get_multid_circle_problem(use_flat_indices)
                 self._prob.run_driver()
@@ -293,7 +293,7 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 assert_near_equal(y02, y0)
 
     def test_dfdx(self):
-        for use_flat_indices in [False]:
+        for use_flat_indices in [False, True]:
             with self.subTest(param=use_flat_indices):
                 self._SHAPE, self._SIZE, self._ALL_IND, self._EVEN_IND, self._ODD_IND, self._prob = _get_multid_circle_problem(use_flat_indices)
                 self._prob.run_driver()
@@ -891,35 +891,6 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 assert_near_equal(J[area_start:area_end, x_start:x_end], dcircle_area_dx)
                 assert_near_equal(J[area_start:area_end, y_start:y_end], dcircle_area_dy)
 
-    def test_linear_constraint_check(self):
-        for use_flat_indices in [False]:
-            with self.subTest(param=use_flat_indices):
-                self._SHAPE, self._SIZE, self._ALL_IND, self._EVEN_IND, self._ODD_IND, self._prob = _get_multid_circle_problem(use_flat_indices)
-                self._prob.run_driver()
-
-                prob = self._prob
-
-                # dfdx = prob.get_callback("dfdx", input_vars=["y", "x"], output_vars=["y0_con.g"])
-                # dfdx = prob.get_callback("dfdx", input_vars=["y", "x"], output_vars=["y0_con.g"])
-                dfdx = prob.get_callback("dfdx", input_vars=["y", "x"])
-
-                input_names_expected = ["x", "y"]
-                input_names = dfdx.input_var_names
-                self.assertEqual(len(input_names), len(input_names_expected))
-                self.assertTrue(all(name in input_names_expected for name in input_names))
-
-                # This doesn't include linear constraints.
-                # Not sure what to do about that.
-                # output_names_expected = ["y0_con.g"]
-                output_names_expected = ["r_con.g", "theta_con.g", "delta_theta_con.g", "l_conx.g", "circle.area", "y0_con.g"]
-                output_names = dfdx.output_var_names
-                self.assertEqual(len(output_names), len(output_names_expected))
-                self.assertTrue(all(name in output_names_expected for name in output_names))
-
-                x0 = dfdx.create_input_vector()
-                # Why does this have a dense column in the first one?
-                # print(dfdx(x0))
-
 
 class IndicesTestComp(om.ExplicitComponent):
 
@@ -1097,6 +1068,81 @@ class TestWithIndices(unittest.TestCase):
         # dfdx_expected[1, 1] = 3
         assert_near_equal(f, prob.get_val('f', indices=[0]))
         assert_near_equal(dfdx, dfdx_expected)
+
+    def test_with_linear_constraint(self):
+        prob = self._prob
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_objective('f', index=0, alias="f_objective")
+        prob.model.add_constraint('f', indices=[1], equals=13.0, alias="f_constraint", linear=True)
+        prob.setup(force_alloc_complex=True)
+        # Need to run final_setup to avoid an error when creating the "_TotalJacInfo" object.
+        prob.final_setup()
+
+        prob.set_val('x', [0.0, 0.0])
+        prob.run_model()
+        prob.run_driver()
+
+        # x[0] = 2/13*f[1] = 2/13*13 = 2
+        # x[1] = (f[1] - 2*x[0])/3 = (13 - 2*2)/3 = 9/3 = 3
+        # f[0] = (x[0] + 2)**2 + (x[1] + 3)**2 - 4 = (2 + 2)**2 + (3 + 3)**2 - 4 = 4**2 + 6**2 - 4 = 48
+        assert_near_equal(prob.get_val('x'), [2, 3])
+        assert_near_equal(prob.get_val('f', indices=[0]), 48)
+        assert_near_equal(prob.get_val('f', indices=[1]), 13)
+
+        # Didn't ask for anything specific, so should get everything.
+        fdfdx = prob.get_callback("fdfdx")
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [2, 3])
+        f, dfdx = fdfdx(x)
+        dfdx_expected = np.zeros((2, 2))
+        dfdx_expected[0, 0] = 2*(x[0] + 2)
+        dfdx_expected[0, 1] = 2*(x[1] + 3)
+        dfdx_expected[1, 0] = 2
+        dfdx_expected[1, 1] = 3
+        assert_near_equal(f, prob.get_val('f'))
+        assert_near_equal(dfdx, dfdx_expected)
+
+        # Asking for both the input and output variables should give us everything.
+        fdfdx = prob.get_callback("fdfdx", input_vars=["x"], output_vars=["f"])
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [2, 3])
+        f, dfdx = fdfdx(x)
+        dfdx_expected = np.zeros((2, 2))
+        dfdx_expected[0, 0] = 2*(x[0] + 2)
+        dfdx_expected[0, 1] = 2*(x[1] + 3)
+        dfdx_expected[1, 0] = 2
+        dfdx_expected[1, 1] = 3
+        assert_near_equal(f, prob.get_val('f'))
+        assert_near_equal(dfdx, dfdx_expected)
+
+        # Asking for just one input here.
+        fdfdx = prob.get_callback("fdfdx", input_vars=[{"x": {"indices": [0]}}])
+        x = fdfdx.create_input_vector()
+        # assert_near_equal(x, [2, 3])
+        assert_near_equal(x, [2])
+        f, dfdx = fdfdx(x)
+        # dfdx_expected = np.zeros((2, 2))
+        dfdx_expected = np.zeros((2, 1))
+        dfdx_expected[0, 0] = 2*(x[0] + 2)
+        # dfdx_expected[0, 1] = 2*(x[1] + 3)
+        dfdx_expected[1, 0] = 2
+        # dfdx_expected[1, 1] = 3
+        assert_near_equal(f, prob.get_val('f'))
+        assert_near_equal(dfdx, dfdx_expected)
+
+        # Asking for just one output here.
+        fdfdx = prob.get_callback("fdfdx", output_vars=[{"f": {"indices": [0]}}])
+        x = fdfdx.create_input_vector()
+        assert_near_equal(x, [2, 3])
+        f, dfdx = fdfdx(x)
+        dfdx_expected = np.zeros((1, 2))
+        dfdx_expected[0, 0] = 2*(x[0] + 2)
+        dfdx_expected[0, 1] = 2*(x[1] + 3)
+        # dfdx_expected[1, 0] = 2
+        # dfdx_expected[1, 1] = 3
+        assert_near_equal(f, prob.get_val('f', indices=[0]))
+        assert_near_equal(dfdx, dfdx_expected)
+
 
 if __name__ == "__main__":
     unittest.main()
