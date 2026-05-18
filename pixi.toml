@@ -197,7 +197,7 @@ dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visuali
 minimal = { features = ["py313", "test", "openblas-explicit"], solve-group = "default" }
 
 # Oldest supported versions
-oldest = { features = ["deps-oldest", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "oldest" }
+oldest = { features = ["deps-oldest", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "oldest" }
 
 # Python version matrix
 py311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "py311" }
