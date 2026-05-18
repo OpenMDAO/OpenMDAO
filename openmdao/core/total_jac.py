@@ -168,8 +168,7 @@ class _TotalJacInfo(object):
         # DJI: This block added by Claude.
         if always_include_linear and of is None and driver:
             lin_con_names = [name for name, meta in driver._cons.items() if meta['linear']]
-            if lin_con_names:
-                of = driver._get_ordered_nl_responses() + lin_con_names
+            of = driver._get_ordered_nl_responses() + lin_con_names
 
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
@@ -185,7 +184,7 @@ class _TotalJacInfo(object):
                 of_metadata, has_custom_derivs = model._get_totals_of_metadata(driver, of)
                 wrt_metadata, has_custom_derivs = model._get_totals_wrt_metadata(False, wrt)
             elif (orig_wrt is None):
-                # Use driver to get wrt metadata, but not forof.
+                # Use driver to get wrt metadata, but not for of.
                 of_metadata, has_custom_derivs = model._get_totals_of_metadata(False, of)
                 wrt_metadata, has_custom_derivs = model._get_totals_wrt_metadata(driver, wrt)
             else:
@@ -199,18 +198,12 @@ class _TotalJacInfo(object):
         # DJI: This block added by Claude.
         if (of_indices is not None) and (orig_of is not None):
             conn_graph = model.get_conn_graph()
-            # of_metadata = dict(of_metadata)  # shallow copy so we don't mutate the original
-            # flat_iter = of_indices_are_flat if of_indices_are_flat is not None \
-            #     else repeat(False)
-            # for vname, new_idxs, is_flat in zip(of_metadata, of_indices, flat_iter):
             for vname, new_idxs in zip(of_metadata, of_indices):
                 if new_idxs is None:
                     continue
-                # meta = of_metadata[vname] = dict(of_metadata[vname])  # shallow copy entry
                 meta = of_metadata[vname]
                 src_shape = conn_graph.nodes[('o', meta['source'])]['attrs'].global_shape
                 new_idx_tuple = tuple(i for i in np.atleast_1d(new_idxs))
-                # idxer = make_indexer(new_idx_tuple, flat_src=is_flat)
                 idxer = make_indexer(new_idx_tuple)
                 idxer.set_src_shape(src_shape)
                 meta['indices'] = idxer
@@ -219,10 +212,6 @@ class _TotalJacInfo(object):
         # DJI: This block added by Claude.
         if (wrt_indices is not None) and (orig_wrt is not None):
             conn_graph = model.get_conn_graph()
-            # wrt_metadata = dict(wrt_metadata)  # shallow copy so we don't mutate the original
-            # flat_iter = wrt_indices_are_flat if wrt_indices_are_flat is not None \
-            #     else repeat(False)
-            # for vname, new_idxs, is_flat in zip(wrt_metadata, wrt_indices, flat_iter):
             for vname, new_idxs in zip(wrt_metadata, wrt_indices):
                 if new_idxs is None:
                     continue
@@ -230,7 +219,6 @@ class _TotalJacInfo(object):
                 meta = wrt_metadata[vname]
                 src_shape = conn_graph.nodes[('o', meta['source'])]['attrs'].global_shape
                 new_idx_tuple = tuple(i for i in np.atleast_1d(new_idxs))
-                # idxer = make_indexer(new_idx_tuple, flat_src=is_flat)
                 idxer = make_indexer(new_idx_tuple)
                 idxer.set_src_shape(src_shape)
                 meta['indices'] = idxer
