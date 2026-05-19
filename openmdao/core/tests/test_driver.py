@@ -1085,16 +1085,16 @@ class TestDriverMPI(unittest.TestCase):
                           2*np.ones(size))
 
         # set distributed design var, set_remote=True
-        driver.set_design_var('x', [3, 3, 3, 3, 3], set_remote=True)
+        driver._set_design_var('x', [3, 3, 3, 3, 3], set_remote=True)
 
         assert_near_equal(driver.get_design_var_values(get_remote=True)['x'],
                           [3, 3, 3, 3, 3])
 
         # set distributed design var, set_remote=False
         if comm.rank == 0:
-            driver.set_design_var('x', 5.0*np.ones(size), set_remote=False)
+            driver._set_design_var('x', 5.0*np.ones(size), set_remote=False)
         else:
-            driver.set_design_var('x', 9.0*np.ones(size), set_remote=False)
+            driver._set_design_var('x', 9.0*np.ones(size), set_remote=False)
 
         assert_near_equal(driver.get_design_var_values(get_remote=True)['x'],
                           [5, 5, 5, 9, 9])
