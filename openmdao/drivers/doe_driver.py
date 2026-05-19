@@ -208,9 +208,9 @@ class DOEDriver(Driver):
             try:
                 msg = None
                 if isinstance(dv_val, np.ndarray):
-                    self.set_design_var(dv_name, dv_val.flatten())
+                    self._set_design_var(dv_name, dv_val.flatten())
                 else:
-                    self.set_design_var(dv_name, dv_val)
+                    self._set_design_var(dv_name, dv_val)
             except ValueError as err:
                 msg = "Error assigning %s = %s: " % (dv_name, dv_val) + str(err)
             finally:

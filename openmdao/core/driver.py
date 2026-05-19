@@ -507,7 +507,7 @@ class Driver(object, metaclass=DriverMetaclass):
         for name in desvar_names:
             value = desvar_vec[name]
             units = meta[name].get('units')
-            self.set_design_var(name, value, set_remote=True, driver_scaling=False, units=units)
+            self._set_design_var(name, value, set_remote=True, units=units)
 
     def _setup_driver(self, problem):
         """
@@ -762,7 +762,7 @@ class Driver(object, metaclass=DriverMetaclass):
         Check for design variable values that exceed their bounds.
 
         This method's behavior is controlled by the OPENMDAO_INVALID_DESVAR environment variable,
-        which may take on values 'ignore', 'raise'', 'warn'.
+        which may take on values 'ignore', 'raise', 'warn'.
         - 'ignore' : Proceed without checking desvar bounds.
         - 'warn' : Issue a warning if one or more desvar values exceed bounds.
         - 'raise' : Raise an exception if one or more desvar values exceed bounds.
@@ -1100,9 +1100,9 @@ class Driver(object, metaclass=DriverMetaclass):
         dvs.update(discrete_dvs)
         return dvs
 
-    def set_design_var(self, name, value, set_remote=True, driver_scaling=False, units=None):
+    def set_design_var(self, name, value, set_remote=True, units=None, **kwargs):
         """
-        Set the value of a design variable.
+        Redirect to _set_design_var, as this public method is deprecated.
 
         'name' can be a promoted output name or an alias.
 
@@ -1115,10 +1115,39 @@ class Driver(object, metaclass=DriverMetaclass):
         set_remote : bool
             If True, set the global value of the variable (value must be of the global size).
             If False, set the local value of the variable (value must be of the local size).
-        driver_scaling : bool
-            If True, assume the value provided is in optimizer-scaled space.
-        units : str or None
-            Units of the value, **after** unscaling from the optimizer-scaled space, if applicable.
+        units : bool
+            Units in which the given value are expressed.
+        **kwargs : dict
+            Used to catch deprecated arguments.
+        """
+        warn_deprecation('set_design_var is deprecated. Internally, drivers should use '
+                         '_set_design_vars or _set_design_var as appropriate.\n'
+                         'Users wishing to prescribe units to design variables should use set_val.',
+                         expires='3.45.0')
+
+        if 'driver_scaling' in kwargs:
+            warn_deprecation('set_design_var no longer accepts argument "driver_scaling". '
+                             'Variable is assumed to be in a model-scaled state.')
+
+        self._set_design_var(name, value, set_remote, units)
+
+    def _set_design_var(self, name, value, set_remote=True, units=None):
+        """
+        Set the value of a design variable using its driver-scaled value.
+
+        'name' can be a promoted output name or an alias.
+
+        Parameters
+        ----------
+        name : str
+            Promoted name or alias of the design variable.
+        value : float or ndarray
+            Value for the design variable in driver scaling/units.
+        set_remote : bool
+            If True, set the global value of the variable (value must be of the global size).
+            If False, set the local value of the variable (value must be of the local size).
+        units : str
+            Units in which the given value are expressed.
         """
         problem = self._problem()
         meta = self._designvars[name]
@@ -1166,6 +1195,9 @@ class Driver(object, metaclass=DriverMetaclass):
                 # provided value is the local value
                 desvar[loc_idxs] = np.atleast_1d(value)
 
+            if units is not None:
+                src_units = problem.model._var_abs2meta['output'][src_name]['units']
+                desvar[loc_idxs] = convert_units(desvar[loc_idxs], units, src_units)
             if meta['units'] is not None:
                 src_units = problem.model._var_allprocs_abs2meta['output'][src_name]['units']
                 desvar[loc_idxs] = convert_units(desvar[loc_idxs], meta['units'], src_units)
@@ -2126,7 +2158,7 @@ class Driver(object, metaclass=DriverMetaclass):
         for name in desvar_names:
             meta = self._designvars[name]
             size = meta['size']
-            self.set_design_var(name, x_new[i:i + size])
+            self._set_design_var(name, x_new[i:i + size])
             i += size
 
     def _compute_con_viol(self, x_new, desvar_names, driver_scaling=True):
