@@ -760,7 +760,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/zstd-1.5.7-h3eecb57_6.conda
       - pypi: git+https://github.com/OpenMDAO/build_pyoptsparse.git#00b4e8ca8b8e49d8c12123d593ac70b01b2e4498
       - pypi: https://files.pythonhosted.org/packages/0a/8b/fd393f0923c82be4ec0db712fffb2ff0a7a131707b842c99bf24b549274d/cython-3.2.4-cp39-abi3-macosx_10_9_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/0f/9e/6142ebfda0cb6e9349c091eae73c2e01a770b7659255248d637bec54a88b/h5py-3.16.0-cp313-cp313-macosx_10_13_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/22/49/b4418a7a892c0dd64442bbbeef54e1cdfe722dfc5a7bf0d611d3f5f90e99/jax-0.4.38-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3c/74/d02409ed2aa865e051b7edda22ad416a39d81a84980f544f8de717cab133/ninja-1.13.0-py3-none-macosx_10_9_universal2.whl
@@ -2242,7 +2241,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/zstd-1.5.7-h3eecb57_6.conda
       - pypi: git+https://github.com/OpenMDAO/build_pyoptsparse.git#00b4e8ca8b8e49d8c12123d593ac70b01b2e4498
       - pypi: https://files.pythonhosted.org/packages/0a/8b/fd393f0923c82be4ec0db712fffb2ff0a7a131707b842c99bf24b549274d/cython-3.2.4-cp39-abi3-macosx_10_9_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/0f/9e/6142ebfda0cb6e9349c091eae73c2e01a770b7659255248d637bec54a88b/h5py-3.16.0-cp313-cp313-macosx_10_13_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/22/49/b4418a7a892c0dd64442bbbeef54e1cdfe722dfc5a7bf0d611d3f5f90e99/jax-0.4.38-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3c/74/d02409ed2aa865e051b7edda22ad416a39d81a84980f544f8de717cab133/ninja-1.13.0-py3-none-macosx_10_9_universal2.whl
@@ -4518,7 +4516,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/5e/0a/9bc5b9febd30f10ffbbdedd561fbd39fbc815865d26db464a0eafd9f91e7/testflo-1.4.22-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5e/cd/f3a881ff5e601d6bbeff63b38ee2362e1167c47d9cde03eddf8d71a4ffb0/meson-1.11.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b0/6a/b9fba73eb5e758e40a514919e096a039d27dc0ab4776a6cc977f5153a55f/jaxlib-0.4.38-cp311-cp311-macosx_10_14_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/ba/95/a825894f3e45cbac7554c4e97314ce886b233a20033787eda755ca8fecc7/h5py-3.16.0-cp311-cp311-macosx_10_9_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/c6/5e/712092cfe7e5eb667b8ad9ca7c54442f21ed7ca8979745f1000e24cf8737/ml_dtypes-0.5.4-cp311-cp311-macosx_10_9_universal2.whl
       osx-arm64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/about-time-4.2.1-pyhd8ed1ab_1.conda
@@ -5937,7 +5934,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/5e/0a/9bc5b9febd30f10ffbbdedd561fbd39fbc815865d26db464a0eafd9f91e7/testflo-1.4.22-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5e/cd/f3a881ff5e601d6bbeff63b38ee2362e1167c47d9cde03eddf8d71a4ffb0/meson-1.11.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/b0/6a/b9fba73eb5e758e40a514919e096a039d27dc0ab4776a6cc977f5153a55f/jaxlib-0.4.38-cp311-cp311-macosx_10_14_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/ba/95/a825894f3e45cbac7554c4e97314ce886b233a20033787eda755ca8fecc7/h5py-3.16.0-cp311-cp311-macosx_10_9_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/c6/5e/712092cfe7e5eb667b8ad9ca7c54442f21ed7ca8979745f1000e24cf8737/ml_dtypes-0.5.4-cp311-cp311-macosx_10_9_universal2.whl
       osx-arm64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/about-time-4.2.1-pyhd8ed1ab_1.conda
@@ -7361,7 +7357,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/5e/0a/9bc5b9febd30f10ffbbdedd561fbd39fbc815865d26db464a0eafd9f91e7/testflo-1.4.22-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5e/cd/f3a881ff5e601d6bbeff63b38ee2362e1167c47d9cde03eddf8d71a4ffb0/meson-1.11.1-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/a8/b8/3c70881695e056f8a32f8b941126cf78775d9a4d7feba8abcb52cb7b04f2/ml_dtypes-0.5.4-cp312-cp312-macosx_10_13_universal2.whl
-      - pypi: https://files.pythonhosted.org/packages/c8/c0/5d4119dba94093bbafede500d3defd2f5eab7897732998c04b54021e530b/h5py-3.16.0-cp312-cp312-macosx_10_13_x86_64.whl
       osx-arm64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/_python_abi3_support-1.0-hd8ed1ab_2.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/about-time-4.2.1-pyhd8ed1ab_1.conda
@@ -7714,7 +7709,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/79/0c/279cb4dc009fe87a8315d1b182f520693236ad07b852152df344ea4e4021/jaxlib-0.10.0-cp312-cp312-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/91/4d/1eb0c7c196a136b1926f4d7f0492a96c6fabd604d77e6cd43b56a3a16d83/cython-3.2.4-cp312-cp312-macosx_11_0_arm64.whl
       - pypi: https://files.pythonhosted.org/packages/a8/b8/3c70881695e056f8a32f8b941126cf78775d9a4d7feba8abcb52cb7b04f2/ml_dtypes-0.5.4-cp312-cp312-macosx_10_13_universal2.whl
-      - pypi: https://files.pythonhosted.org/packages/b0/42/c84efcc1d4caebafb1ecd8be4643f39c85c47a80fe254d92b8b43b1eadaf/h5py-3.16.0-cp312-cp312-macosx_11_0_arm64.whl
       win-64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/_python_abi3_support-1.0-hd8ed1ab_2.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/about-time-4.2.1-pyhd8ed1ab_1.conda
@@ -8778,7 +8772,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/zstd-1.5.7-h3eecb57_6.conda
       - pypi: git+https://github.com/OpenMDAO/build_pyoptsparse.git#00b4e8ca8b8e49d8c12123d593ac70b01b2e4498
       - pypi: https://files.pythonhosted.org/packages/0a/8b/fd393f0923c82be4ec0db712fffb2ff0a7a131707b842c99bf24b549274d/cython-3.2.4-cp39-abi3-macosx_10_9_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/0f/9e/6142ebfda0cb6e9349c091eae73c2e01a770b7659255248d637bec54a88b/h5py-3.16.0-cp313-cp313-macosx_10_13_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/22/49/b4418a7a892c0dd64442bbbeef54e1cdfe722dfc5a7bf0d611d3f5f90e99/jax-0.4.38-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3c/74/d02409ed2aa865e051b7edda22ad416a39d81a84980f544f8de717cab133/ninja-1.13.0-py3-none-macosx_10_9_universal2.whl
@@ -9856,7 +9849,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/a1/8e/b2a08ffc51c93842de71f7f988865cebfa7f43d6721957812dc8cc8b9d40/jaxlib-0.10.0-cp314-cp314-manylinux_2_27_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/c6/bb/82c7dcf38070b46172a517e2334e665c5bf374a262f99a283ea454bece7c/ml_dtypes-0.5.4-cp314-cp314-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/ed/de/0e6edf44d6a04dabd0318a519125ed0415ce437ad5a1ec9b9be03d9048cf/ninja-1.13.0-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
-      - pypi: https://files.pythonhosted.org/packages/f1/16/d905e7f53e661ce2c24686c38048d8e2b750ffc4350009d41c4e6c6c9826/h5py-3.16.0-cp314-cp314-manylinux_2_28_x86_64.whl
       osx-64:
       - conda: https://conda.anaconda.org/conda-forge/noarch/_python_abi3_support-1.0-hd8ed1ab_2.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/about-time-4.2.1-pyhd8ed1ab_1.conda
@@ -10171,7 +10163,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/0a/8b/fd393f0923c82be4ec0db712fffb2ff0a7a131707b842c99bf24b549274d/cython-3.2.4-cp39-abi3-macosx_10_9_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/3c/74/d02409ed2aa865e051b7edda22ad416a39d81a84980f544f8de717cab133/ninja-1.13.0-py3-none-macosx_10_9_universal2.whl
-      - pypi: https://files.pythonhosted.org/packages/48/3c/7fcd9b4c9eed82e91fb15568992561019ae7a829d1f696b2c844355d95dd/h5py-3.16.0-cp314-cp314-macosx_10_15_x86_64.whl
       - pypi: https://files.pythonhosted.org/packages/53/18/a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/ansicolors-1.1.8-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5b/ad/e05dfb934ab7ac55c6bb2e6f2b8de8641bcaec0a35078c3e91f645cd43ad/jax-0.4.29-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5e/0a/9bc5b9febd30f10ffbbdedd561fbd39fbc815865d26db464a0eafd9f91e7/testflo-1.4.22-py2.py3-none-any.whl
@@ -10799,7 +10790,6 @@ environments:
       - pypi: https://files.pythonhosted.org/packages/23/cd/066e86230ae37ed0be70aae89aabf03ca8d9f39c8aea0dec8029455b5540/opt_einsum-3.4.0-py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/24/08/26e6a3ecf0a95f1ec0dcd7a668d5c9a72e581c40fe4ae51e102ca63174c5/jaxlib-0.10.0-cp314-cp314-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/29/45/c0adfbfb0b5895aa18cec400c535b4f7ff3e52536e0403602fc1a23f7de9/ninja-1.13.0-py3-none-win_amd64.whl
-      - pypi: https://files.pythonhosted.org/packages/3e/14/615a450205e1b56d16c6783f5ccd116cde05550faad70ae077c955654a75/h5py-3.16.0-cp314-cp314-win_amd64.whl
       - pypi: https://files.pythonhosted.org/packages/53/18/a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/ansicolors-1.1.8-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5e/0a/9bc5b9febd30f10ffbbdedd561fbd39fbc815865d26db464a0eafd9f91e7/testflo-1.4.22-py2.py3-none-any.whl
       - pypi: https://files.pythonhosted.org/packages/5e/cd/f3a881ff5e601d6bbeff63b38ee2362e1167c47d9cde03eddf8d71a4ffb0/meson-1.11.1-py3-none-any.whl
@@ -32324,13 +32314,6 @@ packages:
   version: 3.2.4
   sha256: 90f43be4eaa6afd58ce20d970bb1657a3627c44e1760630b82aa256ba74b4acb
   requires_python: '>=3.8'
-- pypi: https://files.pythonhosted.org/packages/0f/9e/6142ebfda0cb6e9349c091eae73c2e01a770b7659255248d637bec54a88b/h5py-3.16.0-cp313-cp313-macosx_10_13_x86_64.whl
-  name: h5py
-  version: 3.16.0
-  sha256: 370a845f432c2c9619db8eed334d1e610c6015796122b0e57aa46312c22617d9
-  requires_dist:
-  - numpy>=1.21.2
-  requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/12/33/3298a44d201c45bcf0d769659725ae70e9c6c42adf8032f6d89c8241098d/cython-3.2.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
   name: cython
   version: 3.2.4
@@ -32471,13 +32454,6 @@ packages:
   - numpy>=1.24
   - ml-dtypes>=0.2.0
   - scipy>=1.11.1 ; python_full_version >= '3.12'
-  requires_python: '>=3.10'
-- pypi: https://files.pythonhosted.org/packages/52/a0/c1f604538ff6db22a0690be2dc44ab59178e115f63c917794e529356ab23/h5py-3.16.0-cp311-cp311-manylinux_2_28_x86_64.whl
-  name: h5py
-  version: 3.16.0
-  sha256: fb1720028d99040792bb2fb31facb8da44a6f29df7697e0b84f0d79aff2e9bd3
-  requires_dist:
-  - numpy>=1.21.2
   requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/53/18/a56e2fe47b259bb52201093a3a9d4a32014f9d85071ad07e9d60600890ca/ansicolors-1.1.8-py2.py3-none-any.whl
   name: ansicolors
@@ -32708,20 +32684,6 @@ packages:
   version: 3.2.4
   sha256: b362819d155fff1482575e804e43e3a8825332d32baa15245f4642022664a3f4
   requires_python: '>=3.8'
-- pypi: https://files.pythonhosted.org/packages/b0/42/c84efcc1d4caebafb1ecd8be4643f39c85c47a80fe254d92b8b43b1eadaf/h5py-3.16.0-cp312-cp312-macosx_11_0_arm64.whl
-  name: h5py
-  version: 3.16.0
-  sha256: 42b012933a83e1a558c673176676a10ce2fd3759976a0fedee1e672d1e04fc9d
-  requires_dist:
-  - numpy>=1.21.2
-  requires_python: '>=3.10'
-- pypi: https://files.pythonhosted.org/packages/b0/65/5e088a45d0f43cd814bc5bec521c051d42005a472e804b1a36c48dada09b/h5py-3.16.0-cp313-cp313-macosx_11_0_arm64.whl
-  name: h5py
-  version: 3.16.0
-  sha256: 42108e93326c50c2810025aade9eac9d6827524cdccc7d4b75a546e5ab308edb
-  requires_dist:
-  - numpy>=1.21.2
-  requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/b0/6a/b9fba73eb5e758e40a514919e096a039d27dc0ab4776a6cc977f5153a55f/jaxlib-0.4.38-cp311-cp311-macosx_10_14_x86_64.whl
   name: jaxlib
   version: 0.4.38
