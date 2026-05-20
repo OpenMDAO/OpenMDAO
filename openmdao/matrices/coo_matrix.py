@@ -58,22 +58,23 @@ class COOMatrix(Matrix):
         submats = self._submats
         self._coo_slices = {}
 
-        rows = []
-        cols = []
+        # Pre-allocate the full rows/cols arrays using get_coo_data_size() to avoid
+        # accumulating all per-subjac arrays in memory simultaneously before concatenation.
+        total_nnz = sum(submat.get_coo_data_size() for submat in submats.values())
+        rows = np.empty(total_nnz, dtype=INT_DTYPE)
+        cols = np.empty(total_nnz, dtype=INT_DTYPE)
 
-        # compute the ranges of the subjacs within the COO data/rows/cols arrays
+        # Fill rows/cols one subjac at a time, freeing each temporary array immediately.
         start = end = 0
         for key, submat in submats.items():
             _, r, c = submat.as_coo_info(full=True)
-            end += r.size
-            rows.append(r)
-            cols.append(c)
+            end = start + r.size
+            rows[start:end] = r
+            cols[start:end] = c
             self._coo_slices[key] = slice(start, end)
             start = end
 
-        rows = np.concatenate(rows, dtype=INT_DTYPE)
-        cols = np.concatenate(cols, dtype=INT_DTYPE)
-        data = np.zeros(end, dtype=dtype)
+        data = np.zeros(total_nnz, dtype=dtype)
 
         self._matrix = self._coo = coo_matrix((data, (rows, cols)), shape=(num_rows, num_cols))
 
@@ -125,8 +126,8 @@ class COOMatrix(Matrix):
         """
         if dtype.kind != self.dtype.kind:
             self.dtype = dtype
-            data = self._coo.data if dtype.kind == 'c' else self._coo.data.real
-            self._coo.data = np.ascontiguousarray(data, dtype=dtype)
+            data = self._matrix.data if dtype.kind == 'c' else self._matrix.data.real
+            self._matrix.data = np.ascontiguousarray(data, dtype=dtype)
             self._matrix_T = None
 
     def _update_from_submat(self, subjac, randgen):
