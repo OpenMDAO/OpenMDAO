@@ -133,8 +133,25 @@ def _default_prob_name():
 class _FunctionalCallback(object):
 
     def __init__(self, prob, form, input_vars, output_vars,
-                 # driver_scaling,
                  ):
+        """
+        Initialize a _FunctionalCallback.
+
+        Parameters
+        ----------
+        prob : Problem
+            The Problem instance to wrap.
+        form : str
+            The form of the callback. Must be one of ``'f'``, ``'dfdx'``, or ``'fdfdx'``.
+        input_vars : list of str or list of dict or None
+            Variables to treat as inputs. See :meth:`Problem.get_callback` for the accepted
+            format. Required when ``form='f'``; may be ``None`` for derivative forms to
+            fall back to the driver's design variables.
+        output_vars : list of str or list of dict or None
+            Variables to treat as outputs. See :meth:`Problem.get_callback` for the accepted
+            format. Required when ``form='f'``; may be ``None`` for derivative forms to
+            fall back to the driver's responses.
+        """
         self._problem = prob
 
         valid_forms = ("f", "dfdx", "fdfdx")
@@ -177,54 +194,44 @@ class _FunctionalCallback(object):
                 # Extract just the names and indices to pass to `_TotalJacInfo` constructor.
                 input_var_names = []
                 input_var_indices = []
-                # input_var_indices_are_flat = []
                 for entry in input_vars:
                     if isinstance(entry, str):
                         input_var_names.append(entry)
                         input_var_indices.append(None)
-                        # input_var_indices_are_flat.append(False)
                     elif isinstance(entry, Mapping):
                         for k, meta in entry.items():
                             input_var_names.append(k)
                             input_var_indices.append(meta.get("indices", None))
-                            # input_var_indices_are_flat.append(meta.get("flat_indices", False))
                     else:
                         raise ValueError((f"{self.msginfo}: invalid entry {entry} in "
                                            "input_vars argument"))
             else:
                 input_var_names = None
                 input_var_indices = None
-                # input_var_indices_are_flat = None
 
             if output_vars:
                 # Extract just the names and indices to pass to `_TotalJacInfo` constructor.
                 output_var_names = []
                 output_var_indices = []
-                # output_var_indices_are_flat = []
                 for entry in output_vars:
                     if isinstance(entry, str):
                         output_var_names.append(entry)
                         output_var_indices.append(None)
-                        # output_var_indices_are_flat.append(False)
                     elif isinstance(entry, Mapping):
                         for k, meta in entry.items():
                             output_var_names.append(k)
                             output_var_indices.append(meta.get("indices", None))
-                            # output_var_indices_are_flat.append(meta.get("flat_indices", False))
                     else:
                         raise ValueError((f"{self.msginfo}: invalid entry {entry} in "
                                            "output_vars argument"))
             else:
                 output_var_names = None
                 output_var_indices = None
-                # output_var_indices_are_flat = None
 
             tji = _TotalJacInfo(self.problem, output_var_names, input_var_names,
                                 of_indices=output_var_indices, wrt_indices=input_var_indices,
                                 return_format='flat_dict',
                                 driver_scaling=False,
-                                # of_indices_are_flat=output_var_indices_are_flat,
-                                # wrt_indices_are_flat=input_var_indices_are_flat,
                                 do_special_functional_api_thing=True,
                                 always_include_linear=True,
                                 )
@@ -333,6 +340,38 @@ class _FunctionalCallback(object):
             J[offset_out0:offset_out1, offset_in0:offset_in1] = val
 
     def __call__(self, x, y=None, J=None):
+        """
+        Evaluate the model and return outputs and/or total derivatives.
+
+        Sets the input variables from ``x``, calls ``Problem.run_model()``, and
+        then reads back the requested outputs and/or computes total derivatives,
+        depending on the ``form`` this callback was created with.
+
+        Parameters
+        ----------
+        x : numpy.ndarray
+            Flat 1-D input vector.  Must have length equal to the total size of
+            all input variables (use :meth:`create_input_vector` to create a
+            correctly-sized array pre-populated with the current problem values).
+        y : numpy.ndarray or None, optional
+            Pre-allocated flat 1-D output vector of length equal to the total
+            size of all output variables.  If ``None`` a new array is allocated.
+            Only used when ``form`` is ``'f'`` or ``'fdfdx'``.
+        J : numpy.ndarray or None, optional
+            Pre-allocated Jacobian matrix of shape ``(n_outputs, n_inputs)``.
+            If ``None`` a new array is allocated.  Only used when ``form`` is
+            ``'dfdx'`` or ``'fdfdx'``.
+
+        Returns
+        -------
+        numpy.ndarray
+            When ``form='f'``: the flat output vector ``y``.
+        numpy.ndarray
+            When ``form='dfdx'``: the Jacobian matrix ``J`` of shape
+            ``(n_outputs, n_inputs)``.
+        tuple of numpy.ndarray
+            When ``form='fdfdx'``: the tuple ``(y, J)``.
+        """
         problem = self.problem
 
         if len(x) != self._input_len:
@@ -378,6 +417,27 @@ class _FunctionalCallback(object):
             return y, J
 
     def get_input_val(self, name):
+        """
+        Return the current value of an input variable as a flat 1-D array.
+
+        Parameters
+        ----------
+        name : str
+            Name (or alias) of the input variable, as it was registered in
+            ``input_vars``.
+
+        Returns
+        -------
+        numpy.ndarray
+            Current value of the variable, flattened to 1-D.  If ``indices``
+            were specified for this variable, only the selected elements are
+            returned.
+
+        Raises
+        ------
+        ValueError
+            If ``name`` is not among the registered input variables.
+        """
         try:
             vmetadata = self._input_metadata[name]
         except KeyError:
@@ -391,6 +451,27 @@ class _FunctionalCallback(object):
         return val
 
     def get_output_val(self, name):
+        """
+        Return the current value of an output variable as a flat 1-D array.
+
+        Parameters
+        ----------
+        name : str
+            Name (or alias) of the output variable, as it was registered in
+            ``output_vars``.
+
+        Returns
+        -------
+        numpy.ndarray
+            Current value of the variable, flattened to 1-D.  If ``indices``
+            were specified for this variable, only the selected elements are
+            returned.
+
+        Raises
+        ------
+        ValueError
+            If ``name`` is not among the registered output variables.
+        """
         try:
             vmetadata = self._output_metadata[name]
         except KeyError:
@@ -405,6 +486,14 @@ class _FunctionalCallback(object):
 
     @property
     def form(self):
+        """
+        Return the form of this callback.
+
+        Returns
+        -------
+        str
+            One of ``'f'``, ``'dfdx'``, or ``'fdfdx'``.
+        """
         return self._form
 
     @property
@@ -446,26 +535,65 @@ class _FunctionalCallback(object):
     @property
     def problem(self):
         """
-        Return `Problem` associated with the callback.
+        Return the Problem associated with this callback.
 
         Returns
         -------
-        str
-            Info to prepend to messages.
+        Problem
+            The Problem instance that was passed to the constructor.
         """
         return self._problem
 
     def create_input_vector(self):
+        """
+        Create a flat input vector pre-populated with the current problem values.
+
+        Allocates a zero-filled 1-D array of the correct length and copies the
+        current values of all registered input variables into it.  The returned
+        array can be modified in-place and then passed directly to ``__call__``.
+
+        Returns
+        -------
+        numpy.ndarray
+            Flat 1-D array of length equal to the total size of all input variables,
+            initialised with the current problem values.
+        """
         x0 = np.zeros(self._input_len)
         self._problem_to_vector(x0, self._input_metadata)
         return x0
 
     def create_output_vector(self):
+        """
+        Create a flat output vector pre-populated with the current problem values.
+
+        Allocates a zero-filled 1-D array of the correct length and copies the
+        current values of all registered output variables into it.  The returned
+        array can be passed as the ``y`` argument to ``__call__`` to avoid
+        allocating a new array on each call.
+
+        Returns
+        -------
+        numpy.ndarray
+            Flat 1-D array of length equal to the total size of all output variables,
+            initialised with the current problem values.
+        """
         y0 = np.zeros(self._output_len)
         self._problem_to_vector(y0, self._output_metadata)
         return y0
 
     def create_jacobian_matrix(self):
+        """
+        Create a zero-filled Jacobian matrix of the correct shape.
+
+        Allocates a 2-D array of zeros with shape ``(n_outputs, n_inputs)``.
+        The returned array can be passed as the ``J`` argument to ``__call__``
+        to avoid allocating a new matrix on each call.
+
+        Returns
+        -------
+        numpy.ndarray
+            Zero-filled 2-D array of shape ``(n_outputs, n_inputs)``.
+        """
         J0 = np.zeros((self._output_len, self._input_len))
         return J0
 
@@ -2775,12 +2903,102 @@ class Problem(object, metaclass=ProblemMetaclass):
         """
         return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
 
-    def get_callback(self, form, input_vars=None, output_vars=None,
-                     # driver_scaling=False,
-                     ):
-        return _FunctionalCallback(self, form, input_vars, output_vars,
-                                   # driver_scaling,
-                                   )
+    def get_callback(self, form, input_vars=None, output_vars=None):
+        """
+        Return a callable that wraps this Problem for use as a functional interface.
+
+        The returned callable accepts a flat input vector ``x``, runs the model, and
+        returns outputs and/or total derivatives depending on the requested ``form``.
+
+        Currently specifying units for an input or output variable is not
+        supported: a warning will be issued if units are specified for an input
+        or output variable.
+
+        Parameters
+        ----------
+        form : str
+            Determines what the callable computes and returns. Must be one of:
+
+            ``'f'``
+                Evaluate outputs only.  The callable signature is ``f(x[, y]) -> y``,
+                where ``x`` is the flat input vector and ``y`` is the flat output vector.
+                Both ``input_vars`` and ``output_vars`` must be provided when using this
+                form.
+            ``'dfdx'``
+                Evaluate total derivatives only.  The callable signature is
+                ``f(x[, J]) -> J``, where ``J`` is the Jacobian matrix
+                ``(n_outputs, n_inputs)``.
+            ``'fdfdx'``
+                Evaluate outputs and total derivatives together.  The callable signature
+                is ``f(x[, y[, J]]) -> (y, J)``.
+
+        input_vars : list of str or list of dict, optional
+            Variables to treat as inputs (i.e. the components of ``x``).  Each entry
+            may be either a plain variable name string or a dict mapping an alias to a
+            metadata dict with optional keys ``'name'``, ``'units'``, and ``'indices'``.
+            When ``form`` is ``'dfdx'`` or ``'fdfdx'`` and this argument is omitted,
+            the design variables registered on the driver are used.  When ``form`` is
+            ``'f'``, this argument is required.
+        output_vars : list of str or list of dict, optional
+            Variables to treat as outputs (i.e. the components of ``y`` / rows of
+            ``J``).  The same format as ``input_vars`` applies.  When ``form`` is
+            ``'dfdx'`` or ``'fdfdx'`` and this argument is omitted, the responses
+            registered on the driver are used.  When ``form`` is ``'f'``, this argument
+            is required.
+
+        Returns
+        -------
+        _FunctionalCallback
+            A callable object whose ``__call__`` method maps a flat NumPy input vector
+            to the requested outputs and/or Jacobian.
+
+        Examples
+        --------
+        Set up a simple problem with a Paraboloid component and design variables ``x``
+        and ``y``::
+
+            import openmdao.api as om
+            from openmdao.test_suite.components.paraboloid import Paraboloid
+
+            prob = om.Problem()
+            prob.model.add_subsystem('comp', Paraboloid(),
+                                     promotes_inputs=['x', 'y'],
+                                     promotes_outputs=['f_xy'])
+            prob.model.add_design_var('x', lower=-50, upper=50)
+            prob.model.add_design_var('y', lower=-50, upper=50)
+            prob.model.add_objective('f_xy')
+            prob.setup()
+            prob.final_setup()
+
+        Evaluate outputs only (``form='f'``).  Both ``input_vars`` and ``output_vars``
+        must be supplied::
+
+            f = prob.get_callback('f', input_vars=['x', 'y'], output_vars=['f_xy'])
+            x = f.create_input_vector()
+            x[0] = 3.0   # x
+            x[1] = -4.0  # y
+            y = f(x)     # returns a 1-D array containing f_xy
+
+        Evaluate total derivatives only (``form='dfdx'``).  When ``input_vars`` and
+        ``output_vars`` are omitted the driver's design variables and responses are
+        used automatically::
+
+            dfdx = prob.get_callback('dfdx')
+            x = dfdx.create_input_vector()
+            x[0] = 3.0
+            x[1] = -4.0
+            J = dfdx(x)   # shape (n_outputs, n_inputs)
+
+        Evaluate outputs and total derivatives together (``form='fdfdx'``)::
+
+            fdfdx = prob.get_callback('fdfdx', input_vars=['x', 'y'],
+                                      output_vars=['f_xy'])
+            x = fdfdx.create_input_vector()
+            x[0] = 3.0
+            x[1] = -4.0
+            y, J = fdfdx(x)
+        """
+        return _FunctionalCallback(self, form, input_vars, output_vars)
 
     def get_coloring_dir(self, mode, mkdir=False):
         """
