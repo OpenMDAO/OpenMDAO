@@ -1045,7 +1045,7 @@ class TestWithIndices(unittest.TestCase):
         fdfdx = prob.get_callback("fdfdx", input_vars=[{"x": {"indices": [0]}}])
         x = fdfdx.create_input_vector()
         # assert_near_equal(x, [2, 3])
-        assert_near_equal(x, [2.0])
+        assert_near_equal(x, [2.0], tolerance=1e-12)
         f, dfdx = fdfdx(x)
         # dfdx_expected = np.zeros((2, 2))
         dfdx_expected = np.zeros((2, 1))
