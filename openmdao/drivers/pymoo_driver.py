@@ -468,7 +468,7 @@ class pymooProblem(problem):
             for name, indices in zip(self.x_info['vars'], self.x_info['indices']):
                 vals = np.array([x[f'{name}__{i}'] for i in range(len(indices))])
                 if name in driver._designvars_discrete:
-                    driver.set_design_var(name, vals)
+                    driver._set_design_var(name, vals)
                 else:
                     dv_vec[name] = vals
                     continuous_names.append(name)
@@ -982,7 +982,7 @@ class pymooDriver(Driver):
                         for name, indices in zip(x_info['vars'], x_info['indices']):
                             vals = np.array([x_opt[f'{name}__{i}'] for i in range(len(indices))])
                             if name in self._designvars_discrete:
-                                self.set_design_var(name, vals)
+                                self._set_design_var(name, vals)
                             else:
                                 dv_vec[name] = vals
                                 continuous_names.append(name)
