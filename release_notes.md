@@ -1,4 +1,54 @@
 ***********************************
+# Release Notes for OpenMDAO 3.44.0
+
+May 29, 2026
+
+OpenMDAO 3.44.0 introduces several powerful new options for optimization drivers, nonlinear solvers, and environment security.
+
+### Driver Enhancements
+* `pymooDriver` integrates the [pymoo](https://pymoo.org/) suite of multi-objective optimization algorithms into OpenMDAO. This provides significantly more capable gradient-free optimization implementations than the existing `SimpleGADriver` or `DifferentialEvolutionDriver` components.
+* `modoptDriver` adds support for [modopt](https://github.com/LSDOlab/modopt), enabling modular usage of various gradient-based optimization algorithms.
+
+### Advanced Scaling Architecture
+The scaling of design variables, objectives, and constraints is now managed centrally by an `Autoscaler`. By default, the autoscaler maintains backward compatibility with OpenMDAO's existing scaling behavior using `scaler/adder` or `ref0/ref`. 
+
+However, while the legacy scaling was strictly limited to **element-wise (diagonal matrix) scaling**, the new architecture grants access to entire design variables, constraints, and objectives as contiguous vectors. This enables **generalized linear scaling**, allowing for more advanced autoscaling techniques.
+
+### New Solvers
+This version introduces the `BrentSolver` nonlinear solver. Brent's method provides a highly reliable, *univariate* solver capability that guarantees convergence, provided the state variable has lower and upper bounds that properly bracket the root.
+
+### Environment & Security
+On the environment management side, our Pixi configuration now enforces a dependency cooldown period. When resolving environment dependencies, Pixi will restrict package installation to versions that are at least 14 days old. This is a proactive measure to mitigate the risk of zero-day supply chain attacks.
+
+---
+
+## New Features
+
+- OpenMDAO now issues a warning if a constraint is added without specifying a lower, upper, or equals bound. [#3740](https://github.com/OpenMDAO/OpenMDAO/pull/3740)
+- Implemented `pymooDriver`. [#3749](https://github.com/OpenMDAO/OpenMDAO/pull/3749)
+- Added `BrentSolver` to the available nonlinear solvers. [#3748](https://github.com/OpenMDAO/OpenMDAO/pull/3748)
+- Introduced the `Autoscaler` framework. [#3719](https://github.com/OpenMDAO/OpenMDAO/pull/3719)
+- Added `modoptDriver`. [#3724](https://github.com/OpenMDAO/OpenMDAO/pull/3724)
+
+## Bug Fixes
+
+- Fixed a bug involving the handling of variable names containing brackets in real-time plots. [#3733](https://github.com/OpenMDAO/OpenMDAO/pull/3733)
+- Fixed an issue where the `rel_element` calculation step failed to behave correctly in the presence of multiple inputs. [#3741](https://github.com/OpenMDAO/OpenMDAO/pull/3741)
+- Fixed a bug preventing the N2 diagram from fully executing Phase II of setup. [#3745](https://github.com/OpenMDAO/OpenMDAO/pull/3745)
+- Updated `System._call_user_function` to properly handle `OutOfBoundsError`. [#3751](https://github.com/OpenMDAO/OpenMDAO/pull/3751)
+- Resolved an MPI hang occurring during autoscaler setup. [#3755](https://github.com/OpenMDAO/OpenMDAO/pull/3755)
+- Fixed a bug in unit scaling logic when scaling was separately applied to responses. [#3756](https://github.com/OpenMDAO/OpenMDAO/pull/3756)
+- Fixed a path resolution issue in the `setup_openmdao_pixi` GitHub Action. [#3763](https://github.com/OpenMDAO/OpenMDAO/pull/3763)
+
+## Miscellaneous
+
+- Updated GitHub Actions for automatic Pixi lockfile updates and improved testing of the PyPI release. [#3731](https://github.com/OpenMDAO/OpenMDAO/pull/3731)
+- Added documentation demonstrating how to use CSDL (Computational System Design Language) alongside OpenMDAO. [#3707](https://github.com/OpenMDAO/OpenMDAO/pull/3707)
+- Added a dedicated automated workflow for lockfile updates. [#3758](https://github.com/OpenMDAO/OpenMDAO/pull/3758)
+- Updated `pixi.lock` and resolved bugs within the lockfile update workflow. [#3762](https://github.com/OpenMDAO/OpenMDAO/pull/3762)
+- Renamed `Driver.set_design_var` to its private counterpart `Driver._set_design_var`. [#3753](https://github.com/OpenMDAO/OpenMDAO/pull/3753)
+
+***********************************
 # Release Notes for OpenMDAO 3.43.0
 
 March 11, 2026
