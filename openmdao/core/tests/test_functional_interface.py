@@ -1144,5 +1144,78 @@ class TestWithIndices(unittest.TestCase):
         assert_near_equal(dfdx, dfdx_expected, tolerance=1e-12)
 
 
+class UnitsComp(om.ExplicitComponent):
+    """A simple component with units: f(x) = 2*x, where x is in metres and f is in Newtons."""
+
+    def setup(self):
+        self.add_input('x', val=1.0, units='m')
+        self.add_output('f', val=0.0, units='N')
+
+    def setup_partials(self):
+        self.declare_partials('f', 'x')
+
+    def compute(self, inputs, outputs):
+        outputs['f'] = 2.0 * inputs['x']
+
+    def compute_partials(self, inputs, partials):
+        partials['f', 'x'] = 2.0
+
+
+@use_tempdirs
+class TestUnits(unittest.TestCase):
+    """Tests that the functional API correctly applies unit conversions to the Jacobian."""
+
+    def setUp(self):
+        prob = self._prob = om.Problem()
+        prob.model.add_subsystem('comp', UnitsComp(), promotes=['*'])
+
+        prob.driver = om.ScipyOptimizeDriver()
+        prob.model.add_design_var('x', lower=0.0, upper=10.0)
+        prob.model.add_objective('f')
+
+        prob.setup(force_alloc_complex=True)
+        prob.final_setup()
+        prob.set_val('x', 3.0, units='m')
+        prob.run_model()
+
+    def test_dfdx_no_units(self):
+        # With no unit conversion the Jacobian entry should be the native df/dx = 2 N/m.
+        prob = self._prob
+        dfdx = prob.get_callback('dfdx', input_vars=['x'], output_vars=['f'])
+        x = dfdx.create_input_vector()
+        J = dfdx(x)
+        assert_near_equal(J[0, 0], 2.0, tolerance=1e-12)
+
+    def test_dfdx_output_units(self):
+        # Requesting f in kN means the output is scaled by 1/1000.
+        # So d(f_kN)/d(x_m) = 2 N/m * (1 kN / 1000 N) = 0.002 kN/m.
+        prob = self._prob
+        dfdx = prob.get_callback('dfdx', input_vars=['x'],
+                                 output_vars=[{'f': {'units': 'kN'}}])
+        x = dfdx.create_input_vector()
+        J = dfdx(x)
+        assert_near_equal(J[0, 0], 2.0 / 1000.0, tolerance=1e-12)
+
+    def test_dfdx_input_units(self):
+        # Requesting x in km means the input is scaled by 1000 m/km.
+        # So d(f_N)/d(x_km) = 2 N/m * 1000 m/km = 2000 N/km.
+        prob = self._prob
+        dfdx = prob.get_callback('dfdx', input_vars=[{'x': {'units': 'km'}}],
+                                 output_vars=['f'])
+        x = dfdx.create_input_vector()
+        J = dfdx(x)
+        assert_near_equal(J[0, 0], 2.0 * 1000.0, tolerance=1e-12)
+
+    def test_dfdx_both_units(self):
+        # Requesting x in km and f in kN.
+        # d(f_kN)/d(x_km) = 2 N/m * (1 kN/1000 N) * (1000 m/km) = 2 kN/km.
+        prob = self._prob
+        dfdx = prob.get_callback('dfdx', input_vars=[{'x': {'units': 'km'}}],
+                                 output_vars=[{'f': {'units': 'kN'}}])
+        x = dfdx.create_input_vector()
+        J = dfdx(x)
+        assert_near_equal(J[0, 0], 2.0, tolerance=1e-12)
+
+
 if __name__ == "__main__":
     unittest.main()

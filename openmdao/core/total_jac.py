@@ -19,6 +19,7 @@ import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.relevance import get_relevance
 from openmdao.utils.array_utils import get_random_arr
 from openmdao.utils.general_utils import _unwrap_comm
+from openmdao.utils.units import unit_conversion
 
 
 _directional_rng = np.random.default_rng(99)
@@ -91,6 +92,7 @@ class _TotalJacInfo(object):
                  debug_print=False, driver_scaling=True, get_remote=True, directional=False,
                  coloring_info=None, driver=None, of_indices=None, wrt_indices=None,
                  do_special_functional_api_thing=False, always_include_linear=False,
+                 of_units=None, wrt_units=None,
                  ):
         """
         Initialize object.
@@ -137,6 +139,16 @@ class _TotalJacInfo(object):
             If True and `of` is None, include linear constraints in the set of response variables
             in addition to the nonlinear responses provided by the driver.  Has no effect when
             `of` is not None.  Defaults to False.
+        of_units : dict or None
+            Optional mapping of response variable name to desired units string.  When provided,
+            the corresponding Jacobian rows are scaled so that the derivatives are expressed in
+            those units rather than the variable's native units.  Only used when
+            ``do_special_functional_api_thing`` is True.
+        wrt_units : dict or None
+            Optional mapping of design variable name to desired units string.  When provided,
+            the corresponding Jacobian columns are scaled so that the derivatives are expressed
+            with respect to those units rather than the variable's native units.  Only used when
+            ``do_special_functional_api_thing`` is True.
         """
         self._driver = driver = problem.driver if driver is None else driver
         self.model = model = problem.model
@@ -445,6 +457,56 @@ class _TotalJacInfo(object):
         # Store which VOIs require unit scaling if we're computing an optimization jacobian.
         if not has_custom_derivs:
             self._identify_unit_active_vars()
+
+        # Apply explicit unit conversions requested by the functional API.
+        if of_units or wrt_units:
+            self._apply_functional_api_unit_scalers(of_metadata, wrt_metadata,
+                                                    of_units, wrt_units)
+
+    def _apply_functional_api_unit_scalers(self, of_metadata, wrt_metadata, of_units, wrt_units):
+        """
+        Populate unit scalers for the functional API based on caller-supplied units.
+
+        Parameters
+        ----------
+        of_metadata : dict
+            Response metadata dict keyed by variable name/alias.
+        wrt_metadata : dict
+            Design-variable metadata dict keyed by variable name/alias.
+        of_units : dict or None
+            Mapping of response variable name to desired units string, or None.
+        wrt_units : dict or None
+            Mapping of design variable name to desired units string, or None.
+        """
+        abs2meta = self.model._var_allprocs_abs2meta['output']
+
+        if of_units:
+            for vname, requested_units in of_units.items():
+                if requested_units is None:
+                    continue
+                if vname not in of_metadata:
+                    continue
+                src = of_metadata[vname]['source']
+                native_units = abs2meta[src]['units']
+                if native_units == requested_units:
+                    continue
+                scaler, _ = unit_conversion(native_units, requested_units)
+                if scaler != 1.0:
+                    self._resp_unit_scalers[vname] = scaler
+
+        if wrt_units:
+            for vname, requested_units in wrt_units.items():
+                if requested_units is None:
+                    continue
+                if vname not in wrt_metadata:
+                    continue
+                src = wrt_metadata[vname]['source']
+                native_units = abs2meta[src]['units']
+                if native_units == requested_units:
+                    continue
+                scaler, _ = unit_conversion(native_units, requested_units)
+                if scaler != 1.0:
+                    self._desvar_unit_scalers[vname] = scaler
 
     def _check_discrete_dependence(self):
         model = self.model

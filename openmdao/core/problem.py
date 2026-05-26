@@ -164,17 +164,6 @@ class _FunctionalCallback(object):
          self._output_metadata) = self._process_vars(input_vars, output_vars,
                                                      # driver_scaling,
                                                      )
-        self._maybe_warn_about_units(self._input_metadata)
-        self._maybe_warn_about_units(self._output_metadata)
-
-    def _maybe_warn_about_units(self, meta_data):
-        if self.form != "f":
-            for vname, vdata in meta_data.items():
-                units = vdata["units"]
-                if units is not None:
-                    issue_warning("functional API does not support units properly when "
-                                  f"calculating total derivatives (var {vname} requested with "
-                                  f"units {units})")
 
     def _process_vars(self, input_vars, output_vars,
                       # driver_scaling,
@@ -191,9 +180,10 @@ class _FunctionalCallback(object):
             tji = None
         else:
             if input_vars:
-                # Extract just the names and indices to pass to `_TotalJacInfo` constructor.
+                # Extract just the names, indices, and units to pass to `_TotalJacInfo` constructor.
                 input_var_names = []
                 input_var_indices = []
+                input_var_units = {}
                 for entry in input_vars:
                     if isinstance(entry, str):
                         input_var_names.append(entry)
@@ -202,17 +192,22 @@ class _FunctionalCallback(object):
                         for k, meta in entry.items():
                             input_var_names.append(k)
                             input_var_indices.append(meta.get("indices", None))
+                            u = meta.get("units", None)
+                            if u is not None:
+                                input_var_units[k] = u
                     else:
                         raise ValueError((f"{self.msginfo}: invalid entry {entry} in "
                                            "input_vars argument"))
             else:
                 input_var_names = None
                 input_var_indices = None
+                input_var_units = {}
 
             if output_vars:
-                # Extract just the names and indices to pass to `_TotalJacInfo` constructor.
+                # Extract just the names, indices, and units to pass to `_TotalJacInfo` constructor.
                 output_var_names = []
                 output_var_indices = []
+                output_var_units = {}
                 for entry in output_vars:
                     if isinstance(entry, str):
                         output_var_names.append(entry)
@@ -221,12 +216,16 @@ class _FunctionalCallback(object):
                         for k, meta in entry.items():
                             output_var_names.append(k)
                             output_var_indices.append(meta.get("indices", None))
+                            u = meta.get("units", None)
+                            if u is not None:
+                                output_var_units[k] = u
                     else:
                         raise ValueError((f"{self.msginfo}: invalid entry {entry} in "
                                            "output_vars argument"))
             else:
                 output_var_names = None
                 output_var_indices = None
+                output_var_units = {}
 
             tji = _TotalJacInfo(self.problem, output_var_names, input_var_names,
                                 of_indices=output_var_indices, wrt_indices=input_var_indices,
@@ -234,6 +233,8 @@ class _FunctionalCallback(object):
                                 driver_scaling=False,
                                 do_special_functional_api_thing=True,
                                 always_include_linear=True,
+                                of_units=output_var_units or None,
+                                wrt_units=input_var_units or None,
                                 )
 
             if not input_vars:
