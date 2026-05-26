@@ -47,7 +47,7 @@ parts:
     - file: theory_manual/mpi
   - file: features/features
     sections:
-    - file: features/core_features/main.md
+    - file: features/core_features/main
     - file: features/building_blocks/building_blocks
       sections:
       - file: features/building_blocks/components/components
@@ -58,8 +58,8 @@ parts:
       - file: features/building_blocks/surrogates/index
       - file: features/building_blocks/func_api
       - file: features/building_blocks/jax_subpackage/jax_subpackage
-    - file: features/recording/main.md
-    - file: features/model_visualization/main.md
+    - file: features/recording/main
+    - file: features/model_visualization/main
     - file: features/debugging/debugging
       sections:
       - file: features/debugging/mpi_debugging
@@ -72,7 +72,20 @@ parts:
       - file: features/debugging/profiling/index
     - file: features/warning_control/warnings
     - file: features/units
-    - file: features/experimental/main.md
+    - file: features/experimental/main
+      sections:
+      - file: features/experimental/dyn_shapes
+      - file: features/experimental/approx_coloring
+      - file: features/experimental/plugins
+      - file: features/experimental/pre_opt_post
+      - file: features/experimental/auto_order
+      - file: features/experimental/jax_partial_derivs
+      - file: features/experimental/jax_explicitcomp_api
+      - file: features/experimental/jax_implicitcomp_api
+      - file: features/experimental/julia_explicit_ad
+      - file: features/experimental/csdl_components
+      - file: features/experimental/dyn_units
+      - file: features/experimental/functional_interface
   - file: examples/examples
     sections:
     - file: examples/tldr_paraboloid
@@ -88,7 +101,7 @@ parts:
   chapters:
   - file: other_useful_docs/om_command
   - file: other/citing
-  - file: other_useful_docs/building_a_tool/building_a_tool.md
+  - file: other_useful_docs/building_a_tool/building_a_tool
     sections:
     - file: other_useful_docs/building_a_tool/repository_structure
     - file: other_useful_docs/building_a_tool/release_process
