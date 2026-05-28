@@ -50,3 +50,28 @@ class TestDenseNNComp(unittest.TestCase):
             atol=1.0e-8,
             rtol=1.0e-8,
         )
+    def test_dense_nn_comp_vectorization(self):
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem(
+            "NeuralNetwork",
+            om.DenseNNComp(
+                weights_file="mazur_nn_weights.npz",
+                vec_size=3,
+            ),
+            promotes_inputs=['x'],
+            promotes_outputs=['y']
+        )
+
+        prob.setup(force_alloc_complex=True)
+
+        prob.set_val("x", [[0.05, 0.10],[0.6,0.09],[0.7,1.1]])
+
+        prob.run_model()
+
+        assert_near_equal(
+            prob.get_val("y"),
+            [[1.10590597, 1.2249214 ],[1.12796826, 1.25210053],[1.18077546, 1.31719914]],
+            tolerance=1.0e-8,
+        )
