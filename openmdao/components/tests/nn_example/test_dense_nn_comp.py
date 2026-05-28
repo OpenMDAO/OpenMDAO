@@ -1,9 +1,17 @@
 import unittest
+import numpy as np
 
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal, assert_check_partials
 from openmdao.utils.testing_utils import force_check_partials
 
+import os
+TEST_DIR = os.path.dirname(__file__)
+
+weights_path = os.path.join(
+    TEST_DIR,
+    "mazur_nn_weights.npz",
+)
 
 class TestDenseNNComp(unittest.TestCase):
 
@@ -14,7 +22,7 @@ class TestDenseNNComp(unittest.TestCase):
         prob.model.add_subsystem(
             "NeuralNetwork",
             om.DenseNNComp(
-                weights_file="mazur_nn_weights.npz",
+                weights_file=weights_path,
             ),
             promotes_inputs=['x'],
             promotes_outputs=['y']
@@ -57,14 +65,14 @@ class TestDenseNNComp(unittest.TestCase):
         prob.model.add_subsystem(
             "NeuralNetwork",
             om.DenseNNComp(
-                weights_file="mazur_nn_weights.npz",
+                weights_file=weights_path,
                 vec_size=3,
             ),
             promotes_inputs=['x'],
             promotes_outputs=['y']
         )
 
-        prob.setup(force_alloc_complex=True)
+        prob.setup()
 
         prob.set_val("x", [[0.05, 0.10],[0.6,0.09],[0.7,1.1]])
 
@@ -75,3 +83,6 @@ class TestDenseNNComp(unittest.TestCase):
             [[1.10590597, 1.2249214 ],[1.12796826, 1.25210053],[1.18077546, 1.31719914]],
             tolerance=1.0e-8,
         )
+
+if __name__ == "__main__":
+    unittest.main()
