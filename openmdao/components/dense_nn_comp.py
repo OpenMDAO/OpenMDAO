@@ -1,7 +1,8 @@
 from numpy import load
 import jax.numpy as jnp
 import openmdao.api as om
-
+import jax
+    
 class DenseNNComp(om.JaxExplicitComponent):
     '''
     Fixed-weight dense neural network implemented as an OpenMDAO
@@ -40,7 +41,7 @@ class DenseNNComp(om.JaxExplicitComponent):
 
     The component supports both:
         - single-point evaluations
-        - vectorized evaluations for uncertainty quantification
+        - vectorized evaluations with vmap for uncertainty quantification
 
     Vectorized mode is controlled using vec_size > 1.
 
@@ -138,20 +139,24 @@ class DenseNNComp(om.JaxExplicitComponent):
 
         else:
             return jnp.tanh(z)
-
-    def compute_primal(self, x):
+    
+    def _evaluate_single(self, x):
         z = x
 
-        # Hidden layers
         for W, b in zip(self._weights[:-1], self._biases[:-1]):
-            # Apply the same user specified activation function to each layer
             z = self._activate(jnp.dot(z, W) + b)
 
-        # Output layer
         y = jnp.dot(z, self._weights[-1]) + self._biases[-1]
 
         if self.options["output_activation"] is not None:
-            # Apply the same user specified output function to the output layer
             y = self._activate(y)
+
+        return y
+
+    def compute_primal(self, x):
+        if self.options["vec_size"] == 1:
+            y = self._evaluate_single(x)
+        else:
+            y = jax.vmap(self._evaluate_single)(x)
 
         return (y,)
