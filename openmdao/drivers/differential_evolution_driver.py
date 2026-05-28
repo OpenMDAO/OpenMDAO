@@ -24,6 +24,7 @@ from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.concurrent_utils import concurrent_eval
 from openmdao.utils.mpi import MPI
 from openmdao.core.analysis_error import AnalysisError
+from openmdao.utils.om_warnings import warn_deprecation
 
 
 class DifferentialEvolutionDriver(Driver):
@@ -96,6 +97,9 @@ class DifferentialEvolutionDriver(Driver):
         # Support for Parallel models.
         self._concurrent_pop_size = 0
         self._concurrent_color = 0
+
+        warn_deprecation('The `DifferentialEvolutionDriver` is deprecated. Please use '
+                        '`pymooDriver` for population based optimizations.')
 
     def _declare_options(self):
         """
@@ -303,7 +307,7 @@ class DifferentialEvolutionDriver(Driver):
         for name in desvars:
             i, j = self._desvar_idx[name]
             val = desvar_new[i:j]
-            self.set_design_var(name, val)
+            self._set_design_var(name, val)
 
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             self._run_solve_nonlinear()
@@ -407,7 +411,7 @@ class DifferentialEvolutionDriver(Driver):
 
         for name in self._designvars:
             i, j = self._desvar_idx[name]
-            self.set_design_var(name, x[i:j])
+            self._set_design_var(name, x[i:j])
 
         # a very large number, but smaller than the result of nan_to_num in Numpy
         almost_inf = INF_BOUND

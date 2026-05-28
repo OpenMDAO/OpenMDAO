@@ -42,7 +42,7 @@ def ks_max(x, rho=100.0):
     Returns
     -------
     float
-        A conservative approximation to the minimum value in x.
+        A conservative approximation to the maximum value in x.
     """
     x = jnp.asarray(x)
     x_max = jnp.max(x)

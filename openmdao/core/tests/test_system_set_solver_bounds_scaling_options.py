@@ -616,6 +616,7 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.final_setup()
         constraints_using_set_constraint_options = prob.model.get_constraints()
 
+        self.maxDiff=None
         self.assertEqual(constraints_using_add_constraint, constraints_using_set_constraint_options)
 
         # Now do the same using scaler and adder
@@ -664,6 +665,17 @@ class TestSystemSetConstraintsOptions(unittest.TestCase):
         prob.setup()
         prob.final_setup()
         constraints_using_set_constraint_options = prob.model.get_constraints()
+
+        # Total adder/scaler should be the same, but these options will differ.
+        constraints_using_add_constraint['con1'].pop('ref0')
+        constraints_using_add_constraint['con1'].pop('ref')
+        constraints_using_add_constraint['con1'].pop('adder')
+        constraints_using_add_constraint['con1'].pop('scaler')
+    
+        constraints_using_set_constraint_options['con1'].pop('ref0')
+        constraints_using_set_constraint_options['con1'].pop('ref')
+        constraints_using_set_constraint_options['con1'].pop('adder')
+        constraints_using_set_constraint_options['con1'].pop('scaler')
 
         assert_near_equal(constraints_using_add_constraint,
                           constraints_using_set_constraint_options)

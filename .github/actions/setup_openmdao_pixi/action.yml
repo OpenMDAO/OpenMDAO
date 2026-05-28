@@ -51,11 +51,11 @@ runs:
               -o "${WORKSPACE}/.openmdao-pixi/pixi.lock"
           fi
 
-          echo "PIXI_MANIFEST=${{ github.workspace }}/.openmdao-pixi/pixi.toml" >> $GITHUB_ENV
+          echo "PIXI_MANIFEST=${WORKSPACE}/.openmdao-pixi/pixi.toml" >> $GITHUB_ENV
         fi
 
     - name: Setup Pixi
-      uses: prefix-dev/setup-pixi@v0.8.1
+      uses: prefix-dev/setup-pixi@v0.9.5
       with:
         manifest-path: ${{ env.PIXI_MANIFEST }}
         environments: ${{ inputs.environment }}
