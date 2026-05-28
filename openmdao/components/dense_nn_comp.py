@@ -85,17 +85,17 @@ class DenseNNComp(om.JaxExplicitComponent):
     def setup(self):
         n = self.options["vec_size"]
 
-        self._layer_sizes, self._weights, self._biases = self._load_weights()
+        layer_sizes, self._weights, self._biases = self._load_weights()
 
-        self._num_inputs = self._layer_sizes[0]
-        self._num_outputs = self._layer_sizes[-1]
+        num_inputs = layer_sizes[0]
+        num_outputs = layer_sizes[-1]
 
         if n == 1:
-            self.add_input("x", shape=(self._num_inputs,))
-            self.add_output("y", shape=(self._num_outputs,))
+            self.add_input("x", shape=(num_inputs,))
+            self.add_output("y", shape=(num_outputs,))
         else:
-            self.add_input("x", shape=(n, self._num_inputs))
-            self.add_output("y", shape=(n, self._num_outputs))
+            self.add_input("x", shape=(n, num_inputs))
+            self.add_output("y", shape=(n, num_outputs))
 
     def _load_weights(self):
         data = load(self.options["weights_file"])
@@ -136,11 +136,8 @@ class DenseNNComp(om.JaxExplicitComponent):
         elif activation == "relu":
             return jnp.maximum(0.0, z)
 
-        elif activation == "tanh":
-            return jnp.tanh(z)
-
         else:
-            raise ValueError(f"Unsupported activation '{activation}'")
+            return jnp.tanh(z)
 
     def compute_primal(self, x):
         z = x
