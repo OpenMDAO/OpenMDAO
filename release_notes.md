@@ -39,6 +39,7 @@ On the environment management side, our Pixi configuration now enforces a depend
 - Resolved an MPI hang occurring during autoscaler setup. [#3755](https://github.com/OpenMDAO/OpenMDAO/pull/3755)
 - Fixed a bug in unit scaling logic when scaling was separately applied to responses. [#3756](https://github.com/OpenMDAO/OpenMDAO/pull/3756)
 - Fixed a path resolution issue in the `setup_openmdao_pixi` GitHub Action. [#3763](https://github.com/OpenMDAO/OpenMDAO/pull/3763)
+- Fixed docs search box on left side that wasn't taking any input. [#3769](https://github.com/OpenMDAO/OpenMDAO/pull/3769)
 
 ## Miscellaneous
 
