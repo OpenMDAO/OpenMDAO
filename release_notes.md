@@ -1,7 +1,7 @@
 ***********************************
 # Release Notes for OpenMDAO 3.44.0
 
-May 29, 2026
+June 01, 2026
 
 OpenMDAO 3.44.0 introduces several powerful new options for optimization drivers, nonlinear solvers, and environment security.
 
