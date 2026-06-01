@@ -203,9 +203,9 @@ def fetch_and_update_pulls(repo, cache: PullRequestCache, state='closed', base='
 
         pr_merge_time = pr.merged_at.replace(tzinfo=timezone.utc)
 
-        # Stop if we've reached PRs we already have
+        # Skip PRs we already have (can't break early since sorted by 'updated', not 'merged_at')
         if most_recent and pr_merge_time <= most_recent:
-            break
+            continue
 
         cache.add_pull(PullRequest.from_github_pr(pr))
         new_count += 1
