@@ -91,7 +91,7 @@ class _TotalJacInfo(object):
     def __init__(self, problem, of, wrt, return_format, approx=False,
                  debug_print=False, driver_scaling=True, get_remote=True, directional=False,
                  coloring_info=None, driver=None, of_indices=None, wrt_indices=None,
-                 do_special_functional_api_thing=False, always_include_linear=False,
+                 _functional=False, always_include_linear=False,
                  of_units=None, wrt_units=None,
                  ):
         """
@@ -133,8 +133,8 @@ class _TotalJacInfo(object):
         wrt_indices : iter of int or None
             Indices into the list of 'wrt' variables selecting which of those variables are included
             in the returned total derivatives. If None, the entire variable is included.
-        do_special_functional_api_thing : bool
-            If True, handle `of` and `wrt` variables the way the functional API wants
+        _functional : bool
+            If True, handle `of` and `wrt` variables the way the _functional API wants
         always_include_linear : bool
             If True and `of` is None, include linear constraints in the set of response variables
             in addition to the nonlinear responses provided by the driver.  Has no effect when
@@ -143,12 +143,12 @@ class _TotalJacInfo(object):
             Optional mapping of response variable name to desired units string.  When provided,
             the corresponding Jacobian rows are scaled so that the derivatives are expressed in
             those units rather than the variable's native units.  Only used when
-            ``do_special_functional_api_thing`` is True.
+            ``_functional`` is True.
         wrt_units : dict or None
             Optional mapping of design variable name to desired units string.  When provided,
             the corresponding Jacobian columns are scaled so that the derivatives are expressed
             with respect to those units rather than the variable's native units.  Only used when
-            ``do_special_functional_api_thing`` is True.
+            ``_functional`` is True.
         """
         self._driver = driver = problem.driver if driver is None else driver
         self.model = model = problem.model
@@ -182,7 +182,6 @@ class _TotalJacInfo(object):
         orig_of = of
         orig_wrt = wrt
 
-        # DJI: This block added by Claude.
         if always_include_linear and of is None and driver:
             lin_con_names = [name for name, meta in driver._cons.items() if meta['linear']]
             of = driver._get_ordered_nl_responses() + lin_con_names
@@ -191,7 +190,7 @@ class _TotalJacInfo(object):
             raise RuntimeError("Derivative support has been turned off but compute_totals "
                                "was called.")
 
-        if do_special_functional_api_thing:
+        if _functional:
             if (orig_of is None) and (orig_wrt is None):
                 # Use driver to get of and wrt metadata.
                 (of_metadata, wrt_metadata,
@@ -212,7 +211,6 @@ class _TotalJacInfo(object):
             of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of,
                                                                                       wrt)
 
-        # DJI: This block added by Claude.
         if (of_indices is not None) and (orig_of is not None):
             conn_graph = model.get_conn_graph()
             for vname, new_idxs in zip(of_metadata, of_indices):
@@ -226,7 +224,6 @@ class _TotalJacInfo(object):
                 meta['indices'] = idxer
                 meta['size'] = meta['global_size'] = idxer.indexed_src_size
 
-        # DJI: This block added by Claude.
         if (wrt_indices is not None) and (orig_wrt is not None):
             conn_graph = model.get_conn_graph()
             for vname, new_idxs in zip(wrt_metadata, wrt_indices):
@@ -289,7 +286,6 @@ class _TotalJacInfo(object):
             modes = [self.mode]
         else:
             if not has_lin_cons:
-                # DJI: the `(of_indices is None and wrt_indices is None)` was added by Claude.
                 if (
                     driver and
                         ((orig_of is None and orig_wrt is None) or not has_custom_derivs) and

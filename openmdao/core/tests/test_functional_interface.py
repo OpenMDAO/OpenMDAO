@@ -256,40 +256,46 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 # First, check that the indices worked properly.
                 x0 = f.create_input_vector()
                 y0 = f(x0)
+                x02, input_idx_map = f.create_input_vector(return_index_map=True)
+                y02, output_idx_map = f.create_output_vector(return_index_map=True)
+                f(x02, y=y02)
 
                 # Check the `x` input var.
                 x_expected = prob.get_val("x", indices=x_indices)
                 x_start, x_end = f._input_metadata["x"]["offsets"]
                 assert_near_equal(x0[x_start:x_end], x_expected, tolerance=1e-12)
+                assert_near_equal(x02[input_idx_map['x']], x_expected, tolerance=1e-12)
                 assert_near_equal(f.get_input_val("x"), x_expected, tolerance=1e-12)
 
                 # Check the `y` input var.
                 y_expected = prob.get_val("y", indices=y_indices)
                 y_start, y_end = f._input_metadata["y"]["offsets"]
                 assert_near_equal(x0[y_start:y_end], y_expected, tolerance=1e-12)
+                assert_near_equal(x02[input_idx_map['y']], y_expected, tolerance=1e-12)
                 assert_near_equal(f.get_input_val("y"), y_expected, tolerance=1e-12)
 
                 # Check the `r` input var.
                 r_expected = prob.get_val("r")
                 r_start, r_end = f._input_metadata["r"]["offsets"]
                 assert_near_equal(x0[r_start:r_end], r_expected, tolerance=1e-12)
+                assert_near_equal(x02[input_idx_map['r']], r_expected, tolerance=1e-12)
                 assert_near_equal(f.get_input_val("r"), r_expected, tolerance=1e-12)
 
                 # Check the `circle.area` output var.
                 area_expected = prob.get_val("circle.area")
                 area_start, area_end = f._output_metadata["circle.area"]["offsets"]
                 assert_near_equal(y0[area_start:area_end], area_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map['circle.area']], area_expected, tolerance=1e-12)
                 assert_near_equal(f.get_output_val("circle.area"), area_expected, tolerance=1e-12)
 
                 # Check the `r_con.g` output var.
                 rcong_expected = prob.get_val("r_con.g").flatten()
                 rcong_start, rcong_end = f._output_metadata["r_con.g"]["offsets"]
                 assert_near_equal(y0[rcong_start:rcong_end], rcong_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map['r_con.g']], rcong_expected, tolerance=1e-12)
                 assert_near_equal(f.get_output_val("r_con.g"), rcong_expected, tolerance=1e-12)
 
                 # Make sure the in-place form gets the same answer.
-                y02 = np.zeros_like(y0)
-                f(x0, y=y02)
                 assert_near_equal(y02, y0, tolerance=1e-12)
 
     def test_dfdx(self):
@@ -321,52 +327,64 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 # First, check that the indices worked properly.
                 x0 = dfdx.create_input_vector()
                 y0 = dfdx.create_output_vector()
+                x02, input_idx_map = dfdx.create_input_vector(return_index_map=True)
+                y02, output_idx_map = dfdx.create_output_vector(return_index_map=True)
 
                 # Check the `x` input var.
                 x_expected = prob.get_val("x", indices=x_indices)
                 x_start, x_end = dfdx._input_metadata["x"]["offsets"]
                 assert_near_equal(x0[x_start:x_end], x_expected, tolerance=1e-12)
+                assert_near_equal(x02[input_idx_map['x']], x_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_input_val("x"), x_expected, tolerance=1e-12)
 
                 # Check the `y` input var.
                 y_expected = prob.get_val("y", indices=y_indices)
                 y_start, y_end = dfdx._input_metadata["y"]["offsets"]
                 assert_near_equal(x0[y_start:y_end], y_expected, tolerance=1e-12)
+                assert_near_equal(x02[input_idx_map['y']], y_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_input_val("y"), y_expected, tolerance=1e-12)
 
                 # Check the `r` input var.
                 r_expected = prob.get_val("r")
                 r_start, r_end = dfdx._input_metadata["r"]["offsets"]
                 assert_near_equal(x0[r_start:r_end], r_expected, tolerance=1e-12)
+                assert_near_equal(x02[input_idx_map['r']], r_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_input_val("r"), r_expected, tolerance=1e-12)
 
                 # Check the `circle.area` output var.
                 area_expected = prob.get_val("circle.area")
                 area_start, area_end = dfdx._output_metadata["circle.area"]["offsets"]
                 assert_near_equal(y0[area_start:area_end], area_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map['circle.area']], area_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_output_val("circle.area"), area_expected, tolerance=1e-12)
 
                 # Check the `r_con.g` output var.
                 rcong_expected = prob.get_val("r_con.g").flatten()
                 rcong_start, rcong_end = dfdx._output_metadata["r_con.g"]["offsets"]
                 assert_near_equal(y0[rcong_start:rcong_end], rcong_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map['r_con.g']], rcong_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_output_val("r_con.g"), rcong_expected, tolerance=1e-12)
 
                 # Now check that we get the correct derivatives.
                 J = dfdx(x0)
+                J2, jac_index_map = dfdx.create_jacobian_matrix(return_index_map=True)
+                dfdx(x0, J=J2)
 
                 # Derivative of area wrt x is zero.
                 darea_dx_expected = np.zeros((area_expected.size, x_expected.size))
                 assert_near_equal(J[area_start:area_end, x_start:x_end], darea_dx_expected, tolerance=1e-12)
+                assert_near_equal(J2[*jac_index_map['circle.area', 'x']], darea_dx_expected, tolerance=1e-12)
 
                 # Derivative of area wrt y is zero.
                 darea_dy_expected = np.zeros((area_expected.size, y_expected.size))
                 assert_near_equal(J[area_start:area_end, y_start:y_end], darea_dy_expected, tolerance=1e-12)
+                assert_near_equal(J2[*jac_index_map['circle.area', 'y']], darea_dy_expected, tolerance=1e-12)
 
                 # area = pi*r**2, so darea_dr = 2*pi*r.
                 darea_dr_expected = np.zeros((area_expected.size, r_expected.size))
                 darea_dr_expected[:, :] = 2*np.pi*r_expected
                 assert_near_equal(J[area_start:area_end, r_start:r_end], darea_dr_expected, tolerance=1e-12)
+                assert_near_equal(J2[*jac_index_map['circle.area', 'r']], darea_dr_expected, tolerance=1e-12)
 
                 # Derivative of `r_con.g` wrt `x`.
                 drcong_dx_expected = np.zeros((rcong_expected.size, x_expected.size))
@@ -381,6 +399,7 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                         if i == x_idx_flat:
                             drcong_dx_expected[i, j] = 2*x_expected[j]
                 assert_near_equal(J[rcong_start:rcong_end, x_start:x_end], drcong_dx_expected, tolerance=1e-12)
+                assert_near_equal(J2[*jac_index_map['r_con.g', 'x']], drcong_dx_expected, tolerance=1e-12)
 
                 # Derivative of `r_con.g` wrt `y`.
                 drcong_dy_expected = np.zeros((rcong_expected.size, y_expected.size))
@@ -395,6 +414,7 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                         if i == y_idx_flat:
                             drcong_dy_expected[i, j] = 2*y_expected[j]
                 assert_near_equal(J[rcong_start:rcong_end, y_start:y_end], drcong_dy_expected, tolerance=1e-12)
+                assert_near_equal(J2[*jac_index_map['r_con.g', 'y']], drcong_dy_expected, tolerance=1e-12)
 
                 # Derivative of `r_con.g` wrt `r`.
                 drcong_dr_expected = np.zeros((rcong_expected.size, r_expected.size))
@@ -402,10 +422,9 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                     for j in range(r_expected.size):
                         drcong_dr_expected[i, j] = -2*r_expected[j]
                 assert_near_equal(J[rcong_start:rcong_end, r_start:r_end], drcong_dr_expected, tolerance=1e-12)
+                assert_near_equal(J2[*jac_index_map['r_con.g', 'r']], drcong_dr_expected, tolerance=1e-12)
 
                 # Test that the in-place Jacobian call gets the same answer.
-                J2 = dfdx.create_jacobian_matrix()
-                dfdx(x0, J=J2)
                 assert_near_equal(J2, J, tolerance=1e-12)
 
     def test_fdfdx(self):
@@ -556,63 +575,77 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 # First, check that the indices worked properly.
                 x0 = dfdx.create_input_vector()
                 y0 = dfdx.create_output_vector()
+                x02, input_idx_map = dfdx.create_input_vector(return_index_map=True)
+                y02, output_idx_map = dfdx.create_output_vector(return_index_map=True)
+                dfdx(x02, y=y02)
 
                 # Check the `x` input var.
                 x_expected = prob.get_val("x").flatten()
                 x_start, x_end = dfdx._input_metadata["x"]["offsets"]
                 assert_near_equal(x0[x_start:x_end], x_expected, tolerance=1e-12)
+                assert_near_equal(x02[input_idx_map['x']], x_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_input_val("x"), x_expected, tolerance=1e-12)
 
                 # Check the `y` input var.
                 y_expected = prob.get_val("y").flatten()
                 y_start, y_end = dfdx._input_metadata["y"]["offsets"]
                 assert_near_equal(x0[y_start:y_end], y_expected, tolerance=1e-12)
+                assert_near_equal(x02[input_idx_map['y']], y_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_input_val("y"), y_expected, tolerance=1e-12)
 
                 # Check the `r` input var.
                 r_expected = prob.get_val("r")
                 r_start, r_end = dfdx._input_metadata["r"]["offsets"]
                 assert_near_equal(x0[r_start:r_end], r_expected, tolerance=1e-12)
+                assert_near_equal(x02[input_idx_map['r']], r_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_input_val("r"), r_expected, tolerance=1e-12)
 
                 # Check the `r_con.g` output var.
                 rcong_expected = prob.get_val("r_con.g").flatten()
                 rcong_start, rcong_end = dfdx._output_metadata["r_con.g"]["offsets"]
                 assert_near_equal(y0[rcong_start:rcong_end], rcong_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map['r_con.g']], rcong_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_output_val("r_con.g"), rcong_expected, tolerance=1e-12)
 
                 # Check the `theta_con.g` output var.
                 thetacong_expected = prob.get_val("theta_con.g", indices=EVEN_IND).flatten()
                 thetacong_start, thetacong_end = dfdx._output_metadata["theta_con.g"]["offsets"]
                 assert_near_equal(y0[thetacong_start:thetacong_end], thetacong_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map['theta_con.g']], thetacong_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_output_val("theta_con.g"), thetacong_expected, tolerance=1e-12)
 
                 # Check the `delta_theta_con.g` output var.
                 deltathetacong_expected = prob.get_val("delta_theta_con.g").flatten()
                 deltathetacong_start, deltathetacong_end = dfdx._output_metadata["delta_theta_con.g"]["offsets"]
                 assert_near_equal(y0[deltathetacong_start:deltathetacong_end], deltathetacong_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map['delta_theta_con.g']], deltathetacong_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_output_val("delta_theta_con.g"), deltathetacong_expected, tolerance=1e-12)
 
                 # Check the `l_conx.g` output var.
                 lconxg_expected = prob.get_val("l_conx.g", indices=([0], [0], [0], [0]))
                 lconxg_start, lconxg_end = dfdx._output_metadata["l_conx.g"]["offsets"]
                 assert_near_equal(y0[lconxg_start:lconxg_end], lconxg_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map['l_conx.g']], lconxg_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_output_val("l_conx.g"), lconxg_expected, tolerance=1e-12)
 
                 # Check the `circle.area` output var.
                 area_expected = prob.get_val("circle.area")
                 area_start, area_end = dfdx._output_metadata["circle.area"]["offsets"]
                 assert_near_equal(y0[area_start:area_end], area_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map['circle.area']], area_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_output_val("circle.area"), area_expected, tolerance=1e-12)
 
                 # Check the `y0_con.g` output var.
                 y0_con_g_expected = prob.get_val("y0_con.g", indices=([0], [0], [0], [0]))
                 y0_con_g_start, y0_con_g_end = dfdx._output_metadata["y0_con.g"]["offsets"]
                 assert_near_equal(y0[y0_con_g_start:y0_con_g_end], y0_con_g_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map['y0_con.g']], y0_con_g_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_output_val("y0_con.g"), y0_con_g_expected, tolerance=1e-12)
 
                 # Now check that we get the correct derivatives.
                 J = dfdx(x0)
+                J2, jac_idx_map = dfdx.create_jacobian_matrix(return_index_map=True)
+                dfdx(x02, J=J2)
 
                 # Easier if I have the `x` and `y` values in the multidimensional shape.
                 x = prob.get_val("x")
@@ -709,15 +742,18 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
 
                 ddelta_theta_con_g_dx = ddelta_theta_con_g_deven @ deven_dtheta_actual @ dtheta_actual_dx + ddelta_theta_con_g_dodd @ dodd_dtheta_actual @ dtheta_actual_dx
                 assert_near_equal(J[deltathetacong_start:deltathetacong_end, x_start:x_end], ddelta_theta_con_g_dx, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["delta_theta_con.g", 'x']], ddelta_theta_con_g_dx, tolerance=1e-12)
 
                 # Now do the same thing for the derivative of delta_theta_con_g wrt y.
                 dtheta_actual_dy.shape = (SIZE, SIZE)
                 ddelta_theta_con_g_dy = ddelta_theta_con_g_deven @ deven_dtheta_actual @ dtheta_actual_dy + ddelta_theta_con_g_dodd @ dodd_dtheta_actual @ dtheta_actual_dy
                 assert_near_equal(J[deltathetacong_start:deltathetacong_end, y_start:y_end], ddelta_theta_con_g_dy, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["delta_theta_con.g", 'y']], ddelta_theta_con_g_dy, tolerance=1e-12)
 
                 # delta_theta_con_g is not a function of r, so that derivative should be zero.
                 ddelta_theta_con_g_dr = np.zeros((EVEN_SIZE, 1))
                 assert_near_equal(J[deltathetacong_start:deltathetacong_end, r_start:r_end], ddelta_theta_con_g_dr, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["delta_theta_con.g", 'r']], ddelta_theta_con_g_dr, tolerance=1e-12)
 
                 # OK, so now I want the derivatives of `r_con.g` wrt `x`, `y`, `r`.
                 dr_con_g_dx = np.zeros((*SHAPE, *SHAPE))
@@ -728,6 +764,7 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 # Need to reshape into a matrix.
                 dr_con_g_dx.shape = (SIZE, SIZE)
                 assert_near_equal(J[rcong_start:rcong_end, x_start:x_end], dr_con_g_dx, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["r_con.g", 'x']], dr_con_g_dx, tolerance=1e-12)
 
                 dr_con_g_dy = np.zeros((*SHAPE, *SHAPE))
                 for j in np.ndindex(SHAPE):
@@ -737,6 +774,7 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 # Need to reshape into a matrix.
                 dr_con_g_dy.shape = (SIZE, SIZE)
                 assert_near_equal(J[rcong_start:rcong_end, y_start:y_end], dr_con_g_dy, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["r_con.g", 'y']], dr_con_g_dy, tolerance=1e-12)
 
                 dr_con_g_dr = np.zeros((*SHAPE, *r.shape))
                 for j in np.ndindex(*r.shape):
@@ -745,6 +783,7 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 # Need to reshape into a matrix.
                 dr_con_g_dr.shape = (SIZE, r.size)
                 assert_near_equal(J[rcong_start:rcong_end, r_start:r_end], dr_con_g_dr, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["r_con.g", 'r']], dr_con_g_dr, tolerance=1e-12)
 
                 dtheta_con_g_even_dtheta_actual = np.zeros((*EVEN_SHAPE, *SHAPE))
                 for idx_out_idx_in in zip(*[np.ndenumerate(idxs) for idxs in EVEN_IND]):
@@ -766,6 +805,9 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 assert_near_equal(J[thetacong_start:thetacong_end, x_start:x_end], dtheta_con_g_dx, tolerance=1e-12)
                 assert_near_equal(J[thetacong_start:thetacong_end, y_start:y_end], dtheta_con_g_dy, tolerance=1e-12)
                 assert_near_equal(J[thetacong_start:thetacong_end, r_start:r_end], dtheta_con_g_dr, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["theta_con.g", 'x']], dtheta_con_g_dx, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["theta_con.g", 'y']], dtheta_con_g_dy, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["theta_con.g", 'r']], dtheta_con_g_dr, tolerance=1e-12)
 
                 # Next, get the derivative of `l_conx.g`.
                 dl_conx_g_0_dx = np.zeros((1, *SHAPE))
@@ -775,13 +817,16 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 dl_conx_g_0_dx[(0, *idx0s)] = 1.0
                 dl_conx_g_0_dx.shape = (1, SIZE)
                 assert_near_equal(J[lconxg_start:lconxg_end, x_start:x_end], dl_conx_g_0_dx, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["l_conx.g", 'x']], dl_conx_g_0_dx, tolerance=1e-12)
 
                 # Other derivatives of l_conx.g are zero.
                 dl_conx_g_0_dy = np.zeros((1, *SHAPE))
                 dl_conx_g_0_dy.shape = ((1, SIZE))
                 dl_conx_g_0_dr = np.zeros((1, 1))
                 assert_near_equal(J[lconxg_start:lconxg_end, y_start:y_end], dl_conx_g_0_dy, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["l_conx.g", 'y']], dl_conx_g_0_dy, tolerance=1e-12)
                 assert_near_equal(J[lconxg_start:lconxg_end, r_start:r_end], dl_conx_g_0_dr, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map["l_conx.g", 'r']], dl_conx_g_0_dr, tolerance=1e-12)
 
                 # Next derivative: circle.area = pi*r**2, so derivative is just 2*pi*r of course.
                 dcircle_area_dr = np.zeros((1, 1))
@@ -790,16 +835,22 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 dcircle_area_dx = np.zeros((1, SIZE))
                 dcircle_area_dy = np.zeros((1, SIZE))
                 assert_near_equal(J[area_start:area_end, x_start:x_end], dcircle_area_dx, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map['circle.area', 'x']], dcircle_area_dx, tolerance=1e-12)
                 assert_near_equal(J[area_start:area_end, y_start:y_end], dcircle_area_dy, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map['circle.area', 'y']], dcircle_area_dy, tolerance=1e-12)
                 assert_near_equal(J[area_start:area_end, r_start:r_end], dcircle_area_dr, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map['circle.area', 'r']], dcircle_area_dr, tolerance=1e-12)
 
                 dy0_con_g_dx = np.zeros((1, SIZE))
                 dy0_con_g_dy = np.zeros((1, SIZE))
                 dy0_con_g_dy[0, 0] = 1.0
                 dy0_con_g_dr = np.zeros((1, 1))
                 assert_near_equal(J[y0_con_g_start:y0_con_g_end, x_start:x_end], dy0_con_g_dx, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map['y0_con.g', 'x']], dy0_con_g_dx, tolerance=1e-12)
                 assert_near_equal(J[y0_con_g_start:y0_con_g_end, y_start:y_end], dy0_con_g_dy, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map['y0_con.g', 'y']], dy0_con_g_dy, tolerance=1e-12)
                 assert_near_equal(J[y0_con_g_start:y0_con_g_end, r_start:r_end], dy0_con_g_dr, tolerance=1e-12)
+                assert_near_equal(J2[*jac_idx_map['y0_con.g', 'r']], dy0_con_g_dr, tolerance=1e-12)
 
     def test_constraints_with_indices(self):
         for use_flat_indices in [False, True]:
@@ -833,23 +884,28 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 # First, check that the indices worked properly.
                 x0 = dfdx.create_input_vector()
                 y0 = dfdx.create_output_vector()
+                x02, input_idx_map = dfdx.create_input_vector(return_index_map=True)
+                y02, output_idx_map = dfdx.create_output_vector(return_index_map=True)
 
                 # Check the `x` input var.
                 x_expected = prob.get_val("x").flatten()
                 x_start, x_end = dfdx._input_metadata["x"]["offsets"]
                 assert_near_equal(x0[x_start:x_end], x_expected, tolerance=1e-12)
+                assert_near_equal(x02[input_idx_map['x']], x_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_input_val("x"), x_expected, tolerance=1e-12)
 
                 # Check the `y` input var.
                 y_expected = prob.get_val("y").flatten()
                 y_start, y_end = dfdx._input_metadata["y"]["offsets"]
                 assert_near_equal(x0[y_start:y_end], y_expected, tolerance=1e-12)
+                assert_near_equal(x02[input_idx_map['y']], y_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_input_val("y"), y_expected, tolerance=1e-12)
 
                 # Check the `l_conx.g` output var.
                 lconxg_expected = prob.get_val("l_conx.g").flatten()
                 lconxg_start, lconxg_end = dfdx._output_metadata["l_conx.g"]["offsets"]
                 assert_near_equal(y0[lconxg_start:lconxg_end], lconxg_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map["l_conx.g"]], lconxg_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_output_val("l_conx.g"), lconxg_expected, tolerance=1e-12)
                 SIZE = self._SIZE
                 # Make sure we got the entire `l_conx.g` variable, not just the single one used for the constraint.
@@ -859,10 +915,13 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 area_expected = prob.get_val("circle.area")
                 area_start, area_end = dfdx._output_metadata["circle.area"]["offsets"]
                 assert_near_equal(y0[area_start:area_end], area_expected, tolerance=1e-12)
+                assert_near_equal(y02[output_idx_map["circle.area"]], area_expected, tolerance=1e-12)
                 assert_near_equal(dfdx.get_output_val("circle.area"), area_expected, tolerance=1e-12)
 
                 # Now check that we get the correct derivatives.
                 J = dfdx(x0)
+                J2, jac_index_map = dfdx.create_jacobian_matrix(return_index_map=True)
+                dfdx(x0, J=J2)
 
                 # Easier if I have the `x` and `y` values in the multidimensional shape.
                 x = prob.get_val("x")
@@ -878,18 +937,22 @@ class TestMultiDimensionalCircleOptimization(unittest.TestCase):
                 # Need to reshape into a matrix.
                 dl_conx_g_dx.shape = (SIZE, SIZE)
                 assert_near_equal(J[lconxg_start:lconxg_end, x_start:x_end], dl_conx_g_dx, tolerance=1e-12)
+                assert_near_equal(J2[*jac_index_map["l_conx.g", "x"]], dl_conx_g_dx, tolerance=1e-12)
 
                 # Other derivatives of l_conx.g are zero.
                 dl_conx_g_dy = np.zeros((*SHAPE, *SHAPE))
                 dl_conx_g_dy.shape = ((SIZE, SIZE))
                 assert_near_equal(J[lconxg_start:lconxg_end, y_start:y_end], dl_conx_g_dy, tolerance=1e-12)
+                assert_near_equal(J2[*jac_index_map["l_conx.g", "y"]], dl_conx_g_dy, tolerance=1e-12)
 
                 # Next derivative: circle.area = pi*r**2, so derivative is just 2*pi*r of course.
                 # So derivatives wrt x and y are zero.
                 dcircle_area_dx = np.zeros((1, SIZE))
                 dcircle_area_dy = np.zeros((1, SIZE))
                 assert_near_equal(J[area_start:area_end, x_start:x_end], dcircle_area_dx, tolerance=1e-12)
+                assert_near_equal(J2[*jac_index_map["circle.area", "x"]], dcircle_area_dx, tolerance=1e-12)
                 assert_near_equal(J[area_start:area_end, y_start:y_end], dcircle_area_dy, tolerance=1e-12)
+                assert_near_equal(J2[*jac_index_map["circle.area", "y"]], dcircle_area_dy, tolerance=1e-12)
 
 
 class IndicesTestComp(om.ExplicitComponent):
