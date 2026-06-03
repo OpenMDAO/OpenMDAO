@@ -429,15 +429,20 @@ class _FunctionalCallback:
         current values of all registered input variables into it.  The returned
         array can be modified in-place and then passed directly to ``__call__``.
 
-        If `return_index_map` is `True`, a `dict` mapping each input variable
-        name to a `slice` object that indexes the variable is returned as the
-        second value.
+        Parameters
+        ----------
+        return_index_map : bool, optional
+            If True, also return a dict mapping each input variable name to a
+            slice object that indexes that variable within the returned vector.
 
         Returns
         -------
         numpy.ndarray
             Flat 1-D array of length equal to the total size of all input variables,
             initialised with the current problem values.
+        dict
+            Only returned when ``return_index_map=True``. Maps each input variable
+            name to a slice object that indexes that variable within the vector.
         """
         x0 = np.zeros(self._input_len)
         self._problem_to_vector(x0, self._input_metadata)
@@ -458,15 +463,20 @@ class _FunctionalCallback:
         array can be passed as the ``y`` argument to ``__call__`` to avoid
         allocating a new array on each call.
 
-        If `return_index_map` is `True`, a `dict` mapping each output variable
-        name to a `slice` object that indexes the variable is returned as the
-        second value.
+        Parameters
+        ----------
+        return_index_map : bool, optional
+            If True, also return a dict mapping each output variable name to a
+            slice object that indexes that variable within the returned vector.
 
         Returns
         -------
         numpy.ndarray
             Flat 1-D array of length equal to the total size of all output variables,
             initialised with the current problem values.
+        dict
+            Only returned when ``return_index_map=True``. Maps each output variable
+            name to a slice object that indexes that variable within the vector.
         """
         y0 = np.zeros(self._output_len)
         self._problem_to_vector(y0, self._output_metadata)
@@ -485,14 +495,21 @@ class _FunctionalCallback:
         The returned array can be passed as the ``J`` argument to ``__call__``
         to avoid allocating a new matrix on each call.
 
-        If `return_index_map` is `True`, a `dict` mapping a tuple of output-input variable
-        name pairs to two `slice` objects that indexes the Jacobian is returned as the
-        second value.
+        Parameters
+        ----------
+        return_index_map : bool, optional
+            If True, also return a dict mapping each ``(output_name, input_name)``
+            tuple to a ``(row_slice, col_slice)`` tuple that indexes the
+            corresponding sub-block of the Jacobian.
 
         Returns
         -------
         numpy.ndarray
             Zero-filled 2-D array of shape ``(n_outputs, n_inputs)``.
+        dict
+            Only returned when ``return_index_map=True``. Maps each
+            ``(output_name, input_name)`` tuple to a ``(row_slice, col_slice)``
+            tuple that indexes the corresponding sub-block of the Jacobian.
         """
         J0 = np.zeros((self._output_len, self._input_len))
         if return_index_map:
