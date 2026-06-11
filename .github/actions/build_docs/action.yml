@@ -89,7 +89,7 @@ runs:
         echo "Build the docs"
         echo "============================================================="
         run_and_track python build_source_docs.py
-        run_and_track jupyter-book build -W --keep-going openmdao_book
+        run_and_track jupyter-book build --verbose -W --keep-going openmdao_book
         run_and_track python copy_build_artifacts.py
 
         # Exit with failure if any command failed
