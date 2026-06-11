@@ -80,16 +80,27 @@ runs:
 
         run_and_track python openmdao_book/other/disable_snopt_cells.py
 
-        # Start ipcluster and wait for it to be ready
-        run_and_track ./ipcluster_start.sh
-        echo "Waiting for ipcluster to be ready..."
-        sleep 12
-
         echo "============================================================="
-        echo "Build the docs"
+        echo "Build source docs (API reference notebooks)"
         echo "============================================================="
         run_and_track python build_source_docs.py
-        run_and_track jupyter-book build --verbose -W --keep-going openmdao_book
+
+        echo "============================================================="
+        echo "Execute notebooks (MPI notebooks run under mpiexec)"
+        echo "============================================================="
+        run_and_track python execute_notebooks.py
+
+        echo "============================================================="
+        echo "Copy static assets to executed book directory"
+        echo "============================================================="
+        run_and_track rsync -a --exclude='*.ipynb' openmdao_book/ _executed_book/
+
+        echo "============================================================="
+        echo "Build HTML with Sphinx"
+        echo "============================================================="
+        run_and_track sphinx-build -b html -W --keep-going \
+          _executed_book/ _executed_book/_build/html
+
         run_and_track python copy_build_artifacts.py
 
         # Exit with failure if any command failed
@@ -104,14 +115,14 @@ runs:
         echo "Log files from reports directory"
         echo "============================================================="
         if [ -d /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports ]; then
-          for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports -name '*.log' 2>/dev/null); do
+          for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/_executed_book/_build/html/reports -name '*.log' 2>/dev/null); do
             echo "============================================================="
             echo $f
             echo "============================================================="
             cat $f
           done
         else
-          echo "No jupyter-book reports directory found"
+          echo "No Sphinx reports directory found"
         fi
         exit 1
 
@@ -120,7 +131,7 @@ runs:
       uses: actions/upload-artifact@v7
       with:
         name: built-docs-artifact
-        path: openmdao/docs/openmdao_book/_build/html
+        path: openmdao/docs/_executed_book/_build/html
         retention-days: 1
 
     - name: Publish docs (conda)
@@ -138,7 +149,7 @@ runs:
           echo "Publish docs"
           echo "============================================================="
           cd openmdao/docs
-          python upload_doc_version.py openmdao_book/_build/html/ ${{ inputs.SECRET_docs_location }}
+          python upload_doc_version.py _executed_book/_build/html/ ${{ inputs.SECRET_docs_location }}
         else
           echo "Docs destination not available."
         fi
@@ -158,7 +169,7 @@ runs:
           echo "============================================================="
           eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
           cd openmdao/docs
-          python upload_doc_version.py openmdao_book/_build/html/ ${{ inputs.SECRET_docs_location }}
+          python upload_doc_version.py _executed_book/_build/html/ ${{ inputs.SECRET_docs_location }}
         else
           echo "Docs destination not available."
         fi
