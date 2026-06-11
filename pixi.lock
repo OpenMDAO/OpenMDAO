@@ -1725,7 +1725,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/importlib_resources-7.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipykernel-7.2.0-pyha191276_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipympl-0.10.0-pyhcf101f3_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/ipyparallel-9.1.0-pyhcf101f3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/ipyparallel-9.0.2-pyhcf101f3_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipython-9.13.0-pyh53cf698_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipython_pygments_lexers-1.1.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipywidgets-8.1.8-pyhd8ed1ab_0.conda
@@ -1945,7 +1945,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/importlib_resources-7.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipykernel-7.2.0-pyh5552912_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipympl-0.10.0-pyhcf101f3_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/ipyparallel-9.1.0-pyhcf101f3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/ipyparallel-9.0.2-pyhcf101f3_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipython-9.13.0-pyh53cf698_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipython_pygments_lexers-1.1.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipywidgets-8.1.8-pyhd8ed1ab_0.conda
@@ -2329,7 +2329,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/importlib_resources-7.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipykernel-7.2.0-pyh5552912_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipympl-0.10.0-pyhcf101f3_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/ipyparallel-9.1.0-pyhcf101f3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/ipyparallel-9.0.2-pyhcf101f3_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipython-9.13.0-pyh53cf698_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipython_pygments_lexers-1.1.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipywidgets-8.1.8-pyhd8ed1ab_0.conda
@@ -2717,7 +2717,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/noarch/importlib_resources-7.1.0-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipykernel-7.2.0-pyh6dadd2b_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipympl-0.10.0-pyhcf101f3_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/noarch/ipyparallel-9.1.0-pyhcf101f3_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/noarch/ipyparallel-9.0.2-pyhcf101f3_1.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipython-9.13.0-pyhe2676ad_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipython_pygments_lexers-1.1.1-pyhd8ed1ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/ipywidgets-8.1.8-pyhd8ed1ab_0.conda
@@ -17628,9 +17628,9 @@ packages:
   - pkg:pypi/ipympl?source=hash-mapping
   size: 244162
   timestamp: 1769263121500
-- conda: https://conda.anaconda.org/conda-forge/noarch/ipyparallel-9.1.0-pyhcf101f3_0.conda
-  sha256: b0202033d0a2947aa3dd59336fbe7813fd76b20be14046b9b5c8ebdd2c425422
-  md5: 4f3cb212a8c8db3971b7101f91800669
+- conda: https://conda.anaconda.org/conda-forge/noarch/ipyparallel-9.0.2-pyhcf101f3_1.conda
+  sha256: 7204868332de6b743575ad4f59bd233b66038ffc7c185a8319d517c56dc2eb82
+  md5: 89aad475c705f1f88f16d0e818ff17cf
   depends:
   - decorator
   - ipykernel >=6.9.1
@@ -17648,8 +17648,8 @@ packages:
   license_family: BSD
   purls:
   - pkg:pypi/ipyparallel?source=hash-mapping
-  size: 230292
-  timestamp: 1773181432100
+  size: 228653
+  timestamp: 1770928550974
 - conda: https://conda.anaconda.org/conda-forge/noarch/ipython-9.13.0-pyh53cf698_0.conda
   sha256: a0af49948a1842dfd15a0b0b2fd56c94ddbd07e07a6c8b4bc70d43015eafaff0
   md5: 73e9657cd19605740d21efb14d8d0cb9

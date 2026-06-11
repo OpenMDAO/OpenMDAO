@@ -80,7 +80,7 @@ python = "3.14.*"
 ##########################################################
 
 [feature.docs.dependencies]
-ipyparallel = "*"
+ipyparallel = "==9.0.2"
 jupyter-book = ">=1.0.3,<2"
 matplotlib = "*"
 numpydoc = "*"
