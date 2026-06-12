@@ -38,7 +38,7 @@ runs:
         echo "=================================="
 
     - name: Install Julia
-      uses: julia-actions/install-julia@v2
+      uses: julia-actions/setup-julia@v2
       with:
         version: '1'
 
