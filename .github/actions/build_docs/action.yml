@@ -49,61 +49,8 @@ runs:
           eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
         fi
 
-        set +e           # Don't exit on error
-        set -o pipefail  # But catch pipeline failures
-
-        export PYDEVD_DISABLE_FILE_VALIDATION=1
-
-        BUILD_FAILED=0
-
-        # Cleanup function
-        cleanup() {
-          echo "Stopping ipcluster..."
-          pkill -f ipcluster || true
-        }
-        trap cleanup EXIT
-
-        # Helper function to track failures
-        run_and_track() {
-          echo "Running: $*"
-          "$@"
-          local exit_code=$?
-          if [ $exit_code -ne 0 ]; then
-            echo "Command failed with exit code $exit_code"
-            BUILD_FAILED=1
-          fi
-          return $exit_code
-        }
-
         cd openmdao/docs
-
-        run_and_track python openmdao_book/other/disable_snopt_cells.py
-
-        echo "============================================================="
-        echo "Build source docs (API reference notebooks)"
-        echo "============================================================="
-        run_and_track python build_source_docs.py
-
-        echo "============================================================="
-        echo "Copy source tree to _executed_book/ (non-notebook files only)"
-        echo "============================================================="
-        run_and_track rsync -a --exclude='_build/' --exclude='.ipynb_checkpoints/' --exclude='*.ipynb' openmdao_book/ _executed_book/
-
-        echo "============================================================="
-        echo "Execute notebooks (MPI notebooks run under mpiexec)"
-        echo "============================================================="
-        run_and_track python execute_notebooks.py
-
-        echo "============================================================="
-        echo "Build HTML with Sphinx"
-        echo "============================================================="
-        run_and_track sphinx-build -b html -W --keep-going \
-          _executed_book/ _executed_book/_build/html
-
-        run_and_track python copy_build_artifacts.py
-
-        # Exit with failure if any command failed
-        exit $BUILD_FAILED
+        python build_docs.py build
 
     - name: Display doc build reports
       if: steps.build_docs.outcome == 'failure'
