@@ -52,7 +52,6 @@ runs:
         set +e           # Don't exit on error
         set -o pipefail  # But catch pipeline failures
 
-        export OPENMDAO_REPORTS=0
         export PYDEVD_DISABLE_FILE_VALIDATION=1
 
         BUILD_FAILED=0
@@ -86,14 +85,14 @@ runs:
         run_and_track python build_source_docs.py
 
         echo "============================================================="
+        echo "Copy source tree to _executed_book/ (non-notebook files only)"
+        echo "============================================================="
+        run_and_track rsync -a --exclude='_build/' --exclude='.ipynb_checkpoints/' --exclude='*.ipynb' openmdao_book/ _executed_book/
+
+        echo "============================================================="
         echo "Execute notebooks (MPI notebooks run under mpiexec)"
         echo "============================================================="
         run_and_track python execute_notebooks.py
-
-        echo "============================================================="
-        echo "Copy static assets to executed book directory"
-        echo "============================================================="
-        run_and_track rsync -a --exclude='*.ipynb' openmdao_book/ _executed_book/
 
         echo "============================================================="
         echo "Build HTML with Sphinx"
@@ -114,7 +113,7 @@ runs:
         echo "============================================================="
         echo "Log files from reports directory"
         echo "============================================================="
-        if [ -d /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/openmdao_book/_build/html/reports ]; then
+        if [ -d /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/_executed_book/_build/html/reports ]; then
           for f in $(find /home/runner/work/OpenMDAO/OpenMDAO/openmdao/docs/_executed_book/_build/html/reports -name '*.log' 2>/dev/null); do
             echo "============================================================="
             echo $f
