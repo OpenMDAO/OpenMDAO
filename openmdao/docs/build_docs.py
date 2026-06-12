@@ -10,6 +10,7 @@ Usage (from openmdao/docs/):
 Output: _executed_book/_build/html/index.html
 """
 import argparse
+import json
 import os
 import shutil
 import subprocess
@@ -24,6 +25,15 @@ def _banner(msg):
     print(f'\n{bar}')
     print(msg)
     print(bar, flush=True)
+
+
+def _has_code_cells(nb_path):
+    """Return True if the notebook contains at least one code cell."""
+    try:
+        cells = json.loads(Path(nb_path).read_text(encoding='utf-8')).get('cells', [])
+        return any(c.get('cell_type') == 'code' for c in cells)
+    except Exception:
+        return True
 
 
 def cmd_clean(args):
@@ -55,15 +65,18 @@ def cmd_build(args):
     dst = HERE / '_executed_book'
     # Copy all non-notebook supporting files (data files, scripts, static assets)
     # so they are present alongside the notebooks when papermill executes them.
-    # Notebooks are NOT copied here — papermill writes them directly to _executed_book/,
-    # which allows execute_notebooks.py to use timestamps to skip up-to-date notebooks.
+    # Notebooks with code cells are NOT copied here — papermill writes them directly
+    # to _executed_book/, which allows execute_notebooks.py to use timestamps to skip
+    # up-to-date notebooks.
+    # Notebooks with no code cells (markdown-only, e.g. main.ipynb and _srcdocs stubs)
+    # ARE copied here since papermill never touches them.
     for item in src.rglob('*'):
         if not item.is_file():
             continue
         rel = item.relative_to(src)
         if '_build' in rel.parts or '.ipynb_checkpoints' in rel.parts:
             continue
-        if item.suffix == '.ipynb':
+        if item.suffix == '.ipynb' and _has_code_cells(item):
             continue
         target = dst / rel
         target.parent.mkdir(parents=True, exist_ok=True)

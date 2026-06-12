@@ -18,6 +18,9 @@ Usage (from openmdao/docs/):
     --no-serial   Skip execution of serial (non-MPI) notebooks.
     --no-mpi      Skip execution of MPI notebooks.
 
+Notebooks with no code cells (e.g. the _srcdocs API reference stubs) are skipped
+entirely — they contain only markdown and require no kernel execution.
+
 Output notebooks are written to _executed_book/, mirroring the source tree layout.
 A notebook is skipped when its output already exists and is newer than the source.
 All failures are collected and reported at the end; execution continues even if a
@@ -73,6 +76,15 @@ def _nb_meta(nb_path):
         return {}
 
 
+def has_code_cells(nb_path):
+    """Return True if the notebook contains at least one code cell."""
+    try:
+        cells = json.loads(nb_path.read_text(encoding='utf-8')).get('cells', [])
+        return any(c.get('cell_type') == 'code' for c in cells)
+    except Exception:
+        return True
+
+
 def is_mpi_notebook(nb_path):
     """Return True if the notebook requests MPI execution."""
     return bool(_nb_meta(nb_path).get('mpi', False))
@@ -119,7 +131,8 @@ def main():
 
     notebooks = sorted(SRC_DIR.glob('**/*.ipynb'))
     notebooks = [nb for nb in notebooks
-                 if '.ipynb_checkpoints' not in nb.parts and '_build' not in nb.parts]
+                 if '.ipynb_checkpoints' not in nb.parts and '_build' not in nb.parts
+                 and has_code_cells(nb)]
 
     mpi_notebooks = [nb for nb in notebooks if is_mpi_notebook(nb)]
     serial_notebooks = [nb for nb in notebooks if not is_mpi_notebook(nb)]
