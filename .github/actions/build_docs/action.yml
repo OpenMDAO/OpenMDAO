@@ -37,6 +37,19 @@ runs:
         echo "publish: ${{ inputs.publish }}"
         echo "=================================="
 
+    - name: Install Julia
+      uses: julia-actions/install-julia@v2
+      with:
+        version: '1'
+
+    - name: Install Julia dependencies
+      shell: bash -l {0}
+      run: |
+        if [[ "${{ inputs.use_pixi }}" == "true" ]]; then
+          eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
+        fi
+        pixi run -e ${{ inputs.pixi_env }} install-julia-deps
+
     - name: Build docs
       id: build_docs
       continue-on-error: true
@@ -50,7 +63,7 @@ runs:
         fi
 
         cd openmdao/docs
-        python build_docs.py build --no-rich
+        python build_docs.py build --no-rich --workers 3
 
     - name: Display doc build reports
       if: steps.build_docs.outcome == 'failure'
