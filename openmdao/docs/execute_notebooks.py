@@ -11,12 +11,14 @@ metadata) are executed with OPENMDAO_REPORTS=1. All others run with OPENMDAO_REP
 to avoid the overhead of generating HTML reports for every notebook.
 
 Usage (from openmdao/docs/):
-    python execute_notebooks.py [--workers N] [--force] [--no-serial] [--no-mpi]
+    python execute_notebooks.py [--workers N] [--force] [--no-serial] [--no-mpi] [--no-rich]
 
     --workers N   Number of parallel workers for non-MPI notebooks (default: cpu_count).
     --force       Re-execute all notebooks even if the output is up to date.
     --no-serial   Skip execution of serial (non-MPI) notebooks.
     --no-mpi      Skip execution of MPI notebooks.
+    --no-rich     Use plain-text progress output instead of the Rich progress bar.
+                  Use this on CI where Rich's ANSI output is not rendered.
 
 Notebooks with no code cells (e.g. the _srcdocs API reference stubs) are skipped
 entirely — they contain only markdown and require no kernel execution.
@@ -46,9 +48,9 @@ except ImportError:
     _RICH = False
 
 
-def _make_progress(total, description):
-    """Return a Rich Progress context manager, or None if rich is unavailable."""
-    if not _RICH:
+def _make_progress(total, description, no_rich=False):
+    """Return a Rich Progress context manager, or None if rich is unavailable or disabled."""
+    if not _RICH or no_rich:
         return None
     return Progress(
         SpinnerColumn(),
@@ -127,12 +129,16 @@ def main():
                         help='Skip execution of serial (non-MPI) notebooks.')
     parser.add_argument('--no-mpi', action='store_true',
                         help='Skip execution of MPI notebooks.')
+    parser.add_argument('--no-rich', action='store_true',
+                        help='Use plain-text progress output instead of the Rich progress bar.')
     args = parser.parse_args()
 
-    notebooks = sorted(SRC_DIR.glob('**/*.ipynb'))
-    notebooks = [nb for nb in notebooks
-                 if '.ipynb_checkpoints' not in nb.parts and '_build' not in nb.parts
-                 and has_code_cells(nb)]
+    all_notebooks = sorted(SRC_DIR.glob('**/*.ipynb'))
+    all_notebooks = [nb for nb in all_notebooks
+                     if '.ipynb_checkpoints' not in nb.parts and '_build' not in nb.parts]
+
+    markdown_only = [nb for nb in all_notebooks if not has_code_cells(nb)]
+    notebooks = [nb for nb in all_notebooks if has_code_cells(nb)]
 
     mpi_notebooks = [nb for nb in notebooks if is_mpi_notebook(nb)]
     serial_notebooks = [nb for nb in notebooks if not is_mpi_notebook(nb)]
@@ -153,8 +159,9 @@ def main():
         mpi_notebooks = []
 
     total = len(serial_notebooks) + len(mpi_notebooks)
-    print(f'Found {len(notebooks)} notebooks '
-          f'({len(serial_notebooks)} serial, {len(mpi_notebooks)} MPI, {skipped} up-to-date).')
+    print(f'Found {len(all_notebooks)} notebooks '
+          f'({len(serial_notebooks)} serial, {len(mpi_notebooks)} MPI, '
+          f'{skipped} up-to-date, {len(markdown_only)} markdown-only).')
 
     serial_failed = []
     mpi_failed = []
@@ -171,7 +178,7 @@ def main():
 
         pool_args = [(nb, OUT_DIR / nb.relative_to(SRC_DIR)) for nb in serial_notebooks]
 
-        progress = _make_progress(len(serial_notebooks), 'Serial notebooks')
+        progress = _make_progress(len(serial_notebooks), 'Serial notebooks', args.no_rich)
 
         if progress is not None:
             with progress:
@@ -212,7 +219,7 @@ def main():
     if mpi_notebooks:
         print(f'\nExecuting {len(mpi_notebooks)} MPI notebooks serially...')
 
-        progress = _make_progress(len(mpi_notebooks), 'MPI notebooks')
+        progress = _make_progress(len(mpi_notebooks), 'MPI notebooks', args.no_rich)
 
         if progress is not None:
             with progress:

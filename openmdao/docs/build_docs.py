@@ -91,6 +91,8 @@ def cmd_build(args):
             exec_cmd += ['--no-serial']
         if args.no_mpi:
             exec_cmd += ['--no-mpi']
+        if args.no_rich:
+            exec_cmd += ['--no-rich']
         subprocess.run(exec_cmd, check=True)
     else:
         print('Skipping notebook execution (--no-exec)')
@@ -131,6 +133,8 @@ def main():
                          help='Parallel Sphinx build (-j auto); skips warnings-as-errors.')
     build_p.add_argument('--workers', type=int, default=None,
                          help='Number of parallel workers (default: cpu_count).')
+    build_p.add_argument('--no-rich', action='store_true',
+                         help='Use plain-text progress output; recommended for CI.')
 
     sub.add_parser('clean', help='Remove all generated files.')
 
@@ -143,6 +147,7 @@ def main():
             args.no_mpi = False
             args.fast = False
             args.workers = None
+            args.no_rich = False
         cmd_build(args)
     elif args.subcommand == 'clean':
         cmd_clean(args)
