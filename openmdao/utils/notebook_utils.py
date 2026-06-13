@@ -157,6 +157,45 @@ def cite(reference):
     return
 
 
+def mpi_exec(nprocs, script):
+    """
+    Run a Python script under mpiexec and display output in the notebook.
+
+    Displays an MPI warning admonition, the command being run, captured stdout,
+    and raises RuntimeError if the script exits with a non-zero return code.
+
+    Parameters
+    ----------
+    nprocs : int
+        Number of MPI processes to use.
+    script : str
+        Path to the Python script to run under mpiexec.
+    """
+    import subprocess
+
+    if ipy:
+        from IPython.display import display, HTML, Markdown
+        display(HTML(
+            '<div class="admonition note"><p class="admonition-title">Note</p>'
+            '<p>This feature requires MPI, and may not be able to be run on Colab or Binder.</p>'
+            '</div>'
+        ))
+        display(Markdown(f'`mpiexec -n {nprocs} {script}`'))
+    else:
+        print('Note: This feature requires MPI, and may not be able to be run on Colab or Binder.')
+        print(f'mpiexec -n {nprocs} {script}')
+
+    result = subprocess.run(['mpiexec', '-n', str(nprocs), 'python', script],
+                            capture_output=True, text=True)
+    if result.stdout:
+        print(result.stdout)
+    if result.returncode != 0:
+        if result.stderr:
+            print(result.stderr)
+        raise RuntimeError(
+            f'mpiexec -n {nprocs} {script} failed with exit code {result.returncode}')
+
+
 def notebook_mode():
     """
     Check if the environment is interactive.

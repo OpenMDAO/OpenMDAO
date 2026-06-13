@@ -1,13 +1,13 @@
 """
 Build or clean the OpenMDAO documentation.
 
-Usage (from openmdao/docs/):
-    python build_docs.py build             # full build
-    python build_docs.py build --no-exec   # skip notebook execution
-    python build_docs.py build --fast      # parallel Sphinx, no warnings-as-errors
-    python build_docs.py clean             # remove all generated files
+Usage:
+    python -m openmdao.devtools.build_docs build             # full build
+    python -m openmdao.devtools.build_docs build --no-exec   # skip notebook execution
+    python -m openmdao.devtools.build_docs build --fast      # parallel Sphinx, no warnings-as-errors
+    python -m openmdao.devtools.build_docs clean             # remove all generated files
 
-Output: _executed_book/_build/html/index.html
+Output: openmdao/docs/_executed_book/_build/html/index.html
 """
 import argparse
 import json
@@ -17,7 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-HERE = Path(__file__).parent
+HERE = Path(__file__).parent.parent.parent / 'openmdao' / 'docs'
 
 
 def _banner(msg):

@@ -62,8 +62,7 @@ runs:
           eval "$(pixi shell-hook -e ${{ inputs.pixi_env }})"
         fi
 
-        cd openmdao/docs
-        python build_docs.py build --no-rich --workers 3
+        python -m openmdao.devtools.build_docs build --no-rich --workers 3
 
     - name: Display doc build reports
       if: steps.build_docs.outcome == 'failure'

@@ -79,11 +79,6 @@ python = "3.14.*"
 # Optional features (version-agnostic as much as possible)
 ##########################################################
 
-[feature.docs.tasks.docs]
-cmd = "python build_docs.py"
-cwd = "openmdao/docs"
-description = "Build or clean the OpenMDAO documentation. Subcommands: build (default), clean. Flags: --no-exec (skip all execution), --no-serial (skip serial notebooks), --no-mpi (skip MPI notebooks), --fast (parallel Sphinx), --workers N, --no-rich (plain-text progress for CI)."
-
 [feature.docs.dependencies]
 papermill = "*"
 sphinx = ">=7.4,<8"
