@@ -8,6 +8,20 @@ Usage:
     python -m openmdao.devtools.build_docs clean             # remove all generated files
 
 Output: openmdao/docs/_executed_book/_build/html/index.html
+
+Notebook execution details
+--------------------------
+MPI-dependent notebooks (those with "mpi": true in their top-level metadata) are
+executed serially, one at a time, outside the parallel pool. They manage their own
+MPI processes internally via mpi_exec(). All other notebooks are executed in parallel
+using a multiprocessing pool.
+
+Notebooks that need OpenMDAO reports (those with "reports": true in their top-level
+metadata) are executed with OPENMDAO_REPORTS=1. All others run with OPENMDAO_REPORTS=0
+to avoid the overhead of generating HTML reports for every notebook.
+
+A notebook is skipped when its output in _executed_book/ already exists and is newer
+than the source. All failures are collected and reported at the end.
 """
 import argparse
 import json
@@ -15,9 +29,20 @@ import os
 import shutil
 import subprocess
 import sys
+from multiprocessing.pool import Pool
 from pathlib import Path
 
 HERE = Path(__file__).parent.parent.parent / 'openmdao' / 'docs'
+SRC_DIR = HERE / 'openmdao_book'
+OUT_DIR = HERE / '_executed_book'
+
+try:
+    from rich.progress import (BarColumn, MofNCompleteColumn, Progress,
+                                SpinnerColumn, TaskProgressColumn, TextColumn,
+                                TimeElapsedColumn, TimeRemainingColumn)
+    _RICH = True
+except ImportError:
+    _RICH = False
 
 
 def _banner(msg):
@@ -25,6 +50,31 @@ def _banner(msg):
     print(f'\n{bar}')
     print(msg)
     print(bar, flush=True)
+
+
+def _make_progress(total, description, no_rich=False):
+    """Return a Rich Progress context manager, or None if rich is unavailable or disabled."""
+    if not _RICH or no_rich:
+        return None
+    return Progress(
+        SpinnerColumn(),
+        TextColumn('[bold blue]{task.description}'),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TaskProgressColumn(),
+        TextColumn('[cyan]elapsed:'),
+        TimeElapsedColumn(),
+        TextColumn('[cyan]remaining:'),
+        TimeRemainingColumn(),
+    )
+
+
+def _nb_meta(nb_path):
+    """Return the top-level metadata dict for a notebook, or {} on error."""
+    try:
+        return json.loads(Path(nb_path).read_text(encoding='utf-8')).get('metadata', {})
+    except Exception:
+        return {}
 
 
 def _has_code_cells(nb_path):
@@ -36,9 +86,185 @@ def _has_code_cells(nb_path):
         return True
 
 
+def _is_mpi_notebook(nb_path):
+    """Return True if the notebook requests MPI execution."""
+    return bool(_nb_meta(nb_path).get('mpi', False))
+
+
+def _is_reports_notebook(nb_path):
+    """Return True if the notebook requires OpenMDAO reports to be enabled."""
+    return bool(_nb_meta(nb_path).get('reports', False))
+
+
+def _is_up_to_date(src, out):
+    """Return True if out exists and is newer than src."""
+    return out.exists() and out.stat().st_mtime >= src.stat().st_mtime
+
+
+def _nb_env(nb_path):
+    """Return the subprocess environment for executing a notebook."""
+    env = os.environ.copy()
+    env['OPENMDAO_REPORTS'] = '1' if _is_reports_notebook(nb_path) else '0'
+    return env
+
+
+def _run_notebook(args):
+    """Execute a single notebook with papermill; return (rel_path, returncode, stdout, stderr)."""
+    nb, out = args
+    rel = nb.relative_to(SRC_DIR)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    cmd = ['papermill', str(nb), str(out), '--no-progress-bar', '--kernel', 'python3',
+           '--cwd', str(out.parent)]
+    result = subprocess.run(cmd, capture_output=True, text=True, env=_nb_env(nb))
+    return rel, result.returncode, result.stdout, result.stderr
+
+
+def _execute_notebooks(workers, force, no_serial, no_mpi, no_rich):
+    """Execute all documentation notebooks using papermill."""
+    all_notebooks = sorted(SRC_DIR.glob('**/*.ipynb'))
+    all_notebooks = [nb for nb in all_notebooks
+                     if '.ipynb_checkpoints' not in nb.parts and '_build' not in nb.parts]
+
+    markdown_only = [nb for nb in all_notebooks if not _has_code_cells(nb)]
+    notebooks = [nb for nb in all_notebooks if _has_code_cells(nb)]
+
+    mpi_notebooks = [nb for nb in notebooks if _is_mpi_notebook(nb)]
+    serial_notebooks = [nb for nb in notebooks if not _is_mpi_notebook(nb)]
+
+    if not force:
+        skipped = sum(1 for nb in notebooks
+                      if _is_up_to_date(nb, OUT_DIR / nb.relative_to(SRC_DIR)))
+        mpi_notebooks = [nb for nb in mpi_notebooks
+                         if not _is_up_to_date(nb, OUT_DIR / nb.relative_to(SRC_DIR))]
+        serial_notebooks = [nb for nb in serial_notebooks
+                            if not _is_up_to_date(nb, OUT_DIR / nb.relative_to(SRC_DIR))]
+    else:
+        skipped = 0
+
+    if no_serial:
+        serial_notebooks = []
+    if no_mpi:
+        mpi_notebooks = []
+
+    total = len(serial_notebooks) + len(mpi_notebooks)
+    print(f'Found {len(all_notebooks)} notebooks '
+          f'({len(serial_notebooks)} serial, {len(mpi_notebooks)} MPI, '
+          f'{skipped} up-to-date, {len(markdown_only)} markdown-only).')
+
+    serial_failed = []
+    mpi_failed = []
+
+    if total == 0:
+        print('All notebooks are up to date.')
+        return
+
+    # --- Serial notebooks: execute in parallel ---
+    if serial_notebooks:
+        worker_count = min(workers, len(serial_notebooks))
+        print(f'\nExecuting {len(serial_notebooks)} serial notebooks '
+              f'with {worker_count} workers...')
+
+        pool_args = [(nb, OUT_DIR / nb.relative_to(SRC_DIR)) for nb in serial_notebooks]
+        progress = _make_progress(len(serial_notebooks), 'Serial notebooks', no_rich)
+
+        if progress is not None:
+            with progress:
+                task_id = progress.add_task('Serial notebooks', total=len(serial_notebooks))
+                with Pool(processes=worker_count) as pool:
+                    for rel, rc, stdout, stderr in pool.imap_unordered(_run_notebook, pool_args):
+                        progress.advance(task_id)
+                        if rc != 0:
+                            progress.print(f'  [red]FAILED[/red] {rel}')
+                            if stdout.strip():
+                                progress.print(stdout)
+                            if stderr.strip():
+                                progress.print(stderr)
+                            serial_failed.append(rel)
+        else:
+            done = 0
+            with Pool(processes=worker_count) as pool:
+                for rel, rc, stdout, stderr in pool.imap_unordered(_run_notebook, pool_args):
+                    done += 1
+                    status = 'FAILED' if rc != 0 else 'ok'
+                    print(f'  [{done}/{len(serial_notebooks)}] [{status}] {rel}', flush=True)
+                    if rc != 0:
+                        if stdout.strip():
+                            print(stdout, file=sys.stderr)
+                        if stderr.strip():
+                            print(stderr, file=sys.stderr)
+                        serial_failed.append(rel)
+
+        if serial_failed:
+            print(f'\nSerial summary: {len(serial_failed)} failed, '
+                  f'{len(serial_notebooks) - len(serial_failed)} succeeded.')
+            for f in serial_failed:
+                print(f'  FAILED: {f}')
+        else:
+            print(f'\nSerial summary: all {len(serial_notebooks)} notebooks succeeded.')
+
+    # --- MPI notebooks: execute serially ---
+    if mpi_notebooks:
+        print(f'\nExecuting {len(mpi_notebooks)} MPI notebooks serially...')
+        progress = _make_progress(len(mpi_notebooks), 'MPI notebooks', no_rich)
+
+        if progress is not None:
+            with progress:
+                task_id = progress.add_task('MPI notebooks', total=len(mpi_notebooks))
+                for nb in mpi_notebooks:
+                    rel = nb.relative_to(SRC_DIR)
+                    out = OUT_DIR / rel
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    progress.print(f'  [MPI] {rel}')
+                    cmd = ['papermill', str(nb), str(out), '--no-progress-bar',
+                           '--kernel', 'python3', '--cwd', str(out.parent)]
+                    result = subprocess.run(cmd, capture_output=True, text=True, env=_nb_env(nb))
+                    progress.advance(task_id)
+                    if result.returncode != 0:
+                        progress.print(f'  [red]FAILED[/red] {rel}')
+                        if result.stdout.strip():
+                            progress.print(result.stdout)
+                        if result.stderr.strip():
+                            progress.print(result.stderr)
+                        mpi_failed.append(rel)
+        else:
+            for i, nb in enumerate(mpi_notebooks, 1):
+                rel = nb.relative_to(SRC_DIR)
+                out = OUT_DIR / rel
+                out.parent.mkdir(parents=True, exist_ok=True)
+                print(f'  [{i}/{len(mpi_notebooks)}] [MPI] {rel}', flush=True)
+                cmd = ['papermill', str(nb), str(out), '--no-progress-bar',
+                       '--kernel', 'python3', '--cwd', str(out.parent)]
+                result = subprocess.run(cmd, capture_output=True, text=True, env=_nb_env(nb))
+                if result.returncode != 0:
+                    print(f'  FAILED: {rel}', file=sys.stderr)
+                    if result.stdout.strip():
+                        print(result.stdout, file=sys.stderr)
+                    if result.stderr.strip():
+                        print(result.stderr, file=sys.stderr)
+                    mpi_failed.append(rel)
+
+        if mpi_failed:
+            print(f'\nMPI summary: {len(mpi_failed)} failed, '
+                  f'{len(mpi_notebooks) - len(mpi_failed)} succeeded.')
+            for f in mpi_failed:
+                print(f'  FAILED: {f}')
+        else:
+            print(f'\nMPI summary: all {len(mpi_notebooks)} notebooks succeeded.')
+
+    failed = serial_failed + mpi_failed
+    if failed:
+        print(f'\nOverall: {len(failed)} notebook(s) failed:', file=sys.stderr)
+        for f in failed:
+            print(f'  {f}', file=sys.stderr)
+        raise RuntimeError(f'{len(failed)} notebook(s) failed.')
+
+    print(f'\nOverall: {total} notebook(s) executed successfully'
+          f'{f", {skipped} skipped (up to date)" if skipped else ""}.')
+
+
 def cmd_clean(args):
     """Remove all files generated by the build."""
-    for path in [HERE / '_executed_book', HERE / 'openmdao_book' / '_srcdocs']:
+    for path in [OUT_DIR, SRC_DIR / '_srcdocs']:
         if path.exists():
             _banner(f'Removing {path.relative_to(HERE)}')
             shutil.rmtree(path)
@@ -61,39 +287,34 @@ def cmd_build(args):
     subprocess.run([sys.executable, 'build_source_docs.py'], check=True)
 
     _banner('Copy source tree to _executed_book/')
-    src = HERE / 'openmdao_book'
-    dst = HERE / '_executed_book'
     # Copy all non-notebook supporting files (data files, scripts, static assets)
     # so they are present alongside the notebooks when papermill executes them.
     # Notebooks with code cells are NOT copied here — papermill writes them directly
-    # to _executed_book/, which allows execute_notebooks.py to use timestamps to skip
+    # to _executed_book/, which allows _execute_notebooks to use timestamps to skip
     # up-to-date notebooks.
     # Notebooks with no code cells (markdown-only, e.g. main.ipynb and _srcdocs stubs)
     # ARE copied here since papermill never touches them.
-    for item in src.rglob('*'):
+    for item in SRC_DIR.rglob('*'):
         if not item.is_file():
             continue
-        rel = item.relative_to(src)
+        rel = item.relative_to(SRC_DIR)
         if '_build' in rel.parts or '.ipynb_checkpoints' in rel.parts:
             continue
         if item.suffix == '.ipynb' and _has_code_cells(item):
             continue
-        target = dst / rel
+        target = OUT_DIR / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(item, target)
 
     if not args.no_exec:
         _banner('Execute notebooks')
-        exec_cmd = [sys.executable, 'execute_notebooks.py']
-        if args.workers is not None:
-            exec_cmd += ['--workers', str(args.workers)]
-        if args.no_serial:
-            exec_cmd += ['--no-serial']
-        if args.no_mpi:
-            exec_cmd += ['--no-mpi']
-        if args.no_rich:
-            exec_cmd += ['--no-rich']
-        subprocess.run(exec_cmd, check=True)
+        _execute_notebooks(
+            workers=args.workers if args.workers is not None else os.cpu_count(),
+            force=False,
+            no_serial=args.no_serial,
+            no_mpi=args.no_mpi,
+            no_rich=args.no_rich,
+        )
     else:
         print('Skipping notebook execution (--no-exec)')
 
@@ -107,7 +328,7 @@ def cmd_build(args):
         sphinx_cmd += ['-j', 'auto']
     else:
         sphinx_cmd += ['-W']
-    sphinx_cmd += [str(dst), str(dst / '_build' / 'html')]
+    sphinx_cmd += [str(OUT_DIR), str(OUT_DIR / '_build' / 'html')]
     subprocess.run(sphinx_cmd, check=True)
 
     _banner('Copy build artifacts')
