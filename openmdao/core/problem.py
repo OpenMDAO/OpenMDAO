@@ -2482,52 +2482,6 @@ class Problem(object, metaclass=ProblemMetaclass):
         _FunctionalCallback
             A callable object whose ``__call__`` method maps a flat NumPy input vector
             to the requested outputs and/or Jacobian.
-
-        Examples
-        --------
-        Set up a simple problem with a Paraboloid component and design variables ``x``
-        and ``y``::
-
-            import openmdao.api as om
-            from openmdao.test_suite.components.paraboloid import Paraboloid
-
-            prob = om.Problem()
-            prob.model.add_subsystem('comp', Paraboloid(),
-                                     promotes_inputs=['x', 'y'],
-                                     promotes_outputs=['f_xy'])
-            prob.model.add_design_var('x', lower=-50, upper=50)
-            prob.model.add_design_var('y', lower=-50, upper=50)
-            prob.model.add_objective('f_xy')
-            prob.setup()
-            prob.final_setup()
-
-        Evaluate outputs only (``form='f'``).  Both ``input_vars`` and ``output_vars``
-        must be supplied::
-
-            f = prob.get_callback('f', input_vars=['x', 'y'], output_vars=['f_xy'])
-            x = f.create_input_vector()
-            x[0] = 3.0   # x
-            x[1] = -4.0  # y
-            y = f(x)     # returns a 1-D array containing f_xy
-
-        Evaluate total derivatives only (``form='dfdx'``).  When ``input_vars`` and
-        ``output_vars`` are omitted the driver's design variables and responses are
-        used automatically::
-
-            dfdx = prob.get_callback('dfdx')
-            x = dfdx.create_input_vector()
-            x[0] = 3.0
-            x[1] = -4.0
-            J = dfdx(x)   # shape (n_outputs, n_inputs)
-
-        Evaluate outputs and total derivatives together (``form='fdfdx'``)::
-
-            fdfdx = prob.get_callback('fdfdx', input_vars=['x', 'y'],
-                                      output_vars=['f_xy'])
-            x = fdfdx.create_input_vector()
-            x[0] = 3.0
-            x[1] = -4.0
-            y, J = fdfdx(x)
         """
         return _FunctionalCallback(self, form, input_vars, output_vars)
 
