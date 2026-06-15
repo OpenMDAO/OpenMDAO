@@ -34,11 +34,11 @@ runs:
         # Convert backslashes to forward slashes (works in Git Bash)
         WORKSPACE="${WORKSPACE//\\//}"
 
-        if [[ "${{ github.repository }}" == "OpenMDAO/OpenMDAO" ]]; then
-          echo "Running in OpenMDAO repo, using local pixi.toml"
+        if [[ -f "${WORKSPACE}/pixi.toml" ]]; then
+          echo "Found local pixi.toml, using it"
           echo "PIXI_MANIFEST=${WORKSPACE}/pixi.toml" >> $GITHUB_ENV
         else
-          echo "Running outside OpenMDAO repo, fetching pixi files from GitHub"
+          echo "No local pixi.toml found, fetching pixi files from GitHub"
           mkdir -p "${WORKSPACE}/.openmdao-pixi"
 
           # Fetch pixi.toml
@@ -110,10 +110,6 @@ runs:
             ;;
 
           local_developer)
-            if [[ "${{ github.repository }}" != "OpenMDAO/OpenMDAO" ]]; then
-              echo "Error: 'local_developer' install method only works in OpenMDAO repo"
-              exit 1
-            fi
             echo "Installing from local directory in developer mode"
             python -m pip install -e . --no-deps
             ;;

@@ -80,11 +80,17 @@ python = "3.14.*"
 ##########################################################
 
 [feature.docs.dependencies]
-ipyparallel = "*"
-jupyter-book = ">=1.0.3,<2"
-matplotlib = "*"
-numpydoc = "*"
+papermill = "*"
+sphinx = ">=7.4,<8"
+myst-nb = "*"
+sphinx-book-theme = "*"
+sphinxcontrib-bibtex = "*"
+sphinx-copybutton = "*"
+sphinx-design = "*"
 sphinx-sitemap = "*"
+numpydoc = "*"
+matplotlib = "*"
+pydata-sphinx-theme = ">=0.15.0,<0.16.0"
 idna = "*"
 jinja2 = "*"
 tqdm = "*"
@@ -222,11 +228,15 @@ test = "testflo --skip_dir=.pixi"
 # Install OpenMDAO in development mode and set up pre-commit hooks
 install-openmdao-dev = { cmd = "pip install --no-deps -e . && pre-commit install", description = "Install OpenMDAO in development mode and set up pre-commit hooks" }
 
+# Install Julia-related Python dependencies (requires Julia to be installed separately)
+install-julia-deps = { cmd = "pip install omjlcomps juliacall juliapkg", description = "Install Julia-related Python dependencies (omjlcomps, juliacall, juliapkg). Requires Julia to be installed first." }
+
 # Install latest OpenMDAO from PyPI
 install-openmdao-latest = { cmd = "pip install --no-deps openmdao", description = "Install latest OpenMDAO from PyPI" }
 
 # Install OpenMDAO from GitHub master branch
 install-openmdao-master = { cmd = "pip install --no-deps git+https://github.com/OpenMDAO/OpenMDAO.git@master", description = "Install OpenMDAO from GitHub master branch" }
+
 
 # Build the SNOPT module for pyoptsparse
 [tasks.build-snopt]
