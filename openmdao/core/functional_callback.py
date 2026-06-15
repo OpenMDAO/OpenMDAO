@@ -103,6 +103,14 @@ class _FunctionalCallback:
                 output_var_indices = None
                 output_var_units = {}
 
+            if not self.problem.driver:
+                if not input_var_names:
+                    raise ValueError((f"{self.msginfo}: inputs must be "
+                        "explicitly specified for a Problem without a driver"))
+                if not output_var_names:
+                    raise ValueError((f"{self.msginfo}: outputs must be "
+                        "explicitly specified for a Problem without a driver"))
+
             tji = _TotalJacInfo(self.problem, output_var_names, input_var_names,
                                 of_indices=output_var_indices, wrt_indices=input_var_indices,
                                 return_format='flat_dict',

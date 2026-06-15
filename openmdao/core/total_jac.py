@@ -455,7 +455,6 @@ class _TotalJacInfo(object):
             self._identify_unit_active_vars()
 
         # Apply explicit unit conversions requested by the functional API.
-        # This block created by Claude.
         if of_units or wrt_units:
             self._apply_functional_api_unit_scalers(of_metadata, wrt_metadata,
                                                     of_units, wrt_units)
@@ -475,8 +474,6 @@ class _TotalJacInfo(object):
         wrt_units : dict or None
             Mapping of design variable name to desired units string, or None.
         """
-        # This function created by Claude.
-
         abs2meta = self.model._var_allprocs_abs2meta['output']
 
         if of_units:
