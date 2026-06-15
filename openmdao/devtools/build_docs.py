@@ -7,7 +7,7 @@ Usage:
     python -m openmdao.devtools.build_docs build --fast      # parallel Sphinx, no warnings-as-errors
     python -m openmdao.devtools.build_docs clean             # remove all generated files
 
-Output: openmdao/docs/_executed_book/_build/html/index.html
+Output: openmdao/docs/_executed_book/_build/html/main.html
 
 Notebook execution details
 --------------------------
@@ -334,7 +334,7 @@ def cmd_build(args):
     _banner('Copy build artifacts')
     subprocess.run([sys.executable, 'copy_build_artifacts.py'], check=True)
 
-    print('\nDone. Docs available at: openmdao/docs/_executed_book/_build/html/index.html')
+    print('\nDone. Docs available at: openmdao/docs/_executed_book/_build/html/main.html')
 
 
 def main():
