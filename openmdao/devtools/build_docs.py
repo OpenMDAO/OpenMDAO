@@ -269,10 +269,21 @@ def cmd_view(args):
     import webbrowser
     from http.server import HTTPServer, SimpleHTTPRequestHandler
 
-    html_dir = OUT_DIR / '_build' / 'html'
+    if args.path is not None:
+        # User supplied a path — resolve to the directory containing main.html.
+        p = Path(args.path).resolve()
+        if p.is_file():
+            p = p.parent
+        html_dir = p
+    else:
+        html_dir = OUT_DIR / '_build' / 'html'
+
     if not (html_dir / 'main.html').exists():
-        print('Docs have not been built yet. Run: python -m openmdao.devtools.build_docs build',
-              file=sys.stderr)
+        if args.path is not None:
+            print(f'main.html not found in {html_dir}', file=sys.stderr)
+        else:
+            print('Docs have not been built yet. Run: python -m openmdao.devtools.build_docs build',
+                  file=sys.stderr)
         sys.exit(1)
 
     port = args.port
@@ -388,6 +399,9 @@ def main():
     view_p = sub.add_parser('view', help='Serve the built docs on a local HTTP server.')
     view_p.add_argument('--port', type=int, default=8000,
                         help='Port to serve on (default: 8000).')
+    view_p.add_argument('--path', default=None,
+                        help='Path to a built docs directory or its main.html file. '
+                             'Use this to serve a downloaded CI artifact.')
 
     args = parser.parse_args()
 
