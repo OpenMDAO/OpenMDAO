@@ -37,7 +37,7 @@ import numpy as np
 import json
 from collections import OrderedDict
 
-from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
+from openmdao.core.constants import _DEFAULT_REPORTS_DIR, INF_BOUND, _ReprClass
 from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.mpi import MPI
@@ -942,27 +942,27 @@ class modOptDriver(Driver):
                 if meta['linear']:
                     if meta['equals'] is not None:
                         lin_con_bounds[name] = {
-                            'lower': equals_con[name],
-                            'upper': equals_con[name],
+                            'lower': equals_con[name] if equals_con[name] > -INF_BOUND else None,
+                            'upper': equals_con[name] if equals_con[name] < INF_BOUND else None,
                             'size': size
                         }
                     else:
                         lin_con_bounds[name] = {
-                            'lower': lower_con[name],
-                            'upper': upper_con[name],
+                            'lower': lower_con[name] if lower_con[name] > -INF_BOUND else None,
+                            'upper': upper_con[name] if upper_con[name] < INF_BOUND else None,
                             'size': size
                         }
                 else:
                     if meta['equals'] is not None:
                         nl_con_bounds[name] = {
-                            'lower': equals_con[name],
-                            'upper': equals_con[name],
+                            'lower': equals_con[name] if equals_con[name] > -INF_BOUND else None,
+                            'upper': equals_con[name] if equals_con[name] < INF_BOUND else None,
                             'size': size
                         }
                     else:
                         nl_con_bounds[name] = {
-                            'lower': lower_con[name],
-                            'upper': upper_con[name],
+                            'lower': lower_con[name] if lower_con[name] > -INF_BOUND else -np.inf,
+                            'upper': upper_con[name] if upper_con[name] < INF_BOUND else np.inf,
                             'size': size
                         }
 

@@ -462,6 +462,10 @@ class TestModOptDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
+        # Check well-formed constraint bounds
+        self.assertEqual(prob.driver._mo_prob.nl_con_bounds["c"]["lower"], -15.0)
+        self.assertEqual(prob.driver._mo_prob.nl_con_bounds["c"]["upper"], np.inf)
+
         # Check constraint is satisfied
         self.assertGreaterEqual(prob['c'], -15.0 - 1e-4)
 
