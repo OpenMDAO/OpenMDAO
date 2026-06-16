@@ -20,13 +20,14 @@ Gradient-Free:
     - COBYLA: Constrained Optimization BY Linear Approximation
     - COBYQA: Constrained Optimization BY Quadratic Approximation
     - NelderMead: Nelder-Mead simplex algorithm (unconstrained)
+    - Egor: Efficient Global Optimization in Rust (bayesian optimization)
 
 Notes
 -----
 - SLSQP is the default optimizer and supports gradients, bounds, and all constraint types
 - SNOPT and IPOPT offer high performance but require separate installation/licenses
 - Linear constraints are handled efficiently by pre-computing their Jacobians
-- Gradient-free methods (COBYLA, COBYQA, NelderMead) are useful when derivatives are unavailable
+- Gradient-free methods (COBYLA, COBYQA, NelderMead, Egor) are useful when derivatives are unavailable
 
 See the modOpt documentation at https://modopt.readthedocs.io for detailed information
 on algorithm-specific options and capabilities.
@@ -78,19 +79,19 @@ _gradient_optimizers = {
 # Algorithms that support constraints (inequality and/or equality)
 _constraint_optimizers = {
     'SLSQP', 'PySLSQP', 'COBYLA', 'TrustConstr', 'COBYQA',
-    'SNOPT', 'IPOPT', 'OpenSQP',
+    'SNOPT', 'IPOPT', 'OpenSQP', 'Egor'
 }
 
 # Algorithms that support equality constraints
 _eq_constraint_optimizers = {
     'SLSQP', 'PySLSQP', 'TrustConstr', 'SNOPT', 'IPOPT',
-    'COBYQA', 'OpenSQP',
+    'COBYQA', 'OpenSQP', 'Egor',
 }
-
+    
 # Algorithms that support bounds
 _bounds_optimizers = {
     'SLSQP', 'PySLSQP', 'LBFGSB', 'TrustConstr', 'COBYLA',
-    'COBYQA', 'SNOPT', 'IPOPT', 'OpenSQP',
+    'COBYQA', 'SNOPT', 'IPOPT', 'OpenSQP', 'Egor',
 }
 
 # Gradient-based algorithms that also support constraints (intersection of both sets)
@@ -99,14 +100,14 @@ _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 # Optimizers that use solver_options argument (different API from others)
 _solver_options_optimizers = {
     'SLSQP', 'PySLSQP', 'COBYLA', 'BFGS', 'LBFGSB', 'NelderMead', 'COBYQA',
-    'TrustConstr', 'SNOPT', 'IPOPT', 'ConvexQPSolvers',
+    'TrustConstr', 'SNOPT', 'IPOPT', 'ConvexQPSolvers', 'Egor',
 }
 
 # All available optimizers (excluding CVXOPT and ConvexQPSolvers which require Hessian)
 _all_optimizers = {
     'SLSQP', 'PySLSQP', 'COBYLA', 'BFGS', 'LBFGSB', 'NelderMead',
     'COBYQA', 'TrustConstr', 'OpenSQP', 'SNOPT', 'IPOPT', 'CVXOPT',
-    'ConvexQPSolvers',
+    'ConvexQPSolvers', 'Egor',
 }
 
 CITATIONS = """
@@ -729,6 +730,13 @@ class modOptDriver(Driver):
                 else:
                     self.opt_settings['verbosity'] = 1 if disp else 0
 
+        elif opt == 'Egor':
+            if 'verbose' not in opt_keys_lower:
+                if isinstance(disp, int):
+                    self.opt_settings['verbose'] = disp
+                else:
+                    self.opt_settings['verbose'] = 2 if disp else 0
+
         else:
             # Most SciPy-based optimizers (SLSQP, COBYLA, COBYQA, BFGS, NelderMead)
             # use 'disp' as boolean
@@ -834,6 +842,9 @@ class modOptDriver(Driver):
             if opt == 'IPOPT':
                 # IPOPT uses 'max_iter' instead of 'maxiter'
                 self.opt_settings['max_iter'] = self.options['maxiter']
+            elif opt == 'Egor':
+                # Egor uses 'max_iters' instead of 'maxiter'
+                self.opt_settings['max_iters'] = self.options['maxiter']
             else:
                 self.opt_settings['maxiter'] = self.options['maxiter']
 
