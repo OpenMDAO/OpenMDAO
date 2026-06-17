@@ -221,6 +221,7 @@ exclude = [
     ".venv",
     "__pycache__",
     "test_*.py",
+    "openmdao/docs/_executed_book",
 ]
 
 [tool.ruff.format]

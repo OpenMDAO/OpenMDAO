@@ -23,4 +23,4 @@ repos:
       entry: python openmdao/devtools/check_pixi_lock.py
       language: system
       files: pixi.lock
-      stages: [commit]
+      stages: [pre-commit]
