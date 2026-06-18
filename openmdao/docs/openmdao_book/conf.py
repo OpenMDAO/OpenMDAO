@@ -2,8 +2,8 @@
 
 project = 'OpenMDAO'
 author = 'The OpenMDAO Development Team'
-copyright = 'OpenMDAO Development Team'
-root_doc = 'main'
+copyright = '2026, OpenMDAO Development Team'
+root_doc = 'index'
 
 extensions = [
     'myst_nb',
