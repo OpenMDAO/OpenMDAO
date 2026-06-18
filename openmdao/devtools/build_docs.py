@@ -7,7 +7,7 @@ Usage:
     python -m openmdao.devtools.build_docs build --fast      # parallel Sphinx, no warnings-as-errors
     python -m openmdao.devtools.build_docs clean             # remove all generated files
 
-Output: openmdao/docs/_executed_book/_build/html/main.html
+Output: openmdao/docs/_executed_book/_build/html/index.html
 
 Notebook execution details
 --------------------------
@@ -270,7 +270,7 @@ def cmd_view(args):
     from http.server import HTTPServer, SimpleHTTPRequestHandler
 
     if args.path is not None:
-        # User supplied a path — resolve to the directory containing main.html.
+        # User supplied a path — resolve to the directory containing index.html.
         p = Path(args.path).resolve()
         if p.is_file():
             p = p.parent
@@ -278,16 +278,16 @@ def cmd_view(args):
     else:
         html_dir = OUT_DIR / '_build' / 'html'
 
-    if not (html_dir / 'main.html').exists():
+    if not (html_dir / 'index.html').exists():
         if args.path is not None:
-            print(f'main.html not found in {html_dir}', file=sys.stderr)
+            print(f'index.html not found in {html_dir}', file=sys.stderr)
         else:
             print('Docs have not been built yet. Run: python -m openmdao.devtools.build_docs build',
                   file=sys.stderr)
         sys.exit(1)
 
     port = args.port
-    url = f'http://localhost:{port}/main.html'
+    url = f'http://localhost:{port}/index.html'
 
     handler = functools.partial(SimpleHTTPRequestHandler, directory=str(html_dir))
     server = HTTPServer(('', port), handler)
@@ -329,7 +329,7 @@ def cmd_build(args):
     # Notebooks with code cells are NOT copied here — papermill writes them directly
     # to _executed_book/, which allows _execute_notebooks to use timestamps to skip
     # up-to-date notebooks.
-    # Notebooks with no code cells (markdown-only, e.g. main.ipynb and _srcdocs stubs)
+    # Notebooks with no code cells (markdown-only, e.g. index.ipynb and _srcdocs stubs)
     # ARE copied here since papermill never touches them.
     for item in SRC_DIR.rglob('*'):
         if not item.is_file():
@@ -371,7 +371,7 @@ def cmd_build(args):
     _banner('Copy build artifacts')
     subprocess.run([sys.executable, 'copy_build_artifacts.py'], check=True)
 
-    print('\nDone. Docs available at: openmdao/docs/_executed_book/_build/html/main.html')
+    print('\nDone. Docs available at: openmdao/docs/_executed_book/_build/html/index.html')
 
 
 def main():
@@ -400,7 +400,7 @@ def main():
     view_p.add_argument('--port', type=int, default=8000,
                         help='Port to serve on (default: 8000).')
     view_p.add_argument('--path', default=None,
-                        help='Path to a built docs directory or its main.html file. '
+                        help='Path to a built docs directory or its index.html file. '
                              'Use this to serve a downloaded CI artifact.')
 
     args = parser.parse_args()
