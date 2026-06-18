@@ -942,27 +942,27 @@ class modOptDriver(Driver):
                 if meta['linear']:
                     if meta['equals'] is not None:
                         lin_con_bounds[name] = {
-                            'lower': equals_con[name] if equals_con[name] > -INF_BOUND else None,
-                            'upper': equals_con[name] if equals_con[name] < INF_BOUND else None,
+                            'lower': equals_con[name] if np.any(equals_con[name] > -INF_BOUND) else None,
+                            'upper': equals_con[name] if np.any(equals_con[name] < INF_BOUND) else None,
                             'size': size
                         }
                     else:
                         lin_con_bounds[name] = {
-                            'lower': lower_con[name] if lower_con[name] > -INF_BOUND else None,
-                            'upper': upper_con[name] if upper_con[name] < INF_BOUND else None,
+                            'lower': lower_con[name] if np.any(lower_con[name] > -INF_BOUND) else None,
+                            'upper': upper_con[name] if np.any(upper_con[name] < INF_BOUND) else None,
                             'size': size
                         }
                 else:
                     if meta['equals'] is not None:
                         nl_con_bounds[name] = {
-                            'lower': equals_con[name] if equals_con[name] > -INF_BOUND else None,
-                            'upper': equals_con[name] if equals_con[name] < INF_BOUND else None,
+                            'lower': equals_con[name] if np.any(equals_con[name] > -INF_BOUND) else None,
+                            'upper': equals_con[name] if np.any(equals_con[name] < INF_BOUND) else None,
                             'size': size
                         }
                     else:
                         nl_con_bounds[name] = {
-                            'lower': lower_con[name] if lower_con[name] > -INF_BOUND else -np.inf,
-                            'upper': upper_con[name] if upper_con[name] < INF_BOUND else np.inf,
+                            'lower': lower_con[name] if np.any(lower_con[name] > -INF_BOUND) else None,
+                            'upper': upper_con[name] if np.any(upper_con[name] < INF_BOUND) else None,
                             'size': size
                         }
 
