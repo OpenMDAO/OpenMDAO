@@ -848,15 +848,15 @@ class modOptDriver(Driver):
 
         # Collect design variable information (initial values and bounds)
         x_info = OrderedDict()
-        lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
+        dv_bounds = self._autoscaler.get_bounds_scaling('design_var')
         use_bounds = (opt in _bounds_optimizers)
         for name, meta in self._designvars.items():
             x_info[name] = {}
             x_info[name]['init'] = desvar_vals[name]
 
             if use_bounds:
-                x_info[name]['lower'] = lower_dv[name]
-                x_info[name]['upper'] = upper_dv[name]
+                x_info[name]['lower'] = dv_bounds[name].lower
+                x_info[name]['upper'] = dv_bounds[name].upper
             else:
                 x_info[name]['lower'] = None
                 x_info[name]['upper'] = None
@@ -920,7 +920,7 @@ class modOptDriver(Driver):
                 self._lincongrad_cache = None
 
             # Process constraints and organize into linear and nonlinear categories
-            lower_con, upper_con, equals_con = self._autoscaler.get_bounds_scaling('constraint')
+            con_bounds = self._autoscaler.get_bounds_scaling('constraint')
             for name, meta in self._cons.items():
                 if meta['indices'] is not None:
                     meta['size'] = size = meta['indices'].indexed_src_size
@@ -931,27 +931,27 @@ class modOptDriver(Driver):
                 if meta['linear']:
                     if meta['equals'] is not None:
                         lin_con_bounds[name] = {
-                            'lower': equals_con[name],
-                            'upper': equals_con[name],
+                            'lower': con_bounds[name].equals,
+                            'upper': con_bounds[name].equals,
                             'size': size
                         }
                     else:
                         lin_con_bounds[name] = {
-                            'lower': lower_con[name],
-                            'upper': upper_con[name],
+                            'lower': con_bounds[name].lower,
+                            'upper': con_bounds[name].upper,
                             'size': size
                         }
                 else:
                     if meta['equals'] is not None:
                         nl_con_bounds[name] = {
-                            'lower': equals_con[name],
-                            'upper': equals_con[name],
+                            'lower': con_bounds[name].equals,
+                            'upper': con_bounds[name].equals,
                             'size': size
                         }
                     else:
                         nl_con_bounds[name] = {
-                            'lower': lower_con[name],
-                            'upper': upper_con[name],
+                            'lower': con_bounds[name].lower,
+                            'upper': con_bounds[name].upper,
                             'size': size
                         }
 

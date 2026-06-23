@@ -7,6 +7,8 @@ from enum import IntEnum
 import numpy as np
 
 
+# Retained for backwards compatibility. Infinite bounds are now stored as None or np.inf
+# internally. Do not use this constant for new code.
 INF_BOUND = 1.0E30
 
 
