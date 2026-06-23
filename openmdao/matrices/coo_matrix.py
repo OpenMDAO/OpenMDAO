@@ -58,13 +58,12 @@ class COOMatrix(Matrix):
         submats = self._submats
         self._coo_slices = {}
 
-        # Pre-allocate the full rows/cols arrays using get_coo_data_size() to avoid
-        # accumulating all per-subjac arrays in memory simultaneously before concatenation.
+        # Pre-allocate the full rows/cols arrays to avoid accumulating all
+        # per-subjac arrays in memory simultaneously before concatenation.
         total_nnz = sum(submat.get_coo_data_size() for submat in submats.values())
         rows = np.empty(total_nnz, dtype=INT_DTYPE)
         cols = np.empty(total_nnz, dtype=INT_DTYPE)
 
-        # Fill rows/cols one subjac at a time, freeing each temporary array immediately.
         start = end = 0
         for key, submat in submats.items():
             _, r, c = submat.as_coo_info(full=True)

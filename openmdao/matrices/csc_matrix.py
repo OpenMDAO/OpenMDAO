@@ -11,12 +11,6 @@ class CSCMatrix(COOMatrix):
     """
     Sparse matrix in Compressed Col Storage format.
 
-    Eliminates redundant COO storage by pre-computing a single array mapping
-    each COO entry to its position in the CSC data array. Updates are applied
-    in-place directly to the CSC matrix, and COO arrays are discarded after
-    build. Duplicate (row, col) entries are handled by zeroing CSC data before
-    each update cycle and accumulating contributions with +=.
-
     Parameters
     ----------
     submats : dict
@@ -55,7 +49,6 @@ class CSCMatrix(COOMatrix):
         coo = self._coo
         n_entries = coo.data.size
 
-        # Build CSC once from COO
         self._matrix = csc_matrix((coo.data, (coo.row, coo.col)), shape=coo.shape)
 
         # Compute COO-to-CSC mapping via lexsort (col-major order, same as CSC).

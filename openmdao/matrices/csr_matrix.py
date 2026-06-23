@@ -11,12 +11,6 @@ class CSRMatrix(COOMatrix):
     """
     Sparse matrix in Compressed Row Storage format.
 
-    Eliminates redundant COO storage by pre-computing a single array mapping
-    each COO entry to its position in the CSR data array. Updates are applied
-    in-place directly to the CSR matrix, and COO arrays are discarded after
-    build. Duplicate (row, col) entries are handled by zeroing CSR data before
-    each update cycle and accumulating contributions with np.add.at.
-
     Parameters
     ----------
     submats : dict
@@ -55,7 +49,6 @@ class CSRMatrix(COOMatrix):
         coo = self._coo
         n_entries = coo.data.size
 
-        # Build CSR once from COO
         self._matrix = csr_matrix((coo.data, (coo.row, coo.col)), shape=coo.shape)
 
         # Compute COO-to-CSR mapping via lexsort (row-major order, same as CSR).
