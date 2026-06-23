@@ -77,3 +77,5 @@ exclude_patterns = [
     '**/.ipynb_checkpoints',
     'template.ipynb',
 ]
+
+myst_heading_anchors = 2
