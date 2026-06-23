@@ -27,7 +27,8 @@ Notes
 - SLSQP is the default optimizer and supports gradients, bounds, and all constraint types
 - SNOPT and IPOPT offer high performance but require separate installation/licenses
 - Linear constraints are handled efficiently by pre-computing their Jacobians
-- Gradient-free methods (COBYLA, COBYQA, NelderMead, Egor) are useful when derivatives are unavailable
+- Gradient-free methods (COBYLA, COBYQA, NelderMead, Egor) are useful 
+  when derivatives are unavailable
 
 See the modOpt documentation at https://modopt.readthedocs.io for detailed information
 on algorithm-specific options and capabilities.
@@ -939,31 +940,47 @@ class modOptDriver(Driver):
                     size = meta['global_size'] if meta['distributed'] else meta['size']
 
                 # Separate linear and nonlinear constraints
-                if meta['linear']:
-                    if meta['equals'] is not None:
+                if meta["linear"]:
+                    if meta["equals"] is not None:
                         lin_con_bounds[name] = {
-                            'lower': equals_con[name] if np.any(equals_con[name] > -INF_BOUND) else None,
-                            'upper': equals_con[name] if np.any(equals_con[name] < INF_BOUND) else None,
-                            'size': size
+                            "lower": equals_con[name]
+                            if np.any(equals_con[name] > -INF_BOUND)
+                            else None,
+                            "upper": equals_con[name]
+                            if np.any(equals_con[name] < INF_BOUND)
+                            else None,
+                            "size": size,
                         }
                     else:
                         lin_con_bounds[name] = {
-                            'lower': lower_con[name] if np.any(lower_con[name] > -INF_BOUND) else None,
-                            'upper': upper_con[name] if np.any(upper_con[name] < INF_BOUND) else None,
-                            'size': size
+                            "lower": lower_con[name]
+                            if np.any(lower_con[name] > -INF_BOUND)
+                            else None,
+                            "upper": upper_con[name]
+                            if np.any(upper_con[name] < INF_BOUND)
+                            else None,
+                            "size": size,
                         }
                 else:
-                    if meta['equals'] is not None:
+                    if meta["equals"] is not None:
                         nl_con_bounds[name] = {
-                            'lower': equals_con[name] if np.any(equals_con[name] > -INF_BOUND) else None,
-                            'upper': equals_con[name] if np.any(equals_con[name] < INF_BOUND) else None,
-                            'size': size
+                            "lower": equals_con[name]
+                            if np.any(equals_con[name] > -INF_BOUND)
+                            else None,
+                            "upper": equals_con[name]
+                            if np.any(equals_con[name] < INF_BOUND)
+                            else None,
+                            "size": size,
                         }
                     else:
                         nl_con_bounds[name] = {
-                            'lower': lower_con[name] if np.any(lower_con[name] > -INF_BOUND) else None,
-                            'upper': upper_con[name] if np.any(upper_con[name] < INF_BOUND) else None,
-                            'size': size
+                            "lower": lower_con[name]
+                            if np.any(lower_con[name] > -INF_BOUND)
+                            else None,
+                            "upper": upper_con[name]
+                            if np.any(upper_con[name] < INF_BOUND)
+                            else None,
+                            "size": size,
                         }
 
                     # Initialize sparsity structure for nonlinear constraint Jacobians
