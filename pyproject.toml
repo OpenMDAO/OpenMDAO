@@ -49,6 +49,7 @@ docs = [
     "matplotlib",
     "numpydoc>=1.1",
     "sphinx-sitemap",
+    "pydata-sphinx-theme>=0.15.0,<0.16.0",
     "idna>=3.7",
     "jinja2>=3.1.4",
     "tqdm>=4.66.3"
@@ -137,6 +138,7 @@ analysisdriver = "openmdao.drivers.analysis_driver:AnalysisDriver"
 differentialevolutiondriver = "openmdao.drivers.differential_evolution_driver:DifferentialEvolutionDriver"
 doedriver = "openmdao.drivers.doe_driver:DOEDriver"
 driver = "openmdao.core.driver:Driver"
+modoptdriver = "openmdao.drivers.modopt_driver:modOptDriver"
 pyoptsparsedriver = "openmdao.drivers.pyoptsparse_driver:pyOptSparseDriver"
 pymoodriver = "openmdao.drivers.pymoo_driver:pymooDriver"
 scipydriver = "openmdao.drivers.scipy_optimizer:ScipyOptimizeDriver"
@@ -219,6 +221,7 @@ exclude = [
     ".venv",
     "__pycache__",
     "test_*.py",
+    "openmdao/docs/_executed_book",
 ]
 
 [tool.ruff.format]

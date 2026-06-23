@@ -1,0 +1,47 @@
+name: Update pixi lockfile
+
+permissions:
+  contents: write
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      cooldown_days:
+        description: 'Exclude packages uploaded within this many days (supply chain cooldown)'
+        required: false
+        default: '7'
+        type: string
+  schedule:
+    - cron: '0 5 15 * *'  # Runs at 05:00 UTC on the 15th of every month
+
+jobs:
+  pixi-update:
+    if: github.repository == 'OpenMDAO/OpenMDAO'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@v0.9.5
+        with:
+          run-install: false
+      - name: Apply cooldown period
+        run: |
+          COOLDOWN="${{ inputs.cooldown_days || '7' }}"
+          sed -i "s/exclude-newer = \"[0-9]*d\"/exclude-newer = \"${COOLDOWN}d\"/" pixi.toml
+      - name: Update lockfile
+        run: |
+          set -o pipefail
+          pixi update --json | pixi exec pixi-diff-to-markdown >> diff.md
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'Update pixi lockfile'
+          title: 'Update pixi lockfile'
+          body-path: diff.md
+          branch: update-pixi-lockfile
+          base: master
+          labels: pixi
+          delete-branch: true
+          add-paths: pixi.lock

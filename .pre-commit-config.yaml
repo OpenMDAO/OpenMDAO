@@ -15,3 +15,12 @@ repos:
       # For now, only run on the pixi workflows
       files: ^\.github/workflows/.*_pixi\.ya?ml$
       # files: ^\.github/workflows/.*\.ya?ml$
+
+- repo: local
+  hooks:
+    - id: check-pixi-lock-changes
+      name: Check pixi.lock without pixi.toml changes
+      entry: python openmdao/devtools/check_pixi_lock.py
+      language: system
+      files: pixi.lock
+      stages: [pre-commit]

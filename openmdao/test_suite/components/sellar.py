@@ -631,8 +631,9 @@ class SellarProblem(om.Problem):
     The Sellar problem with configurable model class.
     """
 
-    def __init__(self, model_class=SellarDerivatives, **kwargs):
-        super().__init__(model_class(**kwargs))
+    def __init__(self, model_class=SellarDerivatives, name=None, **kwargs):
+        prob_kwargs = {} if name is None else {'name': name}
+        super().__init__(model_class(**kwargs), **prob_kwargs)
 
         model = self.model
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))

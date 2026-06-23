@@ -43,6 +43,7 @@ description = "OpenMDAO workspace"
 authors = ["OpenMDAO Team <https://github.com/OpenMDAO>"]
 channels = ["conda-forge"]
 platforms = ["linux-64", "osx-64", "osx-arm64", "win-64"]
+exclude-newer = "7d"  # Cooldown to mitigate supply chain attacks
 
 ###############################################
 # Base Dependencies
@@ -79,11 +80,17 @@ python = "3.14.*"
 ##########################################################
 
 [feature.docs.dependencies]
-ipyparallel = "*"
-jupyter-book = ">=1.0.3,<2"
-matplotlib = "*"
-numpydoc = "*"
+papermill = "*"
+sphinx = ">=7.4,<8"
+myst-nb = "*"
+sphinx-book-theme = "*"
+sphinxcontrib-bibtex = "*"
+sphinx-copybutton = "*"
+sphinx-design = "*"
 sphinx-sitemap = "*"
+numpydoc = "*"
+matplotlib = "*"
+pydata-sphinx-theme = ">=0.15.0,<0.16.0"
 idna = "*"
 jinja2 = "*"
 tqdm = "*"
@@ -97,6 +104,7 @@ cyipopt = "*"
 pymoo = ">=0.6.1"
 
 [feature.opt.pypi-dependencies]
+modopt = {git = "https://github.com/lsdolab/modopt.git", branch = "main"}
 build_pyoptsparse = { git = "https://github.com/OpenMDAO/build_pyoptsparse.git" }
 
 # Jax not available for windows on conda-forge
@@ -158,6 +166,14 @@ nbdime = "*"
 [feature.test.pypi-dependencies]
 testflo = "*"
 
+[feature.openblas-explicit.dependencies]
+# Explicitly pin to OpenBLAS across all platforms for numerical consistency and reproducibility.
+# The pixi lockfile update caused dependency resolver to switch to BLIS on linux-64, which has
+# different numerical behavior and caused test failures due to solver divergence.
+# Using OpenBLAS explicitly ensures consistent behavior across all environments (linux-64, osx-64, osx-arm64, win-64).
+libblas = { version = "*", build = "*_openblas" }
+libcblas = { version = "*", build = "*_openblas" }
+
 [feature.visualization.dependencies]
 panel = "*"
 bokeh = "*"
@@ -183,20 +199,20 @@ networkx = "==3.3"
 [environments]
 
 # Default - uses whatever Python solver picks
-default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "default" }
-dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging"], solve-group = "default" }
-minimal = { features = ["py313", "test"], solve-group = "default" }
+default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "default" }
+dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging", "openblas-explicit"], solve-group = "default" }
+minimal = { features = ["py313", "test", "openblas-explicit"], solve-group = "default" }
 
 # Oldest supported versions
-oldest = { features = ["deps-oldest", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "oldest" }
+oldest = { features = ["deps-oldest", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "oldest" }
 
 # Python version matrix
-py311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py311" }
-py312 = { features = ["py312", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "py312" }
+py311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "py311" }
+py312 = { features = ["py312", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "py312" }
 # Note that environment py313 is deprecated in favor of default
-py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi"], solve-group = "default" }
+py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "default" }
 # py314 uses mpi-no-osx instead of mpi because opt/MPI conflict on macOS under py314.
-py314 = { features = ["py314", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi-no-osx"], solve-group = "py314" }
+py314 = { features = ["py314", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi-no-osx", "openblas-explicit"], solve-group = "py314" }
 
 ###############################################
 # Tasks
@@ -212,11 +228,15 @@ test = "testflo --skip_dir=.pixi"
 # Install OpenMDAO in development mode and set up pre-commit hooks
 install-openmdao-dev = { cmd = "pip install --no-deps -e . && pre-commit install", description = "Install OpenMDAO in development mode and set up pre-commit hooks" }
 
+# Install Julia-related Python dependencies (requires Julia to be installed separately)
+install-julia-deps = { cmd = "pip install omjlcomps juliacall juliapkg", description = "Install Julia-related Python dependencies (omjlcomps, juliacall, juliapkg). Requires Julia to be installed first." }
+
 # Install latest OpenMDAO from PyPI
 install-openmdao-latest = { cmd = "pip install --no-deps openmdao", description = "Install latest OpenMDAO from PyPI" }
 
 # Install OpenMDAO from GitHub master branch
 install-openmdao-master = { cmd = "pip install --no-deps git+https://github.com/OpenMDAO/OpenMDAO.git@master", description = "Install OpenMDAO from GitHub master branch" }
+
 
 # Build the SNOPT module for pyoptsparse
 [tasks.build-snopt]
