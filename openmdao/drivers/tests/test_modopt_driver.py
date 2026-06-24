@@ -1362,13 +1362,14 @@ class TestModOptDriver(unittest.TestCase):
         model.add_design_var('x', lower=-50.0, upper=50.0)
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
-        model.add_constraint('c', lower=0.0)
+        model.add_constraint('c', lower=0.0, upper=1e29)
 
         prob.setup()
         prob.run_driver()
 
         # Check expected responses are met
         assert_near_equal(prob['f_xy'], -27.0, 1e-4)
+        print(f"prob['c']={prob['c']}")
         assert_near_equal(prob['c'], 0.0, 1e-4)
 
     @require_modopt_optimizer('COBYQA')
