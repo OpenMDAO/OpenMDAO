@@ -78,4 +78,7 @@ exclude_patterns = [
     'template.ipynb',
 ]
 
+# This tells myst to create "heading anchors" for first and second-level
+# markdown headings (i.e. for both `# Title` and `## SubTitle`) that can be
+# referenced (eg `[reference](/path/to/notebook.ipynb##subtitle)).
 myst_heading_anchors = 2
