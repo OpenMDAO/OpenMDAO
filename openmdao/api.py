@@ -37,7 +37,8 @@ from openmdao.components.vector_magnitude_comp import VectorMagnitudeComp
 from openmdao.components.submodel_comp import SubmodelComp
 from openmdao.components.jax_explicit_comp import JaxExplicitComponent
 from openmdao.components.jax_implicit_comp import JaxImplicitComponent
-
+from openmdao.components.dense_nn_comp import DenseNNComp
+from openmdao.components.jax_flax_comp import JaxFlaxComp
 
 # Solvers
 from openmdao.solvers.linear.linear_block_gs import LinearBlockGS
