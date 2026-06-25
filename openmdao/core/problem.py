@@ -24,6 +24,7 @@ from openmdao.core.constants import _SetupStatus
 from openmdao.core.component import Component
 from openmdao.core.driver import Driver, record_iteration
 from openmdao.core.explicitcomponent import ExplicitComponent
+from openmdao.core.functional_callback import _FunctionalCallback
 from openmdao.core.system import System, _iter_derivs
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
@@ -2432,6 +2433,57 @@ class Problem(object, metaclass=ProblemMetaclass):
            The path of the outputs directory for the problem.
         """
         return _get_outputs_dir(self, *subdirs, mkdir=mkdir)
+
+    def get_callback(self, form, input_vars=None, output_vars=None):
+        """
+        Return a callable that wraps this Problem for use as a functional interface.
+
+        The returned callable accepts a flat input vector ``x``, runs the model, and
+        returns outputs and/or total derivatives depending on the requested ``form``.
+
+        Currently specifying units for an input or output variable is not
+        supported: a warning will be issued if units are specified for an input
+        or output variable.
+
+        Parameters
+        ----------
+        form : str
+            Determines what the callable computes and returns. Must be one of:
+
+            ``'f'``
+                Evaluate outputs only.  The callable signature is ``f(x[, y]) -> y``,
+                where ``x`` is the flat input vector and ``y`` is the flat output vector.
+                Both ``input_vars`` and ``output_vars`` must be provided when using this
+                form.
+            ``'dfdx'``
+                Evaluate total derivatives only.  The callable signature is
+                ``f(x[, J]) -> J``, where ``J`` is the Jacobian matrix
+                ``(n_outputs, n_inputs)``.
+            ``'fdfdx'``
+                Evaluate outputs and total derivatives together.  The callable signature
+                is ``f(x[, y[, J]]) -> (y, J)``.
+
+        input_vars : list of str or list of dict, optional
+            Variables to treat as inputs (i.e. the components of ``x``).  Each entry
+            may be either a plain variable name string or a dict mapping an alias to a
+            metadata dict with optional keys ``'name'``, ``'units'``, and ``'indices'``.
+            When ``form`` is ``'dfdx'`` or ``'fdfdx'`` and this argument is omitted,
+            the design variables registered on the driver are used.  When ``form`` is
+            ``'f'``, this argument is required.
+        output_vars : list of str or list of dict, optional
+            Variables to treat as outputs (i.e. the components of ``y`` / rows of
+            ``J``).  The same format as ``input_vars`` applies.  When ``form`` is
+            ``'dfdx'`` or ``'fdfdx'`` and this argument is omitted, the responses
+            registered on the driver are used.  When ``form`` is ``'f'``, this argument
+            is required.
+
+        Returns
+        -------
+        _FunctionalCallback
+            A callable object whose ``__call__`` method maps a flat NumPy input vector
+            to the requested outputs and/or Jacobian.
+        """
+        return _FunctionalCallback(self, form, input_vars, output_vars)
 
     def get_coloring_dir(self, mode, mkdir=False):
         """
