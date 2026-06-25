@@ -687,7 +687,7 @@ class modOptDriver(Driver):
         # CVXOPT and ConvexQPSolvers are rejected at runtime due to Hessian requirements
         if opt == 'IPOPT':
             if 'print_level' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['print_level'] = min(max(disp, 0), 12)
                 else:
                     self.opt_settings['print_level'] = 5 if disp else 0
@@ -695,7 +695,7 @@ class modOptDriver(Driver):
         elif opt == 'SNOPT':
             if 'major print level' not in opt_keys_lower \
                     and 'minor print level' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     level = min(max(disp, 0), 10)
                     self.opt_settings['Major print level'] = level
                     self.opt_settings['Minor print level'] = level
@@ -705,35 +705,35 @@ class modOptDriver(Driver):
 
         elif opt == 'TrustConstr':
             if 'verbose' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['verbose'] = min(max(disp, 0), 3)
                 else:
                     self.opt_settings['verbose'] = 1 if disp else 0
 
         elif opt == 'PySLSQP':
             if 'iprint' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['iprint'] = disp
                 else:
                     self.opt_settings['iprint'] = 1 if disp else 0
 
         elif opt == 'LBFGSB':
             if 'iprint' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['iprint'] = disp
                 else:
                     self.opt_settings['iprint'] = 0 if disp else -1
 
         elif opt == 'OpenSQP':
             if 'verbosity' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['verbosity'] = disp
                 else:
                     self.opt_settings['verbosity'] = 1 if disp else 0
 
         elif opt == 'Egor':
             if 'verbose' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['verbose'] = disp
                 else:
                     self.opt_settings['verbose'] = 2 if disp else 0
@@ -742,7 +742,7 @@ class modOptDriver(Driver):
             # Most SciPy-based optimizers (SLSQP, COBYLA, COBYQA, BFGS, NelderMead)
             # use 'disp' as boolean
             if 'disp' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['disp'] = disp > 0
                 else:
                     self.opt_settings['disp'] = disp
