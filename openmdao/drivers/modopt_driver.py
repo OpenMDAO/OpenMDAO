@@ -1032,7 +1032,14 @@ class modOptDriver(Driver):
                 out_dir = self.options['output_dir']
 
             # Instantiate and run optimizer
-            optimizer_cls = getattr(mo, opt)
+            try:
+                optimizer_cls = getattr(mo, opt)
+            except AttributeError:
+                raise RuntimeError(
+                    f'The "{opt}" algorithm is currently unavailable in your '
+                    f'environment. You may to manually install it to use with '
+                    f'the modOptDriver.'
+                )
             if opt in _solver_options_optimizers:
                 optimizer = optimizer_cls(
                     problem=self._mo_prob,
