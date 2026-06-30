@@ -21,7 +21,6 @@ Design notes
 
 from __future__ import annotations
 
-import argparse
 import shutil
 import sys
 from pathlib import Path
@@ -58,13 +57,13 @@ def get_package_path() -> Path:
 
 def get_docs_path() -> Path:
     """Return the path to the bundled documentation (Jupyter Book source)."""
+    # should work for both editable and wheel installs
     return _PACKAGE_DIR / "docs" / "openmdao_book"
-
 
 def get_examples_path() -> Path:
     """Return the path to runnable example components."""
+    # should work for both editable and wheel installs
     return _PACKAGE_DIR / "test_suite" / "test_examples"
-
 
 def get_skills_source_dir() -> Path:
     """Return the directory containing bundled skill sources."""
@@ -128,12 +127,10 @@ class Tool:
             Install skills globally if True, otherwise install locally.
         """
         self.use_global = use_global
-        self.home = Path.home()
-        self.cwd = Path.cwd()
 
     def detected(self) -> bool:
         """
-        Return True if this tool (e.g. Claude, Codex) is detected on the current system.
+        Return True if this tool (e.g. Claude) is detected on the current system.
 
         Returns
         -------
@@ -153,11 +150,11 @@ class Tool:
             OpenMDAO built-in skill directory.
         """
         return self.install_path.exists() and any(
-            d for d in self.install_path.iterdir() if d.is_dir() and \
-                d.name.startswith(_SKILL_PREFIX)
+            d for d in self.install_path.iterdir()
+            if d.is_dir() and d.name.startswith(_SKILL_PREFIX)
         )
 
-    def install(self, skill_dir: Path, use_global: bool = False) -> int:
+    def install(self, skill_dir: Path) -> int:
         """
         Install skills into this tool's install path.
 
@@ -165,36 +162,11 @@ class Tool:
         ----------
         skill_dir : Path
             Source directory containing the skill subdirectory to install.
-        use_global : bool
-            Install skills globally if True, otherwise install locally.
 
         Returns
         -------
         int
-            Number of skills installed.
-        """
-        """
-        Copy skill directory trees into *dest*, rewriting path placeholders in place.
-
-        This is the install strategy for Claude Code, which expects one subdirectory
-        per skill, each containing a ``SKILL.md``. Any existing copy of a skill is
-        removed before copying so the install is always a clean replacement. After
-        copying, every ``*.md`` file in the tree is scanned and any path placeholders
-        (``{{OPENMDAO_PATH}}``, ``{{OPENMDAO_DOCS}}``, ``{{OPENMDAO_EXAMPLES}}``)
-        are rewritten to absolute paths on the current machine.
-
-        Parameters
-        ----------
-        skill_dirs : list of Path
-            Source skill directories to install. Each must contain a ``SKILL.md``.
-        dest : Path
-            Directory into which the skill subdirectories are copied. Created if it
-            does not exist.
-
-        Returns
-        -------
-        int
-            Number of skill directories installed.
+            Successful install if 0, otherwise an error code.
         """
         self.install_path.mkdir(parents=True, exist_ok=True)
         target = self.install_path / skill_dir.name
@@ -213,13 +185,16 @@ class Tool:
             if new_text != text:
                 md.write_text(new_text, encoding="utf-8")
 
-        self.install_main_file_md()
+        ok, msg = self.install_main_file_md()
+        if not ok:
+            print(f"Failed to install main file: {msg}", file=sys.stderr)
+            return 1
 
-        return 1
+        return 0
 
     def install_main_file_md(self) -> tuple[bool, str]:
         """
-        Install or update the OpenMDAO-managed section in CLAUDE.md.
+        Install or update OpenMDAO-managed section in the main file for the tool, e.g. CLAUDE.md.
 
         The OpenMDAO content is wrapped in HTML-comment markers so the section can
         be replaced in place on re-install without disturbing user content.
@@ -231,19 +206,17 @@ class Tool:
             error prevented the write; informational outcomes still return True.
         """
         try:
-            source = _find_skill_dir(get_skills_source_dir(), self.key) / self.main_filename
+            skill_dir = _find_skill_dir(get_skills_source_dir(), self.key)
+            if skill_dir is None:
+                return False, f"No skill directory found for key '{self.key}'"
+            source = skill_dir / self.main_filename
             if not source.exists():
                 return False, f"No {self.main_filename} template found at {source}"
 
             body = replace_path_placeholders(source.read_text(encoding="utf-8"))
             wrapped = f"\n\n{_TOOL_SECTION_START}\n{body}\n{_TOOL_SECTION_END}\n"
 
-            if self.use_global:
-                claude_dir = Path.home() / '.claude'
-            else:
-                claude_dir = _REPO_ROOT / '.claude'
-
-            target = claude_dir / self.main_filename
+            target = self.install_path.parent / self.main_filename
             target.parent.mkdir(parents=True, exist_ok=True)
 
             if target.exists():
@@ -251,6 +224,9 @@ class Tool:
                 if _TOOL_SECTION_START in existing and _TOOL_SECTION_END in existing:
                     start = existing.find(_TOOL_SECTION_START)
                     end = existing.find(_TOOL_SECTION_END) + len(_TOOL_SECTION_END)
+                    if end <= start:
+                        return True, f"Malformed OpenMDAO section in {self.main_filename}; " \
+                                     "END before START, no changes made"
                     new_content = existing[:start] + wrapped.lstrip("\n") + existing[end:]
                     target.write_text(new_content, encoding="utf-8")
                     return True, f"Updated existing OpenMDAO section in {self.main_filename}"
@@ -260,8 +236,8 @@ class Tool:
                     target.write_text(new_content, encoding="utf-8")
                     return True, f"Appended OpenMDAO section to existing {self.main_filename}"
             else:
-                # Create a fresh CLAUDE.md.
-                header = "# OpenMDAO Framework Reference\n"
+                # Create a fresh mainfile for the tool.
+                header = '# OpenMDAO Framework Reference\n'
                 target.write_text(header + wrapped.lstrip("\n"), encoding="utf-8")
                 return True, f"Created new {self.main_filename} with OpenMDAO content"
 
@@ -281,8 +257,7 @@ class Tool:
             error prevented the write.
         """
         try:
-            base = (Path.home() if self.use_global else Path.cwd()) / ".claude"
-            target = base / self.main_filename
+            target = self.install_path.parent / self.main_filename
             if not target.exists():
                 return True, f"No {self.main_filename} to clean up"
 
@@ -292,8 +267,11 @@ class Tool:
 
             start = existing.find(_TOOL_SECTION_START)
             end = existing.find(_TOOL_SECTION_END) + len(_TOOL_SECTION_END)
-            new_content = (existing[:start].rstrip("\n") + "\n" + \
-                           existing[end:].lstrip("\n")).strip()
+            if end <= start:
+                return True, f"Malformed OpenMDAO section in {self.main_filename}; " \
+                             "END before START, no changes made"
+            new_content = (existing[:start].rstrip("\n") + "\n"
+                        + existing[end:].lstrip("\n")).strip()
             new_content = (new_content + "\n") if new_content else ""
             target.write_text(new_content, encoding="utf-8")
             return True, f"Removed OpenMDAO section from {self.main_filename}"
@@ -309,87 +287,51 @@ class Tool:
         removed, leaving any unrelated skills the user keeps in the same directory
         untouched.
 
-        Parameters
-        ----------
-        main_filename : str
-            Name of the main file for the tool (e.g., "CLAUDE.md" or "CODEX.md").
-            Used to remove the OpenMDAO-managed section from the file.
-
         Returns
         -------
         int
-            Number of skill directories removed.
+            0 on success, 1 on failure.
         """
-        self.uninstall_main_file_md()
+        ok, msg = self.uninstall_main_file_md()
+        if not ok:
+            print(f"Failed to uninstall main file: {msg}", file=sys.stderr)
+            return 1
+
         if not self.install_path.exists():
             return 0
         # Only remove the OpenMDAO skill subdirectories we installed, so we
         # don't remove unrelated skills the user may keep in the same dir.
-        removed = 0
         for d in self.install_path.iterdir():
             if d.is_dir() and d.name.startswith(_SKILL_PREFIX):
                 shutil.rmtree(d)
-                removed += 1
-        return removed
+        return 0
 
 class ClaudeTool(Tool):
     """Represents the Claude Code tool and how to install skills into it."""
 
     def __init__(self, use_global: bool = False):
         super().__init__(use_global)
-        self.key = "claude"
-        self.name = "Claude Code"
-        self.detect_fn = lambda: bool(shutil.which("claude"))
-        self.main_filename = "CLAUDE.md"
-        self.install_path = self._which_path(self.cwd / ".claude" / "skills",
-                                             self.home / ".claude" / "skills")
-        self.main_filepath = self._which_path(self.cwd / ".claude" / self.main_filename,
-                                              self.home / ".claude" / self.main_filename)
+        self.key = 'claude'
+        self.name = 'Claude Code'
+        self.main_filename = 'CLAUDE.md'
+        if use_global:
+            self.install_path = Path.home() / '.claude' / 'skills'
+        else:
+            self.install_path = Path.cwd() / '.claude' / 'skills'
 
     def detected(self) -> bool:
         """
-        Return True if this tool (e.g. Claude, Codex) is detected on the current system.
+        Return True if this tool is detected on the current system.
 
         Returns
         -------
         bool
             True if the tool is present, False otherwise.
         """
-        return bool(shutil.which("claude"))
-
-    def _which_path(self, project: Path, global_: Path) -> Path:
-        return global_ if self.use_global else project
+        return bool(shutil.which('claude'))
 
 
-class CodexTool(Tool):
-    """Represents the Codex tool and how to install skills into it."""
-
-    def __init__(self, use_global: bool = False):
-        super().__init__(use_global)
-        self.key = "codex"
-        self.name = "OpenAI Codex"
-        self.detect_fn = lambda: bool(shutil.which("codex"))
-        self.main_filename = "CODEX.md"
-        self.install_path = self._which_path(self.cwd / ".codex" / "skills",
-                                             self.home / ".codex" / "skills")
-        self.main_filepath = self._which_path(self.cwd / ".codex" / self.main_filename,
-                                              self.home / ".codex" / self.main_filename)
-
-    def detected(self) -> bool:
-        """
-        Return True if this tool (e.g. Claude, Codex) is detected on the current system.
-
-        Returns
-        -------
-        bool
-            True if the tool is present, False otherwise.
-        """
-        return bool(shutil.which("codex"))
-
-    def _which_path(self, project: Path, global_: Path) -> Path:
-        return global_ if self.use_global else project
-
-def _make_tools(use_global: bool ) -> dict[str, Tool]:
+def _make_tools(use_global: bool) -> dict[str, Tool]:
     """
     Build the registry of supported AI tools.
 
@@ -406,7 +348,6 @@ def _make_tools(use_global: bool ) -> dict[str, Tool]:
     """
     tools: list[Tool] = [
         ClaudeTool(use_global),
-        CodexTool(use_global),
     ]
     return {t.key: t for t in tools}
 
@@ -420,8 +361,9 @@ def cmd_skills_install(args, user_args) -> int:
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed CLI arguments. Relevant attributes: ``use_global`` (bool) and
-        one bool attribute per registered tool key (e.g. ``claude_code``).
+        Parsed CLI arguments.
+
+        Relevant attributes: ``use_global`` (bool) and ``tool`` (str) for the tool key to install.
     user_args : list of str
         Extra positional arguments passed through by the OpenMDAO CLI harness
         (unused; reserved for future extension).
@@ -432,20 +374,29 @@ def cmd_skills_install(args, user_args) -> int:
         Exit code: 0 on success, 1 on failure.
     """
     tools = _make_tools(args.use_global)
+    if not tools:
+        print("No OpenMDAO skills are currently supported for installation.", file=sys.stderr)
+        return 1
+
+    tool_key = args.tool
+    tool = tools.get(tool_key)
+    if not tool:
+        print(f"Tool '{tool_key}' is not supported by OpenMDAO skills installer.", file=sys.stderr)
+        return 1
 
     skill_dir = _find_skill_dir(get_skills_source_dir(), args.tool)
     if not skill_dir:
         print(f"No OpenMDAO skills found in {get_skills_source_dir()}", file=sys.stderr)
         return 1
 
-    tool_key = args.tool
-    tool = tools.get(tool_key)
-
-    scope = "global (home directory)" if args.use_global else "project (current directory)"
+    scope = 'global (home directory)' if args.use_global else 'project (current directory)'
     print(f"Installing OpenMDAO skill — scope: {scope}\n")
 
     print(f"Installing {tool.name} into ({tool.install_path})")
-    tool.install(skill_dir, args.use_global)
+    install_return_code = tool.install(skill_dir)
+    if install_return_code != 0:
+        print(f"No OpenMDAO skills were installed for {tool.name}.", file=sys.stderr)
+        return 1
 
     # Report configured paths so users can verify the placeholder substitution.
     print("Paths configured:")
@@ -532,31 +483,37 @@ def cmd_skills_list(args, user_args) -> int:
     print()
     return 0
 
-def cmd_skills_uninstall(args, user_args: argparse.Namespace) -> int:
+def cmd_skills_uninstall(args, user_args) -> int:
     """
     Execute the ``uninstall-skills`` subcommand.
 
     Parameters
     ----------
     args : argparse.Namespace
-        Parsed CLI arguments. Relevant attributes: ``use_global`` (bool) and
-        one bool attribute per registered tool key (e.g. ``claude_code``).
-        At least one tool flag must be set; the command prints an error and
-        returns 1 if none are provided.
-    user_args : argparse.Namespace
+        Parsed CLI arguments.
+
+        Relevant attributes: ``use_global`` (bool) and ``tool`` (str) for the tool key to uninstall.
+    user_args : list of str
         Extra positional arguments passed through by the OpenMDAO CLI harness
         (unused; reserved for future extension).
 
     Returns
     -------
     int
-        Exit code: 0 on success, 1 if no tool flags were specified.
+        Exit code: 0 on success, 1 if the specified tool is not supported.
     """
     tools = _make_tools(args.use_global)
 
     tool_key = args.tool
+    tool = tools.get(tool_key)
+    if not tool:
+        print(f"Tool '{tool_key}' is not supported by OpenMDAO skills installer.", file=sys.stderr)
+        return 1
 
-    tools[tool_key].uninstall()
+    rc = tool.uninstall()
+    if rc != 0:
+        print(f"Failed to uninstall OpenMDAO skills for {tool.name}.", file=sys.stderr)
+        return 1
 
     print("\nUninstall complete.")
     return 0
