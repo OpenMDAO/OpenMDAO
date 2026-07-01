@@ -3031,7 +3031,8 @@ class TestFeatureSqliteRecorder(unittest.TestCase):
         self.assertEqual(metadata['options'], {"debug_print": [], "optimizer": "SLSQP",
                                                "tol": 1e-03, "maxiter": 200, "disp": True,
                                                "invalid_desvar_behavior": "warn",
-                                                'singular_jac_behavior': 'warn', 'singular_jac_tol': 1e-16})
+                                                'singular_jac_behavior': 'warn', 'singular_jac_tol': 1e-16,
+                                                'normalize_design_vars': False})
         self.assertEqual(metadata['opt_settings'], {"maxiter": 1000})
 
     def test_feature_solver_options(self):
