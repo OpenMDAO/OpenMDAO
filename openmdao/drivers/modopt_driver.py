@@ -20,13 +20,15 @@ Gradient-Free:
     - COBYLA: Constrained Optimization BY Linear Approximation
     - COBYQA: Constrained Optimization BY Quadratic Approximation
     - NelderMead: Nelder-Mead simplex algorithm (unconstrained)
+    - Egor: Efficient Global Optimization in Rust (bayesian optimization)
 
 Notes
 -----
 - SLSQP is the default optimizer and supports gradients, bounds, and all constraint types
 - SNOPT and IPOPT offer high performance but require separate installation/licenses
 - Linear constraints are handled efficiently by pre-computing their Jacobians
-- Gradient-free methods (COBYLA, COBYQA, NelderMead) are useful when derivatives are unavailable
+- Gradient-free methods (COBYLA, COBYQA, NelderMead, Egor) are useful 
+  when derivatives are unavailable
 
 See the modOpt documentation at https://modopt.readthedocs.io for detailed information
 on algorithm-specific options and capabilities.
@@ -36,7 +38,7 @@ import numpy as np
 import json
 from collections import OrderedDict
 
-from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
+from openmdao.core.constants import _DEFAULT_REPORTS_DIR, INF_BOUND, _ReprClass
 from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 from openmdao.utils.om_warnings import issue_warning
 from openmdao.utils.mpi import MPI
@@ -78,19 +80,19 @@ _gradient_optimizers = {
 # Algorithms that support constraints (inequality and/or equality)
 _constraint_optimizers = {
     'SLSQP', 'PySLSQP', 'COBYLA', 'TrustConstr', 'COBYQA',
-    'SNOPT', 'IPOPT', 'OpenSQP',
+    'SNOPT', 'IPOPT', 'OpenSQP', 'Egor'
 }
 
 # Algorithms that support equality constraints
 _eq_constraint_optimizers = {
     'SLSQP', 'PySLSQP', 'TrustConstr', 'SNOPT', 'IPOPT',
-    'COBYQA', 'OpenSQP',
+    'COBYQA', 'OpenSQP', 'Egor',
 }
-
+    
 # Algorithms that support bounds
 _bounds_optimizers = {
     'SLSQP', 'PySLSQP', 'LBFGSB', 'TrustConstr', 'COBYLA',
-    'COBYQA', 'SNOPT', 'IPOPT', 'OpenSQP',
+    'COBYQA', 'SNOPT', 'IPOPT', 'OpenSQP', 'Egor',
 }
 
 # Gradient-based algorithms that also support constraints (intersection of both sets)
@@ -99,14 +101,14 @@ _constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
 # Optimizers that use solver_options argument (different API from others)
 _solver_options_optimizers = {
     'SLSQP', 'PySLSQP', 'COBYLA', 'BFGS', 'LBFGSB', 'NelderMead', 'COBYQA',
-    'TrustConstr', 'SNOPT', 'IPOPT', 'ConvexQPSolvers',
+    'TrustConstr', 'SNOPT', 'IPOPT', 'ConvexQPSolvers', 'Egor',
 }
 
 # All available optimizers (excluding CVXOPT and ConvexQPSolvers which require Hessian)
 _all_optimizers = {
     'SLSQP', 'PySLSQP', 'COBYLA', 'BFGS', 'LBFGSB', 'NelderMead',
     'COBYQA', 'TrustConstr', 'OpenSQP', 'SNOPT', 'IPOPT', 'CVXOPT',
-    'ConvexQPSolvers',
+    'ConvexQPSolvers', 'Egor',
 }
 
 CITATIONS = """
@@ -685,7 +687,7 @@ class modOptDriver(Driver):
         # CVXOPT and ConvexQPSolvers are rejected at runtime due to Hessian requirements
         if opt == 'IPOPT':
             if 'print_level' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['print_level'] = min(max(disp, 0), 12)
                 else:
                     self.opt_settings['print_level'] = 5 if disp else 0
@@ -693,7 +695,7 @@ class modOptDriver(Driver):
         elif opt == 'SNOPT':
             if 'major print level' not in opt_keys_lower \
                     and 'minor print level' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     level = min(max(disp, 0), 10)
                     self.opt_settings['Major print level'] = level
                     self.opt_settings['Minor print level'] = level
@@ -703,37 +705,44 @@ class modOptDriver(Driver):
 
         elif opt == 'TrustConstr':
             if 'verbose' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['verbose'] = min(max(disp, 0), 3)
                 else:
                     self.opt_settings['verbose'] = 1 if disp else 0
 
         elif opt == 'PySLSQP':
             if 'iprint' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['iprint'] = disp
                 else:
                     self.opt_settings['iprint'] = 1 if disp else 0
 
         elif opt == 'LBFGSB':
             if 'iprint' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['iprint'] = disp
                 else:
                     self.opt_settings['iprint'] = 0 if disp else -1
 
         elif opt == 'OpenSQP':
             if 'verbosity' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['verbosity'] = disp
                 else:
                     self.opt_settings['verbosity'] = 1 if disp else 0
+
+        elif opt == 'Egor':
+            if 'verbose' not in opt_keys_lower:
+                if type(disp) is int:
+                    self.opt_settings['verbose'] = disp
+                else:
+                    self.opt_settings['verbose'] = 2 if disp else 0
 
         else:
             # Most SciPy-based optimizers (SLSQP, COBYLA, COBYQA, BFGS, NelderMead)
             # use 'disp' as boolean
             if 'disp' not in opt_keys_lower:
-                if isinstance(disp, int):
+                if type(disp) is int:
                     self.opt_settings['disp'] = disp > 0
                 else:
                     self.opt_settings['disp'] = disp
@@ -834,6 +843,9 @@ class modOptDriver(Driver):
             if opt == 'IPOPT':
                 # IPOPT uses 'max_iter' instead of 'maxiter'
                 self.opt_settings['max_iter'] = self.options['maxiter']
+            elif opt == 'Egor':
+                # Egor uses 'max_iters' instead of 'maxiter'
+                self.opt_settings['max_iters'] = self.options['maxiter']
             else:
                 self.opt_settings['maxiter'] = self.options['maxiter']
 
@@ -928,31 +940,47 @@ class modOptDriver(Driver):
                     size = meta['global_size'] if meta['distributed'] else meta['size']
 
                 # Separate linear and nonlinear constraints
-                if meta['linear']:
-                    if meta['equals'] is not None:
+                if meta["linear"]:
+                    if meta["equals"] is not None:
                         lin_con_bounds[name] = {
-                            'lower': equals_con[name],
-                            'upper': equals_con[name],
-                            'size': size
+                            "lower": equals_con[name]
+                            if np.any(equals_con[name] > -INF_BOUND)
+                            else None,
+                            "upper": equals_con[name]
+                            if np.any(equals_con[name] < INF_BOUND)
+                            else None,
+                            "size": size,
                         }
                     else:
                         lin_con_bounds[name] = {
-                            'lower': lower_con[name],
-                            'upper': upper_con[name],
-                            'size': size
+                            "lower": lower_con[name]
+                            if np.any(lower_con[name] > -INF_BOUND)
+                            else None,
+                            "upper": upper_con[name]
+                            if np.any(upper_con[name] < INF_BOUND)
+                            else None,
+                            "size": size,
                         }
                 else:
-                    if meta['equals'] is not None:
+                    if meta["equals"] is not None:
                         nl_con_bounds[name] = {
-                            'lower': equals_con[name],
-                            'upper': equals_con[name],
-                            'size': size
+                            "lower": equals_con[name]
+                            if np.any(equals_con[name] > -INF_BOUND)
+                            else None,
+                            "upper": equals_con[name]
+                            if np.any(equals_con[name] < INF_BOUND)
+                            else None,
+                            "size": size,
                         }
                     else:
                         nl_con_bounds[name] = {
-                            'lower': lower_con[name],
-                            'upper': upper_con[name],
-                            'size': size
+                            "lower": lower_con[name]
+                            if np.any(lower_con[name] > -INF_BOUND)
+                            else None,
+                            "upper": upper_con[name]
+                            if np.any(upper_con[name] < INF_BOUND)
+                            else None,
+                            "size": size,
                         }
 
                     # Initialize sparsity structure for nonlinear constraint Jacobians
@@ -1004,7 +1032,14 @@ class modOptDriver(Driver):
                 out_dir = self.options['output_dir']
 
             # Instantiate and run optimizer
-            optimizer_cls = getattr(mo, opt)
+            try:
+                optimizer_cls = getattr(mo, opt)
+            except AttributeError:
+                raise RuntimeError(
+                    f'The "{opt}" algorithm is currently unavailable in your '
+                    f'environment. You may to manually install it to use with '
+                    f'the modOptDriver.'
+                )
             if opt in _solver_options_optimizers:
                 optimizer = optimizer_cls(
                     problem=self._mo_prob,

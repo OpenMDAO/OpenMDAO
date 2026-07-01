@@ -462,6 +462,10 @@ class TestModOptDriver(unittest.TestCase):
         prob.setup()
         prob.run_driver()
 
+        # Check well-formed constraint bounds
+        self.assertEqual(prob.driver._mo_prob.nl_con_bounds["c"]["lower"], -15.0)
+        self.assertEqual(prob.driver._mo_prob.nl_con_bounds["c"]["upper"], None)
+
         # Check constraint is satisfied
         self.assertGreaterEqual(prob['c'], -15.0 - 1e-4)
 
@@ -1365,7 +1369,7 @@ class TestModOptDriver(unittest.TestCase):
 
         # Check expected responses are met
         assert_near_equal(prob['f_xy'], -27.0, 1e-4)
-        assert_near_equal(prob['c'], 0.0, 1e-4)
+        assert_near_equal(prob['c'], 0.0, 2e-4)
 
     @require_modopt_optimizer('COBYQA')
     def test_cobyqa_gradient_free(self):

@@ -12,12 +12,14 @@ from copy import deepcopy
 import numpy as np
 
 from openmdao.core.constants import INT_DTYPE
+from openmdao.utils.indexer import indexer as make_indexer
 from openmdao.utils.mpi import MPI, check_mpi_env
 from openmdao.utils.om_warnings import issue_warning, DerivativesWarning
 import openmdao.utils.coloring as coloring_mod
 from openmdao.utils.relevance import get_relevance
 from openmdao.utils.array_utils import get_random_arr
 from openmdao.utils.general_utils import _unwrap_comm
+from openmdao.utils.units import unit_conversion
 
 
 _directional_rng = np.random.default_rng(99)
@@ -88,7 +90,10 @@ class _TotalJacInfo(object):
 
     def __init__(self, problem, of, wrt, return_format, approx=False,
                  debug_print=False, driver_scaling=True, get_remote=True, directional=False,
-                 coloring_info=None, driver=None):
+                 coloring_info=None, driver=None, of_indices=None, wrt_indices=None,
+                 _functional=False, always_include_linear=False,
+                 of_units=None, wrt_units=None,
+                 ):
         """
         Initialize object.
 
@@ -122,6 +127,28 @@ class _TotalJacInfo(object):
         driver : <Driver>, None, or False
             The driver that owns the total jacobian.  If None, use the driver from the problem.
             If False, this total jacobian will be computed directly by the problem.
+        of_indices : iter of int or None
+            Indices into the list of 'of' variables selecting which of those variables are included
+            in the returned total derivatives. If None, the entire variable is included.
+        wrt_indices : iter of int or None
+            Indices into the list of 'wrt' variables selecting which of those variables are included
+            in the returned total derivatives. If None, the entire variable is included.
+        _functional : bool
+            If True, handle `of` and `wrt` variables the way the _functional API wants
+        always_include_linear : bool
+            If True and `of` is None, include linear constraints in the set of response variables
+            in addition to the nonlinear responses provided by the driver.  Has no effect when
+            `of` is not None.  Defaults to False.
+        of_units : dict or None
+            Optional mapping of response variable name to desired units string.  When provided,
+            the corresponding Jacobian rows are scaled so that the derivatives are expressed in
+            those units rather than the variable's native units.  Only used when
+            ``_functional`` is True.
+        wrt_units : dict or None
+            Optional mapping of design variable name to desired units string.  When provided,
+            the corresponding Jacobian columns are scaled so that the derivatives are expressed
+            with respect to those units rather than the variable's native units.  Only used when
+            ``_functional`` is True.
         """
         self._driver = driver = problem.driver if driver is None else driver
         self.model = model = problem.model
@@ -155,11 +182,61 @@ class _TotalJacInfo(object):
         orig_of = of
         orig_wrt = wrt
 
+        if always_include_linear and of is None and driver:
+            lin_con_names = [name for name, meta in driver._cons.items() if meta['linear']]
+            of = driver._get_ordered_nl_responses() + lin_con_names
+
         if not model._use_derivatives:
             raise RuntimeError("Derivative support has been turned off but compute_totals "
                                "was called.")
 
-        of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of, wrt)
+        if _functional:
+            if (orig_of is None) and (orig_wrt is None):
+                # Use driver to get of and wrt metadata.
+                (of_metadata, wrt_metadata,
+                    has_custom_derivs) = model._get_totals_metadata(driver, of, wrt)
+            elif (orig_of is None):
+                # Use driver to get of metadata, but not for wrt.
+                of_metadata, has_custom_derivs = model._get_totals_of_metadata(driver, of)
+                wrt_metadata, has_custom_derivs = model._get_totals_wrt_metadata(False, wrt)
+            elif (orig_wrt is None):
+                # Use driver to get wrt metadata, but not for of.
+                of_metadata, has_custom_derivs = model._get_totals_of_metadata(False, of)
+                wrt_metadata, has_custom_derivs = model._get_totals_wrt_metadata(driver, wrt)
+            else:
+                # Don't use driver for anything.
+                of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(False,
+                                                                                          of, wrt)
+        else:
+            of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of,
+                                                                                      wrt)
+
+        if (of_indices is not None) and (orig_of is not None):
+            conn_graph = model.get_conn_graph()
+            for vname, new_idxs in zip(of_metadata, of_indices):
+                if new_idxs is None:
+                    continue
+                meta = of_metadata[vname]
+                src_shape = conn_graph.nodes[('o', meta['source'])]['attrs'].global_shape
+                new_idx_tuple = tuple(i for i in np.atleast_1d(new_idxs))
+                idxer = make_indexer(new_idx_tuple)
+                idxer.set_src_shape(src_shape)
+                meta['indices'] = idxer
+                meta['size'] = meta['global_size'] = idxer.indexed_src_size
+
+        if (wrt_indices is not None) and (orig_wrt is not None):
+            conn_graph = model.get_conn_graph()
+            for vname, new_idxs in zip(wrt_metadata, wrt_indices):
+                if new_idxs is None:
+                    continue
+                # meta = wrt_metadata[vname] = dict(wrt_metadata[vname])  # shallow copy entry
+                meta = wrt_metadata[vname]
+                src_shape = conn_graph.nodes[('o', meta['source'])]['attrs'].global_shape
+                new_idx_tuple = tuple(i for i in np.atleast_1d(new_idxs))
+                idxer = make_indexer(new_idx_tuple)
+                idxer.set_src_shape(src_shape)
+                meta['indices'] = idxer
+                meta['size'] = meta['global_size'] = idxer.indexed_src_size
 
         ofsize = sum(meta['global_size'] for meta in of_metadata.values())
         wrtsize = sum(meta['global_size'] for meta in wrt_metadata.values())
@@ -209,7 +286,11 @@ class _TotalJacInfo(object):
             modes = [self.mode]
         else:
             if not has_lin_cons:
-                if driver and ((orig_of is None and orig_wrt is None) or not has_custom_derivs):
+                if (
+                    driver and
+                        ((orig_of is None and orig_wrt is None) or not has_custom_derivs) and
+                        (of_indices is None and wrt_indices is None)
+                    ):
                     # we're using driver ofs/wrts
                     if coloring_info is None:
                         self.coloring_info = coloring_info = driver._coloring_info
@@ -372,6 +453,56 @@ class _TotalJacInfo(object):
         # Store which VOIs require unit scaling if we're computing an optimization jacobian.
         if not has_custom_derivs:
             self._identify_unit_active_vars()
+
+        # Apply explicit unit conversions requested by the functional API.
+        if of_units or wrt_units:
+            self._apply_functional_api_unit_scalers(of_metadata, wrt_metadata,
+                                                    of_units, wrt_units)
+
+    def _apply_functional_api_unit_scalers(self, of_metadata, wrt_metadata, of_units, wrt_units):
+        """
+        Populate unit scalers for the functional API based on caller-supplied units.
+
+        Parameters
+        ----------
+        of_metadata : dict
+            Response metadata dict keyed by variable name/alias.
+        wrt_metadata : dict
+            Design-variable metadata dict keyed by variable name/alias.
+        of_units : dict or None
+            Mapping of response variable name to desired units string, or None.
+        wrt_units : dict or None
+            Mapping of design variable name to desired units string, or None.
+        """
+        abs2meta = self.model._var_allprocs_abs2meta['output']
+
+        if of_units:
+            for vname, requested_units in of_units.items():
+                if requested_units is None:
+                    continue
+                if vname not in of_metadata:
+                    continue
+                src = of_metadata[vname]['source']
+                native_units = abs2meta[src]['units']
+                if native_units == requested_units:
+                    continue
+                scaler, _ = unit_conversion(native_units, requested_units)
+                if scaler != 1.0:
+                    self._resp_unit_scalers[vname] = scaler
+
+        if wrt_units:
+            for vname, requested_units in wrt_units.items():
+                if requested_units is None:
+                    continue
+                if vname not in wrt_metadata:
+                    continue
+                src = wrt_metadata[vname]['source']
+                native_units = abs2meta[src]['units']
+                if native_units == requested_units:
+                    continue
+                scaler, _ = unit_conversion(native_units, requested_units)
+                if scaler != 1.0:
+                    self._desvar_unit_scalers[vname] = scaler
 
     def _check_discrete_dependence(self):
         model = self.model
