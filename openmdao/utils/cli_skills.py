@@ -8,7 +8,7 @@ re-syncs the skills.
 
 Design notes
 ------------
-* Skills are bundled at ``openmdao/skills/`` and copied into a tool's skills
+* Skills are bundled in ``openmdao/skills/`` and copied into a tool's skills
   directory on install.
 * Skill files may contain ``{{OPENMDAO_PATH}}``, ``{{OPENMDAO_DOCS}}`` and
   ``{{OPENMDAO_EXAMPLES}}`` placeholders, which are rewritten to absolute paths
@@ -31,7 +31,7 @@ from pathlib import Path
 
 # This file lives at openmdao/utils/cli_skills.py
 _PACKAGE_DIR = Path(__file__).resolve().parent.parent   # .../openmdao/
-_REPO_ROOT = _PACKAGE_DIR.parent                        # repo root (editable only)
+_REPO_ROOT = _PACKAGE_DIR.parent                        # repo root (for Editable/source checkout)
 
 # Editable/source checkout has build files at the repo root; a wheel install
 # does not. Used only for an informational message at the end of install.
@@ -100,7 +100,7 @@ def _find_skill_dirs(root: Path) -> list[Path]:
         and (d / "SKILL.md").exists()
     )
 
-def _find_skill_dir(root: Path, key) -> Path | None:
+def _find_skill_dir(root: Path, key: str) -> Path | None:
     """
     Return the top-level skill directory named ``{_SKILL_PREFIX}{key}`` containing a SKILL.md.
     """
@@ -124,7 +124,7 @@ class Tool:
         Parameters
         ----------
         use_global : bool
-            Install skills globally if True, otherwise install locally.
+            Install skills globally (e.g. ~/.claude) if True, otherwise install locally.
         """
         self.use_global = use_global
 
@@ -137,7 +137,7 @@ class Tool:
         bool
             True if the tool is present, False otherwise.
         """
-        raise NotImplementedError("detected has not been implemented")
+        raise NotImplementedError(f"detected method has not been implemented for {self.name}")
 
     def is_installed(self) -> bool:
         """
@@ -154,7 +154,7 @@ class Tool:
             if d.is_dir() and d.name.startswith(_SKILL_PREFIX)
         )
 
-    def install(self, skill_dir: Path) -> int:
+    def install(self, skill_dir: Path) -> None:
         """
         Install skills into this tool's install path.
 
@@ -163,10 +163,12 @@ class Tool:
         skill_dir : Path
             Source directory containing the skill subdirectory to install.
 
-        Returns
-        -------
-        int
-            Successful install if 0, otherwise an error code.
+        Raises
+        ------
+        RuntimeError
+            If the managed section in the main config file cannot be written.
+        OSError
+            If any file operation fails.
         """
         self.install_path.mkdir(parents=True, exist_ok=True)
         target = self.install_path / skill_dir.name
@@ -178,108 +180,97 @@ class Tool:
             ignore=shutil.ignore_patterns(".DS_Store", ".gitkeep", "__pycache__"),
         )
 
-        # Rewrite placeholders in every markdown file in the copied tree.
         for md in target.rglob("*.md"):
             text = md.read_text(encoding="utf-8")
             new_text = replace_path_placeholders(text)
             if new_text != text:
                 md.write_text(new_text, encoding="utf-8")
 
-        ok, msg = self.install_main_file_md()
-        if not ok:
-            print(f"Failed to install main file: {msg}", file=sys.stderr)
-            return 1
+        self.install_main_file_md()
 
-        return 0
-
-    def install_main_file_md(self) -> tuple[bool, str]:
+    def install_main_file_md(self) -> None:
         """
         Install or update OpenMDAO-managed section in the main file for the tool, e.g. CLAUDE.md.
 
         The OpenMDAO content is wrapped in HTML-comment markers so the section can
         be replaced in place on re-install without disturbing user content.
 
-        Returns
-        -------
-        tuple of (bool, str)
-            A (success, message) pair. *success* is False only if an unexpected
-            error prevented the write; informational outcomes still return True.
+        Raises
+        ------
+        RuntimeError
+            If no skill directory or template file is found, or if the managed
+            section markers are in an invalid order.
+        OSError
+            If the file cannot be read or written.
         """
-        try:
-            skill_dir = _find_skill_dir(get_skills_source_dir(), self.key)
-            if skill_dir is None:
-                return False, f"No skill directory found for key '{self.key}'"
-            source = skill_dir / self.main_filename
-            if not source.exists():
-                return False, f"No {self.main_filename} template found at {source}"
+        skill_dir = _find_skill_dir(get_skills_source_dir(), self.key)
+        if skill_dir is None:
+            raise RuntimeError(f"No skill directory found for key '{self.key}'")
+        source = skill_dir / self.main_filename
+        if not source.exists():
+            raise RuntimeError(f"No {self.main_filename} template found at {source}")
 
-            body = replace_path_placeholders(source.read_text(encoding="utf-8"))
-            wrapped = f"\n\n{_TOOL_SECTION_START}\n{body}\n{_TOOL_SECTION_END}\n"
+        body = replace_path_placeholders(source.read_text(encoding="utf-8"))
+        wrapped = f"\n\n{_TOOL_SECTION_START}\n{body}\n{_TOOL_SECTION_END}\n"
 
-            target = self.install_path.parent / self.main_filename
-            target.parent.mkdir(parents=True, exist_ok=True)
+        target = self.install_path.parent / self.main_filename
+        target.parent.mkdir(parents=True, exist_ok=True)
 
-            if target.exists():
-                existing = target.read_text(encoding="utf-8")
-                if _TOOL_SECTION_START in existing and _TOOL_SECTION_END in existing:
-                    start = existing.find(_TOOL_SECTION_START)
-                    end = existing.find(_TOOL_SECTION_END) + len(_TOOL_SECTION_END)
-                    if end <= start:
-                        return True, f"Malformed OpenMDAO section in {self.main_filename}; " \
-                                     "END before START, no changes made"
-                    new_content = existing[:start] + wrapped.lstrip("\n") + existing[end:]
-                    target.write_text(new_content, encoding="utf-8")
-                    return True, f"Updated existing OpenMDAO section in {self.main_filename}"
-                else:
-                    # File exists but has no managed section yet — append one.
-                    new_content = existing.rstrip("\n") + wrapped
-                    target.write_text(new_content, encoding="utf-8")
-                    return True, f"Appended OpenMDAO section to existing {self.main_filename}"
+        if target.exists():
+            existing = target.read_text(encoding="utf-8")
+            if _TOOL_SECTION_START in existing and _TOOL_SECTION_END in existing:
+                start = existing.find(_TOOL_SECTION_START)
+                end = existing.find(_TOOL_SECTION_END) + len(_TOOL_SECTION_END)
+                if end <= start:
+                    raise RuntimeError(
+                        f"Malformed OpenMDAO section in {self.main_filename}: "
+                        "END marker appears before START marker"
+                    )
+                new_content = existing[:start] + wrapped.lstrip("\n") + existing[end:]
+                target.write_text(new_content, encoding="utf-8")
             else:
-                # Create a fresh mainfile for the tool.
-                header = '# OpenMDAO Framework Reference\n'
-                target.write_text(header + wrapped.lstrip("\n"), encoding="utf-8")
-                return True, f"Created new {self.main_filename} with OpenMDAO content"
+                # File exists but has no managed section yet — append one.
+                new_content = existing.rstrip("\n") + wrapped
+                target.write_text(new_content, encoding="utf-8")
+        else:
+            # Create a fresh mainfile for the tool.
+            header = '# OpenMDAO Framework Reference\n'
+            target.write_text(header + wrapped.lstrip("\n"), encoding="utf-8")
 
-        except OSError as e:
-            return False, f"Error installing {self.main_filename}: {e}"
-
-    def uninstall_main_file_md(self) -> tuple[bool, str]:
+    def uninstall_main_file_md(self) -> None:
         """
         Remove the OpenMDAO-managed section from the specified main file, if present.
 
         Leaves any user-authored content and the file itself intact.
 
-        Returns
-        -------
-        tuple of (bool, str)
-            A (success, message) pair. *success* is False only if an unexpected
-            error prevented the write.
+        Raises
+        ------
+        RuntimeError
+            If the managed section markers are in an invalid order.
+        OSError
+            If the file cannot be read or written.
         """
-        try:
-            target = self.install_path.parent / self.main_filename
-            if not target.exists():
-                return True, f"No {self.main_filename} to clean up"
+        target = self.install_path.parent / self.main_filename
+        if not target.exists():
+            return
 
-            existing = target.read_text(encoding="utf-8")
-            if _TOOL_SECTION_START not in existing or _TOOL_SECTION_END not in existing:
-                return True, f"No OpenMDAO section found in {self.main_filename}"
+        existing = target.read_text(encoding="utf-8")
+        if _TOOL_SECTION_START not in existing or _TOOL_SECTION_END not in existing:
+            return
 
-            start = existing.find(_TOOL_SECTION_START)
-            end = existing.find(_TOOL_SECTION_END) + len(_TOOL_SECTION_END)
-            if end <= start:
-                return True, f"Malformed OpenMDAO section in {self.main_filename}; " \
-                             "END before START, no changes made"
-            new_content = (existing[:start].rstrip("\n") + "\n"
-                        + existing[end:].lstrip("\n")).strip()
-            new_content = (new_content + "\n") if new_content else ""
-            target.write_text(new_content, encoding="utf-8")
-            return True, f"Removed OpenMDAO section from {self.main_filename}"
+        start = existing.find(_TOOL_SECTION_START)
+        end = existing.find(_TOOL_SECTION_END) + len(_TOOL_SECTION_END)
+        if end <= start:
+            raise RuntimeError(
+                f"Malformed OpenMDAO section in {self.main_filename}: "
+                "END marker appears before START marker"
+            )
+        new_content = (existing[:start].rstrip("\n") + "\n"
+                    + existing[end:].lstrip("\n")).strip()
+        new_content = (new_content + "\n") if new_content else ""
+        target.write_text(new_content, encoding="utf-8")
 
-        except OSError as e:
-            return False, f"Error cleaning {self.main_filename}: {e}"
-
-    def uninstall(self) -> int:
+    def uninstall(self) -> None:
         """
         Remove OpenMDAO skills previously installed for this tool.
 
@@ -287,24 +278,21 @@ class Tool:
         removed, leaving any unrelated skills the user keeps in the same directory
         untouched.
 
-        Returns
-        -------
-        int
-            0 on success, 1 on failure.
+        Raises
+        ------
+        RuntimeError
+            If the managed section in the main config file is malformed.
+        OSError
+            If any file operation fails.
         """
-        ok, msg = self.uninstall_main_file_md()
-        if not ok:
-            print(f"Failed to uninstall main file: {msg}", file=sys.stderr)
-            return 1
+        self.uninstall_main_file_md()
 
         if not self.install_path.exists():
-            return 0
-        # Only remove the OpenMDAO skill subdirectories we installed, so we
+            return
         # don't remove unrelated skills the user may keep in the same dir.
         for d in self.install_path.iterdir():
             if d.is_dir() and d.name.startswith(_SKILL_PREFIX):
                 shutil.rmtree(d)
-        return 0
 
 class ClaudeTool(Tool):
     """Represents the Claude Code tool and how to install skills into it."""
@@ -393,9 +381,10 @@ def cmd_skills_install(args, user_args) -> int:
     print(f"Installing OpenMDAO skill — scope: {scope}\n")
 
     print(f"Installing {tool.name} into ({tool.install_path})")
-    install_return_code = tool.install(skill_dir)
-    if install_return_code != 0:
-        print(f"No OpenMDAO skills were installed for {tool.name}.", file=sys.stderr)
+    try:
+        tool.install(skill_dir)
+    except (RuntimeError, OSError) as e:
+        print(f"Failed to install OpenMDAO skills for {tool.name}: {e}", file=sys.stderr)
         return 1
 
     # Report configured paths so users can verify the placeholder substitution.
@@ -510,9 +499,10 @@ def cmd_skills_uninstall(args, user_args) -> int:
         print(f"Tool '{tool_key}' is not supported by OpenMDAO skills installer.", file=sys.stderr)
         return 1
 
-    rc = tool.uninstall()
-    if rc != 0:
-        print(f"Failed to uninstall OpenMDAO skills for {tool.name}.", file=sys.stderr)
+    try:
+        tool.uninstall()
+    except (RuntimeError, OSError) as e:
+        print(f"Failed to uninstall OpenMDAO skills for {tool.name}: {e}", file=sys.stderr)
         return 1
 
     print("\nUninstall complete.")
