@@ -223,7 +223,7 @@ py314 = { features = ["py314", "doe", "opt", "jax", "numba", "notebooks", "visua
 # Development workflow helpers
 clean = "rm -rf packaging dist *.egg-info .pixi"
 
-test = "testflo --skip_dir=.pixi"
+test = { cmd = "testflo openmdao --skip_dir=.pixi" }
 
 # Install OpenMDAO in development mode and set up pre-commit hooks
 install-openmdao-dev = { cmd = "pip install --no-deps -e . && pre-commit install", description = "Install OpenMDAO in development mode and set up pre-commit hooks" }
@@ -244,3 +244,8 @@ description = "Build SNOPT module. Usage: pixi run build-snopt <path_to_snopt_so
 args = ["snopt_src"]
 cmd = "python -m build_pyoptsparse.snopt_module {{snopt_src}}"
 
+[target.osx-64.tasks]
+test = { cmd = "testflo openmdao --skip_dir=.pixi", env = { OMPI_MCA_rmaps_base_oversubscribe = "1", OMPI_MCA_hwloc_base_binding_policy = "none", TMPDIR = "/tmp" } }
+
+[target.osx-arm64.tasks]
+test = { cmd = "testflo openmdao --skip_dir=.pixi", env = { OMPI_MCA_rmaps_base_oversubscribe = "1", OMPI_MCA_hwloc_base_binding_policy = "none", TMPDIR = "/tmp" } }
