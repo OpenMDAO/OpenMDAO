@@ -199,10 +199,6 @@ runs:
           # shellcheck disable=SC2129
           echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> "$GITHUB_ENV"
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> "$GITHUB_ENV"
-          echo "OMPI_MCA_btl=^openib" >> "$GITHUB_ENV"
-
-          echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
-          echo "TMPDIR=/tmp" >> "$GITHUB_ENV"
         else
           echo "mpi4py or petsc4py not installed in this environment, skipping MPI checks"
         fi
@@ -228,12 +224,8 @@ runs:
       shell: bash -l {0}
       env:
         OPENMDAO_CHECK_ALL_PARTIALS: true
-        # MPI settings for CI (all platforms)
-        PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
-        OMPI_MCA_rmaps_base_oversubscribe: "1"
         COVERAGE_RUN: "true"
       run: |
-        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
         echo "============================================================="
         echo "Run tests with coverage (from directory other than repo root)"
         echo "============================================================="
@@ -243,20 +235,25 @@ runs:
         cp .coveragerc $HOME
         cd $HOME
 
-        # Build testflo command
-        TESTFLO_CMD="testflo openmdao --skip_dir=.pixi --timeout=240 --durations=20"
+        # Build pixi run test command
+        TESTFLO_ARGS="--timeout=240 --durations=20"
+
+        # Run serially on macOS CI to avoid resource contention on shared runners
+        if [[ "${{ runner.os }}" == "macOS" ]]; then
+          TESTFLO_ARGS="-n 1 $TESTFLO_ARGS"
+        fi
 
         # Only perform coverage on specified OS + Python version combinations
         if [[ "${{ inputs.COVERAGE }}" == "true" ]]; then
-          TESTFLO_CMD="$TESTFLO_CMD --coverage --coverpkg openmdao"
+          TESTFLO_ARGS="$TESTFLO_ARGS --coverage --coverpkg openmdao"
         fi
 
         # Add --show_skipped unless we're in minimal environment
         if [[ "${{ inputs.PIXI_ENVIRONMENT }}" != "minimal" ]]; then
-          TESTFLO_CMD="$TESTFLO_CMD --show_skipped"
+          TESTFLO_ARGS="$TESTFLO_ARGS --show_skipped"
         fi
 
-        $TESTFLO_CMD
+        pixi run --manifest-path $GITHUB_WORKSPACE/pixi.toml -e ${{ inputs.PIXI_ENVIRONMENT }} test $TESTFLO_ARGS
 
     - name: Display test report on failure (bash)
       if: steps.run_tests_bash.outcome == 'failure'
@@ -321,7 +318,7 @@ runs:
 
     - name: Slack failure to upload to coveralls.io
       if: inputs.COVERAGE == 'true' && steps.coveralls.outcome == 'failure'
-      uses: act10ns/slack@v2.0.0
+      uses: act10ns/slack@v2.2.0
       with:
         webhook-url: ${{ inputs.slack_webhook_url }}
         status: 'warning'
@@ -355,7 +352,7 @@ runs:
 
     - name: Slack unit test failure
       if: failure() && steps.run_tests_bash.outcome == 'failure'
-      uses: act10ns/slack@v2.0.0
+      uses: act10ns/slack@v2.2.0
       with:
         webhook-url: ${{ inputs.slack_webhook_url }}
         status: ${{ steps.run_tests_bash.outcome }}
@@ -365,7 +362,7 @@ runs:
 
     - name: Slack security issue
       if: steps.bandit.outcome == 'failure'
-      uses: act10ns/slack@v2.0.0
+      uses: act10ns/slack@v2.2.0
       with:
         webhook-url: ${{ inputs.slack_webhook_url }}
         status: ${{ steps.bandit.outcome }}
