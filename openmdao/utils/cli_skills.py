@@ -75,7 +75,6 @@ def get_skills_source_dir() -> Path:
         )
     return src
 
-
 def replace_path_placeholders(content: str) -> str:
     """Replace all path placeholders in *content* with absolute paths."""
     return (
@@ -84,7 +83,6 @@ def replace_path_placeholders(content: str) -> str:
         .replace(OPENMDAO_DOCS_PLACEHOLDER, str(get_docs_path()))
         .replace(OPENMDAO_EXAMPLES_PLACEHOLDER, str(get_examples_path()))
     )
-
 
 def _find_skill_dirs(root: Path) -> list[Path]:
     """
@@ -99,17 +97,6 @@ def _find_skill_dirs(root: Path) -> list[Path]:
         and d.name.startswith(_SKILL_PREFIX)
         and (d / "SKILL.md").exists()
     )
-
-def _find_skill_dir(root: Path, key: str) -> Path | None:
-    """
-    Return the top-level skill directory named ``{_SKILL_PREFIX}{key}`` containing a SKILL.md.
-    """
-    if not root.exists():
-        return None
-    for d in root.iterdir():
-        if d.is_dir() and d.name == f"{_SKILL_PREFIX}{key}" and (d / "SKILL.md").exists():
-            return d
-    return None
 
 # ---------------------------------------------------------------------------
 # Tool definitions and functions
@@ -166,7 +153,8 @@ class Tool:
         Raises
         ------
         RuntimeError
-            If the managed section in the main config file cannot be written.
+            If no skill directory or template is found, or if the managed
+            section markers are in an invalid order.
         OSError
             If any file operation fails.
         """
@@ -203,7 +191,9 @@ class Tool:
         OSError
             If the file cannot be read or written.
         """
-        skill_dir = _find_skill_dir(get_skills_source_dir(), self.key)
+        target_name = f'{_SKILL_PREFIX}{self.key}'
+        matches = [d for d in _find_skill_dirs(get_skills_source_dir()) if d.name == target_name]
+        skill_dir = matches[0] if matches else None
         if skill_dir is None:
             raise RuntimeError(f"No skill directory found for key '{self.key}'")
         source = skill_dir / self.main_filename
@@ -372,7 +362,9 @@ def cmd_skills_install(args, user_args) -> int:
         print(f"Tool '{tool_key}' is not supported by OpenMDAO skills installer.", file=sys.stderr)
         return 1
 
-    skill_dir = _find_skill_dir(get_skills_source_dir(), args.tool)
+    target_name = f'{_SKILL_PREFIX}{args.tool}'
+    matches = [d for d in _find_skill_dirs(get_skills_source_dir()) if d.name == target_name]
+    skill_dir = matches[0] if matches else None
     if not skill_dir:
         print(f"No OpenMDAO skills found in {get_skills_source_dir()}", file=sys.stderr)
         return 1

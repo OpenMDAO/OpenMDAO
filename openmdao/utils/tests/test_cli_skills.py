@@ -13,7 +13,7 @@ from openmdao.utils.cli_skills import (
     _SKILL_PREFIX,
 )
 
-# @unittest.skipUnless(os.getenv("CI") == "true", "Skipping CLI skills tests outside of CI environment")
+@unittest.skipUnless(os.getenv("CI") == "true", "Skipping CLI skills tests outside of CI environment")
 class TestCmdlineSkills(unittest.TestCase):
     def tearDown(self):
         # clean up any installed skills after each test to avoid side effects
@@ -133,7 +133,6 @@ class TestCmdlineSkills(unittest.TestCase):
         if not status:
             self.fail("Claude skill status could not be determined")
         self.assertIn('installed (project, global)', status, "Claude skill status does not indicate it is installed")
-
 
 
 if __name__ == "__main__":
