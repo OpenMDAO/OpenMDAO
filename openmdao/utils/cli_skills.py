@@ -102,7 +102,14 @@ def _find_skill_dirs(root: Path) -> list[Path]:
 # Tool definitions and functions
 # ---------------------------------------------------------------------------
 class Tool:
-    """Represents one AI coding tool and how to install skills into it."""
+    """
+    Represents one AI coding tool and how to install skills into it.
+
+    Attributes
+    ----------
+    use_global : bool
+        Install skills globally (e.g. ~/.claude) if True, otherwise install locally.
+    """
 
     def __init__(self, use_global):
         """
@@ -285,7 +292,20 @@ class Tool:
                 shutil.rmtree(d)
 
 class ClaudeTool(Tool):
-    """Represents the Claude Code tool and how to install skills into it."""
+    """
+    Represents the Claude Code tool and how to install skills into it.
+
+    Attributes
+    ----------
+    key : str
+        Short identifier for this tool, used to locate the matching skill directory.
+    name : str
+        Human-readable display name for this tool.
+    main_filename : str
+        Name of the main config file managed by the installer (e.g. ``CLAUDE.md``).
+    install_path : Path
+        Directory where skill subdirectories are installed.
+    """
 
     def __init__(self, use_global: bool = False):
         super().__init__(use_global)

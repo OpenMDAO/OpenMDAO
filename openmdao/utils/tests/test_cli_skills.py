@@ -31,13 +31,18 @@ class TestCmdlineSkills(unittest.TestCase):
         if (cp.returncode != 0):
             raise RuntimeError(f"Failed to run command {cmd}: {cp.stderr.decode('utf-8', 'ignore')}")
 
-    def _get_claude_status(self):
+    def _get_claude_status(self,label):
         cp = subprocess.run(  # nosec: trusted input
             [sys.executable, '-m', 'openmdao.utils.om', 'skills', 'list'],
             stderr=subprocess.PIPE, stdout=subprocess.PIPE,
         )
         if cp.returncode != 0:
             raise RuntimeError(f"skills list failed: {cp.stderr.decode('utf-8', 'ignore')}")
+
+        print(f"CLAUDE status ({label}):")
+        print(cp.stdout.decode('utf-8', 'ignore'))
+        print('-' * 80)
+
         for line in cp.stdout.decode('utf-8', 'ignore').splitlines():
             if 'Claude Code' in line:
                 for token in ('installed (project, global)', 'installed (project)',
@@ -105,23 +110,20 @@ class TestCmdlineSkills(unittest.TestCase):
             self.assertFalse(remaining, f'OpenMDAO skill directories were not removed: {remaining}')
 
     def _claude_skills_list_cmd_test(self):
-        status = self._get_claude_status()
-        if not status:
-            self.fail("Claude skill status could not be determined")
+        status = self._get_claude_status("before_install")
+        self.assertIsNotNone(status, "Claude Code was not found in 'skills list' output")
         self.assertNotIn('installed', status, "Claude skill status indicates it is installed when it should not be")
 
         # install it locally so when we check the status, it is actually there to check
         self._run_command([sys.executable, '-m', 'openmdao.utils.om', 'skills', 'install', 'claude'])
-        status = self._get_claude_status()
-        if not status:
-            self.fail("Claude skill status could not be determined")
+        status = self._get_claude_status("after_local_install")
+        self.assertIsNotNone(status, "Claude Code was not found in 'skills list' output")
         self.assertIn('installed (project)', status, "Claude skill status does not indicate it is installed")
 
         # install it globally so when we check the status, it is actually there to check
         self._run_command([sys.executable, '-m', 'openmdao.utils.om', 'skills', 'install', '--global', 'claude'])
-        status = self._get_claude_status()
-        if not status:
-            self.fail("Claude skill status could not be determined")
+        status = self._get_claude_status("after_global_install")
+        self.assertIsNotNone(status, "Claude Code was not found in 'skills list' output")
         self.assertIn('installed (project, global)', status, "Claude skill status does not indicate it is installed")
 
     # Performs all the install/uninstall/list tests for the claude skill. Put all in one test to
