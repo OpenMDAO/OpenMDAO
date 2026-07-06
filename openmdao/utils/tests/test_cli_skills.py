@@ -25,9 +25,6 @@ class TestCmdlineSkills(unittest.TestCase):
     def setUp(self):
         self._uninstall_all()
 
-    def tearDown(self):
-        self._uninstall_all()
-
     def _run_command(self, cmd):
         cp = subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)  # nosec: trusted input
         if (cp.returncode != 0):
