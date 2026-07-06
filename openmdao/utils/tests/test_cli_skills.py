@@ -1,5 +1,4 @@
 import os
-import shutil
 import subprocess
 import sys
 import unittest
@@ -16,15 +15,15 @@ from openmdao.utils.cli_skills import (
 
 @unittest.skipUnless(os.getenv("CI") == "true", "Skipping CLI skills tests outside of CI environment")
 class TestCmdlineSkills(unittest.TestCase):
-    def _remove_skill_dirs(self, skills_dir: Path):
-        if skills_dir.exists():
-            for d in skills_dir.iterdir():
-                if d.is_dir() and d.name.startswith(_SKILL_PREFIX):
-                    shutil.rmtree(d)
+    def _uninstall_all(self):
+        for flag in [[], ['--global']]:
+            subprocess.run(
+                [sys.executable, '-m', 'openmdao.utils.om', 'skills', 'uninstall'] + flag + ['claude'],
+                stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            )
 
     def setUp(self):
-        self._remove_skill_dirs(Path.cwd() / '.claude' / 'skills')
-        self._remove_skill_dirs(Path.home() / '.claude' / 'skills')
+        self._uninstall_all()
 
     def _run_command(self, cmd):
         cp = subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)  # nosec: trusted input
@@ -47,7 +46,6 @@ class TestCmdlineSkills(unittest.TestCase):
         return None
 
     def _claude_skills_install_test(self, global_install):
-
         if global_install:
             self._run_command([sys.executable, '-m', 'openmdao.utils.om', 'skills', 'install', '--global', 'claude'])
             claude_dir = Path.home() / '.claude'
@@ -80,12 +78,6 @@ class TestCmdlineSkills(unittest.TestCase):
                     f"Placeholder '{placeholder}' was not replaced in {md_file}",
                 )
 
-    def test_claude_skills_local_install(self):
-        self._claude_skills_install_test(False)
-
-    def test_claude_skills_global_install(self):
-        self._claude_skills_install_test(True)
-
     def _claude_skills_uninstall_test(self, global_install):
         # install it first so when we uninstall it, it is actually there to uninstall
         if global_install:
@@ -111,13 +103,7 @@ class TestCmdlineSkills(unittest.TestCase):
                          if d.is_dir() and d.name.startswith(_SKILL_PREFIX)]
             self.assertFalse(remaining, f'OpenMDAO skill directories were not removed: {remaining}')
 
-    def test_claude_skills_local_uninstall(self):
-        self._claude_skills_uninstall_test(False)
-
-    def test_claude_skills_global_uninstall(self):
-        self._claude_skills_uninstall_test(True)
-
-    def test_claude_skills_list_cmd(self):
+    def _claude_skills_list_cmd_test(self):
         status = self._get_claude_status()
         if not status:
             self.fail("Claude skill status could not be determined")
@@ -137,6 +123,14 @@ class TestCmdlineSkills(unittest.TestCase):
             self.fail("Claude skill status could not be determined")
         self.assertIn('installed (project, global)', status, "Claude skill status does not indicate it is installed")
 
+    # Performs all the install/uninstall/list tests for the claude skill. Put all in one test to
+    #  avoid the issue of the tests being run in parallel and interfering with each other.
+    def test_all_cmds(self):
+        self._claude_skills_install_test(False)
+        self._claude_skills_uninstall_test(False)
+        self._claude_skills_install_test(True)
+        self._claude_skills_uninstall_test(True)
+        self._claude_skills_list_cmd_test()
 
 if __name__ == "__main__":
     unittest.main()
