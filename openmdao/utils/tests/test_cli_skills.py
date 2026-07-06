@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import sys
 import unittest
@@ -15,15 +16,15 @@ from openmdao.utils.cli_skills import (
 
 @unittest.skipUnless(os.getenv("CI") == "true", "Skipping CLI skills tests outside of CI environment")
 class TestCmdlineSkills(unittest.TestCase):
-    def _uninstall_all(self):
-        for flag in [[], ['--global']]:
-            subprocess.run(
-                [sys.executable, '-m', 'openmdao.utils.om', 'skills', 'uninstall'] + flag + ['claude'],
-                stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-            )
+    def _remove_skill_dirs(self, skills_dir: Path):
+        if skills_dir.exists():
+            for d in skills_dir.iterdir():
+                if d.is_dir() and d.name.startswith(_SKILL_PREFIX):
+                    shutil.rmtree(d)
 
     def setUp(self):
-        self._uninstall_all()
+        self._remove_skill_dirs(Path.cwd() / '.claude' / 'skills')
+        self._remove_skill_dirs(Path.home() / '.claude' / 'skills')
 
     def _run_command(self, cmd):
         cp = subprocess.run(cmd, stderr=subprocess.PIPE, stdout=subprocess.PIPE)  # nosec: trusted input
