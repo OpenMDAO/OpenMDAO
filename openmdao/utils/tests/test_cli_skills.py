@@ -4,6 +4,8 @@ import sys
 import unittest
 from pathlib import Path
 
+from numpy.testing import tempdir
+
 from openmdao.utils.cli_skills import (
     OPENMDAO_PATH_PLACEHOLDER,
     OPENMDAO_DOCS_PLACEHOLDER,
@@ -13,6 +15,7 @@ from openmdao.utils.cli_skills import (
     _SKILL_PREFIX,
 )
 
+@tempdir()
 @unittest.skipUnless(os.getenv("CI") == "true",
    "Skipping CLI skills tests outside of CI environment. Do not want to install/uninstall skills on developer machines.")
 class TestCmdlineSkills(unittest.TestCase):
@@ -116,6 +119,11 @@ class TestCmdlineSkills(unittest.TestCase):
 
         # install it locally so when we check the status, it is actually there to check
         self._run_command([sys.executable, '-m', 'openmdao.utils.om', 'skills', 'install', 'claude'])
+
+        # print the output of the ls -lR command for the directory /home/runner/.claude/skills
+        import subprocess
+        print("Listing contents of /home/runner/.claude/skills after local install:")
+        subprocess.run(['ls', '-lR', '/home/runner/.claude/skills'])
         status = self._get_claude_status("after_local_install")
         self.assertIsNotNone(status, "Claude Code was not found in 'skills list' output")
         self.assertIn('installed (project)', status, "Claude skill status does not indicate it is installed")
