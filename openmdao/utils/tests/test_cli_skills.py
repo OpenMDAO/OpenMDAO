@@ -13,7 +13,8 @@ from openmdao.utils.cli_skills import (
     _SKILL_PREFIX,
 )
 
-@unittest.skipUnless(os.getenv("CI") == "true", "Skipping CLI skills tests outside of CI environment")
+@unittest.skipUnless(os.getenv("CI") == "true",
+   "Skipping CLI skills tests outside of CI environment. Do not want to install/uninstall skills on developer machines.")
 class TestCmdlineSkills(unittest.TestCase):
     def _uninstall_all(self):
         for flag in [[], ['--global']]:
@@ -127,8 +128,8 @@ class TestCmdlineSkills(unittest.TestCase):
     #  avoid the issue of the tests being run in parallel and interfering with each other.
     def test_all_cmds(self):
         self._claude_skills_install_test(False)
-        self._claude_skills_uninstall_test(False)
         self._claude_skills_install_test(True)
+        self._claude_skills_uninstall_test(False)
         self._claude_skills_uninstall_test(True)
         self._claude_skills_list_cmd_test()
 
