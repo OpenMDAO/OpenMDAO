@@ -107,6 +107,9 @@ pymoo = ">=0.6.1"
 modopt = {git = "https://github.com/lsdolab/modopt.git", branch = "main"}
 build_pyoptsparse = { git = "https://github.com/OpenMDAO/build_pyoptsparse.git" }
 
+[feature.uno.pypi-dependencies]
+unopy = ">=0.2.6"
+
 # Jax not available for windows on conda-forge
 [feature.jax.pypi-dependencies]
 jax = "*"
@@ -199,20 +202,20 @@ networkx = "==3.3"
 [environments]
 
 # Default - uses whatever Python solver picks
-default = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "default" }
-dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging", "openblas-explicit"], solve-group = "default" }
+default = { features = ["py313", "doe", "opt", "uno", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "default" }
+dev = { features = ["py313", "doe", "opt", "uno", "jax", "numba", "notebooks", "visualization", "test", "mpi", "docs", "packaging", "openblas-explicit"], solve-group = "default" }
 minimal = { features = ["py313", "test", "openblas-explicit"], solve-group = "default" }
 
 # Oldest supported versions
-oldest = { features = ["deps-oldest", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "oldest" }
+oldest = { features = ["deps-oldest", "doe", "opt", "uno", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "oldest" }
 
 # Python version matrix
-py311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "py311" }
-py312 = { features = ["py312", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "py312" }
+py311 = { features = ["py311", "doe", "opt", "uno", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "py311" }
+py312 = { features = ["py312", "doe", "opt", "uno", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "py312" }
 # Note that environment py313 is deprecated in favor of default
-py313 = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "default" }
+py313 = { features = ["py313", "doe", "opt", "uno", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "default" }
 # py314 uses mpi-no-osx instead of mpi because opt/MPI conflict on macOS under py314.
-py314 = { features = ["py314", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi-no-osx", "openblas-explicit"], solve-group = "py314" }
+py314 = { features = ["py314", "doe", "opt", "uno", "jax", "numba", "notebooks", "visualization", "test", "mpi-no-osx", "openblas-explicit"], solve-group = "py314" }
 
 ###############################################
 # Tasks

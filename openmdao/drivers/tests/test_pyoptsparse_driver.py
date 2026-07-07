@@ -6,6 +6,7 @@ import unittest
 import os.path
 
 from packaging.version import Version
+from parameterized import parameterized
 
 import numpy as np
 
@@ -2758,10 +2759,14 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(J[('exec.z', 'exec.a')].flatten(), np.array([1.]))
         assert_near_equal(J[('ALIAS_TEST', 'exec.a')].flatten(), np.array([1.]))
 
-    @require_pyoptsparse('IPOPT')
-    def test_driver_sparsity(self):
+    @parameterized.expand([
+        ('IPOPT',),
+        ('Uno',),
+    ])
+    @require_pyoptsparse
+    def test_driver_sparsity(self, optimizer):
         prob = om.Problem()
-        prob.driver = driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        prob.driver = driver = om.pyOptSparseDriver(optimizer=optimizer, print_results=False)
         driver.opt_settings['print_level'] = 0
         driver.opt_settings['max_iter'] = 1000
         driver.declare_coloring()
@@ -3559,11 +3564,15 @@ class TestLinearOnlyDVs(unittest.TestCase):
 
         return prob
 
-    @require_pyoptsparse('IPOPT')
-    def test_lin_only_dvs(self):
+    @parameterized.expand([
+        ('IPOPT',),
+        ('Uno',),
+    ])
+    @require_pyoptsparse
+    def test_lin_only_dvs(self, optimizer):
         shape = (2, 5)
         # do first opt without coloring
-        driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        driver = om.pyOptSparseDriver(optimizer=optimizer, print_results=False)
         driver.opt_settings['print_level'] = 0
         driver.opt_settings['max_iter'] = 1000
         p = self.setup_lin_only_dv_problem(driver=driver, shape=shape)
@@ -3572,7 +3581,7 @@ class TestLinearOnlyDVs(unittest.TestCase):
         nsolves_nocolor = p.driver._total_jac.nsolves
         assert_check_totals(p.check_totals(method='cs', out_stream=None))
 
-        driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        driver = om.pyOptSparseDriver(optimizer=optimizer, print_results=False)
         driver.opt_settings['print_level'] = 0
         driver.opt_settings['max_iter'] = 1000
         driver.declare_coloring()

@@ -30,7 +30,7 @@ else:
     pyoptsparse_version = None
 
 # All optimizers in pyoptsparse
-optlist = {'ALPSO', 'CONMIN', 'IPOPT', 'NLPQLP', 'NSGA2', 'ParOpt', 'PSQP', 'SLSQP', 'SNOPT'}
+optlist = {'ALPSO', 'CONMIN', 'IPOPT', 'NLPQLP', 'NSGA2', 'ParOpt', 'PSQP', 'SLSQP', 'SNOPT', 'Uno'}
 
 if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.0'):
     optlist.add('NOMAD')
@@ -40,7 +40,7 @@ if pyoptsparse_version is None or pyoptsparse_version < Version('2.1.2'):
 
 # names of optimizers that use gradients
 grad_drivers = optlist.intersection({'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP', 'PSQP',
-                                     'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'ParOpt'})
+                                     'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'ParOpt', 'Uno'})
 
 # names of optimizers that allow multiple objectives
 multi_obj_drivers = {'NSGA2'}
@@ -67,7 +67,8 @@ respects_fail_flag = {
     'SNOPT': True,           # as of v2.0.0, requires SNOPT 7.7
     'FSQP': False,           # no longer supported as of v2.1.2
     'NLPY_AUGLAG': False,    # no longer supported as of v2.1.2
-    'NOMAD': False           # no longer supported as of v2.6.0
+    'NOMAD': False,          # no longer supported as of v2.6.0
+    'Uno': True              # Uno respects the fail flag
 }
 
 DEFAULT_OPT_SETTINGS = {}
