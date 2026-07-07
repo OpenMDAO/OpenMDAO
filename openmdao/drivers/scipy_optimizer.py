@@ -119,12 +119,6 @@ class ScipyOptimizeDriver(Driver):
         Pre-calculated gradients of linear constraints.
     _desvar_array_cache : np.ndarray
         Cached array for setting design variables.
-    _dv_norm_lower : np.ndarray or None
-        Concatenated lower bounds of design variables in optimizer-scaled space, used when
-        the ``normalize_design_vars`` option is enabled. None otherwise.
-    _dv_norm_range : np.ndarray or None
-        Concatenated (upper - lower) ranges of design variables in optimizer-scaled space,
-        used when the ``normalize_design_vars`` option is enabled. None otherwise.
     """
 
     def __init__(self, **kwargs):
@@ -159,8 +153,6 @@ class ScipyOptimizeDriver(Driver):
         self._dvlist = None
         self._lincongrad_cache = None
         self._desvar_array_cache = None
-        self._dv_norm_lower = None
-        self._dv_norm_range = None
         self.fail = False
         self.iter_count = 0
         self._check_jac = False
@@ -191,15 +183,6 @@ class ScipyOptimizeDriver(Driver):
                              "ignore - don't perform check.")
         self.options.declare('singular_jac_tol', default=1e-16,
                              desc='Tolerance for zero row/column check.')
-        self.options.declare('normalize_design_vars', default=False, types=bool,
-                             desc='If True, design variables are normalized to the range '
-                             '[0, 1] using their lower and upper bounds before being passed '
-                             'to the underlying scipy optimizer. Bounds passed to scipy are '
-                             'then (0, 1) for all design variables. This is useful for '
-                             'optimizers (such as COBYLA) whose initial-step option (rhobeg) '
-                             'is a single scalar, when design variables have drastically '
-                             'different magnitudes. Requires finite lower and upper bounds '
-                             'on all design variables.')
 
     def _get_name(self):
         """
@@ -256,8 +239,6 @@ class ScipyOptimizeDriver(Driver):
         self._total_jac = None
         self._total_jac_linear = None
         self._desvar_array_cache = None
-        self._dv_norm_lower = None
-        self._dv_norm_range = None
 
         self._check_for_missing_objective()
         self._check_for_invalid_desvar_values()
@@ -317,42 +298,6 @@ class ScipyOptimizeDriver(Driver):
 
                     bounds.append((p_low, p_high))
 
-        # If requested, normalize the design vector to [0, 1] using the (finite) DV bounds.
-        # Bounds passed to scipy become (0, 1), the initial point is remapped, and the raw
-        # design vector is reconstructed inside the objective/gradient callbacks. This lets
-        # scalar step-size options (e.g. COBYLA's rhobeg) act uniformly across design
-        # variables of very different magnitudes.
-        if self.options['normalize_design_vars']:
-            lower_full = np.empty(ndesvar)
-            upper_full = np.empty(ndesvar)
-            i = 0
-            for name, meta in self._designvars.items():
-                size = meta['global_size'] if meta['distributed'] else meta['size']
-                lower_full[i:i + size] = lower_dv[name]
-                upper_full[i:i + size] = upper_dv[name]
-                i += size
-
-            if np.any(lower_full <= -INF_BOUND) or np.any(upper_full >= INF_BOUND):
-                raise RuntimeError(f"{self.msginfo}: The 'normalize_design_vars' option "
-                                   "requires finite lower and upper bounds on all design "
-                                   "variables.")
-
-            dv_range = upper_full - lower_full
-            if np.any(dv_range <= 0.0):
-                raise RuntimeError(f"{self.msginfo}: The 'normalize_design_vars' option "
-                                   "requires upper > lower for every design variable.")
-
-            self._dv_norm_lower = lower_full
-            self._dv_norm_range = dv_range
-
-            # Remap the initial point into normalized space.
-            x_init = (x_init - lower_full) / dv_range
-            # Numerical guard so the initial point respects the [0, 1] bounds we hand to scipy.
-            x_init = np.clip(x_init, 0.0, 1.0)
-
-            if use_bounds:
-                bounds = [(0.0, 1.0)] * ndesvar
-
         if use_bounds and (opt in _supports_new_style) and _use_new_style:
             # For 'trust-constr' it is better to use the new type bounds, because it seems to work
             # better (for the current examples in the tests) with the "keep_feasible" option
@@ -381,10 +326,6 @@ class ScipyOptimizeDriver(Driver):
             if lincons:
                 lincongrad = self._lincongrad_cache = \
                     self._compute_totals(of=lincons, wrt=self._dvlist, return_format='array')
-                # If DV normalization is active, apply chain rule so gradients are w.r.t. the
-                # normalized (0..1) design vector.
-                if self._dv_norm_range is not None:
-                    lincongrad = self._lincongrad_cache = lincongrad * self._dv_norm_range
             else:
                 self._lincongrad_cache = None
 
@@ -640,15 +581,8 @@ class ScipyOptimizeDriver(Driver):
             if MPI:
                 model.comm.Bcast(x_new, root=0)
 
-            # If DV normalization is active, map the [0, 1] optimizer space back to the
-            # driver-scaled design-variable space before writing into the model.
-            if self._dv_norm_range is not None:
-                x_actual = x_new * self._dv_norm_range + self._dv_norm_lower
-            else:
-                x_actual = x_new
-
             # Update the cached design variable vector
-            dv_vec.set_data(x_actual, driver_scaling=True)
+            dv_vec.set_data(x_new, driver_scaling=True)
 
             # Design variables in dv_vec are now in optimizer scaled space and in driver-units.
             self._set_design_vars(driver_scaling=True)
@@ -769,13 +703,7 @@ class ScipyOptimizeDriver(Driver):
         try:
             grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
                                         return_format=self._total_jac_format)
-            # If DV normalization is active, apply the chain rule so returned gradients
-            # correspond to the normalized (0..1) design vector.
-            if self._dv_norm_range is not None:
-                grad = grad * self._dv_norm_range
             self._grad_cache = grad
-            if not np.all(np.isfinite(grad)):
-                print(f'DEBUG _gradfunc: NaN/Inf in grad shape={grad.shape}:\n{grad}')
 
             # First time through, check for zero row/col.
             if self._check_jac and self._total_jac is not None:
