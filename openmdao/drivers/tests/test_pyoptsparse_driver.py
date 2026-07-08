@@ -1458,7 +1458,11 @@ class TestPyoptSparse(unittest.TestCase):
         # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
         prob.driver.run()
 
-    def test_raised_error_objfunc(self):
+    @parameterized.expand([
+        ('SLSQP',),
+        ('Uno',),
+    ])
+    def test_raised_error_objfunc(self, optimizer):
 
         # Component fails hard this time during execution, so we expect
         # pyoptsparse to raise.
@@ -1477,8 +1481,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         # SNOPT has a weird cleanup problem when this fails, so we use SLSQP. For the
         # regular failure, it doesn't matter which opt we choose since they all fail through.
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['optimizer'] = optimizer
+        if optimizer == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
 
         prob.driver.options['print_results'] = False
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -1496,7 +1501,11 @@ class TestPyoptSparse(unittest.TestCase):
 
         # pyopt's failure message differs by platform and is not informative anyway
 
-    def test_raised_error_sensfunc(self):
+    @parameterized.expand([
+        ('SLSQP',),
+        ('Uno',),
+    ])
+    def test_raised_error_sensfunc(self, optimizer):
 
         # Component fails hard this time during gradient eval, so we expect
         # pyoptsparse to raise.
@@ -1514,8 +1523,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         # SNOPT has a weird cleanup problem when this fails, so we use SLSQP. For the
         # regular failure, it doesn't matter which opt we choose since they all fail through.
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['optimizer'] = optimizer
+        if optimizer == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
 
         prob.driver.options['print_results'] = False
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -2112,7 +2122,11 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['obj_cmp.obj'][0], 3.183, 1e-3)
 
-    def test_error_objfun_reraise(self):
+    @parameterized.expand([
+        ('SLSQP',),
+        ('Uno',),
+    ])
+    def test_error_objfun_reraise(self, optimizer):
         # Tests that we re-raise any unclassified error encountered during callback eval.
 
         class EComp(om.ExplicitComponent):
@@ -2133,7 +2147,7 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_design_var('comp.x')
 
         p.driver = om.pyOptSparseDriver()
-        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.options['optimizer'] = optimizer
 
         p.setup()
 
@@ -2142,7 +2156,11 @@ class TestPyoptSparse(unittest.TestCase):
 
         self.assertTrue("This comp will fail." in msg.exception.args[0])
 
-    def test_error_gradfun_reraise(self):
+    @parameterized.expand([
+        ('SLSQP',),
+        ('Uno',),
+    ])
+    def test_error_gradfun_reraise(self, optimizer):
         # Tests that we re-raise any unclassified error encountered during callback eval.
 
         class EComp(om.ExplicitComponent):
@@ -2165,7 +2183,7 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_design_var('comp.x')
 
         p.driver = om.pyOptSparseDriver()
-        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.options['optimizer'] = optimizer
 
         p.setup()
 
@@ -3203,7 +3221,11 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         assert_near_equal(prob['x'], 7.16667, 1e-6)
         assert_near_equal(prob['y'], -7.833334, 1e-6)
 
-    def test_sellar_analysis_error(self):
+    @parameterized.expand([
+        ('SNOPT',),
+        ('Uno',),
+    ])
+    def test_sellar_analysis_error(self, optimizer):
         # One discipline of Sellar will something raise analysis error. This is to test that
         # the iprinting doesn't get out-of-whack.
 
@@ -3300,8 +3322,9 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         model = prob.model = SellarMDAAE()
 
         prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = 'SNOPT'
-        prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['optimizer'] = optimizer
+        if optimizer == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
         prob.driver.options['print_results'] = False
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
