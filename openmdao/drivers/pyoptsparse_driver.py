@@ -68,7 +68,7 @@ respects_fail_flag = {
     'FSQP': False,           # no longer supported as of v2.1.2
     'NLPY_AUGLAG': False,    # no longer supported as of v2.1.2
     'NOMAD': False,          # no longer supported as of v2.6.0
-    'Uno': True              # Uno respects the fail flag
+    'Uno': False             # Uno needs NaN values to handle analysis errors
 }
 
 DEFAULT_OPT_SETTINGS = {}
