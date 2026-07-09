@@ -278,7 +278,10 @@ class _TotalJacInfo(object):
 
         self.relevance = get_relevance(model, of_metadata, wrt_metadata)
 
-        if not all_lin_cons:
+        # When approximating total derivatives at the model level (approx_totals),
+        # continuous variables are perturbed while discrete outputs are not,
+        # so a dependence on discrete outputs is not a problem.
+        if not all_lin_cons and not approx:
             self._check_discrete_dependence()
 
         if approx:
