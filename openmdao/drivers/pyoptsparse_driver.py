@@ -574,6 +574,15 @@ class pyOptSparseDriver(Driver):
                 print(opt_prob)
 
         self._exc_info = None
+
+        # Install a SIGINT handler for optimizers that don't have their own signal handling
+        # (e.g. Uno). When Ctrl+C arrives between Python callbacks, this sets the termination
+        # flag so the next callback entry returns fail=2 instead of crashing.
+        _sigint_cache = None
+        if optimizer not in ('SNOPT',) and self.options['user_terminate_signal'] is None:
+            _sigint_cache = signal.getsignal(signal.SIGINT)
+            signal.signal(signal.SIGINT, self._signal_handler)
+
         try:
 
             # Execute the optimization problem
@@ -682,6 +691,9 @@ class pyOptSparseDriver(Driver):
             signal.signal(sigusr, self._signal_cache)
             self._signal_cache = None   # to prevent memory leak test from failing
 
+        if _sigint_cache is not None:
+            signal.signal(signal.SIGINT, _sigint_cache)
+
         return self.fail
 
     def _objfunc(self, dv_dict):
@@ -747,10 +759,21 @@ class pyOptSparseDriver(Driver):
                     model._clear_iprint()
                     fail = 2
 
+                # Ctrl+C during model execution: set termination flag and return fail=2
+                # so the optimizer (e.g. Uno) can terminate cleanly rather than crashing.
+                except KeyboardInterrupt:
+                    model._clear_iprint()
+                    self._user_termination_flag = True
+                    fail = 2
+
                 # Record after getting obj and constraint to assure they have
                 # been gathered in MPI.
                 rec.abs = 0.0
                 rec.rel = 0.0
+
+        except KeyboardInterrupt:
+            self._user_termination_flag = True
+            fail = 2
 
         except Exception:
             if self._exc_info is None:  # avoid overwriting an earlier exception
@@ -833,6 +856,12 @@ class pyOptSparseDriver(Driver):
                 prob.model._clear_iprint()
                 fail = 2
 
+            # Ctrl+C during gradient computation: set termination flag and return fail=2.
+            except KeyboardInterrupt:
+                prob.model._clear_iprint()
+                self._user_termination_flag = True
+                fail = 2
+
             else:
                 # if we don't convert to 'coo' here, pyoptsparse will do a
                 # conversion of our dense array into a fully dense 'coo', which is bad.
@@ -855,6 +884,10 @@ class pyOptSparseDriver(Driver):
                         for ikey in nl_dvs:
                             newdv[ikey] = sens_dict[okey][ikey]
                 sens_dict = new_sens
+
+        except KeyboardInterrupt:
+            self._user_termination_flag = True
+            fail = 2
 
         except Exception:
             if self._exc_info is None:  # avoid overwriting an earlier exception

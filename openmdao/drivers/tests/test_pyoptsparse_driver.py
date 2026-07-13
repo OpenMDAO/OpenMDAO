@@ -2074,6 +2074,93 @@ class TestPyoptSparse(unittest.TestCase):
         code = prob.driver.pyopt_solution.optInform['value']
         self.assertEqual(code, 71)
 
+    def test_keyboard_interrupt_objfunc_Uno(self):
+        # KeyboardInterrupt raised during model execution is caught in _objfunc and
+        # returned as fail=2, which Uno translates to a clean user-termination exit.
+        _, local_opt = set_pyoptsparse_opt('Uno')
+        if local_opt != 'Uno':
+            raise unittest.SkipTest('pyoptsparse is not providing Uno')
+
+        class ParaboloidKBI(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+                self.add_output('f_xy', val=0.0)
+                self.declare_partials('*', '*')
+                self.iter_count = 0
+
+            def compute(self, inputs, outputs):
+                self.iter_count += 1
+                if self.iter_count == 1:
+                    raise KeyboardInterrupt
+                elif self.iter_count > 3:
+                    raise RuntimeError('Uno should have stopped.')
+                outputs['f_xy'] = (inputs['x'] - 3.0)**2 + inputs['x'] * inputs['y'] + \
+                                   (inputs['y'] + 4.0)**2 - 3.0
+
+            def compute_partials(self, inputs, partials):
+                partials['f_xy', 'x'] = 2.0*inputs['x'] - 6.0 + inputs['y']
+                partials['f_xy', 'y'] = 2.0*inputs['y'] + 8.0 + inputs['x']
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('x', om.IndepVarComp('x', 2.0), promotes=['*'])
+        model.add_subsystem('y', om.IndepVarComp('y', 2.0), promotes=['*'])
+        model.add_subsystem('f_xy', ParaboloidKBI(), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'Uno'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        model.add_objective('f_xy')
+
+        prob.setup()
+        prob.run_driver()
+
+        # Uno inform code 5 is user termination.
+        code = prob.driver.pyopt_solution.optInform['value']
+        self.assertEqual(code, 5)
+
+    def test_keyboard_interrupt_between_callbacks_Uno(self):
+        # When SIGINT arrives between Python callbacks (while C++ is running), the SIGINT
+        # handler that run() installs sets _user_termination_flag without raising. The next
+        # _objfunc call at a new design point returns fail=2 immediately without running the
+        # model, giving Uno a clean user-termination exit.
+        _, local_opt = set_pyoptsparse_opt('Uno')
+        if local_opt != 'Uno':
+            raise unittest.SkipTest('pyoptsparse is not providing Uno')
+
+        prob = om.Problem()
+        model = prob.model
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'Uno'
+
+        model.add_subsystem('comp', om.ExecComp('y = x**2', x=2.0, y=4.0))
+        prob.model.add_design_var('comp.x', lower=-50, upper=50)
+        model.add_objective('comp.y')
+
+        prob.setup()
+        prob.final_setup()
+
+        driver = prob.driver
+        driver._fill_NANs = False  # not needed for this unit-level check
+
+        # Simulate the state after a SIGINT arrived between callbacks:
+        # _in_user_function is False (we're between callbacks) so the handler
+        # only sets the flag without raising.
+        driver._user_termination_flag = True
+        driver._in_user_function = False
+
+        # Calling _objfunc with any dv_dict should return fail=2 immediately
+        # without running the model.
+        dv_dict = {'comp.x': np.array([2.0])}
+        func_dict, fail = driver._objfunc(dv_dict)
+        self.assertEqual(fail, 2)
+
     def test_IPOPT_basic(self):
         _, local_opt = set_pyoptsparse_opt('IPOPT')
         if local_opt != 'IPOPT':
