@@ -798,6 +798,36 @@ class TestDriver(unittest.TestCase):
         msg = "<model> <class Group>: Target for constraint x has no units, but 'ft' units were specified."
         self.assertEqual(str(context.exception), msg)
 
+    def test_units_bug(self):
+        # This tests a bug in the set_design_var method where a design variable was being double
+        # converted when it was set.
+        prob = om.Problem()
+        model = prob.model
+
+        eq = om.ExecComp(
+            ['y=x', 'obj=x'],
+            x={'units': 'm'},
+            y={'units': 'm'},
+            obj={'units': 'm'},
+        )
+
+        model.add_subsystem('comp1', eq, promotes=['*'])
+
+        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
+        prob.driver.opt_settings['MAXIT'] = 1
+        prob.model.add_design_var('x', units='km', lower=1, upper=2, ref=1.0)
+        prob.model.add_constraint('y', units='m', lower=1, upper=2, ref=1.0)
+        prob.model.add_objective('obj')
+
+        prob.setup()
+        prob.set_val('x', val=1.5, units='m')
+
+        # Optimizer will flip this up to the 1km lower bound in 1 iteration.
+        prob.run_driver()
+
+        x = prob.get_val('x', units='m')
+        assert_near_equal(x, 1000.0, 1.0e-6)
+
     def test_get_desvar_subsystem(self):
         # Test for a bug where design variables in a subsystem were not fully set up.
         prob = om.Problem()
