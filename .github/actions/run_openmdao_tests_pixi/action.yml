@@ -332,7 +332,7 @@ runs:
 
     - name: Slack failure to upload to coveralls.io
       if: inputs.COVERAGE == 'true' && steps.coveralls.outcome == 'failure'
-      uses: act10ns/slack@v2.0.0
+      uses: act10ns/slack@v2.2.0
       with:
         webhook-url: ${{ inputs.slack_webhook_url }}
         status: 'warning'
@@ -366,7 +366,7 @@ runs:
 
     - name: Slack unit test failure
       if: failure() && steps.run_tests_bash.outcome == 'failure'
-      uses: act10ns/slack@v2.0.0
+      uses: act10ns/slack@v2.2.0
       with:
         webhook-url: ${{ inputs.slack_webhook_url }}
         status: ${{ steps.run_tests_bash.outcome }}
@@ -376,7 +376,7 @@ runs:
 
     - name: Slack security issue
       if: steps.bandit.outcome == 'failure'
-      uses: act10ns/slack@v2.0.0
+      uses: act10ns/slack@v2.2.0
       with:
         webhook-url: ${{ inputs.slack_webhook_url }}
         status: ${{ steps.bandit.outcome }}
