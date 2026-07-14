@@ -102,7 +102,9 @@ runs:
             fi
             echo "Building wheel"
             cd "$GITHUB_WORKSPACE"
-            python -m pip install build
+            # Manually install package requirements for the isolated build environment.
+            python -m pip install build hatchling "numpy>=2.0"
+
             python -m build --wheel --no-isolation
             WHEEL=$(find dist/openmdao-*.whl)
             echo "Installing from wheel: $WHEEL"
