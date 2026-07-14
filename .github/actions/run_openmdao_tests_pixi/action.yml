@@ -173,7 +173,7 @@ runs:
         eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
         python -m build_pyoptsparse.snopt_module SNOPT/src
 
-    - name: Check MPI and PETSc
+- name: Check MPI and PETSc
       continue-on-error: true
       shell: bash -l {0}
       run: |
@@ -182,10 +182,21 @@ runs:
           echo "============================================================="
           echo "Check MPI and PETSc installation"
           echo "============================================================="
+          
+          # Global OpenMPI settings
           export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
           export OMPI_MCA_rmaps_base_oversubscribe=1
           export OMPI_MCA_mpi_yield_when_idle=1
           export OMPI_MCA_btl=^openib
+          
+          # macOS-specific overrides for this step
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            export OMPI_MCA_btl="tcp,self"
+            export OMPI_MCA_orte_tmpdir_base="$RUNNER_TEMP/ompi"
+            export OMPI_MCA_btl_tcp_if_include="lo0"
+            export PRTE_MCA_oob_tcp_if_include="lo0"
+          fi
+
           echo "-----------------------"
           echo "Quick test of mpi4py:"
           mpirun -n 3 python -c "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
@@ -197,11 +208,20 @@ runs:
             print(x.getArray())"
           echo "-----------------------"
 
+          # Write to GITHUB_ENV so these carry over to the actual test step
           # shellcheck disable=SC2129
           echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> "$GITHUB_ENV"
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> "$GITHUB_ENV"
-          echo "OMPI_MCA_btl=tcp,self" >> "$GITHUB_ENV"
-          echo "OMPI_MCA_orte_tmpdir_base=$RUNNER_TEMP/ompi" >> "$GITHUB_ENV"
+          echo "OMPI_MCA_mpi_yield_when_idle=1" >> "$GITHUB_ENV"
+          
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            echo "OMPI_MCA_btl=tcp,self" >> "$GITHUB_ENV"
+            echo "OMPI_MCA_orte_tmpdir_base=$RUNNER_TEMP/ompi" >> "$GITHUB_ENV"
+            echo "OMPI_MCA_btl_tcp_if_include=lo0" >> "$GITHUB_ENV"
+            echo "PRTE_MCA_oob_tcp_if_include=lo0" >> "$GITHUB_ENV"
+          else
+            echo "OMPI_MCA_btl=^openib" >> "$GITHUB_ENV"
+          fi
 
         else
           echo "mpi4py or petsc4py not installed in this environment, skipping MPI checks"
