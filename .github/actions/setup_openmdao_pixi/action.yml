@@ -101,9 +101,9 @@ runs:
               exit 1
             fi
             echo "Building wheel"
-            cd ${{ github.workspace }}
+            cd "$GITHUB_WORKSPACE"
             python -m pip install build
-            python -m build --wheel
+            python -m build --wheel --no-isolation
             WHEEL=$(find dist/openmdao-*.whl)
             echo "Installing from wheel: $WHEEL"
             python -m pip install "${WHEEL}" --no-deps

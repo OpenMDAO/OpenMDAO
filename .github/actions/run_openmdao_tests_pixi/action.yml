@@ -200,11 +200,9 @@ runs:
           # shellcheck disable=SC2129
           echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> "$GITHUB_ENV"
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> "$GITHUB_ENV"
-          echo "OMPI_MCA_mpi_yield_when_idle=1" >> "$GITHUB_ENV"
-          echo "OMPI_MCA_btl=^openib" >> "$GITHUB_ENV"
+          echo "OMPI_MCA_btl=tcp,self" >> "$GITHUB_ENV"
+          echo "OMPI_MCA_orte_tmpdir_base=$RUNNER_TEMP/ompi" >> "$GITHUB_ENV"
 
-          echo "Workaround for intermittent failures with OMPI https://github.com/open-mpi/ompi/issues/7393"
-          echo "TMPDIR=/tmp" >> "$GITHUB_ENV"
         else
           echo "mpi4py or petsc4py not installed in this environment, skipping MPI checks"
         fi
