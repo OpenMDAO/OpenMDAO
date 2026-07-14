@@ -813,8 +813,7 @@ class TestDriver(unittest.TestCase):
 
         model.add_subsystem('comp1', eq, promotes=['*'])
 
-        prob.driver = om.pyOptSparseDriver(optimizer='SLSQP')
-        prob.driver.opt_settings['MAXIT'] = 1
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', maxiter=1)
         prob.model.add_design_var('x', units='km', lower=1, upper=2, ref=1.0)
         prob.model.add_constraint('y', units='m', lower=1, upper=2, ref=1.0)
         prob.model.add_objective('obj')
