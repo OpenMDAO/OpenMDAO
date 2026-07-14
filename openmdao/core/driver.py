@@ -1198,7 +1198,7 @@ class Driver(object, metaclass=DriverMetaclass):
             if units is not None:
                 src_units = problem.model._var_abs2meta['output'][src_name]['units']
                 desvar[loc_idxs] = convert_units(desvar[loc_idxs], units, src_units)
-            if meta['units'] is not None:
+            elif meta['units'] is not None:
                 src_units = problem.model._var_allprocs_abs2meta['output'][src_name]['units']
                 desvar[loc_idxs] = convert_units(desvar[loc_idxs], meta['units'], src_units)
 
