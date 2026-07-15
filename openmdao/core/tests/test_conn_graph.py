@@ -121,6 +121,12 @@ class TestAllConnectionTypes(unittest.TestCase):
         # Make sure it doesn't raise a Keyerror.
         prob.setup()
 
+        prob.set_val('sub.c1.x', 17.0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('sub.c2.x'), 17.0)
+        assert_near_equal(prob.get_val('sub.c1.x'), 17.0)
+
 
 class TestInputToInputConnections(unittest.TestCase):
 
