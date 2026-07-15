@@ -388,7 +388,11 @@ def write_options_table(pathname, opt_list, out_stream=_DEFAULT_OUT_STREAM):
     for sys_path, opt_dict, nl_dict, ln_dict in opt_list:
         sys_path_list = sys_path.split('.')
         stem_size = indent_inc * len(sys_path_list)
-        out_stream.write(stem_size * ' ' + sys_path_list[-1] + '\n')
+        comp_name = sys_path_list[-1]
+        if comp_name == '':
+            stem_size = 0
+            comp_name = 'model'
+        out_stream.write(stem_size * ' ' + comp_name + '\n')
         stem_size += 2
 
         for opt_name, opt_val in opt_dict.items():
