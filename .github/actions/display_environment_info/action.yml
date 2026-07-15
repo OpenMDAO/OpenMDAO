@@ -63,7 +63,7 @@ runs:
 
     - name: Slack env change
       if: steps.env_info.outputs.errors != ''
-      uses: act10ns/slack@v2.0.0
+      uses: act10ns/slack@v2.2.0
       with:
         webhook-url: ${{ inputs.SECRET_slack_webhook_url }}
         status: 'warning'
