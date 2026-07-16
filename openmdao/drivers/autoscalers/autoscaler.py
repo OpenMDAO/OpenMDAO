@@ -395,8 +395,8 @@ class Autoscaler(AutoscalerBase):
             - Equality constraints (always active)
             - Active inequality constraints (on their bounds, to within some tolerance)
         
-        Scaling Transformations
-        -----------------------
+        Notes
+        -----
         Define scaling transformations that map from unscaled (physical) space to
         scaled (optimizer) space:
         

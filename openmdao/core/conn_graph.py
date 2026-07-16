@@ -3501,7 +3501,7 @@ class AllConnGraph(nx.DiGraph):
             tgt_syspath, tgt_prom = self.get_path_prom(tgt)
             if tgt_syspath:
                 tgt_prom = model._resolver.abs2prom(self.absnames(tgt)[0], 'input')
-            del model._manual_connections[tgt_prom]
+            model._manual_connections.pop(tgt_prom, None)
 
             _, abs_out = root
             if abs_out.startswith('_auto_ivc.'):
