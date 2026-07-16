@@ -85,6 +85,16 @@ runs:
         echo "BANDIT: ${{ inputs.BANDIT }}"
         echo "============================================================="
 
+    - name: Install Uno optimizer (unopy)
+      if: inputs.PIXI_ENVIRONMENT != 'minimal'
+      shell: bash -l {0}
+      run: |
+        echo "============================================================="
+        echo "Install Uno optimizer (unopy) for testing"
+        echo "============================================================="
+        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
+        pip install unopy
+
     - name: Check SNOPT availability
       id: check_snopt
       shell: bash -l {0}

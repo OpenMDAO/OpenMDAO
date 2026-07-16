@@ -335,7 +335,7 @@ def cmd_build(args):
         if not item.is_file():
             continue
         rel = item.relative_to(SRC_DIR)
-        if '_build' in rel.parts or '.ipynb_checkpoints' in rel.parts:
+        if '_build' in rel.parts or '.ipynb_checkpoints' in rel.parts or 'tests' in rel.parts:
             continue
         if item.suffix == '.ipynb' and _has_code_cells(item):
             continue

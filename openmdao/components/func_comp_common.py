@@ -8,24 +8,67 @@ import re
 from functools import partial
 
 import numpy as np
+
 try:
     import jax
     from jax import vmap
     import jax.numpy as jnp
-    # linear_util moved to jax.extend in jax 0.4.17, previous location is deprecated
-    try:
-        from jax.extend import linear_util
-    except ImportError:
-        from jax import linear_util
-    from jax.api_util import argnums_partial
-    from jax._src.api import _jvp, _vjp, api_util
-    jax.config.update("jax_enable_x64", True)  # jax by default uses 32 bit floats
-except Exception:
-    _, err, tb = sys.exc_info()
-    if not isinstance(err, ImportError):
-        traceback.print_tb(tb)
+    _HAS_JAX = True
+except ImportError:
     jax = None
+    _HAS_JAX = False
 
+if _HAS_JAX:
+    try:
+        # 1. linear_util
+        try:
+            from jax.extend import linear_util
+        except ImportError:
+            from jax import linear_util
+
+        # 2. argnums_partial
+        try:
+            from jax._src.api_util import argnums_partial
+        except ImportError:
+            from jax.api_util import argnums_partial
+
+        # 3. _jvp and _vjp (Moved or removed in 0.4.28+)
+        try:
+            from jax._src.api import _jvp, _vjp
+        except ImportError:
+            try:
+                from jax._src.custom_derivatives import _jvp, _vjp
+            except ImportError:
+                # Fallback to public API. Public jax.vjp/jvp expect a standard callable,
+                # but OpenMDAO passes a linear_util.WrappedFun. We unwrap it to satisfy JAX.
+                from jax import jvp as _public_jvp
+                from jax import vjp as _public_vjp
+
+                def _jvp(fun, primals, tangents):
+                    func = fun.call_wrapped if hasattr(fun, 'call_wrapped') else fun
+                    return _public_jvp(func, primals, tangents)
+
+                def _vjp(fun, *primals):
+                    func = fun.call_wrapped if hasattr(fun, 'call_wrapped') else fun
+                    return _public_vjp(func, *primals)
+
+        # 4. api_util
+        try:
+            import jax._src.api_util as api_util
+        except ImportError:
+            try:
+                from jax._src.api import api_util
+            except ImportError:
+                from jax import api_util
+
+        jax.config.update("jax_enable_x64", True)
+        
+    except Exception as e:
+        # If any internal import fails, print the EXACT error instead of silently masking it
+        print(f"\nOpenMDAO JAX Integration Warning: Failed to import internal JAX modules: {e}\n")
+        _, err, tb = sys.exc_info()
+        traceback.print_tb(tb)
+        jax = None
 
 # regex to check for variable names.
 namecheck_rgx = re.compile('[_a-zA-Z][_a-zA-Z0-9]*')
