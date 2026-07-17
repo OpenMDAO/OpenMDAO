@@ -3,7 +3,7 @@
 
 July 17, 2026
 
-OpenMDAO 3.45.0 contains several improvements that user's may find useful.
+OpenMDAO 3.45.0 contains several improvements that users may find useful.
 
 ### Optimization updates
 
