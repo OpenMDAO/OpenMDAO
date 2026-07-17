@@ -1,5 +1,5 @@
 ***********************************
-# Release Notes for OpenMDAO 3.44.0
+# Release Notes for OpenMDAO 3.45.0
 
 July 17, 2026
 
