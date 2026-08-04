@@ -97,7 +97,7 @@ jinja2 = "*"
 tqdm = "*"
 
 [feature.doe.dependencies]
-pydoe3 = "*"
+pydoe = ">=1.0.0"
 
 [feature.opt.dependencies]
 pyoptsparse = ">=2.14.0"
@@ -205,7 +205,11 @@ dev = { features = ["py313", "doe", "opt", "jax", "numba", "notebooks", "visuali
 minimal = { features = ["py313", "test", "openblas-explicit"], solve-group = "default" }
 
 # Oldest supported versions
-oldest = { features = ["deps-oldest", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "oldest" }
+# Note: "doe" is intentionally omitted here. Every pydoe release requires
+# numpy>=2.2.6 / scipy>=1.15.3, which cannot co-exist with the numpy 2.0.* and
+# scipy 1.13.* pins in deps-oldest. The DOE tests are all guarded by
+# skipUnless(pydoe, ...) so they skip cleanly in this environment.
+oldest = { features = ["deps-oldest", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "oldest" }
 
 # Python version matrix
 py311 = { features = ["py311", "doe", "opt", "jax", "numba", "notebooks", "visualization", "test", "mpi", "openblas-explicit"], solve-group = "py311" }
