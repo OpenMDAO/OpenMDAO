@@ -1,6 +1,7 @@
 """Define the Problem class and a FakeComm class for non-MPI users."""
 
 import __main__
+import errno
 import shutil
 
 import sys
@@ -127,6 +128,38 @@ def _default_prob_name():
         return 'problem'
 
     return name.stem
+
+
+def _clear_reports_dir(reports_dirpath):
+    """
+    Remove the contents of the given reports directory without removing the directory itself.
+
+    The directory itself is intentionally left in place because other MPI ranks or processes
+    sharing the same output tree may be concurrently creating it, and deleting it out from under
+    them can cause a spurious FileExistsError from Path.mkdir(exist_ok=True) if the directory
+    vanishes between mkdir's EEXIST and its internal is_dir() check.  See issue #3746 and
+    python/cpython#142916.
+
+    Parameters
+    ----------
+    reports_dirpath : str or pathlib.Path
+        Path of the reports directory to be cleared.
+    """
+    try:
+        entries = list(os.scandir(reports_dirpath))
+    except FileNotFoundError:
+        # another process sharing this output tree already removed the directory
+        return
+
+    for entry in entries:
+        try:
+            if entry.is_dir(follow_symlinks=False):
+                shutil.rmtree(entry.path)
+            else:
+                os.unlink(entry.path)
+        except FileNotFoundError:
+            # another process already removed this entry. Removal is the goal, so not an error.
+            pass
 
 
 class Problem(object, metaclass=ProblemMetaclass):
@@ -1124,19 +1157,30 @@ class Problem(object, metaclass=ProblemMetaclass):
 
         # We don't want to delete the outputs directory because we may be using the coloring files
         # from a previous run.
-        # Start setup by deleting any existing reports so that the files
-        # that are in that directory are all from this run and not a previous run
-        # However, skip this deletion if we're in list_pre_post mode to preserve previously
+        # Start setup by removing any stale reports so that the files in the reports directory
+        # are all from this run and not a previous run.  When reports are active, remove only the
+        # contents of the reports directory, not the directory itself.  Removing the directory
+        # would race with its creation by other ranks/processes sharing this output tree, and
+        # Path.mkdir(exist_ok=True) on another rank can raise a spurious FileExistsError if the
+        # directory vanishes between mkdir's EEXIST and its internal is_dir() check (see
+        # issue #3746 and python/cpython#142916).  When reports are inactive, no rank creates
+        # the directory, so a stale directory can be safely removed entirely.
+        # However, skip this removal if we're in list_pre_post mode to preserve previously
         # generated reports (since list_pre_post exits before report generation hooks run).
         if os.environ.get('OPENMDAO_CLI_LIST_PRE_POST_MODE') != 'true':
-            reports_dirpath = self.get_reports_dir()
+            reports_dirpath = self.get_outputs_dir('reports', mkdir=False)
             if not MPI or (self.comm is not None and self.comm.rank == 0):
                 if os.path.isdir(reports_dirpath):
-                    try:
-                        shutil.rmtree(reports_dirpath)
-                    except FileNotFoundError:
-                        # Folder already removed by another proccess
-                        pass
+                    _clear_reports_dir(reports_dirpath)
+                    if not self._reports:
+                        try:
+                            os.rmdir(reports_dirpath)
+                        except OSError as err:
+                            # ENOENT: another process sharing this output tree already removed
+                            # it.  ENOTEMPTY: another process re-populated it after we cleared
+                            # it, so it is no longer stale and should be left alone.
+                            if err.errno not in (errno.ENOENT, errno.ENOTEMPTY):
+                                raise
         self._metadata['reports_dir'] = self.get_reports_dir()
 
         try:
