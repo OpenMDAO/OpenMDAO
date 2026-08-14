@@ -492,6 +492,9 @@ class _TotalJacInfo(object):
         if return_format == 'array':
             self.J_final = J
             self.J_dict = self._get_dict_J(J, wrt_metadata, of_metadata, 'dict')
+        elif return_format == 'flat_dict_structured_key':
+            self.J_final = self._get_dict_J(J, wrt_metadata, of_metadata, return_format)
+            self.J_dict = self._get_dict_J(J, wrt_metadata, of_metadata, 'dict')
         else:
             self.J_final = self.J_dict = self._get_dict_J(J, wrt_metadata, of_metadata,
                                                           return_format)
