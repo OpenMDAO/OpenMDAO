@@ -25,6 +25,46 @@ from openmdao.utils.units import unit_conversion
 _directional_rng = np.random.default_rng(99)
 
 
+def _check_approx_totals_internal_wrt(model, wrt_metadata):
+    """
+    Raise if totals are requested with respect to an internal variable of an approximated group.
+
+    Parameters
+    ----------
+    model : Group
+        The top-level model.
+    wrt_metadata : dict
+        Metadata for variables with respect to which totals are being computed.
+    """
+    if not wrt_metadata:
+        return
+
+    wrt_sources = [(name, meta['source']) for name, meta in wrt_metadata.items()]
+
+    for group in model.system_iter(include_self=False, recurse=True):
+        if not group._owns_approx_jac:
+            continue
+
+        prefix = group.pathname + '.'
+        offenders = []
+        for name, src in wrt_sources:
+            if src.startswith(prefix) and src not in group._var_allprocs_abs2meta['input']:
+                offenders.append((name, src))
+
+        if offenders:
+            parts = [f"'{name}'" if name == src else f"'{name}' (source '{src}')"
+                     for name, src in offenders]
+            variables = ', '.join(parts)
+            source_text = 'source variable is' if len(offenders) == 1 else 'source variables are'
+
+            raise RuntimeError(
+                f"{group.msginfo}: Total derivatives were requested with respect to {variables}, "
+                f"but this group uses approx_totals and the {source_text} internal to that group. "
+                "Subgroup approximations are computed only with respect to the group's inputs, so "
+                "these derivatives cannot be computed by the model's linear derivative solve."
+            )
+
+
 class _TotalJacInfo(object):
     """
     Object to manage computation of total derivatives.
@@ -210,6 +250,9 @@ class _TotalJacInfo(object):
         else:
             of_metadata, wrt_metadata, has_custom_derivs = model._get_totals_metadata(driver, of,
                                                                                       wrt)
+
+        if not approx:
+            _check_approx_totals_internal_wrt(model, wrt_metadata)
 
         if (of_indices is not None) and (orig_of is not None):
             conn_graph = model.get_conn_graph()

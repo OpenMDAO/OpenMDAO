@@ -107,6 +107,25 @@ class TestSemiTotals(unittest.TestCase):
 
         assert_check_totals(data, atol=1e-6, rtol=1e-6)
 
+    def test_approx_totals_internal_wrt_raises(self):
+        prob = om.Problem()
+
+        group = prob.model.add_subsystem('G', om.Group())
+        group.add_subsystem('ivc', om.IndepVarComp('x', 1.0))
+        group.add_subsystem('comp', om.ExecComp('y = 2.0 * x'))
+        group.connect('ivc.x', 'comp.x')
+        group.approx_totals(method='fd')
+
+        prob.setup(mode='fwd')
+        prob.run_model()
+
+        msg = r"'G.ivc.x'.*approx_totals.*internal"
+        with self.assertRaisesRegex(RuntimeError, msg):
+            prob.compute_totals(of=['G.comp.y'], wrt=['G.ivc.x'])
+
+        with self.assertRaisesRegex(RuntimeError, msg):
+            prob.check_totals(of=['G.comp.y'], wrt=['G.ivc.x'], out_stream=None)
+
     def test_multi_conn_inputs_manual_connect(self):
 
         prob = om.Problem()
