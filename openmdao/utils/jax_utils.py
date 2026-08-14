@@ -1092,7 +1092,10 @@ def _jax_derivs2partials(self, deriv_vals, partials, ofnames, wrtnames):
             if rows is None:
                 partials[ofname, wrtname] = dvals
             else:
-                partials[ofname, wrtname] = dvals[rows, sjmeta['cols']]
+                # Convert to numpy before the fancy index. Indexing a jax array here
+                # routes every gather through jax's dispatch machinery, which dominated
+                # runtime for components with declared sparsity.
+                partials[ofname, wrtname] = np.asarray(dvals)[rows, sjmeta['cols']]
 
 
 def _check_output_shapes(self):
