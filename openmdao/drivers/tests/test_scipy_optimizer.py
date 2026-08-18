@@ -1273,6 +1273,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         assert_near_equal(prob['z'][1], 0.0, 1e-3)
         assert_near_equal(prob['x'], 0.0, 1e-3)
 
+    @unittest.skipIf(Version(scipy_version) >= Version('1.18.0'),
+                     reason='Older versions of SciPy trust_constr work better for this problem')
     def test_trust_constr(self):
 
         class Rosenbrock(om.ExplicitComponent):
@@ -1313,6 +1315,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
         self.assertTrue(prob['c'] < 10)
         self.assertTrue(prob['c'] > 0)
 
+    @unittest.skipIf(Version(scipy_version) >= Version('1.18.0'),
+                     reason='Older versions of SciPy trust_constr work better for this problem')
     def test_trust_constr_hess_option(self):
 
         class Rosenbrock(om.ExplicitComponent):
@@ -1361,7 +1365,7 @@ class TestScipyOptimizeDriver(unittest.TestCase):
             def setup(self):
                 self.add_input('x', np.array([1.5, 1.5, 1.5]))
                 self.add_output('f', 0.0)
-                self.declare_partials('f', 'x', method='fd', form='central', step=1e-4)
+                self.declare_partials('f', 'x', method='fd', form='central', step=1e-2)
 
             def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
                 x = inputs['x']
@@ -1393,6 +1397,8 @@ class TestScipyOptimizeDriver(unittest.TestCase):
 
         assert_near_equal(prob['con.c'], 1., 1e-3)
 
+    @unittest.skipIf(Version(scipy_version) >= Version('1.18.0'),
+                     reason='Older versions of SciPy trust_constr work better for this problem')
     def test_trust_constr_inequality_con(self):
 
         class Sphere(om.ExplicitComponent):

@@ -27,7 +27,7 @@ python -m pip install --upgrade --pre ipyparallel
 echo "============================================================="
 echo "Install latest versions of 'doe' dependencies"
 echo "============================================================="
-python -m pip install --upgrade --pre pyDOE3
+python -m pip install --upgrade --pre pydoe
 
 echo "============================================================="
 echo "Install latest versions of 'jax' dependencies"
