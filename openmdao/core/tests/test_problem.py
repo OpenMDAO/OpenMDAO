@@ -529,6 +529,22 @@ class TestProblem(unittest.TestCase):
 
         np.testing.assert_allclose(checkvec, result)
 
+    def test_compute_totals_flat_dict_structured_key_with_unit_scaling(self):
+        # Regression test: compute_totals with flat_dict_structured_key format crashed when
+        # unit scaling was active because _apply_unit_scaling doesn't handle a single level
+        # dict with a string key.
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExecComp('y=2*x', x={'units': 'lbm'}, y={'units': 'lbm'}))
+        prob.model.add_design_var('comp.x', units='kg')
+        prob.model.add_objective('comp.y')
+        prob.setup()
+        prob.run_model()
+
+        J = prob.compute_totals(return_format='flat_dict_structured_key')
+
+        self.assertIn('comp.y!comp.x', J)
+        self.assertEqual(J['comp.y!comp.x'].shape, (1, 1))
+
     def test_feature_set_indeps(self):
 
         prob = om.Problem()
@@ -2462,7 +2478,7 @@ class TestProblem(unittest.TestCase):
                                 continue
                             with self.subTest(f'{method=} {loss=} {term_tol=} {max_nfev=} {driver_scaling=}'):
                                 model.set_val('x', 5.0)
-                                
+
                                 if method == 'lm':
                                     with assert_warning(OpenMDAOWarning, "find_feasible method is 'lm' which "
                                                         "ignores bounds but one or more design variables have bounds."):
