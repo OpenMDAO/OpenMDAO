@@ -43,6 +43,13 @@ class JaxExplicitComponent(ExplicitComponent):
         The function that computes the colored jacobian.
     _static_hash : tuple
         The hash of the static values.
+    _fwd_jac_func_ : function or None
+        Cached, jitted jvp function used by matrix_free 'fwd' mode (see
+        _compute_jacvec_product). Primal values are passed in as call arguments rather than
+        captured at trace time. Unlike _vjp_fun below this is valid for the life of the
+        Problem and is only rebuilt when discrete inputs or static config change.
+    _fwd_static_hash : tuple or None
+        The (discrete inputs, get_self_statics()) key _fwd_jac_func_ was built from.
     _orig_compute_primal : function
         The original compute_primal method.
     _ret_tuple_compute_primal : function
@@ -66,6 +73,8 @@ class JaxExplicitComponent(ExplicitComponent):
         self._jac_colored_ = None
         self._output_shapes = None
         self._do_shape_check = True
+        self._fwd_jac_func_ = None
+        self._fwd_static_hash = None
 
         if self.compute_primal is None:
             raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
@@ -530,12 +539,29 @@ class JaxExplicitComponent(ExplicitComponent):
             If not None, dict containing discrete input values.
         """
         if mode == 'fwd':
-            dx = tuple(d_inputs.values())
             full_invals = tuple(self._get_compute_primal_invals(inputs, discrete_inputs))
-            x = full_invals[:len(dx)]
-            other = full_invals[len(dx):]
-            _, deriv_vals = jax.jvp(lambda *args: self.compute_primal(*args, *other),
-                                    primals=x, tangents=dx)
+            ncont_ins = d_inputs.nvars()
+            x = full_invals[:ncont_ins]
+            other = full_invals[ncont_ins:]
+
+            # Rebuild only when discrete inputs or static config change, NOT on every continuous
+            # value change (unlike the 'rev' branch below). jax.jit's own executable cache is
+            # keyed on shape/dtype, and `x`/`dx` are passed in as call args below rather than
+            # captured at trace time, so the same compiled jvp is valid for the life of this
+            # Problem -- hashing continuous values here would only force a needless retrace on
+            # every single seed direction, every iteration (the bug this replaces).
+            fwd_hash = (tuple(discrete_inputs.values()) if discrete_inputs else ()) + \
+                self.get_self_statics()
+            if self._fwd_jac_func_ is None or fwd_hash != self._fwd_static_hash:
+                def _fwd_primal(*args):
+                    return self.compute_primal(*args, *other)
+
+                self._fwd_jac_func_ = jax.jit(
+                    lambda primals, tangents: jax.jvp(_fwd_primal, primals, tangents))
+                self._fwd_static_hash = fwd_hash
+
+            dx = tuple(d_inputs.values())
+            _, deriv_vals = self._fwd_jac_func_(x, dx)
             d_outputs.set_vals(deriv_vals)
         else:
             inhash = ((inputs.get_hash(),) + tuple(self._discrete_inputs.values()) +
