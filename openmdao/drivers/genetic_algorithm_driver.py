@@ -65,11 +65,11 @@ class SimpleGADriver(Driver):
         """
         Initialize the SimpleGADriver driver.
         """
-        if find_spec('pyDOE3') is None:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+        if find_spec('pydoe') is None:
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
         super().__init__(**kwargs)
 
@@ -615,7 +615,7 @@ class GeneticAlgorithm:
     objfun : function
         Objective function callback.
     _lhs : function
-        A lazily imported instance of the pyDOE3 latin hypercube sampling function.
+        A lazily imported instance of the pydoe latin hypercube sampling function.
     """
 
     def __init__(self, objfun, comm=None, model_mpi=None):
@@ -623,13 +623,13 @@ class GeneticAlgorithm:
         Initialize genetic algorithm object.
         """
         try:
-            from pyDOE3 import lhs
+            from pydoe import lhs
             self._lhs = lhs
         except ImportError:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
         self.objfun = objfun
         self.comm = comm

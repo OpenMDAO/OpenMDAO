@@ -665,6 +665,43 @@ class DiscreteTestCase(unittest.TestCase):
         self.assertEqual(str(ctx.exception),
                          "Total derivative of 'C3.y' with respect to 'x' depends upon discrete output variables ['G.G1.C1.y'].")
 
+    def test_deriv_err_approx_totals(self):
+        # When approximating totals at the model level, a dependence on discrete outputs is
+        # allowed because the discrete outputs are held constant while the continuous inputs
+        # are perturbed.
+        prob = om.Problem()
+        model = prob.model
+
+        indep = model.add_subsystem('indep', om.IndepVarComp(), promotes_outputs=['x'])
+        indep.add_output('x', 1.0)
+
+        G = model.add_subsystem('G', om.Group(), promotes_inputs=['x'])
+
+        G.add_subsystem('G1', InternalDiscreteGroup(), promotes_inputs=['x'], promotes_outputs=['y'])
+
+        G2 = G.add_subsystem('G2', om.Group(), promotes_inputs=['x'])
+        G2.add_subsystem('C2_1', om.ExecComp('y=3*x'), promotes_inputs=['x'])
+        G2.add_subsystem('C2_2', om.ExecComp('y=4*x'), promotes_outputs=['y'])
+        G2.connect('C2_1.y', 'C2_2.x')
+
+        model.add_subsystem('C3', om.ExecComp('y=3+x'))
+        model.add_subsystem('C4', om.ExecComp('y=4+x'))
+
+        model.connect('G.y', 'C3.x')
+        model.connect('G.G2.y', 'C4.x')
+
+        model.add_design_var('x')
+        model.add_objective('C3.y')
+        model.add_constraint('C4.y')
+
+        model.approx_totals(method='fd')
+
+        prob.setup()
+        prob.run_model()
+
+        # this should not raise even though C3.y depends on a discrete output
+        prob.compute_totals()
+
     def test_connection_to_output(self):
         prob = om.Problem(name='connection_to_output')
         model = prob.model

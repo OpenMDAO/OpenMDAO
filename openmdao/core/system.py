@@ -1022,7 +1022,7 @@ class System(object, metaclass=SystemMetaclass):
             if upper is not None:
                 # Convert upper to ndarray/float as necessary
                 upper = format_as_float_or_array('upper', upper, flatten=True)
-            
+
             new_desvar_metadata.update({'lower': lower, 'upper': upper})
 
         # Now figure out scaling
@@ -1069,7 +1069,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # Compute the combined total_adder and total_scaler from whichever pair is active
             total_adder, total_scaler = determine_adder_scaler(ref0, ref, adder, scaler)
-        
+
             if isinstance(total_scaler, np.ndarray):
                 if np.all(total_scaler == 1.0):
                     total_scaler = None
@@ -1081,7 +1081,7 @@ class System(object, metaclass=SystemMetaclass):
                     total_adder = None
             elif total_adder is not None and total_adder == 0.0:
                 total_adder = None
-    
+
             new_desvar_metadata.update({'ref0': ref0, 'ref': ref, 'scaler': scaler, 'adder': adder,
                                         'total_scaler': total_scaler, 'total_adder': total_adder})
 
@@ -2908,7 +2908,7 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 msg = err.args[0] if err.args else ''
                 err.args = (f"{self.msginfo}: Error calling {fname}(), " + msg,) + err.args[1:]
-                raise 
+                raise
         finally:
             self._inputs.read_only = False
             self._outputs.read_only = False
@@ -3318,7 +3318,7 @@ class System(object, metaclass=SystemMetaclass):
                 adder = None
         elif adder == 0.0:
             adder = None
-        
+
         # determine adder and scaler based on args
         total_adder, total_scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
@@ -3607,7 +3607,7 @@ class System(object, metaclass=SystemMetaclass):
         if lower is None and upper is None and equals is None:
             issue_warning(f"{self.msginfo}: Constraint '{name}' requires one of arguments"
                           " 'lower', 'upper', or 'equals' to be specified.")
-        
+
         self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear, units=units,
@@ -5024,7 +5024,7 @@ class System(object, metaclass=SystemMetaclass):
 
         # For components, self._subsystems_allprocs is empty.
         if self._subsystems_allprocs:
-            for subsys in self.system_iter(include_self=False, recurse=True):
+            for subsys in self.system_iter(include_self=False, recurse=False):
 
                 if subsys.pathname != '_auto_ivc':
                     sub_opts = subsys.list_options(out_stream=None,

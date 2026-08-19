@@ -1,5 +1,5 @@
 """
-pyDOE3 sample generators for Analysis Driver.
+pydoe sample generators for Analysis Driver.
 """
 import numpy as np
 
@@ -12,7 +12,7 @@ _LEVELS = 2  # default number of levels for pyDOE generators
 
 class _pyDOE_AnalysisGenerator(AnalysisGenerator):
     """
-    Base class for Analysis generators implementing methods from pyDOE3.
+    Base class for Analysis generators implementing methods from pydoe.
 
     Parameters
     ----------
@@ -191,13 +191,13 @@ class FullFactorialGenerator(_pyDOE_AnalysisGenerator):
         Initialize the FullFactorialGenerator.
         """
         try:
-            from pyDOE3 import fullfact
+            from pydoe import fullfact
             self._fullfact = fullfact
         except ImportError:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
         super().__init__(var_dict=var_dict, levels=levels)
 
@@ -252,7 +252,7 @@ class GeneralizedSubsetGenerator(_pyDOE_AnalysisGenerator):
         factorial designs.
         Defaults to 1.
     _gsd : function
-        The pyDOE3 generalized subset function, lazily imported.
+        The pydoe generalized subset function, lazily imported.
     """
 
     def __init__(self, var_dict, levels, reduction, n=1):
@@ -263,13 +263,13 @@ class GeneralizedSubsetGenerator(_pyDOE_AnalysisGenerator):
         self._n = n
 
         try:
-            from pyDOE3 import gsd
+            from pydoe import gsd
             self._gsd = gsd
         except ImportError:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
         super().__init__(var_dict, levels=levels)
 
@@ -305,7 +305,7 @@ class PlackettBurmanGenerator(_pyDOE_AnalysisGenerator):
     Attributes
     ----------
     _pbdesign : function
-        The pyDOE3 Plackett-Burman function, lazily imported.
+        The pydoe Plackett-Burman function, lazily imported.
     """
 
     def __init__(self, var_dict):
@@ -313,13 +313,13 @@ class PlackettBurmanGenerator(_pyDOE_AnalysisGenerator):
         Initialize the PlackettBurmanGenerator.
         """
         try:
-            from pyDOE3 import pbdesign
+            from pydoe import pbdesign
             self._pbdesign = pbdesign
         except ImportError:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
         super().__init__(var_dict, levels=2)
 
@@ -361,7 +361,7 @@ class BoxBehnkenGenerator(_pyDOE_AnalysisGenerator):
     _center : int
         The number of center points to include.
     _bbdesign : function
-        The pyDOE3 Box-Behnken function, lazily imported.
+        The pydoe Box-Behnken function, lazily imported.
     """
 
     def __init__(self, var_dict, center=None):
@@ -370,13 +370,13 @@ class BoxBehnkenGenerator(_pyDOE_AnalysisGenerator):
         """
         self._center = center
         try:
-            from pyDOE3 import bbdesign
+            from pydoe import bbdesign
             self._bbdesign = bbdesign
         except ImportError:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
         super().__init__(var_dict, levels=3)
 
@@ -406,7 +406,7 @@ class BoxBehnkenGenerator(_pyDOE_AnalysisGenerator):
 
 class LatinHypercubeGenerator(AnalysisGenerator):
     """
-    DOE case generator implementing Latin hypercube method via pyDOE3.
+    DOE case generator implementing Latin hypercube method via pydoe.
 
     Parameters
     ----------
@@ -437,7 +437,7 @@ class LatinHypercubeGenerator(AnalysisGenerator):
     _seed : int or None
         Random seed.
     _lhs : function
-        The pyDOE3 latin hypercube sampling function, lazily imported.
+        The pydoe latin hypercube sampling function, lazily imported.
     """
 
     # supported pyDOE criterion names.
@@ -453,7 +453,7 @@ class LatinHypercubeGenerator(AnalysisGenerator):
         """
         Initialize the LatinHypercubeGenerator.
 
-        See : https://pythonhosted.org/pyDOE/randomized.html
+        See : https://pydoe.github.io/pydoe/
         """
         if criterion not in self._supported_criterion:
             raise ValueError("Invalid criterion '%s' specified for %s. "
@@ -467,13 +467,13 @@ class LatinHypercubeGenerator(AnalysisGenerator):
         self._seed = seed
 
         try:
-            from pyDOE3 import lhs
+            from pydoe import lhs
             self._lhs = lhs
         except ImportError:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
         super().__init__(var_dict)
 

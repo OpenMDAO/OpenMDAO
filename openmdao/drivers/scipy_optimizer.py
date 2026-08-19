@@ -17,36 +17,27 @@ from openmdao.utils.mpi import MPI
 
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
-               'TNC', 'COBYLA', 'SLSQP'}
-if Version(scipy_version) >= Version("1.1"):  # Only available in newer versions
-    _optimizers.add('trust-constr')
+               'TNC', 'COBYLA', 'SLSQP', 'trust-constr'}
 
 # For 'basinhopping' and 'shgo' gradients are used only in the local minimization
 _gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'SLSQP', 'dogleg',
                         'trust-ncg', 'trust-constr', 'basinhopping', 'shgo'}
 _hessian_optimizers = {'trust-constr', 'trust-ncg'}
 _bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
-                      'differential_evolution', 'basinhopping', 'Nelder-Mead'}
-if Version(scipy_version) >= Version("1.11"):
-    # COBYLA supports bounds starting with SciPy Version 1.11
-    _bounds_optimizers |= {'COBYLA'}
+                      'differential_evolution', 'basinhopping', 'Nelder-Mead', 'COBYLA'}
 
-_constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr', 'shgo'}
-_constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
-if Version(scipy_version) >= Version("1.4"):
-    _constraint_optimizers.add('differential_evolution')
-    _constraint_grad_optimizers.add('differential_evolution')
+_constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr', 'shgo', 'differential_evolution'}
+_constraint_grad_optimizers = (_gradient_optimizers & _constraint_optimizers) | \
+    {'differential_evolution'}
 
 if Version(scipy_version) >= Version("1.14"):
-    # COBYLA supports bounds starting with SciPy Version 1.14
+    # COBYQA is only available starting with SciPy 1.14.
     _optimizers.add('COBYQA')
     _bounds_optimizers |= {'COBYQA'}
     _constraint_optimizers |= {'COBYQA'}
 
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
-_global_optimizers = {'differential_evolution', 'basinhopping'}
-if Version(scipy_version) >= Version("1.2"):  # Only available in newer versions
-    _global_optimizers |= {'shgo', 'dual_annealing'}
+_global_optimizers = {'differential_evolution', 'basinhopping', 'shgo', 'dual_annealing'}
 
 # Global optimizers and optimizers in minimize
 _all_optimizers = _optimizers | _global_optimizers
@@ -59,12 +50,9 @@ _unsupported_optimizers = {'dogleg', 'trust-ncg'}
 # With "old-style" a constraint is a dictionary, with "new-style" an object
 # With "old-style" a bound is a tuple, with "new-style" a Bounds instance
 # In principle now everything can work with "old-style"
-# These settings have no effect to the optimizers implemented before SciPy 1.1
-_supports_new_style = {'trust-constr', 'differential_evolution'}
+_supports_new_style = {'trust-constr', 'differential_evolution', 'shgo'}
 if Version(scipy_version) >= Version("1.14"):
     _supports_new_style.add('COBYQA')
-if Version(scipy_version) >= Version("1.11.0"):
-    _supports_new_style.add('shgo')
 _use_new_style = True  # Recommended to set to True
 
 CITATIONS = """
@@ -338,13 +326,8 @@ class ScipyOptimizeDriver(Driver):
         if use_bounds and (opt in _supports_new_style) and _use_new_style:
             # For 'trust-constr' it is better to use the new type bounds, because it seems to work
             # better (for the current examples in the tests) with the "keep_feasible" option
-            try:
-                from scipy.optimize import Bounds
-                from scipy.optimize._constraints import old_bound_to_new
-            except ImportError:
-                msg = ('The "trust-constr" optimizer is supported for SciPy 1.1.0 and above. '
-                       'The installed version is {}')
-                raise ImportError(msg.format(scipy_version))
+            from scipy.optimize import Bounds
+            from scipy.optimize._constraints import old_bound_to_new
 
             # Convert "old-style" bounds to "new_style" bounds
             lower, upper = old_bound_to_new(bounds)  # tuple, tuple
@@ -396,12 +379,7 @@ class ScipyOptimizeDriver(Driver):
 
                 if opt in _supports_new_style and _use_new_style:
                     # Type of constraints is list of NonlinearConstraint and/or LinearConstraint
-                    try:
-                        from scipy.optimize import NonlinearConstraint, LinearConstraint
-                    except ImportError:
-                        msg = ('The "trust-constr" optimizer is supported for SciPy 1.1.0 and'
-                               'above. The installed version is {}')
-                        raise ImportError(msg.format(scipy_version))
+                    from scipy.optimize import NonlinearConstraint, LinearConstraint
 
                     inf_b = self._inf_bound_new_style
                     if equals is not None:

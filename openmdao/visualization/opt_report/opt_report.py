@@ -121,7 +121,7 @@ def opt_report(prob, outfile=None):
     if not outfile:
         outfile = _default_optimizer_report_filename
 
-    driver_scaling = True
+    driver_scaling = False
 
     # Collect the entire array of array valued desvars and constraints (ignore indices)
     objs_vals = {}

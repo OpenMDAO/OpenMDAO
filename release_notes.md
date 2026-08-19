@@ -1,4 +1,62 @@
 ***********************************
+# Release Notes for OpenMDAO 3.45.0
+
+July 17, 2026
+
+OpenMDAO 3.45.0 contains several improvements that users may find useful.
+
+### Optimization updates
+
+On the optimization front, `Uno` is now available as an optimizer via pyOptSparseDriver. 
+Uno is an optimization solver that is configurable such that it supports both interior point (IPOPT-like) and SQP (SNOPT-like) approaches.
+Uno requires pyOptSparse 2.16.0 or later, which is now included in our pixi environments.
+Users will need to install unopy (`python -m pip install unopy`)
+
+Users can now use the `Egor` optimizer from the EGOBox library via the `modoptDriver`.
+Egor is a surrogate-based optimizer that works well with expensive black-box functions.
+Thank you [relf](https://github.com/relf) for the contribution.
+Users will need to install egobox (`python -m pip install egobox`)
+
+A new Bounds-Based autoscaler is implemented. This autoscaler requires all design variables have defined-bounds, and then scales them onto [0, 1]. This is particularly useful for COBYLA under ScipyOptimizeDriver.
+Thank you [johnjasa](https://github.com/johnjasa) for the contribution.
+
+### Memory Usage
+
+A refactor of our matrix handling has been implemented that can considerably reduce (~15%) memory footprint on some larger problems.
+
+### Functional Interface
+
+OpenMDAO Problems can now provide a [functional interface](https://openmdao.org/newdocs/versions/latest/features/experimental/functional_interface.html), making models callable from outside tools that don't have a driver-interface.
+
+### Other Updates
+
+Internally, we've switched to sphinx-first documentation approach whereby the source documentation notebooks are executed in parallel and the resulting output notebooks are assembled into the documentation using sphinx and mystnb. This has significantly sped up the doc building process.
+
+---
+
+## New Features
+
+- Functional interface for `Problem` [#3690](https://github.com/OpenMDAO/OpenMDAO/pull/3690)
+- Make Egor optimizer available through the modOptDriver [#3778](https://github.com/OpenMDAO/OpenMDAO/pull/3778)
+- Add ability to use Uno with pyOptSparseDriver [#3784](https://github.com/OpenMDAO/OpenMDAO/pull/3784)
+- Add a bounds-based autoscaler, minor driver clean-up [#3781](https://github.com/OpenMDAO/OpenMDAO/pull/3781)
+
+## Bug Fixes
+
+- Fix intermittent MPI test timeouts on macOS runners [#3788](https://github.com/OpenMDAO/OpenMDAO/pull/3788)
+- Fix for a key-error for input-input connections that are created in subgroups. [#3790](https://github.com/OpenMDAO/OpenMDAO/pull/3790)
+- Fix for a double unit conversion on design variables with different units than the model variable. [#3787](https://github.com/OpenMDAO/OpenMDAO/pull/3787)
+- Fix a bug where the list_options was printing options multiple times. [#3785](https://github.com/OpenMDAO/OpenMDAO/pull/3785)
+
+## Miscellaneous
+
+- Bump to version to 3.44.1-dev [#3771](https://github.com/OpenMDAO/OpenMDAO/pull/3771)
+- CI workflow and doc updates [#3775](https://github.com/OpenMDAO/OpenMDAO/pull/3775)
+- Change doc landing pages from using main.ipynb to index.ipynb [#3779](https://github.com/OpenMDAO/OpenMDAO/pull/3779)
+- Small documentation fixes [#3774](https://github.com/OpenMDAO/OpenMDAO/pull/3774)
+- Refactor matrices [#3760](https://github.com/OpenMDAO/OpenMDAO/pull/3760)
+
+***********************************
 # Release Notes for OpenMDAO 3.44.0
 
 June 01, 2026
