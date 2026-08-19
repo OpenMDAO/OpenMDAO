@@ -7,9 +7,16 @@ from enum import IntEnum
 import numpy as np
 
 
-# Retained for backwards compatibility. Infinite bounds are now stored as None or np.inf
-# internally. Do not use this constant for new code.
-INF_BOUND = 1.0E30
+def __getattr__(name: str):
+    """
+    Provide a deprecation warning when someone attempts to access INF_BOUND.
+    """
+    from openmdao.utils.om_warnings import warn_deprecation
+    if name == 'INF_BOUND':
+        warn_deprecation('The INF_BOUND sentinel in OpenMDAO is deprecated. Infinite bounds should '
+        'now be specified using None or +/-np.inf.')
+        return 1.0E30
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
 # This is the dtype we use for index arrays.  Petsc by default uses 32 bit ints
