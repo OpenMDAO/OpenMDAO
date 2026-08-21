@@ -96,9 +96,21 @@ class NonlinearBlockGS(NonlinearSolver):
 
         # When under a complex step from higher in the hierarchy, sometimes the step is too small
         # to trigger reconvergence, so nudge the outputs slightly so that we always get at least
-        # one iteration.
+        # one iteration.  Outputs tagged 'openmdao:indep_var' (IndepVarComp and auto_ivc outputs)
+        # are excluded from both the nudge and its sizing norm: no Gauss-Seidel iteration ever
+        # recomputes them, so a real nudge there would permanently shift the point where the
+        # complex step derivative is evaluated (issue #3800), and sizing the nudge from them
+        # would let unrelated output values steer the iteration count.
         if system.under_complex_step and self.options['cs_reconverge']:
-            system._outputs += np.linalg.norm(system._outputs.asarray()) * 1e-10
+            outputs = system._outputs
+            arr = outputs.asarray()
+            mask = np.ones(arr.size, dtype=bool)
+            abs2meta_out = system._var_allprocs_abs2meta['output']
+            for name in outputs._abs_iter():
+                if 'openmdao:indep_var' in abs2meta_out[name]['tags']:
+                    start, stop = outputs.get_range(name)
+                    mask[start:stop] = False
+            arr[mask] += np.linalg.norm(arr[mask]) * 1e-10
 
         # Execute guess_nonlinear if specified and
         # we have not restarted from a saved point
