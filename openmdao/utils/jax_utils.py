@@ -772,6 +772,8 @@ def _re_init(self):
     self._jac_colored_ = None
     self._output_shapes = None
     self._do_shape_check = True
+    self._fwd_jac_func_ = None
+    self._fwd_static_hash = None
 
 
 def _get_differentiable_compute_primal(self, discrete_inputs):
