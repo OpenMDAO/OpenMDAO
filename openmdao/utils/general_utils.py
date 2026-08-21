@@ -19,11 +19,9 @@ from collections.abc import Iterable
 
 import numpy as np
 
-from openmdao.core.constants import INF_BOUND, _UNDEFINED
+from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.array_utils import shape_to_len
 
-
-_float_inf = float('inf')
 
 
 def ensure_compatible(name, value, shape=None, indices=None, default_shape=(1,)):
@@ -314,10 +312,7 @@ def format_as_float_or_array(name, values, val_if_none=0.0, flatten=False):
     """
     # Convert adder to ndarray/float as necessary
     if isinstance(values, float):
-        if values == _float_inf:
-            values = INF_BOUND
-        elif values == -_float_inf:
-            values = -INF_BOUND
+        pass  # float values including inf pass through unchanged
     elif isinstance(values, np.ndarray):
         if flatten:
             values = values.flatten()

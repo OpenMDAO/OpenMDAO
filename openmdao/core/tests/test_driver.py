@@ -186,7 +186,7 @@ class TestDriver(unittest.TestCase):
 
     def test_vector_bounds_inf(self):
 
-        # make sure no overflow when there is no specified upper/lower bound and significatn scaling
+        # make sure unbounded variables have None bounds (not overflow-prone large floats)
         prob = om.Problem()
         model = prob.model
 
@@ -202,13 +202,13 @@ class TestDriver(unittest.TestCase):
 
         desvars = model.get_design_vars()
 
-        self.assertFalse(np.any(np.isinf(desvars['px.x']['upper'])))
-        self.assertFalse(np.any(np.isinf(-desvars['px.x']['lower'])))
+        self.assertIsNone(desvars['px.x']['upper'])
+        self.assertIsNone(desvars['px.x']['lower'])
 
         responses = prob.model.get_responses()
 
-        self.assertFalse(np.any(np.isinf(responses['comp.y2']['upper'])))
-        self.assertFalse(np.any(np.isinf(-responses['comp.y2']['lower'])))
+        self.assertIsNone(responses['comp.y2']['upper'])
+        self.assertIsNone(responses['comp.y2']['lower'])
 
     def test_vector_scaled_derivs_diff_sizes(self):
 

@@ -17,7 +17,7 @@ from numbers import Integral
 import numpy as np
 
 from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
-    _UNDEFINED, INT_DTYPE, INF_BOUND, _SetupStatus
+    _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.jacobians.dictionary_jacobian import Jacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
@@ -1015,17 +1015,11 @@ class System(object, metaclass=SystemMetaclass):
             if is_undefined(upper):
                 upper = None
 
-            if lower is None:
-                # if not set, set lower to -INF_BOUND and don't apply adder/scaler
-                lower = -INF_BOUND
-            else:
+            if lower is not None:
                 # Convert lower to ndarray/float as necessary
                 lower = format_as_float_or_array('lower', lower, flatten=True)
 
-            if upper is None:
-                # if not set, set upper to INF_BOUND and don't apply adder/scaler
-                upper = INF_BOUND
-            else:
+            if upper is not None:
                 # Convert upper to ndarray/float as necessary
                 upper = format_as_float_or_array('upper', upper, flatten=True)
 
@@ -1178,9 +1172,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # Convert lower to ndarray/float as necessary
             try:
-                if lower is None:
-                    lower = -INF_BOUND
-                else:
+                if lower is not None:
                     lower = format_as_float_or_array('lower', lower, flatten=True)
             except (TypeError, ValueError):
                 raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
@@ -1189,9 +1181,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # Convert upper to ndarray/float as necessary
             try:
-                if upper is None:
-                    upper = INF_BOUND
-                else:
+                if upper is not None:
                     upper = format_as_float_or_array('upper', upper, flatten=True)
             except (TypeError, ValueError):
                 raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
@@ -3306,14 +3296,10 @@ class System(object, metaclass=SystemMetaclass):
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
 
-        if lower is None:
-            lower = -INF_BOUND
-        else:
+        if lower is not None:
             lower = format_as_float_or_array('lower', lower, flatten=True)
 
-        if upper is None:
-            upper = INF_BOUND
-        else:
+        if upper is not None:
             upper = format_as_float_or_array('upper', upper, flatten=True)
 
         if self._static_mode:
@@ -3477,10 +3463,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # Convert lower to ndarray/float as necessary
             try:
-                if lower is None:
-                    # don't apply adder/scaler if lower not set
-                    lower = -INF_BOUND
-                else:
+                if lower is not None:
                     lower = format_as_float_or_array('lower', lower, flatten=True)
             except (TypeError, ValueError):
                 raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
@@ -3489,10 +3472,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # Convert upper to ndarray/float as necessary
             try:
-                if upper is None:
-                    # don't apply adder/scaler if upper not set
-                    upper = INF_BOUND
-                else:
+                if upper is not None:
                     upper = format_as_float_or_array('upper', upper, flatten=True)
             except (TypeError, ValueError):
                 raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "

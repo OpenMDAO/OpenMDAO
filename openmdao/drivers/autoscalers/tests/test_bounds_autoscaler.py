@@ -41,9 +41,9 @@ class TestBoundsAutoscalerMock(unittest.TestCase):
         self.assertEqual(driver._designvars['x']['total_adder'], 2.0)
 
         # Scaled bounds should be [0, 1].
-        lower_vec, upper_vec, _ = autoscaler.get_bounds_scaling('design_var')
-        self.assertAlmostEqual(lower_vec['x'][0], 0.0, places=12)
-        self.assertAlmostEqual(upper_vec['x'][0], 1.0, places=12)
+        bounds = autoscaler.get_bounds_scaling('design_var')
+        self.assertAlmostEqual(bounds['x'].lower[0], 0.0, places=12)
+        self.assertAlmostEqual(bounds['x'].upper[0], 1.0, places=12)
 
     def test_vector_bounds(self):
         driver = self._make_mock({
@@ -62,9 +62,9 @@ class TestBoundsAutoscalerMock(unittest.TestCase):
         np.testing.assert_allclose(meta['total_adder'],
                                    np.array([0.0, 10.0, -5.0]))
 
-        lower_vec, upper_vec, _ = autoscaler.get_bounds_scaling('design_var')
-        np.testing.assert_allclose(lower_vec['x'], np.zeros(3), atol=1e-12)
-        np.testing.assert_allclose(upper_vec['x'], np.ones(3), atol=1e-12)
+        bounds = autoscaler.get_bounds_scaling('design_var')
+        np.testing.assert_allclose(bounds['x'].lower, np.zeros(3), atol=1e-12)
+        np.testing.assert_allclose(bounds['x'].upper, np.ones(3), atol=1e-12)
 
     def test_scalar_bound_broadcasts_over_size(self):
         driver = self._make_mock({
@@ -81,31 +81,35 @@ class TestBoundsAutoscalerMock(unittest.TestCase):
         np.testing.assert_allclose(meta['total_scaler'], np.full(4, 0.25))
         np.testing.assert_allclose(meta['total_adder'], np.full(4, 2.0))
 
-    def test_infinite_lower_bound_raises(self):
-        from openmdao.core.constants import INF_BOUND
+    def test_none_lower_bound_not_scaled(self):
         driver = self._make_mock({
-            'x': {'total_scaler': None, 'total_adder': None,
-                  'lower': -INF_BOUND, 'upper': 1.0,
+            'x': {'total_scaler': 5.0, 'total_adder': 2.0,
+                  'lower': None, 'upper': 1.0,
                   'size': 1, 'distributed': False}
         })
 
         autoscaler = BoundsAutoscaler()
-        with self.assertRaises(RuntimeError) as ctx:
-            autoscaler.setup(driver)
-        self.assertIn("finite lower and upper bounds", str(ctx.exception))
+        autoscaler.setup(driver)
 
-    def test_infinite_upper_bound_raises(self):
-        from openmdao.core.constants import INF_BOUND
+        # Entirely-unbounded DVs are left with their original scaling.
+        meta = autoscaler._var_meta['design_var']['x']
+        self.assertEqual(meta['total_scaler'], 5.0)
+        self.assertEqual(meta['total_adder'], 2.0)
+
+    def test_infinite_upper_bound_not_scaled(self):
         driver = self._make_mock({
-            'x': {'total_scaler': None, 'total_adder': None,
-                  'lower': 0.0, 'upper': INF_BOUND,
+            'x': {'total_scaler': 5.0, 'total_adder': 2.0,
+                  'lower': 0.0, 'upper': np.inf,
                   'size': 1, 'distributed': False}
         })
 
         autoscaler = BoundsAutoscaler()
-        with self.assertRaises(RuntimeError) as ctx:
-            autoscaler.setup(driver)
-        self.assertIn("finite lower and upper bounds", str(ctx.exception))
+        autoscaler.setup(driver)
+
+        # Partially-unbounded DVs are left with their original scaling.
+        meta = autoscaler._var_meta['design_var']['x']
+        self.assertEqual(meta['total_scaler'], 5.0)
+        self.assertEqual(meta['total_adder'], 2.0)
 
     def test_zero_range_raises(self):
         driver = self._make_mock({
@@ -233,7 +237,10 @@ class TestBoundsAutoscalerIntegration(unittest.TestCase):
         assert_near_equal(prob['x'], 7.16667, 1e-5)
         assert_near_equal(prob['y'], -7.833334, 1e-5)
 
-    def test_requires_finite_bounds(self):
+    def test_unbounded_design_var_left_unscaled(self):
+        # x has no bounds -- BoundsAutoscaler should leave its scaling untouched
+        # rather than reject the configuration, while y is still normalized.
+
         prob = om.Problem()
         model = prob.model
 
@@ -242,20 +249,30 @@ class TestBoundsAutoscalerIntegration(unittest.TestCase):
         model.add_subsystem('comp', Paraboloid(), promotes=['*'])
 
         prob.set_solver_print(level=0)
-        prob.driver = om.ScipyOptimizeDriver(optimizer='COBYLA', disp=False)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-9, disp=False)
         prob.driver.autoscaler = BoundsAutoscaler()
 
-        # x has no bounds -- BoundsAutoscaler should reject this configuration.
         model.add_design_var('x')
         model.add_design_var('y', lower=-50.0, upper=50.0)
         model.add_objective('f_xy')
 
         prob.setup()
 
-        with self.assertRaises(RuntimeError) as ctx:
-            prob.run_driver()
+        failed = not prob.run_driver().success
+        self.assertFalse(failed, "Optimization failed, result =\n" +
+                                 str(prob.driver._scipy_optimize_result))
 
-        self.assertIn("finite lower and upper bounds", str(ctx.exception))
+        # Unconstrained minimum of the Paraboloid.
+        assert_near_equal(prob.get_val('x'), 6.66667, 1e-3)
+        assert_near_equal(prob.get_val('y'), -7.33333, 1e-3)
+
+        # x is unbounded, so BoundsAutoscaler leaves its default (no-op) scaling alone,
+        # while y's bounds get normalized to a scaler/adder other than the defaults.
+        dv_meta = prob.driver._autoscaler._var_meta['design_var']
+        self.assertEqual(dv_meta['x']['total_scaler'], 1.0)
+        self.assertEqual(dv_meta['x']['total_adder'], 0.0)
+        self.assertNotEqual(dv_meta['y']['total_scaler'], 1.0)
+        self.assertNotEqual(dv_meta['y']['total_adder'], 0.0)
 
 
 if __name__ == '__main__':

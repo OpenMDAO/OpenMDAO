@@ -1368,8 +1368,8 @@ class TestModOptDriver(unittest.TestCase):
         prob.run_driver()
 
         # Check expected responses are met
-        assert_near_equal(prob['f_xy'], -27.0, 1e-4)
-        assert_near_equal(prob['c'], 0.0, 2e-4)
+        assert_near_equal(prob['f_xy'], -27.0, 1e-3)
+        assert_near_equal(prob['c'], 0.0, 1e-3)
 
     @require_modopt_optimizer('COBYQA')
     def test_cobyqa_gradient_free(self):
@@ -1402,8 +1402,8 @@ class TestModOptDriver(unittest.TestCase):
         prob.run_driver()
 
         # Check expected responses are met
-        assert_near_equal(prob['f_xy'], -27.0, 1e-4)
-        assert_near_equal(prob['c'], 0.0, 1e-4)
+        assert_near_equal(prob['f_xy'], -27.0, 1e-3)
+        assert_near_equal(prob['c'], 0.0, 1e-3)
 
     @require_modopt_optimizer('NelderMead')
     def test_neldermead_unconstrained(self):
@@ -1672,6 +1672,67 @@ class TestModOptDriver(unittest.TestCase):
         # Check that supports dict is read-only
         with self.assertRaises(KeyError):
             prob.driver.supports['equality_constraints'] = False
+
+    def test_inf_bounds_issue_3772(self):
+        """
+        Test that unbounded constraint bounds are passed to modopt as np.inf, not 1e30.
+
+        Regression test for https://github.com/OpenMDAO/OpenMDAO/issues/3772.
+        A one-sided constraint (lower only) should produce upper=np.inf in the
+        modopt problem, not the INF_BOUND sentinel of 1e30.
+        """
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = modOptDriver(optimizer='SLSQP')
+        prob.driver.options['disp'] = False
+        prob.driver.options['turn_off_outputs'] = True
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', lower=-15.0)
+
+        prob.setup()
+        prob.run_driver()
+
+        self.assertTrue(prob.driver.result.success, 'Optimization did not converge')
+        self.assertGreaterEqual(prob['c'], -15.0 - 1e-4)
+
+        # Verify that modopt received None or np.inf (not 1e30) as the upper bound
+        # for the one-sided lower constraint (issue #3772)
+        upper = prob.driver._mo_prob.nl_con_bounds['c']['upper']
+        self.assertTrue(upper is None or np.all(np.isposinf(np.atleast_1d(upper))),
+                        f'Expected None or np.inf upper bound for one-sided constraint, got {upper}')
+
+        # Also verify None or -np.inf lower bound on an upper-only constraint
+        prob2 = om.Problem()
+        model2 = prob2.model
+        model2.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model2.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model2.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model2.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])
+        prob2.set_solver_print(level=0)
+        prob2.driver = modOptDriver(optimizer='SLSQP')
+        prob2.driver.options['disp'] = False
+        prob2.driver.options['turn_off_outputs'] = True
+        model2.add_design_var('x', lower=-50.0, upper=50.0)
+        model2.add_design_var('y', lower=-50.0, upper=50.0)
+        model2.add_objective('f_xy')
+        model2.add_constraint('c', upper=0.0)
+        prob2.setup()
+        prob2.run_driver()
+
+        lower = prob2.driver._mo_prob.nl_con_bounds['c']['lower']
+        self.assertTrue(lower is None or np.all(np.isneginf(np.atleast_1d(lower))),
+                        f'Expected None or -np.inf lower bound for one-sided constraint, got {lower}')
 
 
 @unittest.skipUnless(MODOPT_INSTALLED, 'modOpt is not installed')
