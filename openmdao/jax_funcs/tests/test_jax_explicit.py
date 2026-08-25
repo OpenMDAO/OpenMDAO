@@ -713,5 +713,70 @@ class TestJaxShapesAndReturns(unittest.TestCase):
             self.assertTrue(coloring.total_solves() <= 2)
 
 
+@unittest.skipIf(jax is None, 'jax is not available')
+class TestJaxMatrixFreeFwdCaching(unittest.TestCase):
+    """Regression tests for the matrix_free 'fwd' jvp cache in _compute_jacvec_product.
+
+    Without this cache, every fwd-mode compute_jacvec_product call rebuilt an un-jitted jax.jvp
+    from scratch unlike the 'rev' branch's cached self._vjp_fun.
+    """
+
+    def _build(self, mult=1.0):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        comp = p.model.add_subsystem('comp', DotProdMultPrimalOption(mult=mult))
+        comp.matrix_free = True
+        p.model.connect('ivc.x', 'comp.x')
+        p.model.connect('ivc.y', 'comp.y')
+        p.setup(mode='fwd', force_alloc_complex=True)
+
+        x = np.arange(1, np.prod(x_shape) + 1).reshape(x_shape) * 2.0
+        y = np.arange(1, np.prod(y_shape) + 1).reshape(y_shape) * 3.0
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        return p, comp
+
+    def test_fwd_jvp_reused_across_design_points(self):
+        # The cached jvp function must be the SAME object after the design point moves.
+        # discrete inputs / get_self_statics() should invalidate it, but not a plain
+        # continuous-value change.
+        p, comp = self._build()
+        p.run_model()
+        p.compute_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'])
+        assert_check_totals(p.check_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'],
+                                           method='fd', show_only_incorrect=True))
+
+        self.assertIsNotNone(comp._fwd_jac_func_)
+        cached_func = comp._fwd_jac_func_
+
+        p.set_val('ivc.x', p.get_val('ivc.x') * 1.7 + 0.3)
+        p.set_val('ivc.y', p.get_val('ivc.y') * 0.6 - 0.2)
+        p.run_model()
+        p.compute_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'])
+
+        self.assertIs(comp._fwd_jac_func_, cached_func,
+                     'fwd jvp function was rebuilt after a continuous-value-only change')
+        # and derivatives at the NEW point are still correct
+        assert_check_totals(p.check_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'],
+                                           method='fd', show_only_incorrect=True))
+
+    def test_fwd_jvp_rebuilt_on_static_change(self):
+        # get_self_statics() changing (here, the 'mult' option) must still force a rebuild.
+        p, comp = self._build(mult=1.0)
+        p.run_model()
+        p.compute_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'])
+        cached_func = comp._fwd_jac_func_
+
+        comp.options['mult'] = 5.0
+        p.run_model()
+        p.compute_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'])
+
+        self.assertIsNot(comp._fwd_jac_func_, cached_func,
+                         'fwd jvp function was NOT rebuilt after a static (option) change')
+        assert_check_totals(p.check_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'],
+                                           method='fd', show_only_incorrect=True))
+
+
 if __name__ == '__main__':
     unittest.main()
