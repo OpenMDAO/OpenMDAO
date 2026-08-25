@@ -541,6 +541,278 @@ class TestNLBGaussSeidel(unittest.TestCase):
         assert_near_equal(prob['x'], 0.67883021, 1e-5)
 
 
+class SquareComp(om.ExplicitComponent):
+    """Computes y = x**2 with analytic partials."""
+
+    def setup(self):
+        self.add_input('x', 22.0)
+        self.add_output('y', 1.0)
+        self.declare_partials('y', 'x')
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = inputs['x'] ** 2
+
+    def compute_partials(self, inputs, partials):
+        partials['y', 'x'] = 2.0 * inputs['x']
+
+
+class CoupledComp1(om.ExplicitComponent):
+    """Computes y1 = x + 0.3*y2, half of a coupled pair with contraction ~0.6 per sweep."""
+
+    def setup(self):
+        self.add_input('x', 22.0)
+        self.add_input('y2', 1.0)
+        self.add_output('y1', 1.0)
+        self.declare_partials('*', '*')
+
+    def compute(self, inputs, outputs):
+        outputs['y1'] = inputs['x'] + 0.3 * inputs['y2']
+
+    def compute_partials(self, inputs, partials):
+        partials['y1', 'x'] = 1.0
+        partials['y1', 'y2'] = 0.3
+
+
+class CoupledComp2(om.ExplicitComponent):
+    """Computes y2 = 2*y1 + 0.1*x, the other half of the coupled pair."""
+
+    def setup(self):
+        self.add_input('x', 22.0)
+        self.add_input('y1', 1.0)
+        self.add_output('y2', 1.0)
+        self.declare_partials('*', '*')
+
+    def compute(self, inputs, outputs):
+        outputs['y2'] = 2.0 * inputs['y1'] + 0.1 * inputs['x']
+
+    def compute_partials(self, inputs, partials):
+        partials['y2', 'y1'] = 2.0
+        partials['y2', 'x'] = 0.1
+
+
+class VecSquareComp(om.ExplicitComponent):
+    """Computes y = x**2 elementwise for a length-3 vector, with analytic partials."""
+
+    def setup(self):
+        self.add_input('x', np.ones(3))
+        self.add_output('y', np.ones(3))
+        self.declare_partials('y', 'x', rows=np.arange(3), cols=np.arange(3))
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = inputs['x'] ** 2
+
+    def compute_partials(self, inputs, partials):
+        partials['y', 'x'] = 2.0 * inputs['x']
+
+
+class SquareZComp(om.ExplicitComponent):
+    """Computes lhs = z**2 with analytic partials, used as the balance left-hand side."""
+
+    def setup(self):
+        self.add_input('z', 4.0)
+        self.add_output('lhs', 16.0)
+        self.declare_partials('lhs', 'z')
+
+    def compute(self, inputs, outputs):
+        outputs['lhs'] = inputs['z'] ** 2
+
+    def compute_partials(self, inputs, partials):
+        partials['lhs', 'z'] = 2.0 * inputs['z']
+
+
+class TestNLBGSComplexStepReconverge(unittest.TestCase):
+    """
+    Regression tests for issue #3800.
+
+    The cs_reconverge nudge must not translate the real part of IndepVarComp or auto_ivc
+    outputs, because no Gauss-Seidel iteration recomputes them and the complex step total
+    would then be evaluated at the wrong real point.
+    """
+
+    def _build_feedforward(self, irrelevant, use_aitken=False):
+        prob = om.Problem()
+        ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('x', 22.0)
+        ivc.add_output('irrelevant', irrelevant)
+        prob.model.add_subsystem('sq', SquareComp(), promotes=['*'])
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+        prob.model.nonlinear_solver.options['use_aitken'] = use_aitken
+        prob.setup(force_alloc_complex=True)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        return prob
+
+    def _cs_total(self, prob, of='y', wrt='x'):
+        data = prob.check_totals(of=[of], wrt=[wrt], method='cs', step=1e-40,
+                                 out_stream=None)
+        return data[of, wrt]['J_fd'].item()
+
+    def test_cs_totals_at_declared_point(self):
+        # dy/dx of y = x**2 at x = 22 is exactly 44.  On the unfixed code the nudge
+        # shifts x by norm(outputs)*1e-10 and the error is ~9.7e-8.
+        prob = self._build_feedforward(0.0)
+        J = self._cs_total(prob)
+        self.assertLess(abs(J - 44.0), 1e-10)
+
+    def test_cs_totals_disconnected_output_invariance(self):
+        # A disconnected IndepVarComp output must not influence dy/dx.  On the unfixed
+        # code it inflates the nudge norm, giving errors up to 2.0 for irrelevant=1e10.
+        vals = []
+        for irrelevant in (0.0, 1.0, 1e6, 1e8, 1e10):
+            prob = self._build_feedforward(irrelevant)
+            J = self._cs_total(prob)
+            self.assertLess(abs(J - 44.0), 1e-10,
+                            msg=f'irrelevant={irrelevant}: J={J}')
+            vals.append(J)
+        self.assertEqual(len(set(vals)), 1,
+                         msg=f'derivative varies with disconnected output: {vals}')
+
+    def test_cs_totals_auto_ivc(self):
+        # Same contract when the independent variable lives on the auto_ivc.
+        prob = om.Problem()
+        prob.model.add_subsystem('sq', SquareComp(), promotes=['*'])
+        prob.model.add_subsystem('oth', om.ExecComp('z = 2.0*w'), promotes=['*'])
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+        prob.setup(force_alloc_complex=True)
+        prob.set_solver_print(level=0)
+        prob.set_val('x', 22.0)
+        prob.set_val('w', 1e8)
+        prob.run_model()
+        J = self._cs_total(prob)
+        self.assertLess(abs(J - 44.0), 1e-10)
+
+    def test_cs_totals_vector_indep_var(self):
+        # Every element of a vector-valued independent output must be protected, not
+        # just the first: diag(dy/dx) for y = x**2 at x = [3, 22, 5] is [6, 44, 10].
+        # A mask that covered only the first element of each independent variable
+        # would leave the other two translated and fail here.
+        x = np.array([3.0, 22.0, 5.0])
+        prob = om.Problem()
+        ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('x', x)
+        ivc.add_output('irrelevant', 1e8)
+        prob.model.add_subsystem('sq', VecSquareComp(), promotes=['*'])
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+        prob.setup(force_alloc_complex=True)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        data = prob.check_totals(of=['y'], wrt=['x'], method='cs', step=1e-40,
+                                 out_stream=None)
+        J = data['y', 'x']['J_fd']
+        assert_near_equal(J, np.diag(2.0 * x), 1e-10)
+
+    def test_cs_totals_aitken(self):
+        # The Aitken path shares the nudge and must satisfy the same contract.
+        prob = self._build_feedforward(1e8, use_aitken=True)
+        J = self._cs_total(prob)
+        self.assertLess(abs(J - 44.0), 1e-10)
+
+    def test_cs_totals_coupled_still_reconverges(self):
+        # The nudge exists so that the imaginary fixed-point iteration actually runs in
+        # coupled models.  With the solver-state nudge intact and tight tolerances the
+        # complex step total matches the analytic 2.575; if the nudge were removed
+        # entirely the solver would stop after two sweeps and the error would be ~0.3.
+        prob = om.Problem()
+        ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('x', 22.0)
+        ivc.add_output('irrelevant', 1e8)
+        prob.model.add_subsystem('c1', CoupledComp1(), promotes=['*'])
+        prob.model.add_subsystem('c2', CoupledComp2(), promotes=['*'])
+        prob.model.nonlinear_solver = om.NonlinearBlockGS(maxiter=500, atol=1e-14,
+                                                          rtol=1e-14)
+        prob.setup(force_alloc_complex=True)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        # y1 = x + 0.3*(2*y1 + 0.1*x)  =>  y1 = 2.575*x
+        J = self._cs_total(prob, of='y1')
+        self.assertLess(abs(J - 2.575), 1e-4)
+
+    def test_cs_totals_coupled_disconnected_invariance(self):
+        # In a coupled model the disconnected output must not influence the derivative
+        # even indirectly: if it entered the nudge sizing norm it would change the
+        # iteration count and therefore the converged imaginary part.
+        vals = []
+        for irrelevant in (0.0, 1e8):
+            prob = om.Problem()
+            ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+            ivc.add_output('x', 22.0)
+            ivc.add_output('irrelevant', irrelevant)
+            prob.model.add_subsystem('c1', CoupledComp1(), promotes=['*'])
+            prob.model.add_subsystem('c2', CoupledComp2(), promotes=['*'])
+            prob.model.nonlinear_solver = om.NonlinearBlockGS(maxiter=500)
+            prob.setup(force_alloc_complex=True)
+            prob.set_solver_print(level=0)
+            prob.run_model()
+            vals.append(self._cs_total(prob, of='y1'))
+        self.assertEqual(vals[0], vals[1],
+                         msg=f'coupled derivative varies with disconnected output: {vals}')
+
+    def test_cs_totals_implicit_state_reconverges(self):
+        # A genuine implicit state below the NLBGS must still be nudged and reconverge:
+        # z solves z**2 = x, so dz/dx = 1/(2*sqrt(x)).  On the unfixed code a
+        # disconnected 1e8 output shifts x and the error is ~2.4e-5.
+        prob = om.Problem()
+        ivc = prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('x', 22.0)
+        ivc.add_output('irrelevant', 1e8)
+        sub = prob.model.add_subsystem('sub', om.Group(), promotes=['*'])
+        bal = om.BalanceComp()
+        bal.add_balance('z', lhs_name='lhs', rhs_name='x', val=4.0)
+        sub.add_subsystem('bal', bal, promotes=['*'])
+        sub.add_subsystem('sqc', SquareZComp(), promotes=['*'])
+        sub.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=30)
+        sub.linear_solver = om.DirectSolver()
+        prob.model.nonlinear_solver = om.NonlinearBlockGS()
+        prob.setup(force_alloc_complex=True)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        J = self._cs_total(prob, of='z')
+        self.assertLess(abs(J - 1.0 / (2.0 * np.sqrt(22.0))), 1e-8)
+
+    def test_cs_reconverge_nudge_semantics(self):
+        # White-box check of the nudge itself: under complex step it must leave every
+        # imaginary part untouched, leave outputs tagged 'openmdao:indep_var' untouched,
+        # and shift the remaining outputs by exactly norm(those outputs) * 1e-10.
+        prob = self._build_feedforward(1e8)
+        model = prob.model
+        solver = model.nonlinear_solver
+        model._set_complex_step_mode(True)
+        try:
+            arr = model._outputs.asarray()
+            idx = {name: model._outputs.get_range(name)[0]
+                   for name in model._outputs._abs_iter()}
+            arr[idx['ivc.x']] += 1e-40j       # the perturbation a wrt would carry
+            arr[idx['sq.y']] += 3e-41j        # in-flight imaginary data on a state
+            before = arr.copy()
+            expected_nudge = np.linalg.norm(before[[idx['sq.y']]]) * 1e-10
+
+            solver._iter_initialize()
+
+            after = model._outputs.asarray()
+            self.assertTrue(np.array_equal(after.imag, before.imag),
+                            msg='nudge must not modify imaginary parts')
+            self.assertEqual((after[idx['ivc.x']] - before[idx['ivc.x']]).real, 0.0,
+                             msg='indep var was translated by the nudge')
+            self.assertEqual((after[idx['ivc.irrelevant']] -
+                              before[idx['ivc.irrelevant']]).real, 0.0,
+                             msg='indep var was translated by the nudge')
+            # exact up to one rounding of (y + nudge) in float64
+            delta = (after[idx['sq.y']] - before[idx['sq.y']]).real
+            self.assertLess(abs(delta - expected_nudge), 1e-6 * expected_nudge,
+                            msg='solver-state nudge missing or mis-sized')
+        finally:
+            model._set_complex_step_mode(False)
+
+    def test_cs_totals_repeated_calls_deterministic(self):
+        # Repeated and interleaved cs/fd evaluations must not contaminate each other.
+        prob = self._build_feedforward(1e8)
+        first = self._cs_total(prob)
+        prob.check_totals(of=['y'], wrt=['x'], method='fd', out_stream=None)
+        for _ in range(3):
+            self.assertEqual(self._cs_total(prob), first)
+        self.assertLess(abs(first - 44.0), 1e-10)
+
+
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
 class ProcTestCase1(unittest.TestCase):
 
