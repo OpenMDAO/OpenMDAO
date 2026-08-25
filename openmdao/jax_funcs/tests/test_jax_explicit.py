@@ -67,6 +67,26 @@ class DotProdMultPrimal(DotProdMultPrimalNoDeclPartials):
         self.declare_partials(of=['zz'], wrt=['y'])
 
 
+class DotProdMultPrimalNonDepOutput(om.JaxExplicitComponent):
+    # 'reporting_variable' has no dependence on any input, so its derivatives should never be computed.
+    def setup(self):
+        self.add_input('x', shape_by_conn=True)
+        self.add_input('y', shape_by_conn=True)
+        self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
+        self.add_output('zz', copy_shape='y')
+        self.add_output('reporting_variable', val=0.0, shape=())
+
+    def setup_partials(self):
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        self.declare_partials(of='reporting_variable', wrt='*', dependent=False)
+
+    def compute_primal(self, x, y):
+        z = jnp.dot(x, y)
+        zz = y * 2.5
+        reporting_variable = jnp.array(42.0)  # a fixed diagnostic value, unrelated to x or y
+        return z, zz, reporting_variable
+
+
 class DotProdMultPrimalOption(om.JaxExplicitComponent):
     def __init__(self, stat=2., **kwargs):
         super().__init__(**kwargs)
@@ -498,6 +518,33 @@ class TestJaxComp(unittest.TestCase):
                          {('G.comp.z', 'G.comp.x'), ('G.comp.zz', 'G.comp.y'),
                           ('G.comp.z', 'G.comp.y'), ('G.comp.zz', 'G.comp.zz'),
                           ('G.comp.z', 'G.comp.z')})
+
+    def test_jax_dependent_false_output_excluded_from_derivs(self):
+        # an output declared as dependent=False for all of its wrt's should be excluded from
+        # the jax derivative computation entirely, rather than just having its (unused)
+        # derivative values discarded afterward.
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', DotProdMultPrimalNonDepOutput())
+
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('comp.x', np.array([[1., 2.], [3., 4.]]))
+        p.set_val('comp.y', np.array([[5., 6.], [7., 8.]]))
+
+        p.run_model()
+
+        # 'reporting_variable' should be excluded, leaving only 'z' and 'zz'.
+        self.assertEqual(comp._deriv_output_idxs, (0, 1))
+        self.assertEqual(comp._deriv_output_names, ('z', 'zz'))
+        self.assertNotIn(('comp.reporting_variable', 'comp.x'), comp._subjacs_info)
+        self.assertNotIn(('comp.reporting_variable', 'comp.y'), comp._subjacs_info)
+
+        comp._update_jac_functs(())
+        derivs = comp._jac_func_(*comp._inputs.values())
+        self.assertEqual(len(derivs), 2, 'jax should only differentiate the 2 dependent outputs')
+
+        assert_near_equal(p.get_val('comp.reporting_variable'), 42.0)
+        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=True))
 
 
 class CompRetValue(om.JaxExplicitComponent):

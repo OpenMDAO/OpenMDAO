@@ -776,7 +776,7 @@ def _re_init(self):
     self._fwd_static_hash = None
 
 
-def _get_differentiable_compute_primal(self, discrete_inputs):
+def _get_differentiable_compute_primal(self, discrete_inputs, deriv_output_idxs=None):
     """
     Get the compute_primal function for the jacobian.
 
@@ -789,6 +789,11 @@ def _get_differentiable_compute_primal(self, discrete_inputs):
         The component to get the compute_primal function for.
     discrete_inputs : iter of discrete values
         The discrete input values.
+    deriv_output_idxs : tuple of int or None
+        If not None, restrict the returned function's outputs to just those continuous
+        outputs at these indices (into the full list of continuous outputs). This is used
+        to avoid differentiating through outputs that have no dependent partials declared.
+        If None, all continuous outputs are returned.
 
     Returns
     -------
@@ -808,17 +813,33 @@ def _get_differentiable_compute_primal(self, discrete_inputs):
             def differentiable_compute_primal(*contvals):
                 return self.compute_primal(*contvals, *discrete_inputs)
 
-        return differentiable_compute_primal
-
     elif self._discrete_outputs:
         ncontouts = self._outputs.nvars()
 
         def differentiable_compute_primal(*contvals):
             return self.compute_primal(*contvals)[:ncontouts]
 
+    else:
+        differentiable_compute_primal = self.compute_primal
+
+    if deriv_output_idxs is None:
         return differentiable_compute_primal
 
-    return self.compute_primal
+    base = differentiable_compute_primal
+
+    if len(deriv_output_idxs) == 1:
+        idx0 = deriv_output_idxs[0]
+
+        def restricted_compute_primal(*contvals):
+            return base(*contvals)[idx0]
+
+    else:
+
+        def restricted_compute_primal(*contvals):
+            outs = base(*contvals)
+            return tuple(outs[i] for i in deriv_output_idxs)
+
+    return restricted_compute_primal
 
 
 def _compute_sparsity(self, direction=None, num_iters=1, perturb_size=1e-9, use_nan=False):
