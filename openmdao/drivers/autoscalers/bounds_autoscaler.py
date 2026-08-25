@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from openmdao.core.constants import INF_BOUND
 from openmdao.drivers.autoscalers.autoscaler import Autoscaler
 
 if TYPE_CHECKING:
@@ -30,8 +29,10 @@ class BoundsAutoscaler(Autoscaler):
     (for example, COBYLA's ``rhobeg``) when the design variables span very different
     orders of magnitude.
 
-    Requires finite ``lower`` and ``upper`` bounds on every continuous design variable
-    and ``upper > lower`` for each element.
+    A design variable that is entirely or partially unbounded (``lower`` and/or
+    ``upper`` is ``None``, or either bound contains a non-finite element) is left
+    with its original ``total_scaler``/``total_adder`` unchanged, since there is no
+    finite range to normalize against.
     """
 
     def setup(self, driver: 'Driver'):
@@ -47,6 +48,7 @@ class BoundsAutoscaler(Autoscaler):
 
         dv_meta = self._var_meta['design_var']
         shadow = {}
+        scaled_any = False
 
         for name, meta in dv_meta.items():
             if meta.get('discrete', False):
@@ -56,17 +58,21 @@ class BoundsAutoscaler(Autoscaler):
             size = meta.get('global_size', meta.get('size', 0)) \
                 if meta.get('distributed', False) else meta.get('size', 0)
 
-            lower = meta.get('lower', -INF_BOUND)
-            upper = meta.get('upper', INF_BOUND)
+            lower = meta.get('lower')
+            upper = meta.get('upper')
+
+            if lower is None or upper is None:
+                # Entirely unbounded in at least one direction; leave scaling as-is.
+                shadow[name] = meta
+                continue
 
             lower_arr = self._as_bound_array(lower, size)
             upper_arr = self._as_bound_array(upper, size)
 
-            if np.any(lower_arr <= -INF_BOUND) or np.any(upper_arr >= INF_BOUND):
-                raise RuntimeError(
-                    f"{type(self).__name__} requires finite lower and upper bounds on "
-                    f"all design variables. Design variable '{name}' has non-finite "
-                    "bounds.")
+            if np.any(np.isneginf(lower_arr)) or np.any(np.isposinf(upper_arr)):
+                # Partially unbounded; leave scaling as-is.
+                shadow[name] = meta
+                continue
 
             dv_range = upper_arr - lower_arr
             if np.any(dv_range <= 0.0):
@@ -88,19 +94,17 @@ class BoundsAutoscaler(Autoscaler):
             meta_copy['total_scaler'] = new_scaler
             meta_copy['total_adder'] = new_adder
             shadow[name] = meta_copy
+            scaled_any = True
 
         # Install shadow metadata for design variables only. Constraints and objective
         # continue to point at the driver's original metadata via _var_meta.
         self._var_meta['design_var'] = shadow
 
-        # Any non-empty continuous DV set means scaling is active.
-        if any(not m.get('discrete', False) for m in shadow.values()):
+        if scaled_any:
             self._has_scaling = True
 
         # Refresh cached scaled design-variable bounds with the new scaler/adder.
-        self._scaled_lower['design_var'], \
-            self._scaled_upper['design_var'], \
-            self._scaled_equals['design_var'] = self._compute_scaled_bounds('design_var')
+        self._scaled_bounds['design_var'] = self._compute_scaled_bounds('design_var')
 
     @property
     def report_after_setup(self) -> bool:

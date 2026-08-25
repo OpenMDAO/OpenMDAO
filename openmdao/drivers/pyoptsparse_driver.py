@@ -179,6 +179,8 @@ class pyOptSparseDriver(Driver):
         The pyoptsparse Optimization class, lazily imported.
     """
 
+    _inf_bound = 1.0E30
+
     def __init__(self, **kwargs):
         """
         Initialize pyopt.
@@ -392,19 +394,21 @@ class pyOptSparseDriver(Driver):
         input_vals = self.get_design_var_values()
 
         # Get scaled design variable bounds from autoscaler
-        lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
+        dv_bounds = self._autoscaler.get_bounds_scaling('design_var')
 
         for name, meta in self._designvars.items():
             # translate absolute var names to promoted names for pyoptsparse
             size = meta['global_size'] if meta['distributed'] else meta['size']
+            lb = self._to_driver_bound(dv_bounds[name].lower)
+            ub = self._to_driver_bound(dv_bounds[name].upper)
             if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.1'):
                 opt_prob.addVarGroup(name, size, type='c',
                                      value=input_vals[name],
-                                     lower=lower_dv[name], upper=upper_dv[name])
+                                     lower=lb, upper=ub)
             else:
                 opt_prob.addVarGroup(name, size, varType='c',
                                      value=input_vals[name],
-                                     lower=lower_dv[name], upper=upper_dv[name])
+                                     lower=lb, upper=ub)
 
         if pyoptsparse_version is None or pyoptsparse_version < Version('2.5.1'):
             opt_prob.finalizeDesignVariables()
@@ -458,14 +462,14 @@ class pyOptSparseDriver(Driver):
                 del self._responses[name]
 
         # Get scaled constraint bounds from autoscaler
-        lower_con, upper_con, equals_con = self._autoscaler.get_bounds_scaling('constraint')
+        con_bounds = self._autoscaler.get_bounds_scaling('constraint')
 
         eqcons = {n: m for n, m in self._cons.items() if m['equals'] is not None}
         if eqcons:
             # Add all equality constraints
             for name, meta in eqcons.items():
                 size = meta['global_size'] if meta['distributed'] else meta['size']
-                lower = upper = equals_con[name]
+                lower = upper = self._to_driver_bound(con_bounds[name].equals)
 
                 # set equality constraints as reverse seeds to see what dvs are relevant
                 with relevance.seeds_active(rev_seeds=meta['source']):
@@ -474,9 +478,10 @@ class pyOptSparseDriver(Driver):
                         wrts = [v for v in lin_dvs
                                 if relevance.is_relevant(lin_dvs[v]['source'])]
                         jac = {w: _lin_jacs[name][w] for w in wrts}
+                        yi = _y_intercepts[name]
                         opt_prob.addConGroup(name, size,
-                                             lower=lower - _y_intercepts[name],
-                                             upper=upper - _y_intercepts[name],
+                                             lower=None if lower is None else lower - yi,
+                                             upper=None if upper is None else upper - yi,
                                              linear=True, wrt=wrts, jac=jac)
                     else:
                         wrts = [v for v in nl_dvs
@@ -499,8 +504,8 @@ class pyOptSparseDriver(Driver):
                 size = meta['global_size'] if meta['distributed'] else meta['size']
 
                 # Bounds - double sided is supported (scaled bounds from autoscaler)
-                lower = lower_con[name]
-                upper = upper_con[name]
+                lower = self._to_driver_bound(con_bounds[name].lower)
+                upper = self._to_driver_bound(con_bounds[name].upper)
 
                 # set inequality constraints as reverse seeds to see what dvs are relevant
                 with relevance.seeds_active(rev_seeds=(meta['source'],)):
@@ -509,9 +514,10 @@ class pyOptSparseDriver(Driver):
                         wrts = [n for n, meta in lin_dvs.items()
                                 if relevance.is_relevant(meta['source'])]
                         jac = {w: _lin_jacs[name][w] for w in wrts}
+                        yi = _y_intercepts[name]
                         opt_prob.addConGroup(name, size,
-                                             upper=upper - _y_intercepts[name],
-                                             lower=lower - _y_intercepts[name],
+                                             lower=None if lower is None else lower - yi,
+                                             upper=None if upper is None else upper - yi,
                                              linear=True, wrt=wrts, jac=jac)
                     else:
                         wrts = [n for n, meta in nl_dvs.items()
