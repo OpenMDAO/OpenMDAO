@@ -257,7 +257,7 @@ runs:
         cd $HOME
 
         # Build testflo command
-        TESTFLO_CMD="testflo openmdao --skip_dir=.pixi --timeout=240 --durations=20"
+        TESTFLO_CMD="testflo -s openmdao --skip_dir=.pixi --timeout=240 --durations=20"
 
         # Limit concurrency on macOS runners, which have only 3-4 cores and
         # bog down when N_PROCS=8 MPI tests run alongside other test workers
