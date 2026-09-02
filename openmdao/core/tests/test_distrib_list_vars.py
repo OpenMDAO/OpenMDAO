@@ -598,6 +598,46 @@ class DistributedListVarsTest(unittest.TestCase):
 
         assert_near_equal(prob['C3.sum'], -5.)
 
+    def test_distrib_list_vars_dyn_shapes(self):
+        class SourceComp(om.ExplicitComponent):
+
+            def setup(self):
+                # Distributed input with known local shape
+                self.add_output( "x", val=np.ones(10), distributed=True )
+
+            def compute(self, inputs, outputs):
+                pass
+
+
+        class CopyComp(om.ExplicitComponent):
+
+            def setup(self):
+
+                # The input shape is determined by the connection
+                self.add_input( "x", distributed=True, shape_by_conn=True )
+
+                # Output shape is copied from input
+                self.add_output( "y", distributed=True, copy_shape="x" )
+
+            def compute(self, inputs, outputs):
+                outputs["y"] = inputs["x"]
+
+
+        prob = om.Problem()
+
+        prob.model.add_subsystem( "src", SourceComp() )
+
+        prob.model.add_subsystem( "copy", CopyComp() )
+
+        prob.model.connect( "src.x", "copy.x" )
+
+        prob.setup()
+        prob.final_setup()
+
+        # before the bug fix, this raised an AtrributeError
+        prob.model.list_outputs(out_stream=None)
+
+
 
 @use_tempdirs
 @unittest.skipUnless(PETScVector, "PETSc is required.")

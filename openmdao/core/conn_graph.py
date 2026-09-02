@@ -444,6 +444,7 @@ class NodeAttrs():
                         self._val = np.ones(shape)
                     self._locmeta['shape'] = shape
                     self._locmeta['size'] = size
+                    self._locmeta['val'] = self._val
 
     @property
     def size(self):
