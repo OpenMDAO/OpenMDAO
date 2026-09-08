@@ -76,6 +76,7 @@ import sys
 import importlib
 import numpy as np
 from openmdao.core.driver import Driver, RecordingDebugging
+from openmdao.core.constants import _FINITE_INF_BOUND
 from openmdao.utils.mpi import MPI
 try:
     import pymoo
@@ -575,6 +576,10 @@ class pymooDriver(Driver):
         to coordinate population distribution across all ranks.
     """
 
+    # pymoo samples uniformly between xl and xu, which yields NaN for an infinite bound,
+    # so unbounded directions are clamped to a large finite magnitude instead.
+    _inf_bound = _FINITE_INF_BOUND
+
     def __init__(self, **kwargs):
         """
         Initialize the pymooDriver.
@@ -820,8 +825,8 @@ class pymooDriver(Driver):
             raise RuntimeError('Problem has no design variables.')
 
         # Collect design variable information (initial values and bounds)
-        x_info = {'vars': [], 'upper': np.full(ndesvar, 1e30),
-                  'lower': np.full(ndesvar, -1e30), 'indices': []}
+        x_info = {'vars': [], 'upper': np.full(ndesvar, self._inf_bound),
+                  'lower': np.full(ndesvar, -self._inf_bound), 'indices': []}
         dv_bounds = self._autoscaler.get_bounds_scaling('design_var')
         current_idx = 0
         for name, meta in self._designvars.items():
@@ -835,13 +840,17 @@ class pymooDriver(Driver):
             current_indices = list(range(current_idx, current_idx + size))
             x_info['indices'].append(current_indices)
             if name in self._designvars_discrete:
-                x_info['lower'][current_indices] = meta['lower']
-                x_info['upper'][current_indices] = meta['upper']
+                lower, upper = meta['lower'], meta['upper']
             else:
-                x_info['lower'][current_indices] = -1e30 if dv_bounds[name].lower is None \
-                    else dv_bounds[name].lower
-                x_info['upper'][current_indices] = 1e30 if dv_bounds[name].upper is None \
-                    else dv_bounds[name].upper
+                lower, upper = dv_bounds[name].lower, dv_bounds[name].upper
+
+            # None means entirely unbounded; a partially unbounded array still carries
+            # +/-inf elementwise, so both are mapped to the driver's finite sentinel.
+            inf_bound = self._inf_bound
+            x_info['lower'][current_indices] = -inf_bound if lower is None \
+                else self._to_driver_bound(lower)
+            x_info['upper'][current_indices] = inf_bound if upper is None \
+                else self._to_driver_bound(upper)
             current_idx += size
 
         # Determine total number of constraints

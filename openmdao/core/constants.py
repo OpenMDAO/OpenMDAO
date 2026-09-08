@@ -19,6 +19,13 @@ def __getattr__(name: str):
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
+# The finite magnitude standing in for an infinite bound in drivers and DOE generators whose
+# backend cannot accept IEEE infinity. Unlike the deprecated INF_BOUND, this is not a sentinel
+# that OpenMDAO tests against to recognize an unbounded variable: it is a real bound value
+# handed to one specific backend, and each driver or generator chooses its own via _inf_bound.
+_FINITE_INF_BOUND = 1.0E30
+
+
 # This is the dtype we use for index arrays.  Petsc by default uses 32 bit ints
 if os.environ.get('OPENMDAO_USE_BIG_INTS'):
     INT_DTYPE = np.dtype(np.int64)

@@ -66,7 +66,7 @@ class BoundMap:
         """Initialize BoundMap."""
         self._data = {}
 
-    def set(self, name, lower, upper, equals, size):
+    def set(self, name, lower, upper, equals):
         """
         Store bounds for a single variable.
 
@@ -80,8 +80,6 @@ class BoundMap:
             Upper bound in scaled units, or None if entirely unbounded above.
         equals : ndarray or None
             Equality value in scaled units, or None if not an equality constraint.
-        size : int
-            Number of elements in the variable (used for broadcasting scalars).
         """
         self._data[name] = _VarBounds(
             _compact(lower, is_lower=True),

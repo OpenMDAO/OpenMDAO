@@ -15,7 +15,7 @@ from packaging.version import Version
 import numpy as np
 from scipy.sparse import coo_matrix
 
-from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
+from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _FINITE_INF_BOUND, _ReprClass
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 from openmdao.core.group import Group
@@ -179,7 +179,7 @@ class pyOptSparseDriver(Driver):
         The pyoptsparse Optimization class, lazily imported.
     """
 
-    _inf_bound = 1.0E30
+    _inf_bound = _FINITE_INF_BOUND
 
     def __init__(self, **kwargs):
         """

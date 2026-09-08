@@ -200,7 +200,6 @@ class Autoscaler(AutoscalerBase):
                                         is_lower=False),
                 equals=self._scale_bound(eq, adder, scaler, size, is_lower=False)
                        if eq is not None else None,
-                size=size,
             )
 
         return bounds

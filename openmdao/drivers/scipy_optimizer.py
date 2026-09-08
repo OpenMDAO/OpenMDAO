@@ -9,6 +9,7 @@ import numpy as np
 from scipy import __version__ as scipy_version
 from scipy.optimize import minimize
 
+from openmdao.core.constants import _FINITE_INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
@@ -123,7 +124,7 @@ class ScipyOptimizeDriver(Driver):
     # Optimizers in _supports_new_style use a trust-region polish step that does not
     # converge reliably with IEEE infinity in NonlinearConstraint/LinearConstraint bounds.
     # Clamp ±inf to this value before passing bounds to those constraint classes.
-    _inf_bound_new_style = 1.0E30
+    _inf_bound_new_style = _FINITE_INF_BOUND
 
     def __init__(self, **kwargs):
         """
