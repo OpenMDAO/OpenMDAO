@@ -533,10 +533,10 @@ class TestDOEDriver(unittest.TestCase):
     def test_unbounded_desvar(self):
         # A DOE cannot sample an infinite range, so an unset or infinite bound maps onto
         # the generator's finite _inf_bound sentinel rather than raising or producing NaN.
-        generators = [om.UniformGenerator(num_samples=4, seed=0),
-                      om.LatinHypercubeGenerator(samples=4, seed=0)]
+        generators = [om.UniformGenerator(num_samples=4, seed=0)]
         if pydoe:
-            generators.append(om.FullFactorialGenerator(levels=2))
+            generators.extend([om.LatinHypercubeGenerator(samples=4, seed=0),
+                               om.FullFactorialGenerator(levels=2)])
 
         for bounds in ({'lower': None, 'upper': None},
                        {'lower': -np.inf, 'upper': np.inf},
