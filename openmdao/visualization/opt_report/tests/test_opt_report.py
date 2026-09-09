@@ -5,7 +5,6 @@ import numpy as np
 
 import openmdao.api as om
 
-from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
@@ -30,8 +29,8 @@ except ImportError:
 class TestOptimizationReport(unittest.TestCase):
 
     def setup_problem_and_run_driver(self, driver,
-                                     vars_lower=-INF_BOUND, vars_upper=INF_BOUND,
-                                     cons_lower=-INF_BOUND, cons_upper=INF_BOUND,
+                                     vars_lower=None, vars_upper=None,
+                                     cons_lower=None, cons_upper=None,
                                      final_setup_only=False,
                                      optimizer=None
                                      ):

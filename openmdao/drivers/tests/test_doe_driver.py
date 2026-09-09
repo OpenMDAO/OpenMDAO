@@ -132,7 +132,6 @@ class TestErrors(unittest.TestCase):
                          "Must be one of ['center', 'c', 'maximin', 'm', 'centermaximin', "
                          "'cm', 'correlation', 'corr', None].")
 
-
 @use_tempdirs
 class TestDOEDriver(unittest.TestCase):
 
@@ -530,6 +529,40 @@ class TestDOEDriver(unittest.TestCase):
             outputs = cr.get_case(case).outputs
             for name in ('x', 'y'):
                 assert_near_equal(outputs[name], expected_case[name], 1e-4)
+
+    def test_unbounded_desvar(self):
+        # A DOE cannot sample an infinite range, so an unset or infinite bound maps onto
+        # the generator's finite _inf_bound sentinel rather than raising or producing NaN.
+        generators = [om.UniformGenerator(num_samples=4, seed=0)]
+        if pydoe:
+            generators.extend([om.LatinHypercubeGenerator(samples=4, seed=0),
+                               om.FullFactorialGenerator(levels=2)])
+
+        for bounds in ({'lower': None, 'upper': None},
+                       {'lower': -np.inf, 'upper': np.inf},
+                       {'lower': -10.0, 'upper': np.inf}):
+            for generator in generators:
+                inf_bound = generator._inf_bound
+                design_vars = {
+                    'x': dict(size=1, global_size=1, distributed=False, **bounds),
+                    'y': dict(size=1, global_size=1, distributed=False,
+                              lower=-10.0, upper=10.0),
+                }
+
+                with self.subTest(bounds=bounds, generator=type(generator).__name__):
+                    cases = list(generator(design_vars))
+                    self.assertGreater(len(cases), 0)
+
+                    x_vals = np.concatenate([np.atleast_1d(dict(case)['x'])
+                                             for case in cases])
+
+                    # every sample is finite and inside the sentinel range
+                    self.assertTrue(np.all(np.isfinite(x_vals)))
+                    self.assertLessEqual(np.max(np.abs(x_vals)), inf_bound)
+
+                    # the finite bound that was given is still respected
+                    if np.isfinite(bounds['lower']if bounds['lower'] is not None else np.inf):
+                        self.assertGreaterEqual(np.min(x_vals), bounds['lower'])
 
     @unittest.skipUnless(pydoe, "requires 'pydoe', pip install openmdao[doe]")
     def test_full_factorial(self):

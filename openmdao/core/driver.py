@@ -14,7 +14,7 @@ import scipy.sparse as sp
 from openmdao.drivers.autoscalers.autoscaler import Autoscaler
 from openmdao.core.group import Group
 from openmdao.core.total_jac import _TotalJacInfo
-from openmdao.core.constants import INT_DTYPE, INF_BOUND, _SetupStatus
+from openmdao.core.constants import INT_DTYPE, _SetupStatus
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.record_util import create_local_meta, check_path, has_match
@@ -274,6 +274,8 @@ class Driver(object, metaclass=DriverMetaclass):
         The autoscaler instance used to scale/unscale values for the optimizer.
     """
 
+    _inf_bound = np.inf
+
     def __init__(self, **kwargs):
         """
         Initialize the driver.
@@ -380,6 +382,30 @@ class Driver(object, metaclass=DriverMetaclass):
         if self._problem is None:
             return None
         return f"{self._problem()._get_inst_id()}.driver"
+
+    def _to_driver_bound(self, arr):
+        """
+        Convert a bound array from internal np.inf/-np.inf sentinels to the driver's preferred form.
+
+        Replaces -np.inf with -self._inf_bound and np.inf with self._inf_bound.
+
+        Parameters
+        ----------
+        arr : ndarray or None
+            Bound array from the autoscaler, potentially containing ±np.inf.
+
+        Returns
+        -------
+        ndarray or None
+            Bound array with ±np.inf replaced by ±self._inf_bound. Returns arr unchanged if
+            arr is None or _inf_bound is np.inf.
+        """
+        if arr is None or self._inf_bound is np.inf:
+            return arr
+        result = np.array(arr, dtype=float)
+        result[np.isposinf(result)] = self._inf_bound
+        result[np.isneginf(result)] = -self._inf_bound
+        return result
 
     @property
     def msginfo(self):
@@ -1279,12 +1305,26 @@ class Driver(object, metaclass=DriverMetaclass):
                 if meta['equals'] is not None:
                     con_val -= meta['equals']
                 else:
-                    lower_viol_idxs = np.where(con_val < meta['lower'])[0]
-                    upper_viol_idxs = np.where(con_val > meta['upper'])[0]
-                    non_viol_idxs = np.where((con_val >= meta['lower'])
-                                             & (con_val <= meta['upper']))[0]
-                    con_val[lower_viol_idxs] -= meta['lower']
-                    con_val[upper_viol_idxs] -=  meta['upper']
+                    lower = meta['lower']
+                    upper = meta['upper']
+                    has_lower = lower is not None and not np.all(np.isneginf(np.atleast_1d(lower)))
+                    has_upper = upper is not None and not np.all(np.isposinf(np.atleast_1d(upper)))
+                    if has_lower:
+                        lower_viol_idxs = np.where(con_val < lower)[0]
+                    else:
+                        lower_viol_idxs = np.empty(0, dtype=int)
+                    if has_upper:
+                        upper_viol_idxs = np.where(con_val > upper)[0]
+                    else:
+                        upper_viol_idxs = np.empty(0, dtype=int)
+                    viol_idxs = np.union1d(lower_viol_idxs, upper_viol_idxs)
+                    non_viol_idxs = np.setdiff1d(np.arange(len(con_val)), viol_idxs)
+                    if has_lower:
+                        con_val[lower_viol_idxs] -= lower if np.isscalar(lower) \
+                            else np.asarray(lower)[lower_viol_idxs]
+                    if has_upper:
+                        con_val[upper_viol_idxs] -= upper if np.isscalar(upper) \
+                            else np.asarray(upper)[upper_viol_idxs]
                     con_val[non_viol_idxs] = 0.0
 
             con_dict[name] = con_vec[name].copy()
@@ -1904,8 +1944,8 @@ class Driver(object, metaclass=DriverMetaclass):
         dv_vals = self.get_design_var_values(driver_scaling=True)
         con_vals = self.get_constraint_values(driver_scaling=True)
 
-        lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
-        lower_con, upper_con, _ = self._autoscaler.get_bounds_scaling('constraint')
+        dv_bounds = self._autoscaler.get_bounds_scaling('design_var')
+        con_bounds = self._autoscaler.get_bounds_scaling('constraint')
 
         for constraint, con_options in constraints.items():
             constraint_value = con_vals[constraint]
@@ -1917,19 +1957,19 @@ class Driver(object, metaclass=DriverMetaclass):
                                            'active_bounds': np.zeros(con_size, dtype=int)}
             else:
                 # Inequality constraint, determine active indices and bounds
-                constraint_upper = upper_con[constraint]
-                constraint_lower = lower_con[constraint]
+                constraint_upper = con_bounds[constraint].upper
+                constraint_lower = con_bounds[constraint].lower
 
-                if np.all(np.isinf(constraint_upper)):
-                    upper_idxs = np.empty()
+                if constraint_upper is None:
+                    upper_idxs = np.empty(0, dtype=int)
                 else:
                     upper_mask = np.logical_or(constraint_value > constraint_upper,
                                                np.isclose(constraint_value, constraint_upper,
                                                           atol=feas_atol, rtol=feas_rtol))
                     upper_idxs = np.where(upper_mask)[0]
 
-                if np.all(np.isinf(constraint_lower)):
-                    lower_idxs = np.empty()
+                if constraint_lower is None:
+                    lower_idxs = np.empty(0, dtype=int)
                 else:
                     lower_mask = np.logical_or(constraint_value < constraint_lower,
                                                np.isclose(constraint_value, constraint_lower,
@@ -1946,21 +1986,27 @@ class Driver(object, metaclass=DriverMetaclass):
             des_var_value = dv_vals[des_var]
             des_var_size = des_var_options['size']
 
-            des_var_upper = upper_dv[des_var]
-            des_var_lower = lower_dv[des_var]
+            des_var_upper = dv_bounds[des_var].upper
+            des_var_lower = dv_bounds[des_var].lower
 
             if assume_dvs_active:
                 active_dvs[des_var] = {'indices': np.arange(des_var_size, dtype=int),
                                        'active_bounds': np.zeros(des_var_size, dtype=int)}
             else:
-                upper_mask = np.logical_or(des_var_value > des_var_upper,
-                                           np.isclose(des_var_value, des_var_upper,
-                                                      atol=feas_atol, rtol=feas_rtol))
-                upper_idxs = np.where(upper_mask)[0]
-                lower_mask = np.logical_or(des_var_value < des_var_lower,
-                                           np.isclose(des_var_value, des_var_lower,
-                                                      atol=feas_atol, rtol=feas_rtol))
-                lower_idxs = np.where(lower_mask)[0]
+                if des_var_upper is None:
+                    upper_idxs = np.empty(0, dtype=int)
+                else:
+                    upper_mask = np.logical_or(des_var_value > des_var_upper,
+                                               np.isclose(des_var_value, des_var_upper,
+                                                          atol=feas_atol, rtol=feas_rtol))
+                    upper_idxs = np.where(upper_mask)[0]
+                if des_var_lower is None:
+                    lower_idxs = np.empty(0, dtype=int)
+                else:
+                    lower_mask = np.logical_or(des_var_value < des_var_lower,
+                                               np.isclose(des_var_value, des_var_lower,
+                                                          atol=feas_atol, rtol=feas_rtol))
+                    lower_idxs = np.where(lower_mask)[0]
 
                 active_idxs = sorted(np.concatenate((upper_idxs, lower_idxs)))
                 active_bounds = [1 if idx in upper_idxs else -1 for idx in active_idxs]
@@ -2379,38 +2425,35 @@ class Driver(object, metaclass=DriverMetaclass):
         if method == 'lm':
             bounds = (-np.inf, np.inf)
 
-            if any(meta['lower'] > -1.0E16 or
-                   meta['upper'] < 1.0E16 for meta in self._designvars.values()):
+            if any((meta['lower'] is not None and np.any(np.atleast_1d(meta['lower']) > -1.0E16)) or
+                   (meta['upper'] is not None and np.any(np.atleast_1d(meta['upper']) < 1.0E16))
+                   for meta in self._designvars.values()):
                 issue_warning("find_feasible method is 'lm' which ignores bounds "
                               "but one or more design variables have bounds.")
         else:
             i = 0
             bounds = []
 
-            lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
+            dv_bounds = self._autoscaler.get_bounds_scaling('design_var')
 
             for name, val in desvar_vals.items():
                 meta = self._designvars[name]
                 size = meta['global_size'] if meta['distributed'] else meta['size']
 
-                meta_low = lower_dv[name]
-                meta_high = upper_dv[name]
+                meta_low = dv_bounds[name].lower
+                meta_high = dv_bounds[name].upper
                 for j in range(size):
-                    p_low = meta_low[j]
-                    p_high = meta_high[j]
-
-                    p_low = -np.inf if p_low <= -INF_BOUND else p_low
-                    p_high = np.inf if p_high >= INF_BOUND else p_high
+                    p_low = None if meta_low is None else meta_low[j]
+                    p_high = None if meta_high is None else meta_high[j]
 
                     # If lower and upper are equal at any indices, add some slack
-                    equal_idxs = np.where(np.atleast_1d(np.abs(p_high - p_low)) < 1.0E-16)[0]
-
-                    # Releive bounds if they are pinched
-                    # TODO: Handle this more generically in all drivers
-                    if np.isscalar(p_high):
-                        p_high += 1.0E-16
-                    else:
-                        p_high[equal_idxs] += 1.0E-16
+                    if p_low is not None and p_high is not None:
+                        equal_idxs = np.where(
+                            np.atleast_1d(np.abs(p_high - p_low)) < 1.0E-16)[0]
+                        if np.isscalar(p_high):
+                            p_high += 1.0E-16
+                        else:
+                            p_high[equal_idxs] += 1.0E-16
 
                     bounds.append((p_low, p_high))
 

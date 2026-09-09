@@ -38,7 +38,7 @@ class AutoscalerBase:
     setup(driver)
         Initialize the autoscaler with driver metadata.
         Called once at the start of the driver.run method.
-    
+
     setup_requires_run_model()
         Return True if setup of the autoscaler requires the
         model to be in an executed state.
@@ -50,11 +50,11 @@ class AutoscalerBase:
     apply_design_var_unscaling(vec)
         Unscale the design variables from the optimizer space to the model space.
         Does not modify vec; returns a new array.
-    
+
     apply_constraint_scaling(vec)
         Scale the constraints from model space to optimizer space.
         Modifies vec in-place.
-    
+
     apply_objective_scaling(vec)
         Scale the objectives from model space to optimizer space.
         Modifies vec in-place.
@@ -62,7 +62,7 @@ class AutoscalerBase:
     apply_mult_unscaling(desvar_multipliers, con_multipliers)
         Unscale Lagrange multipliers from optimizer space to physical space.
         Modifies the input dictionaries in-place.
-    
+
     apply_jac_scaling(jac_dict)
         Scale the computed total jacobian from the model/physical space to optimizer space.
 
@@ -77,14 +77,9 @@ class AutoscalerBase:
     _has_scaling : bool
         Flag indicating whether any scaling is applied to design variables, constraints,
         or objectives.
-    _scaled_lower : dict
-        Dictionary mapping VOI type to scaled lower bound arrays for design variables and
-        constraints.
-    _scaled_upper : dict
-        Dictionary mapping VOI type to scaled upper bound arrays for design variables and
-        constraints.
-    _scaled_equals : dict
-        Dictionary mapping VOI type to scaled equality constraint value arrays.
+    _scaled_bounds : dict
+        Dictionary mapping VOI type to a BoundMap of scaled bounds for design variables
+        and constraints. Access per-variable bounds via bounds[name].lower, .upper, .equals.
     _driver_ref : weakref or None
         Weak reference to the driver this autoscaler belongs to. Set during setup().
 
@@ -93,9 +88,7 @@ class AutoscalerBase:
     def __init__(self):
         self._var_meta : dict[str, dict[str, dict]] = {}
         self._has_scaling : bool = False
-        self._scaled_lower = {}
-        self._scaled_upper = {}
-        self._scaled_equals = {}
+        self._scaled_bounds = {}
         self._driver_ref = None
 
     def _get_inst_id(self):
@@ -184,15 +177,13 @@ class AutoscalerBase:
 
     def get_bounds_scaling(self, voi_type):
         """
-        Return pre-computed scaled bounds vectors for the given variable type.
+        Return the pre-computed BoundMap for the given variable type.
 
         Returns bounds cached during setup() in driver (optimizer) units. The original
         metadata bounds remain in physical (model) units and are not modified.
 
-        Infinite bounds (abs value >= INF_BOUND in model space) are returned as ±INF_BOUND.
-
         If scalers change after setup (e.g. in an adaptive autoscaler subclass), call
-        _compute_scaled_bounds() again for each affected voi_type to refresh the cache.
+        _compute_scaled_bounds() again for the affected voi_type to refresh the cache.
 
         Parameters
         ----------
@@ -201,13 +192,10 @@ class AutoscalerBase:
 
         Returns
         -------
-        lower : OptimizerVector
-            Scaled lower bounds. Unbounded entries contain -INF_BOUND.
-        upper : OptimizerVector
-            Scaled upper bounds. Unbounded entries contain INF_BOUND.
-        equals : OptimizerVector or None
-            Scaled equality values. Non-equality constraint entries contain np.nan as
-            a sentinel. None when voi_type='design_var'.
+        BoundMap
+            Scaled bounds. Access per-variable bounds via bounds[name].lower,
+            bounds[name].upper, and bounds[name].equals. Entirely-unbounded
+            directions return None.
         """
         raise NotImplementedError(f'Class {type(self).__name__} does not '
                                   'implement get_bounds_scaling.')

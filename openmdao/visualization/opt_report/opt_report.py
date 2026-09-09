@@ -22,7 +22,6 @@ except ImportError:
     mpl = None
 
 
-from openmdao.core.constants import INF_BOUND
 from openmdao.utils.mpi import MPI
 from openmdao.visualization.tables.table_builder import generate_table
 
@@ -378,13 +377,13 @@ def _make_dvcons_table(meta_dict, vals_dict, kind,
                 else:
                     row[col_name] = max_val_as_str
             elif col_name == 'lower':
-                if meta[col_name] is None or np.all(meta[col_name] == -INF_BOUND):
+                if meta[col_name] is None or np.all(np.isneginf(np.atleast_1d(meta[col_name]))):
                     row[col_name] = None
                 else:
                     lower_val = np.mean(meta[col_name])
                     row[col_name] = _indicate_value_is_derived_from_array(lower_val, meta[col_name])
             elif col_name == 'upper':
-                if meta[col_name] is None or np.all(meta[col_name] == INF_BOUND):
+                if meta[col_name] is None or np.all(np.isposinf(np.atleast_1d(meta[col_name]))):
                     row[col_name] = None
                 else:
                     upper_val = np.mean(meta[col_name])
@@ -522,14 +521,14 @@ def _desvar_or_ineq_constraint_sparkline(ax, meta, val):
 
     # get array for the lower and upper bounds
     if meta['lower'] is None:
-        _lower = (-INF_BOUND * np.ones_like(val)[indices]).ravel()
+        _lower = np.full_like(np.asarray(val).ravel(), -np.inf)
     elif isinstance(meta['lower'], float):
         _lower = (meta['lower'] * np.ones_like(val)[indices]).ravel()
     else:
         _lower = np.asarray(meta['lower']).ravel()
 
     if meta['upper'] is None:
-        _upper = (INF_BOUND * np.ones_like(val)[indices]).ravel()
+        _upper = np.full_like(np.asarray(val).ravel(), np.inf)
     elif isinstance(meta['upper'], float):
         _upper = (meta['upper'] * np.ones_like(val)[indices]).ravel()
     else:
@@ -568,19 +567,18 @@ def _desvar_or_ineq_constraint_sparkline(ax, meta, val):
     ax.plot(ar, _val, '-o', markersize=_plot_marker_size, color=_value_plot_color,
             linewidth=_plot_value_linewidth)
 
-    # Need to do this because of a bug in matplotlib. If the upper or lowers include INF_BOUND
-    #  it affects how the other side of the fill_between is drawn
+    # Need to clip before plotting so matplotlib fill_between handles infinite bounds correctly
     _lower = np.clip(_lower, ymin_plot, ymax_plot)
     _upper = np.clip(_upper, ymin_plot, ymax_plot)
 
     # plot lower area, if exists
-    if not (isinstance(meta['lower'], float) and meta['lower'] == -INF_BOUND):
+    if meta['lower'] is not None and not np.all(np.isneginf(np.atleast_1d(meta['lower']))):
         ax.fill_between(ar, ymin_plot, _lower, color=_out_of_bounds_plot_color,
                         hatch=_out_of_bounds_plot_hatch_pattern, alpha=_out_of_bounds_plot_alpha)
         ax.plot(ar, _lower, color=_out_of_bounds_plot_color, linewidth=_plot_value_linewidth)
 
     # plot upper area, if exists
-    if not (isinstance(meta['upper'], float) and meta['upper'] == INF_BOUND):
+    if meta['upper'] is not None and not np.all(np.isposinf(np.atleast_1d(meta['upper']))):
         ax.fill_between(ar, _upper, ymax_plot, color=_out_of_bounds_plot_color,
                         hatch=_out_of_bounds_plot_hatch_pattern, alpha=_out_of_bounds_plot_alpha)
         ax.plot(ar, _upper, color=_out_of_bounds_plot_color, linewidth=_plot_value_linewidth)
@@ -682,10 +680,12 @@ def _constraint_plot(kind, meta, val, width=300):
             pass  # handle other than ndarray, e.g. int
 
     # If lower and upper bounds are None, return an HTML snippet indicating the issue
-    if kind == 'constraint' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
+    upper_is_inf = meta['upper'] is None or np.all(np.isposinf(np.atleast_1d(meta['upper'])))
+    lower_is_inf = meta['lower'] is None or np.all(np.isneginf(np.atleast_1d(meta['lower'])))
+    if kind == 'constraint' and upper_is_inf and lower_is_inf:
         return '<span class="bounds-unavailable">Both lower and upper bounds are None.</span>'
 
-    if kind == 'desvar' and meta['upper'] == INF_BOUND and meta['lower'] == -INF_BOUND:
+    if kind == 'desvar' and upper_is_inf and lower_is_inf:
         return   # nothing to plot
 
     # Equality constraints are visualized differently
@@ -699,11 +699,11 @@ def _constraint_plot(kind, meta, val, width=300):
 
     # If lower and upper are the same value, visualize the same as an equality constraint
     if (
-        'lower' in meta and meta['lower'] != -INF_BOUND and meta['lower'] is not None
-        and
-        'upper' in meta and meta['upper'] != INF_BOUND and meta['upper'] is not None
-        and
-        meta['lower'] == meta['upper']
+        'lower' in meta and meta['lower'] is not None
+        and not np.all(np.isneginf(np.atleast_1d(meta['lower'])))
+        and 'upper' in meta and meta['upper'] is not None
+        and not np.all(np.isposinf(np.atleast_1d(meta['upper'])))
+        and meta['lower'] == meta['upper']
     ):
         if abs(val - meta['lower']) < _equality_constraint_tolerance:
             html = '<span class="equality-constraint equality-constraint-satisfied">&#10003;</span>'
@@ -716,8 +716,8 @@ def _constraint_plot(kind, meta, val, width=300):
 
     fig, ax = plt.subplots(nrows=1, ncols=1, figsize=_scalar_visual_figsize, dpi=_plot_dpi)
 
-    lower = -INF_BOUND if meta['lower'] is None else meta['lower']
-    upper = INF_BOUND if meta['upper'] is None else meta['upper']
+    lower = -np.inf if meta['lower'] is None else meta['lower']
+    upper = np.inf if meta['upper'] is None else meta['upper']
 
     var_bounds_plot(kind, ax, float(val), lower, upper)
     tmpfile = io.BytesIO()
@@ -781,21 +781,19 @@ def _get_bound_array_min_max(bounds, indices):
     _bounds
         An array representing the bounds.
     _bounds_min
-        The minimum of the bounds, excluding any entries in the _bounds array that
-          equal -INF_BOUND or INF_BOUND. If all the values are those, return INF_BOUND
-          so that when mins are taken that include this value, it doesn't affect the result
+        The minimum of the bounds, excluding any non-finite (inf) entries. If all entries
+          are infinite, return np.inf so that when mins are taken it doesn't affect the result.
     _bounds_max
-        The maximum of the bounds, excluding any entries in the _bounds array that
-          equal -INF_BOUND or INF_BOUND. If all the values are those, return -INF_BOUND
-          so that when maxes are taken that include this value, it doesn't affect the result
+        The maximum of the bounds, excluding any non-finite (inf) entries. If all entries
+          are infinite, return -np.inf so that when maxes are taken it doesn't affect the result.
     """
-    _bounds_no_inf = bounds[np.where(((bounds != -INF_BOUND) & (bounds != INF_BOUND)))]
+    _bounds_no_inf = bounds[np.isfinite(bounds)]
     if _bounds_no_inf.size > 0:
         _bounds_min = np.min(_bounds_no_inf)
         _bounds_max = np.max(_bounds_no_inf)
     else:  # so that when we do min and max on these they are not involved in getting the min/max
-        _bounds_min = INF_BOUND
-        _bounds_max = - INF_BOUND
+        _bounds_min = np.inf
+        _bounds_max = -np.inf
 
     if isinstance(bounds, float):
         _bounds = (bounds * np.ones_like(bounds)[indices]).ravel()
@@ -845,7 +843,7 @@ def var_bounds_plot(kind, ax, value, lower, upper):
     func_val_to_plot_coord = partial(_val_to_plot_coord, lower=lower, upper=upper)
     value_in_plot_coord = func_val_to_plot_coord(value)
 
-    if upper == INF_BOUND:  # there is a lower bound
+    if np.isposinf(upper):  # there is a lower bound
         _draw_in_or_out_bound_section(ax, 0, _plot_x_max / 2, False)
         _draw_in_or_out_bound_section(ax, _plot_x_max / 2, _plot_x_max / 2, True)
         _draw_boundary_label(ax, _plot_x_max / 2,
@@ -864,7 +862,7 @@ def var_bounds_plot(kind, ax, value, lower, upper):
         _draw_pointer_and_label(ax, pointer_plot_coord, pointer_color, value)
         return
 
-    if lower == -INF_BOUND:  # there is an upper bound
+    if np.isneginf(lower):  # there is an upper bound
         _draw_in_or_out_bound_section(ax, 0, _plot_x_max / 2, True)
         _draw_in_or_out_bound_section(ax, _plot_x_max / 2, _plot_x_max / 2, False)
         _draw_boundary_label(ax, _plot_x_max / 2,

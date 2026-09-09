@@ -10,6 +10,8 @@ from collections.abc import Iterator
 import csv
 import itertools
 
+from openmdao.core.constants import _FINITE_INF_BOUND
+
 
 class AnalysisGenerator(Iterator):
     """
@@ -30,6 +32,11 @@ class AnalysisGenerator(Iterator):
     _var_dict : dict
         An internal copy of the var_dict used to create the generator.
     """
+
+    # Sampling covers the range spanned by a factor's bounds, so it has no meaningful
+    # behavior for an infinite range. Unset (None) and infinite bounds are mapped onto
+    # this finite magnitude instead.
+    _inf_bound = _FINITE_INF_BOUND
 
     def __init__(self, var_dict):
         """

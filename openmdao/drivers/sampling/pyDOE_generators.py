@@ -4,7 +4,7 @@ pydoe sample generators for Analysis Driver.
 import numpy as np
 
 from openmdao.drivers.analysis_generator import AnalysisGenerator
-from openmdao.drivers.sampling.sampling_util import _get_size
+from openmdao.drivers.sampling.sampling_util import _get_size, _get_bounds
 
 
 _LEVELS = 2  # default number of levels for pyDOE generators
@@ -111,17 +111,11 @@ class _pyDOE_AnalysisGenerator(AnalysisGenerator):
             size = self._sizes[name]
 
             try:
+                lower, upper = _get_bounds(name, meta, size, self._inf_bound)
+
                 for k in range(size):
-                    lower = meta['lower']
-                    if isinstance(lower, np.ndarray):
-                        lower = lower[k]
-
-                    upper = meta['upper']
-                    if isinstance(upper, np.ndarray):
-                        upper = upper[k]
-
                     levels = self._get_levels(name)
-                    values[row, 0:levels] = np.linspace(lower, upper, num=levels)
+                    values[row, 0:levels] = np.linspace(lower[k], upper[k], num=levels)
 
                     row += 1
             except KeyError:
@@ -507,13 +501,7 @@ class LatinHypercubeGenerator(AnalysisGenerator):
                     size = _get_size(name, meta)
                     sample = row[col:col + size]
 
-                    lower = meta['lower']
-                    if not isinstance(lower, np.ndarray):
-                        lower = lower * np.ones(size)
-
-                    upper = meta['upper']
-                    if not isinstance(upper, np.ndarray):
-                        upper = upper * np.ones(size)
+                    lower, upper = _get_bounds(name, meta, size, self._inf_bound)
 
                     val = lower + sample * (upper - lower)
 

@@ -8,6 +8,9 @@ from collections import OrderedDict
 
 import numpy as np
 
+from openmdao.core.constants import _FINITE_INF_BOUND
+from openmdao.drivers.sampling.sampling_util import _get_bounds
+
 
 _LEVELS = 2  # default number of levels for pyDOE generators
 
@@ -16,6 +19,11 @@ class DOEGenerator(object):
     """
     Base class for a callable object that generates cases for a DOEDriver.
     """
+
+    # A DOE samples over the range spanned by a design variable's bounds, so it has no
+    # meaningful behavior for an infinite range. Unset (None) and infinite bounds are
+    # mapped onto this finite magnitude instead.
+    _inf_bound = _FINITE_INF_BOUND
 
     def __call__(self, design_vars, model=None):
         """
@@ -254,15 +262,7 @@ class UniformGenerator(DOEGenerator):
             sample = []
 
             for name, meta in design_vars.items():
-                size = meta['size']
-
-                lower = meta['lower']
-                if not isinstance(lower, np.ndarray):
-                    lower = lower * np.ones(size)
-
-                upper = meta['upper']
-                if not isinstance(upper, np.ndarray):
-                    upper = upper * np.ones(size)
+                lower, upper = _get_bounds(name, meta, meta['size'], self._inf_bound)
 
                 sample.append((name, np.random.uniform(lower, upper)))
 
@@ -367,18 +367,11 @@ class _pyDOE_Generator(DOEGenerator):
         row = 0
         for name, meta in design_vars.items():
             size = _get_size(meta)
+            lower, upper = _get_bounds(name, meta, size, self._inf_bound)
 
             for k in range(size):
-                lower = meta['lower']
-                if isinstance(lower, np.ndarray):
-                    lower = lower[k]
-
-                upper = meta['upper']
-                if isinstance(upper, np.ndarray):
-                    upper = upper[k]
-
                 levels = self._get_dv_levels(name)
-                values[row, 0:levels] = np.linspace(lower, upper, num=levels)
+                values[row, 0:levels] = np.linspace(lower[k], upper[k], num=levels)
 
                 row += 1
 
@@ -738,13 +731,7 @@ class LatinHypercubeGenerator(DOEGenerator):
                 size = meta['size']
                 sample = row[col:col + size]
 
-                lower = meta['lower']
-                if not isinstance(lower, np.ndarray):
-                    lower = lower * np.ones(size)
-
-                upper = meta['upper']
-                if not isinstance(upper, np.ndarray):
-                    upper = upper * np.ones(size)
+                lower, upper = _get_bounds(name, meta, size, self._inf_bound)
 
                 val = lower + sample * (upper - lower)
 

@@ -2013,13 +2013,13 @@ class Problem(object, metaclass=ProblemMetaclass):
         desvar_opts = [opt for opt in desvar_opts if _find_dict_meta(desvars, opt)]
     
         if ('lower' in desvar_opts or 'upper' in desvar_opts) and driver_scaling:
-            lower, upper, _ = self.driver._autoscaler.get_bounds_scaling('design_var')
+            dv_bounds = self.driver._autoscaler.get_bounds_scaling('design_var')
             for name in desvars:
                 if not desvars[name]['discrete']:
                     if 'lower' in desvar_opts:
-                        desvars[name]['lower'] = lower[name]
+                        desvars[name]['lower'] = dv_bounds[name].lower
                     if 'upper' in desvar_opts:
-                        desvars[name]['upper'] = upper[name]
+                        desvars[name]['upper'] = dv_bounds[name].upper
 
         # include units in our outputs if any constraints have units that are not None
         has_units = any(dvmeta.get('units', None) is not None for dvname, dvmeta in desvars.items())
@@ -2061,14 +2061,14 @@ class Problem(object, metaclass=ProblemMetaclass):
             cons_opts.append('units')
         if (('lower' in cons_opts or 'upper' in cons_opts or 'equals' in cons_opts)
             and driver_scaling):
-            lower, upper, equals = self.driver._autoscaler.get_bounds_scaling('constraint')
+            con_bounds = self.driver._autoscaler.get_bounds_scaling('constraint')
             for name in cons:
                 if 'lower' in cons_opts:
-                    cons[name]['lower'] = lower[name]
+                    cons[name]['lower'] = con_bounds[name].lower
                 if 'upper' in cons_opts:
-                    cons[name]['upper'] = upper[name]
+                    cons[name]['upper'] = con_bounds[name].upper
                 if 'equals' in cons_opts:
-                    cons[name]['equals'] = equals[name]
+                    cons[name]['equals'] = con_bounds[name].equals
         col_names = default_col_names + def_cons_opts + cons_opts
         if 'units' in col_names and driver_scaling:
             for c in cons:

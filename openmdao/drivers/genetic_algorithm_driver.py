@@ -26,7 +26,6 @@ import copy
 
 import numpy as np
 
-from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.utils.concurrent_utils import concurrent_eval
 from openmdao.utils.mpi import MPI
@@ -172,22 +171,22 @@ class SimpleGADriver(Driver):
         for name, meta in self._designvars.items():
             lower, upper = meta['lower'], meta['upper']
             for param in (lower, upper):
-                if param is None or np.all(np.abs(param) >= INF_BOUND):
+                if param is None or np.any(np.isinf(np.atleast_1d(param))):
                     msg = (f"Invalid bounds for design variable '{name}'. When using "
-                           f"{self.__class__.__name__}, values for both 'lower' and 'upper' "
-                           f"must be specified between +/-INF_BOUND ({INF_BOUND}), "
-                           f"but they are: lower={lower}, upper={upper}.")
+                           f"{self.__class__.__name__}, finite values for both 'lower' and "
+                           f"'upper' must be specified, but they are: "
+                           f"lower={lower}, upper={upper}.")
                     raise ValueError(msg)
 
         for name, meta in self._cons.items():
             equals, lower, upper = meta['equals'], meta['lower'], meta['upper']
-            if ((equals is None or np.all(np.abs(equals) >= INF_BOUND)) and
-               (lower is None or np.all(np.abs(lower) >= INF_BOUND)) and
-               (upper is None or np.all(np.abs(upper) >= INF_BOUND))):
+            eq_unbounded = equals is None or np.all(np.isinf(np.atleast_1d(equals)))
+            lower_unbounded = lower is None or np.all(np.isinf(np.atleast_1d(lower)))
+            upper_unbounded = upper is None or np.all(np.isinf(np.atleast_1d(upper)))
+            if eq_unbounded and lower_unbounded and upper_unbounded:
                 msg = (f"Invalid bounds for constraint '{name}'. "
-                       f"When using {self.__class__.__name__}, the value for 'equals', "
-                       f"'lower' or 'upper' must be specified between +/-INF_BOUND "
-                       f"({INF_BOUND}), but they are: "
+                       f"When using {self.__class__.__name__}, a finite value for 'equals', "
+                       f"'lower' or 'upper' must be specified, but they are: "
                        f"equals={equals}, lower={lower}, upper={upper}.")
                 raise ValueError(msg)
 
@@ -494,9 +493,6 @@ class SimpleGADriver(Driver):
             i, j = self._desvar_idx[name]
             self._set_design_var(name, x[i:j])
 
-        # a very large number, but smaller than the result of nan_to_num in Numpy
-        almost_inf = INF_BOUND
-
         # Execute the model
         with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
             self.iter_count += 1
@@ -541,13 +537,13 @@ class SimpleGADriver(Driver):
                 constraint_violations = np.array([])
                 for name, val in self.get_constraint_values().items():
                     con = self._cons[name]
-                    # The not used fields will either None or a very large number
-                    has_lower_con = (con['lower'] is not None) and \
-                        np.any(con['lower'] > -almost_inf)
-                    has_upper_con = (con['upper'] is not None) and \
-                        np.any(con['upper'] < almost_inf)
-                    has_eq_con = (con['equals'] is not None) and \
-                        np.any(np.abs(con['equals']) < almost_inf)
+                    # None means unbounded; np.inf also means unbounded
+                    has_lower_con = con['lower'] is not None and \
+                        not np.all(np.isneginf(np.atleast_1d(con['lower'])))
+                    has_upper_con = con['upper'] is not None and \
+                        not np.all(np.isposinf(np.atleast_1d(con['upper'])))
+                    has_eq_con = con['equals'] is not None and \
+                        not np.all(np.isinf(np.atleast_1d(con['equals'])))
                     if has_lower_con:
                         lb_diff = val - con['lower']
                         lb_violation = np.array([0. if d >= 0 else abs(d) for d in lb_diff])

@@ -7,7 +7,6 @@ import numpy as np
 
 import openmdao.api as om
 
-from openmdao.core.constants import INF_BOUND
 
 from openmdao.drivers.genetic_algorithm_driver import GeneticAlgorithm
 
@@ -44,10 +43,10 @@ extra_prints = False  # enable printing results
 def _test_func_name(func, num, param):
     args = []
     for p in param.args:
-        if p and p == INF_BOUND:
-            args.append('INF_BOUND')
-        elif p and p == -INF_BOUND:
-            args.append('-INF_BOUND')
+        if p is not None and np.isscalar(p) and np.isposinf(p):
+            args.append('inf')
+        elif p is not None and np.isscalar(p) and np.isneginf(p):
+            args.append('-inf')
         else:
             args.append(str(p))
     return func.__name__ + '_' + '_'.join(args)
@@ -526,11 +525,11 @@ class TestSimpleGA(unittest.TestCase):
 
     @parameterized.expand([
         (None, None),
-        (INF_BOUND, INF_BOUND),
-        (None, INF_BOUND),
-        (None, -INF_BOUND),
-        (INF_BOUND, None),
-        (-INF_BOUND, None),
+        (np.inf, np.inf),
+        (None, np.inf),
+        (None, -np.inf),
+        (np.inf, None),
+        (-np.inf, None),
     ],
     name_func=_test_func_name)
     def test_inf_desvar(self, lower, upper):
@@ -550,16 +549,9 @@ class TestSimpleGA(unittest.TestCase):
         with self.assertRaises(ValueError) as err:
             prob.final_setup()
 
-        # A value of None for lower and upper is changed to +/- INF_BOUND in add_design_var()
-        if lower is None:
-            lower = -INF_BOUND
-        if upper is None:
-            upper = INF_BOUND
-
         msg = ("Invalid bounds for design variable 'x'. When using "
-               "SimpleGADriver, values for both 'lower' and 'upper' "
-               f"must be specified between +/-INF_BOUND ({INF_BOUND}), "
-               f"but they are: lower={lower}, upper={upper}.")
+               "SimpleGADriver, finite values for both 'lower' and "
+               f"'upper' must be specified, but they are: lower={lower}, upper={upper}.")
 
         self.maxDiff = None
         self.assertEqual(err.exception.args[0], msg)
@@ -1020,9 +1012,9 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         assert_near_equal(p.get_val('exec.z')[50], -400)
 
     @parameterized.expand([
-        (None, -INF_BOUND, INF_BOUND),
-        (INF_BOUND, None, None),
-        (-INF_BOUND, None, None),
+        (None, -np.inf, np.inf),
+        (np.inf, None, None),
+        (-np.inf, None, None),
     ],
     name_func=_test_func_name)
     def test_inf_constraints(self, equals, lower, upper):
@@ -1047,16 +1039,9 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         with self.assertRaises(ValueError) as err:
             prob.final_setup()
 
-        # A value of None for lower and upper is changed to +/- INF_BOUND in add_constraint()
-        if lower is None:
-            lower = -INF_BOUND
-        if upper is None:
-            upper = INF_BOUND
-
         msg = ("Invalid bounds for constraint 'const.g'. "
-               "When using SimpleGADriver, the value for 'equals', "
-               "'lower' or 'upper' must be specified between "
-               f"+/-INF_BOUND ({INF_BOUND}), but they are: "
+               "When using SimpleGADriver, a finite value for 'equals', "
+               "'lower' or 'upper' must be specified, but they are: "
                f"equals={equals}, lower={lower}, upper={upper}.")
 
         self.maxDiff = None
