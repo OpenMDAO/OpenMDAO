@@ -55,7 +55,7 @@ docs = [
     "tqdm>=4.66.3"
 ]
 doe = [
-    "pyDOE3",
+    "pydoe",
 ]
 jax = [
     "jax>=0.4.0",

@@ -14,6 +14,7 @@ from openmdao.utils.jax_utils import jax, jit, jnp, \
     _ensure_returns_tuple, _compute_output_shapes, _update_add_input_kwargs, \
     _update_add_output_kwargs, _get_differentiable_compute_primal, _re_init, _check_output_shapes
 from openmdao.utils.code_utils import get_return_names, get_function_deps
+from openmdao.utils.name_maps import abs_key2rel_key
 
 
 class JaxExplicitComponent(ExplicitComponent):
@@ -43,6 +44,13 @@ class JaxExplicitComponent(ExplicitComponent):
         The function that computes the colored jacobian.
     _static_hash : tuple
         The hash of the static values.
+    _fwd_jac_func_ : function or None
+        Cached, jitted jvp function used by matrix_free 'fwd' mode (see
+        _compute_jacvec_product). Primal values are passed in as call arguments rather than
+        captured at trace time. Unlike _vjp_fun below this is valid for the life of the
+        Problem and is only rebuilt when discrete inputs or static config change.
+    _fwd_static_hash : tuple or None
+        The (discrete inputs, get_self_statics()) key _fwd_jac_func_ was built from.
     _orig_compute_primal : function
         The original compute_primal method.
     _ret_tuple_compute_primal : function
@@ -52,6 +60,15 @@ class JaxExplicitComponent(ExplicitComponent):
     _do_shape_check : bool
         If True, check the declared output shapes vs. the shapes of the outputs returned from
         compute_primal.
+    _deriv_output_idxs : tuple of int or None
+        Indices, into the full list of continuous outputs, of the outputs that have at least
+        one dependent partial declared. None if all outputs need derivatives (the common
+        case). Outputs can be excluded by declaring their partials as
+        ``dependent=False`` (e.g. ``self.declare_partials('my_output', '*', dependent=False)``),
+        which allows the jax derivative computation to skip them entirely.
+    _deriv_output_names : tuple of str or None
+        The relative names corresponding to _deriv_output_idxs. None if _deriv_output_idxs
+        is None.
     """
 
     def __init__(self, matrix_free=False, fallback_derivs_method='fd', **kwargs):  # noqa
@@ -66,6 +83,12 @@ class JaxExplicitComponent(ExplicitComponent):
         self._jac_colored_ = None
         self._output_shapes = None
         self._do_shape_check = True
+        # matrix_free 'fwd' jvp cache (see _compute_jacvec_product); separate from _static_hash/
+        # _vjp_fun above because it uses a coarser, cheaper invalidation key (see there for why)
+        self._fwd_jac_func_ = None
+        self._fwd_static_hash = None
+        self._deriv_output_idxs = None
+        self._deriv_output_names = None
 
         if self.compute_primal is None:
             raise RuntimeError(f"{self.msginfo}: compute_primal is not defined for this component.")
@@ -209,6 +232,42 @@ class JaxExplicitComponent(ExplicitComponent):
 
         super()._setup_partials()
 
+        if self.options['derivs_method'] == 'jax' and not self.matrix_free:
+            self._deriv_output_idxs = self._get_deriv_output_idxs()
+            if self._deriv_output_idxs is None:
+                self._deriv_output_names = None
+            else:
+                outnames = self._var_rel_names['output']
+                self._deriv_output_names = tuple(outnames[i] for i in self._deriv_output_idxs)
+
+    def _get_deriv_output_idxs(self):
+        """
+        Determine which continuous outputs have at least one dependent partial declared.
+
+        Outputs with no dependent partials (e.g. because the user declared
+        ``dependent=False`` for all of their wrt's) don't need to be differentiated at all,
+        so the jax derivative computation can skip them.
+
+        Returns
+        -------
+        tuple of int or None
+            Indices, into the full list of continuous outputs, of the outputs that need
+            derivatives. None is returned if all outputs need derivatives, which is the
+            common case, so that callers can skip building a restricted compute_primal.
+        """
+        outnames = self._var_rel_names['output']
+
+        # ExplicitComponent unconditionally adds a (-1) diagonal (of, of) entry to
+        # _subjacs_info for every output, representing d(residual)/d(output). That entry
+        # isn't a real declared partial of compute_primal, so it must be ignored here or
+        # every output would always look "wanted".
+        wanted = {abs_key2rel_key(self, key)[0] for key in self._subjacs_info if key[0] != key[1]}
+
+        if len(wanted) >= len(outnames):
+            return None
+
+        return tuple(i for i, name in enumerate(outnames) if name in wanted)
+
     def _statics_changed(self, discrete_inputs):
         """
         Determine if jitting is needed based on changes in static values since the last call.
@@ -346,6 +405,11 @@ class JaxExplicitComponent(ExplicitComponent):
                 self._jac_colored_ = None
                 fjax = jax.jacfwd if self.best_partial_deriv_direction() == 'fwd' else jax.jacrev
                 wrt_idxs = list(range(len(self._var_abs2meta['input'])))
+                if self._deriv_output_idxs is not None:
+                    # some outputs have no dependent partials declared, so avoid
+                    # differentiating through them at all.
+                    differentiable_cp = _get_differentiable_compute_primal(
+                        self, discrete_inputs, self._deriv_output_idxs)
                 self._jac_func_ = fjax(differentiable_cp, argnums=wrt_idxs)
 
             if need_jit:
@@ -389,6 +453,10 @@ class JaxExplicitComponent(ExplicitComponent):
         discrete_inputs : dict or None
             If not None, dict containing discrete input values.
         """
+        if self._deriv_output_idxs is not None and not self._deriv_output_idxs:
+            # none of our outputs have any dependent partials, so there's nothing to compute.
+            return
+
         discrete_inputs = discrete_inputs.values() if discrete_inputs else ()
         self._update_jac_functs(discrete_inputs)
 
@@ -397,12 +465,14 @@ class JaxExplicitComponent(ExplicitComponent):
 
         derivs = self._jac_func_(*inputs.values())
 
+        ofnames = self._var_rel_names['output'] if self._deriv_output_idxs is None \
+            else self._deriv_output_names
+
         # check to see if we even need this with jax.  A jax component doesn't need to map string
         # keys to partials.  We could just use the jacobian as an array to compute the derivatives.
         # Maybe make a simple JaxJacobian that is just a thin wrapper around the jacobian array.
         # The only issue is do higher level jacobians need the subjacobian info?
-        _jax_derivs2partials(self, derivs, partials, self._var_rel_names['output'],
-                             self._var_rel_names['input'])
+        _jax_derivs2partials(self, derivs, partials, ofnames, self._var_rel_names['input'])
 
     def _jacfwd_colored(self, inputs, partials):
         """
@@ -530,12 +600,27 @@ class JaxExplicitComponent(ExplicitComponent):
             If not None, dict containing discrete input values.
         """
         if mode == 'fwd':
-            dx = tuple(d_inputs.values())
             full_invals = tuple(self._get_compute_primal_invals(inputs, discrete_inputs))
-            x = full_invals[:len(dx)]
-            other = full_invals[len(dx):]
-            _, deriv_vals = jax.jvp(lambda *args: self.compute_primal(*args, *other),
-                                    primals=x, tangents=dx)
+            ncont_ins = d_inputs.nvars()
+            x = full_invals[:ncont_ins]
+            other = full_invals[ncont_ins:]
+
+            # Rebuild only when discrete inputs or static config change, NOT on every continuous
+            # value change (unlike the 'rev' branch below). jax.jit's own executable cache is
+            # keyed on shape/dtype, and `x`/`dx` are passed in as call args below rather than
+            # captured at trace time, so the compiled jvp is valid for the life of this Problem
+            fwd_hash = (tuple(discrete_inputs.values()) if discrete_inputs else ()) + \
+                self.get_self_statics()
+            if self._fwd_jac_func_ is None or fwd_hash != self._fwd_static_hash:
+                def _fwd_primal(*args):
+                    return self.compute_primal(*args, *other)
+
+                self._fwd_jac_func_ = jax.jit(
+                    lambda primals, tangents: jax.jvp(_fwd_primal, primals, tangents))
+                self._fwd_static_hash = fwd_hash
+
+            dx = tuple(d_inputs.values())
+            _, deriv_vals = self._fwd_jac_func_(x, dx)
             d_outputs.set_vals(deriv_vals)
         else:
             inhash = ((inputs.get_hash(),) + tuple(self._discrete_inputs.values()) +

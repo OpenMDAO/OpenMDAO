@@ -5,7 +5,6 @@ import unittest
 
 import numpy as np
 
-from packaging.version import Version
 
 import openmdao.api as om
 
@@ -20,9 +19,9 @@ from openmdao.drivers.sampling.pyDOE_generators import FullFactorialGenerator, \
 
 
 try:
-    import pyDOE3
+    import pydoe
 except ImportError:
-    pyDOE3 = None
+    pydoe = None
 
 
 class ParaboloidArray(om.ExplicitComponent):
@@ -47,27 +46,27 @@ class ParaboloidArray(om.ExplicitComponent):
 
 class TestPyDOEErrors(unittest.TestCase):
 
-    @unittest.skipIf(pyDOE3, "only runs if 'pyDOE3' is not installed")
-    def test_no_pyDOE3(self):
+    @unittest.skipIf(pydoe, "only runs if 'pydoe' is not installed")
+    def test_no_pydoe(self):
         with self.assertRaises(RuntimeError) as err:
             FullFactorialGenerator(var_dict={}, levels=3)
 
         self.assertEqual(str(err.exception),
-                         "FullFactorialGenerator requires the 'pyDOE3' package, "
+                         "FullFactorialGenerator requires the 'pydoe' package, "
                          "which can be installed with one of the following commands:\n"
                          "    pip install openmdao[doe]\n"
-                         "    pip install pyDOE3")
+                         "    pip install pydoe")
 
         with self.assertRaises(RuntimeError) as err:
             om.AnalysisDriver(samples=FullFactorialGenerator(var_dict={}, levels=3))
 
         self.assertEqual(str(err.exception),
-                         "FullFactorialGenerator requires the 'pyDOE3' package, "
+                         "FullFactorialGenerator requires the 'pydoe' package, "
                          "which can be installed with one of the following commands:\n"
                          "    pip install openmdao[doe]\n"
-                         "    pip install pyDOE3")
+                         "    pip install pydoe")
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
+    @unittest.skipUnless(pydoe, "requires 'pydoe', pip install openmdao[doe]")
     def test_lhc_criterion(self):
         with self.assertRaises(ValueError) as err:
             LatinHypercubeGenerator(var_dict={}, criterion='foo')
@@ -77,7 +76,7 @@ class TestPyDOEErrors(unittest.TestCase):
                          "Must be one of ['center', 'c', 'maximin', 'm', 'centermaximin', "
                          "'cm', 'correlation', 'corr', None].")
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
+    @unittest.skipUnless(pydoe, "requires 'pydoe', pip install openmdao[doe]")
     def test_missing_bounds(self):
         with self.assertRaises(RuntimeError) as err:
             factors = {
@@ -89,7 +88,7 @@ class TestPyDOEErrors(unittest.TestCase):
                          "Unable to determine levels for factor 'x'. Factors dictionary must "
                          "contain both 'lower' and 'upper' keys.")
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
+    @unittest.skipUnless(pydoe, "requires 'pydoe', pip install openmdao[doe]")
     def test_mismatched_bounds(self):
         with self.assertRaises(ValueError) as err:
             factors = {
@@ -103,7 +102,7 @@ class TestPyDOEErrors(unittest.TestCase):
 
 
 @use_tempdirs
-@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', pip install openmdao[doe]")
+@unittest.skipUnless(pydoe, "requires 'pydoe', pip install openmdao[doe]")
 class TestPyDOEGenerators(unittest.TestCase):
 
     def setUp(self):
@@ -431,7 +430,7 @@ class TestPyDOEGenerators(unittest.TestCase):
 
         objs = [cr.get_case(case).outputs['f'].item() for case in cases]
 
-        self.assertEqual(len(objs), 104)  # The number can be verified with standalone pyDOE3
+        self.assertEqual(len(objs), 104)  # The number can be verified with standalone pydoe
         # Testing uniqueness. If all elements are unique, it should be the same length as the number of cases
         self.assertEqual(len(set(objs)), 104)
 
@@ -510,45 +509,24 @@ class TestPyDOEGenerators(unittest.TestCase):
         # ref: https://en.wikipedia.org/wiki/Box-Behnken_design
         self.assertEqual(len(cases), (3*4)+center)
 
-        # slight change in order from refactor in pyDOE3 v1.0.4 (PR #15)
-        if Version(pyDOE3.__version__) >= Version("1.0.4"):
-            expected = [
-                {'x': np.array([0.]), 'y': np.array([0.]), 'z': np.array([5.])},
-                {'x': np.array([0.]), 'y': np.array([10.]), 'z': np.array([5.])},
-                {'x': np.array([10.]), 'y': np.array([0.]), 'z': np.array([5.])},
-                {'x': np.array([10.]), 'y': np.array([10.]), 'z': np.array([5.])},
+        expected = [
+            {'x': np.array([0.]), 'y': np.array([0.]), 'z': np.array([5.])},
+            {'x': np.array([0.]), 'y': np.array([10.]), 'z': np.array([5.])},
+            {'x': np.array([10.]), 'y': np.array([0.]), 'z': np.array([5.])},
+            {'x': np.array([10.]), 'y': np.array([10.]), 'z': np.array([5.])},
 
-                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([0.])},
-                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([10.])},
-                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([0.])},
-                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([10.])},
+            {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([0.])},
+            {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([10.])},
+            {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([0.])},
+            {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([10.])},
 
-                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([0.])},
-                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([10.])},
-                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([0.])},
-                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([10.])},
+            {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([0.])},
+            {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([10.])},
+            {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([0.])},
+            {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([10.])},
 
-                {'x': np.array([5.]), 'y': np.array([5.]), 'z': np.array([5.])}
-            ]
-        else:
-            expected = [
-                {'x': np.array([0.]), 'y': np.array([0.]), 'z': np.array([5.])},
-                {'x': np.array([10.]), 'y': np.array([0.]), 'z': np.array([5.])},
-                {'x': np.array([0.]), 'y': np.array([10.]), 'z': np.array([5.])},
-                {'x': np.array([10.]), 'y': np.array([10.]), 'z': np.array([5.])},
-
-                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([0.])},
-                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([0.])},
-                {'x': np.array([0.]), 'y': np.array([5.]), 'z': np.array([10.])},
-                {'x': np.array([10.]), 'y': np.array([5.]), 'z': np.array([10.])},
-
-                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([0.])},
-                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([0.])},
-                {'x': np.array([5.]), 'y': np.array([0.]), 'z': np.array([10.])},
-                {'x': np.array([5.]), 'y': np.array([10.]), 'z': np.array([10.])},
-
-                {'x': np.array([5.]), 'y': np.array([5.]), 'z': np.array([5.])},
-            ]
+            {'x': np.array([5.]), 'y': np.array([5.]), 'z': np.array([5.])}
+        ]
 
         for case, expected_case in zip(cases, expected):
             outputs = cr.get_case(case).outputs

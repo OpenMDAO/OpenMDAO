@@ -15,7 +15,7 @@ from packaging.version import Version
 import numpy as np
 from scipy.sparse import coo_matrix
 
-from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _ReprClass
+from openmdao.core.constants import _DEFAULT_REPORTS_DIR, _FINITE_INF_BOUND, _ReprClass
 from openmdao.core.analysis_error import AnalysisError
 from openmdao.core.driver import Driver, RecordingDebugging, filter_by_meta
 from openmdao.core.group import Group
@@ -30,7 +30,7 @@ else:
     pyoptsparse_version = None
 
 # All optimizers in pyoptsparse
-optlist = {'ALPSO', 'CONMIN', 'IPOPT', 'NLPQLP', 'NSGA2', 'ParOpt', 'PSQP', 'SLSQP', 'SNOPT'}
+optlist = {'ALPSO', 'CONMIN', 'IPOPT', 'NLPQLP', 'NSGA2', 'ParOpt', 'PSQP', 'SLSQP', 'SNOPT', 'Uno'}
 
 if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.0'):
     optlist.add('NOMAD')
@@ -40,7 +40,7 @@ if pyoptsparse_version is None or pyoptsparse_version < Version('2.1.2'):
 
 # names of optimizers that use gradients
 grad_drivers = optlist.intersection({'CONMIN', 'FSQP', 'IPOPT', 'NLPQLP', 'PSQP',
-                                     'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'ParOpt'})
+                                     'SLSQP', 'SNOPT', 'NLPY_AUGLAG', 'ParOpt', 'Uno'})
 
 # names of optimizers that allow multiple objectives
 multi_obj_drivers = {'NSGA2'}
@@ -67,7 +67,8 @@ respects_fail_flag = {
     'SNOPT': True,           # as of v2.0.0, requires SNOPT 7.7
     'FSQP': False,           # no longer supported as of v2.1.2
     'NLPY_AUGLAG': False,    # no longer supported as of v2.1.2
-    'NOMAD': False           # no longer supported as of v2.6.0
+    'NOMAD': False,          # no longer supported as of v2.6.0
+    'Uno': False             # Uno needs NaN values to handle analysis errors
 }
 
 DEFAULT_OPT_SETTINGS = {}
@@ -177,6 +178,8 @@ class pyOptSparseDriver(Driver):
     _Optimization: class
         The pyoptsparse Optimization class, lazily imported.
     """
+
+    _inf_bound = _FINITE_INF_BOUND
 
     def __init__(self, **kwargs):
         """
@@ -391,19 +394,21 @@ class pyOptSparseDriver(Driver):
         input_vals = self.get_design_var_values()
 
         # Get scaled design variable bounds from autoscaler
-        lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
+        dv_bounds = self._autoscaler.get_bounds_scaling('design_var')
 
         for name, meta in self._designvars.items():
             # translate absolute var names to promoted names for pyoptsparse
             size = meta['global_size'] if meta['distributed'] else meta['size']
+            lb = self._to_driver_bound(dv_bounds[name].lower)
+            ub = self._to_driver_bound(dv_bounds[name].upper)
             if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.1'):
                 opt_prob.addVarGroup(name, size, type='c',
                                      value=input_vals[name],
-                                     lower=lower_dv[name], upper=upper_dv[name])
+                                     lower=lb, upper=ub)
             else:
                 opt_prob.addVarGroup(name, size, varType='c',
                                      value=input_vals[name],
-                                     lower=lower_dv[name], upper=upper_dv[name])
+                                     lower=lb, upper=ub)
 
         if pyoptsparse_version is None or pyoptsparse_version < Version('2.5.1'):
             opt_prob.finalizeDesignVariables()
@@ -457,14 +462,14 @@ class pyOptSparseDriver(Driver):
                 del self._responses[name]
 
         # Get scaled constraint bounds from autoscaler
-        lower_con, upper_con, equals_con = self._autoscaler.get_bounds_scaling('constraint')
+        con_bounds = self._autoscaler.get_bounds_scaling('constraint')
 
         eqcons = {n: m for n, m in self._cons.items() if m['equals'] is not None}
         if eqcons:
             # Add all equality constraints
             for name, meta in eqcons.items():
                 size = meta['global_size'] if meta['distributed'] else meta['size']
-                lower = upper = equals_con[name]
+                lower = upper = self._to_driver_bound(con_bounds[name].equals)
 
                 # set equality constraints as reverse seeds to see what dvs are relevant
                 with relevance.seeds_active(rev_seeds=meta['source']):
@@ -473,9 +478,10 @@ class pyOptSparseDriver(Driver):
                         wrts = [v for v in lin_dvs
                                 if relevance.is_relevant(lin_dvs[v]['source'])]
                         jac = {w: _lin_jacs[name][w] for w in wrts}
+                        yi = _y_intercepts[name]
                         opt_prob.addConGroup(name, size,
-                                             lower=lower - _y_intercepts[name],
-                                             upper=upper - _y_intercepts[name],
+                                             lower=None if lower is None else lower - yi,
+                                             upper=None if upper is None else upper - yi,
                                              linear=True, wrt=wrts, jac=jac)
                     else:
                         wrts = [v for v in nl_dvs
@@ -498,8 +504,8 @@ class pyOptSparseDriver(Driver):
                 size = meta['global_size'] if meta['distributed'] else meta['size']
 
                 # Bounds - double sided is supported (scaled bounds from autoscaler)
-                lower = lower_con[name]
-                upper = upper_con[name]
+                lower = self._to_driver_bound(con_bounds[name].lower)
+                upper = self._to_driver_bound(con_bounds[name].upper)
 
                 # set inequality constraints as reverse seeds to see what dvs are relevant
                 with relevance.seeds_active(rev_seeds=(meta['source'],)):
@@ -508,9 +514,10 @@ class pyOptSparseDriver(Driver):
                         wrts = [n for n, meta in lin_dvs.items()
                                 if relevance.is_relevant(meta['source'])]
                         jac = {w: _lin_jacs[name][w] for w in wrts}
+                        yi = _y_intercepts[name]
                         opt_prob.addConGroup(name, size,
-                                             upper=upper - _y_intercepts[name],
-                                             lower=lower - _y_intercepts[name],
+                                             lower=None if lower is None else lower - yi,
+                                             upper=None if upper is None else upper - yi,
                                              linear=True, wrt=wrts, jac=jac)
                     else:
                         wrts = [n for n, meta in nl_dvs.items()
@@ -573,6 +580,15 @@ class pyOptSparseDriver(Driver):
                 print(opt_prob)
 
         self._exc_info = None
+
+        # Install a SIGINT handler for optimizers that don't have their own signal handling
+        # (e.g. Uno). When Ctrl+C arrives between Python callbacks, this sets the termination
+        # flag so the next callback entry returns fail=2 instead of crashing.
+        _sigint_cache = None
+        if optimizer not in ('SNOPT',) and self.options['user_terminate_signal'] is None:
+            _sigint_cache = signal.getsignal(signal.SIGINT)
+            signal.signal(signal.SIGINT, self._signal_handler)
+
         try:
 
             # Execute the optimization problem
@@ -681,6 +697,9 @@ class pyOptSparseDriver(Driver):
             signal.signal(sigusr, self._signal_cache)
             self._signal_cache = None   # to prevent memory leak test from failing
 
+        if _sigint_cache is not None:
+            signal.signal(signal.SIGINT, _sigint_cache)
+
         return self.fail
 
     def _objfunc(self, dv_dict):
@@ -746,10 +765,21 @@ class pyOptSparseDriver(Driver):
                     model._clear_iprint()
                     fail = 2
 
+                # Ctrl+C during model execution: set termination flag and return fail=2
+                # so the optimizer (e.g. Uno) can terminate cleanly rather than crashing.
+                except KeyboardInterrupt:
+                    model._clear_iprint()
+                    self._user_termination_flag = True
+                    fail = 2
+
                 # Record after getting obj and constraint to assure they have
                 # been gathered in MPI.
                 rec.abs = 0.0
                 rec.rel = 0.0
+
+        except KeyboardInterrupt:
+            self._user_termination_flag = True
+            fail = 2
 
         except Exception:
             if self._exc_info is None:  # avoid overwriting an earlier exception
@@ -832,6 +862,12 @@ class pyOptSparseDriver(Driver):
                 prob.model._clear_iprint()
                 fail = 2
 
+            # Ctrl+C during gradient computation: set termination flag and return fail=2.
+            except KeyboardInterrupt:
+                prob.model._clear_iprint()
+                self._user_termination_flag = True
+                fail = 2
+
             else:
                 # if we don't convert to 'coo' here, pyoptsparse will do a
                 # conversion of our dense array into a fully dense 'coo', which is bad.
@@ -854,6 +890,10 @@ class pyOptSparseDriver(Driver):
                         for ikey in nl_dvs:
                             newdv[ikey] = sens_dict[okey][ikey]
                 sens_dict = new_sens
+
+        except KeyboardInterrupt:
+            self._user_termination_flag = True
+            fail = 2
 
         except Exception:
             if self._exc_info is None:  # avoid overwriting an earlier exception
@@ -966,7 +1006,7 @@ class pyOptSparseDriver(Driver):
     def _signal_handler(self, signum, frame):
         # Subsystems (particularly external codes) may declare their own signal handling, so
         # execute the cached handler first.
-        if self._signal_cache is not signal.Handlers.SIG_DFL:
+        if callable(self._signal_cache):
             self._signal_cache(signum, frame)
 
         self._user_termination_flag = True

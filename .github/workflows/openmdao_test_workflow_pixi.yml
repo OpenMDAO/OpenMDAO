@@ -121,7 +121,7 @@ jobs:
           RUFF: ${{ matrix.RUFF }}
           SNOPT: ${{ matrix.SNOPT }}
           COVERAGE: ${{ matrix.COVERAGE }}
-          OPENMDAO_INSTALL_FROM: ${{ github.repository == 'OpenMDAO/OpenMDAO' && 'wheel' || 'local_developer' }}
+          OPENMDAO_INSTALL_FROM: ${{ (github.repository == 'OpenMDAO/OpenMDAO' && runner.os != 'Windows') && 'wheel' || 'local_developer' }}
           debug_enabled: ${{ inputs.debug_enabled || false }}
           ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
           ssh_known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}

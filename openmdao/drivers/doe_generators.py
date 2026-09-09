@@ -8,6 +8,9 @@ from collections import OrderedDict
 
 import numpy as np
 
+from openmdao.core.constants import _FINITE_INF_BOUND
+from openmdao.drivers.sampling.sampling_util import _get_bounds
+
 
 _LEVELS = 2  # default number of levels for pyDOE generators
 
@@ -16,6 +19,11 @@ class DOEGenerator(object):
     """
     Base class for a callable object that generates cases for a DOEDriver.
     """
+
+    # A DOE samples over the range spanned by a design variable's bounds, so it has no
+    # meaningful behavior for an infinite range. Unset (None) and infinite bounds are
+    # mapped onto this finite magnitude instead.
+    _inf_bound = _FINITE_INF_BOUND
 
     def __call__(self, design_vars, model=None):
         """
@@ -254,15 +262,7 @@ class UniformGenerator(DOEGenerator):
             sample = []
 
             for name, meta in design_vars.items():
-                size = meta['size']
-
-                lower = meta['lower']
-                if not isinstance(lower, np.ndarray):
-                    lower = lower * np.ones(size)
-
-                upper = meta['upper']
-                if not isinstance(upper, np.ndarray):
-                    upper = upper * np.ones(size)
+                lower, upper = _get_bounds(name, meta, meta['size'], self._inf_bound)
 
                 sample.append((name, np.random.uniform(lower, upper)))
 
@@ -271,7 +271,7 @@ class UniformGenerator(DOEGenerator):
 
 class _pyDOE_Generator(DOEGenerator):
     """
-    Base class for DOE case generators implementing methods from pyDOE3.
+    Base class for DOE case generators implementing methods from pydoe.
 
     Parameters
     ----------
@@ -367,18 +367,11 @@ class _pyDOE_Generator(DOEGenerator):
         row = 0
         for name, meta in design_vars.items():
             size = _get_size(meta)
+            lower, upper = _get_bounds(name, meta, size, self._inf_bound)
 
             for k in range(size):
-                lower = meta['lower']
-                if isinstance(lower, np.ndarray):
-                    lower = lower[k]
-
-                upper = meta['upper']
-                if isinstance(upper, np.ndarray):
-                    upper = upper[k]
-
                 levels = self._get_dv_levels(name)
-                values[row, 0:levels] = np.linspace(lower, upper, num=levels)
+                values[row, 0:levels] = np.linspace(lower[k], upper[k], num=levels)
 
                 row += 1
 
@@ -428,20 +421,20 @@ class FullFactorialGenerator(_pyDOE_Generator):
     Attributes
     ----------
     _fullfact : function
-        The pyDOE3 full factorial function, lazily imported.
+        The pydoe full factorial function, lazily imported.
     """
 
     def __init__(self, levels=_LEVELS):
         """Initialize the FullFactorialGenerator."""
         super().__init__(levels=levels)
         try:
-            from pyDOE3 import fullfact
+            from pydoe import fullfact
             self._fullfact = fullfact
         except ImportError:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
     def _generate_design(self, size):
         """
@@ -489,7 +482,7 @@ class GeneralizedSubsetGenerator(_pyDOE_Generator):
         factorial designs.
         Defaults to 1.
     _gsd : function
-        The pyDOE3 General Subset Design function, lazily imported.
+        The pydoe General Subset Design function, lazily imported.
     """
 
     def __init__(self, levels, reduction, n=1):
@@ -501,13 +494,13 @@ class GeneralizedSubsetGenerator(_pyDOE_Generator):
         self._n = n
 
         try:
-            from pyDOE3 import gsd
+            from pydoe import gsd
             self._gsd = gsd
         except ImportError:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
     def _generate_design(self, size):
         """
@@ -533,7 +526,7 @@ class PlackettBurmanGenerator(_pyDOE_Generator):
     Attributes
     ----------
     _pbdesign : function
-        The pyDOE3 Plackett-Burman function, lazily imported.
+        The pydoe Plackett-Burman function, lazily imported.
     """
 
     def __init__(self):
@@ -543,13 +536,13 @@ class PlackettBurmanGenerator(_pyDOE_Generator):
         super().__init__(levels=2)
 
         try:
-            from pyDOE3 import pbdesign
+            from pydoe import pbdesign
             self._pbdesign = pbdesign
         except ImportError:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
     def _generate_design(self, size):
         """
@@ -586,7 +579,7 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
     _center : int
         The number of center points to include.
     _bbdesign : function
-        The pyDOE3 BoxBehnken function, lazily imported.
+        The pydoe BoxBehnken function, lazily imported.
     """
 
     def __init__(self, center=None):
@@ -597,13 +590,13 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
         self._center = center
 
         try:
-            from pyDOE3 import bbdesign
+            from pydoe import bbdesign
             self._bbdesign = bbdesign
         except ImportError:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
     def _generate_design(self, size):
         """
@@ -631,7 +624,7 @@ class BoxBehnkenGenerator(_pyDOE_Generator):
 
 class LatinHypercubeGenerator(DOEGenerator):
     """
-    DOE case generator implementing Latin hypercube method via pyDOE3.
+    DOE case generator implementing Latin hypercube method via pydoe.
 
     Parameters
     ----------
@@ -659,7 +652,7 @@ class LatinHypercubeGenerator(DOEGenerator):
     _seed : int or None
         Random seed.
     _lhs : function
-        The pyDOE3 latin hypercube sampling function, lazily imported.
+        The pydoe latin hypercube sampling function, lazily imported.
     """
 
     # supported pyDOE criterion names.
@@ -675,18 +668,18 @@ class LatinHypercubeGenerator(DOEGenerator):
         """
         Initialize the LatinHypercubeGenerator.
 
-        See : https://pythonhosted.org/pyDOE/randomized.html
+        See : https://pydoe.github.io/pydoe/
         """
         super().__init__()
 
         try:
-            from pyDOE3 import lhs
+            from pydoe import lhs
             self._lhs = lhs
         except ImportError:
-            raise RuntimeError(f"{self.__class__.__name__} requires the 'pyDOE3' package, "
+            raise RuntimeError(f"{self.__class__.__name__} requires the 'pydoe' package, "
                                "which can be installed with one of the following commands:\n"
                                "    pip install openmdao[doe]\n"
-                               "    pip install pyDOE3")
+                               "    pip install pydoe")
 
         if criterion not in self._supported_criterion:
             raise ValueError("Invalid criterion '%s' specified for %s. "
@@ -738,13 +731,7 @@ class LatinHypercubeGenerator(DOEGenerator):
                 size = meta['size']
                 sample = row[col:col + size]
 
-                lower = meta['lower']
-                if not isinstance(lower, np.ndarray):
-                    lower = lower * np.ones(size)
-
-                upper = meta['upper']
-                if not isinstance(upper, np.ndarray):
-                    upper = upper * np.ones(size)
+                lower, upper = _get_bounds(name, meta, size, self._inf_bound)
 
                 val = lower + sample * (upper - lower)
 

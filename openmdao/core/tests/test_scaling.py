@@ -1492,18 +1492,18 @@ class TestScalingOverhaul(unittest.TestCase):
         assert_near_equal(driver.param_vals['p.x1_s_u'], 1.0)
         assert_near_equal(driver.param_vals['p.x1_s_s'], 1.0/7.0)
 
-        _, scaled_dv_ub, _ = prob.driver._autoscaler.get_bounds_scaling('design_var')
-        _, scaled_con_ub, _ = prob.driver._autoscaler.get_bounds_scaling('constraint')
+        dv_scaling = prob.driver._autoscaler.get_bounds_scaling('design_var')
+        con_scaling = prob.driver._autoscaler.get_bounds_scaling('constraint')
 
         assert_near_equal(driver.param_meta['p.x1_u_u']['upper'], 11.0)
-        assert_near_equal(scaled_dv_ub['p.x1_u_s'], 11.0/7.0)
+        assert_near_equal(dv_scaling['p.x1_u_s'].upper, 11.0/7.0)
         assert_near_equal(driver.param_meta['p.x1_s_u']['upper'], 11.0)
-        assert_near_equal(scaled_dv_ub['p.x1_s_s'], 11.0/7.0)
+        assert_near_equal(dv_scaling['p.x1_s_s'].upper, 11.0/7.0)
 
         assert_near_equal(driver.con_meta['p.x1_u_u']['upper'], 3.3)
-        assert_near_equal(scaled_con_ub['p.x1_u_s'], 3.3/13.0)
+        assert_near_equal(con_scaling['p.x1_u_s'].upper, 3.3/13.0)
         assert_near_equal(driver.con_meta['p.x1_s_u']['upper'], 3.3)
-        assert_near_equal(scaled_con_ub['p.x1_s_s'], 3.3/13.0)
+        assert_near_equal(con_scaling['p.x1_s_s'].upper, 3.3/13.0)
 
         assert_near_equal(driver.con_vals['p.x1_u_u'], 1.0)
         assert_near_equal(driver.con_vals['p.x1_u_s'], 1.0/13.0)

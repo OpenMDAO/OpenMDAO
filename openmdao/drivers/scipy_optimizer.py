@@ -9,7 +9,7 @@ import numpy as np
 from scipy import __version__ as scipy_version
 from scipy.optimize import minimize
 
-from openmdao.core.constants import INF_BOUND
+from openmdao.core.constants import _FINITE_INF_BOUND
 from openmdao.core.driver import Driver, RecordingDebugging
 from openmdao.core.group import Group
 from openmdao.utils.class_util import WeakMethodWrapper
@@ -18,36 +18,27 @@ from openmdao.utils.mpi import MPI
 
 # Optimizers in scipy.minimize
 _optimizers = {'Nelder-Mead', 'Powell', 'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B',
-               'TNC', 'COBYLA', 'SLSQP'}
-if Version(scipy_version) >= Version("1.1"):  # Only available in newer versions
-    _optimizers.add('trust-constr')
+               'TNC', 'COBYLA', 'SLSQP', 'trust-constr'}
 
 # For 'basinhopping' and 'shgo' gradients are used only in the local minimization
 _gradient_optimizers = {'CG', 'BFGS', 'Newton-CG', 'L-BFGS-B', 'TNC', 'SLSQP', 'dogleg',
                         'trust-ncg', 'trust-constr', 'basinhopping', 'shgo'}
 _hessian_optimizers = {'trust-constr', 'trust-ncg'}
 _bounds_optimizers = {'L-BFGS-B', 'TNC', 'SLSQP', 'trust-constr', 'dual_annealing', 'shgo',
-                      'differential_evolution', 'basinhopping', 'Nelder-Mead'}
-if Version(scipy_version) >= Version("1.11"):
-    # COBYLA supports bounds starting with SciPy Version 1.11
-    _bounds_optimizers |= {'COBYLA'}
+                      'differential_evolution', 'basinhopping', 'Nelder-Mead', 'COBYLA'}
 
-_constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr', 'shgo'}
-_constraint_grad_optimizers = _gradient_optimizers & _constraint_optimizers
-if Version(scipy_version) >= Version("1.4"):
-    _constraint_optimizers.add('differential_evolution')
-    _constraint_grad_optimizers.add('differential_evolution')
+_constraint_optimizers = {'COBYLA', 'SLSQP', 'trust-constr', 'shgo', 'differential_evolution'}
+_constraint_grad_optimizers = (_gradient_optimizers & _constraint_optimizers) | \
+    {'differential_evolution'}
 
 if Version(scipy_version) >= Version("1.14"):
-    # COBYLA supports bounds starting with SciPy Version 1.14
+    # COBYQA is only available starting with SciPy 1.14.
     _optimizers.add('COBYQA')
     _bounds_optimizers |= {'COBYQA'}
     _constraint_optimizers |= {'COBYQA'}
 
 _eq_constraint_optimizers = {'SLSQP', 'trust-constr'}
-_global_optimizers = {'differential_evolution', 'basinhopping'}
-if Version(scipy_version) >= Version("1.2"):  # Only available in newer versions
-    _global_optimizers |= {'shgo', 'dual_annealing'}
+_global_optimizers = {'differential_evolution', 'basinhopping', 'shgo', 'dual_annealing'}
 
 # Global optimizers and optimizers in minimize
 _all_optimizers = _optimizers | _global_optimizers
@@ -60,12 +51,9 @@ _unsupported_optimizers = {'dogleg', 'trust-ncg'}
 # With "old-style" a constraint is a dictionary, with "new-style" an object
 # With "old-style" a bound is a tuple, with "new-style" a Bounds instance
 # In principle now everything can work with "old-style"
-# These settings have no effect to the optimizers implemented before SciPy 1.1
-_supports_new_style = {'trust-constr', 'differential_evolution'}
+_supports_new_style = {'trust-constr', 'differential_evolution', 'shgo'}
 if Version(scipy_version) >= Version("1.14"):
     _supports_new_style.add('COBYQA')
-if Version(scipy_version) >= Version("1.11.0"):
-    _supports_new_style.add('shgo')
 _use_new_style = True  # Recommended to set to True
 
 CITATIONS = """
@@ -132,6 +120,11 @@ class ScipyOptimizeDriver(Driver):
     _desvar_array_cache : np.ndarray
         Cached array for setting design variables.
     """
+
+    # Optimizers in _supports_new_style use a trust-region polish step that does not
+    # converge reliably with IEEE infinity in NonlinearConstraint/LinearConstraint bounds.
+    # Clamp ±inf to this value before passing bounds to those constraint classes.
+    _inf_bound_new_style = _FINITE_INF_BOUND
 
     def __init__(self, **kwargs):
         """
@@ -241,8 +234,11 @@ class ScipyOptimizeDriver(Driver):
             for name, meta in self._designvars.items():
                 lower = meta['lower']
                 upper = meta['upper']
-                if isinstance(lower, np.ndarray) or lower > -INF_BOUND \
-                        or isinstance(upper, np.ndarray) or upper < INF_BOUND:
+                lower_bounded = isinstance(lower, np.ndarray) or \
+                    (lower is not None and not np.isneginf(lower))
+                upper_bounded = isinstance(upper, np.ndarray) or \
+                    (upper is not None and not np.isposinf(upper))
+                if lower_bounded or upper_bounded:
                     self._cons[name] = meta.copy()
                     self._cons[name]['equals'] = None
                     self._cons[name]['linear'] = True
@@ -306,7 +302,7 @@ class ScipyOptimizeDriver(Driver):
         else:
             bounds = None
 
-        lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
+        dv_bounds = self._autoscaler.get_bounds_scaling('design_var')
 
         for name, meta in self._designvars.items():
             size = meta['global_size'] if meta['distributed'] else meta['size']
@@ -315,15 +311,15 @@ class ScipyOptimizeDriver(Driver):
 
             # Bounds if our optimizer supports them
             if use_bounds:
-                meta_low = lower_dv[name]
-                meta_high = upper_dv[name]
+                meta_low = dv_bounds[name].lower
+                meta_high = dv_bounds[name].upper
                 for j in range(size):
-                    p_low = meta_low[j]
-                    p_high = meta_high[j]
+                    p_low = None if meta_low is None else meta_low[j]
+                    p_high = None if meta_high is None else meta_high[j]
 
-                    if p_low <= -INF_BOUND:
+                    if p_low is not None and np.isneginf(p_low):
                         p_low = None
-                    if p_high >= INF_BOUND:
+                    if p_high is not None and np.isposinf(p_high):
                         p_high = None
 
                     bounds.append((p_low, p_high))
@@ -331,13 +327,8 @@ class ScipyOptimizeDriver(Driver):
         if use_bounds and (opt in _supports_new_style) and _use_new_style:
             # For 'trust-constr' it is better to use the new type bounds, because it seems to work
             # better (for the current examples in the tests) with the "keep_feasible" option
-            try:
-                from scipy.optimize import Bounds
-                from scipy.optimize._constraints import old_bound_to_new
-            except ImportError:
-                msg = ('The "trust-constr" optimizer is supported for SciPy 1.1.0 and above. '
-                       'The installed version is {}')
-                raise ImportError(msg.format(scipy_version))
+            from scipy.optimize import Bounds
+            from scipy.optimize._constraints import old_bound_to_new
 
             # Convert "old-style" bounds to "new_style" bounds
             lower, upper = old_bound_to_new(bounds)  # tuple, tuple
@@ -364,7 +355,7 @@ class ScipyOptimizeDriver(Driver):
             else:
                 self._lincongrad_cache = None
 
-            lower_con, upper_con, equals_con = self._autoscaler.get_bounds_scaling('constraint')
+            con_bounds = self._autoscaler.get_bounds_scaling('constraint')
 
             # map constraints to index and instantiate constraints for scipy
             for name, meta in self._cons.items():
@@ -372,9 +363,9 @@ class ScipyOptimizeDriver(Driver):
                     meta['size'] = size = meta['indices'].indexed_src_size
                 else:
                     size = meta['global_size'] if meta['distributed'] else meta['size']
-                upper = upper_con[name]
-                lower = lower_con[name]
-                equals = equals_con[name] if meta['equals'] is not None else None
+                upper = con_bounds[name].upper
+                lower = con_bounds[name].lower
+                equals = con_bounds[name].equals
                 linear = name in lincons
 
                 if linear:
@@ -389,18 +380,14 @@ class ScipyOptimizeDriver(Driver):
 
                 if opt in _supports_new_style and _use_new_style:
                     # Type of constraints is list of NonlinearConstraint and/or LinearConstraint
-                    try:
-                        from scipy.optimize import NonlinearConstraint, LinearConstraint
-                    except ImportError:
-                        msg = ('The "trust-constr" optimizer is supported for SciPy 1.1.0 and'
-                               'above. The installed version is {}')
-                        raise ImportError(msg.format(scipy_version))
+                    from scipy.optimize import NonlinearConstraint, LinearConstraint
 
+                    inf_b = self._inf_bound_new_style
                     if equals is not None:
-                        lb = ub = equals
+                        lb = ub = np.clip(equals, -inf_b, inf_b)
                     else:
-                        lb = lower
-                        ub = upper
+                        lb = np.full(size, -inf_b) if lower is None else np.maximum(lower, -inf_b)
+                        ub = np.full(size, inf_b) if upper is None else np.minimum(upper, inf_b)
                     
                     if linear:
                         # LinearConstraint
@@ -414,8 +401,8 @@ class ScipyOptimizeDriver(Driver):
                             # TODO add option for Hessian
                             # Double-sided constraints are accepted by the algorithm
                             args = [name, False, j]
-                            lb_j = np.maximum(lb[j], -INF_BOUND)
-                            ub_j = np.minimum(ub[j], INF_BOUND)
+                            lb_j = lb[j]
+                            ub_j = ub[j]
                             con = NonlinearConstraint(
                                 fun=signature_extender(
                                     WeakMethodWrapper(self, '_con_val_func'), args),
@@ -441,13 +428,13 @@ class ScipyOptimizeDriver(Driver):
                         con_dict['args'] = [name, False, j]
                         constraints.append(con_dict)
 
-                        if isinstance(upper, np.ndarray):
-                            upper = upper[j]
+                        upper_j = None if upper is None else (
+                            upper[j] if isinstance(upper, np.ndarray) else upper)
+                        lower_j = None if lower is None else (
+                            lower[j] if isinstance(lower, np.ndarray) else lower)
 
-                        if isinstance(lower, np.ndarray):
-                            lower = lower[j]
-
-                        dblcon = (upper < INF_BOUND) and (lower > -INF_BOUND)
+                        dblcon = (upper_j is not None and not np.isposinf(upper_j)) and \
+                                 (lower_j is not None and not np.isneginf(lower_j))
 
                         # Add extra constraint if double-sided
                         if dblcon:
@@ -704,19 +691,21 @@ class ScipyOptimizeDriver(Driver):
         cons = self._con_cache
         meta = self._cons[name]
 
-        lower_con, upper_con, equals_con = self._autoscaler.get_bounds_scaling('constraint')
+        con_bounds = self._autoscaler.get_bounds_scaling('constraint')
 
         # Equality constraints
         if meta['equals'] is not None:
-            eq = equals_con[name]
+            eq = con_bounds[name].equals
             return cons[name][idx] - eq[idx]
 
         # Note, scipy defines constraints to be satisfied when positive,
         # which is the opposite of OpenMDAO.
-        upper = upper_con[name][idx]
-        lower = lower_con[name][idx]
+        upper_arr = con_bounds[name].upper
+        lower_arr = con_bounds[name].lower
+        upper = np.inf if upper_arr is None else upper_arr[idx]
+        lower = -np.inf if lower_arr is None else lower_arr[idx]
 
-        if dbl or (lower <= -INF_BOUND):
+        if dbl or np.isneginf(lower):
             return upper - cons[name][idx]
         else:
             return cons[name][idx] - lower
@@ -744,8 +733,6 @@ class ScipyOptimizeDriver(Driver):
             grad = self._compute_totals(of=self._obj_and_nlcons, wrt=self._dvlist,
                                         return_format=self._total_jac_format)
             self._grad_cache = grad
-            if not np.all(np.isfinite(grad)):
-                print(f'DEBUG _gradfunc: NaN/Inf in grad shape={grad.shape}:\n{grad}')
 
             # First time through, check for zero row/col.
             if self._check_jac and self._total_jac is not None:
@@ -814,7 +801,7 @@ class ScipyOptimizeDriver(Driver):
         if isinstance(lower, np.ndarray):
             lower = lower[idx]
 
-        if dbl or (lower <= -INF_BOUND):
+        if dbl or lower is None or np.isneginf(lower):
             return -grad[grad_idx, :]
         else:
             return grad[grad_idx, :]

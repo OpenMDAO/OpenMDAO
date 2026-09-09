@@ -69,7 +69,7 @@ jobs:
 
       - name: Slack POEM message
         if: (github.event.action == 'opened' || github.event.action == 'reopened') && steps.check_for_poem.outputs.POEM_ID != ''
-        uses: act10ns/slack@v2.0.0
+        uses: act10ns/slack@v2.2.0
         with:
           webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
           status: 'warning'

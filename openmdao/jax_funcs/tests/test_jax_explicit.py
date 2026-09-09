@@ -67,6 +67,26 @@ class DotProdMultPrimal(DotProdMultPrimalNoDeclPartials):
         self.declare_partials(of=['zz'], wrt=['y'])
 
 
+class DotProdMultPrimalNonDepOutput(om.JaxExplicitComponent):
+    # 'reporting_variable' has no dependence on any input, so its derivatives should never be computed.
+    def setup(self):
+        self.add_input('x', shape_by_conn=True)
+        self.add_input('y', shape_by_conn=True)
+        self.add_output('z', compute_shape=lambda shapes: (shapes['x'][0], shapes['y'][1]))
+        self.add_output('zz', copy_shape='y')
+        self.add_output('reporting_variable', val=0.0, shape=())
+
+    def setup_partials(self):
+        self.declare_partials(of=['z', 'zz'], wrt=['x', 'y'])
+        self.declare_partials(of='reporting_variable', wrt='*', dependent=False)
+
+    def compute_primal(self, x, y):
+        z = jnp.dot(x, y)
+        zz = y * 2.5
+        reporting_variable = jnp.array(42.0)  # a fixed diagnostic value, unrelated to x or y
+        return z, zz, reporting_variable
+
+
 class DotProdMultPrimalOption(om.JaxExplicitComponent):
     def __init__(self, stat=2., **kwargs):
         super().__init__(**kwargs)
@@ -499,6 +519,33 @@ class TestJaxComp(unittest.TestCase):
                           ('G.comp.z', 'G.comp.y'), ('G.comp.zz', 'G.comp.zz'),
                           ('G.comp.z', 'G.comp.z')})
 
+    def test_jax_dependent_false_output_excluded_from_derivs(self):
+        # an output declared as dependent=False for all of its wrt's should be excluded from
+        # the jax derivative computation entirely, rather than just having its (unused)
+        # derivative values discarded afterward.
+        p = om.Problem()
+        comp = p.model.add_subsystem('comp', DotProdMultPrimalNonDepOutput())
+
+        p.setup(force_alloc_complex=True)
+
+        p.set_val('comp.x', np.array([[1., 2.], [3., 4.]]))
+        p.set_val('comp.y', np.array([[5., 6.], [7., 8.]]))
+
+        p.run_model()
+
+        # 'reporting_variable' should be excluded, leaving only 'z' and 'zz'.
+        self.assertEqual(comp._deriv_output_idxs, (0, 1))
+        self.assertEqual(comp._deriv_output_names, ('z', 'zz'))
+        self.assertNotIn(('comp.reporting_variable', 'comp.x'), comp._subjacs_info)
+        self.assertNotIn(('comp.reporting_variable', 'comp.y'), comp._subjacs_info)
+
+        comp._update_jac_functs(())
+        derivs = comp._jac_func_(*comp._inputs.values())
+        self.assertEqual(len(derivs), 2, 'jax should only differentiate the 2 dependent outputs')
+
+        assert_near_equal(p.get_val('comp.reporting_variable'), 42.0)
+        assert_check_partials(p.check_partials(method='cs', show_only_incorrect=True))
+
 
 class CompRetValue(om.JaxExplicitComponent):
     def __init__(self, shape, nins=1, nouts=1, **kwargs):
@@ -664,6 +711,71 @@ class TestJaxShapesAndReturns(unittest.TestCase):
             coloring = prob.driver._coloring_info.coloring
             self.assertTrue(coloring is not None, 'coloring is None')
             self.assertTrue(coloring.total_solves() <= 2)
+
+
+@unittest.skipIf(jax is None, 'jax is not available')
+class TestJaxMatrixFreeFwdCaching(unittest.TestCase):
+    """Regression tests for the matrix_free 'fwd' jvp cache in _compute_jacvec_product.
+
+    Without this cache, every fwd-mode compute_jacvec_product call rebuilt an un-jitted jax.jvp
+    from scratch unlike the 'rev' branch's cached self._vjp_fun.
+    """
+
+    def _build(self, mult=1.0):
+        p = om.Problem()
+        ivc = p.model.add_subsystem('ivc', om.IndepVarComp('x', val=np.ones(x_shape)))
+        ivc.add_output('y', val=np.ones(y_shape))
+        comp = p.model.add_subsystem('comp', DotProdMultPrimalOption(mult=mult))
+        comp.matrix_free = True
+        p.model.connect('ivc.x', 'comp.x')
+        p.model.connect('ivc.y', 'comp.y')
+        p.setup(mode='fwd', force_alloc_complex=True)
+
+        x = np.arange(1, np.prod(x_shape) + 1).reshape(x_shape) * 2.0
+        y = np.arange(1, np.prod(y_shape) + 1).reshape(y_shape) * 3.0
+        p.set_val('ivc.x', x)
+        p.set_val('ivc.y', y)
+        return p, comp
+
+    def test_fwd_jvp_reused_across_design_points(self):
+        # The cached jvp function must be the SAME object after the design point moves.
+        # discrete inputs / get_self_statics() should invalidate it, but not a plain
+        # continuous-value change.
+        p, comp = self._build()
+        p.run_model()
+        p.compute_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'])
+        assert_check_totals(p.check_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'],
+                                           method='fd', show_only_incorrect=True))
+
+        self.assertIsNotNone(comp._fwd_jac_func_)
+        cached_func = comp._fwd_jac_func_
+
+        p.set_val('ivc.x', p.get_val('ivc.x') * 1.7 + 0.3)
+        p.set_val('ivc.y', p.get_val('ivc.y') * 0.6 - 0.2)
+        p.run_model()
+        p.compute_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'])
+
+        self.assertIs(comp._fwd_jac_func_, cached_func,
+                     'fwd jvp function was rebuilt after a continuous-value-only change')
+        # and derivatives at the NEW point are still correct
+        assert_check_totals(p.check_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'],
+                                           method='fd', show_only_incorrect=True))
+
+    def test_fwd_jvp_rebuilt_on_static_change(self):
+        # get_self_statics() changing (here, the 'mult' option) must still force a rebuild.
+        p, comp = self._build(mult=1.0)
+        p.run_model()
+        p.compute_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'])
+        cached_func = comp._fwd_jac_func_
+
+        comp.options['mult'] = 5.0
+        p.run_model()
+        p.compute_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'])
+
+        self.assertIsNot(comp._fwd_jac_func_, cached_func,
+                         'fwd jvp function was NOT rebuilt after a static (option) change')
+        assert_check_totals(p.check_totals(of=['comp.z', 'comp.zz'], wrt=['ivc.x', 'ivc.y'],
+                                           method='fd', show_only_incorrect=True))
 
 
 if __name__ == '__main__':

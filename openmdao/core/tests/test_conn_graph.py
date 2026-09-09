@@ -109,6 +109,24 @@ class TestAllConnectionTypes(unittest.TestCase):
         prob.setup()
         prob.run_model()
 
+    def test_input_input_connection_bug(self):
+        prob = om.Problem()
+        model = prob.model
+
+        sub = model.add_subsystem('sub', om.Group())
+        sub.add_subsystem('c1', om.ExecComp('y=x'))
+        sub.add_subsystem('c2', om.ExecComp('y=x'))
+        sub.connect('c1.x', 'c2.x')
+
+        # Make sure it doesn't raise a Keyerror.
+        prob.setup()
+
+        prob.set_val('sub.c1.x', 17.0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('sub.c2.x'), 17.0)
+        assert_near_equal(prob.get_val('sub.c1.x'), 17.0)
+
 
 class TestInputToInputConnections(unittest.TestCase):
 

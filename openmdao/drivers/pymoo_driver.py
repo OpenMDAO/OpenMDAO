@@ -76,7 +76,7 @@ import sys
 import importlib
 import numpy as np
 from openmdao.core.driver import Driver, RecordingDebugging
-from openmdao.core.constants import INF_BOUND
+from openmdao.core.constants import _FINITE_INF_BOUND
 from openmdao.utils.mpi import MPI
 try:
     import pymoo
@@ -576,6 +576,10 @@ class pymooDriver(Driver):
         to coordinate population distribution across all ranks.
     """
 
+    # pymoo samples uniformly between xl and xu, which yields NaN for an infinite bound,
+    # so unbounded directions are clamped to a large finite magnitude instead.
+    _inf_bound = _FINITE_INF_BOUND
+
     def __init__(self, **kwargs):
         """
         Initialize the pymooDriver.
@@ -821,9 +825,9 @@ class pymooDriver(Driver):
             raise RuntimeError('Problem has no design variables.')
 
         # Collect design variable information (initial values and bounds)
-        x_info = {'vars': [], 'upper': np.full(ndesvar, 1e30),
-                  'lower': np.full(ndesvar, -1e30), 'indices': []}
-        lower_dv, upper_dv, _ = self._autoscaler.get_bounds_scaling('design_var')
+        x_info = {'vars': [], 'upper': np.full(ndesvar, self._inf_bound),
+                  'lower': np.full(ndesvar, -self._inf_bound), 'indices': []}
+        dv_bounds = self._autoscaler.get_bounds_scaling('design_var')
         current_idx = 0
         for name, meta in self._designvars.items():
             x_info['vars'].append(name)
@@ -836,11 +840,17 @@ class pymooDriver(Driver):
             current_indices = list(range(current_idx, current_idx + size))
             x_info['indices'].append(current_indices)
             if name in self._designvars_discrete:
-                x_info['lower'][current_indices] = meta['lower']
-                x_info['upper'][current_indices] = meta['upper']
+                lower, upper = meta['lower'], meta['upper']
             else:
-                x_info['lower'][current_indices] = lower_dv[name]
-                x_info['upper'][current_indices] = upper_dv[name]
+                lower, upper = dv_bounds[name].lower, dv_bounds[name].upper
+
+            # None means entirely unbounded; a partially unbounded array still carries
+            # +/-inf elementwise, so both are mapped to the driver's finite sentinel.
+            inf_bound = self._inf_bound
+            x_info['lower'][current_indices] = -inf_bound if lower is None \
+                else self._to_driver_bound(lower)
+            x_info['upper'][current_indices] = inf_bound if upper is None \
+                else self._to_driver_bound(upper)
             current_idx += size
 
         # Determine total number of constraints
@@ -856,9 +866,11 @@ class pymooDriver(Driver):
                 if meta['equals'] is not None:
                     neqcons += size
                 else:
-                    if np.any(meta['upper'] < INF_BOUND):
+                    if meta['upper'] is not None and \
+                            not np.all(np.isposinf(np.atleast_1d(meta['upper']))):
                         nieqcons += size
-                    if np.any(meta['lower'] > -INF_BOUND):
+                    if meta['lower'] is not None and \
+                            not np.all(np.isneginf(np.atleast_1d(meta['lower']))):
                         nieqcons += size
 
         # Collect constraint information
@@ -867,7 +879,7 @@ class pymooDriver(Driver):
         current_eq_idx = 0
         current_ieq_idx = 0
         if opt in _constraint_optimizers:
-            lower_con, upper_con, equals_con = self._autoscaler.get_bounds_scaling('constraint')
+            con_bounds = self._autoscaler.get_bounds_scaling('constraint')
             for name, meta in self._cons.items():
                 if meta['indices'] is not None:
                     size = meta['indices'].indexed_src_size
@@ -879,25 +891,27 @@ class pymooDriver(Driver):
                     current_eq_indices = list(range(current_eq_idx, current_eq_idx + size))
                     eq_con_info['vars'].append(name)
                     eq_con_info['indices'].append(current_eq_indices)
-                    eq_con_info['equals'][current_eq_indices] = equals_con[name]
+                    eq_con_info['equals'][current_eq_indices] = con_bounds[name].equals
                     current_eq_idx += size
 
                 else:
                     # Need to log upper and lower as separate inequality constraints
-                    if np.any(meta['upper'] < INF_BOUND):
+                    if meta['upper'] is not None and \
+                            not np.all(np.isposinf(np.atleast_1d(meta['upper']))):
                         current_ieq_indices = list(range(current_ieq_idx, current_ieq_idx + size))
                         ieq_con_info['vars'].append(name)
                         ieq_con_info['indices'].append(current_ieq_indices)
                         ieq_con_info['is_upper'].append(True)
-                        ieq_con_info['bound'][current_ieq_indices] = upper_con[name]
+                        ieq_con_info['bound'][current_ieq_indices] = con_bounds[name].upper
                         current_ieq_idx += size
 
-                    if np.any(meta['lower'] > -INF_BOUND):
+                    if meta['lower'] is not None and \
+                            not np.all(np.isneginf(np.atleast_1d(meta['lower']))):
                         current_ieq_indices = list(range(current_ieq_idx, current_ieq_idx + size))
                         ieq_con_info['vars'].append(name)
                         ieq_con_info['indices'].append(current_ieq_indices)
                         ieq_con_info['is_upper'].append(False)
-                        ieq_con_info['bound'][current_ieq_indices] = lower_con[name]
+                        ieq_con_info['bound'][current_ieq_indices] = con_bounds[name].lower
                         current_ieq_idx += size
 
         # Collect objective information

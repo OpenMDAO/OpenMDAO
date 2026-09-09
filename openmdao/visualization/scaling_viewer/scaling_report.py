@@ -1,12 +1,13 @@
 
 """Define a function to view driver scaling."""
+import numbers
 import os
 import json
 import functools
 
 import numpy as np
 
-from openmdao.core.constants import _SetupStatus, INF_BOUND
+from openmdao.core.constants import _SetupStatus
 import openmdao.utils.hooks as hooks
 from openmdao.utils.webview import webview
 from openmdao.utils.general_utils import default_noraise
@@ -19,7 +20,7 @@ _default_scaling_filename = 'driver_scaling_report.html'
 def _getdef(val, unset):
     if val is None:
         return unset
-    if np.isscalar(val) and (val == INF_BOUND or val == -INF_BOUND):
+    if np.isscalar(val) and isinstance(val, numbers.Number) and np.isinf(val):
         return unset
     return val
 
@@ -36,7 +37,7 @@ def _get_flat(val, size, unset=''):
     if val is None:
         return val
     if np.isscalar(val):
-        if (val == INF_BOUND or val == -INF_BOUND):
+        if isinstance(val, numbers.Number) and np.isinf(val):
             val = unset
         return np.full(size, val)
     if val.size > 1:

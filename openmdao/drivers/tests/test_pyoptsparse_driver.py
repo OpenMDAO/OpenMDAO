@@ -6,6 +6,7 @@ import unittest
 import os.path
 
 from packaging.version import Version
+from parameterized import parameterized
 
 import numpy as np
 
@@ -1457,7 +1458,11 @@ class TestPyoptSparse(unittest.TestCase):
         # Piggyback test: make sure we can run the driver again as a subdriver without a keyerror.
         prob.driver.run()
 
-    def test_raised_error_objfunc(self):
+    @parameterized.expand([
+        ('SLSQP',),
+        ('Uno',),
+    ])
+    def test_raised_error_objfunc(self, optimizer):
 
         # Component fails hard this time during execution, so we expect
         # pyoptsparse to raise.
@@ -1476,8 +1481,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         # SNOPT has a weird cleanup problem when this fails, so we use SLSQP. For the
         # regular failure, it doesn't matter which opt we choose since they all fail through.
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['optimizer'] = optimizer
+        if optimizer == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
 
         prob.driver.options['print_results'] = False
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -1495,7 +1501,11 @@ class TestPyoptSparse(unittest.TestCase):
 
         # pyopt's failure message differs by platform and is not informative anyway
 
-    def test_raised_error_sensfunc(self):
+    @parameterized.expand([
+        ('SLSQP',),
+        ('Uno',),
+    ])
+    def test_raised_error_sensfunc(self, optimizer):
 
         # Component fails hard this time during gradient eval, so we expect
         # pyoptsparse to raise.
@@ -1513,8 +1523,9 @@ class TestPyoptSparse(unittest.TestCase):
 
         # SNOPT has a weird cleanup problem when this fails, so we use SLSQP. For the
         # regular failure, it doesn't matter which opt we choose since they all fail through.
-        prob.driver.options['optimizer'] = 'SLSQP'
-        prob.driver.opt_settings['ACC'] = 1e-9
+        prob.driver.options['optimizer'] = optimizer
+        if optimizer == 'SLSQP':
+            prob.driver.opt_settings['ACC'] = 1e-9
 
         prob.driver.options['print_results'] = False
         model.add_design_var('x', lower=-50.0, upper=50.0)
@@ -2063,6 +2074,93 @@ class TestPyoptSparse(unittest.TestCase):
         code = prob.driver.pyopt_solution.optInform['value']
         self.assertEqual(code, 71)
 
+    def test_keyboard_interrupt_objfunc_Uno(self):
+        # KeyboardInterrupt raised during model execution is caught in _objfunc and
+        # returned as fail=2, which Uno translates to a clean user-termination exit.
+        _, local_opt = set_pyoptsparse_opt('Uno')
+        if local_opt != 'Uno':
+            raise unittest.SkipTest('pyoptsparse is not providing Uno')
+
+        class ParaboloidKBI(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', val=0.0)
+                self.add_input('y', val=0.0)
+                self.add_output('f_xy', val=0.0)
+                self.declare_partials('*', '*')
+                self.iter_count = 0
+
+            def compute(self, inputs, outputs):
+                self.iter_count += 1
+                if self.iter_count == 1:
+                    raise KeyboardInterrupt
+                elif self.iter_count > 3:
+                    raise RuntimeError('Uno should have stopped.')
+                outputs['f_xy'] = (inputs['x'] - 3.0)**2 + inputs['x'] * inputs['y'] + \
+                                   (inputs['y'] + 4.0)**2 - 3.0
+
+            def compute_partials(self, inputs, partials):
+                partials['f_xy', 'x'] = 2.0*inputs['x'] - 6.0 + inputs['y']
+                partials['f_xy', 'y'] = 2.0*inputs['y'] + 8.0 + inputs['x']
+
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('x', om.IndepVarComp('x', 2.0), promotes=['*'])
+        model.add_subsystem('y', om.IndepVarComp('y', 2.0), promotes=['*'])
+        model.add_subsystem('f_xy', ParaboloidKBI(), promotes=['*'])
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'Uno'
+
+        prob.model.add_design_var('x', lower=-50, upper=50)
+        prob.model.add_design_var('y', lower=-50, upper=50)
+        model.add_objective('f_xy')
+
+        prob.setup()
+        prob.run_driver()
+
+        # Uno inform code 5 is user termination.
+        code = prob.driver.pyopt_solution.optInform['value']
+        self.assertEqual(code, 5)
+
+    def test_keyboard_interrupt_between_callbacks_Uno(self):
+        # When SIGINT arrives between Python callbacks (while C++ is running), the SIGINT
+        # handler that run() installs sets _user_termination_flag without raising. The next
+        # _objfunc call at a new design point returns fail=2 immediately without running the
+        # model, giving Uno a clean user-termination exit.
+        _, local_opt = set_pyoptsparse_opt('Uno')
+        if local_opt != 'Uno':
+            raise unittest.SkipTest('pyoptsparse is not providing Uno')
+
+        prob = om.Problem()
+        model = prob.model
+
+        prob.driver = pyOptSparseDriver()
+        prob.driver.options['optimizer'] = 'Uno'
+
+        model.add_subsystem('comp', om.ExecComp('y = x**2', x=2.0, y=4.0))
+        prob.model.add_design_var('comp.x', lower=-50, upper=50)
+        model.add_objective('comp.y')
+
+        prob.setup()
+        prob.final_setup()
+
+        driver = prob.driver
+        driver._fill_NANs = False  # not needed for this unit-level check
+
+        # Simulate the state after a SIGINT arrived between callbacks:
+        # _in_user_function is False (we're between callbacks) so the handler
+        # only sets the flag without raising.
+        driver._user_termination_flag = True
+        driver._in_user_function = False
+
+        # Calling _objfunc with any dv_dict should return fail=2 immediately
+        # without running the model.
+        dv_dict = {'comp.x': np.array([2.0])}
+        func_dict, fail = driver._objfunc(dv_dict)
+        self.assertEqual(fail, 2)
+
     def test_IPOPT_basic(self):
         _, local_opt = set_pyoptsparse_opt('IPOPT')
         if local_opt != 'IPOPT':
@@ -2111,7 +2209,11 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(prob['z'][0], 1.9776, 1e-3)
         assert_near_equal(prob['obj_cmp.obj'][0], 3.183, 1e-3)
 
-    def test_error_objfun_reraise(self):
+    @parameterized.expand([
+        ('SLSQP',),
+        ('Uno',),
+    ])
+    def test_error_objfun_reraise(self, optimizer):
         # Tests that we re-raise any unclassified error encountered during callback eval.
 
         class EComp(om.ExplicitComponent):
@@ -2132,7 +2234,7 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_design_var('comp.x')
 
         p.driver = om.pyOptSparseDriver()
-        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.options['optimizer'] = optimizer
 
         p.setup()
 
@@ -2141,7 +2243,11 @@ class TestPyoptSparse(unittest.TestCase):
 
         self.assertTrue("This comp will fail." in msg.exception.args[0])
 
-    def test_error_gradfun_reraise(self):
+    @parameterized.expand([
+        ('SLSQP',),
+        ('Uno',),
+    ])
+    def test_error_gradfun_reraise(self, optimizer):
         # Tests that we re-raise any unclassified error encountered during callback eval.
 
         class EComp(om.ExplicitComponent):
@@ -2164,7 +2270,7 @@ class TestPyoptSparse(unittest.TestCase):
         p.model.add_design_var('comp.x')
 
         p.driver = om.pyOptSparseDriver()
-        p.driver.options['optimizer'] = 'SLSQP'
+        p.driver.options['optimizer'] = optimizer
 
         p.setup()
 
@@ -2758,10 +2864,14 @@ class TestPyoptSparse(unittest.TestCase):
         assert_near_equal(J[('exec.z', 'exec.a')].flatten(), np.array([1.]))
         assert_near_equal(J[('ALIAS_TEST', 'exec.a')].flatten(), np.array([1.]))
 
-    @require_pyoptsparse('IPOPT')
-    def test_driver_sparsity(self):
+    @parameterized.expand([
+        ('IPOPT',),
+        ('Uno',),
+    ])
+    @require_pyoptsparse
+    def test_driver_sparsity(self, optimizer):
         prob = om.Problem()
-        prob.driver = driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        prob.driver = driver = om.pyOptSparseDriver(optimizer=optimizer, print_results=False)
         driver.opt_settings['print_level'] = 0
         driver.opt_settings['max_iter'] = 1000
         driver.declare_coloring()
@@ -3198,7 +3308,11 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         assert_near_equal(prob['x'], 7.16667, 1e-6)
         assert_near_equal(prob['y'], -7.833334, 1e-6)
 
-    def test_sellar_analysis_error(self):
+    @parameterized.expand([
+        ('SNOPT',),
+        ('Uno',),
+    ])
+    def test_sellar_analysis_error(self, optimizer):
         # One discipline of Sellar will something raise analysis error. This is to test that
         # the iprinting doesn't get out-of-whack.
 
@@ -3295,8 +3409,9 @@ class TestPyoptSparseSnoptFeature(unittest.TestCase):
         model = prob.model = SellarMDAAE()
 
         prob.driver = pyOptSparseDriver()
-        prob.driver.options['optimizer'] = 'SNOPT'
-        prob.driver.opt_settings['Verify level'] = 3
+        prob.driver.options['optimizer'] = optimizer
+        if optimizer == 'SNOPT':
+            prob.driver.opt_settings['Verify level'] = 3
         prob.driver.options['print_results'] = False
 
         model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
@@ -3559,11 +3674,15 @@ class TestLinearOnlyDVs(unittest.TestCase):
 
         return prob
 
-    @require_pyoptsparse('IPOPT')
-    def test_lin_only_dvs(self):
+    @parameterized.expand([
+        ('IPOPT',),
+        ('Uno',),
+    ])
+    @require_pyoptsparse
+    def test_lin_only_dvs(self, optimizer):
         shape = (2, 5)
         # do first opt without coloring
-        driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        driver = om.pyOptSparseDriver(optimizer=optimizer, print_results=False)
         driver.opt_settings['print_level'] = 0
         driver.opt_settings['max_iter'] = 1000
         p = self.setup_lin_only_dv_problem(driver=driver, shape=shape)
@@ -3572,7 +3691,7 @@ class TestLinearOnlyDVs(unittest.TestCase):
         nsolves_nocolor = p.driver._total_jac.nsolves
         assert_check_totals(p.check_totals(method='cs', out_stream=None))
 
-        driver = om.pyOptSparseDriver(optimizer='IPOPT', print_results=False)
+        driver = om.pyOptSparseDriver(optimizer=optimizer, print_results=False)
         driver.opt_settings['print_level'] = 0
         driver.opt_settings['max_iter'] = 1000
         driver.declare_coloring()

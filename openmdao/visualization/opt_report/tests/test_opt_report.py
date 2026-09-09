@@ -5,7 +5,6 @@ import numpy as np
 
 import openmdao.api as om
 
-from openmdao.core.constants import INF_BOUND
 from openmdao.core.driver import Driver
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.simple_comps import DoubleArrayComp
@@ -21,17 +20,17 @@ from openmdao.visualization.opt_report.opt_report import opt_report, \
     _default_optimizer_report_filename
 
 try:
-    import pyDOE3
+    import pydoe
 except ImportError:
-    pyDOE3 = None
+    pydoe = None
 
 
 @use_tempdirs
 class TestOptimizationReport(unittest.TestCase):
 
     def setup_problem_and_run_driver(self, driver,
-                                     vars_lower=-INF_BOUND, vars_upper=INF_BOUND,
-                                     cons_lower=-INF_BOUND, cons_upper=INF_BOUND,
+                                     vars_lower=None, vars_upper=None,
+                                     cons_lower=None, cons_upper=None,
                                      final_setup_only=False,
                                      optimizer=None
                                      ):
@@ -251,7 +250,7 @@ class TestOptimizationReport(unittest.TestCase):
         outfilepath = prob.get_reports_dir() / _default_optimizer_report_filename
         self.assertFalse(os.path.exists(outfilepath))
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pydoe, "requires 'pydoe', install openmdao[doe]")
     def test_opt_report_genetic_algorithm(self):
         self.setup_problem_and_run_driver(om.SimpleGADriver,
                                           vars_lower=-50, vars_upper=50.,
@@ -262,7 +261,7 @@ class TestOptimizationReport(unittest.TestCase):
         opt_report(self.prob)
         self.check_opt_report(expected=expect)
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pydoe, "requires 'pydoe', install openmdao[doe]")
     def test_opt_report_differential_evolution(self):
         prob = om.Problem()
 
