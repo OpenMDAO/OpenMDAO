@@ -1,4 +1,36 @@
 ***********************************
+
+Sept 10, 2026
+
+OpenMDAO 3.45.1 contains bug fixes and performance improvements.
+
+Thanks to @johnjasa for some improvments to the way our Jax components handle unneeded partials can caching of matrix-free forward mode derivatives.
+
+OpenMDAO had been using a large finite sentinel to represent infinity (INF_BOUND), as was expected by many optimization drivers. Some newer optimizers prefer an actual IEEE floating point "infinity" value. Now `lower=None` and `upper=None` is kept internally until each given driver converts it to the form needed for its optimization backend. Use of INF_BOUND is deprecated.
+
+## New Features
+
+- Adding jax non-dependent partials logic [#3805](https://github.com/OpenMDAO/OpenMDAO/pull/3805)
+- Adding matrix-free forward mode caching [#3806](https://github.com/OpenMDAO/OpenMDAO/pull/3806)
+- Deprecate INF_BOUND, use `lower=None` or `upper=None` internally to represent unbounded variables. [#3808](https://github.com/OpenMDAO/OpenMDAO/pull/3808)
+
+## Bug Fixes
+
+- Fix edge case bug with "_TotalJacInfo.compute_totals" [#3803](https://github.com/OpenMDAO/OpenMDAO/pull/3803)
+- Raise when approximated subgroup totals target internal source variables [#3799](https://github.com/OpenMDAO/OpenMDAO/pull/3799)
+- Fix reports directory race during Problem.setup [#3798](https://github.com/OpenMDAO/OpenMDAO/pull/3798)
+- Preserve independent outputs during NonlinearBlockGS complex step reconvergence [#3809](https://github.com/OpenMDAO/OpenMDAO/pull/3809)
+- Fixed bug where val metadata wasn't being copied during dynamic shape resolution [#3813](https://github.com/OpenMDAO/OpenMDAO/pull/3813)
+- Preserve independent outputs during Broyden complex step reconvergence [#3811](https://github.com/OpenMDAO/OpenMDAO/pull/3811)
+
+## Miscellaneous
+
+- Turn off driver scaling in the optimizer report [#3796](https://github.com/OpenMDAO/OpenMDAO/pull/3796)
+- Speedup jax gathering of partials [#3801](https://github.com/OpenMDAO/OpenMDAO/pull/3801)
+- Migrate optional DOE dependency from pyDOE3 to pydoe [#3797](https://github.com/OpenMDAO/OpenMDAO/pull/3797)
+- Update pixi lockfile [#3804](https://github.com/OpenMDAO/OpenMDAO/pull/3804)
+
+***********************************
 # Release Notes for OpenMDAO 3.45.0
 
 July 17, 2026
