@@ -29,6 +29,7 @@ OpenMDAO had been using a large finite sentinel to represent infinity (INF_BOUND
 - Speedup jax gathering of partials [#3801](https://github.com/OpenMDAO/OpenMDAO/pull/3801)
 - Migrate optional DOE dependency from pyDOE3 to pydoe [#3797](https://github.com/OpenMDAO/OpenMDAO/pull/3797)
 - Update pixi lockfile [#3804](https://github.com/OpenMDAO/OpenMDAO/pull/3804)
+- Installer for OpenMDAO specific skills for AI coding assistants [#3783](https://github.com/OpenMDAO/OpenMDAO/pull/3783)
 
 ***********************************
 # Release Notes for OpenMDAO 3.45.0
