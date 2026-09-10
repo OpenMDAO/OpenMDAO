@@ -73,6 +73,10 @@ from openmdao.visualization.realtime_plot.realtime_plot import \
     _realtime_plot_setup_parser, _realtime_plot_cmd, _rtplot_cmd, _rtplot_setup_parser
 from openmdao.recorders.view_cases import _view_cases_setup_parser, _view_cases_cmd
 
+# Conversion subcommands map (for 'openmdao skills' sub-sub-commands)
+from openmdao.utils.cli_skills import (_setup_skills_install, cmd_skills_install,
+                                       _setup_skills_uninstall, cmd_skills_uninstall,
+                                       _setup_skills_list, cmd_skills_list)
 
 def _view_connections_setup_parser(parser):
     """
@@ -582,6 +586,50 @@ def _comm_info_cmd(options, user_args):
 
     _load_and_exec(options.file[0], user_args)
 
+_skills_command_map = {
+    'install': (
+        _setup_skills_install,
+        cmd_skills_install,
+        'Install OpenMDAO skills.',
+    ),
+    'uninstall': (
+        _setup_skills_uninstall,
+        cmd_skills_uninstall,
+        'Uninstall OpenMDAO skills.',
+    ),
+    'list': (
+        _setup_skills_list,
+        cmd_skills_list,
+        'List OpenMDAO skills.',
+    ),
+}
+
+def _setup_skills_parser(parser):
+    """Set up parser for the 'skills' subcommand with sub-sub-commands."""
+    subparsers = parser.add_subparsers(
+        title='Skills Commands', metavar='', dest='skills_command', help='Type of skills command'
+    )
+    for name, (parser_setup_func, executor, help_str) in sorted(_skills_command_map.items()):
+        subparser = subparsers.add_parser(name, help=help_str)
+        parser_setup_func(subparser)
+        subparser.set_defaults(executor=executor)
+
+def _skills_cmd(options, user_args):
+    """Execute the appropriate skills command based on sub-sub-command."""
+    if not hasattr(options, 'executor'):
+        # No sub-sub-command was specified, show help
+        print(
+            'Error: Please specify a skills command (install, uninstall, or list)'
+        )
+        print("Use 'openmdao skills -h' for more information.")
+        sys.exit(1)
+
+    # Execute the appropriate conversion function
+    options.executor(options, user_args)
+
+
+
+
 
 # this dict should contain names mapped to tuples of the form:
 #   (setup_parser_func, executor, description)
@@ -686,6 +734,11 @@ _command_map = {
         "Generate a simple scaffold for a component.",
     ),
     "scaling": (_scaling_setup_parser, _scaling_cmd, "View driver scaling report."),
+    'skills': (
+        _setup_skills_parser,
+        _skills_cmd,
+        'Install OpenMDAO agent skills into AI coding tools.',
+    ),
     "summary": (
         _config_summary_setup_parser,
         _config_summary_cmd,
@@ -859,6 +912,7 @@ def openmdao_cmd():
         else:
             print("\nNothing to do.")
 
+    # add_subparsers(parser)
 
 if __name__ == '__main__':
     openmdao_cmd()
