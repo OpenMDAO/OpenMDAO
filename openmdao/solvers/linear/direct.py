@@ -8,7 +8,6 @@ import scipy.sparse.linalg
 from scipy.sparse import csc_matrix
 
 from openmdao.solvers.solver import LinearSolver
-from openmdao.matrices.dense_matrix import DenseMatrix
 from openmdao.utils.array_utils import identity_column_iter
 from openmdao.solvers.linear.linear_rhs_checker import LinearRHSChecker
 
@@ -184,6 +183,16 @@ class DirectSolver(LinearSolver):
     ----------
     _lin_rhs_checker : LinearRHSChecker or None
         Object for checking the right-hand side of the linear solve.
+    _lu : SuperLU or None
+        Sparse factorization, set when the assembled jacobian is sparse.
+    _lup : tuple or None
+        Dense factorization, set when the jacobian is dense or built from matrix-vector
+        products.
+    _factored_assembled_jac : bool
+        True if the factorization currently held came from an assembled jacobian. The
+        system's jacobian can change identity between linearize and solve, for instance
+        when a group begins approximating its own derivatives, so the solve is driven by
+        what was factorized rather than by what the system reports at solve time.
     """
 
     SOLVER = 'LN: Direct'
@@ -194,6 +203,9 @@ class DirectSolver(LinearSolver):
         """
         super().__init__(**kwargs)
         self._lin_rhs_checker = None
+        self._lu = None
+        self._lup = None
+        self._factored_assembled_jac = False
 
     def _declare_options(self):
         """
@@ -341,6 +353,8 @@ class DirectSolver(LinearSolver):
 
         if system._get_assembled_jac() is not None:
             matrix = system._assembled_jac.get_dr_do_matrix()
+            self._lu = self._lup = None
+            self._factored_assembled_jac = True
 
             if matrix is None:
                 # this happens if we're not rank 0 when using owned_sizes
@@ -378,6 +392,8 @@ class DirectSolver(LinearSolver):
                                    "when running under MPI if comm.size > 1.")
 
             mtx = self._build_mtx()
+            self._lu = self._lup = None
+            self._factored_assembled_jac = False
 
             # During LU decomposition, detect singularities and warn user.
             with warnings.catch_warnings():
@@ -511,12 +527,17 @@ class DirectSolver(LinearSolver):
                     x_vec[:] = sol_array
                     return
 
+        if self._lu is None and self._lup is None:
+            raise RuntimeError(f"{system.msginfo}: DirectSolver has no factorization to "
+                               "solve with. Its linearize step either did not run or ran "
+                               "while the system was using a different jacobian.")
+
         # AssembledJacobians are unscaled.
-        if system._get_assembled_jac() is not None:
+        if self._factored_assembled_jac:
             full_b = b_vec
 
             with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-                if isinstance(system._assembled_jac._dr_do_mtx, DenseMatrix):
+                if self._lu is None:
                     sol_array = scipy.linalg.lu_solve(self._lup, full_b, trans=trans_lu)
                 else:
                     sol_array = self._lu.solve(full_b, trans_splu)
