@@ -101,6 +101,8 @@ class Component(System):
         then shape is a tuple of shapes, otherwise it is a single shape.
     _valid_name_map : dict
         Mapping of declared input/output names to valid Python names.
+    _res_primal_name_map : dict
+        Mapping of declared output names to residual variable names in compute_primal.
     _orig_compute_primal : function
         The original compute_primal method.
     """
@@ -123,6 +125,7 @@ class Component(System):
         self._has_distrib_outputs = False
         self._compute_primals_out_shape = None
         self._valid_name_map = {}
+        self._res_primal_name_map = {}
         self._orig_compute_primal = getattr(self, 'compute_primal')
 
     def _tree_flatten(self):
@@ -766,7 +769,7 @@ class Component(System):
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
                    shape_by_conn=False, copy_shape=None, compute_shape=None,
                    units_by_conn=False, copy_units=None, compute_units=None,
-                   distributed=None, primal_name=None):
+                   distributed=None, primal_name=None, res_primal_name=None):
         """
         Add an output variable to the component.
 
@@ -830,7 +833,10 @@ class Component(System):
             across MPI processes.
         primal_name : str or None
             Valid python name to represent the variable in compute_primal if 'name' is not a valid
-            python name.
+            python name. For an ImplicitComponent, this is the name of the state input argument.
+        res_primal_name : str or None
+            For an ImplicitComponent, the valid python name to represent the residual returned by
+            compute_primal if different from 'name' or 'primal_name'.
 
         Returns
         -------
@@ -957,6 +963,8 @@ class Component(System):
 
         if primal_name is not None:
             self._valid_name_map[name] = primal_name
+        if res_primal_name is not None:
+            self._res_primal_name_map[name] = res_primal_name
 
         metadata = {
             'val': val,
@@ -1003,7 +1011,8 @@ class Component(System):
 
         return metadata
 
-    def add_discrete_output(self, name, val, desc='', tags=None, primal_name=None):
+    def add_discrete_output(self, name, val, desc='', tags=None, primal_name=None,
+                            res_primal_name=None):
         """
         Add an output variable to the component.
 
@@ -1020,7 +1029,10 @@ class Component(System):
             list_inputs and list_outputs.
         primal_name : str or None
             Valid python name to represent the variable in compute_primal if 'name' is not a valid
-            python name.
+            python name. For an ImplicitComponent, this is the name of the state input argument.
+        res_primal_name : str or None
+            For an ImplicitComponent, the valid python name to represent the residual returned by
+            compute_primal if different from 'name' or 'primal_name'.
 
         Returns
         -------
@@ -1036,6 +1048,8 @@ class Component(System):
 
         if primal_name is not None:
             self._valid_name_map[name] = primal_name
+        if res_primal_name is not None:
+            self._res_primal_name_map[name] = res_primal_name
 
         metadata = {}
 

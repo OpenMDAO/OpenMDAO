@@ -225,7 +225,7 @@ class ExplicitComponent(Component):
                    lower=None, upper=None, ref=1.0, ref0=0.0, res_ref=None, tags=None,
                    shape_by_conn=False, copy_shape=None, compute_shape=None,
                    units_by_conn=False, compute_units=None, copy_units=None,
-                   distributed=None, primal_name=None):
+                   distributed=None, primal_name=None, res_primal_name=None):
         """
         Add an output variable to the component.
 
@@ -291,6 +291,8 @@ class ExplicitComponent(Component):
         primal_name : str or None
             Valid python name to represent the variable in compute_primal if 'name' is not a valid
             python name.
+        res_primal_name : str or None
+            Unused for ExplicitComponent.
 
         Returns
         -------
@@ -308,7 +310,8 @@ class ExplicitComponent(Component):
                                   copy_shape=copy_shape, compute_shape=compute_shape,
                                   units_by_conn=units_by_conn, compute_units=compute_units,
                                   copy_units=copy_units,
-                                  distributed=distributed, primal_name=primal_name)
+                                  distributed=distributed, primal_name=primal_name,
+                                  res_primal_name=res_primal_name)
 
     def _approx_subjac_keys_iter(self):
         is_input = self._inputs._contains_abs
