@@ -1093,13 +1093,13 @@ class ImplicitComponent(Component):
 
     def _check_compute_primal_returns(self):
         """
-        Check that the compute_primal method returns the expected residuals.
+        Check that the compute_primal method returns the expected discrete outputs and residuals.
         """
         retnames = get_return_names(self.compute_primal)
+        discrete_outnames = list(self._discrete_outputs)
         outnames = list(self._var_rel_names['output'])
-        outnames.extend(self._discrete_outputs)
 
-        expected_names = []
+        expected_names = [self._valid_name_map.get(n, n) for n in discrete_outnames]
         for n in outnames:
             if n in self._res_primal_name_map:
                 expected_names.append(self._res_primal_name_map[n])
@@ -1110,10 +1110,18 @@ class ImplicitComponent(Component):
             raise RuntimeError(f"{self.msginfo}: compute_primal method returns {len(retnames)} "
                                f"values but expected {len(expected_names)}.")
 
+        ndiscrete = len(discrete_outnames)
         for i, (expname, rname) in enumerate(zip(expected_names, retnames)):
             if rname is None:
                 continue
-            orig_outname = outnames[i]
+            if i < ndiscrete:
+                # discrete outputs have no residual, so the returned name must match exactly.
+                if rname != expname:
+                    raise RuntimeError(f"{self.msginfo}: compute_primal method returns "
+                                       f"'{rname}' for return value {i} but expected '{expname}' "
+                                       f"for discrete output '{discrete_outnames[i]}'.")
+                continue
+            orig_outname = outnames[i - ndiscrete]
             if orig_outname in self._res_primal_name_map:
                 if rname != expname:
                     raise RuntimeError(f"{self.msginfo}: compute_primal method returns "
@@ -1126,7 +1134,7 @@ class ImplicitComponent(Component):
                                        f"output '{orig_outname}' is '{expname}' or "
                                        f"'res_{expname}'. To map a different residual name in "
                                        "compute_primal, set 'res_primal_name' when calling "
-                                       "add_output/add_discrete_output.")
+                                       "add_output.")
 
     def compute_fd_sparsity(self, method='fd', num_full_jacs=2, perturb_size=1e-9):
         """

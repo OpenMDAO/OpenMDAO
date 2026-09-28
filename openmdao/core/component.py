@@ -1011,8 +1011,7 @@ class Component(System):
 
         return metadata
 
-    def add_discrete_output(self, name, val, desc='', tags=None, primal_name=None,
-                            res_primal_name=None):
+    def add_discrete_output(self, name, val, desc='', tags=None, primal_name=None):
         """
         Add an output variable to the component.
 
@@ -1029,10 +1028,7 @@ class Component(System):
             list_inputs and list_outputs.
         primal_name : str or None
             Valid python name to represent the variable in compute_primal if 'name' is not a valid
-            python name. For an ImplicitComponent, this is the name of the state input argument.
-        res_primal_name : str or None
-            For an ImplicitComponent, the valid python name to represent the residual returned by
-            compute_primal if different from 'name' or 'primal_name'.
+            python name.
 
         Returns
         -------
@@ -1048,8 +1044,6 @@ class Component(System):
 
         if primal_name is not None:
             self._valid_name_map[name] = primal_name
-        if res_primal_name is not None:
-            self._res_primal_name_map[name] = res_primal_name
 
         metadata = {}
 
