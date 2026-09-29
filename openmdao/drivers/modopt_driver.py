@@ -27,7 +27,7 @@ Notes
 - SLSQP is the default optimizer and supports gradients, bounds, and all constraint types
 - SNOPT and IPOPT offer high performance but require separate installation/licenses
 - Linear constraints are handled efficiently by pre-computing their Jacobians
-- Gradient-free methods (COBYLA, COBYQA, NelderMead, Egor) are useful 
+- Gradient-free methods (COBYLA, COBYQA, NelderMead, Egor) are useful
   when derivatives are unavailable
 
 See the modOpt documentation at https://modopt.readthedocs.io for detailed information
@@ -88,7 +88,7 @@ _eq_constraint_optimizers = {
     'SLSQP', 'PySLSQP', 'TrustConstr', 'SNOPT', 'IPOPT',
     'COBYQA', 'OpenSQP', 'Egor',
 }
-    
+
 # Algorithms that support bounds
 _bounds_optimizers = {
     'SLSQP', 'PySLSQP', 'LBFGSB', 'TrustConstr', 'COBYLA',
@@ -506,7 +506,9 @@ class modOptProblem(problem):
         model = self.driver._problem().model
         with RecordingDebugging(self.driver._get_name(), self.driver.iter_count, self.driver):
             self.driver.iter_count += 1
-            with model._relevance.nonlinear_active('iter', active=self.driver._model_ran):
+            # if coloring is enabled, pre and iter have run.
+            # if coloring is disabled, pre has run.
+            with model._relevance.nonlinear_active('iter'):
                 self.driver._run_solve_nonlinear()
                 self.driver._model_ran = True
 
