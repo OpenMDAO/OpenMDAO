@@ -570,7 +570,7 @@ class _FuncGrapher(ast.NodeVisitor):
             self.outs[-1].append(_get_return_name(n))
 
 
-def get_func_graph(func, outnames=None, display=False):
+def get_func_graph(func, outnames=None, display=False, res_names=None):
     """
     Generate a graph between a function's inputs and outputs.
 
@@ -585,6 +585,8 @@ def get_func_graph(func, outnames=None, display=False):
         The list of expected output variable names.
     display : bool
         If True, display the graph using pydot.
+    res_names : dict or list or None
+        Expected residual variable names corresponding to outnames for implicit functions.
 
     Returns
     -------
@@ -603,10 +605,24 @@ def get_func_graph(func, outnames=None, display=False):
         if len(retnames) != len(outnames):
             raise RuntimeError("Number of return values in function does not match number of "
                                f"expected return names. ({outnames}) != ({retnames})")
-        for ret, name in zip(retnames, outnames):
+        for i, (ret, name) in enumerate(zip(retnames, outnames)):
             if ret is not None and ret != name:
-                raise RuntimeError(f"Return value name '{name}' in function does not match "
-                                   f"expected name '{ret}.")
+                # Check if it matches an allowed residual name
+                allowed_res_name = None
+                if res_names is not None:
+                    if isinstance(res_names, dict):
+                        allowed_res_name = res_names.get(name)
+                    elif isinstance(res_names, (list, tuple)) and i < len(res_names):
+                        allowed_res_name = res_names[i]
+                if allowed_res_name is not None:
+                    if ret != allowed_res_name:
+                        raise RuntimeError(f"Return value name '{ret}' in function does not match "
+                                           f"expected residual name '{allowed_res_name}'.")
+                elif ret == f'res_{name}':
+                    pass
+                else:
+                    raise RuntimeError(f"Return value name '{ret}' in function does not match "
+                                       f"expected name '{name}'.")
     else:
         outnames = []
         for ret in retnames:
@@ -632,7 +648,7 @@ def get_func_graph(func, outnames=None, display=False):
     return visitor.graph
 
 
-def get_function_deps(func, outputs=None, display=False):
+def get_function_deps(func, outputs=None, display=False, res_names=None):
     """
     Generate tuples of the form (output, input) for the given function.
 
@@ -650,6 +666,8 @@ def get_function_deps(func, outputs=None, display=False):
         The list of output variable names.
     display : bool
         If True, display the function graph using pydot.
+    res_names : dict or list or None
+        Expected residual variable names corresponding to outputs for implicit functions.
 
     Yields
     ------
@@ -657,7 +675,7 @@ def get_function_deps(func, outputs=None, display=False):
         A tuple of the form (output, input).
     """
     try:
-        graph = get_func_graph(func, outputs, display)
+        graph = get_func_graph(func, outputs, display, res_names=res_names)
         if graph is None:
             if outputs is None:
                 return
