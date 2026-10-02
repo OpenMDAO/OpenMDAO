@@ -489,7 +489,9 @@ class pymooProblem(problem):
         model = self.driver._problem().model
         with RecordingDebugging(self.driver._get_name(), self.driver.iter_count, self.driver):
             self.driver.iter_count += 1
-            with model._relevance.nonlinear_active('iter', active=self.driver._model_ran):
+            # if coloring is enabled, pre and iter have run.
+            # if coloring is disabled, pre has run.
+            with model._relevance.nonlinear_active('iter'):
                 self.driver._run_solve_nonlinear()
                 self.driver._model_ran = True
 
