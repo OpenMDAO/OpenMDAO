@@ -756,9 +756,9 @@ class pyOptSparseDriver(Driver):
                 self.iter_count += 1
                 try:
                     self._in_user_function = True
-                    # deactivate the relevance if we haven't run the full model yet, so that
-                    # the full model will run at least once.
-                    with model._relevance.nonlinear_active('iter', active=self._model_ran):
+                    # if coloring is enabled, pre and iter have run.
+                    # if coloring is disabled, pre has run.
+                    with model._relevance.nonlinear_active('iter'):
                         self._run_solve_nonlinear()
                         self._model_ran = True
 
