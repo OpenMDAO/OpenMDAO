@@ -26,7 +26,7 @@ from openmdao.solvers.linear.linear_runonce import LinearRunOnce
 from openmdao.solvers.linear.direct import DirectSolver
 from openmdao.utils.array_utils import _flatten_src_indices, ValueRepeater
 from openmdao.utils.general_utils import shape2tuple, ensure_compatible, \
-    meta2src_iter, is_undefined, collect_errors
+    meta2src_iter, is_undefined, collect_errors, all_ancestors
 from openmdao.utils.units import unit_conversion, simplify_unit, _find_unit
 from openmdao.utils.graph_utils import get_out_of_order_nodes, get_sccs_topo, \
     get_unresolved_knowns, is_unresolved, get_active_edges, are_connected
@@ -1122,6 +1122,12 @@ class Group(System):
 
         self._dataflow_graph = self._get_dataflow_graph()
         self._problem_meta['dataflow_graph'] = self._dataflow_graph
+
+        # Ancestor assembled jacobians take their structure from _subjacs_info when they are
+        # first built during linearization, so the approximation blocks must be in place before
+        # then.  They need the dataflow graph, so this can't happen in _setup_partials.
+        if self._use_derivatives:
+            self._setup_approx_ancestor_views()
 
         # figure out if we can remove any edges based on zero partials we find
         # in components.  By default all component connected outputs
@@ -2884,6 +2890,100 @@ class Group(System):
 
         self._owns_approx_jac = True
         self._owns_approx_jac_meta = kwargs
+
+    def _setup_approx_ancestor_views(self):
+        """
+        Give ancestors of approximating subgroups the subgroup's semi-total jacobian structure.
+
+        Ancestors collect subjac metadata from their descendants' components.  Below a group that
+        approximates its own derivatives those component partials are never computed, and the
+        group's semi-total subjacs are only created later, so an ancestor that assembles a
+        jacobian would otherwise represent the group with stale component-level structure.  Here
+        the rows of each outermost approximating subgroup are replaced, in every ancestor, by the
+        structure of an explicit block: an identity diagonal plus d(output)/d(boundary input).
+        After this, an ancestor's _subjacs_info holds that block for the subgroup rather than the
+        subgroup's component partials.  This is only done when some ancestor actually assembles a
+        jacobian, since nothing else reads it.
+        """
+        if self._owns_approx_jac:
+            return  # approximating the whole model, so no subgroup structure is used
+
+        graph = self._dataflow_graph
+        for group in self.system_iter(recurse=True, typ=Group):
+            if not group._owns_approx_jac:
+                continue
+
+            ancestors = [self] + [self._get_subsystem(path) for path in
+                                  all_ancestors(group.pathname.rpartition('.')[0])][::-1]
+            if any(anc._owns_approx_jac for anc in ancestors):
+                continue  # an enclosing group approximates, and its structure replaces this one
+            if not any(anc._get_asm_jac_solvers() for anc in ancestors):
+                continue
+
+            view = group._get_semitotal_view(graph)
+            prefix = group.pathname + '.'
+            for anc in ancestors:
+                info = anc._subjacs_info
+                for key in [k for k in info if k[0].startswith(prefix)]:
+                    del info[key]
+                info.update(view)
+
+    def _get_semitotal_view(self, graph):
+        """
+        Return subjac metadata representing this approximating group as an explicit block.
+
+        Parameters
+        ----------
+        graph : networkx.DiGraph
+            The dataflow graph.
+
+        Returns
+        -------
+        dict
+            Subjac metadata keyed by (of, wrt) absolute names.
+        """
+        info = self._subjacs_info
+        abs2meta_out = self._var_abs2meta['output']
+        abs2meta_in = self._var_abs2meta['input']
+        internal_conns = self._conn_global_abs_in2out
+        ivcs = self.get_indep_vars(local=False)
+        boundary_ins = [n for n in abs2meta_in if n not in internal_conns]
+
+        # Find what each boundary input reaches without leaving this group.  A path that leaves
+        # and re-enters the group is not part of the group's own block.
+        prefix = self.pathname + '.'
+        reach = {}
+        for wrt in boundary_ins:
+            reach[wrt] = found = set()
+            stack = [wrt] if wrt in graph else []
+            while stack:
+                for node in graph.successors(stack.pop()):
+                    if node not in found and node.startswith(prefix):
+                        found.add(node)
+                        stack.append(node)
+
+        view = {}
+        for of, ometa in abs2meta_out.items():
+            osize = ometa['size']
+            meta = SUBJAC_META_DEFAULTS.copy()
+            meta['diagonal'] = True
+            meta['val'] = np.full(osize, -1.0)
+            view[of, of] = Subjac.get_instance_metadata(meta, None, (osize, osize), self, (of, of))
+
+            if of in ivcs:
+                continue
+
+            for wrt in boundary_ins:
+                key = (of, wrt)
+                if key in info:
+                    view[key] = info[key]
+                elif of in reach[wrt]:
+                    # register it here too, so the approximation stores its values in it
+                    shape = (osize, abs2meta_in[wrt]['size'])
+                    info[key] = view[key] = Subjac.get_instance_metadata(
+                        SUBJAC_META_DEFAULTS.copy(), None, shape, self, key)
+
+        return view
 
     def _setup_partials(self):
         """
