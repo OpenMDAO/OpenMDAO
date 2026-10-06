@@ -327,6 +327,45 @@ class TestJaxImplicitComp(unittest.TestCase):
                             atol=2e-4, rtol=3e-6)
         assert_check_partials(prob.check_partials(show_only_incorrect=True), rtol=1e-5)
 
+    def test_jax_implicit_sparsity_with_res_primal_name(self):
+        class JaxSparseCompResPrimal(om.JaxImplicitComponent):
+            def setup(self):
+                self.add_input('a', val=2.0)
+                self.add_input('b', val=3.0)
+                self.add_output('x', val=1.0)
+                self.add_output('y', val=1.0, res_primal_name='custom_res_y')
+
+            def setup_partials(self):
+                self.linear_solver = om.DirectSolver()
+                self.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+
+            def compute_primal(self, a, b, x, y):
+                res_x = a * x - 4.0
+                custom_res_y = b * y - 9.0
+                return res_x, custom_res_y
+
+        prob = om.Problem()
+        comp = prob.model.add_subsystem('comp', JaxSparseCompResPrimal())
+        prob.setup()
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        assert_near_equal(prob.get_val('comp.x'), 2.0, tolerance=1e-6)
+        assert_near_equal(prob.get_val('comp.y'), 3.0, tolerance=1e-6)
+
+        subjacs = comp._subjacs_info
+        self.assertIn(('comp.x', 'comp.a'), subjacs)
+        self.assertIn(('comp.x', 'comp.x'), subjacs)
+        self.assertNotIn(('comp.x', 'comp.b'), subjacs)
+        self.assertNotIn(('comp.x', 'comp.y'), subjacs)
+
+        self.assertIn(('comp.y', 'comp.b'), subjacs)
+        self.assertIn(('comp.y', 'comp.y'), subjacs)
+        self.assertNotIn(('comp.y', 'comp.a'), subjacs)
+        self.assertNotIn(('comp.y', 'comp.x'), subjacs)
+
+        assert_check_partials(prob.check_partials(out_stream=None), rtol=1e-5)
+
 
 if __name__ == '__main__':
     unittest.main()
