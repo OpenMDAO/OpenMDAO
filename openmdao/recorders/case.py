@@ -1205,6 +1205,13 @@ class Case(object):
                 if driver_units and meta['units'] is not None:
                     var_units = abs2meta[src]['units']
                     val = convert_units(val, var_units, meta['units'])
+                if scaled:
+                    adder = meta.get('total_adder')
+                    scaler = meta.get('total_scaler')
+                    if adder is not None:
+                        val = val + adder
+                    if scaler is not None:
+                        val = val * scaler
                 ret_vars[name] = val
 
         return PromAbsDict(ret_vars, self._prom2abs['output'], self._abs2prom['output'],
