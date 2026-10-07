@@ -3058,7 +3058,7 @@ class TestSqliteCaseReader(unittest.TestCase):
         assert_near_equal(derivs['con|with->scaling', 'exec.a'].ravel(), 4.0/11.0)
 
         cons = case.get_constraints()
-        con_vals = driver.get_constraint_values(driver_scaling=False)
+        con_vals = driver.get_constraint_values(driver_scaling=True)
 
         assert_near_equal(cons['exec.z'], con_vals['exec.z'])
         assert_near_equal(cons['ALIAS_TEST'], con_vals['ALIAS_TEST'])
@@ -3194,6 +3194,35 @@ class DummyClass(object):
 
         objs = case.get_objectives()
         self.assertEqual(set(objs.keys()), {'z'})
+
+    def test_get_scaled_values(self):
+        # scaled = (value + adder)*scaler, with ref/ref0 -> adder=-ref0, scaler=1/(ref-ref0)
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', om.ExecComp(['f=x**2', 'c=3.0*x']), promotes=['*'])
+        prob.model.add_design_var('x', lower=0., upper=10., ref=10., ref0=2.)  # scaler=1/8, adder=-2
+        prob.model.add_objective('f', scaler=0.5, adder=1.)
+        prob.model.add_constraint('c', upper=20., ref=5.)                     # scaler=1/5
+
+        prob.driver.recording_options['record_desvars'] = True
+        prob.driver.recording_options['record_objectives'] = True
+        prob.driver.recording_options['record_constraints'] = True
+        prob.driver.add_recorder(om.SqliteRecorder('cases.sql'))
+
+        prob.setup()
+        prob.set_val('x', 6.)
+        prob.run_driver()
+        prob.cleanup()
+
+        cr = om.CaseReader(prob.get_outputs_dir() / 'cases.sql')
+        case = cr.get_case(cr.list_cases('driver', out_stream=None)[-1])
+
+        assert_near_equal(case.get_design_vars(scaled=False)['x'].item(), 6.)
+        assert_near_equal(case.get_objectives(scaled=False)['f'].item(), 36.)
+        assert_near_equal(case.get_constraints(scaled=False)['c'].item(), 18.)
+
+        assert_near_equal(case.get_design_vars(scaled=True)['x'].item(), (6. - 2.) / 8.)
+        assert_near_equal(case.get_objectives(scaled=True)['f'].item(), (36. + 1.) * 0.5)
+        assert_near_equal(case.get_constraints(scaled=True)['c'].item(), 18. / 5.)
 
     def test_pickle_vulnerability(self):
         # test handling of vulnerability https://github.com/advisories/GHSA-g4r7-86gm-pgqc
