@@ -16,7 +16,8 @@ class HessianAutoscaler(AutoscalerBase):
     This is the default Autoscaler in OpenMDAO that scales optimization variables based
     on matrix design-variable transformation, x = M y.
     
-    x is the model variable, y is the optimizer variable, and the matrix M is the scaler/preconditioner
+    x is the model variable, y is the optimizer variable, and the matrix M is the 
+    scaler/preconditioner
     
     """
     
@@ -34,6 +35,7 @@ class HessianAutoscaler(AutoscalerBase):
             The step size for finite difference approximation (default is 1e-6)
         use_scipy_eigs : bool, optional
             If True, use Scipy library to compute the eigenpairs (default is False)
+            Else, the cheaper, local implementation of the Arnoldi algorithm will be used to estimate the eigenpairs
         start_vec : ndarray, optional
             The starting vector used in the Arnoldi algorithm (default: random if start_vec = None)
         """
@@ -86,7 +88,7 @@ class HessianAutoscaler(AutoscalerBase):
         for voi_type in ['design_var', 'constraint']:
             self._scaled_lower[voi_type], \
                 self._scaled_upper[voi_type], self._scaled_equals[voi_type] = \
-                self._compute_hessian_bounds(voi_type)
+                self._build_model_bound_vectors(voi_type)
         
         dv_names = [name for name, meta in driver._designvars.items()
             if not meta.get('discrete', False)]
@@ -110,6 +112,7 @@ class HessianAutoscaler(AutoscalerBase):
             self._dv_sizes[name] = meta['size']
         
         def obj_grad(x):
+            """Evaluate the objective gradient at model-space design point x."""
             return self._gradfunc(driver, x)
         eigenvals, self.eigenvecs_m = self._get_eigen_decomp(gradfunc=obj_grad,
                                                                     m=self.m, x=x0, 
@@ -117,10 +120,6 @@ class HessianAutoscaler(AutoscalerBase):
                                                                     b=self.b)
         eigenvals = self._clean_eigenvals(eigenvals)
         self.eigenvals_m = eigenvals.copy()
-        
-        # I = np.eye(len(x0))
-        # self.eigenvals_m = np.ones(self.m)
-        # self.eigenvecs_m = I[:,:self.m]
         
         self.arnoldi_grad_evals = self.num_grad_evals
         
@@ -132,6 +131,24 @@ class HessianAutoscaler(AutoscalerBase):
         self._has_scaling = True
     
     def _as_bound_array(self, val, size, default):
+        """
+        Convert a bound to a flat floating-point array of the requested size.
+
+        Parameters
+        ----------
+        val : scalar or array_like or None
+            Bound value. If None, use default.
+        size : int
+            Number of bound entries.
+        default : scalar or array_like
+            Value used when val is None.
+
+        Returns
+        -------
+        ndarray
+            Independent one-dimensional array, with scalar values repeated
+            and array values broadcast as needed.
+        """
         if val is None:
             val = default
 
@@ -146,7 +163,30 @@ class HessianAutoscaler(AutoscalerBase):
 
         return arr.ravel()
     
-    def _compute_hessian_bounds(self, voi_type):
+    def _build_model_bound_vectors(self, voi_type):
+        """
+        Assemble model-space bound vectors for continuous variables.
+
+        Parameters
+        ----------
+        voi_type : {'design_var', 'constraint'}
+            Variable type whose bounds are assembled.
+
+        Returns
+        -------
+        lower_vec : OptimizerVector
+            Lower bounds, using -INF_BOUND for unspecified bounds.
+        upper_vec : OptimizerVector
+            Upper bounds, using INF_BOUND for unspecified bounds.
+        equals_vec : OptimizerVector or None
+            Constraint equality targets, with NaN for unspecified targets;
+            None for design variables.
+
+        Notes
+        -----
+        Discrete variables are skipped. Distributed variables use their
+        global size.
+        """
         vecmeta = {}
         total_size = 0
 
@@ -187,6 +227,20 @@ class HessianAutoscaler(AutoscalerBase):
         return lower_vec, upper_vec, equals_vec
     
     def get_bounds_scaling(self, voi_type):
+        """
+        Return the cached bound vectors for the requested variable type.
+
+        Parameters
+        ----------
+        voi_type : {'design_var', 'constraint'}
+            Variable type whose bounds are requested.
+
+        Returns
+        -------
+        tuple
+            Lower, upper, and equality bound vectors. The equality vector
+            is None for design variables. Values remain in model space.
+        """
         return (
             self._scaled_lower[voi_type],
             self._scaled_upper[voi_type],
@@ -735,6 +789,8 @@ class HessianAutoscaler(AutoscalerBase):
         beta = tilde_vals - alpha
 
         def _as_2d(block):
+            """ Convert a Jacobian block to a two-dimensional array. """
+            
             arr = np.asarray(block)
 
             if arr.ndim == 1:
@@ -858,150 +914,3 @@ class HessianAutoscaler(AutoscalerBase):
                 _scale_nested_output(blocks)
                 
         self.num_grad_evals += 1
-    
-    # def apply_jac_scaling(self, jac_dict):
-    #     """
-    #     Scale total derivatives from model-space design variables x to optimizer-space
-    #     variables y.
-
-    #     For HessianAutoscaler:
-
-    #         x = M y
-
-    #     so:
-
-    #         d(response)/dy = d(response)/dx @ M
-
-    #     For multiple design variables, OpenMDAO may store Jacobian blocks separately
-    #     by design variable. This method assembles the full d(response)/dx block in
-    #     contiguous driver design-variable order, applies M, then scatters the result
-    #     back into the original per-design-variable blocks.
-    #     """
-    #     if not self._has_scaling:
-    #         return
-
-    #     if not hasattr(self, '_dv_slices') or not self._dv_slices:
-    #         return
-
-    #     M = self._compute_matrix_M()
-
-    #     # Use the exact slices from the OptimizerVector used to build x0 and M.
-    #     dv_slices = self._dv_slices
-    #     n_total = self.n_vars
-
-    #     if M.shape != (n_total, n_total):
-    #         raise RuntimeError(
-    #             f"HessianAutoscaler M has shape {M.shape}, but the contiguous "
-    #             f"design-variable vector has size {n_total}."
-    #         )
-
-    #     def _as_2d(block):
-    #         arr = np.asarray(block)
-
-    #         if arr.ndim == 1:
-    #             return arr.reshape(1, -1), True
-
-    #         if arr.ndim == 2:
-    #             return arr, False
-
-    #         raise RuntimeError(
-    #             f"Cannot scale Jacobian block with {arr.ndim} dimensions."
-    #         )
-
-    #     def _scale_nested_output(jac_blocks):
-    #         """
-    #         Scale one nested output entry:
-
-    #             jac_blocks[in_name] = d(output)/d(input)
-
-    #         This modifies existing blocks in place.
-    #         """
-            
-    #         # The first block is used to determine the number of rows in the Jacobian. 
-    #         # scalar objective or constraint: n_row = 1, 
-    #         # vector objective or constraint: n_row = size of the output vector
-    #         # We assume that the columns of each block correspond to contiguous slices
-    #         # of the design variables, as given by dv_slices. This allows us to assemble 
-    #         # the full d(response)/dx matrix in the correct order for multiplication with M.
-    #         first_block = None
-    #         for in_name in dv_slices:
-    #             if in_name in jac_blocks:
-    #                 first_block = jac_blocks[in_name]
-    #                 break
-
-    #         if first_block is None:
-    #             return
-
-    #         first_arr, first_was_1d = _as_2d(first_block)
-    #         n_rows = first_arr.shape[0]
-
-    #         Jx = np.zeros((n_rows, n_total))
-
-    #         # Assemble d(response)/dx in contiguous design-variable order.
-    #         for in_name, slc in dv_slices.items():
-    #             if in_name not in jac_blocks:
-    #                 continue
-
-    #             arr, was_1d = _as_2d(jac_blocks[in_name])
-
-    #             if arr.shape[0] != n_rows:
-    #                 raise RuntimeError(
-    #                     f"Jacobian block for '{in_name}' has {arr.shape[0]} rows, "
-    #                     f"but expected {n_rows}."
-    #                 )
-
-    #             # use slice to place the block in the correct columns of Jx
-    #             if arr.shape[1] != slc.stop - slc.start:
-    #                 raise RuntimeError(
-    #                     f"Jacobian block for '{in_name}' has shape {arr.shape}, "
-    #                     f"but expected second dimension {slc.stop - slc.start}."
-    #                 )
-
-    #             Jx[:, slc] = arr
-
-    #         # Chain rule: d(response)/dy = d(response)/dx @ dx/dy = Jx @ M.
-    #         Jy = Jx @ M
-
-    #         # Scatter back into existing OpenMDAO blocks.
-    #         for in_name, slc in dv_slices.items():
-    #             if in_name not in jac_blocks:
-    #                 continue
-
-    #             block = jac_blocks[in_name]
-    #             arr = np.asarray(block)
-    #             piece = Jy[:, slc]
-
-    #             if arr.ndim == 1:
-    #                 arr[...] = piece.reshape(-1)
-    #             else:
-    #                 arr[...] = piece
-
-    #     if not jac_dict:
-    #         return
-
-    #     first_key = next(iter(jac_dict))
-
-    #     if isinstance(first_key, tuple):
-    #         # Flat dict format:
-    #         #     jac_dict[(out_name, in_name)] = block
-    #         #
-    #         # Convert to temporary nested grouping by output name.
-    #         by_output = {}
-
-    #         for (out_name, in_name), block in jac_dict.items():
-    #             if in_name in dv_slices:
-    #                 by_output.setdefault(out_name, {})[in_name] = block
-
-    #         for blocks in by_output.values():
-    #             _scale_nested_output(blocks)
-
-    #     else:
-    #         # Nested dict format:
-    #         #     jac_dict[out_name][in_name] = block
-    #         for out_name, blocks in jac_dict.items():
-    #             _scale_nested_output(blocks)
-                
-    #     self.num_grad_evals += 1
-                
-        
-    
