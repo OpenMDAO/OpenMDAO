@@ -38,6 +38,23 @@ class ParaboloidArray(om.ExplicitComponent):
 @use_tempdirs
 class TestUniformGenerator(unittest.TestCase):
 
+    def test_unbounded_factor(self):
+        # Sampling cannot cover an infinite range, so an unset or infinite bound maps onto
+        # the generator's finite _inf_bound sentinel rather than raising or producing NaN.
+        for factors in ({'x': {'lower': None, 'upper': 10}, 'y': {'lower': -10, 'upper': 10}},
+                        {'x': {'lower': -np.inf, 'upper': 10}, 'y': {'lower': -10, 'upper': 10}},
+                        {'x': {'lower': -10, 'upper': np.inf}, 'y': {'lower': -10, 'upper': 10}}):
+            with self.subTest(factors=factors):
+                gen = UniformGenerator(factors, num_samples=4, seed=0)
+                inf_bound = gen._inf_bound
+
+                x_vals = np.concatenate([np.atleast_1d(sample['x']['val'])
+                                         for sample in gen])
+
+                self.assertEqual(x_vals.size, 4)
+                self.assertTrue(np.all(np.isfinite(x_vals)))
+                self.assertLessEqual(np.max(np.abs(x_vals)), inf_bound)
+
     def test_uniform(self):
         prob = om.Problem()
         model = prob.model

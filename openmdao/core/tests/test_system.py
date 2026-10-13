@@ -394,7 +394,7 @@ class TestSystem(unittest.TestCase):
 
         opt_list = prob.model.list_options(out_stream=None)
 
-        self.assertEqual(len(opt_list), 9)
+        self.assertEqual(len(opt_list), 7)
         self.assertTrue(opt_list[1][0] == 'cycle')
         self.assertTrue(opt_list[1][2]['maxiter'] == 10)
         self.assertTrue(opt_list[3][1]['use_jit'] is True)

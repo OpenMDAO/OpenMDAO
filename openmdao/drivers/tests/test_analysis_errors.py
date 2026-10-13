@@ -39,6 +39,9 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
         'SLSQP': {
             'ACC': 1e-9
         },
+        'Uno': {
+            'preset': 'filtersqp',
+        },
     }
 
     # some optimizers may not be able to find the solution within 1e-6
@@ -53,6 +56,7 @@ class TestPyoptSparseAnalysisErrors(unittest.TestCase):
     invalid_range = defaultdict(lambda: {'x': (7.2, 10.2), 'y': (-50.0001, -40.)})
     invalid_range.update({
         'ParOpt': {'x': (4., 6.), 'y': (-4., -6.)},
+        'Uno': {'x': (9.5, 10.5), 'y': (4.5, 5.5)},
     })
 
     expected_result_eval_errors = defaultdict(lambda: 0)

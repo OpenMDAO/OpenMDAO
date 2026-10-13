@@ -17,6 +17,7 @@ on:
 
 jobs:
   pixi-update:
+    if: github.repository == 'OpenMDAO/OpenMDAO'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

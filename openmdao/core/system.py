@@ -17,7 +17,7 @@ from numbers import Integral
 import numpy as np
 
 from openmdao.core.constants import _DEFAULT_COLORING_DIR, _DEFAULT_OUT_STREAM, \
-    _UNDEFINED, INT_DTYPE, INF_BOUND, _SetupStatus
+    _UNDEFINED, INT_DTYPE, _SetupStatus
 from openmdao.jacobians.dictionary_jacobian import Jacobian
 from openmdao.recorders.recording_manager import RecordingManager
 from openmdao.vectors.vector import _full_slice
@@ -1015,20 +1015,14 @@ class System(object, metaclass=SystemMetaclass):
             if is_undefined(upper):
                 upper = None
 
-            if lower is None:
-                # if not set, set lower to -INF_BOUND and don't apply adder/scaler
-                lower = -INF_BOUND
-            else:
+            if lower is not None:
                 # Convert lower to ndarray/float as necessary
                 lower = format_as_float_or_array('lower', lower, flatten=True)
 
-            if upper is None:
-                # if not set, set upper to INF_BOUND and don't apply adder/scaler
-                upper = INF_BOUND
-            else:
+            if upper is not None:
                 # Convert upper to ndarray/float as necessary
                 upper = format_as_float_or_array('upper', upper, flatten=True)
-            
+
             new_desvar_metadata.update({'lower': lower, 'upper': upper})
 
         # Now figure out scaling
@@ -1075,7 +1069,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # Compute the combined total_adder and total_scaler from whichever pair is active
             total_adder, total_scaler = determine_adder_scaler(ref0, ref, adder, scaler)
-        
+
             if isinstance(total_scaler, np.ndarray):
                 if np.all(total_scaler == 1.0):
                     total_scaler = None
@@ -1087,7 +1081,7 @@ class System(object, metaclass=SystemMetaclass):
                     total_adder = None
             elif total_adder is not None and total_adder == 0.0:
                 total_adder = None
-    
+
             new_desvar_metadata.update({'ref0': ref0, 'ref': ref, 'scaler': scaler, 'adder': adder,
                                         'total_scaler': total_scaler, 'total_adder': total_adder})
 
@@ -1178,9 +1172,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # Convert lower to ndarray/float as necessary
             try:
-                if lower is None:
-                    lower = -INF_BOUND
-                else:
+                if lower is not None:
                     lower = format_as_float_or_array('lower', lower, flatten=True)
             except (TypeError, ValueError):
                 raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
@@ -1189,9 +1181,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # Convert upper to ndarray/float as necessary
             try:
-                if upper is None:
-                    upper = INF_BOUND
-                else:
+                if upper is not None:
                     upper = format_as_float_or_array('upper', upper, flatten=True)
             except (TypeError, ValueError):
                 raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
@@ -2918,7 +2908,7 @@ class System(object, metaclass=SystemMetaclass):
             else:
                 msg = err.args[0] if err.args else ''
                 err.args = (f"{self.msginfo}: Error calling {fname}(), " + msg,) + err.args[1:]
-                raise 
+                raise
         finally:
             self._inputs.read_only = False
             self._outputs.read_only = False
@@ -3306,14 +3296,10 @@ class System(object, metaclass=SystemMetaclass):
         ref = format_as_float_or_array('ref', ref, val_if_none=None, flatten=True)
         ref0 = format_as_float_or_array('ref0', ref0, val_if_none=None, flatten=True)
 
-        if lower is None:
-            lower = -INF_BOUND
-        else:
+        if lower is not None:
             lower = format_as_float_or_array('lower', lower, flatten=True)
-        
-        if upper is None:
-            upper = INF_BOUND
-        else:
+
+        if upper is not None:
             upper = format_as_float_or_array('upper', upper, flatten=True)
 
         if self._static_mode:
@@ -3332,7 +3318,7 @@ class System(object, metaclass=SystemMetaclass):
                 adder = None
         elif adder == 0.0:
             adder = None
-        
+
         # determine adder and scaler based on args
         total_adder, total_scaler = determine_adder_scaler(ref0, ref, adder, scaler)
 
@@ -3477,10 +3463,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # Convert lower to ndarray/float as necessary
             try:
-                if lower is None:
-                    # don't apply adder/scaler if lower not set
-                    lower = -INF_BOUND
-                else:
+                if lower is not None:
                     lower = format_as_float_or_array('lower', lower, flatten=True)
             except (TypeError, ValueError):
                 raise TypeError("Argument 'lower' can not be a string ('{}' given). You can not "
@@ -3489,10 +3472,7 @@ class System(object, metaclass=SystemMetaclass):
 
             # Convert upper to ndarray/float as necessary
             try:
-                if upper is None:
-                    # don't apply adder/scaler if upper not set
-                    upper = INF_BOUND
-                else:
+                if upper is not None:
                     upper = format_as_float_or_array('upper', upper, flatten=True)
             except (TypeError, ValueError):
                 raise TypeError("Argument 'upper' can not be a string ('{}' given). You can not "
@@ -3627,7 +3607,7 @@ class System(object, metaclass=SystemMetaclass):
         if lower is None and upper is None and equals is None:
             issue_warning(f"{self.msginfo}: Constraint '{name}' requires one of arguments"
                           " 'lower', 'upper', or 'equals' to be specified.")
-        
+
         self.add_response(name=name, type_='con', lower=lower, upper=upper,
                           equals=equals, scaler=scaler, adder=adder, ref=ref,
                           ref0=ref0, indices=indices, linear=linear, units=units,
@@ -5044,7 +5024,7 @@ class System(object, metaclass=SystemMetaclass):
 
         # For components, self._subsystems_allprocs is empty.
         if self._subsystems_allprocs:
-            for subsys in self.system_iter(include_self=False, recurse=True):
+            for subsys in self.system_iter(include_self=False, recurse=False):
 
                 if subsys.pathname != '_auto_ivc':
                     sub_opts = subsys.list_options(out_stream=None,

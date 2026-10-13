@@ -147,6 +147,12 @@ class LintJupyterOutputsTestCase(unittest.TestCase):
                         if "allow-assert" in tags:
                             continue
 
+                    # %%writefile cells are not executed by the notebook kernel; skip them.
+                    src = block['source']
+                    first_line = (src[0] if src else '') if isinstance(src, list) else src
+                    if first_line.strip().startswith('%%writefile'):
+                        continue
+
                     for line in block['source']:
                         if 'assert' in line:
                             sblock = ''.join(block['source'])

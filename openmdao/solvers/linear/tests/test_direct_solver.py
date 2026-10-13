@@ -1079,5 +1079,138 @@ class TestDirectSolverMPI(unittest.TestCase):
         assert_near_equal(prob['g2.y2'], 0.80, 1.0e-5)
 
 
+class SqrtState(om.ImplicitComponent):
+    """
+    R(y, x) = y**2 - x, so y = sqrt(x) and dy/dx = 1 / (2*sqrt(x)).
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Component options.
+    """
+
+    def setup(self):
+        """
+        Declare inputs, outputs and partials.
+        """
+        self.add_input('x', 3.0)
+        self.add_output('y', 2.0)
+        self.declare_partials('y', ['x', 'y'])
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        """
+        Compute the residual.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables.
+        outputs : Vector
+            Unscaled, dimensional output variables.
+        residuals : Vector
+            Unscaled, dimensional residuals.
+        """
+        residuals['y'] = outputs['y'] ** 2 - inputs['x']
+
+    def linearize(self, inputs, outputs, partials):
+        """
+        Compute the partials.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables.
+        outputs : Vector
+            Unscaled, dimensional output variables.
+        partials : Jacobian
+            Sub-jac components written to partials[output_name, input_name].
+        """
+        partials['y', 'y'] = 2.0 * outputs['y']
+        partials['y', 'x'] = -1.0
+
+
+class ScaledSqrtState(SqrtState):
+    """
+    The same state, declared with output and residual scaling.
+
+    Parameters
+    ----------
+    **kwargs : dict
+        Component options.
+    """
+
+    def setup(self):
+        """
+        Declare inputs, outputs and partials with non-unit scaling.
+        """
+        self.add_input('x', 3.0)
+        self.add_output('y', 2.0, ref=100.0, res_ref=0.01)
+        self.declare_partials('y', ['x', 'y'])
+
+
+class TestDirectSolverUnderApproximation(unittest.TestCase):
+    """
+    A group may approximate its own derivatives while containing a DirectSolver.
+
+    The system's jacobian changes identity when the group starts approximating, so a
+    DirectSolver that factorized before the switch must still solve with the factorization
+    it holds rather than with the one the system reports at solve time.
+    """
+
+    def _build(self, method, comp_class=None):
+        p = om.Problem(reports=False)
+        g = p.model.add_subsystem('g', om.Group(), promotes=['*'])
+        g.add_subsystem('comp', (comp_class or SqrtState)(), promotes=['*'])
+        g.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=-1)
+        g.linear_solver = om.DirectSolver()
+        g.approx_totals(method=method)
+        p.setup(force_alloc_complex=(method == 'cs'))
+        p.set_val('x', 3.0)
+        p.run_model()
+        return p
+
+    def test_approx_totals_fd_on_group_with_direct_solver(self):
+        p = self._build('fd')
+        assert_near_equal(p.get_val('y')[0], np.sqrt(3.0), 1e-10)
+        J = p.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        assert_near_equal(J['y', 'x'][0][0], 1.0 / (2.0 * np.sqrt(3.0)), 1e-5)
+
+    def test_approx_totals_cs_on_group_with_direct_solver(self):
+        p = self._build('cs')
+        J = p.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        assert_near_equal(J['y', 'x'][0][0], 1.0 / (2.0 * np.sqrt(3.0)), 1e-10)
+
+    def test_approx_totals_with_scaling(self):
+        # the assembled and matrix-free solve paths differ by the unscaled context, so a
+        # scaled model is what tells them apart
+        for method in ('fd', 'cs'):
+            with self.subTest(method=method):
+                p = self._build(method, ScaledSqrtState)
+                assert_near_equal(p.get_val('y')[0], np.sqrt(3.0), 1e-8)
+                J = p.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+                assert_near_equal(J['y', 'x'][0][0], 1.0 / (2.0 * np.sqrt(3.0)), 1e-5)
+
+    def test_scaled_model_without_approximation(self):
+        # the same scaled model, solved analytically, must be unaffected
+        p = om.Problem(reports=False)
+        g = p.model.add_subsystem('g', om.Group(), promotes=['*'])
+        g.add_subsystem('comp', ScaledSqrtState(), promotes=['*'])
+        g.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=-1)
+        g.linear_solver = om.DirectSolver()
+        p.setup()
+        p.set_val('x', 3.0)
+        p.run_model()
+        J = p.compute_totals(of=['y'], wrt=['x'], return_format='flat_dict')
+        assert_near_equal(J['y', 'x'][0][0], 1.0 / (2.0 * np.sqrt(3.0)), 1e-10)
+
+    def test_solve_without_factorization_gives_a_clear_error(self):
+        p = self._build('fd')
+        solver = p.model.g.linear_solver
+        solver._lu = solver._lup = None
+        with self.assertRaises(RuntimeError) as cm:
+            solver.solve('fwd')
+        self.assertIn('no factorization', str(cm.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

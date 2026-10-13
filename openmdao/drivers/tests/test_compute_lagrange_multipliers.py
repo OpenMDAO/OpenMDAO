@@ -2,6 +2,7 @@
 
 import unittest
 from packaging.version import Version
+from parameterized import parameterized
 
 import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
@@ -14,10 +15,10 @@ from openmdao.utils.general_utils import set_pyoptsparse_opt
 _, snopt_opt = set_pyoptsparse_opt('SNOPT', fallback=True)
 
 
-@require_pyoptsparse('IPOPT')
+@require_pyoptsparse
 @unittest.skipIf(pyoptsparse_version is None or
-                 pyoptsparse_version < Version('2.13.0'),
-                 reason='Requires pyoptsparse 2.13.0 or later.')
+                 pyoptsparse_version < Version('2.16.0'),
+                 reason='Requires pyoptsparse 2.16.0 or later for Uno support.')
 @use_tempdirs
 class TestComputeLagrangeMultipliers(unittest.TestCase):
 
@@ -43,24 +44,34 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
 
         return prob
 
-    def test_simple_paraboloid_upper_inequality_constraint_unscaled(self):
+    @parameterized.expand([
+        ('IPOPT',),
+        ('Uno',),
+    ])
+    def test_simple_paraboloid_upper_inequality_constraint_unscaled(self, reference_optimizer):
         """
-        Test the computed Lagrange multipliers against IPOPT. Note IPOPT and
-        SNOPT use opposite sign conventions on Lagrange multipliers.
+        Test the computed Lagrange multipliers against IPOPT or Uno reference.
+        Note IPOPT and SNOPT use opposite sign conventions on Lagrange multipliers.
         """
         drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
                    'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
                    'pos_SNOPT': om.pyOptSparseDriver(optimizer=snopt_opt, print_results=False),
-                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)}
+                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
+                   'pos_Uno': om.pyOptSparseDriver(optimizer='Uno', print_results=False)}
 
-        prob = self._make_problem(driver=drivers['pos_IPOPT'])
+        # Get reference multipliers using the parametrized optimizer
+        if reference_optimizer == 'IPOPT':
+            prob = self._make_problem(driver=drivers['pos_IPOPT'])
+        elif reference_optimizer == 'Uno':
+            prob = self._make_problem(driver=drivers['pos_Uno'])
+
         result = prob.run_driver()
         self.assertEqual(result.exit_status, 'SUCCESS',
-                         msg='Failed to converge baseline IPOPT optimization.')
+                         msg=f'Failed to converge baseline {reference_optimizer} optimization.')
         reference_multipliers = prob.driver.pyopt_solution.lambdaStar
 
         for driver_name, driver in drivers.items():
-            with self.subTest(f'{driver_name=}'):
+            with self.subTest(f'reference={reference_optimizer}, tested={driver_name}'):
                 prob = self._make_problem(driver=driver)
                 result =  prob.run_driver()
                 self.assertEqual(result.exit_status, 'SUCCESS',
@@ -70,26 +81,36 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
                 self.assertEqual(active_cons['c']['indices'], [0])
                 self.assertEqual(active_cons['c']['active_bounds'], [1])
 
-    def test_simple_paraboloid_upper_inequality_constraint_scaled(self):
+    @parameterized.expand([
+        ('IPOPT',),
+        ('Uno',),
+    ])
+    def test_simple_paraboloid_upper_inequality_constraint_scaled(self, reference_optimizer):
         """
-        Test the computed Lagrange multipliers against IPOPT. Note IPOPT and
-        SNOPT use opposite sign conventions on Lagrange multipliers.
+        Test the computed Lagrange multipliers against IPOPT or Uno reference.
+        Note IPOPT and SNOPT use opposite sign conventions on Lagrange multipliers.
         """
         drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
                    'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
                    'pos_SNOPT': om.pyOptSparseDriver(optimizer=snopt_opt, print_results=False),
-                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),}
+                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
+                   'pos_Uno': om.pyOptSparseDriver(optimizer='Uno', print_results=False)}
 
-        prob = self._make_problem(driver=drivers['pos_IPOPT'], f_xy_ref=0.1, c_ref=15, x_ref=10, y_ref=10)
+        # Get reference multipliers using the parametrized optimizer
+        if reference_optimizer == 'IPOPT':
+            prob = self._make_problem(driver=drivers['pos_IPOPT'], f_xy_ref=0.1, c_ref=15, x_ref=10, y_ref=10)
+        elif reference_optimizer == 'Uno':
+            prob = self._make_problem(driver=drivers['pos_Uno'], f_xy_ref=0.1, c_ref=15, x_ref=10, y_ref=10)
+
         result = prob.run_driver()
         self.assertEqual(result.exit_status, 'SUCCESS',
-                         msg='Failed to converge baseline IPOPT optimization.')
+                         msg=f'Failed to converge baseline {reference_optimizer} optimization.')
         reference_multipliers = prob.driver.pyopt_solution.lambdaStar
         active_dvs, active_cons = prob.driver.compute_lagrange_multipliers(driver_scaling=True)
         assert_near_equal(active_cons['c']['multipliers'], reference_multipliers['c'], tolerance=1.0E-5)
 
         for driver_name, driver in drivers.items():
-            with self.subTest(f'{driver_name=}'):
+            with self.subTest(f'reference={reference_optimizer}, tested={driver_name}'):
                 prob = self._make_problem(driver=driver, f_xy_ref=0.1, c_ref=15, x_ref=10, y_ref=10)
                 result =  prob.run_driver()
                 self.assertEqual(result.exit_status, 'SUCCESS',
@@ -102,24 +123,34 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
                 _, unscaled_active_cons = prob.driver.compute_lagrange_multipliers(driver_scaling=False)
                 assert_near_equal(unscaled_active_cons['c']['multipliers'], 0.5, tolerance=1.0E-5)
 
-    def test_simple_paraboloid_upper_inequality_constraint_lower_y_bound(self):
+    @parameterized.expand([
+        ('IPOPT',),
+        ('Uno',),
+    ])
+    def test_simple_paraboloid_upper_inequality_constraint_lower_y_bound(self, reference_optimizer):
         """
-        Test the computed Lagrange multipliers against IPOPT. Note IPOPT and
-        SNOPT use opposite sign conventions on Lagrange multipliers.
+        Test the computed Lagrange multipliers against IPOPT or Uno reference.
+        Note IPOPT and SNOPT use opposite sign conventions on Lagrange multipliers.
         """
         drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
                    'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
                    'pos_SNOPT': om.pyOptSparseDriver(optimizer=snopt_opt, print_results=False),
-                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),}
+                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
+                   'pos_Uno': om.pyOptSparseDriver(optimizer='Uno', print_results=False)}
 
-        prob = self._make_problem(driver=drivers['pos_IPOPT'], y_lower=-7.0)
+        # Get reference multipliers using the parametrized optimizer
+        if reference_optimizer == 'IPOPT':
+            prob = self._make_problem(driver=drivers['pos_IPOPT'], y_lower=-7.0)
+        elif reference_optimizer == 'Uno':
+            prob = self._make_problem(driver=drivers['pos_Uno'], y_lower=-7.0)
+
         result = prob.run_driver()
         self.assertEqual(result.exit_status, 'SUCCESS',
-                         msg='Failed to converge baseline IPOPT optimization.')
+                         msg=f'Failed to converge baseline {reference_optimizer} optimization.')
         reference_multipliers = prob.driver.pyopt_solution.lambdaStar
 
         for driver_name, driver in drivers.items():
-            with self.subTest(f'{driver_name=}'):
+            with self.subTest(f'reference={reference_optimizer}, tested={driver_name}'):
                 prob = self._make_problem(driver=driver, y_lower=-7.0)
                 result =  prob.run_driver()
                 self.assertEqual(result.exit_status, 'SUCCESS',
@@ -145,26 +176,37 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
                 f_perturbed = prob.get_val('f_xy')
                 assert_near_equal((f_perturbed - f_nom) / 0.01, lambda_y, tolerance=1.0E-1)
 
-    def test_simple_paraboloid_upper_inequality_constraint_lower_y_bound_scaled(self):
+    @parameterized.expand([
+        ('IPOPT',),
+        ('Uno',),
+    ])
+    def test_simple_paraboloid_upper_inequality_constraint_lower_y_bound_scaled(self, reference_optimizer):
         """
-        Test the computed Lagrange multipliers against IPOPT. Note IPOPT and
-        SNOPT use opposite sign conventions on Lagrange multipliers.
+        Test the computed Lagrange multipliers against IPOPT or Uno reference.
+        Note IPOPT and SNOPT use opposite sign conventions on Lagrange multipliers.
         """
         drivers = {'pos_IPOPT': om.pyOptSparseDriver(optimizer='IPOPT', print_results=False),
                    'pos_SLSQP': om.pyOptSparseDriver(optimizer='SLSQP', print_results=False),
                    'pos_SNOPT': om.pyOptSparseDriver(optimizer=snopt_opt, print_results=False),
-                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),}
+                   'scipy_SLSQP': om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False),
+                   'pos_Uno': om.pyOptSparseDriver(optimizer='Uno', print_results=False)}
 
-        prob = self._make_problem(driver=drivers['pos_IPOPT'], y_lower=-7.0, f_xy_ref=0.1,
-                                  c_ref=15, x_ref=10, y_ref=10)
+        # Get reference multipliers using the parametrized optimizer
+        if reference_optimizer == 'IPOPT':
+            prob = self._make_problem(driver=drivers['pos_IPOPT'], y_lower=-7.0, f_xy_ref=0.1,
+                                      c_ref=15, x_ref=10, y_ref=10)
+        elif reference_optimizer == 'Uno':
+            prob = self._make_problem(driver=drivers['pos_Uno'], y_lower=-7.0, f_xy_ref=0.1,
+                                      c_ref=15, x_ref=10, y_ref=10)
+
         result = prob.run_driver()
         self.assertEqual(result.exit_status, 'SUCCESS',
-                         msg='Failed to converge baseline IPOPT optimization.')
+                         msg=f'Failed to converge baseline {reference_optimizer} optimization.')
         reference_multipliers = prob.driver.pyopt_solution.lambdaStar
 
         for driver_name, driver in drivers.items():
             for use_sparse in [True, False]:
-                with self.subTest(f'{driver_name=} {use_sparse=}'):
+                with self.subTest(f'reference={reference_optimizer}, tested={driver_name} {use_sparse=}'):
                     prob = self._make_problem(driver=driver, y_lower=-7.0, f_xy_ref=0.1,
                                             c_ref=15, x_ref=10, y_ref=10)
                     result =  prob.run_driver()

@@ -1188,6 +1188,12 @@ class Component(System):
             raise ValueError('{}: d({})/d({}): If one of rows/cols is specified, then '
                              'both must be specified.'.format(self.msginfo, of, wrt))
 
+        if rows is not None and method in ('fd', 'cs'):
+            issue_warning(f"d({of})/d({wrt}): rows and cols do not reduce the number of "
+                          f"evaluations when method='{method}'. Use declare_coloring to compute "
+                          "the sparsity of approximated partials.",
+                          prefix=self.msginfo, category=DerivativesWarning)
+
         if dependent:
             meta['val'] = val
             meta['diagonal'] = diagonal

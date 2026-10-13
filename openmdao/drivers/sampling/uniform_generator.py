@@ -4,7 +4,7 @@ Uniform generator for Analysis Driver.
 import numpy as np
 
 from openmdao.drivers.analysis_generator import AnalysisGenerator
-from openmdao.drivers.sampling.sampling_util import _get_size
+from openmdao.drivers.sampling.sampling_util import _get_size, _get_bounds
 
 
 class UniformGenerator(AnalysisGenerator):
@@ -86,8 +86,9 @@ class UniformGenerator(AnalysisGenerator):
 
         d = {}
         for name, meta in self._var_dict.items():
+            lower, upper = _get_bounds(name, meta, sizes[name], self._inf_bound)
             d[name] = {
-                'val': np.random.uniform(meta['lower'], meta['upper'], sizes[name]),
+                'val': np.random.uniform(lower, upper, sizes[name]),
                 'units': meta.get('units', None),
                 'indices': meta.get('indices', None)
             }

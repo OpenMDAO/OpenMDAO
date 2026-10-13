@@ -904,5 +904,317 @@ class TestBryodenFeature(unittest.TestCase):
         assert_near_equal(p.get_val('circuit.R1.I') + p.get_val('circuit.D1.I'), .1, 1e-6)
 
 
+class _CSSquare(om.ExplicitComponent):
+    """y = x**2, scalar or elementwise, with analytic partials so it survives an outer cs."""
+
+    def initialize(self):
+        self.options.declare('size', types=int, default=1)
+
+    def setup(self):
+        size = self.options['size']
+        if size == 1:
+            self.add_input('x', val=1.0)
+            self.add_output('y', val=1.0)
+            self.declare_partials('y', 'x')
+        else:
+            self.add_input('x', val=np.ones(size))
+            self.add_output('y', val=np.ones(size))
+            self.declare_partials('y', 'x', rows=np.arange(size), cols=np.arange(size))
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = inputs['x'] ** 2
+
+    def compute_partials(self, inputs, partials):
+        partials['y', 'x'] = 2.0 * inputs['x']
+
+
+class _CSRoot(om.ImplicitComponent):
+    """R(s) = s**2 - a, so s = sqrt(a) and ds/da = 1/(2*sqrt(a))."""
+
+    def setup(self):
+        self.add_input('a', val=4.0)
+        self.add_output('s', val=1.5, lower=0.0, upper=10.0)
+        self.declare_partials('s', ['a', 's'])
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        residuals['s'] = outputs['s'] ** 2 - inputs['a']
+
+    def linearize(self, inputs, outputs, partials):
+        partials['s', 's'] = 2.0 * outputs['s']
+        partials['s', 'a'] = -1.0
+
+
+class _CSCycleA(om.ExplicitComponent):
+    """y1 = a - k*y2**2, nonlinear in the coupling."""
+
+    def initialize(self):
+        self.options.declare('k', default=0.1)
+
+    def setup(self):
+        self.add_input('a', val=3.0)
+        self.add_input('y2', val=0.0)
+        self.add_output('y1', val=1.0)
+        self.declare_partials('y1', ['a', 'y2'])
+
+    def compute(self, inputs, outputs):
+        outputs['y1'] = inputs['a'] - self.options['k'] * inputs['y2'] ** 2
+
+    def compute_partials(self, inputs, partials):
+        partials['y1', 'a'] = 1.0
+        partials['y1', 'y2'] = -2.0 * self.options['k'] * inputs['y2']
+
+
+class _CSCycleB(om.ExplicitComponent):
+    """y2 = k*y1."""
+
+    def initialize(self):
+        self.options.declare('k', default=0.1)
+
+    def setup(self):
+        self.add_input('y1', val=1.0)
+        self.add_output('y2', val=1.0)
+        self.declare_partials('y2', 'y1')
+
+    def compute(self, inputs, outputs):
+        outputs['y2'] = self.options['k'] * inputs['y1']
+
+    def compute_partials(self, inputs, partials):
+        partials['y2', 'y1'] = self.options['k']
+
+
+class TestBroydenCSIndepVarNudge(unittest.TestCase):
+    """Independent outputs must not be translated by the cs_reconverge nudge. Issue #3810."""
+
+    def _feedforward(self, irrelevant=None, state_vars=None, size=1):
+        prob = om.Problem()
+        model = prob.model
+        ivc = model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+        if size == 1:
+            ivc.add_output('x', 22.0)
+        else:
+            ivc.add_output('x', np.array([3.0, 22.0, 5.0]))
+        if irrelevant is not None:
+            ivc.add_output('irrelevant', irrelevant)
+        model.add_subsystem('sq', _CSSquare(size=size), promotes=['*'])
+
+        solver = model.nonlinear_solver = om.BroydenSolver()
+        solver.options['cs_reconverge'] = True
+        if state_vars is not None:
+            solver.options['state_vars'] = state_vars
+        solver.linear_solver = om.DirectSolver()
+        model.linear_solver = om.DirectSolver()
+        return prob
+
+    def _cs_total(self, prob, of='y', wrt='x'):
+        data = prob.check_totals(of=[of], wrt=[wrt], method='cs', out_stream=None)
+        return data[of, wrt]['J_fd']
+
+    def _run(self, prob):
+        prob.setup(force_alloc_complex=True)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+        return prob
+
+    def test_indep_var_not_shifted_full_inverse(self):
+        # The issue #3810 reproducer. In full inverse mode the Broyden state vector is the
+        # whole output vector, so this cannot be fixed by looking at Broyden's state alone.
+        prob = self._run(self._feedforward())
+        assert_near_equal(self._cs_total(prob).item(), 44.0, 1e-13)
+
+    def test_indep_var_not_shifted_explicit_state_vars(self):
+        # Same defect reached through the other Broyden mode. Here the nudge moves an output
+        # that Broyden does not own and never writes back.
+        prob = self._run(self._feedforward(state_vars=['y']))
+        assert_near_equal(self._cs_total(prob).item(), 44.0, 1e-13)
+
+    def test_disconnected_output_does_not_change_derivative(self):
+        # The magnitude of a completely disconnected output must not reach the derivative
+        # through the norm that sizes the nudge.
+        results = [self._cs_total(self._run(self._feedforward(irrelevant=v))).item()
+                   for v in (0.0, 1.0, 1e8, 1e10)]
+        for value in results:
+            assert_near_equal(value, 44.0, 1e-13)
+        self.assertEqual(len(set(results)), 1,
+                         msg='a disconnected output changed the reported derivative')
+
+    def test_disconnected_output_does_not_change_iteration_count(self):
+        # Restoring independent values after a full nudge would still leave the sizing norm
+        # contaminated, which steers how hard the solver works. Pin the behavior, not just
+        # the number.
+        counts = []
+        for value in (0.0, 1e6, 1e8, 1e10):
+            prob = self._run(self._nonlinear_cycle(irrelevant=value))
+            self._cs_total(prob, of='y1', wrt='a')
+            counts.append(prob.model.nonlinear_solver._iter_count)
+        self.assertEqual(len(set(counts)), 1,
+                         msg=f'disconnected output changed Broyden iteration count: {counts}')
+
+    def test_auto_ivc_indep_var(self):
+        # _auto_ivc outputs carry the same tag and must be protected the same way.
+        prob = om.Problem()
+        model = prob.model
+        model.add_subsystem('sq', _CSSquare(), promotes=['*'])
+        solver = model.nonlinear_solver = om.BroydenSolver()
+        solver.linear_solver = om.DirectSolver()
+        model.linear_solver = om.DirectSolver()
+        prob.setup(force_alloc_complex=True)
+        prob.set_solver_print(level=0)
+        prob.set_val('x', 22.0)
+        prob.run_model()
+        assert_near_equal(self._cs_total(prob).item(), 44.0, 1e-13)
+
+    def test_vector_indep_var(self):
+        # Every element of a vector independent variable must be protected, not just the
+        # first. A scalar-only mask passes the scalar tests and fails here.
+        prob = self._run(self._feedforward(irrelevant=1e8, size=3))
+        x = np.array([3.0, 22.0, 5.0])
+        expected = np.diag([2.0 * x[0], 2.0 * x[1], 2.0 * x[2]])
+        assert_near_equal(self._cs_total(prob), expected, 1e-12)
+
+    def test_indep_var_declared_as_state_var(self):
+        # An independent output may legally be named in state_vars. Excluding it by
+        # Broyden's state membership rather than by tag reintroduces the defect here.
+        prob = self._run(self._feedforward(irrelevant=1e8, state_vars=['x', 'y']))
+        assert_near_equal(self._cs_total(prob).item(), 44.0, 1e-13)
+
+    def _nonlinear_cycle(self, irrelevant=None, state_vars=('y1', 'y2')):
+        prob = om.Problem()
+        model = prob.model
+        ivc = model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('a', 3.0)
+        if irrelevant is not None:
+            ivc.add_output('irrelevant', irrelevant)
+        model.add_subsystem('c1', _CSCycleA(k=0.1), promotes=['*'])
+        model.add_subsystem('c2', _CSCycleB(k=0.1), promotes=['*'])
+        solver = model.nonlinear_solver = om.BroydenSolver()
+        solver.options['maxiter'] = 60
+        solver.options['atol'] = 1e-14
+        solver.options['rtol'] = 1e-14
+        if state_vars is not None:
+            solver.options['state_vars'] = list(state_vars)
+        solver.linear_solver = om.DirectSolver()
+        model.linear_solver = om.DirectSolver()
+        return prob
+
+    def test_coupled_states_still_reconverge(self):
+        # The nudge is retained for genuine solver states. Removing it entirely leaves this
+        # cycle unconverged under complex step.
+        prob = self._run(self._nonlinear_cycle(irrelevant=1e8))
+        expected = 1.0 / np.sqrt(1.0 + 4.0 * 0.1 ** 3 * 3.0)
+        assert_near_equal(self._cs_total(prob, of='y1', wrt='a').item(), expected, 1e-10)
+
+    def test_implicit_state_derivative(self):
+        # A real implicit state, where the wrong base point shows up as a wrong analytic
+        # value rather than a convergence artifact.
+        prob = om.Problem()
+        model = prob.model
+        ivc = model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('a', 4.0)
+        ivc.add_output('irrelevant', 1e8)
+        model.add_subsystem('root', _CSRoot(), promotes=['*'])
+        solver = model.nonlinear_solver = om.BroydenSolver()
+        solver.options['state_vars'] = ['s']
+        solver.options['maxiter'] = 60
+        solver.options['atol'] = 1e-14
+        solver.options['rtol'] = 1e-14
+        solver.linear_solver = om.DirectSolver()
+        model.linear_solver = om.DirectSolver()
+        self._run(prob)
+        assert_near_equal(self._cs_total(prob, of='s', wrt='a').item(), 0.25, 1e-10)
+
+    def test_with_linesearch(self):
+        # The nudge runs before the linesearch ever sees the vector. Bounds enforcement
+        # must not reintroduce a shift on independent outputs.
+        prob = om.Problem()
+        model = prob.model
+        ivc = model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+        ivc.add_output('a', 4.0)
+        ivc.add_output('irrelevant', 1e8)
+        model.add_subsystem('root', _CSRoot(), promotes=['*'])
+        solver = model.nonlinear_solver = om.BroydenSolver()
+        solver.options['state_vars'] = ['s']
+        solver.options['maxiter'] = 60
+        solver.options['atol'] = 1e-14
+        solver.options['rtol'] = 1e-14
+        solver.linesearch = om.BoundsEnforceLS()
+        solver.linear_solver = om.DirectSolver()
+        model.linear_solver = om.DirectSolver()
+        self._run(prob)
+        assert_near_equal(self._cs_total(prob, of='s', wrt='a').item(), 0.25, 1e-10)
+
+    def test_repeated_evaluations_and_fd(self):
+        # Repeated complex steps must be idempotent, and fd must be unaffected because the
+        # modified block is gated on complex step.
+        prob = self._run(self._feedforward(irrelevant=1e8))
+        first = self._cs_total(prob).item()
+        second = self._cs_total(prob).item()
+        third = self._cs_total(prob).item()
+        self.assertEqual(first, second)
+        self.assertEqual(first, third)
+        assert_near_equal(first, 44.0, 1e-13)
+
+        other = self._run(self._feedforward(irrelevant=1e8))
+        fd = other.check_totals(of=['y'], wrt=['x'], method='fd', out_stream=None)
+        assert_near_equal(fd['y', 'x']['J_fd'].item(), 44.0, 1e-5)
+
+    def test_cs_reconverge_nudge_semantics(self):
+        # White-box check of the nudge itself: it must leave every imaginary part untouched,
+        # leave outputs tagged 'openmdao:indep_var' untouched, and shift the remaining
+        # outputs by exactly norm(those outputs) * 1e-10.
+        prob = self._run(self._feedforward(irrelevant=1e8))
+        model = prob.model
+        solver = model.nonlinear_solver
+        model._set_complex_step_mode(True)
+        try:
+            arr = model._outputs.asarray()
+            idx = {name: model._outputs.get_range(name)[0]
+                   for name in model._outputs._abs_iter()}
+            arr[idx['ivc.x']] += 1e-40j
+            arr[idx['sq.y']] += 3e-41j
+            before = arr.copy()
+            expected_nudge = np.linalg.norm(before[[idx['sq.y']]]) * 1e-10
+
+            captured = {}
+            original_get_vector = solver.get_vector
+
+            def capture(vec):
+                if 'arr' not in captured:
+                    captured['arr'] = model._outputs.asarray().copy()
+                return original_get_vector(vec)
+
+            solver.get_vector = capture
+            try:
+                solver._iter_initialize()
+            finally:
+                solver.get_vector = original_get_vector
+
+            # the first get_vector call is the statement right after the nudge
+            after = captured['arr']
+            self.assertTrue(np.array_equal(after.imag, before.imag),
+                            msg='nudge must not modify imaginary parts')
+            self.assertEqual((after[idx['ivc.x']] - before[idx['ivc.x']]).real, 0.0,
+                             msg='indep var was translated by the nudge')
+            self.assertEqual((after[idx['ivc.irrelevant']] -
+                              before[idx['ivc.irrelevant']]).real, 0.0,
+                             msg='disconnected indep var was translated by the nudge')
+            # exact, including the single float64 rounding of (y + nudge)
+            base = before[idx['sq.y']].real
+            expected_delta = (base + expected_nudge) - base
+            delta = (after[idx['sq.y']] - before[idx['sq.y']]).real
+            self.assertEqual(delta, expected_delta,
+                             msg='solver-state nudge missing or mis-sized')
+        finally:
+            model._set_complex_step_mode(False)
+
+    def test_real_solve_and_fd_unchanged(self):
+        # The modified block is gated on complex step, so a plain real solve must be
+        # bit-identical to what it always was.
+        prob = self._run(self._nonlinear_cycle(irrelevant=1e8))
+        y1 = prob.get_val('y1')[0]
+        expected = (-1.0 + np.sqrt(1.0 + 4.0 * 0.1 ** 3 * 3.0)) / (2.0 * 0.1 ** 3)
+        assert_near_equal(y1, expected, 1e-10)
+        self.assertFalse(np.iscomplexobj(prob.model._outputs.asarray()))
+
+
 if __name__ == "__main__":
     unittest.main()

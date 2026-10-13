@@ -74,7 +74,7 @@ jobs:
         uses: ./.github/actions/setup_openmdao_pixi
         with:
           environment: '${{ matrix.PIXI_ENVIRONMENT }}'
-          openmdao_install_from: 'wheel'
+          openmdao_install_from: ${{ github.repository == 'OpenMDAO/OpenMDAO' && 'wheel' || 'local_developer' }}
 
       - name: Check SNOPT availability
         id: check_snopt

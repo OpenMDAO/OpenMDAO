@@ -4,7 +4,6 @@ from collections import defaultdict
 import re
 
 from openmdao.utils.shell_proc import _is_process_running
-from openmdao.core.constants import INF_BOUND
 
 try:
     from openmdao.visualization.realtime_plot.realtime_plot_class import _RealTimePlot
@@ -910,7 +909,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
             units = self._case_tracker._get_units(varname_minus_type)
             desvars_button_label = f"{varname} ({units})"
 
-            if upper_bound != INF_BOUND:
+            if upper_bound is not None and not np.isposinf(upper_bound):
                 upper_bound_indicator = self._make_bounds_display(
                     _bounds_infinity,
                     upper_bound,
@@ -926,7 +925,7 @@ class _RealTimeOptimizerPlot(_RealTimePlot):
                     visible=False,
                 )
 
-            if lower_bound != -INF_BOUND:
+            if lower_bound is not None and not np.isneginf(lower_bound):
                 lower_bound_indicator = self._make_bounds_display(
                     lower_bound,
                     -_bounds_infinity,

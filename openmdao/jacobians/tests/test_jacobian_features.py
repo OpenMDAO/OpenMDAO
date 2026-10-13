@@ -15,7 +15,8 @@ except ImportError:
 
 import openmdao.api as om
 
-from openmdao.utils.assert_utils import assert_near_equal
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.om_warnings import DerivativesWarning
 
 
 class SimpleComp(om.ExplicitComponent):
@@ -244,6 +245,21 @@ class TestJacobianFeatures(unittest.TestCase):
         with self.assertRaises(ValueError) as ex:
             problem.run_model()
         self.assertEqual(str(ex.exception), error_msg)
+
+    @parameterized.expand(['fd', 'cs'])
+    def test_approx_rows_cols_warning(self, method):
+        comp = SimpleCompKwarg({'of': 'g', 'wrt': 'y1', 'method': method,
+                                'rows': [0, 1, 2, 3], 'cols': [0, 0, 1, 1]})
+        problem = self.problem
+        model = problem.model
+        model.add_subsystem('simple', comp, promotes=['x', 'y1', 'y2', 'y3', 'z', 'f', 'g'])
+
+        msg = ("'simple' <class SimpleCompKwarg>: d(g)/d(y1): rows and cols do not reduce the "
+               f"number of evaluations when method='{method}'. Use declare_coloring to compute "
+               "the sparsity of approximated partials.")
+        with assert_warning(DerivativesWarning, msg):
+            problem.setup()
+            problem.final_setup()
 
     def test_const_jacobian(self):
         model = om.Group()

@@ -444,7 +444,7 @@ class TestDesvarOnModel(unittest.TestCase):
 
     def test_desvar_inf_bounds(self):
 
-        # make sure no overflow when there is no specified upper/lower bound and significatn scaling
+        # make sure unbounded variables have None bounds (not overflow-prone large floats)
 
         prob = om.Problem()
 
@@ -461,15 +461,15 @@ class TestDesvarOnModel(unittest.TestCase):
 
         des_vars = prob.model.get_design_vars()
 
-        self.assertFalse(np.isinf(des_vars['x']['upper']))
-        self.assertFalse(np.isinf(-des_vars['x']['lower']))
+        self.assertIsNone(des_vars['x']['upper'])
+        self.assertIsNone(des_vars['x']['lower'])
 
         responses = prob.model.get_responses()
 
-        self.assertFalse(np.isinf(responses['con_cmp1.con1']['upper']))
-        self.assertFalse(np.isinf(responses['con_cmp2.con2']['upper']))
-        self.assertFalse(np.isinf(-responses['con_cmp1.con1']['lower']))
-        self.assertFalse(np.isinf(-responses['con_cmp2.con2']['lower']))
+        self.assertIsNone(responses['con_cmp1.con1']['upper'])
+        self.assertIsNone(responses['con_cmp2.con2']['upper'])
+        self.assertIsNone(responses['con_cmp1.con1']['lower'])
+        self.assertIsNone(responses['con_cmp2.con2']['lower'])
 
     def test_desvar_invalid_name(self):
 

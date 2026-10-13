@@ -86,24 +86,30 @@ def _header_cell():
     return template
 
 
+def _write_if_changed(filename, content):
+    """Write content to filename only if it differs from what is already there."""
+    try:
+        with open(filename, 'r') as f:
+            if f.read() == content:
+                return
+    except FileNotFoundError:
+        pass
+    with open(filename, 'w') as f:
+        f.write(content)
+
+
 def build_src_docs(top, src_dir, project_name='openmdao'):
     """
     Generate the source documenation notebook files.
     """
     doc_dir = os.path.join(top, "_srcdocs")
-    if os.path.isdir(doc_dir):
-        import shutil
-        shutil.rmtree(doc_dir)
-
     if not os.path.isdir(doc_dir):
         os.mkdir(doc_dir)
 
     packages_dir = os.path.join(doc_dir, "packages")
-    if not os.path.isdir(packages_dir):
-        os.mkdir(packages_dir)
+    os.makedirs(packages_dir, exist_ok=True)
 
     index_filename = os.path.join(doc_dir, "index.ipynb")
-    index = open(index_filename, "w")
     index_data = index_top
 
     for package in packages:
@@ -135,10 +141,8 @@ def build_src_docs(top, src_dir, project_name='openmdao'):
 
             # make subpkg directory (e.g. _srcdocs/packages/core) for ref sheets
             package_dir = os.path.join(packages_dir, package)
-            os.mkdir(package_dir)
+            os.makedirs(package_dir, exist_ok=True)
 
-            # create/write a package index file: (e.g. "_srcdocs/packages/openmdao.core.ipynb")
-            package_file = open(package_filename, "w")
             package_data = f"# {package_name}\n\n"
 
             for sub_package in sub_packages:
@@ -154,43 +158,20 @@ def build_src_docs(top, src_dir, project_name='openmdao'):
 
                     # creates and writes out one reference sheet (e.g. core/component.ipynb)
                     ref_sheet_filename = os.path.join(package_dir, sub_package + ".ipynb")
-                    ref_sheet = open(ref_sheet_filename, "w")
-
-                    # get the meat of the ref sheet code done
                     filename = sub_package + ".py"
-                    ref_sheet.write(_header_cell())
-                    ref_sheet.close()
+                    data = json.loads(_header_cell())
+                    data['cells'][0]['source'] = header(filename,
+                                                        package_name + "." + sub_package)
+                    _write_if_changed(ref_sheet_filename,
+                                      json.dumps(data, indent=4))
 
-                    # Open the json file and fill in the template details
-                    with open(ref_sheet_filename, 'r+') as f:
-                        data = json.load(f)
-                        data['cells'][0]['source'] = header(filename,
-                                                            package_name + "." + sub_package)
-                        f.seek(0)
-                        json.dump(data, f, indent=4)
-                        f.truncate()
+            data = json.loads(_header_cell())
+            data['cells'][0]['source'] = package_data
+            _write_if_changed(package_filename, json.dumps(data, indent=4))
 
-            # finish and close each package file
-            package_file.write(_header_cell())
-            package_file.close()
-            with open(package_filename, 'r+') as f:
-                data = json.load(f)
-                data['cells'][0]['source'] = package_data
-                f.seek(0)
-                json.dump(data, f, indent=4)
-                f.truncate()
-            package_file.close()
-
-    # finish and close top-level index file
-    index.write(_header_cell())
-    index.close()
-    with open(index_filename, 'r+') as f:
-        data = json.load(f)
-        data['cells'][0]['source'] = index_data
-        f.seek(0)
-        json.dump(data, f, indent=4)
-        f.truncate()
-    index.close()
+    data = json.loads(_header_cell())
+    data['cells'][0]['source'] = index_data
+    _write_if_changed(index_filename, json.dumps(data, indent=4))
 
 
 if __name__ == '__main__':

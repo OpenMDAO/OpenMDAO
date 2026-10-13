@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from openmdao.utils.rangemapper import RangeMapper, RangeTree, FlatRangeMapper
 
@@ -105,7 +106,7 @@ class TestRangeMapper(unittest.TestCase):
                 self.assertEqual(list(mapper.overlap_iter('z', other_mapper)), [('z', 0, 6, 'z', 1, 7)])
 
     def test_dump(self):
-        with unittest.mock.patch('builtins.print') as mock_print:
+        with patch('builtins.print') as mock_print:
             for mclass in (RangeTree, FlatRangeMapper):
                 with self.subTest(msg=f'{mclass.__name__} test'):
                     mapper = mclass(_data.items())

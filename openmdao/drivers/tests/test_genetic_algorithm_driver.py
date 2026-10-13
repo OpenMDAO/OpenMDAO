@@ -7,7 +7,6 @@ import numpy as np
 
 import openmdao.api as om
 
-from openmdao.core.constants import INF_BOUND
 
 from openmdao.drivers.genetic_algorithm_driver import GeneticAlgorithm
 
@@ -34,9 +33,9 @@ except ImportError:
     PETScVector = None
 
 try:
-    import pyDOE3
+    import pydoe
 except ImportError:
-    pyDOE3 = None
+    pydoe = None
 
 extra_prints = False  # enable printing results
 
@@ -44,10 +43,10 @@ extra_prints = False  # enable printing results
 def _test_func_name(func, num, param):
     args = []
     for p in param.args:
-        if p and p == INF_BOUND:
-            args.append('INF_BOUND')
-        elif p and p == -INF_BOUND:
-            args.append('-INF_BOUND')
+        if p is not None and np.isscalar(p) and np.isposinf(p):
+            args.append('inf')
+        elif p is not None and np.isscalar(p) and np.isneginf(p):
+            args.append('-inf')
         else:
             args.append(str(p))
     return func.__name__ + '_' + '_'.join(args)
@@ -55,28 +54,28 @@ def _test_func_name(func, num, param):
 
 class TestErrors(unittest.TestCase):
 
-    @unittest.skipIf(pyDOE3, "only runs if 'pyDOE3' is not installed")
-    def test_no_pyDOE3(self):
+    @unittest.skipIf(pydoe, "only runs if 'pydoe' is not installed")
+    def test_no_pydoe(self):
         with self.assertRaises(RuntimeError) as err:
             GeneticAlgorithm(lambda: 0)
 
         self.assertEqual(str(err.exception),
-                         "GeneticAlgorithm requires the 'pyDOE3' package, "
+                         "GeneticAlgorithm requires the 'pydoe' package, "
                          "which can be installed with one of the following commands:\n"
                          "    pip install openmdao[doe]\n"
-                         "    pip install pyDOE3")
+                         "    pip install pydoe")
 
         with self.assertRaises(RuntimeError) as err:
             om.SimpleGADriver()
 
         self.assertEqual(str(err.exception),
-                         "SimpleGADriver requires the 'pyDOE3' package, "
+                         "SimpleGADriver requires the 'pydoe' package, "
                          "which can be installed with one of the following commands:\n"
                          "    pip install openmdao[doe]\n"
-                         "    pip install pyDOE3")
+                         "    pip install pydoe")
 
 
-    @unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+    @unittest.skipUnless(pydoe, "requires 'pydoe', install openmdao[doe]")
     def test_deprecation_warning(self):
         """Test that SimpleGADriver raises a deprecation warning on instantiation."""
         msg = ('The `SimpleGADriver` is deprecated. Please use '
@@ -85,7 +84,7 @@ class TestErrors(unittest.TestCase):
             om.SimpleGADriver()
 
 
-@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+@unittest.skipUnless(pydoe, "requires 'pydoe', install openmdao[doe]")
 class TestSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -526,11 +525,11 @@ class TestSimpleGA(unittest.TestCase):
 
     @parameterized.expand([
         (None, None),
-        (INF_BOUND, INF_BOUND),
-        (None, INF_BOUND),
-        (None, -INF_BOUND),
-        (INF_BOUND, None),
-        (-INF_BOUND, None),
+        (np.inf, np.inf),
+        (None, np.inf),
+        (None, -np.inf),
+        (np.inf, None),
+        (-np.inf, None),
     ],
     name_func=_test_func_name)
     def test_inf_desvar(self, lower, upper):
@@ -550,16 +549,9 @@ class TestSimpleGA(unittest.TestCase):
         with self.assertRaises(ValueError) as err:
             prob.final_setup()
 
-        # A value of None for lower and upper is changed to +/- INF_BOUND in add_design_var()
-        if lower is None:
-            lower = -INF_BOUND
-        if upper is None:
-            upper = INF_BOUND
-
         msg = ("Invalid bounds for design variable 'x'. When using "
-               "SimpleGADriver, values for both 'lower' and 'upper' "
-               f"must be specified between +/-INF_BOUND ({INF_BOUND}), "
-               f"but they are: lower={lower}, upper={upper}.")
+               "SimpleGADriver, finite values for both 'lower' and "
+               f"'upper' must be specified, but they are: lower={lower}, upper={upper}.")
 
         self.maxDiff = None
         self.assertEqual(err.exception.args[0], msg)
@@ -590,7 +582,7 @@ class TestSimpleGA(unittest.TestCase):
             self.assertLessEqual(1.0, prob["x"][i])
 
 
-@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+@unittest.skipUnless(pydoe, "requires 'pydoe', install openmdao[doe]")
 class TestDriverOptionsSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -640,7 +632,7 @@ class Box(om.ExplicitComponent):
         outputs['volume'] = length*height*width
 
 
-@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+@unittest.skipUnless(pydoe, "requires 'pydoe', install openmdao[doe]")
 class TestMultiObjectiveSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -772,7 +764,7 @@ class TestMultiObjectiveSimpleGA(unittest.TestCase):
         self.assertTrue(np.all(sorted_obj[:-1, 1] >= sorted_obj[1:, 1]))
 
 
-@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+@unittest.skipUnless(pydoe, "requires 'pydoe', install openmdao[doe]")
 class TestConstrainedSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -1020,9 +1012,9 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         assert_near_equal(p.get_val('exec.z')[50], -400)
 
     @parameterized.expand([
-        (None, -INF_BOUND, INF_BOUND),
-        (INF_BOUND, None, None),
-        (-INF_BOUND, None, None),
+        (None, -np.inf, np.inf),
+        (np.inf, None, None),
+        (-np.inf, None, None),
     ],
     name_func=_test_func_name)
     def test_inf_constraints(self, equals, lower, upper):
@@ -1047,16 +1039,9 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         with self.assertRaises(ValueError) as err:
             prob.final_setup()
 
-        # A value of None for lower and upper is changed to +/- INF_BOUND in add_constraint()
-        if lower is None:
-            lower = -INF_BOUND
-        if upper is None:
-            upper = INF_BOUND
-
         msg = ("Invalid bounds for constraint 'const.g'. "
-               "When using SimpleGADriver, the value for 'equals', "
-               "'lower' or 'upper' must be specified between "
-               f"+/-INF_BOUND ({INF_BOUND}), but they are: "
+               "When using SimpleGADriver, a finite value for 'equals', "
+               "'lower' or 'upper' must be specified, but they are: "
                f"equals={equals}, lower={lower}, upper={upper}.")
 
         self.maxDiff = None
@@ -1091,7 +1076,7 @@ class TestConstrainedSimpleGA(unittest.TestCase):
         assert_near_equal(prob['parab.f'], f_opt, 1e-4)
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+@unittest.skipUnless(pydoe, "requires 'pydoe', install openmdao[doe]")
 class MPITestSimpleGA(unittest.TestCase):
 
     N_PROCS = 2
@@ -1330,7 +1315,7 @@ class Summer(om.ExplicitComponent):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+@unittest.skipUnless(pydoe, "requires 'pydoe', install openmdao[doe]")
 @use_tempdirs
 class MPITestSimpleGA4Procs(unittest.TestCase):
 
@@ -1555,7 +1540,7 @@ class MPITestSimpleGA4Procs(unittest.TestCase):
         assert_near_equal(np.sum(prob.get_val('f_xy', get_remote=True))/3, -23.1333, 0.15)
 
 
-@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+@unittest.skipUnless(pydoe, "requires 'pydoe', install openmdao[doe]")
 class TestFeatureSimpleGA(unittest.TestCase):
 
     def setUp(self):
@@ -1789,7 +1774,7 @@ class TestFeatureSimpleGA(unittest.TestCase):
 
 
 @unittest.skipUnless(MPI and PETScVector, "MPI and PETSc are required.")
-@unittest.skipUnless(pyDOE3, "requires 'pyDOE3', install openmdao[doe]")
+@unittest.skipUnless(pydoe, "requires 'pydoe', install openmdao[doe]")
 class MPIFeatureTests(unittest.TestCase):
     N_PROCS = 2
 

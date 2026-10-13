@@ -1,9 +1,13 @@
 """Unit Tests for the code that does automatic report generation"""
 from importlib.util import find_spec
 import unittest
+import unittest.mock as mock
 import pathlib
+import shutil
 import sys
 import os
+import threading
+import time
 from io import StringIO
 
 import numpy as np
@@ -11,7 +15,7 @@ import numpy as np
 import openmdao.api as om
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.groups.parallel_groups import Diamond
-from openmdao.core.problem import _default_prob_name
+from openmdao.core.problem import _default_prob_name, _clear_reports_dir
 import openmdao.core.problem as probmod
 from openmdao.core.constants import _UNDEFINED
 from openmdao.utils.general_utils import set_pyoptsparse_opt
@@ -699,6 +703,260 @@ class TestReportsSystemMPI(unittest.TestCase):
             self.assertTrue(path.is_file(), f'The scaling report file, {str(path)}, was not found')
             path = pathlib.Path(problem_reports_dir).joinpath(self.optimizer_filename)
             self.assertTrue(path.is_file(), f'The optimizer report file, {str(path)}, was not found')
+
+
+@use_tempdirs
+class TestSetupReportsDirRace(unittest.TestCase):
+    """
+    Tests for the reports directory handling in Problem.setup (issue #3746).
+
+    During setup, stale reports must be removed, but the reports directory itself must not be
+    deleted while other ranks/processes sharing the output tree may be concurrently creating it,
+    because Path.mkdir(exist_ok=True) can raise a spurious FileExistsError if the directory
+    vanishes between mkdir's EEXIST and its internal is_dir() check (python/cpython#142916).
+    """
+
+    # generous timeout for the orchestration events below.  The events fire microseconds apart
+    # in a normal run; the timeout only bounds a hang if orchestration is broken.
+    TIMEOUT = 30.0
+
+    def setUp(self):
+        probmod._clear_problem_names()  # need to reset these to simulate separate runs
+        os.environ.pop('OPENMDAO_REPORTS', None)
+        # The reports code does nothing if TESTFLO_RUNNING is set, so remove it for these tests
+        # and remember its value so it can be restored.
+        self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
+        clear_reports()
+
+    def tearDown(self):
+        if self.testflo_running is not None:
+            os.environ['TESTFLO_RUNNING'] = self.testflo_running
+
+    def _make_problem(self, name, reports='n2'):
+        prob = om.Problem(name=name, reports=reports)
+        prob.model.add_subsystem('comp', om.ExecComp('y = 2.0*x'))
+        return prob
+
+    def test_setup_no_spurious_fileexists_from_concurrent_mkdir(self):
+        # Deterministic regression test for issue #3746.
+        #
+        # Interleaving exercised (all filesystem operations and exceptions are real; the
+        # events below only fix the order in which the two actors reach them):
+        #
+        #   "rank 1" (worker thread): calls prob.get_reports_dir(force=True), the same
+        #       production call every rank makes during Problem.setup.  Its exists() check
+        #       sees no reports dir, so it proceeds into Path.mkdir(parents=True,
+        #       exist_ok=True).
+        #   "rank 0" (main thread): calls prob.setup() with active reports.
+        #
+        #   1. rank 1 reaches os.mkdir for the reports dir and waits for rank 0 to create it.
+        #   2. rank 0's setup creates the reports dir.
+        #   3. rank 1's os.mkdir now raises a genuine FileExistsError from the kernel.
+        #   4. if rank 0's setup deletes the reports directory itself (the pre-fix behavior),
+        #      that deletion is allowed to complete here, inside pathlib's window between
+        #      os.mkdir raising EEXIST and its is_dir() verification.
+        #   5. rank 1's pathlib mkdir then runs its real is_dir() check.
+        #
+        # On code that deletes the reports directory during setup, step 5 finds no directory
+        # and mkdir(exist_ok=True) raises FileExistsError for a path that does not exist.
+        # With setup only clearing the directory's contents, no deletion ever occurs, the
+        # is_dir() check sees the directory, and the mkdir call succeeds.
+        prob = self._make_problem('race_prob')
+        self.assertTrue(len(prob._reports) > 0)  # active reports required for this scenario
+        prob.setup()
+
+        leaf = prob.get_outputs_dir() / 'reports'
+        if leaf.is_dir():
+            os.rmdir(leaf)  # start with no reports dir, as on a first run
+        leaf_str = os.fspath(leaf)
+
+        rank1_entered = threading.Event()   # rank 1 is inside os.mkdir for the reports dir
+        created = threading.Event()         # rank 0's setup has created the reports dir
+        eexist = threading.Event()          # rank 1 has its genuine EEXIST in hand
+        deleted = threading.Event()         # rank 0's setup has deleted the reports dir
+        rank1_done = threading.Event()      # rank 1's mkdir call has fully completed
+        setup_done = threading.Event()      # rank 0's setup() has returned
+
+        real_mkdir = os.mkdir
+        real_rmtree = shutil.rmtree
+        result = {}
+
+        def instrumented_mkdir(path, mode=0o777, *args, **kwargs):
+            if os.fspath(path) != leaf_str:
+                return real_mkdir(path, mode, *args, **kwargs)
+            if threading.current_thread().name == 'rank1':
+                rank1_entered.set()
+                if not created.wait(self.TIMEOUT):
+                    raise RuntimeError('orchestration timeout waiting for creation')
+                try:
+                    real_mkdir(path, mode, *args, **kwargs)
+                except OSError:
+                    eexist.set()
+                    # give the setup-side deletion (if the implementation performs one) time
+                    # to land inside pathlib's EEXIST -> is_dir() window
+                    t0 = time.perf_counter()
+                    while not (deleted.is_set() or setup_done.is_set()):
+                        if time.perf_counter() - t0 > self.TIMEOUT:
+                            raise RuntimeError('orchestration timeout in EEXIST window')
+                        time.sleep(0.001)
+                    raise
+            else:
+                # rank 0 re-creating the dir after a deletion must not beat rank 1's
+                # is_dir() check, else the race window closes by luck
+                if deleted.is_set() and not rank1_done.is_set():
+                    if not rank1_done.wait(self.TIMEOUT):
+                        raise RuntimeError('orchestration timeout waiting for rank 1')
+                real_mkdir(path, mode, *args, **kwargs)
+                created.set()
+
+        def instrumented_rmtree(path, *args, **kwargs):
+            if os.fspath(path) == leaf_str:
+                if not eexist.wait(self.TIMEOUT):
+                    raise RuntimeError('orchestration timeout waiting for EEXIST')
+                real_rmtree(path, *args, **kwargs)
+                deleted.set()
+            else:
+                real_rmtree(path, *args, **kwargs)
+
+        def rank1():
+            try:
+                result['dir'] = prob.get_reports_dir(force=True)
+            except BaseException as exc:
+                result['exc'] = exc
+            finally:
+                rank1_done.set()
+
+        with mock.patch('os.mkdir', instrumented_mkdir), \
+                mock.patch('shutil.rmtree', instrumented_rmtree):
+            t = threading.Thread(target=rank1, name='rank1')
+            t.start()
+            self.assertTrue(rank1_entered.wait(self.TIMEOUT), 'rank 1 never reached mkdir')
+            try:
+                prob.setup()
+            finally:
+                setup_done.set()
+                t.join(self.TIMEOUT)
+
+        self.assertFalse(t.is_alive(), 'rank 1 thread did not finish')
+        if 'exc' in result:
+            raise result['exc']
+        self.assertTrue(pathlib.Path(result['dir']).is_dir())
+
+    def test_setup_clears_stale_report_files(self):
+        # stale files in an existing reports dir must be gone after setup, and the reports
+        # dir must exist afterward when reports are active
+        prob = self._make_problem('stale_prob')
+        prob.setup()
+
+        reports_dir = prob.get_outputs_dir() / 'reports'
+        self.assertTrue(reports_dir.is_dir())
+        stale = reports_dir / 'stale_report.html'
+        stale.write_text('from a previous run')
+        stale_sub = reports_dir / 'stale_subdir'
+        stale_sub.mkdir()
+        (stale_sub / 'nested.html').write_text('nested stale content')
+
+        prob.setup()
+
+        self.assertTrue(reports_dir.is_dir())
+        self.assertFalse(stale.exists())
+        self.assertFalse(stale_sub.exists())
+
+    def test_setup_removes_stale_reports_dir_when_reports_inactive(self):
+        # when no reports are active, nothing will create the reports dir, so a stale one
+        # from a previous run must be removed entirely, as before
+        prob = self._make_problem('inactive_prob')
+        prob.setup()
+
+        reports_dir = prob.get_outputs_dir() / 'reports'
+        self.assertTrue(reports_dir.is_dir())
+        (reports_dir / 'stale_report.html').write_text('from a previous run')
+
+        probmod._clear_problem_names()
+        prob2 = self._make_problem('inactive_prob', reports=False)
+        self.assertEqual(len(prob2._reports), 0)
+        prob2.setup()
+
+        self.assertFalse(reports_dir.exists())
+
+    def test_clear_reports_dir_tolerates_concurrent_removal(self):
+        # a peer process removing an entry (or the whole dir) first is a benign outcome
+        workdir = pathlib.Path('clear_tol')
+        workdir.mkdir()
+        for fname in ('a.html', 'b.html'):
+            (workdir / fname).write_text('x')
+
+        real_unlink = os.unlink
+        calls = {'n': 0}
+
+        def racing_unlink(path, *args, **kwargs):
+            calls['n'] += 1
+            if calls['n'] == 1:
+                real_unlink(path, *args, **kwargs)  # a peer removed this entry first
+                raise FileNotFoundError(2, 'No such file or directory', os.fspath(path))
+            real_unlink(path, *args, **kwargs)
+
+        with mock.patch('os.unlink', racing_unlink):
+            _clear_reports_dir(workdir)
+
+        self.assertTrue(workdir.is_dir())
+        self.assertEqual(list(workdir.iterdir()), [])
+
+        # the whole directory having been removed by a peer is also benign
+        _clear_reports_dir(workdir / 'no_such_dir')
+
+    def test_clear_reports_dir_propagates_real_errors(self):
+        # only the benign concurrent-removal outcome is tolerated; real filesystem errors
+        # must propagate
+        workdir = pathlib.Path('clear_err')
+        workdir.mkdir()
+        (workdir / 'a.html').write_text('x')
+
+        def denied_unlink(path, *args, **kwargs):
+            raise PermissionError(13, 'Permission denied', os.fspath(path))
+
+        with mock.patch('os.unlink', denied_unlink):
+            with self.assertRaises(PermissionError):
+                _clear_reports_dir(workdir)
+
+    @unittest.skipIf(sys.platform == 'win32', 'symlink creation requires privileges on Windows')
+    def test_clear_reports_dir_unlinks_symlinks_without_following(self):
+        workdir = pathlib.Path('clear_sym')
+        workdir.mkdir()
+        target_dir = pathlib.Path('sym_target')
+        target_dir.mkdir()
+        keep = target_dir / 'keep.txt'
+        keep.write_text('do not delete')
+
+        os.symlink(target_dir.resolve(), workdir / 'link_to_dir')
+        os.symlink('no_such_file', workdir / 'dangling')
+
+        _clear_reports_dir(workdir)
+
+        self.assertEqual(list(workdir.iterdir()), [])
+        self.assertTrue(keep.is_file())  # symlinked-to contents must be untouched
+
+    @unittest.skipIf(sys.platform == 'win32',
+                     'directory file descriptors are not supported on Windows')
+    def test_setup_preserves_reports_dir_identity(self):
+        # supplementary architecture coverage: with active reports, setup must not replace
+        # the reports directory with a new one.  A deleted-and-recreated directory can reuse
+        # the same inode number, so instead of comparing st_ino, watch the original
+        # directory's link count through an open descriptor: it drops to 0 if the directory
+        # is unlinked.
+        prob = self._make_problem('ident_prob')
+        prob.setup()
+
+        reports_dir = prob.get_outputs_dir() / 'reports'
+        fd = os.open(reports_dir, os.O_RDONLY)
+        try:
+            prob.setup()
+
+            self.assertTrue(reports_dir.is_dir())
+            self.assertGreater(os.fstat(fd).st_nlink, 0,
+                               'the original reports directory was deleted during setup')
+        finally:
+            os.close(fd)
 
 
 if __name__ == '__main__':

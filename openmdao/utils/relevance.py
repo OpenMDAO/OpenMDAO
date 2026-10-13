@@ -754,7 +754,7 @@ class Relevance(object):
                 self._active = save_active
 
     @contextmanager
-    def nonlinear_active(self, name, active=True):
+    def nonlinear_active(self, name):
         """
         Context manager for activating a subset of systems using 'pre', 'post', or 'iter'.
 
@@ -762,14 +762,12 @@ class Relevance(object):
         ----------
         name : str
             Name of the set to activate.
-        active : bool
-            If False, relevance is temporarily deactivated.
 
         Yields
         ------
         None
         """
-        if not active or self._active is False or name not in self._nonlinear_sets:
+        if self._active is False or name not in self._nonlinear_sets:
             yield
         else:
             save_active = self._active
