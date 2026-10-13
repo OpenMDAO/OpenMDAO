@@ -4,8 +4,9 @@ import weakref
 from openmdao.drivers.autoscalers.autoscaler_base import AutoscalerBase
 from openmdao.vectors.optimizer_vector import OptimizerVector
 from openmdao.core.driver import Driver
-from openmdao.core.constants import INF_BOUND
+# from openmdao.core.constants import INF_BOUND
 from openmdao.utils.om_warnings import issue_warning
+from openmdao.vectors.bound_map import BoundMap
         
 from scipy.sparse.linalg import eigs, LinearOperator
 from .arnoldi_algorithm import sort_eigs, extract_eigpairs
@@ -175,9 +176,9 @@ class HessianAutoscaler(AutoscalerBase):
         Returns
         -------
         lower_vec : OptimizerVector
-            Lower bounds, using -INF_BOUND for unspecified bounds.
+            Lower bounds, using -np.inf for unspecified bounds.
         upper_vec : OptimizerVector
-            Upper bounds, using INF_BOUND for unspecified bounds.
+            Upper bounds, using np.inf for unspecified bounds.
         equals_vec : OptimizerVector or None
             Constraint equality targets, with NaN for unspecified targets;
             None for design variables.
@@ -212,8 +213,8 @@ class HessianAutoscaler(AutoscalerBase):
             size = vmeta['size']
             s = vmeta['slice']
 
-            lower_data[s] = self._as_bound_array(meta.get('lower', -INF_BOUND), size, -INF_BOUND)
-            upper_data[s] = self._as_bound_array(meta.get('upper', INF_BOUND), size, INF_BOUND)
+            lower_data[s] = self._as_bound_array(meta.get('lower', -np.inf), size, -np.inf)
+            upper_data[s] = self._as_bound_array(meta.get('upper', np.inf), size, np.inf)
 
             if voi_type == 'constraint':
                 eq = meta.get('equals')
@@ -228,6 +229,8 @@ class HessianAutoscaler(AutoscalerBase):
     
     def get_bounds_scaling(self, voi_type):
         """
+        Return bounds using the current BoundMap interface.
+        
         Return the cached bound vectors for the requested variable type.
 
         Parameters
@@ -241,11 +244,33 @@ class HessianAutoscaler(AutoscalerBase):
             Lower, upper, and equality bound vectors. The equality vector
             is None for design variables. Values remain in model space.
         """
-        return (
-            self._scaled_lower[voi_type],
-            self._scaled_upper[voi_type],
-            self._scaled_equals[voi_type],
-        )
+        # return (
+        #     self._scaled_lower[voi_type],
+        #     self._scaled_upper[voi_type],
+        #     self._scaled_equals[voi_type],
+        # )
+        lower_vec = self._scaled_lower[voi_type]
+        upper_vec = self._scaled_upper[voi_type]
+        equals_vec = self._scaled_equals[voi_type]
+
+        bounds = BoundMap()
+
+        for name, meta in self._var_meta[voi_type].items():
+            if meta.get('discrete', False):
+                continue
+
+            equals = None
+            if equals_vec is not None and meta.get('equals') is not None:
+                equals = equals_vec[name].copy()
+
+            bounds.set(
+                name,
+                lower=lower_vec[name].copy(),
+                upper=upper_vec[name].copy(),
+                equals=equals,
+            )
+
+        return bounds
     
     def _gradfunc(self, driver, x):
         """
@@ -624,8 +649,11 @@ class HessianAutoscaler(AutoscalerBase):
             lb = meta['lower']
             ub = meta['upper']
 
-            has_lb = np.any(np.asarray(lb) > -INF_BOUND)
-            has_ub = np.any(np.asarray(ub) < INF_BOUND)
+            # has_lb = np.any(np.asarray(lb) > -np.inf)
+            # has_ub = np.any(np.asarray(ub) < np.inf)
+            
+            has_lb = lb is not None and np.any(np.isfinite(np.asarray(lb)))
+            has_ub = ub is not None and np.any(np.isfinite(np.asarray(ub)))
 
             if not has_lb and not has_ub:
                 continue
@@ -642,8 +670,8 @@ class HessianAutoscaler(AutoscalerBase):
             p._metadata['static_mode'] = True
             p.model._static_responses[prom_name] = p.model._responses[prom_name]
 
-            meta['lower'] = -INF_BOUND
-            meta['upper'] = INF_BOUND
+            meta['lower'] = -np.inf
+            meta['upper'] = np.inf
     
     def apply_mult_unscaling(self, desvar_multipliers, con_multipliers):
         """
