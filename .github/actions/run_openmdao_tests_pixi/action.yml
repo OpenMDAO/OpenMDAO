@@ -93,7 +93,7 @@ runs:
         echo "Install Uno optimizer (unopy) for testing"
         echo "============================================================="
         eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
-        pip install unopy<0.4.15
+        pip install unopy<=0.4.14
 
     - name: Check SNOPT availability
       id: check_snopt
