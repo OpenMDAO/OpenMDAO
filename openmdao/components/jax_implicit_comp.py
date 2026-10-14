@@ -208,8 +208,17 @@ class JaxImplicitComponent(ImplicitComponent):
                 if not self._declared_partials_patterns:
                     self._do_sparsity = True
                     try:
+                        res_names = {}
+                        for n in self._var_rel_names['output']:
+                            valid_n = self._valid_name_map.get(n, n)
+                            if n in self._res_primal_name_map:
+                                res_names[valid_n] = self._res_primal_name_map[n]
+                            else:
+                                res_names[valid_n] = f'res_{valid_n}'
+
                         deps = list(get_function_deps(self._orig_compute_primal,
-                                                      self._var_rel_names['output']))
+                                                      self._var_rel_names['output'],
+                                                      res_names=res_names))
                     except Exception as err:
                         issue_warning(f"{self.msginfo}: Couldn't determine function graph for "
                                       f"compute_primal: {err}")

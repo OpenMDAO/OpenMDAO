@@ -3,6 +3,7 @@
 from scipy.sparse import coo_matrix
 from itertools import chain
 from types import MethodType
+import inspect
 import numpy as np
 
 from openmdao.core.component import Component, _allowed_types
@@ -11,6 +12,7 @@ from openmdao.vectors.vector import _full_slice
 from openmdao.recorders.recording_iteration_stack import Recording
 from openmdao.utils.class_util import overrides_method
 from openmdao.utils.array_utils import shape_to_len
+from openmdao.utils.code_utils import get_return_names
 from openmdao.utils.general_utils import format_as_float_or_array, _subjac_meta2value, \
     is_undefined
 from openmdao.utils.units import simplify_unit
@@ -1061,6 +1063,78 @@ class ImplicitComponent(Component):
         else:
             return list(chain(self._var_rel_names['input'], self._var_rel_names['output'],
                               self._discrete_inputs))
+
+    def _check_compute_primal_args(self):
+        """
+        Check that the compute_primal method args are in the correct order.
+        """
+        args = list(inspect.signature(self._orig_compute_primal).parameters)
+        if args and args[0] == 'self':
+            args = args[1:]
+        compargs = self._get_compute_primal_argnames()
+        if args != compargs:
+            has_res_primal = any(
+                n in self._valid_name_map and self._valid_name_map[n].startswith('res_')
+                for n in self._var_rel_names['output']
+            )
+            if has_res_primal:
+                msg = (f"{self.msginfo}: compute_primal method args {args} don't match "
+                       f"the args {compargs} mapped from this component's inputs. "
+                       "If you intended to specify the name of the returned residual in "
+                       "compute_primal, use 'res_primal_name' instead of 'primal_name'.")
+            else:
+                msg = (f"{self.msginfo}: compute_primal method args {args} don't match "
+                       f"the args {compargs} mapped from this component's inputs. To "
+                       "map inputs to the compute_primal method, set the name used in "
+                       "compute_primal to the 'primal_name' arg when calling "
+                       "add_input/add_discrete_input. This is only necessary if the "
+                       "declared component input name is not a valid Python name.")
+            raise RuntimeError(msg)
+
+    def _check_compute_primal_returns(self):
+        """
+        Check that the compute_primal method returns the expected discrete outputs and residuals.
+        """
+        retnames = get_return_names(self.compute_primal)
+        discrete_outnames = list(self._discrete_outputs)
+        outnames = list(self._var_rel_names['output'])
+
+        expected_names = [self._valid_name_map.get(n, n) for n in discrete_outnames]
+        for n in outnames:
+            if n in self._res_primal_name_map:
+                expected_names.append(self._res_primal_name_map[n])
+            else:
+                expected_names.append(self._valid_name_map.get(n, n))
+
+        if len(retnames) != len(expected_names):
+            raise RuntimeError(f"{self.msginfo}: compute_primal method returns {len(retnames)} "
+                               f"values but expected {len(expected_names)}.")
+
+        ndiscrete = len(discrete_outnames)
+        for i, (expname, rname) in enumerate(zip(expected_names, retnames)):
+            if rname is None:
+                continue
+            if i < ndiscrete:
+                # discrete outputs have no residual, so the returned name must match exactly.
+                if rname != expname:
+                    raise RuntimeError(f"{self.msginfo}: compute_primal method returns "
+                                       f"'{rname}' for return value {i} but expected '{expname}' "
+                                       f"for discrete output '{discrete_outnames[i]}'.")
+                continue
+            orig_outname = outnames[i - ndiscrete]
+            if orig_outname in self._res_primal_name_map:
+                if rname != expname:
+                    raise RuntimeError(f"{self.msginfo}: compute_primal method returns "
+                                       f"'{rname}' for return value {i} but expected '{expname}' "
+                                       "as specified by 'res_primal_name'.")
+            else:
+                if rname != expname and rname != f'res_{expname}':
+                    raise RuntimeError(f"{self.msginfo}: compute_primal method returns '{rname}' "
+                                       f"for return value {i} but the expected residual name for "
+                                       f"output '{orig_outname}' is '{expname}' or "
+                                       f"'res_{expname}'. To map a different residual name in "
+                                       "compute_primal, set 'res_primal_name' when calling "
+                                       "add_output.")
 
     def compute_fd_sparsity(self, method='fd', num_full_jacs=2, perturb_size=1e-9):
         """
