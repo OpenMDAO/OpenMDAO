@@ -3037,6 +3037,48 @@ class TestPyoptSparse(unittest.TestCase):
 
         self.assertEqual(prob.driver.iter_count, 1)
 
+    def test_hotstart_file_missing_linear_constraint(self):
+        # This is a regression test for issue #3761, where the y-intercept used for a linear
+        # constraint's bounds was computed from stale, unevaluated model outputs whenever the
+        # hotstart_file option was set, even if that file did not actually exist.
+        def _build_prob(hotstart_file=None):
+            prob = om.Problem()
+            model = prob.model
+
+            model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+            model.add_subsystem('p2', om.IndepVarComp('y', 30.0), promotes=['*'])
+            model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+            model.add_subsystem('con', om.ExecComp('c = x - y'), promotes=['*'])
+
+            prob.set_solver_print(level=0)
+
+            kwargs = {'print_results': False}
+            if hotstart_file is not None:
+                kwargs['hotstart_file'] = hotstart_file
+            prob.driver = pyOptSparseDriver(**kwargs)
+
+            model.add_design_var('x', lower=-50.0, upper=50.0)
+            model.add_design_var('y', lower=-50.0, upper=50.0)
+            model.add_objective('f_xy')
+            model.add_constraint('c', upper=10.0, linear=True)
+
+            prob.setup()
+            return prob
+
+        # Baseline result with no hotstart_file, where the initial model run always happens.
+        prob = _build_prob()
+        prob.run_driver()
+        f_baseline = prob.get_val('f_xy')[0]
+        c_baseline = prob.get_val('c')[0]
+
+        # This hotstart file does not exist. The initial model run must still happen so that
+        # the linear constraint's bounds are computed correctly.
+        prob = _build_prob(hotstart_file='nonexistent_hotstart.hst')
+        prob.run_driver()
+
+        assert_near_equal(prob.get_val('f_xy')[0], f_baseline, 1e-6)
+        assert_near_equal(prob.get_val('c')[0], c_baseline, 1e-6)
+
     def test_hist_file_hotstart_deprecated(self):
         filename = "hist_file"
 
