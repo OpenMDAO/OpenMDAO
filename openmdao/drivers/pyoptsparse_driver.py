@@ -7,6 +7,7 @@ additional MPI capability.
 """
 from importlib.util import find_spec
 import importlib.metadata as ilmd
+import os
 import sys
 import json
 import signal
@@ -374,8 +375,14 @@ class pyOptSparseDriver(Driver):
         linear_constraints = [key for key, con in self._cons.items() if con['linear']]
 
         # Only need initial run if we have linear constraints or if we are using an optimizer that
-        # doesn't perform one initially.
-        model_ran = bool(self.options['hotstart_file'])
+        # doesn't perform one initially. If hotstarting from an existing file, pyOpt will replay
+        # stored function evaluations, so we can skip our own initial run in that case. However,
+        # linear constraints always require an initial run regardless of hotstarting, because
+        # their y-intercept is computed from the current model outputs, which the hotstart file
+        # has no bearing on.
+        hotstart_file = self.options['hotstart_file']
+        model_ran = (bool(hotstart_file) and os.path.isfile(hotstart_file)
+                     and not linear_constraints)
         if not model_ran and (optimizer in run_required or linear_constraints):
             with RecordingDebugging(self._get_name(), self.iter_count, self) as rec:
                 self._run_solve_nonlinear()
