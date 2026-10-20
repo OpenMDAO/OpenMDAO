@@ -2694,7 +2694,13 @@ class Group(System):
             with self._matvec_context(scope_out, scope_in, mode) as vecs:
                 d_inputs, d_outputs, d_residuals = vecs
 
-                jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
+                if self._owns_approx_jac and self.pathname and \
+                        self._owns_approx_wrt is not None and isinstance(jac, DictionaryJacobian):
+                    # We're approximating our jacobian, so we behave like an explicit block, the
+                    # same as in _solve_linear.
+                    jac._apply_approx_block(self, d_inputs, d_outputs, d_residuals, mode)
+                else:
+                    jac._apply(self, d_inputs, d_outputs, d_residuals, mode)
 
                 if self._fd_rev_xfer_correction_dist and mode == 'rev':
                     self._apply_fd_rev_xfer_correction()

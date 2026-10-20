@@ -20,6 +20,9 @@ class DictionaryJacobian(Jacobian):
     ----------
     _has_children : bool
         True if the system has children, False otherwise.
+    _approx_block_keys : list or None
+        Ordered subjac keys making up the explicit block of a group that approximates its own
+        derivatives.  Computed on first use.
     """
 
     def __init__(self, system, subjacs_info=None):
@@ -28,12 +31,13 @@ class DictionaryJacobian(Jacobian):
         """
         super().__init__(system, subjacs_info)
         self._has_children = bool(system._subsystems_allprocs)
+        self._approx_block_keys = None
         self._setup(system)
 
     def _setup(self, system):
         self._subjacs = self._get_subjacs(system)
 
-    def _apply(self, system, d_inputs, d_outputs, d_residuals, mode):
+    def _apply(self, system, d_inputs, d_outputs, d_residuals, mode, keys=None):
         """
         Compute matrix-vector product.
 
@@ -49,6 +53,8 @@ class DictionaryJacobian(Jacobian):
             residuals linear vector.
         mode : str
             'fwd' or 'rev'.
+        keys : list or None
+            If not None, only these subjac keys are applied.
         """
         fwd = mode == 'fwd'
         d_out_names = d_outputs._names
@@ -67,7 +73,10 @@ class DictionaryJacobian(Jacobian):
         key_owners = system._get_subjac_owners()
 
         with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
-            for abs_key in self._get_ordered_subjac_keys(system):
+            if keys is None:
+                keys = self._get_ordered_subjac_keys(system)
+
+            for abs_key in keys:
                 res_name, other_name = abs_key
 
                 ofvec = abs_resids(res_name) if res_name in d_res_names else None
@@ -112,6 +121,48 @@ class DictionaryJacobian(Jacobian):
                                     d_outputs._abs_set_val(other_name, left_vec)
                                 elif other_name in d_inp_names:
                                     d_inputs._abs_set_val(other_name, left_vec)
+
+    def _apply_approx_block(self, system, d_inputs, d_outputs, d_residuals, mode):
+        """
+        Compute matrix-vector product for a group that approximates its own derivatives.
+
+        The group is an explicit block: the approximated d(output)/d(wrt) subjacs plus -1 on the
+        output diagonal, the same convention its _solve_linear uses.  Partials declared by
+        components inside the group (for example the residual partials of an implicit component,
+        or partials with respect to inputs connected inside the group) are not part of that
+        block.
+
+        Parameters
+        ----------
+        system : System
+            System that is updating this jacobian.
+        d_inputs : Vector
+            inputs linear vector.
+        d_outputs : Vector
+            outputs linear vector.
+        d_residuals : Vector
+            residuals linear vector.
+        mode : str
+            'fwd' or 'rev'.
+        """
+        if self._approx_block_keys is None:
+            wrts = system._owns_approx_wrt
+            self._approx_block_keys = [key for key in self._get_ordered_subjac_keys(system)
+                                       if key[1] in wrts]
+
+        self._apply(system, d_inputs, d_outputs, d_residuals, mode, self._approx_block_keys)
+
+        d_res_names = d_residuals._names
+        with system._unscaled_context(outputs=[d_outputs], residuals=[d_residuals]):
+            outs = d_outputs.asarray()
+            resids = d_residuals.asarray()
+            for name in d_outputs._names:
+                if name in d_res_names:
+                    slc = self._output_slices[name]
+                    if mode == 'fwd':
+                        resids[slc] -= outs[slc]
+                    else:
+                        outs[slc] -= resids[slc]
 
 
 class _CheckingJacobian(DictionaryJacobian):
