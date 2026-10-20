@@ -2821,6 +2821,13 @@ class Group(System):
                         for approximation in self._approx_schemes.values():
                             approximation.compute_approximations(self, jac=jac)
 
+            if self._assembled_jac is not None:
+                # The approximation runs our nonlinear solver, which may have updated the
+                # assembled jacobian it uses while our approximation is suspended under complex
+                # step.  Its subjac values are shared with our approximation's jacobian, so
+                # return them to our own dtype.
+                self._assembled_jac._pre_update(self._outputs.dtype)
+
         else:
 
             relevance = self._relevance
@@ -2839,6 +2846,9 @@ class Group(System):
     def _check_first_linearize(self):
         if self._first_call_to_linearize:
             self._first_call_to_linearize = False  # only do this once
+            # A Newton or Broyden solver may have suspended our approximation in order to
+            # linearize our residuals.  Setting the approximation up must not end the suspension.
+            suspended = self._approx_suspended()
             coloring = self._get_coloring() if coloring_mod._use_partial_sparsity else None
 
             if coloring is None:
@@ -2849,6 +2859,24 @@ class Group(System):
                     self._setup_approx_derivs()
             else:
                 self._setup_approx_coloring()
+
+            if suspended:
+                self._owns_approx_jac = False
+
+    def _approx_suspended(self):
+        """
+        Return True if this group approximates its derivatives but that is currently switched off.
+
+        NewtonSolver and BroydenSolver switch the approximation off while they linearize the
+        group's residuals.  While it is off, the group behaves like a group that does not
+        approximate, and the approximation's jacobian is kept for when it is switched back on.
+
+        Returns
+        -------
+        bool
+            True if the approximation is suspended.
+        """
+        return bool(self._approx_schemes) and not self._owns_approx_jac
 
     def approx_totals(self, method='fd', step=None, form=None, step_calc=None):
         """
@@ -3051,6 +3079,12 @@ class Group(System):
         Jacobian
             The initialized jacobian.
         """
+        if self._approx_suspended():
+            # A nonlinear solver is linearizing our residuals, so behave like a group that does
+            # not approximate.  The approximation's jacobian stays in self._jacobian, unchanged,
+            # for when the approximation is switched back on.
+            return self._get_assembled_jac()
+
         if self._relevance_changed():
             self._jacobian = None
 
@@ -3064,6 +3098,29 @@ class Group(System):
                 self._jacobian = self._get_assembled_jac()
 
         return self._jacobian
+
+    def _get_assembled_jac(self):
+        """
+        Get the assembled jacobian if there is one.
+
+        Returns
+        -------
+        AssembledJacobian or None
+            The assembled jacobian, or None if none of this group's solvers needs one.
+        """
+        if self._approx_suspended():
+            # Build the assembled jacobian that our solvers use while the approximation is
+            # suspended, without replacing the approximation's jacobian.
+            if self._assembled_jac is None:
+                approx_jac = self._jacobian
+                self._jacobian = None
+                try:
+                    super()._get_assembled_jac()
+                finally:
+                    self._jacobian = approx_jac
+            return self._assembled_jac
+
+        return super()._get_assembled_jac()
 
     def _approx_subjac_keys_iter(self):
         """
