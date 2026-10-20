@@ -1,6 +1,8 @@
 """A group that approximates its own derivatives and also owns a Newton or Broyden solver."""
 import unittest
 
+import numpy as np
+
 import openmdao.api as om
 from openmdao.utils.assert_utils import assert_near_equal
 
@@ -45,6 +47,99 @@ class _State(om.ImplicitComponent):
             d_outputs['w'] = d_residuals['w'] / 4.0
         else:
             d_residuals['w'] = d_outputs['w'] / 4.0
+
+
+class _LinearizedState(_State):
+    """_State that computes its partials in linearize, so every linearization rewrites them."""
+
+    def setup(self):
+        self.add_output('w', 1.0)
+        for name in self.options['coefs']:
+            self.add_input(name, 1.0)
+        self.declare_partials('w', ['w'] + list(self.options['coefs']))
+
+    def linearize(self, inputs, outputs, partials):
+        partials['w', 'w'] = 4.0
+        for name, c in self.options['coefs'].items():
+            partials['w', name] = -c
+
+
+class _Poly(om.ExplicitComponent):
+    """out = x + c * x**k, with partials computed in compute_partials."""
+
+    def initialize(self):
+        self.options.declare('c')
+        self.options.declare('k')
+
+    def setup(self):
+        self.add_input('x', 1.0)
+        self.add_output('out', 1.0)
+        self.declare_partials('out', 'x')
+
+    def compute(self, inputs, outputs):
+        c, k = self.options['c'], self.options['k']
+        outputs['out'] = inputs['x'] + c * inputs['x'] ** k
+
+    def compute_partials(self, inputs, partials):
+        c, k = self.options['c'], self.options['k']
+        partials['out', 'x'] = 1.0 + k * c * inputs['x'] ** (k - 1)
+
+
+class _CubicState(om.ImplicitComponent):
+    """R(w) = w + 0.3*w**3 - y, which does not solve itself."""
+
+    def setup(self):
+        self.add_input('y', 1.0)
+        self.add_output('w', 1.0)
+        self.declare_partials('w', ['w', 'y'])
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        residuals['w'] = outputs['w'] + 0.3 * outputs['w'] ** 3 - inputs['y']
+
+    def linearize(self, inputs, outputs, partials):
+        partials['w', 'w'] = 1.0 + 0.9 * outputs['w'] ** 2
+        partials['w', 'y'] = -1.0
+
+
+class _SizedSource(om.IndepVarComp):
+
+    def initialize(self):
+        super().initialize()
+        self.options.declare('n', default=1)
+
+    def setup(self):
+        self.add_output('x', np.ones(self.options['n']))
+        super().setup()
+
+
+class _SizedState(om.ImplicitComponent):
+    """R = 4w - 3x elementwise, partials computed in linearize."""
+
+    def initialize(self):
+        self.options.declare('n', default=1)
+
+    def setup(self):
+        n = self.options['n']
+        self.add_input('x', np.ones(n))
+        self.add_output('w', np.ones(n))
+        self.declare_partials('w', ['w', 'x'])
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        residuals['w'] = 4.0 * outputs['w'] - 3.0 * inputs['x']
+
+    def linearize(self, inputs, outputs, partials):
+        n = self.options['n']
+        partials['w', 'w'] = 4.0 * np.eye(n)
+        partials['w', 'x'] = -3.0 * np.eye(n)
+
+
+class _SizedGroup(om.Group):
+
+    def initialize(self):
+        self.options.declare('n', default=1)
+
+    def setup(self):
+        self.add_subsystem('state', _SizedState(n=self.options['n']), promotes=['*'])
 
 
 _LINEAR = {
@@ -239,6 +334,27 @@ class TestApproxGroupWithNewton(unittest.TestCase):
                 assert_near_equal(p.get_val('G.c1.out'), 16.0 / 7.0, 1e-12)
                 self.assertTrue(G.linear_solver._factored_assembled_jac)
 
+    def test_resetup_after_changing_sizes(self):
+        # The approximation's private metadata is rebuilt when the same group is set up again.
+        for method in ('fd', 'cs'):
+            with self.subTest(method=method):
+                p = om.Problem()
+                p.model.add_subsystem('ivc', _SizedSource(n=1), promotes=['*'])
+                G = p.model.add_subsystem('G', _SizedGroup(n=1), promotes=['*'])
+                G.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=-1)
+                G.linear_solver = om.DirectSolver(assemble_jac=False)
+                G.approx_totals(method=method)
+                p.setup(force_alloc_complex=True)
+                p.run_model()
+                J = p.compute_totals(of=['w'], wrt=['x'])
+                assert_near_equal(J['w', 'x'], [[0.75]], 1e-6)
+                p.model.ivc.options['n'] = 2
+                G.options['n'] = 2
+                p.setup(force_alloc_complex=True)
+                p.run_model()
+                J = p.compute_totals(of=['w'], wrt=['x'])
+                assert_near_equal(J['w', 'x'], 0.75 * np.eye(2), 1e-6)
+
     def test_relevance_change_with_assembled_parent(self):
         # A group that does not approximate keeps rebuilding its assembled jacobian when the
         # relevance changes, as before.
@@ -287,6 +403,149 @@ class TestApproxGroupWithNewton(unittest.TestCase):
                     G.run_apply_linear(mode)
                     J = p.compute_totals(of=['G.c2.out'], wrt=['ivc.x'])
                     assert_near_equal(J['G.c2.out', 'ivc.x'], [[0.5]], 1e-6)
+
+
+class TestApproxGroupPartialsStorage(unittest.TestCase):
+
+    def test_component_partials_survive_the_approximation(self):
+        # The group stores semi-totals under keys that are also the component's own partials
+        # (both inputs of the state are group inputs).  The component's partials must not change.
+        for newton in (True, False):
+            for method in ('fd', 'cs'):
+                with self.subTest(newton=newton, method=method):
+                    p = om.Problem()
+                    p.model.add_subsystem('ivca', om.IndepVarComp('a', 1.0))
+                    p.model.add_subsystem('ivcb', om.IndepVarComp('b', 2.0))
+                    G = p.model.add_subsystem('G', om.Group())
+                    state = G.add_subsystem('state', _State(coefs={'u': 1.0, 'v': 2.0}))
+                    if not newton:
+                        state.solve_nonlinear = lambda inputs, outputs: outputs.set_val(
+                            (inputs['u'] + 2.0 * inputs['v']) / 4.0, 'w')
+                    p.model.connect('ivca.a', 'G.state.u')
+                    p.model.connect('ivcb.b', 'G.state.v')
+                    if newton:
+                        G.nonlinear_solver = om.NewtonSolver(solve_subsystems=False,
+                                                             atol=1e-12, rtol=1e-12, iprint=-1)
+                        G.linear_solver = om.DirectSolver(assemble_jac=False)
+                    G.approx_totals(method=method)
+                    p.setup(force_alloc_complex=True)
+                    p.run_model()
+                    p.compute_totals(of=['G.state.w'], wrt=['ivca.a', 'ivcb.b'])
+                    data = p.check_partials(includes=['G.state'], method='fd', out_stream=None)
+                    for (of, wrt), exact in ((('w', 'u'), -1.0), (('w', 'v'), -2.0)):
+                        assert_near_equal(np.ravel(data['G.state'][of, wrt]['J_fwd']), [exact],
+                                          1e-15)
+
+    def test_ancestor_assembled_jacobian_reads_the_semitotals(self):
+        # An ancestor's assembled jacobian represents the group by its semi-totals.  When the
+        # group's Newton relinearizes the component, the component's partial must not replace
+        # the semi-total stored under the same key.
+        for mode in ('fwd', 'rev'):
+            for method in ('fd', 'cs'):
+                with self.subTest(mode=mode, method=method):
+                    p = om.Problem()
+                    p.model.add_subsystem('ivca', om.IndepVarComp('a', 1.0))
+                    p.model.add_subsystem('ivcb', om.IndepVarComp('b', 2.0))
+                    G = p.model.add_subsystem('G', om.Group())
+                    G.add_subsystem('state', _LinearizedState(coefs={'u': 1.0, 'v': 2.0}))
+                    p.model.add_subsystem('d', _Lin(coefs={'w': 3.0}))
+                    p.model.connect('ivca.a', 'G.state.u')
+                    p.model.connect('ivcb.b', 'G.state.v')
+                    p.model.connect('G.state.w', 'd.w')
+                    G.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, atol=1e-12,
+                                                         rtol=1e-12, iprint=-1)
+                    G.linear_solver = om.DirectSolver(assemble_jac=False)
+                    G.approx_totals(method=method)
+                    p.model.linear_solver = om.DirectSolver(assemble_jac=True)
+                    p.setup(mode=mode, force_alloc_complex=True)
+                    p.run_model()
+                    J = p.compute_totals(of=['G.state.w', 'd.out'], wrt=['ivca.a', 'ivcb.b'])
+                    assert_near_equal(J['G.state.w', 'ivca.a'], [[0.25]], 1e-6)
+                    assert_near_equal(J['G.state.w', 'ivcb.b'], [[0.5]], 1e-6)
+                    assert_near_equal(J['d.out', 'ivca.a'], [[0.75]], 1e-6)
+                    assert_near_equal(J['d.out', 'ivcb.b'], [[1.5]], 1e-6)
+
+    def test_newton_matches_the_group_without_approximation(self):
+        # Subjacs that only the approximation uses must stay out of the jacobian that the group's
+        # own Newton assembles, so that after the approximation has run the Newton solves exactly
+        # as it would in the same group without approx_totals.  Here d(imp.w)/d(H.c2.x) is such a
+        # subjac: H.c2.x is connected inside the child group H, so its approximated value lands in
+        # the dr/do part of an assembled jacobian.  Newton stops after 2 iterations, so the
+        # approximation starts from a point that is not converged and that value is not zero.
+        def build(linear, method):
+            p = om.Problem()
+            p.model.add_subsystem('ivc', om.IndepVarComp('x', 1.0))
+            G = p.model.add_subsystem('G', om.Group())
+            H = G.add_subsystem('H', om.Group())
+            H.add_subsystem('c1', _Poly(c=0.1, k=3))
+            H.add_subsystem('c2', _Poly(c=0.2, k=2))
+            H.connect('c1.out', 'c2.x')
+            G.add_subsystem('imp', _CubicState())
+            G.connect('H.c2.out', 'imp.y')
+            p.model.connect('ivc.x', 'G.H.c1.x')
+            G.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, atol=1e-30, rtol=1e-30,
+                                                 maxiter=2, iprint=-1, err_on_non_converge=False)
+            G.linear_solver = _LINEAR[linear]()
+            if method is not None:
+                G.approx_totals(method=method)
+            p.setup(force_alloc_complex=True)
+            return p
+
+        for linear in ('direct_asm', 'direct'):
+            for method in ('fd', 'cs'):
+                with self.subTest(linear=linear, method=method):
+                    p, control = build(linear, method), build(linear, None)
+                    for i, x in enumerate((1.0, 1.3, 1.7, 2.0)):
+                        for prob in (p, control):
+                            prob.set_val('ivc.x', x)
+                            prob.run_model()
+                        if i == 0:
+                            p.compute_totals(of=['G.imp.w'], wrt=['ivc.x'])
+                        for name in ('G.H.c1.out', 'G.H.c2.out', 'G.imp.w'):
+                            assert_near_equal(p.get_val(name), control.get_val(name), 1e-12)
+
+    def test_child_group_partials_survive_the_approximation(self):
+        # The approximation also differentiates with respect to inputs that are connected inside a
+        # child group (here H.c2.x).  A component's own partial with respect to such an input is
+        # then also an approximation key, and it must not be overwritten by the approximated
+        # value: neither check_partials nor the group's own Newton may see anything but the
+        # declared partial.  Newton stops after 2 iterations, so the comparison with the same
+        # group without approx_totals shows the jacobian that Newton used.
+        def build(linear, method):
+            p = om.Problem()
+            p.model.add_subsystem('ivc', om.IndepVarComp('x', 1.0))
+            G = p.model.add_subsystem('G', om.Group())
+            H = G.add_subsystem('H', om.Group())
+            H.add_subsystem('c1', _Poly(c=0.1, k=3))
+            H.add_subsystem('c2', _Lin(coefs={'x': 3.0}))
+            H.connect('c1.out', 'c2.x')
+            G.add_subsystem('imp', _CubicState())
+            G.connect('H.c2.out', 'imp.y')
+            p.model.connect('ivc.x', 'G.H.c1.x')
+            G.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, atol=1e-30, rtol=1e-30,
+                                                 maxiter=2, iprint=-1, err_on_non_converge=False)
+            G.linear_solver = _LINEAR[linear]()
+            if method is not None:
+                G.approx_totals(method=method)
+            p.setup(force_alloc_complex=True)
+            return p
+
+        for linear in ('direct_asm', 'direct'):
+            for method in ('fd', 'cs'):
+                with self.subTest(linear=linear, method=method):
+                    p, control = build(linear, method), build(linear, None)
+                    for i, x in enumerate((1.0, 1.3, 1.7)):
+                        for prob in (p, control):
+                            prob.set_val('ivc.x', x)
+                            prob.run_model()
+                        if i == 0:
+                            p.compute_totals(of=['G.imp.w'], wrt=['ivc.x'])
+                            data = p.check_partials(includes=['G.H.c2'], method='fd',
+                                                    out_stream=None)
+                            assert_near_equal(np.ravel(data['G.H.c2']['out', 'x']['J_fwd']),
+                                              [3.0], 1e-15)
+                        for name in ('G.H.c1.out', 'G.H.c2.out', 'G.imp.w'):
+                            assert_near_equal(p.get_val(name), control.get_val(name), 1e-12)
 
 
 if __name__ == '__main__':

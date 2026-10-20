@@ -170,6 +170,10 @@ class Group(System):
         Cache for the system graph.
     _key_owner : dict
         The owning rank keyed by absolute jacobian key.
+    _approx_subjacs_info : dict or None
+        Subjac metadata used by this group's approximation of its own derivatives.  Keys that
+        are also a descendant component's own partials have private metadata here, because the
+        approximation stores semi-total derivatives in them.  Built on first use.
     """
 
     def __init__(self, **kwargs):
@@ -204,6 +208,7 @@ class Group(System):
         self._is_explicit = None
         self._sys_graph_cache = None
         self._key_owner = None
+        self._approx_subjacs_info = None
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -2970,7 +2975,7 @@ class Group(System):
         dict
             Subjac metadata keyed by (of, wrt) absolute names.
         """
-        info = self._subjacs_info
+        info = self._get_approx_subjacs_info()
         abs2meta_out = self._var_abs2meta['output']
         abs2meta_in = self._var_abs2meta['input']
         internal_conns = self._conn_global_abs_in2out
@@ -3018,6 +3023,7 @@ class Group(System):
         Call setup_partials in components.
         """
         self._subjacs_info = info = {}
+        self._approx_subjacs_info = None
         conn_graph = self.get_conn_graph()
         nodes = conn_graph.nodes()
 
@@ -3091,7 +3097,8 @@ class Group(System):
         if self._jacobian is None:
             if self._owns_approx_jac:
                 # Group needs a jacobian if it's approximating derivatives.
-                self._jacobian = DictionaryJacobian(system=self)
+                self._jacobian = DictionaryJacobian(system=self,
+                                                    subjacs_info=self._get_approx_subjacs_info())
                 self._get_static_wrt_matches()
 
             if self._jacobian is None:
@@ -3121,6 +3128,48 @@ class Group(System):
             return self._assembled_jac
 
         return super()._get_assembled_jac()
+
+    def _get_approx_subjacs_info(self):
+        """
+        Return the subjac metadata used by this group's approximation of its own derivatives.
+
+        It is this group's _subjacs_info, except that a key which is also a descendant
+        component's own partial gets a private copy of the metadata.  The approximation stores a
+        semi-total derivative in it, which must not overwrite the component's partial (or be
+        overwritten by it when the component is linearized again).
+
+        Returns
+        -------
+        dict
+            Subjac metadata keyed by (of, wrt) absolute names.
+        """
+        if not self.pathname:
+            # A top level approximation computes totals, and it keeps using _subjacs_info.
+            return self._subjacs_info
+
+        if self._approx_subjacs_info is None:
+            from openmdao.core.component import Component
+
+            comp_metas = set()
+            for comp in self.system_iter(recurse=True, typ=Component):
+                comp_metas.update(id(meta) for meta in comp._subjacs_info.values())
+
+            self._approx_subjacs_info = info = dict(self._subjacs_info)
+            # The approximation takes derivatives with respect to every input that is not
+            # connected by one of our own connections (_approx_semitotal_subjac_keys_iter), so a
+            # component partial with respect to such an input is also an approximation key.
+            own_conns = self._conn_abs_in2out
+            for key, meta in info.items():
+                if key[1] in own_conns or id(meta) not in comp_metas:
+                    continue
+                if key[1] in self._var_allprocs_abs2meta['input']:
+                    # a component partial that is also an approximation key
+                    meta = meta.copy()
+                    if meta.get('val') is not None:
+                        meta['val'] = meta['val'].copy()
+                    info[key] = meta
+
+        return self._approx_subjacs_info
 
     def _approx_subjac_keys_iter(self):
         """
@@ -3361,12 +3410,13 @@ class Group(System):
         wrt_seen = set()
         compute_cross_keys = not total and self.comm.size > 1 and self._has_fd_group
         graph = self._problem_meta['dataflow_graph']
+        info = self._get_approx_subjacs_info()
 
         for key in approx_keys:
             of, wrt = key
 
-            if key in self._subjacs_info:
-                meta = self._subjacs_info[key]
+            if key in info:
+                meta = info[key]
             else:
                 # check connection between of and wrt before creating a subjac
                 if not are_connected(graph, wrt, of):
@@ -3385,9 +3435,8 @@ class Group(System):
                     # have a -1 on the diagonal.
                     meta['val'] = np.full(osize, -1.0)
 
-                self._subjacs_info[key] = meta = Subjac.get_instance_metadata(meta, None,
-                                                                              (osize, isize),
-                                                                              self, key)
+                info[key] = meta = Subjac.get_instance_metadata(meta, None, (osize, isize),
+                                                                self, key)
 
             if compute_cross_keys:
                 sout = sizes_out[:, abs2idx[of]]

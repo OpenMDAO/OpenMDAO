@@ -13,6 +13,8 @@ class DictionaryJacobian(Jacobian):
     ----------
     system : System
         Parent system to this jacobian.
+    subjacs_info : dict or None
+        Sub-Jacobian metadata to use instead of the system's own _subjacs_info.
 
     Attributes
     ----------
@@ -20,11 +22,11 @@ class DictionaryJacobian(Jacobian):
         True if the system has children, False otherwise.
     """
 
-    def __init__(self, system):
+    def __init__(self, system, subjacs_info=None):
         """
         Initialize all attributes.
         """
-        super().__init__(system)
+        super().__init__(system, subjacs_info)
         self._has_children = bool(system._subsystems_allprocs)
         self._setup(system)
 
