@@ -244,6 +244,47 @@ class TestGraphFunction(unittest.TestCase):
         partials = sorted(get_function_deps(func))
         self.assertEqual(sorted(partials), [('out0', 'a')])
 
+    def test_function_deps_default_res_convention(self):
+        def func(a, b, x, y):
+            res_x = a * x + b
+            res_y = y - 3.0
+            return res_x, res_y
+
+        graph = get_func_graph(func, outnames=['x', 'y'])
+        self.assertIn(('a', 'res_x'), graph.edges())
+        self.assertIn(('b', 'res_x'), graph.edges())
+        self.assertIn(('res_x', 'x'), graph.edges())
+        self.assertIn(('res_y', 'y'), graph.edges())
+
+        partials = sorted(get_function_deps(func, outputs=['x', 'y']))
+        self.assertEqual(sorted(partials), [('x', 'a'), ('x', 'b'), ('x', 'x'), ('y', 'y')])
+
+    def test_function_deps_explicit_res_names(self):
+        def func(a, b, x, y):
+            rx = a * x + b
+            ry = y - 3.0
+            return rx, ry
+
+        res_names = {'x': 'rx', 'y': 'ry'}
+        graph = get_func_graph(func, outnames=['x', 'y'], res_names=res_names)
+        self.assertIn(('a', 'rx'), graph.edges())
+        self.assertIn(('b', 'rx'), graph.edges())
+        self.assertIn(('rx', 'x'), graph.edges())
+        self.assertIn(('ry', 'y'), graph.edges())
+
+        partials = sorted(get_function_deps(func, outputs=['x', 'y'], res_names=res_names))
+        self.assertEqual(sorted(partials), [('x', 'a'), ('x', 'b'), ('x', 'x'), ('y', 'y')])
+
+    def test_function_deps_res_name_mismatch(self):
+        def func(a, x):
+            foo_x = a * x
+            return foo_x
+
+        with self.assertRaises(RuntimeError) as cm:
+            get_func_graph(func, outnames=['x'])
+        self.assertIn("Return value name 'foo_x' in function does not match expected name 'x'.",
+                      str(cm.exception))
+
 
 if __name__ == '__main__':
     unittest.main()

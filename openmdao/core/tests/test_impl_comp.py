@@ -1670,6 +1670,104 @@ class TestMappedNames(unittest.TestCase):
                          "arg when calling add_input/add_discrete_input. This is only necessary if the declared "
                          "component input name is not a valid Python name.")
 
+    def test_implicit_comp_res_default_convention(self):
+        class Comp(om.ImplicitComponent):
+            def setup(self):
+                self.add_input('a', val=2.0)
+                self.add_output('x', val=1.0)
+
+            def setup_partials(self):
+                self.declare_partials('x', ['a', 'x'], method='cs')
+
+            def compute_primal(self, a, x):
+                res_x = a * x - 4.0
+                return res_x
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', Comp())
+        p.model.comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        p.model.comp.linear_solver = om.DirectSolver()
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.x'), 2.0, 1e-6)
+
+    def test_implicit_comp_res_primal_name_explicit(self):
+        class Comp(om.ImplicitComponent):
+            def setup(self):
+                self.add_input('a', val=2.0)
+                self.add_output('x', val=1.0, res_primal_name='custom_residual')
+
+            def setup_partials(self):
+                self.declare_partials('x', ['a', 'x'], method='cs')
+
+            def compute_primal(self, a, x):
+                custom_residual = a * x - 6.0
+                return custom_residual
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', Comp())
+        p.model.comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        p.model.comp.linear_solver = om.DirectSolver()
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.x'), 3.0, 1e-6)
+
+    def test_implicit_comp_colon_primal_and_res_primal(self):
+        class Comp(om.ImplicitComponent):
+            def setup(self):
+                self.add_input('my:a', primal_name='a', val=3.0)
+                self.add_output('my:x', primal_name='x', res_primal_name='res_x', val=1.0)
+
+            def setup_partials(self):
+                self.declare_partials('my:x', ['my:a', 'my:x'], method='cs')
+
+            def compute_primal(self, a, x):
+                res_x = a * x - 9.0
+                return res_x
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', Comp())
+        p.model.comp.nonlinear_solver = om.NewtonSolver(solve_subsystems=False)
+        p.model.comp.linear_solver = om.DirectSolver()
+        p.setup()
+        p.run_model()
+        assert_near_equal(p.get_val('comp.my:x'), 3.0, 1e-6)
+
+    def test_implicit_comp_res_primal_mismatch_error(self):
+        class Comp(om.ImplicitComponent):
+            def setup(self):
+                self.add_input('a', val=2.0)
+                self.add_output('x', val=1.0, res_primal_name='custom_residual')
+
+            def compute_primal(self, a, x):
+                wrong_residual = a * x - 4.0
+                return wrong_residual
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', Comp())
+        with self.assertRaises(RuntimeError) as ctx:
+            p.setup()
+        self.assertIn("compute_primal method returns 'wrong_residual' for return value 0 "
+                      "but expected 'custom_residual' as specified by 'res_primal_name'",
+                      str(ctx.exception))
+
+    def test_implicit_comp_primal_name_hint(self):
+        class Comp(om.ImplicitComponent):
+            def setup(self):
+                self.add_input('a', val=2.0)
+                self.add_output('x', val=1.0, primal_name='res_x')
+
+            def compute_primal(self, a, x):
+                res_x = a * x - 4.0
+                return res_x
+
+        p = om.Problem()
+        p.model.add_subsystem('comp', Comp())
+        with self.assertRaises(RuntimeError) as ctx:
+            p.setup()
+        self.assertIn("If you intended to specify the name of the returned residual in "
+                      "compute_primal, use 'res_primal_name' instead of 'primal_name'.",
+                      str(ctx.exception))
 
 
 if __name__ == '__main__':
