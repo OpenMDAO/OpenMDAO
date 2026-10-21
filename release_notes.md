@@ -3,7 +3,10 @@
 Oct 23, 2026
 
 OpenMDAO 3.45.2 continues to add some bug fixes and performance improvemnts. It contains a number of
-community contributions. Thank you everyone.
+community contributions.
+
+Thank you to [Monstertov](https://github.com/Monstertov), [machismo0311](https://github.com/machismo0311),
+and [vera-rubin](https://github.com/vera-rubin) for their contributions to this release.
 
 Note this includes a backwards incompatibility due to the assumption that the default residual naming
 jax. Residuals from that function are now assumed to be name `res_{name}` unless explicitly overridden.
@@ -20,6 +23,7 @@ See [#3821](https://github.com/OpenMDAO/OpenMDAO/pull/3821) for more information
 - Fixed a bug where using pre_opt_post without coloring in some drivers would lead to components that didn't execute. [#3822](https://github.com/OpenMDAO/OpenMDAO/pull/3822)
 - Preserve DirectSolver factorization path when computing approximated totals [#3817](https://github.com/OpenMDAO/OpenMDAO/pull/3817)
 - Fix incorrect linear constraint bounds in pyOptSparseDriver when hotstart_file option is set. [#3820](https://github.com/OpenMDAO/OpenMDAO/pull/3820)
+- Fixed BalanceComp constructor passing lhs_kwargs instead of rhs_kwargs when adding a balance. [#3830](https://github.com/OpenMDAO/OpenMDAO/pull/3830)
 
 ## Miscellaneous
 
