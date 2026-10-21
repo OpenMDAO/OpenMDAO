@@ -20,6 +20,27 @@ class HessianAutoscaler(AutoscalerBase):
     x is the model variable, y is the optimizer variable, and the matrix M is the 
     scaler/preconditioner
     
+    Attributes
+    ----------
+    m : int
+        Number of eigenpairs used for Hessian-based scaling.
+    grad_fd_step : float
+        Finite difference step used to approximate Hessian-vector products.
+    use_scipy_eigs : bool
+        Whether to use SciPy instead of the local Arnoldi implementation.
+    b : ndarray or None
+        Starting vector for eigenpair estimation.
+    max_iter : int
+        Krylov iteration count for the local Arnoldi implementation,
+        or maximum iteration count passed to SciPy.
+    eigenvals_m : ndarray or None
+        Selected Hessian eigenvalues, populated during setup.
+    eigenvecs_m : ndarray or None
+        Corresponding eigenvectors, populated during setup.
+    num_grad_evals : int
+        Number of objective-gradient evaluations performed by the autoscaler.
+    arnoldi_grad_evals : int
+        Gradient-evaluation count recorded after eigenpair estimation.
     """
     
     def __init__(self, num_modes, num_krylov = None, grad_fd_step=1e-6, use_scipy_eigs=False, start_vec = None):
@@ -46,7 +67,7 @@ class HessianAutoscaler(AutoscalerBase):
         self.grad_fd_step = grad_fd_step
         self.use_scipy_eigs = use_scipy_eigs
         self.b = start_vec
-        if num_krylov is None:
+        if num_krylov is None or num_krylov < num_modes:
             num_krylov = 2*num_modes
         self.max_iter = num_krylov
         self.eigenvals_m = None
@@ -386,7 +407,6 @@ class HessianAutoscaler(AutoscalerBase):
         else:        
             # use the local implementation of the Arnoldi algorithm
             eigenvals_m, eigenvecs_m = extract_eigpairs(A=Hv, b=b, iter=self.max_iter, m=m)
-            print("eigenvalues = ", eigenvals_m)
         return eigenvals_m, eigenvecs_m
     
     def _clean_eigenvals(self, eigenvals):
@@ -629,7 +649,7 @@ class HessianAutoscaler(AutoscalerBase):
         return vec
     
     @staticmethod
-    def update_design_vars(p):
+    def transform_desvar_bounds(p):
         """
         Convert bounded design variables to linear constraints after setup but before final_setup.
 
