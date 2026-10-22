@@ -1225,7 +1225,7 @@ class TestPETScDirectSolverNoPETSc(unittest.TestCase):
                 om.PETScDirectSolver()
 
             msg = ('PETSc is not available, but the PETScDirectSolver was '
-                   'assigned to the problem.Please make sure petsc4py is '
+                   'assigned to the model. Please make sure petsc4py is '
                    'installed.')
             self.assertTrue(str(cm.exception).endswith(msg))
 

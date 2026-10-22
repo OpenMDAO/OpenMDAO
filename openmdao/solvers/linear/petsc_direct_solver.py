@@ -268,7 +268,7 @@ class PETScDirectSolver(DirectSolver):
             self._PETSc = PETSc
         except ImportError:
             raise ImportError(f"{self.msginfo}: PETSc is not available, but the "
-                               "PETScDirectSolver was assigned to the problem."
+                               "PETScDirectSolver was assigned to the model. "
                                "Please make sure petsc4py is installed.")
 
     def _declare_options(self):
