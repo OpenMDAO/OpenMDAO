@@ -124,6 +124,26 @@ class TestBalanceComp(unittest.TestCase):
 
         assert_check_partials(cpd, atol=1e-5, rtol=1e-5)
 
+    def test_create_on_init_rhs_kwargs(self):
+
+        prob = om.Problem()
+
+        bal = om.BalanceComp('x', val=1.0, rhs_kwargs={'val': 6.0})
+
+        prob.model.add_subsystem('exec', om.ExecComp('y=3*x'))
+        prob.model.add_subsystem('balance', bal)
+        prob.model.connect('balance.x', 'exec.x')
+        prob.model.connect('exec.y', 'balance.lhs:x')
+
+        prob.model.linear_solver = om.DirectSolver()
+        prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, iprint=0)
+
+        prob.setup()
+        prob.run_model()
+
+        assert_almost_equal(prob['balance.rhs:x'], 6.0, decimal=7)
+        assert_almost_equal(prob['balance.x'], 2.0, decimal=7)
+
     def test_balance_comp_record_options(self):
 
         prob = om.Problem()
