@@ -1,6 +1,7 @@
 """Test the PETScDirectSolver linear solver class."""
 
 import unittest
+import unittest.mock
 import numpy as np
 from scipy import sparse
 import openmdao.api as om
@@ -1209,6 +1210,24 @@ class TestPETScDirectSolverRemoteErrors(unittest.TestCase):
                "cannot be used in or above a ParallelGroup or a distributed "
                "component.")
         self.assertEqual(str(cm.exception), msg)
+
+
+class TestPETScDirectSolverNoPETSc(unittest.TestCase):
+
+    def test_raises_import_error_when_petsc4py_missing(self):
+        """
+        Test that instantiating the PETScDirectSolver raises an ImportError
+        with an informative message if petsc4py is not installed, regardless
+        of whether petsc4py is actually available in this environment.
+        """
+        with unittest.mock.patch.dict('sys.modules', {'petsc4py': None}):
+            with self.assertRaises(ImportError) as cm:
+                om.PETScDirectSolver()
+
+            msg = ('PETSc is not available, but the PETScDirectSolver was '
+                   'assigned to the problem.Please make sure petsc4py is '
+                   'installed.')
+            self.assertTrue(str(cm.exception).endswith(msg))
 
 
 @unittest.skipUnless(PETSc, "only run with PETSc.")
