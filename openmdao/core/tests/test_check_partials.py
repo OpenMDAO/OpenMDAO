@@ -529,6 +529,40 @@ class TestProblemCheckPartials(unittest.TestCase):
         data = prob.check_partials(out_stream=None)
         assert_check_partials(data)
 
+    def test_constant_partials_unchanged(self):
+        # check_partials must not write its finite difference values into partials
+        # that were declared with a constant val
+        A = np.array([[1.0, 2.0, 0.0], [0.0, 3.0, 4.0]])
+
+        class Lin(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(3))
+                self.add_output('y', np.ones(2))
+                self.add_output('z', np.ones(3))
+                self.declare_partials('y', 'x', val=A)
+                self.declare_partials('z', 'x', rows=np.arange(3), cols=np.arange(3),
+                                      val=[5.0, 6.0, 7.0])
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = A @ inputs['x']
+                outputs['z'] = np.array([5.0, 6.0, 7.0]) * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('lin', Lin(), promotes=['*'])
+        p.setup()
+        p.set_val('x', [0.3, 1.7, -2.2])
+        p.run_model()
+
+        for _ in range(2):
+            data = p.check_partials(out_stream=None, method='fd')
+            assert_check_partials(data, atol=1e-6, rtol=1e-6)
+            np.testing.assert_array_equal(data['lin'][('y', 'x')]['J_fwd'], A)
+            np.testing.assert_array_equal(data['lin'][('z', 'x')]['J_fwd'], np.diag([5.0, 6.0, 7.0]))
+
+        totals = p.compute_totals(['y', 'z'], ['x'])
+        np.testing.assert_array_equal(totals[('y', 'x')], A)
+        np.testing.assert_array_equal(totals[('z', 'x')], np.diag([5.0, 6.0, 7.0]))
+
     def test_implicit_undeclared(self):
         # Test to see that check_partials works when state_wrt_input and state_wrt_state
         # partials are missing.

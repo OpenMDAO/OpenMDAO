@@ -125,7 +125,12 @@ class _CheckingJacobian(DictionaryJacobian):
         super().__init__(system)
 
     def _setup(self, system):
-        self._subjacs_info = self._subjacs_info.copy()
+        # copy the metadata and the values, so that the approximated values are not written
+        # into the subjacs of the system
+        self._subjacs_info = {key: meta.copy() for key, meta in self._subjacs_info.items()}
+        for meta in self._subjacs_info.values():
+            if hasattr(meta.get('val'), 'copy'):
+                meta['val'] = meta['val'].copy()
 
         self._setup_index_maps(system)
         self._subjacs = self._get_subjacs(system)
