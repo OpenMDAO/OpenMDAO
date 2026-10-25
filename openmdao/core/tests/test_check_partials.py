@@ -557,11 +557,78 @@ class TestProblemCheckPartials(unittest.TestCase):
             data = p.check_partials(out_stream=None, method='fd')
             assert_check_partials(data, atol=1e-6, rtol=1e-6)
             np.testing.assert_array_equal(data['lin'][('y', 'x')]['J_fwd'], A)
-            np.testing.assert_array_equal(data['lin'][('z', 'x')]['J_fwd'], np.diag([5.0, 6.0, 7.0]))
+            np.testing.assert_array_equal(data['lin'][('z', 'x')]['J_fwd'],
+                                          np.diag([5.0, 6.0, 7.0]))
 
         totals = p.compute_totals(['y', 'z'], ['x'])
         np.testing.assert_array_equal(totals[('y', 'x')], A)
         np.testing.assert_array_equal(totals[('z', 'x')], np.diag([5.0, 6.0, 7.0]))
+
+    def test_constant_partials_unchanged_directional(self):
+        # a directional check must not write the directional derivative into the first
+        # column of a partial that was declared with a constant val
+        A = np.array([[1.0, 2.0, 0.0], [0.0, 3.0, 4.0]])
+
+        class Lin(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(3))
+                self.add_output('y', np.ones(2))
+                self.declare_partials('y', 'x', val=A)
+                self.set_check_partial_options(wrt='x', directional=True)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = A @ inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('lin', Lin(), promotes=['*'])
+        p.setup()
+        p.set_val('x', [0.3, 1.7, -2.2])
+        p.run_model()
+
+        for _ in range(2):
+            data = p.check_partials(out_stream=None, method='fd')
+            assert_check_partials(data, atol=1e-6, rtol=1e-6)
+
+        totals = p.compute_totals(['y'], ['x'])
+        np.testing.assert_array_equal(totals[('y', 'x')], A)
+
+    def test_directional_rows_cols_fd_column(self):
+        # for a partial declared with rows and cols, the directional J_fd must be the whole
+        # finite difference column, not only its entries in the first column of the pattern
+        x0 = np.array([0.5, -1.5, 2.0])
+        cases = [
+            # diagonal pattern, analytic value of entry 1 is wrong (2 * x instead of x)
+            (np.arange(3), np.arange(3), lambda x: 0.5 * x ** 2,
+             lambda x: x * np.array([1.0, 2.0, 1.0]), x0),
+            # 4 nonzeros in 3 rows
+            ([0, 0, 1, 2], [0, 1, 1, 2], lambda x: np.array([x[0] + 2.0 * x[1], 3.0 * x[1],
+                                                             4.0 * x[2] ** 2]),
+             lambda x: np.array([1.0, 2.0, 3.0, 8.0 * x[2]]), np.array([3.0, 3.0, 16.0])),
+        ]
+        for rows, cols, func, partial, fd_expected in cases:
+            class Comp(om.ExplicitComponent):
+                def setup(self):
+                    self.add_input('x', np.ones(3))
+                    self.add_output('y', np.ones(3))
+                    self.declare_partials('y', 'x', rows=rows, cols=cols)
+                    self.set_check_partial_options('x', method='fd', directional=True)
+
+                def compute(self, inputs, outputs):
+                    outputs['y'] = func(inputs['x'])
+
+                def compute_partials(self, inputs, partials):
+                    partials['y', 'x'] = partial(inputs['x'])
+
+            p = om.Problem()
+            p.model.add_subsystem('comp', Comp())
+            p.setup()
+            p.set_val('comp.x', x0)
+            p.run_model()
+
+            data = p.check_partials(out_stream=None)
+            J_fd = data['comp'][('y', 'x')]['J_fd']
+            J_fd = J_fd[0] if isinstance(J_fd, list) else J_fd
+            np.testing.assert_allclose(J_fd.ravel(), fd_expected, rtol=1e-5)
 
     def test_implicit_undeclared(self):
         # Test to see that check_partials works when state_wrt_input and state_wrt_state
