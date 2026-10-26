@@ -9,8 +9,7 @@ Thank you to [Monstertov](https://github.com/Monstertov), [machismo0311](https:/
 and [vera-rubin](https://github.com/vera-rubin) for their contributions to this release.
 
 Note this includes a backwards incompatibility due to the assumption that the default residual naming
-jax. Residuals from that function are now assumed to be name `res_{name}` unless explicitly overridden.
-See [#3821](https://github.com/OpenMDAO/OpenMDAO/pull/3821) for more information.
+in JAX. Residuals from the implicit components `compute_primal` method are now assumed to be name `res_{name}` unless explicitly overridden. See [#3821](https://github.com/OpenMDAO/OpenMDAO/pull/3821) for more information.
 
 ## New Features
 
@@ -24,6 +23,7 @@ See [#3821](https://github.com/OpenMDAO/OpenMDAO/pull/3821) for more information
 - Preserve DirectSolver factorization path when computing approximated totals [#3817](https://github.com/OpenMDAO/OpenMDAO/pull/3817)
 - Fix incorrect linear constraint bounds in pyOptSparseDriver when hotstart_file option is set. [#3820](https://github.com/OpenMDAO/OpenMDAO/pull/3820)
 - Fixed BalanceComp constructor passing lhs_kwargs instead of rhs_kwargs when adding a balance. [#3830](https://github.com/OpenMDAO/OpenMDAO/pull/3830)
+- Add back removed error raise missing petsc with PETScDirectSolver. [#3845](https://github.com/OpenMDAO/OpenMDAO/pull/3845)
 
 ## Miscellaneous
 
