@@ -1,6 +1,6 @@
 ***********************************
 
-Oct 23, 2026
+Oct 27, 2026
 
 OpenMDAO 3.45.2 continues to add some bug fixes and performance improvemnts. It contains a number of
 community contributions.
