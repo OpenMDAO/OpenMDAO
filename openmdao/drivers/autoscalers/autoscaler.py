@@ -34,7 +34,7 @@ class Autoscaler(AutoscalerBase):
         from openmdao.core.driver import RecordingDebugging
 
         if self.setup_requires_run_model:
-            with RecordingDebugging(driver._get_name(), driver.iter_count, self):
+            with RecordingDebugging(driver._get_name(), driver.iter_count, driver):
                 with driver._problem().model._relevance.nonlinear_active('iter'):
                     driver._run_solve_nonlinear()
                 driver.iter_count += 1
