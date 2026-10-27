@@ -1,5 +1,6 @@
 """Define the DictionaryJacobian class."""
 import numpy as np
+from scipy.sparse import issparse
 
 from openmdao.jacobians.jacobian import Jacobian
 from openmdao.jacobians.subjac import SUBJAC_META_DEFAULTS
@@ -112,6 +113,31 @@ class DictionaryJacobian(Jacobian):
                                     d_inputs._abs_set_val(other_name, left_vec)
 
 
+def _meta_with_zero_val(meta):
+    """
+    Return a copy of subjac metadata whose 'val' is a new zero array of the same shape and format.
+
+    Parameters
+    ----------
+    meta : dict
+        Metadata for the subjacobian.
+
+    Returns
+    -------
+    dict
+        The copied metadata.
+    """
+    meta = meta.copy()
+    val = meta['val']
+    if issparse(val):
+        val = val.copy()
+        val.data = np.zeros_like(val.data)
+        meta['val'] = val
+    elif val is not None:
+        meta['val'] = np.zeros_like(val)
+    return meta
+
+
 class _CheckingJacobian(DictionaryJacobian):
     """
     A special type of Jacobian that we use only inside of check_partials.
@@ -125,7 +151,10 @@ class _CheckingJacobian(DictionaryJacobian):
         super().__init__(system)
 
     def _setup(self, system):
-        self._subjacs_info = self._subjacs_info.copy()
+        # The approximated values are written into arrays owned by this jacobian, which is
+        # discarded after check_partials, so the subjacs of the system are left unchanged.
+        self._subjacs_info = {key: _meta_with_zero_val(meta)
+                              for key, meta in self._subjacs_info.items()}
 
         self._setup_index_maps(system)
         self._subjacs = self._get_subjacs(system)
@@ -136,13 +165,9 @@ class _CheckingJacobian(DictionaryJacobian):
 
     def items(self):
         for key, subjac in self._subjacs.items():
-            meta = subjac.info
             if self._is_explicitcomp and key[0] == key[1]:
                 continue
-            if 'directional' in meta:
-                yield key, np.atleast_2d(meta['val']).T
-            else:
-                yield key, subjac.todense()
+            yield key, subjac.todense()
 
     def _setup_index_maps(self, system):
         super()._setup_index_maps(system)
@@ -173,13 +198,13 @@ class _CheckingJacobian(DictionaryJacobian):
                     subjac['shape'] = subjac['val'].shape
 
                 elif directional:
-                    shape = self._subjacs_info[key]['val'].shape
-                    if shape[-1] != 1:
-                        self._subjacs_info[key] = meta = self._subjacs_info[key].copy()
-                        if len(shape) > 1:
-                            meta['val'] = np.atleast_2d(meta['val'][:, 0]).T
-                        else:
-                            meta['val'] = np.atleast_1d(meta['val'])
+                    # A directional derivative is a single column. It is stored densely,
+                    # whatever the declared sparsity, so that set_col keeps all of its entries.
+                    meta = self._subjacs_info[key]
+                    meta['rows'] = meta['cols'] = None
+                    meta['diagonal'] = False
+                    if issparse(meta['val']) or meta['val'].shape != (nrows, 1):
+                        meta['val'] = np.zeros((nrows, 1))
 
     def set_col(self, system, icol, column):
         """
@@ -205,31 +230,14 @@ class _CheckingJacobian(DictionaryJacobian):
 
         wrt, loc_idx = self._col_mapper.index2key_rel(icol)  # local col index into subjacs
 
-        # If we are doing a directional derivative, then the sparsity will be violated.
-        # Skip sparsity check if that is the case.
-        options = system._get_check_partial_options()
-        loc_wrt = wrt.rpartition('.')[2]
-        directional = (options is not None and loc_wrt in options and
-                       options[loc_wrt]['directional'])
-
+        # The subjacs of directional derivatives are dense (see _setup_index_maps), so their
+        # columns are not checked against a sparsity pattern.
         subjacs = self._get_subjacs(system)
 
         for of, start, end, _, _ in system._get_jac_ofs():
             key = (of, wrt)
             if key in subjacs:
-                subjac = subjacs[key]
-                info = subjac.info
-                if info['diagonal']:
-                    subjac.set_col(loc_idx, column[start:end], self._uncovered_threshold)
-                    if directional:
-                        info['directional'] = True
-                elif info['cols'] is not None:
-                    subjac.set_col(loc_idx, column[start:end], self._uncovered_threshold)
-                    if directional:
-                        info['directional'] = True
-                        continue
-                else:
-                    subjac.set_col(loc_idx, column[start:end], self._uncovered_threshold)
+                subjacs[key].set_col(loc_idx, column[start:end], self._uncovered_threshold)
 
 
 class ExplicitDictionaryJacobian(Jacobian):
