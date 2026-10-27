@@ -170,6 +170,11 @@ class Group(System):
         Cache for the system graph.
     _key_owner : dict
         The owning rank keyed by absolute jacobian key.
+    _approx_wrt_links : dict
+        Inputs that are perturbed together when approximating semi-total derivatives, keyed by
+        the first input of each linked set.  Each value is a list of (input, outputs) for all
+        inputs in the set, where outputs are the outputs whose derivatives are stored in the
+        columns of that input.  The other inputs of the set map to None.
     """
 
     def __init__(self, **kwargs):
@@ -204,6 +209,7 @@ class Group(System):
         self._is_explicit = None
         self._sys_graph_cache = None
         self._key_owner = None
+        self._approx_wrt_links = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -3302,6 +3308,7 @@ class Group(System):
 
         approx_keys = self._get_approx_subjac_keys(initialize=True)
         wrt_seen = set()
+        new_keys = set()
         compute_cross_keys = not total and self.comm.size > 1 and self._has_fd_group
         graph = self._problem_meta['dataflow_graph']
 
@@ -3331,6 +3338,7 @@ class Group(System):
                 self._subjacs_info[key] = meta = Subjac.get_instance_metadata(meta, None,
                                                                               (osize, isize),
                                                                               self, key)
+                new_keys.add(key)
 
             if compute_cross_keys:
                 sout = sizes_out[:, abs2idx[of]]
@@ -3349,7 +3357,11 @@ class Group(System):
                 wrt_seen.add(wrt)
                 approx.add_approximation(wrt, self, meta)
 
-        if not total:
+        if total:
+            self._approx_wrt_links = {}
+        else:
+            self._approx_wrt_links = self._get_approx_wrt_links(approx_keys, wrt_seen, new_keys)
+
             # we're taking semi-total derivs for this group. Update _owns_approx_of
             # and _owns_approx_wrt so we can use the same approx code for totals and
             # semi-totals.  Also, the order must match order of vars in the output and
@@ -3371,6 +3383,71 @@ class Group(System):
                     self._owns_approx_wrt[n] = {'distributed': m['distributed']}
 
             self._owns_approx_jac = True
+
+    def _get_approx_wrt_links(self, approx_keys, wrts, new_keys):
+        """
+        Find inputs that can be perturbed together when approximating semi-total derivatives.
+
+        Inputs connected to the same source with the same src_indices and units always hold the
+        same values, for example the promoted copies of one input.  Perturbing all of them at
+        once gives the sum of their columns in a single run.  For each output, that sum is stored
+        in the subjac of only one of the inputs and the subjacs of the others are zero, which
+        gives the same derivatives once the inputs are mapped back to their source.
+
+        Parameters
+        ----------
+        approx_keys : list of (str, str)
+            The (of, wrt) keys being approximated.
+        wrts : set of str
+            Inputs that have an approximation.
+        new_keys : set of (str, str)
+            Subjac keys that were created for the approximation.
+
+        Returns
+        -------
+        dict
+            The value of _approx_wrt_links.
+        """
+        links = {}
+        if self.comm.size > 1:
+            return links
+
+        abs2meta_in = self._var_abs2meta['input']
+        get_source = self._resolver.source
+        linked = defaultdict(list)
+
+        for wrt in dict.fromkeys(wrt for _, wrt in approx_keys):
+            if wrt in wrts and wrt in abs2meta_in:
+                meta = abs2meta_in[wrt]
+                inds = meta['src_inds_list']
+                if inds:
+                    inds = np.asarray(idx_list_to_index_array(inds), dtype=INT_DTYPE)
+                    inds = (inds.shape, inds.tobytes())
+                else:
+                    inds = None
+                linked[get_source(wrt), meta['units'], inds].append(wrt)
+
+        info = self._subjacs_info
+        ofs = list(dict.fromkeys(of for of, _ in approx_keys))
+
+        for names in linked.values():
+            if len(names) < 2:
+                continue
+
+            owned = {name: [] for name in names}
+            for of in ofs:
+                keys = [(of, name) for name in names if (of, name) in info]
+                if keys:
+                    # prefer a subjac that existed before the approximation was set up, since
+                    # an ancestor with an assembled jacobian may already reference it.
+                    old = [key for key in keys if key not in new_keys]
+                    owned[(old or keys)[0][1]].append(of)
+
+            links[names[0]] = list(owned.items())
+            for name in names[1:]:
+                links[name] = None
+
+        return links
 
     def _setup_approx_coloring(self):
         """
