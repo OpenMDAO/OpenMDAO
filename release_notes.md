@@ -34,7 +34,7 @@ in JAX. Residuals from the implicit components `compute_primal` method are now a
 
 ## Backwards incompatible API changes
 
-Residuals from that function are now assumed to be name `res_{name}` unless explicitly overridden.
+Residuals from JaxImplicitComponent's compute_primal function are now assumed to be name `res_{name}` unless explicitly overridden.
 See [#3821](https://github.com/OpenMDAO/OpenMDAO/pull/3821) for more information. This is a safety
 measure to avoid name collisions between outputs and residuals. In a future version of OpenMDAO, we will use the more standard OpenMDAO `inputs, outputs, residuals` set of dict-like arguments, rendering this unnecessary in the future.
 
