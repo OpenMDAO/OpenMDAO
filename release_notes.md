@@ -1,5 +1,45 @@
 ***********************************
 
+Oct 27, 2026
+
+OpenMDAO 3.45.2 continues to add some bug fixes and performance improvemnts. It contains a number of
+community contributions.
+
+Thank you to [Monstertov](https://github.com/Monstertov), [machismo0311](https://github.com/machismo0311),
+and [vera-rubin](https://github.com/vera-rubin) for their contributions to this release.
+
+Note this includes a backwards incompatibility due to the assumption that the default residual naming
+in JAX. Residuals from the implicit components `compute_primal` method are now assumed to be name `res_{name}` unless explicitly overridden. See [#3821](https://github.com/OpenMDAO/OpenMDAO/pull/3821) for more information.
+
+## New Features
+
+- warn when rows/cols are declared on an fd or cs partial [#3823](https://github.com/OpenMDAO/OpenMDAO/pull/3823)
+- Support residual primal naming and default res_ convention for implicit components [#3821](https://github.com/OpenMDAO/OpenMDAO/pull/3821)
+
+
+## Bug Fixes
+
+- Fixed a bug where using pre_opt_post without coloring in some drivers would lead to components that didn't execute. [#3822](https://github.com/OpenMDAO/OpenMDAO/pull/3822)
+- Preserve DirectSolver factorization path when computing approximated totals [#3817](https://github.com/OpenMDAO/OpenMDAO/pull/3817)
+- Fix incorrect linear constraint bounds in pyOptSparseDriver when hotstart_file option is set. [#3820](https://github.com/OpenMDAO/OpenMDAO/pull/3820)
+- Fixed BalanceComp constructor passing lhs_kwargs instead of rhs_kwargs when adding a balance. [#3830](https://github.com/OpenMDAO/OpenMDAO/pull/3830)
+- Add back removed error raise missing petsc with PETScDirectSolver. [#3845](https://github.com/OpenMDAO/OpenMDAO/pull/3845)
+
+## Miscellaneous
+
+- Fix release_workflow github action [#3815](https://github.com/OpenMDAO/OpenMDAO/pull/3815)
+- Pin unopy to <=0.4.14 for testing [#3829](https://github.com/OpenMDAO/OpenMDAO/pull/3829)
+- Fixed issue where optimizer variables obtained from Case weren't scaled when requested. [#3827](https://github.com/OpenMDAO/OpenMDAO/pull/3827)
+- Preserve approximated subgroup derivatives in ancestor assembled Jacobians [#3825](https://github.com/OpenMDAO/OpenMDAO/pull/3825)
+
+## Backwards incompatible API changes
+
+Residuals from JaxImplicitComponent's compute_primal function are now assumed to be name `res_{name}` unless explicitly overridden.
+See [#3821](https://github.com/OpenMDAO/OpenMDAO/pull/3821) for more information. This is a safety
+measure to avoid name collisions between outputs and residuals. In a future version of OpenMDAO, we will use the more standard OpenMDAO `inputs, outputs, residuals` set of dict-like arguments, rendering this unnecessary in the future.
+
+***********************************
+
 Sept 10, 2026
 
 OpenMDAO 3.45.1 contains bug fixes and performance improvements.
