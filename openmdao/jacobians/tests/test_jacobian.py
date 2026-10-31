@@ -1082,6 +1082,53 @@ class MyDenseComp(ExplicitComponent):
         partials['z', 'y'] = np.array([[0.0, 8.0*inputs['y'][1]], [5.0*inputs['x'][1]**2, 0.0]])
 
 
+class NegativeSrcIndicesAssembledJacTestCase(unittest.TestCase):
+    def _make_problem(self, assembled_type, mode, src_indices):
+        p = Problem(reports=False, model=Group(assembled_jac_type=assembled_type))
+        p.model.add_subsystem('ivc', IndepVarComp('x', np.array([1., 2., 3., 4.])))
+
+        group = p.model.add_subsystem('G', Group())
+        group.add_subsystem('c1', ExecComp('y=2*u', u=np.zeros(3), y=np.zeros(3)))
+        group.add_subsystem('c2', ExecComp('z=2*v[0]+3*v[1]+4*v[2]', v=np.zeros(3)))
+        group.connect('c1.y', 'c2.v', src_indices=[1, 0, 1])
+        p.model.connect('ivc.x', 'G.c1.u', src_indices=src_indices)
+        p.model.linear_solver = DirectSolver(assemble_jac=True)
+        p.setup(mode=mode)
+        p.run_model()
+        return p
+
+    def test_negative_src_indices_assembled_totals(self):
+        # z = 12*x[1] + 6*x[3], regardless of whether x[3] is named -1 or 3.
+        expected = np.array([[0., 12., 0., 6.]])
+        for assembled_type, mode, src_indices in itertools.product(
+                ('csc', 'dense'), ('fwd', 'rev'), ([-1, 1, -1], [3, 1, 3])):
+            with self.subTest(assembled_type=assembled_type, mode=mode,
+                              src_indices=src_indices):
+                p = self._make_problem(assembled_type, mode, src_indices)
+                total = p.compute_totals(of=['G.c2.z'], wrt=['ivc.x'], return_format='array')
+                np.testing.assert_allclose(total, expected, atol=1e-12)
+
+    def test_negative_src_indices_assembled_optimization(self):
+        for assembled_type in ('csc', 'dense'):
+            with self.subTest(assembled_type=assembled_type):
+                p = Problem(reports=False, model=Group(assembled_jac_type=assembled_type))
+                p.model.add_subsystem('ivc', IndepVarComp('x', np.array([1., 2., 3., 4.])))
+                group = p.model.add_subsystem('G', Group())
+                group.add_subsystem('c1', ExecComp('y=2*u', u=np.zeros(3), y=np.zeros(3)))
+                group.add_subsystem('c2', ExecComp('z=2*v[0]+3*v[1]+4*v[2]', v=np.zeros(3)))
+                group.connect('c1.y', 'c2.v', src_indices=[1, 0, 1])
+                p.model.connect('ivc.x', 'G.c1.u', src_indices=[-1, 1, -1])
+                p.model.linear_solver = DirectSolver(assemble_jac=True)
+                p.model.add_design_var('ivc.x', indices=[3], lower=0, upper=10)
+                p.model.add_objective('G.c2.z')
+                p.driver = ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-12,
+                                               disp=False, maxiter=30)
+                p.setup(mode='fwd')
+                p.run_driver()
+                self.assertAlmostEqual(float(p.get_val('ivc.x')[3]), 0., places=8)
+                self.assertAlmostEqual(float(p.get_val('G.c2.z')[0]), 24., places=8)
+
+
 class OverlappingPartialsTestCase(unittest.TestCase):
     def test_repeated_src_indices_csc(self):
         size = 2
