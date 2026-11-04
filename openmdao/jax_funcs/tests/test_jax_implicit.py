@@ -367,5 +367,39 @@ class TestJaxImplicitComp(unittest.TestCase):
         assert_check_partials(prob.check_partials(out_stream=None), rtol=1e-5)
 
 
+def _compute_primal_is_jitted(comp):
+    func = getattr(comp.compute_primal, '__func__', comp.compute_primal)
+    return hasattr(func, 'lower')
+
+
+@unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
+class TestImplicitPrimalJittedWithoutLinearize(unittest.TestCase):
+    def test_apply_nonlinear_jits_before_linearize(self):
+        class Resid(om.JaxImplicitComponent):
+            def setup(self):
+                self.add_input('a', val=1.0)
+                self.add_output('x', val=0.25)
+
+            def compute_primal(self, a, x):
+                return a * x - 3.0
+
+        def build(use_jit):
+            p = om.Problem(reports=False)
+            p.model.add_subsystem('comp', Resid(use_jit=use_jit))
+            p.setup()
+            p.final_setup()
+            return p
+
+        compiled = build(True)
+        plain = build(False)
+        self.assertFalse(_compute_primal_is_jitted(compiled.model.comp))
+        compiled.model.run_apply_nonlinear()
+        plain.model.run_apply_nonlinear()
+        self.assertTrue(_compute_primal_is_jitted(compiled.model.comp))
+        self.assertFalse(_compute_primal_is_jitted(plain.model.comp))
+        assert_near_equal(compiled.model.comp._residuals['x'], np.array([-2.75]))
+        assert_near_equal(plain.model.comp._residuals['x'], np.array([-2.75]))
+
+
 if __name__ == '__main__':
     unittest.main()

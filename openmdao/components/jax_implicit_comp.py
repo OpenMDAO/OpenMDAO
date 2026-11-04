@@ -44,6 +44,9 @@ class JaxImplicitComponent(ImplicitComponent):
         The function that computes the colored jacobian.
     _static_hash : tuple
         The hash of the static values.
+    _compute_static_hash : int or None
+        Hash of discrete inputs and get_self_statics() for the compute_primal jit.
+        Kept separate from _static_hash, which partials use as their static key.
     _orig_compute_primal : function
         The original compute_primal method.
     _ret_tuple_compute_primal : function
@@ -64,6 +67,7 @@ class JaxImplicitComponent(ImplicitComponent):
         self._sparsity = None
         self._jac_func_ = None
         self._static_hash = None
+        self._compute_static_hash = None
         self._jac_colored_ = None
         self._output_shapes = None
         self._do_shape_check = True
@@ -274,6 +278,59 @@ class JaxImplicitComponent(ImplicitComponent):
             Always returns False.
         """
         return False
+
+    def _ensure_jitted_compute_primal(self, discrete_inputs):
+        """
+        Jit compute_primal before derivatives are requested.
+
+        _update_jac_functs installs the jitted primal, but only when partials run.
+        A residual evaluation that never linearizes would otherwise stay eager.
+
+        Parameters
+        ----------
+        discrete_inputs : iter
+            Discrete input values, in the order used by _update_jac_functs.
+        """
+        if self.options['derivs_method'] != 'jax' or not self.options['use_jit']:
+            return
+
+        # Do not call _statics_changed. That writes _static_hash, which partials
+        # use to decide when their compiled functions are stale.
+        inhash = hash((tuple(discrete_inputs) if discrete_inputs else (),
+                       self.get_self_statics()))
+        if inhash == self._compute_static_hash:
+            return
+
+        # Partials close over the previous compute_primal.
+        self._compute_static_hash = inhash
+        self._jac_func_ = None
+        self.compute_primal = self._get_jax_compute_primal(discrete_inputs, True)
+
+    def apply_nonlinear(self, inputs, outputs, residuals, discrete_inputs=None,
+                        discrete_outputs=None):
+        """
+        Compute residuals given inputs and outputs.
+
+        The model is assumed to be in an unscaled state. When use_jit is set,
+        compile compute_primal on this path instead of waiting for linearization.
+
+        Parameters
+        ----------
+        inputs : Vector
+            Unscaled, dimensional input variables read via inputs[key].
+        outputs : Vector
+            Unscaled, dimensional output variables read via outputs[key].
+        residuals : Vector
+            Unscaled, dimensional residuals written to via residuals[key].
+        discrete_inputs : dict or None
+            If not None, dict containing discrete input values.
+        discrete_outputs : dict or None
+            If not None, dict containing discrete output values.
+        """
+        discrete_vals = discrete_inputs.values() if discrete_inputs else ()
+        self._ensure_jitted_compute_primal(discrete_vals)
+        super().apply_nonlinear(inputs, outputs, residuals, discrete_inputs,
+                                 discrete_outputs)
 
     def _get_jax_compute_primal(self, discrete_inputs, need_jit):
         """
