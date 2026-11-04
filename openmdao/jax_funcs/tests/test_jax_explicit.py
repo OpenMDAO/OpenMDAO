@@ -778,5 +778,97 @@ class TestJaxMatrixFreeFwdCaching(unittest.TestCase):
                                            method='fd', show_only_incorrect=True))
 
 
+def _compute_primal_is_jitted(comp):
+    func = getattr(comp.compute_primal, '__func__', comp.compute_primal)
+    return hasattr(func, 'lower')
+
+
+@unittest.skipIf(jax is None, 'jax is not available')
+class TestComputePrimalJittedWithoutLinearize(unittest.TestCase):
+    def test_run_model_jits_before_totals(self):
+        class Rhs(om.JaxExplicitComponent):
+            def setup(self):
+                self.add_input('x', val=np.ones(6))
+                self.add_output('xdot', val=np.zeros(6))
+
+            def compute_primal(self, x):
+                xdot = x
+                for _ in range(8):
+                    xdot = jnp.sin(xdot) * jnp.cos(x) + 0.1 * xdot ** 2
+                return xdot
+
+        def build(use_jit):
+            p = om.Problem(reports=False)
+            p.model.add_subsystem('rhs', Rhs(use_jit=use_jit), promotes=['*'])
+            p.setup()
+            p.set_val('x', np.full(6, 0.3))
+            p.run_model()
+            return p
+
+        compiled = build(True)
+        plain = build(False)
+        self.assertTrue(_compute_primal_is_jitted(compiled.model.rhs))
+        self.assertFalse(_compute_primal_is_jitted(plain.model.rhs))
+        assert_near_equal(compiled.get_val('xdot'), plain.get_val('xdot'))
+        assert_check_partials(compiled.check_partials(out_stream=None), atol=1e-5)
+
+    def test_static_change_rejits_compute_primal(self):
+        class Scale(om.JaxExplicitComponent):
+            def initialize(self):
+                self.options.declare('mult', default=2.0)
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+            def get_self_statics(self):
+                return (self.options['mult'],)
+
+            def compute_primal(self, x):
+                return x * self.options['mult']
+
+        p = om.Problem(reports=False)
+        p.model.add_subsystem('c', Scale(), promotes=['*'])
+        p.setup()
+        p.set_val('x', 3.0)
+        p.run_model()
+        self.assertTrue(_compute_primal_is_jitted(p.model.c))
+        first = p.model.c.compute_primal
+        assert_near_equal(p.get_val('y'), 6.0)
+
+        p.model.c.options['mult'] = 4.0
+        p.run_model()
+        self.assertIsNot(p.model.c.compute_primal, first)
+        self.assertTrue(_compute_primal_is_jitted(p.model.c))
+        assert_near_equal(p.get_val('y'), 12.0)
+        assert_check_partials(p.check_partials(out_stream=None), atol=1e-5)
+
+    def test_repeated_compute_keeps_compiled_primal(self):
+        class Scale(om.JaxExplicitComponent):
+            def initialize(self):
+                self.options.declare('mult', default=2.0)
+
+            def setup(self):
+                self.add_input('x', val=1.0)
+                self.add_output('y', val=1.0)
+
+            def get_self_statics(self):
+                return (self.options['mult'],)
+
+            def compute_primal(self, x):
+                return x * self.options['mult']
+
+        p = om.Problem(reports=False)
+        p.model.add_subsystem('c', Scale(), promotes=['*'])
+        p.setup()
+        p.set_val('x', 3.0)
+        p.run_model()
+        first = p.model.c.compute_primal
+        p.run_model()
+        self.assertIs(p.model.c.compute_primal, first)
+        self.assertIsNone(p.model.c._static_hash)
+        assert_near_equal(p.get_val('y'), 6.0)
+
+
 if __name__ == '__main__':
     unittest.main()
