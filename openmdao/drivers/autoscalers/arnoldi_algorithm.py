@@ -4,9 +4,10 @@ from scipy.linalg import eig
 
 def arnoldi(A, b, k):
     """
-    Computes the Arnoldi decomposition of matrix A using the starting vector b.
+    Compute the Arnoldi decomposition of matrix A using the starting vector b.
 
-    Parameters:
+    Parameters
+    ----------
     A : (n, n) array-like
         The input square matrix.
     b : (n,) array-like
@@ -14,7 +15,8 @@ def arnoldi(A, b, k):
     k : int
         The number of Arnoldi iterations (dimension of Krylov subspace).
 
-    Returns:
+    Returns
+    -------
     Q : (n, k+1) array
         Orthonormal basis of the Krylov subspace.
     H : (k+1, k) array
@@ -43,17 +45,18 @@ def arnoldi(A, b, k):
 
 def extract_tridiag(H):
     """
-        This function keeps the tridiagomal entries of matrix H 
-        and set all other entries to zeros.
+    Keep the tridiagonal entries of matrix H and set all other entries to zero.
         
-        Parameters:
-        H : (m, n) array-like
-            The input matrix (Hessenberg matrix from Arnoldi iteration).
+    Parameters
+    ----------
+    H : (m, n) array-like
+        The input matrix (Hessenberg matrix from Arnoldi iteration).
             
-        Returns:
-        td_H : (m, n) array
-            The tridiagonal matrix with the same shape as H, containing only 
-            the main diagonal and the first superdiagonal and subdiagonal entries of H.
+    Returns
+    -------
+    td_H : (m, n) array
+        The tridiagonal matrix with the same shape as H, containing only 
+        the main diagonal and the first superdiagonal and subdiagonal entries of H.
     """
     m, n = H.shape
     assert m >= n, f"extract_tridiag requires m >= n, but got shape {H.shape}"
@@ -77,9 +80,10 @@ def extract_tridiag(H):
     
 def compute_eigenvalues_and_eigenvectors(A, b, k):
     """
-    Computes the approximate eigenvalues and eigenvectors of A using Arnoldi iteration.
+    Compute the approximate eigenvalues and eigenvectors of A using Arnoldi iteration.
 
-    Parameters:
+    Parameters
+    ----------
     A : (n, n) array-like
         The input square matrix.
     b : (n,) array-like
@@ -87,7 +91,8 @@ def compute_eigenvalues_and_eigenvectors(A, b, k):
     k : int
         The number of Arnoldi iterations.
 
-    Returns:
+    Returns
+    -------
     eigvals : array
         Approximate eigenvalues of A.
     eigvecs : array
@@ -114,19 +119,20 @@ def sort_eigs(unsorted_eigvals, unsorted_eigvecs):
     """
     Sorts eigenvalues and eigenvectors in descending order of eigenvalues.
 
-    Parameters:
+    Parameters
+    ----------
     unsorted_eigvals : (k,) array-like
         The array of eigenvalues.
     unsorted_eigvecs : (n, k) array-like
         The corresponding matrix of eigenvectors.
 
-    Returns:
+    Returns
+    -------
     sorted_eigvals : (k,) array
         Eigenvalues sorted in descending order.
     sorted_eigvecs : (n, k) array
         Corresponding eigenvectors sorted accordingly.
     """
-    
     # Get sorting indices (descending order)
     sorted_indices = np.argsort(np.abs(unsorted_eigvals))[::-1]
     
@@ -139,17 +145,21 @@ def sort_eigs(unsorted_eigvals, unsorted_eigvecs):
 
 def extract_eigpairs(A, b, iter, m):
     """
-    provides m largest eigenvalues and eigenvectors of the matrix (or linear operator) A
+    Provide the m largest eigenvalues and eigenvectors of the matrix (or linear operator) A
     
-    Parameters:
+    Parameters
+    ----------
     A : (n, n) array-like
         The input square matrix. It can be a matrix or linear operator
     b : (n,) array-like
         The starting vector for Arnoldi iteration.
     iter : int
         The number of Arnoldi iterations.
+    m : int
+        The number of eigenpairs to return.
         
-    Returns:
+    Returns
+    -------
     m_eigvals : (m, ) array
         m largest approximate eigenvalues of A.
     m_eigvecs : (n, m) array 

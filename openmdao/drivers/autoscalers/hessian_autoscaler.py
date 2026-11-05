@@ -43,7 +43,8 @@ class HessianAutoscaler(AutoscalerBase):
         Gradient-evaluation count recorded after eigenpair estimation.
     """
     
-    def __init__(self, num_modes, num_krylov = None, grad_fd_step=1e-6, use_scipy_eigs=False, start_vec = None):
+    def __init__(self, num_modes, num_krylov=None, grad_fd_step=1e-6, use_scipy_eigs=False,
+                 start_vec=None):
         """
         Initialize the HessianAutoscaler with the specified parameters.
         
@@ -57,11 +58,11 @@ class HessianAutoscaler(AutoscalerBase):
             The step size for finite difference approximation (default is 1e-6)
         use_scipy_eigs : bool, optional
             If True, use Scipy library to compute the eigenpairs (default is False)
-            Else, the cheaper, local implementation of the Arnoldi algorithm will be used to estimate the eigenpairs
+            Else, the cheaper, local implementation of the Arnoldi algorithm will be used to
+            estimate the eigenpairs
         start_vec : ndarray, optional
             The starting vector used in the Arnoldi algorithm (default: random if start_vec = None)
         """
-        
         super().__init__()
         self.m = num_modes
         self.grad_fd_step = grad_fd_step
@@ -116,7 +117,8 @@ class HessianAutoscaler(AutoscalerBase):
             if not meta.get('discrete', False)]
         
         if not dv_names:
-            raise RuntimeError("HessianAutoscaler requires at least one continuous design variable.")
+            raise RuntimeError(
+                'HessianAutoscaler requires at least one continuous design variable.')
         
         x0_vec = driver._vectors['design_var']
         x0_vec.update_from_model(driver, driver_scaling=False)
@@ -124,7 +126,8 @@ class HessianAutoscaler(AutoscalerBase):
         self.n_vars = x0.size
         
         if self.m > self.n_vars:
-            raise RuntimeError(f"Number of modes cannot exceed the number of design variables. There are {self.n_vars} design variables and {self.m} modes.")
+            raise RuntimeError('Number of modes cannot exceed the number of design variables. '
+                               f'There are {self.n_vars} design variables and {self.m} modes.')
         
         # store the slices and sizes of each design variable for later use in apply_jac_scaling(...)
         self._dv_slices = {}
@@ -244,7 +247,8 @@ class HessianAutoscaler(AutoscalerBase):
 
         lower_vec = OptimizerVector(voi_type, lower_data, vecmeta)
         upper_vec = OptimizerVector(voi_type, upper_data, vecmeta)
-        equals_vec = OptimizerVector(voi_type, equals_data, vecmeta) if voi_type == 'constraint' else None
+        equals_vec = (OptimizerVector(voi_type, equals_data, vecmeta)
+                      if voi_type == 'constraint' else None)
 
         return lower_vec, upper_vec, equals_vec
     
@@ -295,10 +299,10 @@ class HessianAutoscaler(AutoscalerBase):
     
     def _gradfunc(self, driver, x):
         """
-        Extracts the gradient of the objective function at a design point
+        Extract the gradient of the objective function at a design point
         
         Parameters
-        ---------
+        ----------
         driver : Driver
             The driver associated with this autoscaler.
         x : ndarray
@@ -329,13 +333,18 @@ class HessianAutoscaler(AutoscalerBase):
         return totals[0, :].copy()
     
     def _compute_Hv(self, gradfunc, x, grad_fd_step):
-        """ Compute the matrix-vector (mv) product using Forward Diffrerence (FD)
+        """
+        Compute the Hessian as a linear operator using forward differences.
+
+        The matrix-vector (mv) product is computed using a Forward Difference (FD)
         approximation. The Hessian is then formed based on mv as a linear operator.
         
         Parameters
         ----------
         gradfunc : vec
             A function that returns the gradient of the objective function in vector form.
+        x : ndarray
+            The design point at which the Hessian is approximated.
         grad_fd_step : scalar
             the step size for FD approximation.
             
@@ -348,8 +357,8 @@ class HessianAutoscaler(AutoscalerBase):
         h = grad_fd_step                                # FD perturbation
         g = gradfunc(x)
         def mv(v):
-            """This subfunction performs the forward difference in the direction
-            of an arbitrary vector v.
+            """
+            Perform the forward difference in the direction of an arbitrary vector v.
             """
             g_eps_h = gradfunc(x + h*v) # compute Hessian-vec product with FD
             
@@ -380,13 +389,12 @@ class HessianAutoscaler(AutoscalerBase):
             The starting vector used in the Arnoldi algorithm
             
         Returns
-        --------
+        -------
         eigenvals_m : arr
             Array of m largest (in magnitude) eigenvalues
         eigenvecs_m : arr
             Matrix of the eigenvectors corresponding to eigenvals_m
         """
-        
         n_vars = len(x)
         
         Hv = self._compute_Hv(gradfunc, x, self.grad_fd_step)
@@ -402,7 +410,8 @@ class HessianAutoscaler(AutoscalerBase):
             real_vecs = np.real(vecs)
             
             # sort the eigenvalues and eigenvectors from highest to lowest in magnitude
-            eigenvals_m, eigenvecs_m = sort_eigs(unsorted_eigvals=real_vals, unsorted_eigvecs=real_vecs)
+            eigenvals_m, eigenvecs_m = sort_eigs(unsorted_eigvals=real_vals,
+                                                 unsorted_eigvecs=real_vecs)
         
         else:        
             # use the local implementation of the Arnoldi algorithm
@@ -434,7 +443,7 @@ class HessianAutoscaler(AutoscalerBase):
     
     def _compute_matrix_M(self):
         """ 
-        Computes the mapping M using m eigenvalues and eigenvectors.
+        Compute the mapping M using m eigenvalues and eigenvectors.
         
         M = V_m * |Lambda_m|^(-1/2) * V_m^T  +  |lambda_m|^(-1/2) * (I - V_m*V_m^T)
         
@@ -443,15 +452,16 @@ class HessianAutoscaler(AutoscalerBase):
         M : ndarray
             The scaling matrix/preconditioner.
         """
-        
         if np.max(np.abs(self.eigenvals_m)) <= 1e-10:
             M = np.eye(self.n_vars)
-            issue_warning("HessianAutoscaler: The Hessian is nearly singular or the objective is linear. " 
+            issue_warning("HessianAutoscaler: The Hessian is nearly singular or the objective "
+                          "is linear. " 
                           "Using identity matrix as the scaling matrix.",
                           category=Warning)
         else:
             # if np.abs(self.eigenvals_m[self.m - 1]) <= 1e-10:
-            #     raise ValueError(f"The smallest eigenvalue is approximately zero (value = {self.eigenvals_m[self.m - 1]})")
+            #     raise ValueError(f"The smallest eigenvalue is approximately zero "
+            #                      f"(value = {self.eigenvals_m[self.m - 1]})")
             I = np.eye(self.n_vars)
             tilde_vals = np.copy(self.eigenvals_m)
             for i in range(self.m):
@@ -475,15 +485,16 @@ class HessianAutoscaler(AutoscalerBase):
         ----------
         y : ndarray 
             The optimization variable. Note x_scaled = y
+
         Returns
-        --------
+        -------
         My : ndarray
             The unscaled design variables. That is x_model = My
         """
-        
         if np.max(np.abs(self.eigenvals_m)) <= 1e-10:
             My = y
-            issue_warning("HessianAutoscaler: The Hessian is nearly singular or the objective is linear. " 
+            issue_warning("HessianAutoscaler: The Hessian is nearly singular or the objective "
+                          "is linear. " 
                           "Using identity matrix as the scaling matrix.",
                           category=Warning)
         else:
@@ -503,7 +514,7 @@ class HessianAutoscaler(AutoscalerBase):
         Compute y = M^{-1} x without inverting any matrix
 
         Parameters
-        ---------
+        ----------
         x : (1D array or vector)
             model space design variables
         m : (integer)
@@ -514,6 +525,7 @@ class HessianAutoscaler(AutoscalerBase):
             eigenvectors
 
         Returns
+        -------
         y : 1D array or vector 
             optimization variable (equivalently x_scaled)
         """
@@ -528,7 +540,8 @@ class HessianAutoscaler(AutoscalerBase):
             tilde_lambda = tilde_vals[self.m-1]
             w = np.transpose(self.eigenvecs_m) @ x
 
-            y = (self.eigenvecs_m @ (np.diag(tilde_vals) - tilde_lambda * Im)) @ w + tilde_lambda * x
+            y = ((self.eigenvecs_m @ (np.diag(tilde_vals) - tilde_lambda * Im)) @ w
+                 + tilde_lambda * x)
             # y_0 = eigenvecs_m @ np.diag(tilde_vals) @ w
         return y
 
@@ -600,7 +613,6 @@ class HessianAutoscaler(AutoscalerBase):
         vec : OptimizerVector
             An OptimizerVector with voi_type='design_var'.
         """
-        
         # check if vector is in already in model (not driver-scaled) form
         if not vec.driver_scaling:
             return vec
@@ -640,6 +652,7 @@ class HessianAutoscaler(AutoscalerBase):
             g(My) = g(x)
                 OR
             g_scaled(y) = g(x)
+
         Parameters
         ----------
         vec : OptimizerVector
@@ -655,15 +668,14 @@ class HessianAutoscaler(AutoscalerBase):
 
         For each design variable that has finite lower or upper bounds, this function adds an
         equivalent linear constraint on that variable and removes the bounds from the design
-        variable declaration.  This must be called after Problem.setup() but before run_model(), run_driver()
-        or final_setup().
+        variable declaration.  This must be called after Problem.setup() but before run_model(),
+        run_driver() or final_setup().
 
         Parameters
         ----------
         p : om.Problem
             The Problem instance, which must have had setup() called already.
         """
-
         for prom_name, meta in p.model.get_design_vars(
                 recurse=True, get_sizes=False, use_prom_ivc=True).items():
             lb = meta['lower']
@@ -697,8 +709,9 @@ class HessianAutoscaler(AutoscalerBase):
         """
         Unscale the Lagrange multipliers from optimizer space to model space.
         
-        This method transforms active design variable bounds from the scaled optimization space back to 
-        physical (model) space. It does not affect the Lagrange multipliers of active constraints.
+        This method transforms active design variable bounds from the scaled optimization space
+        back to physical (model) space. It does not affect the Lagrange multipliers of active
+        constraints.
         
         At optimality, we assume the KKT stationarity condition holds:
         
@@ -779,8 +792,9 @@ class HessianAutoscaler(AutoscalerBase):
     
     def apply_jac_scaling(self, jac_dict):
         """
-        Scale total derivatives from model-space design variables x to optimizer-space
-        variables y using the low-rank form of the HessianAutoscaler transformation.
+        Scale total derivatives from model-space x to optimizer-space y.
+
+        This uses the low-rank form of the HessianAutoscaler transformation.
 
         For HessianAutoscaler:
 
@@ -837,8 +851,7 @@ class HessianAutoscaler(AutoscalerBase):
         beta = tilde_vals - alpha
 
         def _as_2d(block):
-            """ Convert a Jacobian block to a two-dimensional array. """
-            
+            """Convert a Jacobian block to a two-dimensional array."""
             arr = np.asarray(block)
 
             if arr.ndim == 1:
