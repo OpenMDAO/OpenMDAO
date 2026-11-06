@@ -196,6 +196,8 @@ runs:
           export OMPI_MCA_rmaps_base_oversubscribe=1
           export OMPI_MCA_mpi_yield_when_idle=1
           export OMPI_MCA_btl=^openib
+          export OMPI_MCA_pml=ob1
+          export UCX_TLS=tcp
           echo "-----------------------"
           echo "Quick test of mpi4py:"
           mpirun -n 3 python -c "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
@@ -211,6 +213,8 @@ runs:
           echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> "$GITHUB_ENV"
           echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> "$GITHUB_ENV"
           echo "OMPI_MCA_btl=tcp,self" >> "$GITHUB_ENV"
+          echo "OMPI_MCA_pml=ob1" >> "$GITHUB_ENV"
+          echo "UCX_TLS=tcp" >> "$GITHUB_ENV"
           echo "OMPI_MCA_orte_tmpdir_base=$RUNNER_TEMP/ompi" >> "$GITHUB_ENV"
 
         else
@@ -241,6 +245,10 @@ runs:
         # MPI settings for CI (all platforms)
         PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
         OMPI_MCA_rmaps_base_oversubscribe: "1"
+        # Some runner VMs expose an Azure MANA verbs device that UCX picks up but
+        # cannot use, which hangs MPI startup. Force the ob1/TCP path instead.
+        OMPI_MCA_pml: "ob1"
+        UCX_TLS: "tcp"
         # Make oversubscribed MPI ranks yield the CPU while idle instead of
         # busy-polling, which starves working ranks on the small CI runners
         OMPI_MCA_mpi_yield_when_idle: "1"
