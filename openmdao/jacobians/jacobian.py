@@ -38,6 +38,8 @@ class Jacobian(object):
     ----------
     system : System
         Parent system to this jacobian.
+    subjacs_info : dict or None
+        Sub-Jacobian metadata to use instead of the system's own _subjacs_info.
 
     Attributes
     ----------
@@ -75,11 +77,11 @@ class Jacobian(object):
         Full shape of the jacobian, including dr/do and dr/di.
     """
 
-    def __init__(self, system):
+    def __init__(self, system, subjacs_info=None):
         """
         Initialize all attributes.
         """
-        self._subjacs_info = system._subjacs_info
+        self._subjacs_info = system._subjacs_info if subjacs_info is None else subjacs_info
         self._subjacs = None
         self._irrelevant_subjacs = {}
         self._under_complex_step = False
