@@ -175,6 +175,12 @@ testflo = "*"
 libblas = { version = "*", build = "*_openblas" }
 libcblas = { version = "*", build = "*_openblas" }
 
+[feature.openblas-explicit.target.win-64.dependencies]
+# OpenBLAS 0.3.34 overflows the dgemm kernel's stack on Windows with AMD Zen 4/5 CPUs that expose
+# AVX-512, causing access violations in dense LU factorizations of order ~300 and larger.
+# See https://github.com/OpenMathLib/OpenBLAS/issues/6013
+libopenblas = "!=0.3.34"
+
 [feature.visualization.dependencies]
 panel = "*"
 bokeh = "*"
