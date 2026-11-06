@@ -56,6 +56,9 @@ runs:
       env:
         PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
         OMPI_MCA_rmaps_base_oversubscribe: "1"
+        OMPI_MCA_pml: "ob1"
+        OMPI_MCA_btl: "tcp,self"
+        UCX_TLS: "tcp"
       shell: bash -l {0}
       run: |
         if [[ "${{ inputs.use_pixi }}" == "true" ]]; then
