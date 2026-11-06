@@ -234,6 +234,11 @@ class ApproximationScheme(object):
         else:
             wrt_matches = None
 
+        links = system._approx_wrt_links if not total and _is_group(system) else None
+        if links:
+            col_starts = {n: start for n, start, _, _, _, _ in system._get_jac_wrts(wrt_matches)}
+            row_ranges = {n: (start, end) for n, start, end, _, _ in system._get_jac_ofs()}
+
         if self._totals_directional_mode == 'rev':
             wrts_directional = []
             in_inds_directional = []
@@ -250,6 +255,21 @@ class ApproximationScheme(object):
                 directional = meta['directional'] or self._totals_directions
 
                 in_idx = range(start, end)
+
+                if links and wrt in links and not directional:
+                    if links[wrt] is not None:
+                        # Perturb all of the linked inputs in the same run.  Each output's rows
+                        # go into the columns of only one of the inputs, and are zero in the
+                        # columns of the others.
+                        loc = np.arange(end - start)[:, np.newaxis]
+                        vec_idx = loc + [vec.get_range(n)[0] for n, _ in links[wrt]]
+                        in_idx = loc + [col_starts[n] for n, _ in links[wrt]]
+                        rows = [np.array([i for of in ofs for i in range(*row_ranges[of])],
+                                         dtype=INT_DTYPE) for _, ofs in links[wrt]]
+                        self._nruns_uncolored += end - start
+                        self._approx_groups.append((wrt, data, in_idx, [(vec, vec_idx)], False,
+                                                    meta['vector'], rows))
+                    continue
 
                 if total and sinds is not _full_slice:
                     if vec is None:
@@ -291,7 +311,7 @@ class ApproximationScheme(object):
                     else:
                         direction = meta['vector']
                     self._approx_groups.append(((wrt,) if directional else wrt, data, in_idx,
-                                                [(vec, vec_idx)], directional, direction))
+                                                [(vec, vec_idx)], directional, direction, None))
 
         if total:
             if self._totals_directional_mode == 'rev':
@@ -299,7 +319,7 @@ class ApproximationScheme(object):
                 vector = self._totals_directions['fwd']
                 self._approx_groups = [(tuple(wrts_directional), data_directional,
                                         [in_inds_directional], list(vec_inds_directional.items()),
-                                        True, vector)]
+                                        True, vector, None)]
 
             # compute scatter from the results vector into a column of the total jacobian
             sinds, tinds, colsize, has_dist_data = system._get_jac_col_scatter()
@@ -463,7 +483,7 @@ class ApproximationScheme(object):
         system : System
             System where this approximation is occurring.
         approx_groups : list of tuples of the form (wrt, data, jaccols, vec, vec_idx, directional,
-                                                    dir_vector)
+                                                    dir_vector, linked_rows)
             wrt -> name of the 'with respect to' variable
             data -> metadata needed to perform cs or fd
             jaccols -> jacobian columns corresponding to all solves for the 'wrt' variable
@@ -472,6 +492,8 @@ class ApproximationScheme(object):
             directional -> if True we're computing a directional derivative (one approx for the
                            whole wrt variable instead of 1 per entry in the variable)
             dir_vector -> if directional is True, this may contain the direction vector
+            linked_rows -> if not None, jaccols holds a column for each of several linked inputs
+                           and this holds the rows that are stored in each of those columns
 
         Yields
         ------
@@ -500,10 +522,11 @@ class ApproximationScheme(object):
         fd_count = 0
         mycomm = system._full_comm if use_parallel_fd else system.comm
         abs2prom = system._resolver.abs2prom
+        linked_col = None
 
         # now do uncolored solves
         for group_i, tup in enumerate(approx_groups):
-            wrt, data, jcol_idxs, vec_ind_list, directional, direction = tup
+            wrt, data, jcol_idxs, vec_ind_list, directional, direction, _ = tup
             if self._progress_out:
                 start_time = time.perf_counter()
 
@@ -574,7 +597,15 @@ class ApproximationScheme(object):
                     # approx_groups[gi] -> (wrt, data, jcol_idxs, vec_ind_list, direction)
                     # [2] -> jcol_idxs, and [icount] -> actual indices used for the fd run.
                     jinds = approx_groups[gi][2][icount]
-                    if directional:
+                    linked_rows = approx_groups[gi][6]
+                    if linked_rows is not None:
+                        if linked_col is None:
+                            linked_col = np.zeros(res.size)
+                        for jidx, rows in zip(jinds, linked_rows):
+                            linked_col[:] = 0.0
+                            linked_col[rows] = res[rows]
+                            yield jidx, linked_col
+                    elif directional:
                         yield jinds[0], res
                     else:
                         yield jinds, res
