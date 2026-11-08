@@ -1,12 +1,18 @@
 """Tests for HessianAutoscaler."""
 
+import os
+import pathlib
 import unittest
 
 import numpy as np
 
-import openmdao
 from openmdao.drivers.autoscalers.hessian_autoscaler import HessianAutoscaler
 import openmdao.api as om
+import openmdao.core.problem as probmod
+from openmdao.utils.reports_system import clear_reports
+from openmdao.utils.testing_utils import require_pyoptsparse, use_tempdirs
+from openmdao.utils.tests.test_hooks import hooks_active
+from openmdao.visualization.scaling_viewer.scaling_report import _default_scaling_filename
 
 
 class TestHessianAutoscaler(unittest.TestCase):
@@ -257,6 +263,7 @@ class TestHessianAutoscaler(unittest.TestCase):
         """ Test that design variables with bounds are handled correctly by the autoscaler.
             Variables with bounds should be transformed to general constraints"""
         prob = om.Problem(reports=False)
+        self.addCleanup(prob.cleanup)
 
         prob.model.add_subsystem(
             'quad',
@@ -303,8 +310,223 @@ class TestHessianAutoscaler(unittest.TestCase):
             self.assertIsNone(con['equals'])
             self.assertTrue(con['linear'])
 
+    def test_scipy_eigs_backend(self):
+        """Test eigenpair estimation with SciPy's eigs instead of the local Arnoldi."""
+        autoscaler = HessianAutoscaler(num_modes=2, use_scipy_eigs=True)
+        eigenvals_m, eigenvecs_m = autoscaler._get_eigen_decomp(
+            self._grad_obj_func, 2, np.ones(4), True, self.start_vec)
+
+        np.testing.assert_array_almost_equal(eigenvecs_m.T @ eigenvecs_m, np.eye(2), decimal=8)
+        np.testing.assert_array_almost_equal(eigenvals_m, self.eigs[:2], decimal=6)
+
+    def test_scipy_eigs_optimization(self):
+        """Test that an optimization using the SciPy eigs backend reaches the known optimum."""
+        prob = om.Problem(reports=False)
+        self.addCleanup(prob.cleanup)
+
+        prob.model.add_subsystem(
+            'quad',
+            om.ExecComp('f = (x[0] - 1)**2 + 10*(x[1] + 2)**2 + 100*(x[2] - 0.5)**2 '
+                        '+ 1000*x[3]**2', x=np.ones(4)),
+            promotes=['*'],
+        )
+        prob.model.add_design_var('x')
+        prob.model.add_objective('f')
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-12, disp=False)
+        prob.driver.autoscaler = HessianAutoscaler(num_modes=2, use_scipy_eigs=True,
+                                                   start_vec=self.start_vec)
+        prob.setup()
+
+        result = prob.run_driver()
+
+        self.assertTrue(result.success, str(result))
+        np.testing.assert_allclose(prob.get_val('x'), [1.0, -2.0, 0.5, 0.0], atol=1e-6)
+
+    # Expected failure: with a linear objective every retained eigenvalue is near zero,
+    # and apply_jac_scaling raises RuntimeError even though setup falls back to identity
+    # scaling. Remove the decorator once a linear objective is supported.
+    @unittest.expectedFailure
+    def test_linear_objective(self):
+        """Test that a linear objective falls back to identity scaling and optimizes."""
+        prob = om.Problem(reports=False)
+        self.addCleanup(prob.cleanup)
+
+        prob.model.add_subsystem('obj', om.ExecComp('f = 2*x + 3*z'), promotes=['*'])
+        prob.model.add_subsystem('con', om.ExecComp('g = x**2 + z**2'), promotes=['*'])
+        prob.model.add_design_var('x')
+        prob.model.add_design_var('z')
+        prob.model.add_objective('f')
+        prob.model.add_constraint('g', upper=1.0)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-12, disp=False)
+        prob.driver.autoscaler = HessianAutoscaler(num_modes=1)
+        prob.setup()
+        prob.set_val('x', 0.5)
+        prob.set_val('z', 0.5)
+
+        prob.run_driver()
+
+        expected = -np.array([2.0, 3.0]) / np.sqrt(13.0)
+        self.assertAlmostEqual(prob.get_val('x')[0], expected[0], places=6)
+        self.assertAlmostEqual(prob.get_val('z')[0], expected[1], places=6)
+
+    # Expected failure: without transform_desvar_bounds, get_bounds_scaling returns the
+    # model-space bounds and the optimizer applies them to the scaled variables y = M^{-1} x.
+    # Remove the decorator once bounds are respected (or replace the checks with assertRaises
+    # if the fix is to reject untransformed bounds).
+    @unittest.expectedFailure
+    def test_design_var_bounds_without_transform(self):
+        """Test that design variable bounds are respected without transform_desvar_bounds."""
+        prob = om.Problem(reports=False)
+        self.addCleanup(prob.cleanup)
+
+        prob.model.add_subsystem('quad', om.ExecComp('f = (x - 3)**2 + (z + 2)**2'),
+                                 promotes=['*'])
+        prob.model.add_design_var('x', lower=0.0, upper=2.0)
+        prob.model.add_design_var('z', lower=-1.0, upper=1.0)
+        prob.model.add_objective('f')
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-12, disp=False)
+        prob.driver.autoscaler = HessianAutoscaler(num_modes=2)
+        prob.setup()
+        prob.set_val('x', 1.0)
+        prob.set_val('z', 0.0)
+
+        prob.run_driver()
+
+        self.assertAlmostEqual(prob.get_val('x')[0], 2.0, places=8)
+        self.assertAlmostEqual(prob.get_val('z')[0], -1.0, places=8)
+
+    # Expected failure: objective scaling is ignored, so a negative scaler that requests
+    # maximization still minimizes. Remove the decorator once objective scaling is applied.
+    @unittest.expectedFailure
+    def test_maximize_objective(self):
+        """Test maximization of an objective using a negative scaler."""
+        prob = om.Problem(reports=False)
+        self.addCleanup(prob.cleanup)
+
+        prob.model.add_subsystem('quad', om.ExecComp('f = -(x - 1)**2 - 2*(z + 0.5)**2'),
+                                 promotes=['*'])
+        prob.model.add_design_var('x')
+        prob.model.add_design_var('z')
+        prob.model.add_objective('f', scaler=-1.0)
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-12, disp=False,
+                                             maxiter=50)
+        prob.driver.autoscaler = HessianAutoscaler(num_modes=2)
+        prob.setup()
+        prob.set_val('x', 0.0)
+        prob.set_val('z', 0.0)
+
+        prob.run_driver()
+
+        self.assertAlmostEqual(prob.get_val('x')[0], 1.0, places=6)
+        self.assertAlmostEqual(prob.get_val('z')[0], -0.5, places=6)
+
+    # Expected failure: transform_desvar_bounds adds the constraint without the design
+    # variable's units, so bounds given in 'ft' are applied in the model's 'm'.
+    # Remove the decorator once the bounds keep their units.
+    @unittest.expectedFailure
+    def test_transformed_bounds_with_units(self):
+        """Test that transformed bounds are applied in the design variable's units."""
+        prob = om.Problem(reports=False)
+        self.addCleanup(prob.cleanup)
+
+        prob.model.add_subsystem('ivc', om.IndepVarComp('x', 0.5, units='m'), promotes=['*'])
+        prob.model.add_subsystem('quad', om.ExecComp('f = (x - 2.0)**2', x={'units': 'm'}),
+                                 promotes=['*'])
+        prob.model.add_design_var('x', units='ft', lower=0.0, upper=3.0)
+        prob.model.add_objective('f')
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-12, disp=False)
+        prob.driver.autoscaler = HessianAutoscaler(num_modes=1)
+        prob.setup()
+        prob.driver.autoscaler.transform_desvar_bounds(prob)
+
+        prob.run_driver()
+
+        # The upper bound of 3 ft is 0.9144 m, which is active because the optimum is at 2 m.
+        self.assertAlmostEqual(prob.get_val('x', units='m')[0], 0.9144, places=6)
+
+    @require_pyoptsparse('SLSQP')
+    def test_pyoptsparse_linear_constraint_on_subset_of_dvs(self):
+        """Test pyOptSparseDriver with a linear constraint that depends on only one DV."""
+
+        def run(autoscaler):
+            prob = om.Problem(reports=False)
+            self.addCleanup(prob.cleanup)
+
+            prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
+            prob.model.ivc.add_output('x', np.zeros(2))
+            prob.model.ivc.add_output('z', np.zeros(2))
+            prob.model.add_subsystem(
+                'obj', om.ExecComp('f = (x[0] - 1)**2 + 4*(x[1] - 1)**2 + (z[0] + 1)**2 '
+                                   '+ 9*(z[1] + 1)**2 + x[0]*z[0]',
+                                   x=np.zeros(2), z=np.zeros(2)),
+                promotes=['*'])
+            prob.model.add_subsystem('con', om.ExecComp('c = x[0] + x[1]', x=np.zeros(2)),
+                                     promotes=['*'])
+            prob.model.add_design_var('x')
+            prob.model.add_design_var('z')
+            prob.model.add_objective('f')
+            prob.model.add_constraint('c', lower=3.0, linear=True)
+
+            prob.driver = om.pyOptSparseDriver(optimizer='SLSQP', print_results=False)
+            prob.driver.opt_settings['ACC'] = 1e-12
+            if autoscaler is not None:
+                prob.driver.autoscaler = autoscaler
+            prob.setup()
+            prob.run_driver()
+            return prob
+
+        expected = run(None)
+        prob = run(HessianAutoscaler(num_modes=2, start_vec=np.ones(4)))
+
+        np.testing.assert_allclose(prob.get_val('x'), expected.get_val('x'), atol=1e-6)
+        np.testing.assert_allclose(prob.get_val('z'), expected.get_val('z'), atol=1e-6)
+        self.assertGreaterEqual(prob.get_val('c')[0], 3.0 - 1e-8)
+
+
+@use_tempdirs
+class TestHessianAutoscalerReports(unittest.TestCase):
+    """Tests of HessianAutoscaler with the reports system enabled."""
+
+    def setUp(self):
+        """Enable the reports system, which is disabled while testflo is running."""
+        probmod._clear_problem_names()
+        os.environ.pop('OPENMDAO_REPORTS', None)
+        self.testflo_running = os.environ.pop('TESTFLO_RUNNING', None)
+        clear_reports()
+
+    def tearDown(self):
+        """Restore the testflo environment variable."""
+        if self.testflo_running is not None:
+            os.environ['TESTFLO_RUNNING'] = self.testflo_running
+
+    # Expected failure: report_after_setup=True suppresses the usual scaling report, and the
+    # post-setup report entry point is never registered, so no scaling report is written.
+    # Remove the decorator once the scaling report is generated for this autoscaler.
+    @unittest.expectedFailure
+    @hooks_active
+    def test_scaling_report_generated(self):
+        """Test that an optimization with reports enabled produces a scaling report."""
+        prob = om.Problem()
+        prob.model.add_subsystem('quad', om.ExecComp('f = (x - 3)**2 + 10*(z + 2)**2'),
+                                 promotes=['*'])
+        prob.model.add_design_var('x')
+        prob.model.add_design_var('z')
+        prob.model.add_objective('f')
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', tol=1e-12, disp=False)
+        prob.driver.autoscaler = HessianAutoscaler(num_modes=2)
+        prob.setup()
+        prob.run_driver()
         prob.cleanup()
-        
+
+        path = pathlib.Path(prob.get_reports_dir()) / _default_scaling_filename
+        self.assertTrue(path.is_file(), f'The scaling report file, {path}, was not found')
+
 
 if __name__ == '__main__':
     unittest.main()
