@@ -1,26 +1,78 @@
 import numpy as np
 import weakref
 
+from openmdao.drivers.autoscalers.autoscaler import Autoscaler
 from openmdao.drivers.autoscalers.autoscaler_base import AutoscalerBase
 from openmdao.vectors.optimizer_vector import OptimizerVector
 from openmdao.core.driver import Driver
 # from openmdao.core.constants import INF_BOUND
-from openmdao.utils.om_warnings import issue_warning
+from openmdao.utils.om_warnings import issue_warning, OpenMDAOWarning
+from openmdao.utils.relevance import get_relevance
 from openmdao.vectors.bound_map import BoundMap
         
 from scipy.sparse.linalg import eigs, LinearOperator
 from .arnoldi_algorithm import _sort_eigs, _extract_eigpairs
+
+
+def _has_finite(val):
+    """
+    Return True if a bound value contains any finite entries.
+
+    Parameters
+    ----------
+    val : float, ndarray, or None
+        The bound value.
+
+    Returns
+    -------
+    bool
+        True if val is not None and has at least one finite entry.
+    """
+    return val is not None and bool(np.any(np.isfinite(np.asarray(val, dtype=float))))
+
+
+def _supports_linear_inequality_constraints(driver):
+    """
+    Return True if the driver's optimizer supports linear inequality constraints.
+
+    Parameters
+    ----------
+    driver : Driver
+        The driver to check.
+
+    Returns
+    -------
+    bool
+        True if the optimizer supports linear inequality constraints.
+    """
+    from openmdao.drivers.scipy_optimizer import ScipyOptimizeDriver, _constraint_optimizers
+
+    # ScipyOptimizeDriver updates its supports flags for the selected optimizer only after
+    # the autoscaler has been set up, so check the optimizer directly.
+    if isinstance(driver, ScipyOptimizeDriver):
+        return driver.options['optimizer'] in _constraint_optimizers
+
+    supports = driver.supports
+    return bool(supports['inequality_constraints'] and supports['linear_constraints'])
+
 
 class HessianAutoscaler(AutoscalerBase):
     """Scale design variables using approximate eigenpairs of the objective Hessian.
 
     This autoscaler scales optimization variables based on the matrix design-variable
     transformation, x = M y. The eigenpairs used to form M are estimated once, at the
-    initial design point.
-    
-    x is the model variable, y is the optimizer variable, and the matrix M is the 
+    initial design point. They are re-estimated only when the driver is set up again at a
+    different design point.
+
+    x is the model variable, y is the optimizer variable, and the matrix M is the
     scaler/preconditioner.
-    
+
+    Objectives and constraints are scaled as they are by the default Autoscaler, using
+    their ref/ref0/scaler/adder. Design variable ref/ref0/scaler/adder are replaced by the
+    transformation M. Because M mixes design variables, design variable bounds are converted
+    automatically to linear constraints named '<design var name>_bounds' in the driver, so
+    the optimizer must support linear inequality constraints. The model is not modified.
+
     Attributes
     ----------
     num_modes : int
@@ -32,8 +84,8 @@ class HessianAutoscaler(AutoscalerBase):
     start_vec : ndarray or None
         Starting vector for eigenpair estimation.
     num_krylov : int
-        Krylov iteration count for the local Arnoldi implementation,
-        or maximum iteration count passed to SciPy.
+        Krylov iteration count for the local Arnoldi implementation, or the number of
+        Arnoldi vectors (ncv) passed to SciPy.
     n_vars : int
         Total size of the continuous design variables, populated during setup.
     eigenvals_m : ndarray or None
@@ -44,6 +96,12 @@ class HessianAutoscaler(AutoscalerBase):
         Number of objective-gradient evaluations performed by the autoscaler.
     arnoldi_grad_evals : int
         Gradient-evaluation count recorded after eigenpair estimation.
+    _response_scaler : Autoscaler
+        Default autoscaler used to scale objectives and constraints.
+    _is_identity : bool
+        True if the Hessian estimate is nearly zero and the identity transformation is used.
+    _estimated_x0 : ndarray or None
+        Design point at which the eigenpairs were last estimated.
     """
     
     def __init__(self, num_modes, num_krylov=None, grad_fd_step=1e-6, use_scipy_eigs=False,
@@ -56,7 +114,8 @@ class HessianAutoscaler(AutoscalerBase):
         num_modes : int
             The number of eigenpairs used for the Hessian-based scaling
         num_krylov : int, optional
-            The number of Krylov iterations for the Arnoldi method (default is 2*num_modes)
+            The number of Krylov iterations for the Arnoldi method (default is 2*num_modes).
+            Must be at least num_modes.
         grad_fd_step : float, optional
             The step size for finite difference approximation (default is 1e-6)
         use_scipy_eigs : bool, optional
@@ -64,20 +123,27 @@ class HessianAutoscaler(AutoscalerBase):
             Else, the cheaper, local implementation of the Arnoldi algorithm will be used to
             estimate the eigenpairs
         start_vec : ndarray, optional
-            The starting vector used in the Arnoldi algorithm (default: random if start_vec = None)
+            The starting vector used in the Arnoldi algorithm. If None, a pseudorandom vector
+            from a fixed seed is used, so results are reproducible.
         """
         super().__init__()
         self.num_modes = num_modes
         self.grad_fd_step = grad_fd_step
         self.use_scipy_eigs = use_scipy_eigs
         self.start_vec = start_vec
-        if num_krylov is None or num_krylov < num_modes:
+        if num_krylov is None:
             num_krylov = 2*num_modes
+        elif num_krylov < num_modes:
+            raise ValueError(f'HessianAutoscaler: num_krylov ({num_krylov}) must be at least '
+                             f'num_modes ({num_modes}).')
         self.num_krylov = num_krylov
         self.eigenvals_m = None
         self.eigenvecs_m = None
         self.num_grad_evals = 0
         self.arnoldi_grad_evals = 0
+        self._response_scaler = Autoscaler()
+        self._is_identity = False
+        self._estimated_x0 = None
         
     def setup(self, driver: 'Driver'):
         """
@@ -90,11 +156,19 @@ class HessianAutoscaler(AutoscalerBase):
         """
         from openmdao.core.driver import RecordingDebugging
 
-        if self.setup_requires_run_model:
-            with RecordingDebugging(driver._get_name(), driver.iter_count, driver):
-                with driver._problem().model._relevance.nonlinear_active('iter'):
-                    driver._run_solve_nonlinear()
-                driver.iter_count += 1
+        dv_names = [name for name, meta in driver._designvars.items()
+                    if not meta.get('discrete', False)]
+
+        if not dv_names:
+            raise RuntimeError(
+                'HessianAutoscaler requires at least one continuous design variable.')
+
+        if len(driver._objs) != 1:
+            raise RuntimeError('HessianAutoscaler currently supports only one objective.')
+
+        # The transformation x = M y mixes design variables, so bounds on x cannot be passed
+        # to the optimizer as bounds on y. Convert them to linear constraints on x.
+        self._convert_desvar_bounds(driver)
 
         self._driver_ref = weakref.ref(driver)
         self._var_meta : dict[str, dict[str, dict]] = {
@@ -102,41 +176,47 @@ class HessianAutoscaler(AutoscalerBase):
             'constraint': driver._cons,
             'objective': driver._objs,
         }
-        
-        # Compute and cache scaled bounds vectors for design vars and constraints
+
+        # Objectives and constraints use the default scaling based on ref/ref0/scaler/adder.
+        self._response_scaler.setup(driver)
+
+        # Cache the design variable bounds, which are all infinite at this point.
         self._scaled_lower = {}
         self._scaled_upper = {}
         self._scaled_equals = {}
+        self._scaled_lower['design_var'], self._scaled_upper['design_var'], \
+            self._scaled_equals['design_var'] = self._build_model_bound_vectors('design_var')
 
-        for voi_type in ['design_var', 'constraint']:
-            self._scaled_lower[voi_type], \
-                self._scaled_upper[voi_type], self._scaled_equals[voi_type] = \
-                self._build_model_bound_vectors(voi_type)
-        
-        dv_names = [name for name, meta in driver._designvars.items()
-            if not meta.get('discrete', False)]
-        
-        if not dv_names:
-            raise RuntimeError(
-                'HessianAutoscaler requires at least one continuous design variable.')
-        
         x0_vec = driver._vectors['design_var']
         x0_vec.update_from_model(driver, driver_scaling=False)
         x0 = x0_vec.asarray().copy()
         self.n_vars = x0.size
-        
+
         if self.num_modes > self.n_vars:
             raise RuntimeError('Number of modes cannot exceed the number of design variables. '
                                f'There are {self.n_vars} design variables and '
                                f'{self.num_modes} modes.')
-        
+
         # store the slices and sizes of each design variable for later use in apply_jac_scaling(...)
         self._dv_slices = {}
         self._dv_sizes = {}
         for name, meta in x0_vec._meta.items():
             self._dv_slices[name] = meta['slice']
             self._dv_sizes[name] = meta['size']
-        
+
+        self._has_scaling = True
+
+        # final_setup calls this method for every run_model and run_driver, so only estimate
+        # the eigenpairs again if the design point has changed since the last estimate.
+        if self._estimated_x0 is not None and np.array_equal(self._estimated_x0, x0):
+            return
+
+        if self.setup_requires_run_model:
+            with RecordingDebugging(driver._get_name(), driver.iter_count, driver):
+                with driver._problem().model._relevance.nonlinear_active('iter'):
+                    driver._run_solve_nonlinear()
+                driver.iter_count += 1
+
         def obj_grad(x):
             """Evaluate the objective gradient at model-space design point x."""
             return self._gradfunc(driver, x)
@@ -146,16 +226,104 @@ class HessianAutoscaler(AutoscalerBase):
                                                              b=self.start_vec)
         eigenvals = self._clean_eigenvals(eigenvals)
         self.eigenvals_m = eigenvals.copy()
-        
+
+        self._is_identity = bool(np.max(np.abs(self.eigenvals_m)) <= 1e-10)
+        if self._is_identity:
+            issue_warning('HessianAutoscaler: The Hessian is nearly singular or the objective '
+                          'is linear. Using the identity matrix as the scaling matrix.',
+                          category=OpenMDAOWarning)
+
         self.arnoldi_grad_evals = self.num_grad_evals
-        
+        self._estimated_x0 = x0.copy()
+
         # reset the model to x0 after the perturbations in _get_eigen_decomp(...)
         x0_vec.set_data(x0, driver_scaling=False)
         driver._set_design_vars(driver_scaling=False)
         driver._run_solve_nonlinear()
-        
-        self._has_scaling = True
-    
+
+    def _convert_desvar_bounds(self, driver):
+        """
+        Replace design variable bounds with equivalent linear constraints in the driver.
+
+        For each continuous design variable with a finite lower or upper bound, a linear
+        constraint named '<design var name>_bounds' is added to the driver's responses and
+        constraints, using the design variable's indices, units, and ref/ref0/scaler/adder,
+        and the bounds are removed from the driver's design variable metadata. Only the
+        driver's copies of the metadata are changed. The model is not modified, and the
+        driver metadata is rebuilt from the model at every final_setup, so the bounds behave
+        normally again if a different autoscaler is used.
+
+        Parameters
+        ----------
+        driver : Driver
+            The driver associated with this autoscaler.
+        """
+        bounded = [name for name, meta in driver._designvars.items()
+                   if not meta.get('discrete', False)
+                   and (_has_finite(meta.get('lower')) or _has_finite(meta.get('upper')))]
+        if not bounded:
+            return
+
+        if not _supports_linear_inequality_constraints(driver):
+            raise RuntimeError(
+                f'{driver.msginfo}: HessianAutoscaler converts design variable bounds to linear '
+                f'constraints, but the optimizer does not support inequality constraints. '
+                f'Design variables {bounded} have bounds. Use an optimizer that supports '
+                'inequality constraints, or remove the bounds.')
+
+        # Copy the dicts and the changed entries so that model metadata is never modified.
+        designvars = dict(driver._designvars)
+        responses = dict(driver._responses)
+        cons = dict(driver._cons)
+
+        for name in bounded:
+            dv_meta = designvars[name]
+
+            con_name = f'{name}_bounds'
+            while con_name in responses or con_name in designvars:
+                con_name = f'_{con_name}'
+
+            con_meta = {key: val for key, val in dv_meta.items() if key != 'orig'}
+            con_meta.update(alias=con_name, equals=None, linear=True, parent='', type='con')
+            responses[con_name] = cons[con_name] = con_meta
+
+            designvars[name] = dict(dv_meta, lower=None, upper=None)
+
+            # The constraint has the same source as the design variable, so it is remote or
+            # distributed in the same way.
+            if name in driver._remote_dvs:
+                driver._remote_cons[con_name] = driver._remote_dvs[name]
+                driver._remote_responses[con_name] = driver._remote_dvs[name]
+            if name in driver._dist_driver_vars:
+                driver._dist_driver_vars[con_name] = driver._dist_driver_vars[name]
+
+        driver._designvars = designvars
+        driver._responses = responses
+        driver._cons = cons
+
+        # The model's relevance graph was built in final_setup from the original responses, so
+        # rebuild it in the same way to include the new constraints. Then redo the parts of
+        # Driver._setup_driver that depend on the constraints and design variable bounds.
+        model = driver._problem().model
+        model._problem_meta['relevance'] = get_relevance(model, responses, designvars)
+        driver._split_dvs(model)
+        driver._vectors['design_var'] = OptimizerVector.create_from_model(
+            voi_type='design_var', driver=driver, driver_scaling=False)
+        driver._vectors['constraint'] = OptimizerVector.create_from_model(
+            voi_type='constraint', driver=driver, driver_scaling=False)
+
+    @property
+    def has_scaling(self):
+        """
+        Return True if any scaling is applied to design variables, constraints, or objectives.
+
+        Returns
+        -------
+        bool
+            True if any scaling is applied, otherwise False.
+        """
+        return self._has_scaling
+
     def _as_bound_array(self, val, size, default):
         """
         Convert a bound to a flat floating-point array of the requested size.
@@ -266,15 +434,14 @@ class HessianAutoscaler(AutoscalerBase):
 
         Returns
         -------
-        tuple
-            Lower, upper, and equality bound vectors. The equality vector
-            is None for design variables. Values remain in model space.
+        BoundMap
+            Design variable bounds, which are always infinite because they are converted to
+            linear constraints in setup, or constraint bounds scaled in the same way as the
+            default Autoscaler.
         """
-        # return (
-        #     self._scaled_lower[voi_type],
-        #     self._scaled_upper[voi_type],
-        #     self._scaled_equals[voi_type],
-        # )
+        if voi_type == 'constraint':
+            return self._response_scaler.get_bounds_scaling('constraint')
+
         lower_vec = self._scaled_lower[voi_type]
         upper_vec = self._scaled_upper[voi_type]
         equals_vec = self._scaled_equals[voi_type]
@@ -319,13 +486,9 @@ class HessianAutoscaler(AutoscalerBase):
         driver._set_design_vars(driver_scaling=False)
 
         driver._run_solve_nonlinear()
-        
-        # ensure only one objective is defined
-        if len(driver._objs) != 1:
-            raise RuntimeError("HessianAutoscaler currently supports only one objective.")
 
         obj_names = list(driver._objs)
-        dv_names = list(driver._designvars)
+        dv_names = list(self._dv_slices)
 
         totals = driver._compute_totals(
             of=obj_names,
@@ -403,20 +566,29 @@ class HessianAutoscaler(AutoscalerBase):
         
         Hv = self._compute_Hv(gradfunc, x, self.grad_fd_step)
         if b is None:
-            b = np.random.rand(n_vars)
-        
+            # use a local, seeded generator so results are reproducible and the global
+            # numpy random state is not changed
+            b = np.random.default_rng(0).random(n_vars)
+
         if use_scipy_eigs:
-            # use the Scipy library to compute the eigenpairs
-            vals, vecs = eigs(Hv, k=m, which='LM', v0=b, maxiter=self.num_krylov) 
-            
-            # extract the real parts of vals and vecs 
-            real_vals = np.real(vals)               
+            # use the Scipy library to compute the eigenpairs. num_krylov sets the number of
+            # Arnoldi vectors, which SciPy requires to be greater than m and at most n_vars.
+            ncv = self.num_krylov if m < self.num_krylov <= n_vars else None
+            vals, vecs = eigs(Hv, k=m, which='LM', v0=b, ncv=ncv)
+
+            # extract the real parts of vals and vecs
+            real_vals = np.real(vals)
             real_vecs = np.real(vecs)
-            
+
             # sort the eigenvalues and eigenvectors from highest to lowest in magnitude
             eigenvals_m, eigenvecs_m = _sort_eigs(unsorted_eigvals=real_vals,
-                                                 unsorted_eigvecs=real_vecs)
-        
+                                                  unsorted_eigvecs=real_vecs)
+
+            # The finite-difference Hessian is not exactly symmetric, so the eigenvectors are
+            # only nearly orthonormal. The transformations M and M^-1 assume orthonormal
+            # eigenvectors, so orthonormalize them.
+            eigenvecs_m, _ = np.linalg.qr(eigenvecs_m)
+
         else:        
             # use the local implementation of the Arnoldi algorithm
             eigenvals_m, eigenvecs_m = _extract_eigpairs(A=Hv, b=b, iter=self.num_krylov, m=m)
@@ -436,7 +608,7 @@ class HessianAutoscaler(AutoscalerBase):
         cleaned_eigenvals : array
             Array of cleaned eigenvalues
         """
-        if eigenvals[0] <= 1e-10:
+        if np.max(np.abs(eigenvals)) <= 1e-10:
             return eigenvals
         
         for idx, val in enumerate(eigenvals):
@@ -495,12 +667,8 @@ class HessianAutoscaler(AutoscalerBase):
         My : ndarray
             The unscaled design variables. That is x_model = My
         """
-        if np.max(np.abs(self.eigenvals_m)) <= 1e-10:
+        if self._is_identity:
             My = y
-            issue_warning("HessianAutoscaler: The Hessian is nearly singular or the objective "
-                          "is linear. " 
-                          "Using identity matrix as the scaling matrix.",
-                          category=Warning)
         else:
             tilde_vals = np.copy(self.eigenvals_m)
             for i in range(self.num_modes):
@@ -528,7 +696,7 @@ class HessianAutoscaler(AutoscalerBase):
         y : 1D array or vector 
             optimization variable (equivalently x_scaled)
         """
-        if np.max(np.abs(self.eigenvals_m)) <= 1e-10:
+        if self._is_identity:
             y = x
         else:
             Im = np.eye(self.num_modes)
@@ -568,20 +736,16 @@ class HessianAutoscaler(AutoscalerBase):
         """
         Return True if the scaling report should be generated after setup() is called.
 
-        When False (default), the scaling report is generated after the first nonlinear
-        totals computation during optimization (the same timing as on master). This is
-        appropriate for autoscalers whose configure() method is a no-op.
-
-        When True, the scaling report fires immediately after configure() completes.
-        Subclasses whose configure() method modifies scaling parameters should override
-        this property to return True so that the report reflects the post-configure scaling.
+        This autoscaler returns False, so the scaling report is generated after the first
+        nonlinear totals computation during optimization. The eigenpairs are estimated in
+        setup(), before that computation, so the report reflects the Hessian-based scaling.
 
         Returns
         -------
         bool
             True if the scaling report should be generated after configure(), False otherwise.
         """
-        return True
+        return False
     
     def apply_design_var_scaling(self, vec: 'OptimizerVector'):
         """
@@ -628,42 +792,44 @@ class HessianAutoscaler(AutoscalerBase):
 
         Notes
         -----
-        In the case of the Hessian Autoscaler, the scaled objective is the same as
-        the unscaled objective. That is, 
-            f(My) = f(x) 
-                OR
-            f_scaled(y) = f(x)
+        The objective is scaled as it is by the default Autoscaler, using its
+        ref/ref0/scaler/adder. Without those, the scaled objective is the same as the
+        unscaled objective, f_scaled(y) = f(My) = f(x). A negative scaler or ref turns a
+        minimization into a maximization, as it does with the default Autoscaler.
 
         Parameters
         ----------
         vec : OptimizerVector
             An OptimizerVector with voi_type='objective'.
         """
-        vec._driver_scaling = True
+        self._response_scaler.apply_objective_scaling(vec)
         return vec
-    
+
     def apply_constraint_scaling(self, vec: 'OptimizerVector'):
         """
         Scale the constraints from the model space to the optimizer space.
 
-        Similar to the objective, the scaled and unscaled constraints are
-        the same. That is, 
-            g(My) = g(x)
-                OR
-            g_scaled(y) = g(x)
+        Constraints are scaled as they are by the default Autoscaler, using their
+        ref/ref0/scaler/adder. Without those, the scaled constraints are the same as the
+        unscaled constraints, g_scaled(y) = g(My) = g(x).
 
         Parameters
         ----------
         vec : OptimizerVector
             An OptimizerVector with voi_type='constraint'.
         """
-        vec._driver_scaling = True
+        self._response_scaler.apply_constraint_scaling(vec)
         return vec
     
     @staticmethod
     def transform_desvar_bounds(p):
         """
-        Convert bounded design variables to linear constraints after setup but before final_setup.
+        Convert bounded design variables to linear constraints in the model.
+
+        This is optional. HessianAutoscaler converts design variable bounds automatically in
+        the driver without modifying the model. Use this method to make the conversion part of
+        the model instead, for example to inspect the constraints with
+        Problem.model.get_constraints().
 
         For each design variable that has finite lower or upper bounds, this function adds an
         equivalent linear constraint on that variable and removes the bounds from the design
@@ -692,12 +858,15 @@ class HessianAutoscaler(AutoscalerBase):
             con_lower = lb if has_lb else None
             con_upper = ub if has_ub else None
 
+            # The bounds are given in the design variable's units and scaling, so the
+            # constraint must use the same units and scaling.
             p._metadata['static_mode'] = False
             p.model.add_constraint(prom_name, lower=con_lower, upper=con_upper, linear=True,
-                                # ref=meta['ref'], ref0=meta['ref0'],
-                                # scaler=meta['scaler'], adder=meta['adder'],
-                                indices=meta.get('indices'),
-                                flat_indices=meta.get('flat_indices', False))
+                                   ref=meta.get('ref'), ref0=meta.get('ref0'),
+                                   scaler=meta.get('scaler'), adder=meta.get('adder'),
+                                   units=meta.get('units'),
+                                   indices=meta.get('indices'),
+                                   flat_indices=meta.get('flat_indices', False))
             p._metadata['static_mode'] = True
             p.model._static_responses[prom_name] = p.model._responses[prom_name]
 
@@ -709,11 +878,11 @@ class HessianAutoscaler(AutoscalerBase):
         Unscale the Lagrange multipliers from optimizer space to model space.
         
         The derivation below gives the transformation of the multipliers from the scaled
-        optimization space back to physical (model) space. Constraints are not scaled by this
-        autoscaler, so constraint multipliers are unchanged. Unscaling of design variable bound
-        multipliers (M^{-1} * lambda_bound_scaled) is not yet implemented, and design variable
-        multipliers are returned unchanged. Design variable bounds are expected to be converted
-        to linear constraints with transform_desvar_bounds.
+        optimization space back to physical (model) space. Objectives and constraints are
+        scaled as they are by the default Autoscaler, so constraint multipliers are unscaled
+        in the same way. Design variable bounds are converted to linear constraints in setup,
+        so their multipliers are constraint multipliers. There are no design variable bound
+        multipliers to unscale, and design variable multipliers are returned unchanged.
         
         At optimality, we assume the KKT stationarity condition holds:
         
@@ -756,22 +925,20 @@ class HessianAutoscaler(AutoscalerBase):
             λ = (dTg/dg) / (dTf/df) * λ_scaled
         
         For the Hessian autoscaler, we have
-        
+
             T_x(x) = y(x) = M^{-1} x
-            T_g(g) = g(x)
-            T_f(f) = f(x)
-        
+            T_g(g) = (g + adder_g) * scaler_g
+            T_f(f) = (f + adder_f) * scaler_f
+
         The derivatives are:
-        
+
             dT_x/dx = scaler_x = M^{-1}
-            dT_g/dg = scaler_g = 1
-            dT_f/df = scaler_f = 1
-        
+            dT_g/dg = scaler_g
+            dT_f/df = scaler_f
+
         Therefore:
-        
-            λ_constraint = (scaler_g / scaler_f) * λ_constraint_scaled = λ_constraint_scaled
-    
-            λ_bound = (scaler_x / scaler_f) * λ_bound_scaled = M^{-1} * λ_bound_scaled
+
+            λ_constraint = (scaler_g / scaler_f) * λ_constraint_scaled
         
         Parameters
         ----------
@@ -789,7 +956,8 @@ class HessianAutoscaler(AutoscalerBase):
             A reference to the con_multipliers given on input. The values of the multipliers
             were unscaled in-place.
         """
-        # temporarily assuming design variable bounds are not present
+        # Design variable multipliers are left unchanged because bounds are not allowed.
+        self._response_scaler.apply_mult_unscaling(None, con_multipliers)
         return desvar_multipliers, con_multipliers
     
     def apply_jac_scaling(self, jac_dict):
@@ -820,6 +988,9 @@ class HessianAutoscaler(AutoscalerBase):
             J_{y_j} = alpha * J_{x_j} + S @ D @ V_j.T
 
         where V_i is the row block of V corresponding to design variable x_i.
+
+        The rows of objectives and constraints are then scaled as they are by the default
+        Autoscaler.
         """
         if not self._has_scaling:
             return
@@ -828,6 +999,11 @@ class HessianAutoscaler(AutoscalerBase):
             return
 
         if not jac_dict:
+            return
+
+        if self._is_identity:
+            # x = y, so only the objective and constraint scaling applies.
+            self._scale_jac_rows(jac_dict)
             return
 
         dv_slices = self._dv_slices
@@ -975,5 +1151,33 @@ class HessianAutoscaler(AutoscalerBase):
             #     jac_dict[out_name][in_name] = block
             for out_name, blocks in jac_dict.items():
                 _scale_nested_output(blocks)
-                
-        self.num_grad_evals += 1
+
+        self._scale_jac_rows(jac_dict)
+
+    def _scale_jac_rows(self, jac_dict):
+        """
+        Scale the Jacobian rows of objectives and constraints, in place.
+
+        This applies the same output scaling as the default Autoscaler.
+
+        Parameters
+        ----------
+        jac_dict : dict
+            Nested dict where jac_dict[output_name][input_name] = array, or flat dict where
+            jac_dict[(output_name, input_name)] = array.
+        """
+        responses = (self._var_meta['objective'], self._var_meta['constraint'])
+
+        for key, val in jac_dict.items():
+            if isinstance(key, tuple):
+                blocks = [(key[0], val)]
+            else:
+                blocks = [(key, block) for block in val.values()]
+
+            for out_name, block in blocks:
+                for meta in responses:
+                    if out_name in meta:
+                        scaler = meta[out_name]['total_scaler']
+                        if scaler is not None:
+                            block[...] = (scaler * block.T).T
+                        break
