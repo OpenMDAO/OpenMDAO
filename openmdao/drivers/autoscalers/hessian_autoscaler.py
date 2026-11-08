@@ -12,13 +12,14 @@ from scipy.sparse.linalg import eigs, LinearOperator
 from .arnoldi_algorithm import sort_eigs, extract_eigpairs
 
 class HessianAutoscaler(AutoscalerBase):
-    """Transform optimizer variables between model and optimizer spaces.
+    """Scale design variables using approximate eigenpairs of the objective Hessian.
 
-    This is the default Autoscaler in OpenMDAO that scales optimization variables based
-    on matrix design-variable transformation, x = M y.
+    This autoscaler scales optimization variables based on the matrix design-variable
+    transformation, x = M y. The eigenpairs used to form M are estimated once, at the
+    initial design point.
     
     x is the model variable, y is the optimizer variable, and the matrix M is the 
-    scaler/preconditioner
+    scaler/preconditioner.
     
     Attributes
     ----------
@@ -84,12 +85,9 @@ class HessianAutoscaler(AutoscalerBase):
         ----------
         driver : Driver
             The driver associated with this autoscaler.
-        model_has_run: bool
-            True if setup is being called after the model has been run. If not,
-            and setup requires run model, it will be executed within setup.
         """
         from openmdao.core.driver import RecordingDebugging
-        
+
         if self.setup_requires_run_model:
             with RecordingDebugging(driver._get_name(), driver.iter_count, driver):
                 with driver._problem().model._relevance.nonlinear_active('iter'):
@@ -306,9 +304,12 @@ class HessianAutoscaler(AutoscalerBase):
         driver : Driver
             The driver associated with this autoscaler.
         x : ndarray
-            design variables in the physical (model) space
+            Design variables in the physical (model) space.
+
+        Returns
+        -------
         ndarray
-            A vector of the objective gradients
+            The objective gradient with respect to the design variables.
         """
         dv_vec = driver._vectors['design_var']
         dv_vec.set_data(x, driver_scaling=False)
@@ -341,7 +342,7 @@ class HessianAutoscaler(AutoscalerBase):
         
         Parameters
         ----------
-        gradfunc : vec
+        gradfunc : callable
             A function that returns the gradient of the objective function in vector form.
         x : ndarray
             The design point at which the Hessian is approximated.
@@ -371,11 +372,11 @@ class HessianAutoscaler(AutoscalerBase):
     
     def _get_eigen_decomp(self, gradfunc, m, x, use_scipy_eigs, b):
         """
-        Compute the eigevalue decomposition using Arnoldi method
-        
+        Compute the eigenvalue decomposition using the Arnoldi method.
+
         Parameters
         ----------
-        gradfunc : vec
+        gradfunc : callable
             A function that returns the gradient of the objective function in vector form.
         m : int
             The number of eigenpairs used for the Hessian-based scaling
@@ -383,7 +384,7 @@ class HessianAutoscaler(AutoscalerBase):
             Vector of (unscaled) design variables in the model space
         use_scipy_eigs : bool
             If True, use Scipy library to compute the eigenpairs. This choice
-            is more expensive and more accurate. If False, the cheaper, local impelementation 
+            is more expensive and more accurate. If False, the cheaper, local implementation
             of the Arnoldi algorithm will be used to estimate the eigenpairs
         b : vec
             The starting vector used in the Arnoldi algorithm
@@ -479,7 +480,7 @@ class HessianAutoscaler(AutoscalerBase):
         Compute the model design variable through the matrix-vector product My.
         
         My = V_m * ( |Lambda|^(-1/2) - |lambda_m|^(-1/2)*I_m ) * z   +   |lambda_m|^(-1/2) * y
-        where z = V_m^T 
+        where z = V_m^T y
         
         Parameters
         ----------
@@ -517,12 +518,6 @@ class HessianAutoscaler(AutoscalerBase):
         ----------
         x : (1D array or vector)
             model space design variables
-        m : (integer)
-            number of eigenpairs used to form M
-        eigenvals_m : (1D array or vector)
-            m eigenvalues
-        eigenvecs_m : (2D array or vector)
-            eigenvectors
 
         Returns
         -------
@@ -709,9 +704,12 @@ class HessianAutoscaler(AutoscalerBase):
         """
         Unscale the Lagrange multipliers from optimizer space to model space.
         
-        This method transforms active design variable bounds from the scaled optimization space
-        back to physical (model) space. It does not affect the Lagrange multipliers of active
-        constraints.
+        The derivation below gives the transformation of the multipliers from the scaled
+        optimization space back to physical (model) space. Constraints are not scaled by this
+        autoscaler, so constraint multipliers are unchanged. Unscaling of design variable bound
+        multipliers (M^{-1} * lambda_bound_scaled) is not yet implemented, and design variable
+        multipliers are returned unchanged. Design variable bounds are expected to be converted
+        to linear constraints with transform_desvar_bounds.
         
         At optimality, we assume the KKT stationarity condition holds:
         

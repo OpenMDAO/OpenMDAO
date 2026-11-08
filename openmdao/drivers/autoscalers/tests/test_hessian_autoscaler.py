@@ -50,7 +50,7 @@ class TestHessianAutoscaler(unittest.TestCase):
         )
     
     def _obj_func(self, x):
-        """A quadratic objective objective function for testing."""
+        """A quadratic objective function for testing."""
         return 0.5 * x.T @ self.Q @ np.diag(self.eigs) @ self.Q.T @ x
     
     def _grad_obj_func(self, x):
