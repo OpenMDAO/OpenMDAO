@@ -476,27 +476,83 @@ class TestHessianAutoscaler(unittest.TestCase):
         self.assertIn('the optimizer does not support inequality constraints', str(cm.exception))
         self.assertIn("['x', 'z']", str(cm.exception))
 
-    @require_pyoptsparse('SLSQP')
-    def test_pyoptsparse_not_supported(self):
-        """Test that pyOptSparseDriver is rejected until it supports dense constraint coupling."""
+    def _run_pyoptsparse(self, autoscaler, constraint=None, coloring=False):
+        """
+        Run pyOptSparse SLSQP on a problem whose Hessian couples x and z.
+
+        The bounds on both design variables are active at the optimum. constraint is None,
+        'linear' (on x only), or 'nonlinear' (on x only).
+        """
         prob = om.Problem(reports=False)
         self.addCleanup(prob.cleanup)
 
-        prob.model.add_subsystem('quad', om.ExecComp('f = (x - 3)**2 + (z + 2)**2'),
-                                 promotes=['*'])
+        prob.model.add_subsystem(
+            'obj', om.ExecComp('f = (x - 3)**2 + 10*(z + 2)**2 + 4*(x - 3)*(z + 2)'),
+            promotes=['*'])
         prob.model.add_design_var('x', lower=0.0, upper=2.0)
         prob.model.add_design_var('z', lower=-1.0, upper=1.0)
         prob.model.add_objective('f')
 
+        if constraint == 'linear':
+            prob.model.add_subsystem('con', om.ExecComp('c = 2*x'), promotes=['*'])
+            prob.model.add_constraint('c', upper=1.5, linear=True)
+        elif constraint == 'nonlinear':
+            prob.model.add_subsystem('con', om.ExecComp('c = x**2'), promotes=['*'])
+            prob.model.add_constraint('c', upper=0.25)
+
         prob.driver = om.pyOptSparseDriver(optimizer='SLSQP', print_results=False)
-        prob.driver.autoscaler = HessianAutoscaler(num_modes=2)
+        prob.driver.opt_settings['ACC'] = 1e-12
+        if coloring:
+            prob.driver.declare_coloring()
+        if autoscaler is not None:
+            prob.driver.autoscaler = autoscaler
         prob.setup()
+        prob.set_val('x', 0.25)
+        prob.set_val('z', 0.0)
+        prob.run_driver()
+        return prob
 
-        with self.assertRaises(RuntimeError) as cm:
-            prob.run_driver()
+    def _check_pyoptsparse_matches_default(self, **kwargs):
+        expected = self._run_pyoptsparse(None, **kwargs)
+        prob = self._run_pyoptsparse(HessianAutoscaler(num_modes=2), **kwargs)
 
-        self.assertIn('HessianAutoscaler is not currently supported with pyOptSparseDriver',
-                      str(cm.exception))
+        for name in ('x', 'z', 'f'):
+            np.testing.assert_allclose(prob.get_val(name), expected.get_val(name), atol=1e-7)
+        return prob
+
+    @require_pyoptsparse('SLSQP')
+    def test_pyoptsparse_design_var_bounds(self):
+        """Test bounds converted to linear constraints when the Hessian couples the DVs."""
+        prob = self._check_pyoptsparse_matches_default()
+
+        # The scaling couples x and z, so every constraint depends on both.
+        self.assertEqual(sorted(prob.driver._lin_dvs), ['x', 'z'])
+        self.assertAlmostEqual(prob.get_val('x')[0], 1.0, places=7)
+        self.assertAlmostEqual(prob.get_val('z')[0], -1.0, places=7)
+
+    @require_pyoptsparse('SLSQP')
+    def test_pyoptsparse_linear_constraint_on_one_dv(self):
+        """Test a linear constraint that depends on only one of the coupled DVs."""
+        prob = self._check_pyoptsparse_matches_default(constraint='linear')
+        self.assertAlmostEqual(prob.get_val('x')[0], 0.75, places=7)
+
+    @require_pyoptsparse('SLSQP')
+    def test_pyoptsparse_nonlinear_constraint_on_one_dv(self):
+        """Test a nonlinear constraint that depends on only one of the coupled DVs."""
+        prob = self._check_pyoptsparse_matches_default(constraint='nonlinear')
+        self.assertAlmostEqual(prob.get_val('x')[0], 0.5, places=7)
+
+    @require_pyoptsparse('SLSQP')
+    def test_pyoptsparse_with_total_coloring(self):
+        """Test that total coloring does not impose model sparsity on the coupled jacobian."""
+        prob = self._check_pyoptsparse_matches_default(constraint='nonlinear', coloring=True)
+        self.assertEqual(prob.driver._con_subjacs, {})
+
+    def test_default_autoscalers_do_not_couple_design_vars(self):
+        """Test that only HessianAutoscaler reports coupled design variables."""
+        self.assertFalse(om.Autoscaler().couples_design_vars)
+        self.assertFalse(om.BoundsAutoscaler().couples_design_vars)
+        self.assertTrue(HessianAutoscaler(num_modes=1).couples_design_vars)
 
     def test_maximize_objective(self):
         """Test maximization of an objective using a negative scaler."""

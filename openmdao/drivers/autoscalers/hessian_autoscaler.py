@@ -155,18 +155,6 @@ class HessianAutoscaler(AutoscalerBase):
             The driver associated with this autoscaler.
         """
         from openmdao.core.driver import RecordingDebugging
-        from openmdao.drivers.pyoptsparse_driver import pyOptSparseDriver
-
-        # pyOptSparseDriver declares each constraint to depend only on the design variables
-        # that are relevant to it in the model. The transformation x = M y makes every
-        # constraint depend on every optimizer variable, so pyOptSparse would drop those terms.
-        if isinstance(driver, pyOptSparseDriver):
-            raise RuntimeError(
-                f'{driver.msginfo}: HessianAutoscaler is not currently supported with '
-                'pyOptSparseDriver. pyOptSparseDriver declares each constraint to depend only '
-                'on the design variables that affect it in the model, but the HessianAutoscaler '
-                'transformation makes every constraint depend on every optimizer variable, '
-                'which would give incorrect results.')
 
         dv_names = [name for name, meta in driver._designvars.items()
                     if not meta.get('discrete', False)]
@@ -740,6 +728,18 @@ class HessianAutoscaler(AutoscalerBase):
         -------
         bool
             True if the driver must execute run_model before the autoscaler's configure method.
+        """
+        return True
+
+    @property
+    def couples_design_vars(self):
+        """
+        Return True because the transformation x = M y mixes the design variables.
+
+        Returns
+        -------
+        bool
+            True, since every optimizer variable can affect every design variable.
         """
         return True
 

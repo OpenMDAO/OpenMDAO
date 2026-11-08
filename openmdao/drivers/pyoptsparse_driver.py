@@ -471,6 +471,15 @@ class pyOptSparseDriver(Driver):
         # Get scaled constraint bounds from autoscaler
         con_bounds = self._autoscaler.get_bounds_scaling('constraint')
 
+        # If the autoscaler mixes design variables, every constraint depends on every
+        # optimizer variable, so the model's relevance can't be used to limit the dependence.
+        couples_dvs = self._autoscaler.couples_design_vars
+
+        def _get_wrts(dvs):
+            if couples_dvs:
+                return list(dvs)
+            return [n for n, m in dvs.items() if relevance.is_relevant(m['source'])]
+
         eqcons = {n: m for n, m in self._cons.items() if m['equals'] is not None}
         if eqcons:
             # Add all equality constraints
@@ -482,8 +491,7 @@ class pyOptSparseDriver(Driver):
                 with relevance.seeds_active(rev_seeds=meta['source']):
 
                     if meta['linear']:
-                        wrts = [v for v in lin_dvs
-                                if relevance.is_relevant(lin_dvs[v]['source'])]
+                        wrts = _get_wrts(lin_dvs)
                         jac = {w: _lin_jacs[name][w] for w in wrts}
                         yi = _y_intercepts[name]
                         opt_prob.addConGroup(name, size,
@@ -491,8 +499,7 @@ class pyOptSparseDriver(Driver):
                                              upper=None if upper is None else upper - yi,
                                              linear=True, wrt=wrts, jac=jac)
                     else:
-                        wrts = [v for v in nl_dvs
-                                if relevance.is_relevant(nl_dvs[v]['source'])]
+                        wrts = _get_wrts(nl_dvs)
 
                         if name in self._con_subjacs:
                             resjac = self._con_subjacs[name]
@@ -518,8 +525,7 @@ class pyOptSparseDriver(Driver):
                 with relevance.seeds_active(rev_seeds=(meta['source'],)):
 
                     if meta['linear']:
-                        wrts = [n for n, meta in lin_dvs.items()
-                                if relevance.is_relevant(meta['source'])]
+                        wrts = _get_wrts(lin_dvs)
                         jac = {w: _lin_jacs[name][w] for w in wrts}
                         yi = _y_intercepts[name]
                         opt_prob.addConGroup(name, size,
@@ -527,8 +533,7 @@ class pyOptSparseDriver(Driver):
                                              upper=None if upper is None else upper - yi,
                                              linear=True, wrt=wrts, jac=jac)
                     else:
-                        wrts = [n for n, meta in nl_dvs.items()
-                                if relevance.is_relevant(meta['source'])]
+                        wrts = _get_wrts(nl_dvs)
                         if name in self._con_subjacs:
                             resjac = self._con_subjacs[name]
                             jac = {n: resjac[n] for n in wrts}
@@ -976,6 +981,12 @@ class pyOptSparseDriver(Driver):
         """
         total_sparsity = None
         self._con_subjacs = {}
+
+        # The sparsity is that of the jacobian with respect to the model design variables. If the
+        # autoscaler mixes design variables, the jacobian seen by the optimizer is dense.
+        if self._autoscaler.couples_design_vars:
+            return
+
         coloring = coloring if coloring is not None else self._get_static_coloring()
         if coloring is not None:
             total_sparsity = coloring.get_subjac_sparsity()

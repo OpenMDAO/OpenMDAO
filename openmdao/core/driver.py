@@ -728,7 +728,12 @@ class Driver(object, metaclass=DriverMetaclass):
             The model being used in the optimization problem.
         """
         lin_cons = tuple([meta['source'] for meta in self._cons.values() if meta['linear']])
-        if lin_cons:
+        if lin_cons and self._autoscaler.couples_design_vars:
+            # The scaling mixes design variables, so every optimizer variable can affect every
+            # constraint and objective, regardless of which design variables they depend on.
+            self._lin_dvs = self._designvars
+            self._nl_dvs = self._designvars
+        elif lin_cons:
             relevance = model._relevance
             dvs = tuple([meta['source'] for meta in self._designvars.values()])
 
