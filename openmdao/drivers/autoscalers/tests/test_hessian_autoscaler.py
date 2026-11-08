@@ -476,16 +476,9 @@ class TestHessianAutoscaler(unittest.TestCase):
         self.assertIn('the optimizer does not support inequality constraints', str(cm.exception))
         self.assertIn("['x', 'z']", str(cm.exception))
 
-    # Expected failure: pyOptSparseDriver declares each constraint to depend only on the design
-    # variables that are relevant to it in the model (x space). The transformation x = M y makes
-    # every constraint depend on every optimizer variable, so pyOptSparse drops the coupling
-    # terms and the converted bounds are violated (here by about 1e-6, and by much more when the
-    # Hessian couples the design variables). Remove the decorator once pyOptSparseDriver uses
-    # dense constraint dependence with this autoscaler.
-    @unittest.expectedFailure
     @require_pyoptsparse('SLSQP')
-    def test_pyoptsparse_design_var_bounds(self):
-        """Test automatic conversion of bounds with pyOptSparseDriver."""
+    def test_pyoptsparse_not_supported(self):
+        """Test that pyOptSparseDriver is rejected until it supports dense constraint coupling."""
         prob = om.Problem(reports=False)
         self.addCleanup(prob.cleanup)
 
@@ -496,16 +489,14 @@ class TestHessianAutoscaler(unittest.TestCase):
         prob.model.add_objective('f')
 
         prob.driver = om.pyOptSparseDriver(optimizer='SLSQP', print_results=False)
-        prob.driver.opt_settings['ACC'] = 1e-12
         prob.driver.autoscaler = HessianAutoscaler(num_modes=2)
         prob.setup()
-        prob.set_val('x', 1.0)
-        prob.set_val('z', 0.0)
 
-        prob.run_driver()
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_driver()
 
-        self.assertAlmostEqual(prob.get_val('x')[0], 2.0, places=6)
-        self.assertAlmostEqual(prob.get_val('z')[0], -1.0, places=6)
+        self.assertIn('HessianAutoscaler is not currently supported with pyOptSparseDriver',
+                      str(cm.exception))
 
     def test_maximize_objective(self):
         """Test maximization of an objective using a negative scaler."""
@@ -601,44 +592,6 @@ class TestHessianAutoscaler(unittest.TestCase):
             HessianAutoscaler(num_modes=3, num_krylov=2)
 
         self.assertIn('num_krylov (2) must be at least num_modes (3)', str(cm.exception))
-
-    @require_pyoptsparse('SLSQP')
-    def test_pyoptsparse_linear_constraint_on_subset_of_dvs(self):
-        """Test pyOptSparseDriver with a linear constraint that depends on only one DV."""
-
-        def run(autoscaler):
-            prob = om.Problem(reports=False)
-            self.addCleanup(prob.cleanup)
-
-            prob.model.add_subsystem('ivc', om.IndepVarComp(), promotes=['*'])
-            prob.model.ivc.add_output('x', np.zeros(2))
-            prob.model.ivc.add_output('z', np.zeros(2))
-            prob.model.add_subsystem(
-                'obj', om.ExecComp('f = (x[0] - 1)**2 + 4*(x[1] - 1)**2 + (z[0] + 1)**2 '
-                                   '+ 9*(z[1] + 1)**2 + x[0]*z[0]',
-                                   x=np.zeros(2), z=np.zeros(2)),
-                promotes=['*'])
-            prob.model.add_subsystem('con', om.ExecComp('c = x[0] + x[1]', x=np.zeros(2)),
-                                     promotes=['*'])
-            prob.model.add_design_var('x')
-            prob.model.add_design_var('z')
-            prob.model.add_objective('f')
-            prob.model.add_constraint('c', lower=3.0, linear=True)
-
-            prob.driver = om.pyOptSparseDriver(optimizer='SLSQP', print_results=False)
-            prob.driver.opt_settings['ACC'] = 1e-12
-            if autoscaler is not None:
-                prob.driver.autoscaler = autoscaler
-            prob.setup()
-            prob.run_driver()
-            return prob
-
-        expected = run(None)
-        prob = run(HessianAutoscaler(num_modes=2, start_vec=np.ones(4)))
-
-        np.testing.assert_allclose(prob.get_val('x'), expected.get_val('x'), atol=1e-6)
-        np.testing.assert_allclose(prob.get_val('z'), expected.get_val('z'), atol=1e-6)
-        self.assertGreaterEqual(prob.get_val('c')[0], 3.0 - 1e-8)
 
 
 @use_tempdirs
