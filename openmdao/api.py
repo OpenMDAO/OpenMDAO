@@ -106,6 +106,7 @@ from openmdao.drivers.sampling.pyDOE_generators import \
 # Autoscalers
 from openmdao.drivers.autoscalers.autoscaler import Autoscaler
 from openmdao.drivers.autoscalers.bounds_autoscaler import BoundsAutoscaler
+from openmdao.drivers.autoscalers.hessian_autoscaler import HessianAutoscaler
 
 # System-Building Tools
 from openmdao.utils.options_dictionary import OptionsDictionary
