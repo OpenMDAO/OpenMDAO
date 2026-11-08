@@ -2,7 +2,7 @@ import numpy as np
 from scipy.linalg import eig 
 
 
-def arnoldi(A, b, k):
+def _arnoldi(A, b, k):
     """
     Compute the Arnoldi decomposition of matrix A using the starting vector b.
 
@@ -43,7 +43,7 @@ def arnoldi(A, b, k):
 
     return Q, H
 
-def extract_tridiag(H):
+def _extract_tridiag(H):
     """
     Keep the tridiagonal entries of matrix H and set all other entries to zero.
         
@@ -59,7 +59,7 @@ def extract_tridiag(H):
         the main diagonal and the first superdiagonal and subdiagonal entries of H.
     """
     m, n = H.shape
-    assert m >= n, f"extract_tridiag requires m >= n, but got shape {H.shape}"
+    assert m >= n, f"_extract_tridiag requires m >= n, but got shape {H.shape}"
     
     td_H = np.zeros_like(H)
     
@@ -78,7 +78,7 @@ def extract_tridiag(H):
             
     return td_H
     
-def compute_eigenvalues_and_eigenvectors(A, b, k):
+def _compute_eigenvalues_and_eigenvectors(A, b, k):
     """
     Compute the approximate eigenvalues and eigenvectors of A using Arnoldi iteration.
 
@@ -98,10 +98,10 @@ def compute_eigenvalues_and_eigenvectors(A, b, k):
     eigvecs : array
         Approximate eigenvectors of A.
     """
-    Q, H = arnoldi(A, b, k)
+    Q, H = _arnoldi(A, b, k)
     
     # Make the tridiagonal form of Hessenberg matrix H symmetric
-    td_H = extract_tridiag(H)
+    td_H = _extract_tridiag(H)
     H = 0.5 *(td_H[:-1, :] + np.transpose(td_H[:-1, :])) # Ignore last row for eigenvalues
     eigvals, eigvecs_H = eig(H)
     eigvals = np.real(eigvals)                           # extract the real parts
@@ -115,7 +115,7 @@ def compute_eigenvalues_and_eigenvectors(A, b, k):
     
     return np.abs(eigvals), eigvecs
 
-def sort_eigs(unsorted_eigvals, unsorted_eigvecs):
+def _sort_eigs(unsorted_eigvals, unsorted_eigvecs):
     """
     Sorts eigenvalues and eigenvectors in descending order of eigenvalues.
 
@@ -143,7 +143,7 @@ def sort_eigs(unsorted_eigvals, unsorted_eigvecs):
     return sorted_eigvals, sorted_eigvecs
     
 
-def extract_eigpairs(A, b, iter, m):
+def _extract_eigpairs(A, b, iter, m):
     """
     Provide the m largest eigenvalues and eigenvectors of the matrix (or linear operator) A
     
@@ -166,8 +166,8 @@ def extract_eigpairs(A, b, iter, m):
         Corresponding m approximate eigenvectors of A.
     """
     k = iter
-    eigvals, eigvecs = compute_eigenvalues_and_eigenvectors(A, b, k)
-    sorted_vals, sorted_vecs = sort_eigs(eigvals, eigvecs)
+    eigvals, eigvecs = _compute_eigenvalues_and_eigenvectors(A, b, k)
+    sorted_vals, sorted_vecs = _sort_eigs(eigvals, eigvecs)
     m_eigvals = np.copy(sorted_vals[0:m])
     m_eigvecs = np.copy(sorted_vecs[:, 0:m])
 

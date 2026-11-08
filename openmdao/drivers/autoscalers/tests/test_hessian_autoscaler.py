@@ -6,7 +6,6 @@ import numpy as np
 
 import openmdao
 from openmdao.drivers.autoscalers.hessian_autoscaler import HessianAutoscaler
-from openmdao.drivers.autoscalers.arnoldi_algorithm import arnoldi, extract_tridiag
 import openmdao.api as om
 
 

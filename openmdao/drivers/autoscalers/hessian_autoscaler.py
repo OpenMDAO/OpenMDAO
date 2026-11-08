@@ -9,7 +9,7 @@ from openmdao.utils.om_warnings import issue_warning
 from openmdao.vectors.bound_map import BoundMap
         
 from scipy.sparse.linalg import eigs, LinearOperator
-from .arnoldi_algorithm import sort_eigs, extract_eigpairs
+from .arnoldi_algorithm import _sort_eigs, _extract_eigpairs
 
 class HessianAutoscaler(AutoscalerBase):
     """Scale design variables using approximate eigenpairs of the objective Hessian.
@@ -23,17 +23,19 @@ class HessianAutoscaler(AutoscalerBase):
     
     Attributes
     ----------
-    m : int
+    num_modes : int
         Number of eigenpairs used for Hessian-based scaling.
     grad_fd_step : float
         Finite difference step used to approximate Hessian-vector products.
     use_scipy_eigs : bool
         Whether to use SciPy instead of the local Arnoldi implementation.
-    b : ndarray or None
+    start_vec : ndarray or None
         Starting vector for eigenpair estimation.
-    max_iter : int
+    num_krylov : int
         Krylov iteration count for the local Arnoldi implementation,
         or maximum iteration count passed to SciPy.
+    n_vars : int
+        Total size of the continuous design variables, populated during setup.
     eigenvals_m : ndarray or None
         Selected Hessian eigenvalues, populated during setup.
     eigenvecs_m : ndarray or None
@@ -65,13 +67,13 @@ class HessianAutoscaler(AutoscalerBase):
             The starting vector used in the Arnoldi algorithm (default: random if start_vec = None)
         """
         super().__init__()
-        self.m = num_modes
+        self.num_modes = num_modes
         self.grad_fd_step = grad_fd_step
         self.use_scipy_eigs = use_scipy_eigs
-        self.b = start_vec
+        self.start_vec = start_vec
         if num_krylov is None or num_krylov < num_modes:
             num_krylov = 2*num_modes
-        self.max_iter = num_krylov
+        self.num_krylov = num_krylov
         self.eigenvals_m = None
         self.eigenvecs_m = None
         self.num_grad_evals = 0
@@ -123,9 +125,10 @@ class HessianAutoscaler(AutoscalerBase):
         x0 = x0_vec.asarray().copy()
         self.n_vars = x0.size
         
-        if self.m > self.n_vars:
+        if self.num_modes > self.n_vars:
             raise RuntimeError('Number of modes cannot exceed the number of design variables. '
-                               f'There are {self.n_vars} design variables and {self.m} modes.')
+                               f'There are {self.n_vars} design variables and '
+                               f'{self.num_modes} modes.')
         
         # store the slices and sizes of each design variable for later use in apply_jac_scaling(...)
         self._dv_slices = {}
@@ -138,9 +141,9 @@ class HessianAutoscaler(AutoscalerBase):
             """Evaluate the objective gradient at model-space design point x."""
             return self._gradfunc(driver, x)
         eigenvals, self.eigenvecs_m = self._get_eigen_decomp(gradfunc=obj_grad,
-                                                                    m=self.m, x=x0, 
-                                                                    use_scipy_eigs=self.use_scipy_eigs, 
-                                                                    b=self.b)
+                                                             m=self.num_modes, x=x0,
+                                                             use_scipy_eigs=self.use_scipy_eigs,
+                                                             b=self.start_vec)
         eigenvals = self._clean_eigenvals(eigenvals)
         self.eigenvals_m = eigenvals.copy()
         
@@ -404,19 +407,19 @@ class HessianAutoscaler(AutoscalerBase):
         
         if use_scipy_eigs:
             # use the Scipy library to compute the eigenpairs
-            vals, vecs = eigs(Hv, k=m, which='LM', v0=b, maxiter=self.max_iter) 
+            vals, vecs = eigs(Hv, k=m, which='LM', v0=b, maxiter=self.num_krylov) 
             
             # extract the real parts of vals and vecs 
             real_vals = np.real(vals)               
             real_vecs = np.real(vecs)
             
             # sort the eigenvalues and eigenvectors from highest to lowest in magnitude
-            eigenvals_m, eigenvecs_m = sort_eigs(unsorted_eigvals=real_vals,
+            eigenvals_m, eigenvecs_m = _sort_eigs(unsorted_eigvals=real_vals,
                                                  unsorted_eigvecs=real_vecs)
         
         else:        
             # use the local implementation of the Arnoldi algorithm
-            eigenvals_m, eigenvecs_m = extract_eigpairs(A=Hv, b=b, iter=self.max_iter, m=m)
+            eigenvals_m, eigenvecs_m = _extract_eigpairs(A=Hv, b=b, iter=self.num_krylov, m=m)
         return eigenvals_m, eigenvecs_m
     
     def _clean_eigenvals(self, eigenvals):
@@ -460,15 +463,15 @@ class HessianAutoscaler(AutoscalerBase):
                           "Using identity matrix as the scaling matrix.",
                           category=Warning)
         else:
-            # if np.abs(self.eigenvals_m[self.m - 1]) <= 1e-10:
+            # if np.abs(self.eigenvals_m[self.num_modes - 1]) <= 1e-10:
             #     raise ValueError(f"The smallest eigenvalue is approximately zero "
-            #                      f"(value = {self.eigenvals_m[self.m - 1]})")
+            #                      f"(value = {self.eigenvals_m[self.num_modes - 1]})")
             I = np.eye(self.n_vars)
             tilde_vals = np.copy(self.eigenvals_m)
-            for i in range(self.m):
+            for i in range(self.num_modes):
                 tilde_vals[i] = 1/np.sqrt(np.abs(self.eigenvals_m[i]))
                 
-            tilde_lambda = tilde_vals[self.m - 1]
+            tilde_lambda = tilde_vals[self.num_modes - 1]
 
             M = ( self.eigenvecs_m @ np.diag(tilde_vals) ) @ np.transpose(self.eigenvecs_m)
             M += tilde_lambda * ( I - self.eigenvecs_m @ np.transpose(self.eigenvecs_m) )        
@@ -500,13 +503,14 @@ class HessianAutoscaler(AutoscalerBase):
                           category=Warning)
         else:
             tilde_vals = np.copy(self.eigenvals_m)
-            for i in range(self.m):
+            for i in range(self.num_modes):
                 tilde_vals[i] = 1/np.sqrt(np.abs(self.eigenvals_m[i]))
                 
-            tilde_lambda = tilde_vals[self.m-1]
+            tilde_lambda = tilde_vals[self.num_modes-1]
             z = np.transpose(self.eigenvecs_m) @ y
 
-            My = (self.eigenvecs_m @ (np.diag(tilde_vals) - tilde_lambda * np.eye(self.m))) @ z 
+            My = (self.eigenvecs_m
+                  @ (np.diag(tilde_vals) - tilde_lambda * np.eye(self.num_modes))) @ z
             My += tilde_lambda * y
         return My
 
@@ -527,12 +531,12 @@ class HessianAutoscaler(AutoscalerBase):
         if np.max(np.abs(self.eigenvals_m)) <= 1e-10:
             y = x
         else:
-            Im = np.eye(self.m)
+            Im = np.eye(self.num_modes)
             tilde_vals = np.copy(self.eigenvals_m)
-            for i in range(self.m):
+            for i in range(self.num_modes):
                 tilde_vals[i] = np.sqrt(np.abs(self.eigenvals_m[i]))
                 
-            tilde_lambda = tilde_vals[self.m-1]
+            tilde_lambda = tilde_vals[self.num_modes-1]
             w = np.transpose(self.eigenvecs_m) @ x
 
             y = ((self.eigenvecs_m @ (np.diag(tilde_vals) - tilde_lambda * Im)) @ w
@@ -845,7 +849,7 @@ class HessianAutoscaler(AutoscalerBase):
             )
 
         tilde_vals = 1.0 / np.sqrt(eigs_abs)
-        alpha = tilde_vals[self.m - 1]
+        alpha = tilde_vals[self.num_modes - 1]
         beta = tilde_vals - alpha
 
         def _as_2d(block):
@@ -890,7 +894,7 @@ class HessianAutoscaler(AutoscalerBase):
             #   J_{x_i}: (n_rows, size_i)
             #   V_i:     (size_i, m)
             #   S:       (n_rows, m)
-            S = np.zeros((n_rows, self.m))
+            S = np.zeros((n_rows, self.num_modes))
 
             for in_name, slc in dv_slices.items():
                 if in_name not in jac_blocks:
