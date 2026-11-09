@@ -223,7 +223,7 @@ class TestHessianAutoscaler(unittest.TestCase):
             tol=1e-12,
             disp=False,
         )
-        prob.driver.options['maxiter'] = 200
+        prob.driver.options['maxiter'] = 30
         prob.driver.autoscaler = HessianAutoscaler(
             num_modes=3,
             num_krylov=4,
