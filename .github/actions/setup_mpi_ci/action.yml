@@ -1,0 +1,118 @@
+name: 'Setup MPI for CI'
+description: 'Pin Open MPI to a transport that works on CI runners and smoke-test it, retrying on intermittent failures'
+
+inputs:
+  pixi_environment:
+    description: 'Pixi environment whose MPI installation should be configured and tested'
+    required: true
+  attempts:
+    description: 'Maximum number of smoke test attempts'
+    required: false
+    default: '3'
+  timeout:
+    description: 'Seconds allowed for each smoke test command before the attempt is considered hung'
+    required: false
+    default: '60'
+
+runs:
+  using: composite
+  steps:
+
+    - name: Configure and test MPI
+      if: runner.os != 'Windows'
+      shell: bash -l {0}
+      env:
+        PIXI_ENVIRONMENT: ${{ inputs.pixi_environment }}
+        MPI_SMOKE_ATTEMPTS: ${{ inputs.attempts }}
+        MPI_SMOKE_TIMEOUT: ${{ inputs.timeout }}
+      run: |
+        eval "$(pixi shell-hook -e "$PIXI_ENVIRONMENT")"
+
+        if ! python -c "import mpi4py" 2>/dev/null; then
+          echo "mpi4py not installed in the '$PIXI_ENVIRONMENT' environment, skipping MPI setup"
+          exit 0
+        fi
+
+        mkdir -p "$RUNNER_TEMP/ompi"
+
+        # Open MPI otherwise selects the UCX PML on runner VMs that expose an
+        # Azure MANA verbs device it cannot use, which hangs MPI startup.
+        # OMPI_MCA_btl only applies once the ob1 PML is selected.
+        MPI_ENV=(
+          "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe"
+          "OMPI_MCA_rmaps_base_oversubscribe=1"
+          "OMPI_MCA_pml=ob1"
+          "OMPI_MCA_btl=tcp,self"
+          "UCX_TLS=tcp"
+          "OMPI_MCA_mpi_yield_when_idle=1"
+          "OMPI_MCA_orte_tmpdir_base=$RUNNER_TEMP/ompi"
+        )
+        for kv in "${MPI_ENV[@]}"; do
+          export "$kv"
+          echo "$kv" >> "$GITHUB_ENV"
+        done
+
+        echo "============================================================="
+        echo "Runner MPI diagnostics"
+        echo "============================================================="
+        echo "cores: $(python -c 'import os; print(os.cpu_count())')"
+        mpirun --version | head -n 1 || true
+        ompi_info 2>/dev/null | grep -i -E "ucx|MCA pml|MCA btl" || true
+        (ibv_devices 2>/dev/null || echo "ibv_devices: not available") | head -n 10
+
+        echo "============================================================="
+        echo "Smoke test MPI and PETSc (up to $MPI_SMOKE_ATTEMPTS attempts)"
+        echo "============================================================="
+        python - <<'PY'
+        import importlib.util
+        import os
+        import signal
+        import subprocess
+        import sys
+        import time
+
+        attempts = int(os.environ['MPI_SMOKE_ATTEMPTS'])
+        timeout = float(os.environ['MPI_SMOKE_TIMEOUT'])
+
+        MPI4PY_CODE = "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
+        PETSC4PY_CODE = (
+            "import numpy; from mpi4py import MPI; comm = MPI.COMM_WORLD; "
+            "import petsc4py; petsc4py.init(); "
+            "x = petsc4py.PETSc.Vec().createWithArray(numpy.ones(5)*comm.rank, comm=comm); "
+            "print(x.getArray())"
+        )
+
+        checks = [('mpi4py', MPI4PY_CODE)]
+        if importlib.util.find_spec('petsc4py') is not None:
+            checks.append(('petsc4py', PETSC4PY_CODE))
+
+
+        def run_check(name, code):
+            cmd = ['mpirun', '-n', '3', sys.executable, '-c', code]
+            print(f'--- {name}: {" ".join(cmd[:4])} ...', flush=True)
+            proc = subprocess.Popen(cmd, start_new_session=True)
+            try:
+                return proc.wait(timeout=timeout) == 0
+            except subprocess.TimeoutExpired:
+                print(f'--- {name}: no completion after {timeout:.0f}s, killing', flush=True)
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.wait()
+                return False
+
+
+        for attempt in range(1, attempts + 1):
+            failed = [name for name, code in checks if not run_check(name, code)]
+            if not failed:
+                if attempt > 1:
+                    print(f'::warning title=Flaky MPI startup::MPI smoke test passed only on attempt '
+                          f'{attempt} of {attempts}')
+                else:
+                    print('MPI smoke test passed')
+                sys.exit(0)
+            print(f'Attempt {attempt}/{attempts} failed: {", ".join(failed)}', flush=True)
+            if attempt < attempts:
+                time.sleep(5)
+
+        print(f'::error title=MPI unavailable::MPI smoke test failed after {attempts} attempts')
+        sys.exit(1)
+        PY
