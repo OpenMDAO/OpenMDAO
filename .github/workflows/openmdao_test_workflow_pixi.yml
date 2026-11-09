@@ -47,13 +47,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        OS: [ubuntu-24.04, macos-latest]
-        PIXI_ENVIRONMENT: [minimal, py311, py312, default, py314, dev]
+        OS: [ubuntu-24.04]
+        PIXI_ENVIRONMENT: [minimal, py312, default, py314, dev]
         BANDIT: [false]
         RUFF: [false]
         SNOPT: [true]
         COVERAGE: [false]
         include:
+
+          # macOS - default
+          - OS: macos-latest
+            PIXI_ENVIRONMENT: default
+            BANDIT: false
+            RUFF: false
+            SNOPT: true
+            COVERAGE: false
+
+          # macOS - py314 (uses mpi-no-osx; kept separate from the ubuntu
+          # py-version sweep since this combination has needed its own fixes)
+          - OS: macos-latest
+            PIXI_ENVIRONMENT: py314
+            BANDIT: false
+            RUFF: false
+            SNOPT: true
+            COVERAGE: false
 
           # Windows - default
           - OS: windows-latest

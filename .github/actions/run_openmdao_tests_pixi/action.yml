@@ -292,6 +292,9 @@ runs:
       env:
         OPENMDAO_CHECK_ALL_PARTIALS: true
         COVERAGE_RUN: "true"
+        # Print a Python-level traceback on fatal crashes (e.g. native access
+        # violations) that would otherwise terminate testflo silently
+        PYTHONFAULTHANDLER: "1"
       run: |
         & pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }} -s powershell | Out-String | Invoke-Expression
         echo "============================================================="

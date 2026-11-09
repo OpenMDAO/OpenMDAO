@@ -238,9 +238,7 @@ def config_summary(problem, stream=sys.stdout):
     setup_done = model._problem_meta['setup_status'] >= _SetupStatus.POST_FINAL_SETUP
 
     if problem.comm.size > 1:
-        local_max = np.array([max_depth])
-        global_max_depth = np.zeros(1, dtype=int)
-        problem.comm.Allreduce(local_max, global_max_depth, op=MPI.MAX)
+        global_max_depth = problem.comm.allreduce(max_depth, op=MPI.MAX)
 
         proc_names = problem.comm.gather((sysnames, grpnames, ln_solvers, nl_solvers), root=0)
         grpnames = set()
