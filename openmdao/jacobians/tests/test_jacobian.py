@@ -1129,6 +1129,30 @@ class NegativeSrcIndicesAssembledJacTestCase(unittest.TestCase):
                 self.assertAlmostEqual(float(p.get_val('G.c2.z')[0]), 24., places=8)
 
 
+class AutoIVCNegativeSrcIndicesAssembledJacTestCase(unittest.TestCase):
+    def test_auto_ivc_negative_src_indices_assembled_totals(self):
+        # x is sourced by the automatic IVC; no IndepVarComp is constructed.
+        expected = np.array([[0., 12., 0., 6.]])
+        for assembled_type, mode, src_indices in itertools.product(
+                ('csc', 'dense'), ('fwd', 'rev'), ([-1, 1, -1], [3, 1, 3])):
+            with self.subTest(assembled_type=assembled_type, mode=mode,
+                              src_indices=src_indices):
+                p = Problem(reports=False, model=Group(assembled_jac_type=assembled_type))
+                group = p.model.add_subsystem('G', Group())
+                group.add_subsystem('c1', ExecComp('y=2*u', u=np.zeros(3), y=np.zeros(3)),
+                                    promotes_inputs=[('u', 'x')])
+                group.add_subsystem('c2', ExecComp('z=2*v[0]+3*v[1]+4*v[2]',
+                                                   v=np.zeros(3)))
+                group.connect('c1.y', 'c2.v', src_indices=[1, 0, 1])
+                p.model.promotes('G', inputs=['x'], src_indices=src_indices, src_shape=(4,))
+                p.model.set_input_defaults('x', val=np.array([1., 2., 3., 4.]))
+                p.model.linear_solver = DirectSolver(assemble_jac=True)
+                p.setup(mode=mode)
+                p.run_model()
+                total = p.compute_totals(of=['G.c2.z'], wrt=['x'], return_format='array')
+                np.testing.assert_allclose(total, expected, atol=1e-12)
+
+
 class OverlappingPartialsTestCase(unittest.TestCase):
     def test_repeated_src_indices_csc(self):
         size = 2
