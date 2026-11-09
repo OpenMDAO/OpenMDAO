@@ -630,6 +630,83 @@ class TestProblemCheckPartials(unittest.TestCase):
             J_fd = J_fd[0] if isinstance(J_fd, list) else J_fd
             np.testing.assert_allclose(J_fd.ravel(), fd_expected, rtol=1e-5)
 
+    def test_directional_matrix_free_undeclared_subjacs(self):
+        # A matrix-free component declares no partials, so _CheckingJacobian creates a
+        # (nrows, 1) subjac for each directional key in its own copy of the subjac metadata.
+        # Those must hold the full FD column, and must not be added to the component.
+        A = np.array([[1.0, 2.0, 0.0], [0.0, 3.0, 4.0]])   # y: 2 rows, x: 3 cols
+        B = np.array([[2.0, -1.0], [0.5, 1.0], [0.0, 3.0]])  # z: 3 rows, w: 2 cols
+
+        class MatFree(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(3))
+                self.add_input('w', np.ones(2))
+                self.add_output('y', np.ones(2))
+                self.add_output('z', np.ones(3))
+                # complex step, so the random direction can't push the FD error past the
+                # tolerances below
+                self.set_check_partial_options(wrt='*', directional=True, method='cs')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = A @ inputs['x']
+                outputs['z'] = B @ inputs['w'] + inputs['x'] ** 2
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                x = inputs['x']
+                if mode == 'fwd':
+                    if 'y' in d_outputs and 'x' in d_inputs:
+                        d_outputs['y'] += A @ d_inputs['x']
+                    if 'z' in d_outputs:
+                        if 'w' in d_inputs:
+                            d_outputs['z'] += B @ d_inputs['w']
+                        if 'x' in d_inputs:
+                            d_outputs['z'] += 2.0 * x * d_inputs['x']
+                else:
+                    if 'y' in d_outputs and 'x' in d_inputs:
+                        d_inputs['x'] += A.T @ d_outputs['y']
+                    if 'z' in d_outputs:
+                        if 'w' in d_inputs:
+                            d_inputs['w'] += B.T @ d_outputs['z']
+                        if 'x' in d_inputs:
+                            d_inputs['x'] += 2.0 * x * d_outputs['z']
+
+        p = om.Problem(reports=False)
+        comp = p.model.add_subsystem('comp', MatFree(), promotes=['*'])
+        p.setup(force_alloc_complex=True)
+        p.set_val('x', [0.3, 1.7, -2.2])
+        p.set_val('w', [0.5, -1.0])
+        p.run_model()
+
+        subjacs_before = dict(comp._subjacs_info)
+
+        # run twice: the second call must not see state left over from the first
+        for _ in range(2):
+            data = p.check_partials(out_stream=None)
+            assert_check_partials(data, atol=1e-10, rtol=1e-10)
+
+            for (of, wrt), nrows in [(('y', 'x'), 2), (('z', 'x'), 3), (('z', 'w'), 3)]:
+                deriv = data['comp'][of, wrt]
+                J_fd = deriv['J_fd']
+                J_fd = J_fd[0] if isinstance(J_fd, list) else J_fd
+                # a directional result is one dense column with a row per output entry
+                self.assertEqual(J_fd.shape, (nrows, 1))
+                assert_near_equal(J_fd, deriv['J_fwd'], 1e-10)
+
+                # dot product test between the approximated column and the reverse product
+                dhat_d, mhat_m = deriv['directional_fd_rev']
+                assert_near_equal(dhat_d, mhat_m, 1e-10)
+
+            # (y, w) has no dependence; it may be omitted or reported as zero
+            if ('y', 'w') in data['comp']:
+                J_fd = data['comp']['y', 'w']['J_fd']
+                J_fd = J_fd[0] if isinstance(J_fd, list) else J_fd
+                assert_near_equal(J_fd, np.zeros((2, 1)), 1e-12)
+
+            # the subjacs created for the check stay in the checking jacobian
+            self.assertEqual(set(comp._subjacs_info), set(subjacs_before))
+            for key, meta in subjacs_before.items():
+                self.assertIs(comp._subjacs_info[key], meta)
+
     def test_implicit_undeclared(self):
         # Test to see that check_partials works when state_wrt_input and state_wrt_state
         # partials are missing.
