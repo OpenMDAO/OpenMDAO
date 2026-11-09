@@ -105,10 +105,6 @@ def _compute_eigenvalues_and_eigenvectors(A, b, k):
     H = 0.5 *(td_H[:-1, :] + np.transpose(td_H[:-1, :])) # Ignore last row for eigenvalues
     eigvals, eigvecs_H = eig(H)
     eigvals = np.real(eigvals)                           # extract the real parts
-    
-    # Compute eigenvalues and eigenvectors of the Hessenberg matrix H
-    # eigvals, eigvecs_H = eig(H[:-1, :])  # Ignore last row for eigenvalues
-    # eigvals = np.real(eigvals)           # extract the real parts
 
     # Transform eigenvectors of H to approximate eigenvectors of A
     eigvecs = Q[:, :-1] @ eigvecs_H

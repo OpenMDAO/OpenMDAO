@@ -35,6 +35,7 @@ class TestHessianAutoscaler(unittest.TestCase):
         autoscaler = HessianAutoscaler(num_modes=2)
         autoscaler.eigenvals_m = np.array([16.0, 4.0])
         autoscaler.eigenvecs_m = np.eye(2)
+        autoscaler._update_eigen_cache()
 
         # For this Hessian, M = diag(1/sqrt(16), 1/sqrt(4)).
         # Therefore M @ [8, 6] = [2, 3].

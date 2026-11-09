@@ -61,8 +61,8 @@ class HessianAutoscaler(AutoscalerBase):
 
     This autoscaler scales optimization variables based on the matrix design-variable
     transformation, x = M y. The eigenpairs used to form M are estimated once, at the
-    initial design point. They are re-estimated only when the driver is set up again at a
-    different design point.
+    initial design point. They are re-estimated only when `setup` is called on the problem
+    again and the design point has changed.
 
     x is the model variable, y is the optimizer variable, and the matrix M is the
     scaler/preconditioner.
@@ -102,6 +102,14 @@ class HessianAutoscaler(AutoscalerBase):
         True if the Hessian estimate is nearly zero and the identity transformation is used.
     _estimated_x0 : ndarray or None
         Design point at which the eigenpairs were last estimated.
+    _m_vals : ndarray or None
+        Cached |eigenvalue|^(-1/2) of the retained modes, used by the transformation M.
+    _m_alpha : float or None
+        Last retained |eigenvalue|^(-1/2), which scales the complement of the modes in M.
+    _minv_vals : ndarray or None
+        Cached |eigenvalue|^(1/2) of the retained modes, used by the transformation M^{-1}.
+    _minv_alpha : float or None
+        Last retained |eigenvalue|^(1/2), which scales the complement of the modes in M^{-1}.
     """
     
     def __init__(self, num_modes, num_krylov=None, grad_fd_step=1e-6, use_scipy_eigs=False,
@@ -144,7 +152,11 @@ class HessianAutoscaler(AutoscalerBase):
         self._response_scaler = Autoscaler()
         self._is_identity = False
         self._estimated_x0 = None
-        
+        self._m_vals = None
+        self._m_alpha = None
+        self._minv_vals = None
+        self._minv_alpha = None
+
     def setup(self, driver: 'Driver'):
         """
         Perform setup of autoscaler during final setup of the problem.
@@ -232,6 +244,8 @@ class HessianAutoscaler(AutoscalerBase):
             issue_warning('HessianAutoscaler: The Hessian is nearly singular or the objective '
                           'is linear. Using the identity matrix as the scaling matrix.',
                           category=OpenMDAOWarning)
+        else:
+            self._update_eigen_cache()
 
         self.arnoldi_grad_evals = self.num_grad_evals
         self._estimated_x0 = x0.copy()
@@ -617,6 +631,19 @@ class HessianAutoscaler(AutoscalerBase):
         
         return eigenvals
     
+    def _update_eigen_cache(self):
+        """
+        Cache the eigenvalue transforms used by M, M^{-1} and the jacobian scaling.
+
+        Called once after the eigenpairs are estimated. The eigenvalues are expected to be
+        nonzero, which _clean_eigenvals guarantees unless the identity transformation is used.
+        """
+        abs_vals = np.abs(self.eigenvals_m)
+        self._m_vals = 1.0 / np.sqrt(abs_vals)
+        self._m_alpha = self._m_vals[-1]
+        self._minv_vals = np.sqrt(abs_vals)
+        self._minv_alpha = self._minv_vals[-1]
+
     def _compute_matrix_M(self):
         """ 
         Compute the mapping M using m eigenvalues and eigenvectors.
@@ -635,19 +662,10 @@ class HessianAutoscaler(AutoscalerBase):
                           "Using identity matrix as the scaling matrix.",
                           category=Warning)
         else:
-            # if np.abs(self.eigenvals_m[self.num_modes - 1]) <= 1e-10:
-            #     raise ValueError(f"The smallest eigenvalue is approximately zero "
-            #                      f"(value = {self.eigenvals_m[self.num_modes - 1]})")
-            I = np.eye(self.n_vars)
-            tilde_vals = np.copy(self.eigenvals_m)
-            for i in range(self.num_modes):
-                tilde_vals[i] = 1/np.sqrt(np.abs(self.eigenvals_m[i]))
-                
-            tilde_lambda = tilde_vals[self.num_modes - 1]
+            V = self.eigenvecs_m
+            M = (V * self._m_vals) @ V.T
+            M += self._m_alpha * (np.eye(self.n_vars) - V @ V.T)
 
-            M = ( self.eigenvecs_m @ np.diag(tilde_vals) ) @ np.transpose(self.eigenvecs_m)
-            M += tilde_lambda * ( I - self.eigenvecs_m @ np.transpose(self.eigenvecs_m) )        
-        
         return M
     
     def _compute_My(self, y):
@@ -670,16 +688,9 @@ class HessianAutoscaler(AutoscalerBase):
         if self._is_identity:
             My = y
         else:
-            tilde_vals = np.copy(self.eigenvals_m)
-            for i in range(self.num_modes):
-                tilde_vals[i] = 1/np.sqrt(np.abs(self.eigenvals_m[i]))
-                
-            tilde_lambda = tilde_vals[self.num_modes-1]
-            z = np.transpose(self.eigenvecs_m) @ y
-
-            My = (self.eigenvecs_m
-                  @ (np.diag(tilde_vals) - tilde_lambda * np.eye(self.num_modes))) @ z
-            My += tilde_lambda * y
+            V = self.eigenvecs_m
+            z = V.T @ y
+            My = V @ ((self._m_vals - self._m_alpha) * z) + self._m_alpha * y
         return My
 
     def _compute_M_inverse_x(self, x):    
@@ -699,17 +710,9 @@ class HessianAutoscaler(AutoscalerBase):
         if self._is_identity:
             y = x
         else:
-            Im = np.eye(self.num_modes)
-            tilde_vals = np.copy(self.eigenvals_m)
-            for i in range(self.num_modes):
-                tilde_vals[i] = np.sqrt(np.abs(self.eigenvals_m[i]))
-                
-            tilde_lambda = tilde_vals[self.num_modes-1]
-            w = np.transpose(self.eigenvecs_m) @ x
-
-            y = ((self.eigenvecs_m @ (np.diag(tilde_vals) - tilde_lambda * Im)) @ w
-                 + tilde_lambda * x)
-            # y_0 = eigenvecs_m @ np.diag(tilde_vals) @ w
+            V = self.eigenvecs_m
+            w = V.T @ x
+            y = V @ ((self._minv_vals - self._minv_alpha) * w) + self._minv_alpha * x
         return y
 
 
@@ -1019,26 +1022,10 @@ class HessianAutoscaler(AutoscalerBase):
             return
 
         dv_slices = self._dv_slices
-        n_total = self.n_vars
 
         V = self.eigenvecs_m
-        eigs_abs = np.abs(self.eigenvals_m)
-
-        if V.shape[0] != n_total:
-            raise RuntimeError(
-                f"HessianAutoscaler eigenvector matrix has {V.shape[0]} rows, "
-                f"but the contiguous design-variable vector has size {n_total}."
-            )
-
-        if np.any(eigs_abs <= 1e-10):
-            raise RuntimeError(
-                "HessianAutoscaler cannot scale the Jacobian because at least one "
-                "retained Hessian eigenvalue is near zero."
-            )
-
-        tilde_vals = 1.0 / np.sqrt(eigs_abs)
-        alpha = tilde_vals[self.num_modes - 1]
-        beta = tilde_vals - alpha
+        alpha = self._m_alpha
+        beta = self._m_vals - alpha
 
         def _as_2d(block):
             """Convert a Jacobian block to a two-dimensional array."""
