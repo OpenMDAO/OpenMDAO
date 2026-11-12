@@ -495,6 +495,60 @@ class TestProblemCheckPartials(unittest.TestCase):
         compdata, _ = pt2.check_partials(out_stream=None)
         compare_prob_vs_comp_check_partials(data, compdata, pt2)
 
+    def test_sparse_matrix_val(self):
+        # issue #3179: partials declared with a scipy sparse matrix as val lost entries
+        from scipy.sparse import lil_matrix
+
+        class QuadPoly(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('xu', shape_by_conn=True)
+                self.add_input('yu', shape_by_conn=True, copy_shape='xu')
+                self.add_input('xl', shape_by_conn=True, copy_shape='xu')
+                self.add_input('yl', shape_by_conn=True, copy_shape='xu')
+                self.add_output('P', compute_shape=lambda shapes: (shapes['xu'][0] - 1, 4, 2))
+
+            def setup_partials(self):
+                n = self._get_var_meta('xu', 'size')
+                dP_dxl = lil_matrix((8 * (n - 1), n), dtype=int)
+                dP_dyl = lil_matrix((8 * (n - 1), n), dtype=int)
+                dP_dxu = np.zeros((n - 1, 4, 2, n))
+                dP_dyu = np.zeros((n - 1, 4, 2, n))
+                for i in range(n - 1):
+                    dP_dxl[8 * i, i] = dP_dxl[8 * i + 2, i + 1] = 1
+                    dP_dyl[8 * i + 1, i] = dP_dyl[8 * i + 3, i + 1] = 1
+                    dP_dxu[i, 3, 0, i] = dP_dxu[i, 2, 0, i + 1] = 1
+                    dP_dyu[i, 3, 1, i] = dP_dyu[i, 2, 1, i + 1] = 1
+                self.declare_partials('P', 'xl', val=dP_dxl.tocsr())
+                self.declare_partials('P', 'yl', val=dP_dyl.tocsr())
+                self.declare_partials('P', 'xu', val=dP_dxu.reshape(8 * (n - 1), n))
+                self.declare_partials('P', 'yu', val=dP_dyu.reshape(8 * (n - 1), n))
+                self.expected = {'xl': dP_dxl.toarray(), 'yl': dP_dyl.toarray(),
+                                 'xu': dP_dxu.reshape(8 * (n - 1), n),
+                                 'yu': dP_dyu.reshape(8 * (n - 1), n)}
+
+            def compute(self, inputs, outputs):
+                P = outputs['P']
+                P[:, 0, 0], P[:, 1, 0] = inputs['xl'][:-1], inputs['xl'][1:]
+                P[:, 2, 0], P[:, 3, 0] = inputs['xu'][1:], inputs['xu'][:-1]
+                P[:, 0, 1], P[:, 1, 1] = inputs['yl'][:-1], inputs['yl'][1:]
+                P[:, 2, 1], P[:, 3, 1] = inputs['yu'][1:], inputs['yu'][:-1]
+
+        p = om.Problem()
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_output('xl', [0.0, 1.23, 2.0])
+        indeps.add_output('xu', [0.0, 1.0, 2.0])
+        indeps.add_output('yl', [-1.0, -1.0, -1.0])
+        indeps.add_output('yu', [1.0, 1.0, 1.0])
+        comp = p.model.add_subsystem('quadpoly', QuadPoly(), promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        for _ in range(2):  # the issue reported different results for a second call
+            data = p.check_partials(out_stream=None)
+            assert_check_partials(data, atol=1e-6, rtol=1e-6)
+            for wrt, expected in comp.expected.items():
+                assert_near_equal(data['quadpoly'][('P', wrt)]['J_fwd'], expected, 1e-8)
+
     def test_matrix_free_explicit(self):
         prob = om.Problem()
 
