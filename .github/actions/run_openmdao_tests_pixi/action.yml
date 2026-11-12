@@ -183,39 +183,11 @@ runs:
         eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
         python -m build_pyoptsparse.snopt_module SNOPT/src
 
-    - name: Check MPI and PETSc
-      continue-on-error: true
-      shell: bash -l {0}
-      run: |
-        eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
-        if python -c "import mpi4py, petsc4py" 2>/dev/null; then
-          echo "============================================================="
-          echo "Check MPI and PETSc installation"
-          echo "============================================================="
-          export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
-          export OMPI_MCA_rmaps_base_oversubscribe=1
-          export OMPI_MCA_mpi_yield_when_idle=1
-          export OMPI_MCA_btl=^openib
-          echo "-----------------------"
-          echo "Quick test of mpi4py:"
-          mpirun -n 3 python -c "from mpi4py import MPI; print(f'Rank: {MPI.COMM_WORLD.rank}')"
-          echo "-----------------------"
-          echo "Quick test of petsc4py:"
-          mpirun -n 3 python -c "import numpy; from mpi4py import MPI; comm = MPI.COMM_WORLD; \
-            import petsc4py; petsc4py.init(); \
-            x = petsc4py.PETSc.Vec().createWithArray(numpy.ones(5)*comm.rank, comm=comm);  \
-            print(x.getArray())"
-          echo "-----------------------"
-
-          # shellcheck disable=SC2129
-          echo "PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe" >> "$GITHUB_ENV"
-          echo "OMPI_MCA_rmaps_base_oversubscribe=1" >> "$GITHUB_ENV"
-          echo "OMPI_MCA_btl=tcp,self" >> "$GITHUB_ENV"
-          echo "OMPI_MCA_orte_tmpdir_base=$RUNNER_TEMP/ompi" >> "$GITHUB_ENV"
-
-        else
-          echo "mpi4py or petsc4py not installed in this environment, skipping MPI checks"
-        fi
+    - name: Setup MPI
+      if: inputs.PIXI_ENVIRONMENT != 'minimal'
+      uses: ./.github/actions/setup_mpi_ci
+      with:
+        pixi_environment: '${{ inputs.PIXI_ENVIRONMENT }}'
 
     # Enable tmate debugging of manually-triggered workflows if the input option was provided
     #
@@ -238,12 +210,6 @@ runs:
       shell: bash -l {0}
       env:
         OPENMDAO_CHECK_ALL_PARTIALS: true
-        # MPI settings for CI (all platforms)
-        PRTE_MCA_rmaps_default_mapping_policy: ":oversubscribe"
-        OMPI_MCA_rmaps_base_oversubscribe: "1"
-        # Make oversubscribed MPI ranks yield the CPU while idle instead of
-        # busy-polling, which starves working ranks on the small CI runners
-        OMPI_MCA_mpi_yield_when_idle: "1"
         COVERAGE_RUN: "true"
       run: |
         eval "$(pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }})"
@@ -292,6 +258,9 @@ runs:
       env:
         OPENMDAO_CHECK_ALL_PARTIALS: true
         COVERAGE_RUN: "true"
+        # Print a Python-level traceback on fatal crashes (e.g. native access
+        # violations) that would otherwise terminate testflo silently
+        PYTHONFAULTHANDLER: "1"
       run: |
         & pixi shell-hook -e ${{ inputs.PIXI_ENVIRONMENT }} -s powershell | Out-String | Invoke-Expression
         echo "============================================================="

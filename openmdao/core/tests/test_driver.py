@@ -670,23 +670,23 @@ class TestDriver(unittest.TestCase):
         case = cr.get_case(cases[0])
 
         # Test the results in the VOI specified units
-        dv = case.get_design_vars()
+        dv = case.get_design_vars(scaled=False)
         assert_near_equal(dv['x'][0], om.convert_units(35.0, 'degF', 'degC'), 1e-8)
 
-        obj = case.get_objectives()
+        obj = case.get_objectives(scaled=False)
         assert_near_equal(obj['y2'][0], om.convert_units(105.0, 'degF', 'degC'), 1e-8)
 
-        con = case.get_constraints()
+        con = case.get_constraints(scaled=False)
         assert_near_equal(con['y1'][0], om.convert_units(70.0, 'degF', 'degC'), 1e-8)
 
         # Test the results in the model units
-        dv = case.get_design_vars(driver_units=False)
+        dv = case.get_design_vars(scaled=False, driver_units=False)
         assert_near_equal(dv['x'][0], 35.0, 1e-8)
 
-        obj = case.get_objectives(driver_units=False)
+        obj = case.get_objectives(scaled=False, driver_units=False)
         assert_near_equal(obj['y2'][0], 105.0, 1e-8)
 
-        con = case.get_constraints(driver_units=False)
+        con = case.get_constraints(scaled=False, driver_units=False)
         assert_near_equal(con['y1'][0], 70.0, 1e-8)
 
     def test_units_compute_totals(self):

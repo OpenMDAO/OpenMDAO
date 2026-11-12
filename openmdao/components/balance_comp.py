@@ -156,7 +156,7 @@ class BalanceComp(ImplicitComponent):
             self.add_balance(name, eq_units=eq_units, lhs_name=lhs_name,
                              rhs_name=rhs_name, rhs_val=rhs_val, use_mult=use_mult,
                              mult_name=mult_name, mult_val=mult_val, normalize=normalize,
-                             val=val, lhs_kwargs=lhs_kwargs, rhs_kwargs=lhs_kwargs,
+                             val=val, lhs_kwargs=lhs_kwargs, rhs_kwargs=rhs_kwargs,
                              mult_kwargs=mult_kwargs, **_kwargs)
 
         self._no_check_partials = True
@@ -247,8 +247,8 @@ class BalanceComp(ImplicitComponent):
                         _dscale_drhs = -np.sign(rhs) / rhs**2
                 else:
                     # Indices where the rhs is near zero or not near zero
-                    idxs_nz = np.where(absrhs < 2)[0]
-                    idxs_nnz = np.where(absrhs >= 2)[0]
+                    idxs_nz = np.where(absrhs < 2)
+                    idxs_nnz = np.where(absrhs >= 2)
 
                     # scale factor that normalizes by the rhs, except near 0
                     _scale_factor[idxs_nnz] = 1.0 / absrhs[idxs_nnz]
