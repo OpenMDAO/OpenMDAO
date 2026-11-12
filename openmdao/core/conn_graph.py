@@ -3007,8 +3007,6 @@ class AllConnGraph(nx.DiGraph):
 
         Parameters
         ----------
-        model : Group
-            The model.
         parent : tuple of the form ('o', name)
             The source output node.
         child : tuple of the form ('i' or 'o', name)
