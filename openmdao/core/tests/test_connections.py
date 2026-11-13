@@ -332,6 +332,82 @@ class TestShapes(unittest.TestCase):
 
 class TestMultiConns(unittest.TestCase):
 
+    def test_repeated_connection_promoted_names(self):
+        prob = om.Problem(reports=False)
+        group = prob.model.add_subsystem('g', om.Group(),
+                                        promotes_outputs=[('iv.x', 'x')],
+                                        promotes_inputs=['y'])
+        group.add_subsystem('iv', om.IndepVarComp('x', 3.0))
+        group.add_subsystem('c', om.ExecComp('z=2*y'), promotes_inputs=['y'])
+        group.connect('iv.x', 'y')
+        prob.model.connect('x', 'y')
+
+        with self.assertRaisesRegex(Exception, "connected to 'g.iv.x' multiple times"):
+            prob.setup()
+            prob.final_setup()
+
+    def test_implicit_connections_at_multiple_levels(self):
+        prob = om.Problem(reports=False)
+        group = prob.model.add_subsystem('g', om.Group(), promotes=['*'])
+        inner = group.add_subsystem('inner', om.Group(),
+                                    promotes_outputs=[('iv.x', 'x')],
+                                    promotes_inputs=[('y', 'x')])
+        inner.add_subsystem('iv', om.IndepVarComp('x', 3.0))
+        inner.add_subsystem('c', om.ExecComp('z=2*y'), promotes_inputs=['y'])
+        prob.setup()
+        prob.run_model()
+        assert_near_equal(prob.get_val('g.inner.c.z'), 6.0)
+
+    def test_repeated_connection_nested_aliases(self):
+        prob = om.Problem(reports=False)
+        group = prob.model.add_subsystem('g', om.Group(), promotes=['*'])
+        inner = group.add_subsystem('inner', om.Group(),
+                                    promotes_outputs=[('iv.x', 'source')],
+                                    promotes_inputs=[('y', 'target')])
+        inner.add_subsystem('iv', om.IndepVarComp('x', 3.0))
+        inner.add_subsystem('c', om.ExecComp('z=2*y'), promotes_inputs=['y'])
+        inner.connect('iv.x', 'y')
+        prob.model.connect('source', 'target')
+
+        with self.assertRaisesRegex(Exception, "connected to 'g.inner.iv.x' multiple times"):
+            prob.setup()
+            prob.final_setup()
+
+    def test_repeated_connection_src_indices(self):
+        prob = om.Problem(reports=False)
+        group = prob.model.add_subsystem('g', om.Group(),
+                                        promotes_outputs=[('iv.x', 'x')],
+                                        promotes_inputs=['y'])
+        group.add_subsystem('iv', om.IndepVarComp('x', np.arange(4.0)))
+        group.add_subsystem('c', om.ExecComp('z=2*y', y=np.ones(2), z=np.ones(2)),
+                            promotes_inputs=['y'])
+        group.connect('iv.x', 'y', src_indices=[0, 1])
+        prob.model.connect('x', 'y', src_indices=[2, 3])
+
+        with self.assertRaisesRegex(Exception, "connected to 'g.iv.x' multiple times"):
+            prob.setup()
+            prob.final_setup()
+
+    def test_single_connection_promoted_fanout(self):
+        for connect_outer in (False, True):
+            with self.subTest(connect_outer=connect_outer):
+                prob = om.Problem(reports=False)
+                group = prob.model.add_subsystem('g', om.Group(),
+                                                promotes_outputs=[('iv.x', 'x')],
+                                                promotes_inputs=['y'])
+                group.add_subsystem('iv', om.IndepVarComp('x', 3.0))
+                for name in ('c1', 'c2'):
+                    group.add_subsystem(name, om.ExecComp('z=2*y'), promotes_inputs=['y'])
+                if connect_outer:
+                    prob.model.connect('x', 'y')
+                else:
+                    group.connect('iv.x', 'y')
+
+                prob.setup()
+                prob.run_model()
+                assert_near_equal(prob.get_val('g.c1.z'), 6.0)
+                assert_near_equal(prob.get_val('g.c2.z'), 6.0)
+
     def test_mult_conns(self):
 
         class SubGroup(om.Group):
