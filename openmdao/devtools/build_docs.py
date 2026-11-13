@@ -22,6 +22,9 @@ to avoid the overhead of generating HTML reports for every notebook.
 
 A notebook is skipped when its output in _executed_book/ already exists and is newer
 than the source. All failures are collected and reported at the end.
+
+A cell that runs longer than _CELL_TIMEOUT seconds fails its notebook, so that a hung
+notebook is reported by name rather than blocking the build indefinitely.
 """
 import argparse
 import json
@@ -35,6 +38,9 @@ from pathlib import Path
 HERE = Path(__file__).parent.parent.parent / 'openmdao' / 'docs'
 SRC_DIR = HERE / 'openmdao_book'
 OUT_DIR = HERE / '_executed_book'
+
+# The slowest notebook in CI takes about a minute in total.
+_CELL_TIMEOUT = 900
 
 try:
     from rich.progress import (BarColumn, MofNCompleteColumn, Progress,
@@ -108,14 +114,19 @@ def _nb_env(nb_path):
     return env
 
 
+def _papermill_cmd(nb, out):
+    """Return the papermill command that executes notebook nb and writes the result to out."""
+    return ['papermill', str(nb), str(out), '--no-progress-bar', '--kernel', 'python3',
+            '--cwd', str(out.parent), '--execution-timeout', str(_CELL_TIMEOUT)]
+
+
 def _run_notebook(args):
     """Execute a single notebook with papermill; return (rel_path, returncode, stdout, stderr)."""
     nb, out = args
     rel = nb.relative_to(SRC_DIR)
     out.parent.mkdir(parents=True, exist_ok=True)
-    cmd = ['papermill', str(nb), str(out), '--no-progress-bar', '--kernel', 'python3',
-           '--cwd', str(out.parent)]
-    result = subprocess.run(cmd, capture_output=True, text=True, env=_nb_env(nb))
+    result = subprocess.run(_papermill_cmd(nb, out), capture_output=True, text=True,
+                            env=_nb_env(nb))
     return rel, result.returncode, result.stdout, result.stderr
 
 
@@ -215,9 +226,8 @@ def _execute_notebooks(workers, force, no_serial, no_mpi, no_rich):
                     out = OUT_DIR / rel
                     out.parent.mkdir(parents=True, exist_ok=True)
                     progress.print(f'  [MPI] {rel}')
-                    cmd = ['papermill', str(nb), str(out), '--no-progress-bar',
-                           '--kernel', 'python3', '--cwd', str(out.parent)]
-                    result = subprocess.run(cmd, capture_output=True, text=True, env=_nb_env(nb))
+                    result = subprocess.run(_papermill_cmd(nb, out), capture_output=True,
+                                            text=True, env=_nb_env(nb))
                     progress.advance(task_id)
                     if result.returncode != 0:
                         progress.print(f'  [red]FAILED[/red] {rel}')
@@ -232,9 +242,8 @@ def _execute_notebooks(workers, force, no_serial, no_mpi, no_rich):
                 out = OUT_DIR / rel
                 out.parent.mkdir(parents=True, exist_ok=True)
                 print(f'  [{i}/{len(mpi_notebooks)}] [MPI] {rel}', flush=True)
-                cmd = ['papermill', str(nb), str(out), '--no-progress-bar',
-                       '--kernel', 'python3', '--cwd', str(out.parent)]
-                result = subprocess.run(cmd, capture_output=True, text=True, env=_nb_env(nb))
+                result = subprocess.run(_papermill_cmd(nb, out), capture_output=True,
+                                        text=True, env=_nb_env(nb))
                 if result.returncode != 0:
                     print(f'  FAILED: {rel}', file=sys.stderr)
                     if result.stdout.strip():
