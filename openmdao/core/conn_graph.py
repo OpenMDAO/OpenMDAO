@@ -741,6 +741,8 @@ class AllConnGraph(nx.DiGraph):
         A set of nodes that have multiple incoming connections.
     _input_input_conns : set
         A set of nodes that have input to input connections.
+    _manual_conn_sources : dict
+        Absolute output names manually connected to each absolute input name.
     _first_pass : bool
         True if we're in the first pass of node data updates.
     _required_conns : set
@@ -785,6 +787,7 @@ class AllConnGraph(nx.DiGraph):
         super().__init__(*args, **kwargs)
         self._mult_inconn_nodes = set()
         self._input_input_conns = set()
+        self._manual_conn_sources = {}
         self._first_pass = True
         self._required_conns = set()
         self._resolved = set()
@@ -2073,14 +2076,28 @@ class AllConnGraph(nx.DiGraph):
                                      f"meant to connect to one of the following inputs: {guesses}.")
                 continue
 
-            out_comps = {n.rpartition('.')[0] for n in resolver.absnames(prom_src, src_io)}
-            in_comps = {n.rpartition('.')[0] for n in resolver.absnames(prom_tgt, tgt_io)}
+            abs_srcs = resolver.absnames(prom_src, src_io)
+            abs_tgts = resolver.absnames(prom_tgt, tgt_io)
+            out_comps = {n.rpartition('.')[0] for n in abs_srcs}
+            in_comps = {n.rpartition('.')[0] for n in abs_tgts}
 
             if out_comps & in_comps:
                 self._bad_conns.add((prom_src, prom_tgt))
                 group._collect_error(f"{group.msginfo}: Source and target are in the same System "
                                      f"for connection from '{prom_src}' to '{prom_tgt}'.")
                 continue
+
+            if src_io == 'output':
+                abs_src = abs_srcs[0]
+                repeated = [tgt for tgt in abs_tgts
+                            if abs_src in self._manual_conn_sources.get(tgt, ())]
+                if repeated:
+                    for tgt in repeated:
+                        group._collect_error(f"{group.msginfo}: Input '{tgt}' is connected to "
+                                             f"'{abs_src}' multiple times through different names.")
+                    continue
+                for tgt in abs_tgts:
+                    self._manual_conn_sources.setdefault(tgt, set()).add(abs_src)
 
             src_node, _ = self.get_node_attrs(group.pathname, prom_src, src_io[0])
             tgt_node, _ = self.get_node_attrs(group.pathname, prom_tgt, tgt_io[0])
