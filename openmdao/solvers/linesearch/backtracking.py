@@ -470,6 +470,43 @@ class ArmijoGoldsteinLS(LinesearchSolver):
             self._mpi_print(self._iter_count, phi, self.alpha)
 
 
+def _clip_to_bounds(u_data, lower_bounds, upper_bounds):
+    """
+    Set each finite entry of u_data that violates a bound to that bound.
+
+    The bound is assigned directly. Adding (bound - u) to u instead can round away
+    from the bound when |u| is much larger than the bound: u = -1e12 and
+    lower = 1e-6 gives 0.
+
+    Parameters
+    ----------
+    u_data : ndarray
+        Output values; modified in place.
+    lower_bounds : ndarray or None
+        Lower bounds array.
+    upper_bounds : ndarray or None
+        Upper bounds array.
+
+    Returns
+    -------
+    ndarray
+        The change applied to u_data.
+    """
+    bounded = u_data
+    if lower_bounds is not None:
+        bounded = np.maximum(bounded, lower_bounds)
+    if upper_bounds is not None:
+        bounded = np.minimum(bounded, upper_bounds)
+    change = bounded - u_data
+
+    # An inf or nan entry gets u + change, which is nan. The solver then sees a nan
+    # norm and stops.
+    finite = np.isfinite(u_data)
+    u_data[~finite] += change[~finite]
+    u_data[finite] = bounded[finite]
+    return change
+
+
 def _enforce_bounds_vector(u, du, alpha, lower_bounds, upper_bounds):
     """
     Enforce lower/upper bounds, backtracking the entire vector together.
@@ -528,6 +565,17 @@ def _enforce_bounds_vector(u, du, alpha, lower_bounds, upper_bounds):
         # We first update u to reflect the required change to du.
         u.add_scal_vec(-d_alpha, du)
 
+        # Rounding in this update can leave an entry that should reach its bound
+        # outside it, far outside when |u| is much larger than the bound (e.g.,
+        # u = -1e12 and lower = 1e-6 gives 0). Place such entries on the bound.
+        # Only entries with a nonzero step are changed.
+        u_data = u.asarray()
+        u_step = u_data[mask]
+        _clip_to_bounds(u_step,
+                        None if lower_bounds is None else lower_bounds[mask],
+                        None if upper_bounds is None else upper_bounds[mask])
+        u_data[mask] = u_step
+
         # At this point, we normalize d_alpha by alpha to figure out the relative
         # amount that the du vector has to be reduced, then apply the reduction.
         du *= 1 - d_alpha / alpha
@@ -561,19 +609,10 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
     # enforce bounds on step in-place.
     u_data = u.asarray()
 
-    # If u > lower, we're just adding zero. Otherwise, we're adding
-    # the step required to get up to the lower bound.
-    # For du, we normalize by alpha since du eventually gets
+    # Move each u that violates a bound onto that bound, and change du by the
+    # same amount. For du, we normalize by alpha since du eventually gets
     # multiplied by alpha.
-    change_lower = 0. if lower_bounds is None else np.maximum(u_data, lower_bounds) - u_data
-
-    # If u < upper, we're just adding zero. Otherwise, we're adding
-    # the step required to get down to the upper bound, but normalized
-    # by alpha since du eventually gets multiplied by alpha.
-    change_upper = 0. if upper_bounds is None else np.minimum(u_data, upper_bounds) - u_data
-
-    change = change_lower + change_upper
-    u_data += change
+    change = _clip_to_bounds(u_data, lower_bounds, upper_bounds)
     du += change / alpha
 
 
@@ -606,20 +645,10 @@ def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
     u_data = u.asarray()
     du_data = du.asarray()
 
-    # If u > lower, we're just adding zero. Otherwise, we're adding
-    # the step required to get up to the lower bound.
-    # For du, we normalize by alpha since du eventually gets
+    # Move each u that violates a bound onto that bound, and change du by the
+    # same amount. For du, we normalize by alpha since du eventually gets
     # multiplied by alpha.
-    change_lower = 0. if lower_bounds is None else np.maximum(u_data, lower_bounds) - u_data
-
-    # If u < upper, we're just adding zero. Otherwise, we're adding
-    # the step required to get down to the upper bound, but normalized
-    # by alpha since du eventually gets multiplied by alpha.
-    change_upper = 0. if upper_bounds is None else np.minimum(u_data, upper_bounds) - u_data
-
-    change = change_lower + change_upper
-
-    u_data += change
+    change = _clip_to_bounds(u_data, lower_bounds, upper_bounds)
     du_data += change / alpha
 
     # Now we ensure that we will backtrack along the wall during the
