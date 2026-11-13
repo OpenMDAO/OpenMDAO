@@ -13,7 +13,7 @@ import openmdao.api as om
 from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDense
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
-from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, SellarNoDerivatives
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning
 from openmdao.utils.testing_utils import use_tempdirs
 from openmdao.utils.mpi import MPI
@@ -85,6 +85,13 @@ def require_modopt_optimizer(optimizer_name):
                 try:
                     from cobyqa import minimize as _
                     require_modopt_optimizer._available_optimizers.add('COBYQA')
+                except ImportError:
+                    pass
+
+                # Egor requires egobox
+                try:
+                    import egobox  # noqa: F401
+                    require_modopt_optimizer._available_optimizers.add('Egor')
                 except ImportError:
                     pass
 
@@ -1404,6 +1411,75 @@ class TestModOptDriver(unittest.TestCase):
         # Check expected responses are met
         assert_near_equal(prob['f_xy'], -27.0, 1e-3)
         assert_near_equal(prob['c'], 0.0, 1e-3)
+
+    @require_modopt_optimizer('Egor')
+    def test_egor_gradient_free(self):
+        """
+        Test Egor gradient-free optimizer.
+
+        Egor is a bayesian optimizer from egobox, suited to expensive black-box functions.
+        It requires finite bounds on all design variables.
+        """
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('p1', om.IndepVarComp('x', 50.0), promotes=['*'])
+        model.add_subsystem('p2', om.IndepVarComp('y', 50.0), promotes=['*'])
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = x + y'), promotes=['*'])
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = modOptDriver(optimizer='Egor')
+        prob.driver.options['disp'] = False
+        prob.driver.options['maxiter'] = 20
+        prob.driver.options['turn_off_outputs'] = True
+        prob.driver.opt_settings['seed'] = 42
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', equals=0.0)
+
+        prob.setup()
+        result = prob.run_driver()
+
+        self.assertTrue(result.success)
+        self.assertFalse(prob.driver.supports['gradients'])
+
+        # Check expected responses are met
+        assert_near_equal(prob['f_xy'], -27.0, 1e-3)
+        assert_near_equal(prob['c'], 0.0, 1e-3)
+
+    @require_modopt_optimizer('Egor')
+    def test_egor_sellar(self):
+        prob = om.Problem()
+        model = prob.model = SellarNoDerivatives(nonlinear_solver=om.NonlinearBlockGS,
+                                                 linear_solver=om.ScipyKrylov)
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = modOptDriver(optimizer='Egor')
+        prob.driver.options['disp'] = False
+        prob.driver.options['maxiter'] = 30
+        prob.driver.options['turn_off_outputs'] = True
+        prob.driver.opt_settings['seed'] = 0
+
+        prob.setup(check=False, mode='rev')
+        result = prob.run_driver()
+
+        self.assertTrue(result.success)
+
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 1e-3)
+        assert_near_equal(prob['obj'], 3.18339, 1e-3)
 
     @require_modopt_optimizer('NelderMead')
     def test_neldermead_unconstrained(self):

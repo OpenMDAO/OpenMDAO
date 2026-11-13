@@ -31,7 +31,8 @@ else:
     pyoptsparse_version = None
 
 # All optimizers in pyoptsparse
-optlist = {'ALPSO', 'CONMIN', 'IPOPT', 'NLPQLP', 'NSGA2', 'ParOpt', 'PSQP', 'SLSQP', 'SNOPT', 'Uno'}
+optlist = {'ALPSO', 'CONMIN', 'Egor', 'IPOPT', 'NLPQLP', 'NSGA2', 'ParOpt', 'PSQP', 'SLSQP',
+           'SNOPT', 'Uno'}
 
 if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.0'):
     optlist.add('NOMAD')
@@ -59,6 +60,7 @@ respects_fail_flag = {
     # Currently supported optimizers (v2.9.0)
     'ALPSO': False,
     'CONMIN': False,
+    'Egor': True,
     'IPOPT': False,
     'NLPQLP': False,
     'NSGA2': False,
@@ -133,7 +135,7 @@ class pyOptSparseDriver(Driver):
     is an object-oriented framework for formulating and solving nonlinear
     constrained optimization problems, with additional MPI capability.
     pypptsparse has interfaces to the following optimizers:
-    ALPSO, CONMIN, FSQP, IPOPT, NLPQLP, NSGA2, PSQP, SLSQP,
+    ALPSO, CONMIN, Egor, FSQP, IPOPT, NLPQLP, NSGA2, PSQP, SLSQP,
     SNOPT, NLPY_AUGLAG, NOMAD, ParOpt.
     Note that some of these are not open source and therefore not included
     in the pyoptsparse source code.
@@ -592,7 +594,7 @@ class pyOptSparseDriver(Driver):
         # (e.g. Uno). When Ctrl+C arrives between Python callbacks, this sets the termination
         # flag so the next callback entry returns fail=2 instead of crashing.
         _sigint_cache = None
-        if optimizer not in ('SNOPT',) and self.options['user_terminate_signal'] is None:
+        if optimizer not in ('SNOPT', 'Egor') and self.options['user_terminate_signal'] is None:
             _sigint_cache = signal.getsignal(signal.SIGINT)
             signal.signal(signal.SIGINT, self._signal_handler)
 
@@ -687,6 +689,10 @@ class pyOptSparseDriver(Driver):
                     self.fail = True
             elif optimizer == 'PSQP':
                 if exit_status not in {1, 2, 3, 4}:
+                    self.fail = True
+            elif optimizer == 'Egor':
+                # 3: user interruption, 6: unexpected exit, 7: objective function error
+                if exit_status in {3, 6, 7}:
                     self.fail = True
             else:
                 # exit status may be the empty string for optimizers that don't support it
