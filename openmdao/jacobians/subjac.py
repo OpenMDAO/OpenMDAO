@@ -37,7 +37,7 @@ class Subjac(object):
         Whether the wrt variable is an input.
     dtype : dtype
         The dtype of the subjacobian.
-    src_indices : array or None
+    src_inds_list : array or None
         Source indices for the subjacobian.  None unless the jacobian is split into a square
         and non-square part where the square part has outputs as rows and columns, requiring
         a mapping of inputs to their source outputs via the src_indices array.
@@ -120,6 +120,11 @@ class Subjac(object):
         self.parent_ncols = col_slice.stop - col_slice.start
         if src_inds_list is not None:
             src_indices = idx_list_to_index_array(src_inds_list)
+            if src_indices is not None and np.any(src_indices < 0):
+                # Negative source indices are relative to the source output's width.
+                # Normalize before mapping them into assembled Jacobian columns.
+                src_indices = np.where(src_indices < 0,
+                                       src_indices + self.parent_ncols, src_indices)
         else:
             src_indices = None
         self.src_indices = src_indices
