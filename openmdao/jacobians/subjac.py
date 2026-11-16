@@ -37,7 +37,7 @@ class Subjac(object):
         Whether the wrt variable is an input.
     dtype : dtype
         The dtype of the subjacobian.
-    src_indices : array or None
+    src_inds_list : array or None
         Source indices for the subjacobian.  None unless the jacobian is split into a square
         and non-square part where the square part has outputs as rows and columns, requiring
         a mapping of inputs to their source outputs via the src_indices array.
