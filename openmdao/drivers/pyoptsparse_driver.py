@@ -405,6 +405,17 @@ class pyOptSparseDriver(Driver):
         # Get scaled design variable bounds from autoscaler
         dv_bounds = self._autoscaler.get_bounds_scaling('design_var')
 
+        # Egor needs finite bounds, we check for unbounded design variables 
+        # before pyoptsparse replaces them with +/-1e20.
+        if optimizer == 'Egor':
+            unbounded = [name for name in self._designvars
+                         if any(bound is None or np.any(np.isinf(bound))
+                                for bound in (dv_bounds[name].lower, dv_bounds[name].upper))]
+            if unbounded:
+                raise RuntimeError(f"{self.msginfo}: Egor requires finite lower and upper bounds "
+                                   "on all design variables, but the following design variables "
+                                   f"are unbounded: {unbounded}.")
+
         for name, meta in self._designvars.items():
             # translate absolute var names to promoted names for pyoptsparse
             size = meta['global_size'] if meta['distributed'] else meta['size']

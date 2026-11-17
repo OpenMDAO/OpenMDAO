@@ -3878,6 +3878,27 @@ class TestPyoptSparseEgor(unittest.TestCase):
 
         self.assertIn('Objective evaluation failed', str(cm.exception))
 
+    def test_unbounded_desvar(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_design_var('x', lower=-50.0)
+        model.add_design_var('y', upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.driver = pyOptSparseDriver(optimizer='Egor', print_results=False)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_driver()
+
+        self.assertEqual(str(cm.exception),
+                         "pyOptSparseDriver: Egor requires finite lower and upper bounds on all "
+                         "design variables, but the following design variables are unbounded: "
+                         "['x', 'y'].")
+
     def test_sellar(self):
         prob = om.Problem()
         model = prob.model = SellarNoDerivatives(nonlinear_solver=om.NonlinearBlockGS,
