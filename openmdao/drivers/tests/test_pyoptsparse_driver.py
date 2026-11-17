@@ -2,7 +2,9 @@
 
 import copy
 import pathlib
+import signal
 import unittest
+import os
 import os.path
 
 from packaging.version import Version
@@ -3898,6 +3900,45 @@ class TestPyoptSparseEgor(unittest.TestCase):
                          "pyOptSparseDriver: Egor requires finite lower and upper bounds on all "
                          "design variables, but the following design variables are unbounded: "
                          "['x', 'y'].")
+
+    def run_terminated_paraboloid(self, terminate, **driver_options):
+        # The termination is requested at the 7th evaluation, after the initial DOE.
+        class ParaboloidTerminate(Paraboloid):
+            def setup(self):
+                super().setup()
+                self.eval_count = 0
+
+            def compute(self, inputs, outputs):
+                self.eval_count += 1
+                if self.eval_count == 7:
+                    terminate()
+                super().compute(inputs, outputs)
+
+        comp = ParaboloidTerminate()
+        prob = self.setup_paraboloid(comp=comp, upper=-15.0)
+        prob.driver.opt_settings['n_doe'] = 5
+        prob.driver.options.update(driver_options)
+
+        result = prob.run_driver()
+
+        # Egor stops after the current iteration with the INTERRUPT status.
+        self.assertEqual(prob.driver.pyopt_solution.optInform['value'], 3)
+        self.assertFalse(result.success)
+        # The model is only run once more, at the optimum found before termination.
+        self.assertEqual(comp.eval_count, 8)
+
+    def test_keyboard_interrupt(self):
+        def terminate():
+            raise KeyboardInterrupt
+
+        self.run_terminated_paraboloid(terminate)
+
+    @unittest.skipUnless(hasattr(signal, 'SIGUSR1'), 'SIGUSR1 is not available on this platform.')
+    def test_user_terminate_signal(self):
+        def terminate():
+            os.kill(os.getpid(), signal.SIGUSR1)
+
+        self.run_terminated_paraboloid(terminate, user_terminate_signal=signal.SIGUSR1)
 
     def test_sellar(self):
         prob = om.Problem()

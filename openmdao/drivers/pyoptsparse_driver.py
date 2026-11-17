@@ -758,6 +758,13 @@ class pyOptSparseDriver(Driver):
             self._signal_cache = signal.getsignal(sigusr)
             signal.signal(sigusr, self._signal_handler)
 
+        # Egor takes a failed evaluation as a point to reject and goes on,
+        # so termination is handled with a KeyboardInterrupt instead.
+        is_egor = self.options['optimizer'] == 'Egor'
+        # Handle a user_terminate_signal received while Egor was running.
+        if is_egor and self._user_termination_flag:
+            raise KeyboardInterrupt('User requested termination.')
+
         try:
             dv_vec.set_data(dv_dict, driver_scaling=True)
             self._set_design_vars(driver_scaling=dv_vec.driver_scaling)
@@ -822,6 +829,11 @@ class pyOptSparseDriver(Driver):
         # print(func_dict, flush=True)
 
         self._in_user_function = False
+
+        # Handle Ctrl+C or a user_terminate_signal received while the model was running.
+        if is_egor and self._user_termination_flag:
+            raise KeyboardInterrupt('User requested termination.')
+
         return func_dict, fail
 
     def _gradfunc(self, dv_dict, func_dict):
