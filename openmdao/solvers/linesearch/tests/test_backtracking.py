@@ -407,6 +407,53 @@ class TestAnalysisErrorImplicit(unittest.TestCase):
         self.assertTrue(correct, msg='Expected line search output not found in stdout')
 
 
+class LargeStartComp(om.ImplicitComponent):
+    """
+    Output that starts far outside a bound that is small in magnitude.
+
+    Moving y = -1e12 to the lower bound 1e-6 by adding (1e-6 - y) gives 0
+    in floating point, and the residual y / y is then nan.
+    """
+
+    def initialize(self):
+        self.options.declare('start', default=-1e12)
+        self.options.declare('lower', default=1e-6)
+        self.options.declare('upper', default=None)
+
+    def setup(self):
+        self.add_output('y', val=self.options['start'], lower=self.options['lower'],
+                        upper=self.options['upper'])
+        self.add_residual('r')
+        self.declare_partials(of='r', wrt='y', method='fd')
+
+    def apply_nonlinear(self, inputs, outputs, residuals):
+        residuals['r'] = outputs['y'] / outputs['y']
+
+
+class TestBoundsEnforceLSPrecision(unittest.TestCase):
+
+    def _run(self, method, **comp_options):
+        p = om.Problem(reports=False)
+        p.model.add_subsystem('comp', LargeStartComp(**comp_options), promotes=['*'])
+        newton = p.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False,
+                                                            maxiter=1, iprint=-1,
+                                                            err_on_non_converge=False)
+        newton.linesearch = om.BoundsEnforceLS(bound_enforcement=method, iprint=-1)
+        p.setup()
+        p.run_model()
+        return p.get_val('y')[0]
+
+    def test_lower_bound_reached_exactly(self):
+        for method in ('scalar', 'vector', 'wall'):
+            with self.subTest(method=method):
+                self.assertEqual(self._run(method), 1e-6)
+
+    def test_upper_bound_reached_exactly(self):
+        for method in ('scalar', 'vector', 'wall'):
+            with self.subTest(method=method):
+                self.assertEqual(self._run(method, start=1e12, lower=None, upper=-1e-6), -1e-6)
+
+
 class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 
     def setUp(self):
