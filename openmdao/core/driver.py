@@ -10,7 +10,6 @@ import weakref
 
 import numpy as np
 import scipy.sparse as sp
-import scipy.sparse.linalg
 
 from openmdao.drivers.autoscalers.autoscaler import Autoscaler
 from openmdao.core.group import Group
