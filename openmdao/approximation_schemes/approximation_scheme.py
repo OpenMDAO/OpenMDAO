@@ -259,8 +259,9 @@ class ApproximationScheme(object):
                 if links and wrt in links and not directional:
                     if links[wrt] is not None:
                         # Perturb all of the linked inputs in the same run.  Each output's rows
-                        # go into the columns of only one of the inputs, and are zero in the
-                        # columns of the others.
+                        # go into the columns of only one of the inputs, whose subjac is dense and
+                        # owned by the group, and are zero in the columns of the others.  See
+                        # Group._setup_approx_wrt_link_sets.
                         loc = np.arange(end - start)[:, np.newaxis]
                         vec_idx = loc + [vec.get_range(n)[0] for n, _ in links[wrt]]
                         in_idx = loc + [col_starts[n] for n, _ in links[wrt]]

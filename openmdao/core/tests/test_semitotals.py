@@ -407,6 +407,84 @@ class SharedInputComp(om.ExplicitComponent):
         partials['y', 'y_in'] = 2.0 * inputs['y_in']
 
 
+class DoubleComp(om.ExplicitComponent):
+    # y = 2 x, with a diagonal (or rows/cols) partial.
+
+    def initialize(self):
+        self.options.declare('n', types=int, default=3)
+        self.options.declare('pattern', values=['diagonal', 'rows'], default='diagonal')
+
+    def setup(self):
+        n = self.options['n']
+        self.add_input('x', np.ones(n))
+        self.add_output('y', np.ones(n))
+        if self.options['pattern'] == 'diagonal':
+            self.declare_partials('y', 'x', diagonal=True)
+        else:
+            self.declare_partials('y', 'x', rows=np.arange(n), cols=np.arange(n))
+        self._counter = 0
+
+    def compute(self, inputs, outputs):
+        self._counter += 1
+        outputs['y'] = 2.0 * inputs['x']
+
+    def compute_partials(self, inputs, partials):
+        partials['y', 'x'] = np.full(self.options['n'], 2.0)
+
+
+class SumCoupledComp(om.ExplicitComponent):
+    # z = 3 x + sum(y), with a diagonal (or rows/cols) partial wrt x and a dense one wrt y.
+
+    def initialize(self):
+        self.options.declare('n', types=int, default=3)
+        self.options.declare('pattern', values=['diagonal', 'rows'], default='diagonal')
+
+    def setup(self):
+        n = self.options['n']
+        self.add_input('x', np.ones(n))
+        self.add_input('y', np.ones(n))
+        self.add_output('z', np.ones(n))
+        if self.options['pattern'] == 'diagonal':
+            self.declare_partials('z', 'x', diagonal=True)
+        else:
+            self.declare_partials('z', 'x', rows=np.arange(n), cols=np.arange(n))
+        self.declare_partials('z', 'y')
+        self._counter = 0
+
+    def compute(self, inputs, outputs):
+        self._counter += 1
+        outputs['z'] = 3.0 * inputs['x'] + np.sum(inputs['y'])
+
+    def compute_partials(self, inputs, partials):
+        n = self.options['n']
+        partials['z', 'x'] = np.full(n, 3.0)
+        partials['z', 'y'] = np.ones((n, n))
+
+
+class CycleComp(om.ExplicitComponent):
+    # y = k x + 0.1 z, with analytic partials.
+
+    def initialize(self):
+        self.options.declare('n', types=int, default=3)
+        self.options.declare('k', default=1.0)
+
+    def setup(self):
+        n = self.options['n']
+        self.add_input('x', np.ones(n))
+        self.add_input('z', np.ones(n))
+        self.add_output('y', np.ones(n))
+        self.declare_partials('y', 'x')
+        self.declare_partials('y', 'z')
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.options['k'] * inputs['x'] + 0.1 * inputs['z']
+
+    def compute_partials(self, inputs, partials):
+        n = self.options['n']
+        partials['y', 'x'] = self.options['k'] * np.eye(n)
+        partials['y', 'z'] = 0.1 * np.eye(n)
+
+
 class TestSemiTotalsSharedInputs(unittest.TestCase):
 
     def build(self, ncomps, method, mode, chain=True, src_indices=None, units=None,
@@ -518,6 +596,84 @@ class TestSemiTotalsSharedInputs(unittest.TestCase):
                 if not assembled:
                     self.assertEqual(self.get_calls(prob, 3), [4] * 3)
                 self.check_totals(prob, method)
+
+    def test_summed_column_denser_than_partial(self):
+        # The summed column of z = 3 x + sum(2 x) is 3 I + 2 ones, which doesn't fit in the
+        # diagonal partial d(z)/d(x) of the component that owns z.
+        n = 3
+        for pattern, assembled, mode, names in product(['diagonal', 'rows'], [False, True],
+                                                       ['fwd', 'rev'], [('c0', 'c1'), ('b', 'a')]):
+            with self.subTest(pattern=pattern, assembled=assembled, mode=mode, names=names):
+                c0, c1 = names
+                prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('ivc', om.IndepVarComp('x', np.array([0.3, 0.7, 1.1])))
+                sub = model.add_subsystem('sub', om.Group())
+                sub.add_subsystem(c0, DoubleComp(n=n, pattern=pattern), promotes_inputs=['x'])
+                sub.add_subsystem(c1, SumCoupledComp(n=n, pattern=pattern),
+                                  promotes_inputs=['x'])
+                sub.connect(f'{c0}.y', f'{c1}.y')
+                model.connect('ivc.x', 'sub.x')
+                model.add_subsystem('obj', om.ExecComp('f = sum(z)', z=np.ones(n)))
+                model.connect(f'sub.{c1}.z', 'obj.z')
+                model.add_design_var('ivc.x')
+                model.add_objective('obj.f')
+                if assembled:
+                    model.linear_solver = om.DirectSolver(assemble_jac=True)
+                sub.approx_totals(method='cs')
+                prob.setup(mode=mode, force_alloc_complex=True)
+                prob.run_model()
+
+                sub._get_subsystem(c0)._counter = sub._get_subsystem(c1)._counter = 0
+                J = prob.compute_totals()
+                assert_near_equal(J['obj.f', 'ivc.x'], np.full((1, n), 9.0), 1e-12)
+
+                # both copies of x are still perturbed in the same runs
+                self.assertEqual(sub._approx_schemes['cs']._nruns_uncolored, n)
+                self.assertEqual(sub._get_subsystem(c0)._counter, n)
+                self.assertEqual(sub._get_subsystem(c1)._counter, n)
+
+                data = prob.check_totals(method='cs', out_stream=None)
+                assert_check_totals(data, atol=1e-10, rtol=1e-10)
+
+    def test_nested_newton_relinearizes_components(self):
+        # A Newton solver inside the approximated group calls compute_partials during every
+        # finite difference sample.  That must not change the approximated columns.
+        n = 3
+        for mode in ('fwd', 'rev'):
+            with self.subTest(mode=mode):
+                prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('ivc', om.IndepVarComp('x', np.linspace(0.2, 0.8, n)))
+                sub = model.add_subsystem('sub', om.Group())
+                inner = sub.add_subsystem('inner', om.Group())
+                inner.add_subsystem('c0', CycleComp(n=n, k=2.0), promotes_inputs=['x'])
+                inner.add_subsystem('c1', CycleComp(n=n, k=3.0), promotes_inputs=['x'])
+                inner.connect('c0.y', 'c1.z')
+                inner.connect('c1.y', 'c0.z')
+                inner.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, atol=1e-12,
+                                                         rtol=1e-14, maxiter=15, iprint=-1)
+                inner.linear_solver = om.DirectSolver()
+                sub.promotes('inner', inputs=['x'])
+                model.connect('ivc.x', 'sub.x')
+                model.add_subsystem('obj', om.ExecComp('f = sum(y)', y=np.ones(n)))
+                model.connect('sub.inner.c1.y', 'obj.y')
+                model.add_design_var('ivc.x')
+                model.add_objective('obj.f')
+                sub.approx_totals(method='fd', step=1e-6)
+                prob.setup(mode=mode, force_alloc_complex=True)
+                prob.run_model()
+
+                J = prob.compute_totals()
+                # y1 = 3 x + 0.1 (2 x + 0.1 y1), so d(y1)/dx = 3.2 / 0.99 on the diagonal
+                assert_near_equal(J['obj.f', 'ivc.x'], np.full((1, n), 3.2 / 0.99), 1e-6)
+                # both copies of x are still perturbed in the same runs
+                wrts = [group[0] for group in sub._approx_schemes['fd']._approx_groups]
+                self.assertIn('sub.inner.c0.x', wrts)
+                self.assertNotIn('sub.inner.c1.x', wrts)
+
+                # the components keep their own analytic partials
+                assert_near_equal(inner.c1._jacobian['y', 'x'], 3.0 * np.eye(n), 1e-15)
 
     def test_issue_3426(self):
         # y = f1(x; alpha), z = f2(x, y; beta), q = f3(z) with f1 and f2 in an approximated group.
