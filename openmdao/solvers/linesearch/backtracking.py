@@ -145,7 +145,7 @@ class LinesearchSolver(NonlinearSolver):
         else:
             self._lower_bounds = self._upper_bounds = None
 
-    def _enforce_bounds(self, step, alpha):
+    def _enforce_bounds(self, step, alpha, u0=None):
         """
         Enforce lower/upper bounds.
 
@@ -157,6 +157,10 @@ class LinesearchSolver(NonlinearSolver):
             Newton step; the backtracking is applied to this vector in-place.
         alpha : float
             Step size parameter.
+        u0 : ndarray or None
+            Output values before the step was added. Used by the scalar method
+            so that clipped entries of the step are computed from the original
+            point rather than from the overshot value.
         """
         system = self._system()
         if not system._has_bounds:
@@ -173,7 +177,7 @@ class LinesearchSolver(NonlinearSolver):
         if method == 'vector':
             _enforce_bounds_vector(system._outputs, step, alpha, lower, upper)
         elif method == 'scalar':
-            _enforce_bounds_scalar(system._outputs, step, alpha, lower, upper)
+            _enforce_bounds_scalar(system._outputs, step, alpha, lower, upper, u0=u0)
         elif method == 'wall':
             _enforce_bounds_wall(system._outputs, step, alpha, lower, upper)
 
@@ -305,9 +309,16 @@ class ArmijoGoldsteinLS(LinesearchSolver):
         self._dir_derivative = -phi0
 
         # Initial step length based on the input step length parameter
+        u0 = None
+        if system._has_bounds and self.options['bound_enforcement'] == 'scalar':
+            # Save the pre-step point so that _enforce_bounds_scalar can set
+            # du from (bound - u0) / alpha. Computing that from the overshot
+            # value injects an error of about eps * |u_bad| (issue #3861).
+            u0 = u.asarray(copy=True)
+
         u.add_scal_vec(alpha, du)
 
-        self._enforce_bounds(step=du, alpha=alpha)
+        self._enforce_bounds(step=du, alpha=alpha, u0=u0)
 
         try:
             cache = self._solver_info.save_cache()
@@ -581,7 +592,7 @@ def _enforce_bounds_vector(u, du, alpha, lower_bounds, upper_bounds):
         du *= 1 - d_alpha / alpha
 
 
-def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
+def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds, u0=None):
     """
     Enforce lower/upper bounds on each scalar separately, then backtrack as a vector.
 
@@ -599,6 +610,12 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
         Lower bounds array.
     upper_bounds : ndarray
         Upper bounds array.
+    u0 : ndarray or None
+        Output values before the step was added. If provided, clipped entries
+        of du are set to (bound - u0) / alpha so that backtracking along du
+        returns toward the original point. If not provided, du is updated with
+        (bound - u_bad) / alpha, which is algebraically equivalent but can be
+        inaccurate when |u_bad| is very large.
     """
     # The assumption is that alpha * step has been added to this vector
     # just prior to this method being called. We are currently in the
@@ -608,12 +625,22 @@ def _enforce_bounds_scalar(u, du, alpha, lower_bounds, upper_bounds):
 
     # enforce bounds on step in-place.
     u_data = u.asarray()
+    du_data = du.asarray()
 
     # Move each u that violates a bound onto that bound, and change du by the
     # same amount. For du, we normalize by alpha since du eventually gets
     # multiplied by alpha.
     change = _clip_to_bounds(u_data, lower_bounds, upper_bounds)
-    du += change / alpha
+    du_data += change / alpha
+
+    # du += (bound - u_bad) / alpha should equal (bound - u0) / alpha, but
+    # change = bound - u_bad carries an absolute error of about eps * |u_bad|.
+    # When the Newton step overshoots by many orders of magnitude, that error
+    # can be as large as the remaining interval. ArmijoGoldsteinLS backtracks
+    # along this du without re-checking bounds (issue #3861).
+    if u0 is not None:
+        finite_clipped = np.isfinite(u_data) & (change != 0)
+        du_data[finite_clipped] = (u_data[finite_clipped] - u0[finite_clipped]) / alpha
 
 
 def _enforce_bounds_wall(u, du, alpha, lower_bounds, upper_bounds):
