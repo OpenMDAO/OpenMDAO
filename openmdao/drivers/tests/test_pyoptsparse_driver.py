@@ -2,7 +2,9 @@
 
 import copy
 import pathlib
+import signal
 import unittest
+import os
 import os.path
 
 from packaging.version import Version
@@ -15,7 +17,7 @@ from openmdao.test_suite.components.expl_comp_array import TestExplCompArrayDens
 from openmdao.test_suite.components.paraboloid import Paraboloid
 from openmdao.test_suite.components.paraboloid_problem import ParaboloidProblem
 from openmdao.test_suite.components.paraboloid_distributed import DistParab
-from openmdao.test_suite.components.sellar import SellarDerivativesGrouped
+from openmdao.test_suite.components.sellar import SellarDerivativesGrouped, SellarNoDerivatives
 from openmdao.utils.assert_utils import assert_near_equal, assert_warning, assert_check_totals
 from openmdao.utils.general_utils import set_pyoptsparse_opt, run_driver
 from openmdao.utils.testing_utils import use_tempdirs, require_pyoptsparse
@@ -3793,6 +3795,178 @@ class TestLinearConstraintUnits(unittest.TestCase):
         # Optimum: c = 2 ft = 0.6096 m, so x = 0.3048 m = 1 ft
         assert_near_equal(prob.get_val('x', units='m'), 0.3048, tolerance=1e-5)
         assert_near_equal(prob.get_val('c', units='ft'), 2.0, tolerance=1e-5)
+
+
+@require_pyoptsparse(optimizer='Egor')
+@use_tempdirs
+class TestPyoptSparseEgor(unittest.TestCase):
+    """Tests of the gradient-free Egor optimizer from egobox (requires pyoptsparse >= 2.17)."""
+
+    def setup_paraboloid(self, comp=None, **con_kwargs):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid() if comp is None else comp, promotes=['*'])
+        model.add_subsystem('con', om.ExecComp('c = - x + y'), promotes=['*'])
+        model.set_input_defaults('x', 50.0)
+        model.set_input_defaults('y', 50.0)
+
+        model.add_design_var('x', lower=-50.0, upper=50.0)
+        model.add_design_var('y', lower=-50.0, upper=50.0)
+        model.add_objective('f_xy')
+        model.add_constraint('c', **con_kwargs)
+
+        prob.driver = pyOptSparseDriver(optimizer='Egor', print_results=False)
+        prob.driver.opt_settings['seed'] = 42
+        prob.driver.opt_settings['max_iters'] = 20
+
+        prob.setup()
+        return prob
+
+    @parameterized.expand([
+        ('upper', {'upper': -15.0}),
+        ('equals', {'equals': -15.0}),
+        ('two_sided', {'lower': -16.0, 'upper': -15.0}),
+        ('linear', {'upper': -15.0, 'linear': True}),
+    ])
+    def test_paraboloid_constrained(self, name, con_kwargs):
+        prob = self.setup_paraboloid(**con_kwargs)
+        result = prob.run_driver()
+
+        self.assertTrue(result.success, "Optimization failed, info = " +
+                                        str(prob.driver.pyopt_solution.optInform))
+        self.assertFalse(prob.driver.supports['gradients'])
+        self.assertEqual(prob.driver.pyopt_solution.userSensCalls, 0)
+
+        # Minimum should be at (7.166667, -7.833334)
+        assert_near_equal(prob['x'], 7.16667, 1e-3)
+        assert_near_equal(prob['y'], -7.83333, 1e-3)
+        assert_near_equal(prob['f_xy'], -27.08333, 1e-3)
+
+    def test_analysis_error(self):
+        # Points raising an AnalysisError are given to Egor as NaN and rejected.
+        prob = self.setup_paraboloid(comp=ParaboloidAE(), upper=-15.0)
+        result = prob.run_driver()
+
+        self.assertTrue(result.success, "Optimization failed, info = " +
+                                        str(prob.driver.pyopt_solution.optInform))
+
+        assert_near_equal(prob['x'], 7.16667, 1e-3)
+        assert_near_equal(prob['y'], -7.83333, 1e-3)
+
+    def test_analysis_error_everywhere(self):
+
+        class AlwaysAE(om.ExplicitComponent):
+
+            def setup(self):
+                self.add_input('x', 1.0)
+                self.add_output('y', 1.0)
+
+            def compute(self, inputs, outputs):
+                raise om.AnalysisError('This comp always fails.')
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', AlwaysAE(), promotes=['*'])
+        prob.model.add_design_var('x', lower=-1.0, upper=1.0)
+        prob.model.add_objective('y')
+
+        prob.driver = pyOptSparseDriver(optimizer='Egor', print_results=False)
+        prob.driver.opt_settings['max_iters'] = 5
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_driver()
+
+        self.assertIn('Objective evaluation failed', str(cm.exception))
+
+    def test_unbounded_desvar(self):
+        prob = om.Problem()
+        model = prob.model
+
+        model.add_subsystem('comp', Paraboloid(), promotes=['*'])
+        model.add_design_var('x', lower=-50.0)
+        model.add_design_var('y', upper=50.0)
+        model.add_objective('f_xy')
+
+        prob.driver = pyOptSparseDriver(optimizer='Egor', print_results=False)
+
+        prob.setup()
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.run_driver()
+
+        self.assertEqual(str(cm.exception),
+                         "pyOptSparseDriver: Egor requires finite lower and upper bounds on all "
+                         "design variables, but the following design variables are unbounded: "
+                         "['x', 'y'].")
+
+    def run_terminated_paraboloid(self, terminate, **driver_options):
+        # The termination is requested at the 7th evaluation, after the initial DOE.
+        class ParaboloidTerminate(Paraboloid):
+            def setup(self):
+                super().setup()
+                self.eval_count = 0
+
+            def compute(self, inputs, outputs):
+                self.eval_count += 1
+                if self.eval_count == 7:
+                    terminate()
+                super().compute(inputs, outputs)
+
+        comp = ParaboloidTerminate()
+        prob = self.setup_paraboloid(comp=comp, upper=-15.0)
+        prob.driver.opt_settings['n_doe'] = 5
+        prob.driver.options.update(driver_options)
+
+        result = prob.run_driver()
+
+        # Egor stops after the current iteration with the INTERRUPT status.
+        self.assertEqual(prob.driver.pyopt_solution.optInform['value'], 3)
+        self.assertFalse(result.success)
+        # The model is only run once more, at the optimum found before termination.
+        self.assertEqual(comp.eval_count, 8)
+
+    def test_keyboard_interrupt(self):
+        def terminate():
+            raise KeyboardInterrupt
+
+        self.run_terminated_paraboloid(terminate)
+
+    @unittest.skipUnless(hasattr(signal, 'SIGUSR1'), 'SIGUSR1 is not available on this platform.')
+    def test_user_terminate_signal(self):
+        def terminate():
+            os.kill(os.getpid(), signal.SIGUSR1)
+
+        self.run_terminated_paraboloid(terminate, user_terminate_signal=signal.SIGUSR1)
+
+    def test_sellar(self):
+        prob = om.Problem()
+        model = prob.model = SellarNoDerivatives(nonlinear_solver=om.NonlinearBlockGS,
+                                                 linear_solver=om.ScipyKrylov)
+
+        model.add_design_var('z', lower=np.array([-10.0, 0.0]), upper=np.array([10.0, 10.0]))
+        model.add_design_var('x', lower=0.0, upper=10.0)
+        model.add_objective('obj')
+        model.add_constraint('con1', upper=0.0)
+        model.add_constraint('con2', upper=0.0)
+
+        prob.set_solver_print(level=0)
+
+        prob.driver = pyOptSparseDriver(optimizer='Egor', print_results=False)
+        prob.driver.opt_settings['seed'] = 0
+        prob.driver.opt_settings['max_iters'] = 30
+
+        prob.setup(check=False, mode='rev')
+        result = prob.run_driver()
+
+        self.assertTrue(result.success, "Optimization failed, info = " +
+                                        str(prob.driver.pyopt_solution.optInform))
+
+        assert_near_equal(prob['z'][0], 1.9776, 1e-3)
+        assert_near_equal(prob['z'][1], 0.0, 1e-3)
+        assert_near_equal(prob['x'], 0.0, 1e-3)
+        assert_near_equal(prob['obj'], 3.18339, 1e-3)
 
 
 if __name__ == "__main__":
