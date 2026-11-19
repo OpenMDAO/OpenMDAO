@@ -454,6 +454,57 @@ class TestBoundsEnforceLSPrecision(unittest.TestCase):
                 self.assertEqual(self._run(method, start=1e12, lower=None, upper=-1e-6), -1e-6)
 
 
+class TestArmijoGoldsteinLSScalarOvershoot(unittest.TestCase):
+    """
+    Regression for a large Newton overshoot with bound_enforcement='scalar'.
+
+    After a step of about -1e12, du += (bound - u_bad) / alpha injects an
+    error of about eps * |u_bad|. Backtracking along that du can leave the
+    bounds. See issue #3861.
+    """
+
+    def test_backtracking_stays_inside_bounds(self):
+        lower = 1e-6
+        upper = 1e-4
+        x0 = 7e-5
+
+        class FlatResidualComp(om.ImplicitComponent):
+
+            def setup(self):
+                self.add_output('x', val=x0, lower=lower, upper=upper)
+                self.declare_partials('x', 'x', val=1e-12)
+                self.visited = []
+
+            def apply_nonlinear(self, inputs, outputs, residuals):
+                self.visited.append(outputs['x'][0])
+                residuals['x'] = 1.0 + 1e-12 * outputs['x']
+
+        prob = om.Problem(reports=False)
+        comp = prob.model.add_subsystem('comp', FlatResidualComp())
+
+        newton = prob.model.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, maxiter=1,
+                                                              iprint=-1, err_on_non_converge=False)
+        prob.model.linear_solver = om.DirectSolver()
+        newton.linesearch = om.ArmijoGoldsteinLS(bound_enforcement='scalar', maxiter=5, iprint=-1)
+
+        prob.setup()
+        prob.run_model()
+
+        for x in comp.visited:
+            self.assertGreaterEqual(x, lower)
+            self.assertLessEqual(x, upper)
+
+        x_final = prob.get_val('comp.x')[0]
+        self.assertGreaterEqual(x_final, lower)
+        self.assertLessEqual(x_final, upper)
+
+        # The corrected step is (lower - x0) / alpha = -6.9e-5, so backtracking
+        # from the bound returns toward x0. After five rho=0.5 contractions the
+        # step length is 0.0625.
+        expected = x0 + 0.0625 * (lower - x0)
+        assert_near_equal(x_final, expected, 1e-12)
+
+
 class TestBoundsEnforceLSArrayBounds(unittest.TestCase):
 
     def setUp(self):
