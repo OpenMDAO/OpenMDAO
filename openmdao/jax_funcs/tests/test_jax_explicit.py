@@ -802,6 +802,8 @@ class TestComputePrimalJittedWithoutLinearize(unittest.TestCase):
             p.model.add_subsystem('rhs', Rhs(use_jit=use_jit), promotes=['*'])
             p.setup()
             p.set_val('x', np.full(6, 0.3))
+            p.final_setup()
+            self.assertEqual(_compute_primal_is_jitted(p.model.rhs), use_jit)
             p.run_model()
             return p
 
@@ -812,20 +814,21 @@ class TestComputePrimalJittedWithoutLinearize(unittest.TestCase):
         assert_near_equal(compiled.get_val('xdot'), plain.get_val('xdot'))
         assert_check_partials(compiled.check_partials(out_stream=None), atol=1e-5)
 
-    def test_static_change_rejits_compute_primal(self):
+    def test_static_change_updates_primal_and_partials(self):
         class Scale(om.JaxExplicitComponent):
             def initialize(self):
                 self.options.declare('mult', default=2.0)
 
             def setup(self):
                 self.add_input('x', val=1.0)
+                self.add_discrete_input('sign', val=1)
                 self.add_output('y', val=1.0)
 
             def get_self_statics(self):
                 return (self.options['mult'],)
 
-            def compute_primal(self, x):
-                return x * self.options['mult']
+            def compute_primal(self, x, sign):
+                return sign * x * self.options['mult']
 
         p = om.Problem(reports=False)
         p.model.add_subsystem('c', Scale(), promotes=['*'])
@@ -835,12 +838,18 @@ class TestComputePrimalJittedWithoutLinearize(unittest.TestCase):
         self.assertTrue(_compute_primal_is_jitted(p.model.c))
         first = p.model.c.compute_primal
         assert_near_equal(p.get_val('y'), 6.0)
+        assert_check_partials(p.check_partials(out_stream=None), atol=1e-5)
+
+        p.set_val('sign', -1)
+        p.run_model()
+        self.assertIs(p.model.c.compute_primal, first)
+        assert_near_equal(p.get_val('y'), -6.0)
+        assert_check_partials(p.check_partials(out_stream=None), atol=1e-5)
 
         p.model.c.options['mult'] = 4.0
         p.run_model()
-        self.assertIsNot(p.model.c.compute_primal, first)
-        self.assertTrue(_compute_primal_is_jitted(p.model.c))
-        assert_near_equal(p.get_val('y'), 12.0)
+        self.assertIs(p.model.c.compute_primal, first)
+        assert_near_equal(p.get_val('y'), -12.0)
         assert_check_partials(p.check_partials(out_stream=None), atol=1e-5)
 
     def test_repeated_compute_keeps_compiled_primal(self):

@@ -44,10 +44,6 @@ class JaxExplicitComponent(ExplicitComponent):
         The function that computes the colored jacobian.
     _static_hash : tuple
         The hash of the static values.
-    _compute_static_hash : int or None
-        Hash of discrete inputs and get_self_statics() for the compute_primal jit.
-        Kept separate from _static_hash. Matrix-free reverse mode stores an
-        input-value cache key there.
     _fwd_jac_func_ : function or None
         Cached, jitted jvp function used by matrix_free 'fwd' mode (see
         _compute_jacvec_product). Primal values are passed in as call arguments rather than
@@ -84,7 +80,6 @@ class JaxExplicitComponent(ExplicitComponent):
         self._sparsity = None
         self._jac_func_ = None
         self._static_hash = None
-        self._compute_static_hash = None
         self._jac_colored_ = None
         self._output_shapes = None
         self._do_shape_check = True
@@ -135,6 +130,7 @@ class JaxExplicitComponent(ExplicitComponent):
         and outputs will use compute_shape.
         """
         _re_init(self)
+        self.compute_primal = self._ret_tuple_compute_primal
 
         if len(self._var_rel_names['input']) > 0 or len(self._var_rel_names['output']) > 0:
             return
@@ -188,6 +184,13 @@ class JaxExplicitComponent(ExplicitComponent):
         This happens in final_setup after all var sizes and partials are set.
         """
         _jax_register_pytree_class(self.__class__)
+
+        if self.options['use_jit']:
+            # Discrete inputs are static arguments. JAX also sees self statics via the pytree.
+            start = self._inputs.nvars() + 1
+            static_argnums = tuple(range(start, start + len(self._discrete_inputs)))
+            primal = jit(self._ret_tuple_compute_primal.__func__, static_argnums=static_argnums)
+            self.compute_primal = MethodType(primal, self)
 
         if not self._discrete_inputs and not self.get_self_statics():
             # avoid unnecessary statics checks
@@ -310,40 +313,11 @@ class JaxExplicitComponent(ExplicitComponent):
         """
         return False
 
-    def _ensure_jitted_compute_primal(self, discrete_inputs):
-        """
-        Jit compute_primal before derivatives are requested.
-
-        _update_jac_functs installs the jitted primal, but only when partials run.
-        A compute-only loop would otherwise keep executing the primal eagerly.
-
-        Parameters
-        ----------
-        discrete_inputs : iter
-            Discrete input values, in the order used by _update_jac_functs.
-        """
-        if self.options['derivs_method'] != 'jax' or not self.options['use_jit']:
-            return
-
-        # Do not call _statics_changed. That writes _static_hash, and matrix-free
-        # reverse mode uses the same attribute as an input-value cache key.
-        inhash = hash((tuple(discrete_inputs) if discrete_inputs else (),
-                       self.get_self_statics()))
-        if inhash == self._compute_static_hash:
-            return
-
-        # Partials close over the previous compute_primal.
-        self._compute_static_hash = inhash
-        self._jac_func_ = None
-        self.compute_primal = self._get_jax_compute_primal(discrete_inputs, True)
-
     def compute(self, inputs, outputs, discrete_inputs=None, discrete_outputs=None):
         if self._do_shape_check:
             _check_output_shapes(self)
             self._do_shape_check = False
 
-        discrete_vals = discrete_inputs.values() if discrete_inputs else ()
-        self._ensure_jitted_compute_primal(discrete_vals)
         super().compute(inputs, outputs, discrete_inputs, discrete_outputs)
 
     def _get_compute_primal_tracing_args(self):
@@ -361,23 +335,6 @@ class JaxExplicitComponent(ExplicitComponent):
         for name in self._var_rel_names['input']:
             args.append(jax.ShapeDtypeStruct(self._var_rel2meta[name]['shape'], jnp.float64))
         return args
-
-    def _get_jax_compute_primal(self, discrete_inputs, need_jit):
-        """
-        Get the jax version of the compute_primal method.
-        """
-        compute_primal = self._ret_tuple_compute_primal.__func__
-
-        if need_jit:
-            # jit the compute_primal method
-            idx = self._inputs.nvars() + 1
-            if discrete_inputs:
-                static_argnums = list(range(idx, idx + len(discrete_inputs)))
-            else:
-                static_argnums = []
-            compute_primal = jit(compute_primal, static_argnums=static_argnums)
-
-        return MethodType(compute_primal, self)
 
     def _update_jac_functs(self, discrete_inputs):
         """
@@ -402,7 +359,6 @@ class JaxExplicitComponent(ExplicitComponent):
             self._jac_func_ = None
 
         if self._jac_func_ is None:
-            self.compute_primal = self._get_jax_compute_primal(discrete_inputs, need_jit)
             differentiable_cp = _get_differentiable_compute_primal(self, discrete_inputs)
 
             if self._coloring_info.use_coloring():
