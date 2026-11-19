@@ -1,4 +1,5 @@
 import unittest
+from itertools import product
 
 import numpy as np
 import openmdao.api as om
@@ -376,6 +377,360 @@ class TestSemiTotalsNumCalls(unittest.TestCase):
             result = prob.run_driver()
 
             self.assertTrue(result.success)
+
+
+class SharedInputComp(om.ExplicitComponent):
+
+    def initialize(self):
+        self.options.declare('n', types=int, default=4)
+        self.options.declare('k', types=float, default=1.0)
+        self.options.declare('units', default=None, allow_none=True)
+
+    def setup(self):
+        n = self.options['n']
+        self.add_input('x', np.ones(n), units=self.options['units'])
+        self.add_input('y_in', 1.0)
+        self.add_output('y', 1.0)
+        self.declare_partials('y', ['x', 'y_in'])
+
+        self._counter = 0
+
+    def compute(self, inputs, outputs):
+        self._counter += 1
+        k = self.options['k']
+        outputs['y'] = k * np.sum(np.sin(inputs['x']) * np.arange(1, inputs['x'].size + 1)) + \
+            inputs['y_in'] ** 2
+
+    def compute_partials(self, inputs, partials):
+        k = self.options['k']
+        partials['y', 'x'] = k * np.cos(inputs['x']) * np.arange(1, inputs['x'].size + 1)
+        partials['y', 'y_in'] = 2.0 * inputs['y_in']
+
+
+class DoubleComp(om.ExplicitComponent):
+    # y = 2 x, with a diagonal (or rows/cols) partial.
+
+    def initialize(self):
+        self.options.declare('n', types=int, default=3)
+        self.options.declare('pattern', values=['diagonal', 'rows'], default='diagonal')
+
+    def setup(self):
+        n = self.options['n']
+        self.add_input('x', np.ones(n))
+        self.add_output('y', np.ones(n))
+        if self.options['pattern'] == 'diagonal':
+            self.declare_partials('y', 'x', diagonal=True)
+        else:
+            self.declare_partials('y', 'x', rows=np.arange(n), cols=np.arange(n))
+        self._counter = 0
+
+    def compute(self, inputs, outputs):
+        self._counter += 1
+        outputs['y'] = 2.0 * inputs['x']
+
+    def compute_partials(self, inputs, partials):
+        partials['y', 'x'] = np.full(self.options['n'], 2.0)
+
+
+class SumCoupledComp(om.ExplicitComponent):
+    # z = 3 x + sum(y), with a diagonal (or rows/cols) partial wrt x and a dense one wrt y.
+
+    def initialize(self):
+        self.options.declare('n', types=int, default=3)
+        self.options.declare('pattern', values=['diagonal', 'rows'], default='diagonal')
+
+    def setup(self):
+        n = self.options['n']
+        self.add_input('x', np.ones(n))
+        self.add_input('y', np.ones(n))
+        self.add_output('z', np.ones(n))
+        if self.options['pattern'] == 'diagonal':
+            self.declare_partials('z', 'x', diagonal=True)
+        else:
+            self.declare_partials('z', 'x', rows=np.arange(n), cols=np.arange(n))
+        self.declare_partials('z', 'y')
+        self._counter = 0
+
+    def compute(self, inputs, outputs):
+        self._counter += 1
+        outputs['z'] = 3.0 * inputs['x'] + np.sum(inputs['y'])
+
+    def compute_partials(self, inputs, partials):
+        n = self.options['n']
+        partials['z', 'x'] = np.full(n, 3.0)
+        partials['z', 'y'] = np.ones((n, n))
+
+
+class CycleComp(om.ExplicitComponent):
+    # y = k x + 0.1 z, with analytic partials.
+
+    def initialize(self):
+        self.options.declare('n', types=int, default=3)
+        self.options.declare('k', default=1.0)
+
+    def setup(self):
+        n = self.options['n']
+        self.add_input('x', np.ones(n))
+        self.add_input('z', np.ones(n))
+        self.add_output('y', np.ones(n))
+        self.declare_partials('y', 'x')
+        self.declare_partials('y', 'z')
+
+    def compute(self, inputs, outputs):
+        outputs['y'] = self.options['k'] * inputs['x'] + 0.1 * inputs['z']
+
+    def compute_partials(self, inputs, partials):
+        n = self.options['n']
+        partials['y', 'x'] = self.options['k'] * np.eye(n)
+        partials['y', 'z'] = 0.1 * np.eye(n)
+
+
+class TestSemiTotalsSharedInputs(unittest.TestCase):
+
+    def build(self, ncomps, method, mode, chain=True, src_indices=None, units=None,
+              approx='sub', assembled=False):
+        prob = om.Problem()
+        model = prob.model
+
+        ivc = model.add_subsystem('ivc', om.IndepVarComp())
+        if src_indices is None:
+            ivc.add_output('x', np.array([0.3, 0.7, 1.1, 1.9]))
+        else:
+            ivc.add_output('x', np.array([0.3, 0.7, 1.1, 1.9, 2.3]))
+
+        sub = model.add_subsystem('sub', om.Group())
+        for i in range(ncomps):
+            comp_units = None if units is None else units[i]
+            comp = SharedInputComp(n=4, k=1.0 + i, units=comp_units)
+            if src_indices is None:
+                sub.add_subsystem(f'c{i}', comp, promotes_inputs=['x'])
+            else:
+                sub.add_subsystem(f'c{i}', comp)
+                model.connect('ivc.x', f'sub.c{i}.x', src_indices=src_indices[i])
+            if chain and i > 0:
+                sub.connect(f'c{i - 1}.y', f'c{i}.y_in')
+
+        if src_indices is None:
+            model.connect('ivc.x', 'sub.x')
+
+        if chain:
+            model.add_subsystem('obj', om.ExecComp('f = 2.0 * y ** 2'))
+            model.connect(f'sub.c{ncomps - 1}.y', 'obj.y')
+        else:
+            terms = ' + '.join(f'y{i} ** 2' for i in range(ncomps))
+            model.add_subsystem('obj', om.ExecComp(f'f = {terms}'))
+            for i in range(ncomps):
+                model.connect(f'sub.c{i}.y', f'obj.y{i}')
+
+        model.add_design_var('ivc.x')
+        model.add_objective('obj.f')
+        model.add_constraint('sub.c0.y', upper=100.0)
+
+        if approx == 'sub':
+            sub.approx_totals(method=method)
+        else:
+            model.approx_totals(method=method)
+
+        if assembled:
+            model.linear_solver = om.DirectSolver(assemble_jac=True)
+
+        prob.setup(mode=mode, force_alloc_complex=True)
+        prob.run_model()
+
+        return prob
+
+    def get_calls(self, prob, ncomps):
+        return [prob.model.sub._get_subsystem(f'c{i}')._counter for i in range(ncomps)]
+
+    def reset_calls(self, prob, ncomps):
+        for i in range(ncomps):
+            prob.model.sub._get_subsystem(f'c{i}')._counter = 0
+
+    def check_totals(self, prob, method):
+        tol = 1e-5 if method == 'fd' else 1e-10
+        data = prob.check_totals(method='cs', out_stream=None)
+        assert_check_totals(data, atol=tol, rtol=tol)
+
+    def test_promoted_input_call_counts(self):
+        # each promoted copy of x should not be perturbed separately, so the number of
+        # compute calls should match the number made when approximating at the top level.
+        for ncomps, method, mode in product([2, 5], ['fd', 'cs'], ['fwd', 'rev']):
+            with self.subTest(ncomps=ncomps, method=method, mode=mode):
+                calls = {}
+                for approx in ('model', 'sub'):
+                    prob = self.build(ncomps, method, mode, approx=approx)
+                    self.reset_calls(prob, ncomps)
+                    prob.compute_totals()
+                    calls[approx] = self.get_calls(prob, ncomps)
+
+                self.assertEqual(calls['sub'], [4] * ncomps)
+                self.assertEqual(calls['sub'], calls['model'])
+
+                self.check_totals(prob, method)
+
+    def test_copies_with_different_src_indices_or_units(self):
+        src_indices = [[0, 1, 2, 3], [1, 2, 3, 4], [0, 1, 2, 3], [1, 2, 3, 4]]
+        units = ['m', 'cm', 'm', 'cm']
+        for method, mode in product(['fd', 'cs'], ['fwd', 'rev']):
+            with self.subTest(method=method, mode=mode, case='src_indices'):
+                prob = self.build(4, method, mode, src_indices=src_indices)
+                self.reset_calls(prob, 4)
+                prob.compute_totals()
+                self.assertEqual(self.get_calls(prob, 4), [8] * 4)
+                self.check_totals(prob, method)
+
+            with self.subTest(method=method, mode=mode, case='units'):
+                prob = self.build(4, method, mode, units=units)
+                self.reset_calls(prob, 4)
+                prob.compute_totals()
+                self.assertEqual(self.get_calls(prob, 4), [8] * 4)
+                self.check_totals(prob, method)
+
+    def test_outputs_depend_on_one_copy(self):
+        # Each output depends on only one of the promoted copies of x.
+        for method, mode, assembled in product(['fd', 'cs'], ['fwd', 'rev'], [False, True]):
+            with self.subTest(method=method, mode=mode, assembled=assembled):
+                prob = self.build(3, method, mode, chain=False, assembled=assembled)
+                self.reset_calls(prob, 3)
+                prob.compute_totals()
+                if not assembled:
+                    self.assertEqual(self.get_calls(prob, 3), [4] * 3)
+                self.check_totals(prob, method)
+
+    def test_summed_column_denser_than_partial(self):
+        # The summed column of z = 3 x + sum(2 x) is 3 I + 2 ones, which doesn't fit in the
+        # diagonal partial d(z)/d(x) of the component that owns z.
+        n = 3
+        for pattern, assembled, mode, names in product(['diagonal', 'rows'], [False, True],
+                                                       ['fwd', 'rev'], [('c0', 'c1'), ('b', 'a')]):
+            with self.subTest(pattern=pattern, assembled=assembled, mode=mode, names=names):
+                c0, c1 = names
+                prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('ivc', om.IndepVarComp('x', np.array([0.3, 0.7, 1.1])))
+                sub = model.add_subsystem('sub', om.Group())
+                sub.add_subsystem(c0, DoubleComp(n=n, pattern=pattern), promotes_inputs=['x'])
+                sub.add_subsystem(c1, SumCoupledComp(n=n, pattern=pattern),
+                                  promotes_inputs=['x'])
+                sub.connect(f'{c0}.y', f'{c1}.y')
+                model.connect('ivc.x', 'sub.x')
+                model.add_subsystem('obj', om.ExecComp('f = sum(z)', z=np.ones(n)))
+                model.connect(f'sub.{c1}.z', 'obj.z')
+                model.add_design_var('ivc.x')
+                model.add_objective('obj.f')
+                if assembled:
+                    model.linear_solver = om.DirectSolver(assemble_jac=True)
+                sub.approx_totals(method='cs')
+                prob.setup(mode=mode, force_alloc_complex=True)
+                prob.run_model()
+
+                sub._get_subsystem(c0)._counter = sub._get_subsystem(c1)._counter = 0
+                J = prob.compute_totals()
+                assert_near_equal(J['obj.f', 'ivc.x'], np.full((1, n), 9.0), 1e-12)
+
+                # both copies of x are still perturbed in the same runs
+                self.assertEqual(sub._approx_schemes['cs']._nruns_uncolored, n)
+                self.assertEqual(sub._get_subsystem(c0)._counter, n)
+                self.assertEqual(sub._get_subsystem(c1)._counter, n)
+
+                data = prob.check_totals(method='cs', out_stream=None)
+                assert_check_totals(data, atol=1e-10, rtol=1e-10)
+
+    def test_nested_newton_relinearizes_components(self):
+        # A Newton solver inside the approximated group calls compute_partials during every
+        # finite difference sample.  That must not change the approximated columns.
+        n = 3
+        for mode in ('fwd', 'rev'):
+            with self.subTest(mode=mode):
+                prob = om.Problem()
+                model = prob.model
+                model.add_subsystem('ivc', om.IndepVarComp('x', np.linspace(0.2, 0.8, n)))
+                sub = model.add_subsystem('sub', om.Group())
+                inner = sub.add_subsystem('inner', om.Group())
+                inner.add_subsystem('c0', CycleComp(n=n, k=2.0), promotes_inputs=['x'])
+                inner.add_subsystem('c1', CycleComp(n=n, k=3.0), promotes_inputs=['x'])
+                inner.connect('c0.y', 'c1.z')
+                inner.connect('c1.y', 'c0.z')
+                inner.nonlinear_solver = om.NewtonSolver(solve_subsystems=False, atol=1e-12,
+                                                         rtol=1e-14, maxiter=15, iprint=-1)
+                inner.linear_solver = om.DirectSolver()
+                sub.promotes('inner', inputs=['x'])
+                model.connect('ivc.x', 'sub.x')
+                model.add_subsystem('obj', om.ExecComp('f = sum(y)', y=np.ones(n)))
+                model.connect('sub.inner.c1.y', 'obj.y')
+                model.add_design_var('ivc.x')
+                model.add_objective('obj.f')
+                sub.approx_totals(method='fd', step=1e-6)
+                prob.setup(mode=mode, force_alloc_complex=True)
+                prob.run_model()
+
+                J = prob.compute_totals()
+                # y1 = 3 x + 0.1 (2 x + 0.1 y1), so d(y1)/dx = 3.2 / 0.99 on the diagonal
+                assert_near_equal(J['obj.f', 'ivc.x'], np.full((1, n), 3.2 / 0.99), 1e-6)
+                # both copies of x are still perturbed in the same runs
+                wrts = [group[0] for group in sub._approx_schemes['fd']._approx_groups]
+                self.assertIn('sub.inner.c0.x', wrts)
+                self.assertNotIn('sub.inner.c1.x', wrts)
+
+                # the components keep their own analytic partials
+                assert_near_equal(inner.c1._jacobian['y', 'x'], 3.0 * np.eye(n), 1e-15)
+
+    def test_issue_3426(self):
+        # y = f1(x; alpha), z = f2(x, y; beta), q = f3(z) with f1 and f2 in an approximated group.
+        nx, ny = 3, 50
+
+        class F1(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(nx))
+                self.add_input('alpha', np.ones(4))
+                self.add_output('y', np.ones(ny))
+                self.declare_partials('*', '*', method='fd')
+                self._counter = 0
+
+            def compute(self, inputs, outputs):
+                self._counter += 1
+                outputs['y'] = np.sin(np.arange(ny) * inputs['x'].sum()) * inputs['alpha'].sum()
+
+        class F2(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(nx))
+                self.add_input('y', np.ones(ny))
+                self.add_input('beta', np.ones(4))
+                self.add_output('z', 1.0)
+                self.declare_partials('*', '*', method='fd')
+                self._counter = 0
+
+            def compute(self, inputs, outputs):
+                self._counter += 1
+                outputs['z'] = (inputs['x'] ** 2).sum() + \
+                    (inputs['y'] ** 2).sum() * inputs['beta'].sum()
+
+        calls = {}
+        for approx in ('sub', 'model'):
+            prob = om.Problem()
+            sub = prob.model.add_subsystem('sub', om.Group(), promotes=['*'])
+            sub.add_subsystem('f1', F1(), promotes=['*'])
+            sub.add_subsystem('f2', F2(), promotes=['*'])
+            prob.model.add_subsystem('f3', om.ExecComp('q = 2.0 * z'), promotes=['*'])
+            if approx == 'sub':
+                sub.approx_totals(method='fd')
+            else:
+                prob.model.approx_totals(method='fd')
+            prob.model.add_design_var('x')
+            prob.model.add_objective('q')
+            prob.setup(force_alloc_complex=True)
+            prob.set_val('x', np.array([0.1, 0.2, 0.3]))
+            prob.run_model()
+
+            sub.f1._counter = sub.f2._counter = 0
+            prob.compute_totals()
+            calls[approx] = (sub.f1._counter, sub.f2._counter)
+
+            data = prob.check_totals(method='cs', out_stream=None)
+            assert_check_totals(data, atol=1e-6, rtol=1e-4)
+
+        self.assertEqual(calls['sub'], (nx, nx))
+        self.assertEqual(calls['sub'], calls['model'])
 
 
 if __name__ == '__main__':
