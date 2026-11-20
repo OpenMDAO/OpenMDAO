@@ -31,6 +31,80 @@ from openmdao.utils.om_warnings import issue_warning, DerivativesWarning, \
 from openmdao.utils.units import convert_units
 
 
+def _sparse_lstsq(mat, rhs, rtol=1.0E-6, max_refine=10):
+    """
+    Solve the least squares problem min ||mat @ x - rhs|| for a sparse matrix.
+
+    If the matrix has full column rank, the solution comes from the augmented system
+
+        [ I      mat ] [ r ]   [ rhs ]
+        [ mat^T   0  ] [ x ] = [  0  ]
+
+    with a sparse LU factorization and iterative refinement, which is repeated for as long as
+    the corrections decrease. Otherwise, or if the refinement does not converge, scipy's lsqr
+    is used with tight tolerances, and a warning is issued if lsqr does not converge. With its
+    default tolerances and iteration limit lsqr can stop with errors of several percent in
+    the solution.
+
+    Parameters
+    ----------
+    mat : scipy.sparse matrix
+        The matrix of the least squares problem, of shape (n, m).
+    rhs : ndarray
+        The right-hand side, of size n.
+    rtol : float
+        The refinement has converged if its last correction is smaller than rtol times the
+        solution of the augmented system.
+    max_refine : int
+        The largest number of refinement steps.
+
+    Returns
+    -------
+    ndarray
+        The solution, of size m.
+    """
+    n, m = mat.shape
+    rhs = np.asarray(rhs, dtype=float).ravel()
+
+    if m <= n:
+        aug = sp.block_array([[sp.identity(n, format='csc'), mat], [mat.T, None]], format='csc')
+        aug_rhs = np.concatenate([rhs, np.zeros(m)])
+        try:
+            lu = sp.linalg.splu(aug)
+            pivots = np.abs(lu.U.diagonal())
+            rank_deficient = pivots.min() <= 1.0E-13 * pivots.max()
+        except RuntimeError:
+            rank_deficient = True
+
+        # If the matrix is rank deficient, for example because of dependent constraints, the
+        # solution is not unique and lsqr gives the one of least norm.
+        if not rank_deficient:
+            sol = lu.solve(aug_rhs)
+            last_norm = np.inf
+            for _ in range(max_refine):
+                step = lu.solve(aug_rhs - aug @ sol)
+                step_norm = np.linalg.norm(step)
+                if not np.isfinite(step_norm) or step_norm >= last_norm:
+                    # The corrections no longer decrease: the refinement has reached the
+                    # accuracy of the factorization, or it diverges.
+                    break
+                sol += step
+                last_norm = step_norm
+
+            if last_norm <= rtol * np.linalg.norm(sol):
+                return sol[n:]
+
+    result = sp.linalg.lsqr(mat, rhs, atol=1.0E-14, btol=1.0E-14, iter_lim=max(10000, 100 * m))
+    if result[1] in (3, 7):
+        reason = 'reached its iteration limit' if result[1] == 7 else \
+            'stopped because the system is ill-conditioned'
+        issue_warning(f'The sparse least squares solve for the Lagrange multipliers {reason}. '
+                      'The multipliers may be inaccurate. Use use_sparse_solve=False for a '
+                      'dense solve.', category=DriverWarning)
+
+    return result[0]
+
+
 class DriverResult():
     """
     A container that stores information pertaining to the result of a driver execution.
@@ -2037,8 +2111,9 @@ class Driver(object, metaclass=DriverMetaclass):
             The feasibility tolerance under which the optimization was run. If None, attempt
             to determine this automatically based on the specified optimizer settings.
         use_sparse_solve : bool
-            If True, use scipy.sparse.linalg.lstsq to solve for the multipliers. Otherwise, numpy
-            will be used with dense arrays.
+            If True, solve for the multipliers with a sparse factorization of the least squares
+            problem (scipy.sparse.linalg.lsqr if the active constraints are dependent).
+            Otherwise, numpy.linalg.lstsq will be used with dense arrays.
 
         Returns
         -------
@@ -2129,10 +2204,9 @@ class Driver(object, metaclass=DriverMetaclass):
             active_cons_mat = np.block(active_jac_blocks)
 
         if use_sparse_solve:
-            lstsq_sol = sp.linalg.lsqr(active_cons_mat.T, -grad_f_vec)
+            multipliers_vec = _sparse_lstsq(active_cons_mat.T, -grad_f_vec)
         else:
-            lstsq_sol = np.linalg.lstsq(active_cons_mat.T, -grad_f_vec, rcond=None)
-        multipliers_vec = lstsq_sol[0]
+            multipliers_vec = np.linalg.lstsq(active_cons_mat.T, -grad_f_vec, rcond=None)[0]
 
         dv_multipliers = dict()
         con_multipliers = dict()
