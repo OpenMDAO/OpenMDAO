@@ -75,8 +75,9 @@ class HessianAutoscaler(AutoscalerBase):
 
     Attributes
     ----------
-    num_modes : int
-        Number of eigenpairs used for Hessian-based scaling.
+    num_modes : int or None
+        Number of eigenpairs used for Hessian-based scaling. If None at instantiation, a
+        default is computed during setup as min(16, max(1, n_vars - 2)).
     grad_fd_step : float
         Finite difference step used to approximate Hessian-vector products.
     use_scipy_eigs : bool
@@ -112,15 +113,17 @@ class HessianAutoscaler(AutoscalerBase):
         Last retained |eigenvalue|^(1/2), which scales the complement of the modes in M^{-1}.
     """
     
-    def __init__(self, num_modes, num_krylov=None, grad_fd_step=1e-6, use_scipy_eigs=False,
+    def __init__(self, num_modes=None, num_krylov=None, grad_fd_step=1e-6, use_scipy_eigs=False,
                  start_vec=None):
         """
         Initialize the HessianAutoscaler with the specified parameters.
-        
+
         Parameters
         ----------
-        num_modes : int
-            The number of eigenpairs used for the Hessian-based scaling
+        num_modes : int, optional
+            The number of eigenpairs used for the Hessian-based scaling. If not given, a
+            default of min(16, max(1, n_vars - 2)) is computed during setup, where n_vars
+            is the total size of the continuous design variables.
         num_krylov : int, optional
             The number of Krylov iterations for the Arnoldi method (default is 2*num_modes).
             Must be at least num_modes.
@@ -139,11 +142,12 @@ class HessianAutoscaler(AutoscalerBase):
         self.grad_fd_step = grad_fd_step
         self.use_scipy_eigs = use_scipy_eigs
         self.start_vec = start_vec
-        if num_krylov is None:
-            num_krylov = 2*num_modes
-        elif num_krylov < num_modes:
-            raise ValueError(f'HessianAutoscaler: num_krylov ({num_krylov}) must be at least '
-                             f'num_modes ({num_modes}).')
+        if num_modes is not None:
+            if num_krylov is None:
+                num_krylov = 2 * num_modes
+            elif num_krylov < num_modes:
+                raise ValueError(f'HessianAutoscaler: num_krylov ({num_krylov}) must be at '
+                                 f'least num_modes ({num_modes}).')
         self.num_krylov = num_krylov
         self.eigenvals_m = None
         self.eigenvecs_m = None
@@ -203,6 +207,15 @@ class HessianAutoscaler(AutoscalerBase):
         x0_vec.update_from_model(driver, driver_scaling=False)
         x0 = x0_vec.asarray().copy()
         self.n_vars = x0.size
+
+        if self.num_modes is None:
+            self.num_modes = min(16, max(1, self.n_vars - 2))
+
+            if self.num_krylov is None:
+                self.num_krylov = 2 * self.num_modes
+            elif self.num_krylov < self.num_modes:
+                raise ValueError(f'HessianAutoscaler: num_krylov ({self.num_krylov}) must be '
+                                 f'at least num_modes ({self.num_modes}).')
 
         if self.num_modes > self.n_vars:
             raise RuntimeError('Number of modes cannot exceed the number of design variables. '

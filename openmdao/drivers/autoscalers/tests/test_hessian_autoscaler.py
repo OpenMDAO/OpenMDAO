@@ -123,7 +123,43 @@ class TestHessianAutoscaler(unittest.TestCase):
         np.testing.assert_allclose(
             prob.get_val('f'), 0.0, rtol=0.0, atol=1e-10,
         )
-        
+
+    def test_default_num_modes(self):
+        """Verify that num_modes defaults to min(16, max(1, n_vars - 2)) during setup."""
+        H = self.Q @ np.diag(self.eigs) @ self.Q.T
+
+        class Quadratic(om.ExplicitComponent):
+            """Quadratic objective with an exact gradient."""
+
+            def setup(self):
+                self.add_input('x', val=np.ones(4))
+                self.add_output('f', val=0.0)
+                self.declare_partials('f', 'x')
+
+            def compute(self, inputs, outputs):
+                x = inputs['x']
+                outputs['f'] = 0.5 * x @ H @ x
+
+            def compute_partials(self, inputs, partials):
+                partials['f', 'x'] = (H @ inputs['x']).reshape(1, 4)
+
+        prob = om.Problem(reports=False)
+        self.addCleanup(prob.cleanup)
+
+        prob.model.add_subsystem('quad', Quadratic(), promotes=['*'])
+        prob.model.add_design_var('x')
+        prob.model.add_objective('f')
+
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP', disp=False)
+        autoscaler = prob.driver.autoscaler = HessianAutoscaler(start_vec=self.start_vec)
+
+        prob.setup()
+        prob.run_model()
+
+        # There are 4 design variables, so the default is min(16, max(1, 4 - 2)) = 2.
+        self.assertEqual(autoscaler.num_modes, 2)
+        self.assertEqual(autoscaler.num_krylov, 4)
+
     def test_multiple_dvs_with_nonlinear_constraints(self):
         """Verify that the autoscaler works with and preserves the optimum of a 
         problem with multiple DVs and nonlinear constraints."""
