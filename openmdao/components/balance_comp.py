@@ -247,8 +247,8 @@ class BalanceComp(ImplicitComponent):
                         _dscale_drhs = -np.sign(rhs) / rhs**2
                 else:
                     # Indices where the rhs is near zero or not near zero
-                    idxs_nz = np.where(absrhs < 2)[0]
-                    idxs_nnz = np.where(absrhs >= 2)[0]
+                    idxs_nz = np.where(absrhs < 2)
+                    idxs_nnz = np.where(absrhs >= 2)
 
                     # scale factor that normalizes by the rhs, except near 0
                     _scale_factor[idxs_nnz] = 1.0 / absrhs[idxs_nnz]

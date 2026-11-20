@@ -495,6 +495,60 @@ class TestProblemCheckPartials(unittest.TestCase):
         compdata, _ = pt2.check_partials(out_stream=None)
         compare_prob_vs_comp_check_partials(data, compdata, pt2)
 
+    def test_sparse_matrix_val(self):
+        # issue #3179: partials declared with a scipy sparse matrix as val lost entries
+        from scipy.sparse import lil_matrix
+
+        class QuadPoly(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('xu', shape_by_conn=True)
+                self.add_input('yu', shape_by_conn=True, copy_shape='xu')
+                self.add_input('xl', shape_by_conn=True, copy_shape='xu')
+                self.add_input('yl', shape_by_conn=True, copy_shape='xu')
+                self.add_output('P', compute_shape=lambda shapes: (shapes['xu'][0] - 1, 4, 2))
+
+            def setup_partials(self):
+                n = self._get_var_meta('xu', 'size')
+                dP_dxl = lil_matrix((8 * (n - 1), n), dtype=int)
+                dP_dyl = lil_matrix((8 * (n - 1), n), dtype=int)
+                dP_dxu = np.zeros((n - 1, 4, 2, n))
+                dP_dyu = np.zeros((n - 1, 4, 2, n))
+                for i in range(n - 1):
+                    dP_dxl[8 * i, i] = dP_dxl[8 * i + 2, i + 1] = 1
+                    dP_dyl[8 * i + 1, i] = dP_dyl[8 * i + 3, i + 1] = 1
+                    dP_dxu[i, 3, 0, i] = dP_dxu[i, 2, 0, i + 1] = 1
+                    dP_dyu[i, 3, 1, i] = dP_dyu[i, 2, 1, i + 1] = 1
+                self.declare_partials('P', 'xl', val=dP_dxl.tocsr())
+                self.declare_partials('P', 'yl', val=dP_dyl.tocsr())
+                self.declare_partials('P', 'xu', val=dP_dxu.reshape(8 * (n - 1), n))
+                self.declare_partials('P', 'yu', val=dP_dyu.reshape(8 * (n - 1), n))
+                self.expected = {'xl': dP_dxl.toarray(), 'yl': dP_dyl.toarray(),
+                                 'xu': dP_dxu.reshape(8 * (n - 1), n),
+                                 'yu': dP_dyu.reshape(8 * (n - 1), n)}
+
+            def compute(self, inputs, outputs):
+                P = outputs['P']
+                P[:, 0, 0], P[:, 1, 0] = inputs['xl'][:-1], inputs['xl'][1:]
+                P[:, 2, 0], P[:, 3, 0] = inputs['xu'][1:], inputs['xu'][:-1]
+                P[:, 0, 1], P[:, 1, 1] = inputs['yl'][:-1], inputs['yl'][1:]
+                P[:, 2, 1], P[:, 3, 1] = inputs['yu'][1:], inputs['yu'][:-1]
+
+        p = om.Problem()
+        indeps = p.model.add_subsystem('indeps', om.IndepVarComp(), promotes=['*'])
+        indeps.add_output('xl', [0.0, 1.23, 2.0])
+        indeps.add_output('xu', [0.0, 1.0, 2.0])
+        indeps.add_output('yl', [-1.0, -1.0, -1.0])
+        indeps.add_output('yu', [1.0, 1.0, 1.0])
+        comp = p.model.add_subsystem('quadpoly', QuadPoly(), promotes=['*'])
+        p.setup()
+        p.run_model()
+
+        for _ in range(2):  # the issue reported different results for a second call
+            data = p.check_partials(out_stream=None)
+            assert_check_partials(data, atol=1e-6, rtol=1e-6)
+            for wrt, expected in comp.expected.items():
+                assert_near_equal(data['quadpoly'][('P', wrt)]['J_fwd'], expected, 1e-8)
+
     def test_matrix_free_explicit(self):
         prob = om.Problem()
 
@@ -528,6 +582,184 @@ class TestProblemCheckPartials(unittest.TestCase):
 
         data = prob.check_partials(out_stream=None)
         assert_check_partials(data)
+
+    def test_constant_partials_unchanged(self):
+        # check_partials must not write its finite difference values into partials
+        # that were declared with a constant val
+        A = np.array([[1.0, 2.0, 0.0], [0.0, 3.0, 4.0]])
+
+        class Lin(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(3))
+                self.add_output('y', np.ones(2))
+                self.add_output('z', np.ones(3))
+                self.declare_partials('y', 'x', val=A)
+                self.declare_partials('z', 'x', rows=np.arange(3), cols=np.arange(3),
+                                      val=[5.0, 6.0, 7.0])
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = A @ inputs['x']
+                outputs['z'] = np.array([5.0, 6.0, 7.0]) * inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('lin', Lin(), promotes=['*'])
+        p.setup()
+        p.set_val('x', [0.3, 1.7, -2.2])
+        p.run_model()
+
+        for _ in range(2):
+            data = p.check_partials(out_stream=None, method='fd')
+            assert_check_partials(data, atol=1e-6, rtol=1e-6)
+            np.testing.assert_array_equal(data['lin'][('y', 'x')]['J_fwd'], A)
+            np.testing.assert_array_equal(data['lin'][('z', 'x')]['J_fwd'],
+                                          np.diag([5.0, 6.0, 7.0]))
+
+        totals = p.compute_totals(['y', 'z'], ['x'])
+        np.testing.assert_array_equal(totals[('y', 'x')], A)
+        np.testing.assert_array_equal(totals[('z', 'x')], np.diag([5.0, 6.0, 7.0]))
+
+    def test_constant_partials_unchanged_directional(self):
+        # a directional check must not write the directional derivative into the first
+        # column of a partial that was declared with a constant val
+        A = np.array([[1.0, 2.0, 0.0], [0.0, 3.0, 4.0]])
+
+        class Lin(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(3))
+                self.add_output('y', np.ones(2))
+                self.declare_partials('y', 'x', val=A)
+                self.set_check_partial_options(wrt='x', directional=True)
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = A @ inputs['x']
+
+        p = om.Problem()
+        p.model.add_subsystem('lin', Lin(), promotes=['*'])
+        p.setup()
+        p.set_val('x', [0.3, 1.7, -2.2])
+        p.run_model()
+
+        for _ in range(2):
+            data = p.check_partials(out_stream=None, method='fd')
+            assert_check_partials(data, atol=1e-6, rtol=1e-6)
+
+        totals = p.compute_totals(['y'], ['x'])
+        np.testing.assert_array_equal(totals[('y', 'x')], A)
+
+    def test_directional_rows_cols_fd_column(self):
+        # for a partial declared with rows and cols, the directional J_fd must be the whole
+        # finite difference column, not only its entries in the first column of the pattern
+        x0 = np.array([0.5, -1.5, 2.0])
+        cases = [
+            # diagonal pattern, analytic value of entry 1 is wrong (2 * x instead of x)
+            (np.arange(3), np.arange(3), lambda x: 0.5 * x ** 2,
+             lambda x: x * np.array([1.0, 2.0, 1.0]), x0),
+            # 4 nonzeros in 3 rows
+            ([0, 0, 1, 2], [0, 1, 1, 2], lambda x: np.array([x[0] + 2.0 * x[1], 3.0 * x[1],
+                                                             4.0 * x[2] ** 2]),
+             lambda x: np.array([1.0, 2.0, 3.0, 8.0 * x[2]]), np.array([3.0, 3.0, 16.0])),
+        ]
+        for rows, cols, func, partial, fd_expected in cases:
+            class Comp(om.ExplicitComponent):
+                def setup(self):
+                    self.add_input('x', np.ones(3))
+                    self.add_output('y', np.ones(3))
+                    self.declare_partials('y', 'x', rows=rows, cols=cols)
+                    self.set_check_partial_options('x', method='fd', directional=True)
+
+                def compute(self, inputs, outputs):
+                    outputs['y'] = func(inputs['x'])
+
+                def compute_partials(self, inputs, partials):
+                    partials['y', 'x'] = partial(inputs['x'])
+
+            p = om.Problem()
+            p.model.add_subsystem('comp', Comp())
+            p.setup()
+            p.set_val('comp.x', x0)
+            p.run_model()
+
+            data = p.check_partials(out_stream=None)
+            J_fd = data['comp'][('y', 'x')]['J_fd']
+            J_fd = J_fd[0] if isinstance(J_fd, list) else J_fd
+            np.testing.assert_allclose(J_fd.ravel(), fd_expected, rtol=1e-5)
+
+    def test_directional_matrix_free_undeclared_subjacs(self):
+        # A matrix-free component declares no partials, so _CheckingJacobian creates a
+        # (nrows, 1) subjac for each directional key in its own copy of the subjac metadata.
+        # Those must hold the full FD column, and must not be added to the component.
+        A = np.array([[1.0, 2.0, 0.0], [0.0, 3.0, 4.0]])   # y: 2 rows, x: 3 cols
+        B = np.array([[2.0, -1.0], [0.5, 1.0], [0.0, 3.0]])  # z: 3 rows, w: 2 cols
+
+        class MatFree(om.ExplicitComponent):
+            def setup(self):
+                self.add_input('x', np.ones(3))
+                self.add_input('w', np.ones(2))
+                self.add_output('y', np.ones(2))
+                self.add_output('z', np.ones(3))
+                # complex step, so the random direction can't push the FD error past the
+                # tolerances below
+                self.set_check_partial_options(wrt='*', directional=True, method='cs')
+
+            def compute(self, inputs, outputs):
+                outputs['y'] = A @ inputs['x']
+                outputs['z'] = B @ inputs['w'] + inputs['x'] ** 2
+
+            def compute_jacvec_product(self, inputs, d_inputs, d_outputs, mode):
+                x = inputs['x']
+                if mode == 'fwd':
+                    if 'y' in d_outputs and 'x' in d_inputs:
+                        d_outputs['y'] += A @ d_inputs['x']
+                    if 'z' in d_outputs:
+                        if 'w' in d_inputs:
+                            d_outputs['z'] += B @ d_inputs['w']
+                        if 'x' in d_inputs:
+                            d_outputs['z'] += 2.0 * x * d_inputs['x']
+                else:
+                    if 'y' in d_outputs and 'x' in d_inputs:
+                        d_inputs['x'] += A.T @ d_outputs['y']
+                    if 'z' in d_outputs:
+                        if 'w' in d_inputs:
+                            d_inputs['w'] += B.T @ d_outputs['z']
+                        if 'x' in d_inputs:
+                            d_inputs['x'] += 2.0 * x * d_outputs['z']
+
+        p = om.Problem(reports=False)
+        comp = p.model.add_subsystem('comp', MatFree(), promotes=['*'])
+        p.setup(force_alloc_complex=True)
+        p.set_val('x', [0.3, 1.7, -2.2])
+        p.set_val('w', [0.5, -1.0])
+        p.run_model()
+
+        subjacs_before = dict(comp._subjacs_info)
+
+        # run twice: the second call must not see state left over from the first
+        for _ in range(2):
+            data = p.check_partials(out_stream=None)
+            assert_check_partials(data, atol=1e-10, rtol=1e-10)
+
+            for (of, wrt), nrows in [(('y', 'x'), 2), (('z', 'x'), 3), (('z', 'w'), 3)]:
+                deriv = data['comp'][of, wrt]
+                J_fd = deriv['J_fd']
+                J_fd = J_fd[0] if isinstance(J_fd, list) else J_fd
+                # a directional result is one dense column with a row per output entry
+                self.assertEqual(J_fd.shape, (nrows, 1))
+                assert_near_equal(J_fd, deriv['J_fwd'], 1e-10)
+
+                # dot product test between the approximated column and the reverse product
+                dhat_d, mhat_m = deriv['directional_fd_rev']
+                assert_near_equal(dhat_d, mhat_m, 1e-10)
+
+            # (y, w) has no dependence; it may be omitted or reported as zero
+            if ('y', 'w') in data['comp']:
+                J_fd = data['comp']['y', 'w']['J_fd']
+                J_fd = J_fd[0] if isinstance(J_fd, list) else J_fd
+                assert_near_equal(J_fd, np.zeros((2, 1)), 1e-12)
+
+            # the subjacs created for the check stay in the checking jacobian
+            self.assertEqual(set(comp._subjacs_info), set(subjacs_before))
+            for key, meta in subjacs_before.items():
+                self.assertIs(comp._subjacs_info[key], meta)
 
     def test_implicit_undeclared(self):
         # Test to see that check_partials works when state_wrt_input and state_wrt_state

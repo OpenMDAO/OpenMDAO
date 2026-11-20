@@ -27,9 +27,6 @@ class Autoscaler(AutoscalerBase):
         ----------
         driver : Driver
             The driver associated with this autoscaler.
-        model_has_run: bool
-            True if setup is being called after the model has been run. If not,
-            and setup requires run model, it will be executed within setup.
         """
         from openmdao.core.driver import RecordingDebugging
 
