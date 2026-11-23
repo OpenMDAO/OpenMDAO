@@ -108,6 +108,8 @@ runs:
         echo "============================================================="
         tar -czf "${ARCHIVE}" \
           -C openmdao/docs/_executed_book/_build \
+          --exclude='html/.doctrees' \
+          --exclude='html/_sources' \
           --transform "s|^html|openmdao-${TAG}-docs|" \
           html
         gh release upload "${TAG}" "${ARCHIVE}" --clobber --repo "${GITHUB_REPOSITORY}"
