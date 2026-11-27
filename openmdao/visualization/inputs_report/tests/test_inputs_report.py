@@ -1,5 +1,7 @@
 """Test the inputs report. """
 import unittest
+from pathlib import Path
+
 import numpy as np
 
 import openmdao.api as om
@@ -17,6 +19,44 @@ except ImportError:
 
 @use_tempdirs
 class TestInputsReport(unittest.TestCase):
+
+    def test_tabulator_tooltips(self):
+        """Show absolute input and source names when hovering over their cells."""
+        try:
+            from playwright.sync_api import Error, expect, sync_playwright
+        except ImportError:
+            self.skipTest("Test requires the 'playwright' package.")
+
+        prob = om.Problem(reports=False)
+        prob.model.add_subsystem('indep', om.IndepVarComp('x', 2.0),
+                                 promotes_outputs=[('x', 'source')])
+        prob.model.add_subsystem('comp', om.ExecComp('y = 2 * x'),
+                                 promotes_inputs=[('x', 'target')])
+        prob.model.connect('source', 'target')
+        prob.setup()
+        prob.run_model()
+
+        outfile = Path('inputs.html').resolve()
+        inputs_report(prob, display=False, outfile=outfile)
+
+        with sync_playwright() as playwright:
+            try:
+                browser = playwright.chromium.launch()
+            except Error as err:
+                if "Executable doesn't exist" not in str(err):
+                    raise
+                self.skipTest("Test requires Playwright's Chromium browser.")
+
+            page = browser.new_page()
+            errors = []
+            page.on('pageerror', lambda error: errors.append(error.message))
+            page.goto(outfile.as_uri())
+            tooltip = page.locator('.tabulator-tooltip')
+            page.get_by_role('gridcell', name='target', exact=True).hover()
+            expect(tooltip).to_have_text('comp.x')
+            page.get_by_role('gridcell', name='source', exact=True).hover()
+            expect(tooltip).to_have_text('indep.x')
+            self.assertEqual(errors, [])
 
     def test_inputs_reports(self):
         prob = om.Problem(model=DoubleSellar(), reports=None)
