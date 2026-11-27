@@ -3390,6 +3390,11 @@ class Group(System):
             msg = f"{self.msginfo}: semi-total coloring is currently not supported."
             raise RuntimeError(msg)
 
+        if len(set(g[1:] for g in self._coloring_info.wrt_groups)) > 1:
+            raise RuntimeError(f"{self.msginfo}: declare_coloring was called more than once with "
+                               "different method, form or step, but a Group can only use one "
+                               "approximation scheme.")
+
     def _update_approx_coloring_meta(self, meta):
         """
         Update metadata for a subjac based on coloring metadata.

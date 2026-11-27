@@ -1577,6 +1577,12 @@ class System(object, metaclass=SystemMetaclass):
         """
         Set options for deriv coloring of a set of wrt vars matching the given pattern(s).
 
+        This can be called more than once with different wrt patterns, for example to use a
+        different method for different variables.  The columns matching each call are colored
+        separately.  If a variable matches the wrt patterns of more than one call, the last call
+        wins.  A call with the same wrt patterns as an earlier call replaces it.  All other
+        options apply to the coloring as a whole and are taken from the last call.
+
         Parameters
         ----------
         wrt : str or list of str
@@ -1614,6 +1620,16 @@ class System(object, metaclass=SystemMetaclass):
             raise RuntimeError(
                 "{}: method must be one of ['fd', 'cs', 'jax'].".format(self.msginfo))
 
+        wrt_patterns = (wrt, ) if isinstance(wrt, str) else tuple(wrt)
+
+        # keep earlier calls unless they used the same wrt patterns
+        wrt_groups = [g for g in self._coloring_info.wrt_groups if g[0] != wrt_patterns]
+        wrt_groups.append((wrt_patterns, method, form, step))
+
+        if len(wrt_groups) > 1 and 'jax' in [g[1] for g in wrt_groups]:
+            raise RuntimeError(f"{self.msginfo}: declare_coloring with method='jax' can't be "
+                               "combined with other calls to declare_coloring.")
+
         self._has_approx = True
 
         # start with defaults
@@ -1632,10 +1648,8 @@ class System(object, metaclass=SystemMetaclass):
 
         options.coloring = self._coloring_info.coloring
 
-        if isinstance(wrt, str):
-            options.wrt_patterns = (wrt, )
-        else:
-            options.wrt_patterns = tuple(wrt)
+        options.wrt_patterns = tuple(dict.fromkeys(p for g in wrt_groups for p in g[0]))
+        options.wrt_groups = tuple(wrt_groups)
         options.method = method
         options.per_instance = per_instance
         options.num_full_jacs = num_full_jacs
@@ -2022,10 +2036,13 @@ class System(object, metaclass=SystemMetaclass):
 
         if self.uses_approx():
             direction = 'fwd'
+            # columns from different declare_coloring calls must not share a color
+            col_partition = info._get_col_partition(self)
         else:
             direction = self.best_partial_deriv_direction()
+            col_partition = None
 
-        coloring = _compute_coloring(sparsity, direction)
+        coloring = _compute_coloring(sparsity, direction, col_partition=col_partition)
         coloring._resolver = self._resolver
 
         if not self._finalize_coloring(coloring, info, sp_info, sparsity_time):
@@ -2124,9 +2141,9 @@ class System(object, metaclass=SystemMetaclass):
                                     info.wrt_patterns))
             info.update(info.coloring._meta)
             if self.uses_approx():
-                approx = self._get_approx_scheme(info['method'])
                 # force regen of approx groups during next compute_approximations
-                approx._reset()
+                for approx in self._approx_schemes.values():
+                    approx._reset()
         elif isinstance(static, Coloring):
             info.coloring = coloring = static
 

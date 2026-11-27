@@ -14,6 +14,7 @@ import webbrowser
 from importlib.util import find_spec
 import inspect
 from itertools import combinations, groupby
+from collections import defaultdict
 from contextlib import contextmanager
 from pprint import pprint
 from packaging.version import Version
@@ -520,6 +521,9 @@ class Partial_ColoringMeta(ColoringMeta):
         Filename where coloring is stored.
     wrt_matches : set of str or None
         Where matched wrt names are stored.
+    wrt_groups : tuple of tuple
+        One (wrt_patterns, method, form, step) entry for each call to declare_coloring.
+        Columns matching different entries are never given the same color.
     """
 
     _meta_names = {'wrt_patterns', 'per_instance', 'method', 'form', 'step'}
@@ -548,6 +552,7 @@ class Partial_ColoringMeta(ColoringMeta):
         self.per_instance = per_instance
         self.fname = None
         self.wrt_matches = None
+        self.wrt_groups = ()
 
     @property
     def wrt_patterns(self):
@@ -628,6 +633,60 @@ class Partial_ColoringMeta(ColoringMeta):
                              "options: {}.".format(self.msginfo, self.wrt_patterns))
 
         return self.wrt_matches
+
+    def _get_wrt2group(self, system):
+        """
+        Map each matching wrt variable to the index of the declare_coloring call it belongs to.
+
+        If a variable matches the wrt patterns of more than one call, the last call wins.
+
+        Parameters
+        ----------
+        system : System
+            System being colored.
+
+        Returns
+        -------
+        dict or None
+            Mapping of absolute wrt name to an index into wrt_groups, or None if declare_coloring
+            was called at most once.
+        """
+        if len(self.wrt_groups) < 2:
+            return None
+
+        prefix = system.pathname + '.' if system.pathname else ''
+        wrts = list(system._promoted_wrt_iter())
+        wrt2group = {}
+        for i, (patterns, _, _, _) in enumerate(self.wrt_groups):
+            for name in pattern_filter(patterns, wrts):
+                wrt2group[prefix + name] = i
+
+        return wrt2group
+
+    def _get_col_partition(self, system):
+        """
+        Return the columns of the colored jacobian grouped by declare_coloring call.
+
+        Parameters
+        ----------
+        system : System
+            System being colored.
+
+        Returns
+        -------
+        list of ndarray or None
+            Column indices for each declare_coloring call, or None if declare_coloring was called
+            at most once.
+        """
+        wrt2group = self._get_wrt2group(system)
+        if wrt2group is None:
+            return None
+
+        partition = defaultdict(list)
+        for wrt, start, end, _, _, _ in system._get_jac_wrts(self.wrt_matches):
+            partition[wrt2group.get(wrt)].append(np.arange(start, end, dtype=INT_DTYPE))
+
+        return [np.concatenate(cols) for cols in partition.values()]
 
     def update(self, dct):
         """
@@ -3014,7 +3073,7 @@ def _get_total_jac_sparsity(prob, num_full_jacs=_DEF_COMP_SPARSITY_ARGS['num_ful
     return coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=shape), spmeta
 
 
-def _compute_coloring(J, mode, direct=True):
+def _compute_coloring(J, mode, direct=True, col_partition=None):
     """
     Compute a good coloring in a specified dominant direction.
 
@@ -3028,6 +3087,10 @@ def _compute_coloring(J, mode, direct=True):
     direct : bool
         If True and doing bidirectional coloring, use the direct method to compute the column
         adjacency matrix of partitions, else use the substitution method.
+    col_partition : list of ndarray or None
+        If not None, groups of column indices (row indices if mode is 'rev') that are colored
+        separately, so that no color contains indices from more than one group.  Not supported
+        if mode is 'auto'.
 
     Returns
     -------
@@ -3041,6 +3104,8 @@ def _compute_coloring(J, mode, direct=True):
         start_mem = None
 
     if mode == 'auto':  # use bidirectional coloring
+        if col_partition is not None:
+            raise RuntimeError("col_partition is not supported for bidirectional coloring.")
         if isinstance(J, np.ndarray):
             nzrows, nzcols = np.nonzero(J)
             J = coo_matrix((np.ones(nzrows.size, dtype=bool), (nzrows, nzcols)), shape=J.shape)
@@ -3079,7 +3144,14 @@ def _compute_coloring(J, mode, direct=True):
         J = coo_matrix((np.ones(nzrows.size), (nzrows, nzcols)), shape=J.shape)
 
     nzrows, nzcols = J.row, J.col
-    col_groups = _get_full_disjoint_cols(J)
+    if col_partition is None:
+        col_groups = _get_full_disjoint_cols(J)
+    else:
+        col_groups = []
+        csc = J.tocsc()
+        for cols in col_partition:
+            for grp in _get_full_disjoint_cols(csc[:, cols].tocoo()):
+                col_groups.append(cols[grp].tolist())
 
     col2rows = [None] * ncols  # will contain list of nonzero rows for each column
 

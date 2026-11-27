@@ -145,6 +145,17 @@ class ApproximationScheme(object):
         wrt_matches = system._coloring_info._update_wrt_matches(system)
         outvec = system._outputs
 
+        # A component may have colored columns belonging to other approx schemes, and may have
+        # called declare_coloring more than once, so keep track of which wrt var each colored
+        # column belongs to.
+        is_comp = not (is_total or is_semi)
+        if is_comp:
+            wrt2group = system._coloring_info._get_wrt2group(system)
+            wrt_starts = []
+            wrt_names = []
+        else:
+            wrt2group = None
+
         # this maps column indices into colored jac into indices into full jac
         if wrt_matches is not None:
             ccol2jcol = np.empty(coloring._shape[1], dtype=INT_DTYPE)
@@ -153,10 +164,13 @@ class ApproximationScheme(object):
         if is_total:
             ccol2outvec = np.empty(coloring._shape[1], dtype=INT_DTYPE)
 
-        if is_total or wrt_matches is not None:
+        if is_total or is_comp or wrt_matches is not None:
             colored_start = colored_end = 0
             for abs_wrt, cstart, cend, _, cinds, _ in system._get_jac_wrts():
                 if wrt_matches is None or abs_wrt in wrt_matches:
+                    if is_comp:
+                        wrt_starts.append(colored_start)
+                        wrt_names.append(abs_wrt)
                     colored_end += cend - cstart
                     if wrt_matches is not None:
                         ccol2jcol[colored_start:colored_end] = range(cstart, cend)
@@ -190,11 +204,19 @@ class ApproximationScheme(object):
                 colorstart = colorend
             start = end
 
+        # data is the same for all colored approxs from the same declare_coloring call, so we
+        # only need the first one for each call
+        group_data = {}
         for wrt, meta in self._wrt_meta.items():
             if wrt_matches is None or wrt in wrt_matches:
-                # data is the same for all colored approxs so we only need the first
-                data = self._get_approx_data(system, wrt, meta)
-                break
+                group = None if wrt2group is None else wrt2group.get(wrt)
+                if group not in group_data:
+                    group_data[group] = self._get_approx_data(system, wrt, meta)
+                    if wrt2group is None:
+                        break
+
+        if not group_data:  # none of the colored columns belong to this approx scheme
+            return
 
         outputs = system._outputs
         inputs = system._inputs
@@ -203,6 +225,17 @@ class ApproximationScheme(object):
         use_full_cols = is_semi or isinstance(system, ImplicitComponent)
 
         for cols, nzrows in coloring.color_nonzero_iter('fwd'):
+            if is_comp:
+                for i in np.unique(np.searchsorted(wrt_starts, cols, side='right') - 1):
+                    wrt = wrt_names[i]
+                    if wrt in self._wrt_meta:
+                        break
+                else:
+                    continue  # none of these columns are approximated by this scheme
+                # all columns of a color belong to the same declare_coloring call
+                data = group_data[None if wrt2group is None else wrt2group.get(wrt)]
+            else:
+                data = group_data[None]
             nzrows = [row_map[r] for r in nzrows]
             jaccols = cols if wrt_matches is None else ccol2jcol[cols]
             if is_total:

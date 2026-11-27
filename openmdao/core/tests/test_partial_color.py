@@ -14,14 +14,16 @@ except ImportError:
     jax = None
 
 from openmdao.api import Problem, Group, IndepVarComp, ImplicitComponent, ExplicitComponent, \
-    NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver, ImplicitFuncComp
+    NonlinearBlockGS, ScipyOptimizeDriver, NewtonSolver, DirectSolver, ImplicitFuncComp, ExecComp
 from openmdao.core.problem import _clear_problem_names
 import openmdao.func_api as omf
-from openmdao.utils.assert_utils import assert_near_equal, assert_warning
+from openmdao.utils.assert_utils import assert_near_equal, assert_warning, \
+    assert_check_partials, assert_check_totals
 from openmdao.utils.array_utils import evenly_distrib_idxs
 from openmdao.utils.testing_utils import require_pyoptsparse, use_tempdirs, parameterized_name
 from openmdao.utils.mpi import MPI
 from openmdao.utils.coloring import compute_total_coloring
+from openmdao.utils.reports_system import clear_report_registry
 
 
 try:
@@ -624,6 +626,238 @@ class TestColoringImplicitFuncComp(unittest.TestCase):
                 comp.run_linearize()
                 jac = comp._jacobian._subjacs_info
                 _check_partial_matrix(comp, jac, sparsity, method)
+
+
+class _MultiColorComp(ExplicitComponent):
+    """
+    Component with diagonal partials, colored using one declare_coloring call per entry in calls.
+    """
+
+    def initialize(self):
+        self.options.declare('size', default=5)
+        self.options.declare('calls', default=())
+        self.options.declare('cs_partials', default=())
+        self._nruns = 0
+
+    def setup(self):
+        size = self.options['size']
+        for name in ('x', 'y', 'z'):
+            self.add_input(name, np.ones(size))
+        self.add_output('out1', np.ones(size))
+        self.add_output('out2', np.ones(size))
+
+        for wrt in self.options['cs_partials']:
+            self.declare_partials('*', wrt, method='cs')
+
+        for wrt, method in self.options['calls']:
+            self.declare_coloring(wrt=wrt, method=method)
+
+    def compute(self, inputs, outputs):
+        self._nruns += 1
+        outputs['out1'] = inputs['x'] ** 2 * inputs['z']
+        outputs['out2'] = inputs['y'] ** 2 + inputs['z']
+
+
+class _SparseCompExplicitMultiColor(SparseCompExplicit):
+    def __init__(self, sparsity, calls, **kwargs):
+        super().__init__(sparsity, **kwargs)
+        self.calls = calls
+
+    def setup(self):
+        super().setup()
+        for wrt, method in self.calls:
+            self.declare_coloring(wrt=wrt, method=method)
+
+
+@use_tempdirs
+class TestColoringMultipleDeclares(unittest.TestCase):
+    """
+    Tests for components that call declare_coloring more than once (issue #2659).
+    """
+
+    def setUp(self):
+        np.random.seed(11)
+
+    def _setup_problem(self, comp, name):
+        prob = Problem(name=name)
+        prob.model.add_subsystem('comp', comp)
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        size = comp.options['size']
+        xx = np.arange(1, size + 1, dtype=float)
+        prob['comp.x'] = xx * 3.
+        prob['comp.y'] = xx * 4.
+        prob['comp.z'] = xx * 5.
+        prob.run_model()
+        return prob
+
+    def _check_derivs(self, prob, exact=()):
+        # check computed derivatives against analytic ones, check_partials and check_totals
+        x = prob.get_val('comp.x')
+        y = prob.get_val('comp.y')
+        z = prob.get_val('comp.z')
+        expected = {
+            ('comp.out1', 'comp.x'): np.diag(2. * x * z),
+            ('comp.out1', 'comp.y'): np.zeros((x.size, y.size)),
+            ('comp.out1', 'comp.z'): np.diag(x ** 2),
+            ('comp.out2', 'comp.x'): np.zeros((y.size, x.size)),
+            ('comp.out2', 'comp.y'): np.diag(2. * y),
+            ('comp.out2', 'comp.z'): np.eye(z.size),
+        }
+        ofs = ['comp.out1', 'comp.out2']
+        wrts = ['comp.x', 'comp.y', 'comp.z']
+        J = prob.compute_totals(of=ofs, wrt=wrts)
+        for key, val in expected.items():
+            # complex step columns are exact, fd ones are not
+            tol = 1e-15 if key[1] in exact else 1e-6
+            assert_near_equal(J[key], val, tolerance=tol)
+
+        data = prob.check_partials(method='fd', form='central', out_stream=None)
+        assert_check_partials(data, atol=1e-4, rtol=1e-6)
+        data = prob.check_totals(of=ofs, wrt=wrts, method='fd', form='central', out_stream=None)
+        assert_check_totals(data, atol=1e-4, rtol=1e-6)
+
+    def _check_colors(self, comp, groups):
+        # no color may contain columns from more than one group of wrt variables
+        coloring = comp._coloring_info.coloring
+        self.assertIsNotNone(coloring)
+        col2group = []
+        for name, size in zip(coloring._col_vars, coloring._col_var_sizes):
+            col2group.extend([groups[name]] * size)
+        for cols in coloring.color_iter('fwd'):
+            self.assertEqual(len(set(col2group[c] for c in cols)), 1)
+
+    def test_issue_example(self):
+        size = 5
+        ExecComp.register('unsafe_2659', lambda x: x**2, complex_safe=False)
+        ExecComp.register('safe_2659', lambda x: x**2, complex_safe=True)
+        prob = Problem(name='test_issue_example')
+        comp = prob.model.add_subsystem('comp', ExecComp(['out1 = unsafe_2659(x) * z',
+                                                          'out2 = safe_2659(y) + z'],
+                                                         shape=size))
+        comp.declare_coloring(wrt=('x', 'z'), method='fd')
+        comp.declare_coloring(wrt='y', method='cs')
+
+        prob.setup(mode='fwd')
+        xx = np.arange(1, size + 1, dtype=float)
+        prob['comp.x'] = xx * 3.
+        prob['comp.y'] = xx * 4.
+        prob['comp.z'] = xx * 5.
+        prob.run_model()
+
+        self._check_derivs(prob, exact=('comp.y',))
+        self._check_colors(comp, {'x': 0, 'z': 0, 'y': 1})
+
+    def test_fd_cs_different_wrt(self):
+        comp = _MultiColorComp(calls=[(['x', 'z'], 'fd'), ('y', 'cs')])
+        prob = self._setup_problem(comp, 'test_fd_cs_different_wrt')
+        self._check_derivs(prob, exact=('comp.y',))
+        self._check_colors(comp, {'x': 0, 'z': 0, 'y': 1})
+
+        # x and z need 2 colors, y needs 1, so a linearize takes 3 runs
+        start_nruns = comp._nruns
+        comp.run_linearize()
+        self.assertEqual(comp._nruns - start_nruns, 3)
+
+    def test_fd_fd_different_wrt(self):
+        # this used to silently leave the derivatives wrt x and z at zero
+        comp = _MultiColorComp(calls=[(['x', 'z'], 'fd'), ('y', 'fd')])
+        prob = self._setup_problem(comp, 'test_fd_fd_different_wrt')
+        self._check_derivs(prob)
+        self._check_colors(comp, {'x': 0, 'z': 0, 'y': 1})
+
+    def test_overlapping_wrt_last_call_wins(self):
+        comp = _MultiColorComp(calls=[('*', 'fd'), ('y', 'cs')])
+        prob = self._setup_problem(comp, 'test_overlapping_wrt_last_call_wins')
+        self._check_derivs(prob, exact=('comp.y',))
+        self._check_colors(comp, {'x': 0, 'z': 0, 'y': 1})
+        self.assertEqual(list(comp._approx_schemes['cs']._wrt_meta), ['comp.y'])
+
+    def test_same_wrt_replaces_earlier_call(self):
+        comp = _MultiColorComp(calls=[('*', 'fd'), ('*', 'cs')])
+        prob = self._setup_problem(comp, 'test_same_wrt_replaces_earlier_call')
+        self._check_derivs(prob, exact=('comp.x', 'comp.y', 'comp.z'))
+        self.assertEqual(len(comp._coloring_info.wrt_groups), 1)
+        self.assertEqual(comp._coloring_info.method, 'cs')
+        self.assertEqual(list(comp._approx_schemes), ['cs'])
+
+    def test_uncolored_approx_with_other_method(self):
+        # partials wrt y use cs but are not colored
+        comp = _MultiColorComp(calls=[(['x', 'z'], 'fd')], cs_partials=('y',))
+        prob = self._setup_problem(comp, 'test_uncolored_approx_with_other_method')
+        self._check_derivs(prob, exact=('comp.y',))
+
+    def test_static(self):
+        calls = [(['x', 'z'], 'fd'), ('y', 'cs')]
+        comp = _MultiColorComp(calls=calls)
+        prob = self._setup_problem(comp, 'test_static_multi')
+        coloring = comp._compute_coloring()[0]
+        comp._save_coloring(coloring)
+
+        _clear_problem_names()
+        clear_report_registry()
+
+        comp = _MultiColorComp(calls=calls)
+        comp.use_fixed_coloring()
+        prob = self._setup_problem(comp, 'test_static_multi')
+        self._check_derivs(prob, exact=('comp.y',))
+        self._check_colors(comp, {'x': 0, 'z': 0, 'y': 1})
+        self.assertFalse(comp._coloring_info.dynamic)
+
+    def test_sparse_fd_cs(self):
+        isplit = 7
+        osplit = 5
+        sparsity = setup_sparsity(_BIGMASK)
+        calls = [(['x0', 'x1', 'x2'], 'fd'), (['x3', 'x4', 'x5', 'x6'], 'cs')]
+
+        prob = Problem(name='test_sparse_fd_cs')
+        model = prob.model
+        indeps, conns = setup_indeps(isplit, _BIGMASK.shape[1], 'indeps', 'comp')
+        model.add_subsystem('indeps', indeps)
+        comp = model.add_subsystem('comp',
+                                   _SparseCompExplicitMultiColor(sparsity, calls, method='fd',
+                                                                 isplit=isplit, osplit=osplit))
+        for conn in conns:
+            model.connect(*conn)
+
+        prob.setup(mode='fwd', force_alloc_complex=True)
+        prob.set_solver_print(level=0)
+        prob.run_model()
+
+        comp.run_linearize()
+        groups = {f'x{i}': 0 if i < 3 else 1 for i in range(isplit)}
+        self._check_colors(comp, groups)
+
+        prob.run_model()
+        start_nruns = comp._nruns
+        comp.run_linearize()
+        ncolors = len(list(comp._coloring_info.coloring.color_iter('fwd')))
+        self.assertEqual(comp._nruns - start_nruns, ncolors)
+        _check_partial_matrix(comp, comp._jacobian._subjacs_info, sparsity, 'fd')
+
+    def test_group_different_methods_error(self):
+        prob = Problem(name='test_group_different_methods_error')
+        prob.model.add_subsystem('comp', _MultiColorComp())
+        prob.model.declare_coloring(wrt='comp.x', method='fd')
+        prob.model.declare_coloring(wrt='comp.y', method='cs')
+
+        with self.assertRaises(RuntimeError) as cm:
+            prob.setup()
+
+        self.assertEqual(str(cm.exception),
+                         "<model> <class Group>: declare_coloring was called more than once with "
+                         "different method, form or step, but a Group can only use one "
+                         "approximation scheme.")
+
+    def test_jax_with_other_calls_error(self):
+        comp = _MultiColorComp()
+        comp.declare_coloring(wrt='x', method='fd')
+
+        with self.assertRaises(RuntimeError) as cm:
+            comp.declare_coloring(wrt='y', method='jax')
+
+        self.assertEqual(str(cm.exception),
+                         "<class _MultiColorComp>: declare_coloring with method='jax' can't be "
+                         "combined with other calls to declare_coloring.")
 
 
 @use_tempdirs
