@@ -367,5 +367,83 @@ class TestJaxImplicitComp(unittest.TestCase):
         assert_check_partials(prob.check_partials(out_stream=None), rtol=1e-5)
 
 
+def _compute_primal_is_jitted(comp):
+    func = getattr(comp.compute_primal, '__func__', comp.compute_primal)
+    return hasattr(func, 'lower')
+
+
+@unittest.skipIf(jax is None or sys.version_info < (3, 9), 'jax is not available or python < 3.9.')
+class TestImplicitPrimalJittedWithoutLinearize(unittest.TestCase):
+    def test_apply_nonlinear_uses_primal_jitted_at_setup(self):
+        class Resid(om.JaxImplicitComponent):
+            def setup(self):
+                self.add_input('a', val=1.0)
+                self.add_output('x', val=0.25)
+
+            def compute_primal(self, a, x):
+                return a * x - 3.0
+
+        def build(use_jit):
+            p = om.Problem(reports=False)
+            p.model.add_subsystem('comp', Resid(use_jit=use_jit))
+            p.setup()
+            p.final_setup()
+            return p
+
+        compiled = build(True)
+        plain = build(False)
+        self.assertTrue(_compute_primal_is_jitted(compiled.model.comp))
+        first = compiled.model.comp.compute_primal
+        compiled.model.run_apply_nonlinear()
+        plain.model.run_apply_nonlinear()
+        self.assertIs(compiled.model.comp.compute_primal, first)
+        self.assertFalse(_compute_primal_is_jitted(plain.model.comp))
+        assert_near_equal(compiled.model.comp._residuals['x'], np.array([-2.75]))
+        assert_near_equal(plain.model.comp._residuals['x'], np.array([-2.75]))
+
+    def test_static_changes_and_repeated_apply_nonlinear(self):
+        class ScaledResidual(om.JaxImplicitComponent):
+            def initialize(self):
+                self.options.declare('mult', default=2.0)
+
+            def setup(self):
+                self.add_input('a', val=1.0)
+                self.add_output('x', val=0.25)
+                self.add_discrete_input('sign', val=1)
+
+            def get_self_statics(self):
+                return (self.options['mult'],)
+
+            def compute_primal(self, a, x, sign):
+                return sign * self.options['mult'] * a * x - 3.0
+
+        p = om.Problem(reports=False)
+        comp = p.model.add_subsystem('comp', ScaledResidual(use_jit=True))
+        p.setup()
+        p.final_setup()
+        self.assertTrue(_compute_primal_is_jitted(comp))
+        primal = comp.compute_primal
+
+        def check_residual(expected):
+            p.model.run_apply_nonlinear()
+            self.assertIs(comp.compute_primal, primal)
+            assert_near_equal(comp._residuals['x'], np.array([expected]))
+
+        check_residual(-2.5)
+        p.set_val('comp.a', 2.0)
+        check_residual(-2.0)
+        check_residual(-2.0)
+        self.assertIsNone(comp._static_hash)
+        assert_check_partials(p.check_partials(out_stream=None), atol=1e-5)
+
+        p.set_val('comp.sign', -1)
+        check_residual(-4.0)
+        assert_check_partials(p.check_partials(out_stream=None), atol=1e-5)
+
+        comp.options['mult'] = 4.0
+        check_residual(-5.0)
+        assert_check_partials(p.check_partials(out_stream=None), atol=1e-5)
+
+
 if __name__ == '__main__':
     unittest.main()

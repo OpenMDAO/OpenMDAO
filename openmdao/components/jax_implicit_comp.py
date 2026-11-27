@@ -105,6 +105,7 @@ class JaxImplicitComponent(ImplicitComponent):
         Check if inputs and outputs have been added, and if not, determine them from compute_primal.
         """
         _re_init(self)
+        self.compute_primal = self._ret_tuple_compute_primal
 
         if len(self._var_rel_names['input']) > 0 or len(self._var_rel_names['output']) > 0:
             return
@@ -178,6 +179,13 @@ class JaxImplicitComponent(ImplicitComponent):
 
     def _setup_jax(self):
         _jax_register_pytree_class(self.__class__)
+
+        if self.options['use_jit']:
+            # Discrete inputs are static arguments. JAX also sees self statics via the pytree.
+            start = self._inputs.nvars() + self._outputs.nvars() + 1
+            static_argnums = tuple(range(start, start + len(self._discrete_inputs)))
+            primal = jit(self._ret_tuple_compute_primal.__func__, static_argnums=static_argnums)
+            self.compute_primal = MethodType(primal, self)
 
         if not self._discrete_inputs and not self._discrete_outputs and not self.get_self_statics():
             # avoid unnecessary statics checks
@@ -275,23 +283,6 @@ class JaxImplicitComponent(ImplicitComponent):
         """
         return False
 
-    def _get_jax_compute_primal(self, discrete_inputs, need_jit):
-        """
-        Get the jax version of the compute_primal method.
-        """
-        compute_primal = self._ret_tuple_compute_primal.__func__
-
-        if need_jit:
-            # jit the compute_primal method
-            idx = self._inputs.nvars() + self._outputs.nvars() + 1
-            if discrete_inputs:
-                static_argnums = list(range(idx, idx + len(discrete_inputs)))
-            else:
-                static_argnums = []
-            compute_primal = jit(compute_primal, static_argnums=static_argnums)
-
-        return MethodType(compute_primal, self)
-
     def _update_jac_functs(self, discrete_inputs):
         """
         Update the jax function that computes the jacobian for this component if necessary.
@@ -315,7 +306,6 @@ class JaxImplicitComponent(ImplicitComponent):
             self._jac_func_ = None
 
         if self._jac_func_ is None:
-            self.compute_primal = self._get_jax_compute_primal(discrete_inputs, need_jit)
             differentiable_cp = _get_differentiable_compute_primal(self, discrete_inputs)
 
             if self._coloring_info.use_coloring():
