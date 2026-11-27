@@ -175,6 +175,26 @@ class AutoscalerBase:
         """
         return False
 
+    @property
+    def couples_design_vars(self) -> bool:
+        """
+        Return True if the design variable scaling mixes different design variables.
+
+        When False (default), each optimizer variable depends only on its own model design
+        variable, so the sparsity of the total jacobian with respect to the model design
+        variables also applies to the optimizer variables.
+
+        When True, as for a matrix transformation x = M y with a dense M, every optimizer
+        variable can affect every design variable. Drivers must then treat every response as
+        depending on every design variable, rather than using the sparsity of the model.
+
+        Returns
+        -------
+        bool
+            True if the design variable scaling couples different design variables.
+        """
+        return False
+
     def get_bounds_scaling(self, voi_type):
         """
         Return the pre-computed BoundMap for the given variable type.

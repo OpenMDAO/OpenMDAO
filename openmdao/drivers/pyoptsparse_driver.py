@@ -31,7 +31,8 @@ else:
     pyoptsparse_version = None
 
 # All optimizers in pyoptsparse
-optlist = {'ALPSO', 'CONMIN', 'IPOPT', 'NLPQLP', 'NSGA2', 'ParOpt', 'PSQP', 'SLSQP', 'SNOPT', 'Uno'}
+optlist = {'ALPSO', 'CONMIN', 'Egor', 'IPOPT', 'NLPQLP', 'NSGA2', 'ParOpt', 'PSQP', 'SLSQP',
+           'SNOPT', 'Uno'}
 
 if pyoptsparse_version is None or pyoptsparse_version < Version('2.6.0'):
     optlist.add('NOMAD')
@@ -59,6 +60,7 @@ respects_fail_flag = {
     # Currently supported optimizers (v2.9.0)
     'ALPSO': False,
     'CONMIN': False,
+    'Egor': True,
     'IPOPT': False,
     'NLPQLP': False,
     'NSGA2': False,
@@ -133,7 +135,7 @@ class pyOptSparseDriver(Driver):
     is an object-oriented framework for formulating and solving nonlinear
     constrained optimization problems, with additional MPI capability.
     pypptsparse has interfaces to the following optimizers:
-    ALPSO, CONMIN, FSQP, IPOPT, NLPQLP, NSGA2, PSQP, SLSQP,
+    ALPSO, CONMIN, Egor, FSQP, IPOPT, NLPQLP, NSGA2, PSQP, SLSQP,
     SNOPT, NLPY_AUGLAG, NOMAD, ParOpt.
     Note that some of these are not open source and therefore not included
     in the pyoptsparse source code.
@@ -403,6 +405,17 @@ class pyOptSparseDriver(Driver):
         # Get scaled design variable bounds from autoscaler
         dv_bounds = self._autoscaler.get_bounds_scaling('design_var')
 
+        # Egor needs finite bounds, we check for unbounded design variables 
+        # before pyoptsparse replaces them with +/-1e20.
+        if optimizer == 'Egor':
+            unbounded = [name for name in self._designvars
+                         if any(bound is None or np.any(np.isinf(bound))
+                                for bound in (dv_bounds[name].lower, dv_bounds[name].upper))]
+            if unbounded:
+                raise RuntimeError(f"{self.msginfo}: Egor requires finite lower and upper bounds "
+                                   "on all design variables, but the following design variables "
+                                   f"are unbounded: {unbounded}.")
+
         for name, meta in self._designvars.items():
             # translate absolute var names to promoted names for pyoptsparse
             size = meta['global_size'] if meta['distributed'] else meta['size']
@@ -471,6 +484,15 @@ class pyOptSparseDriver(Driver):
         # Get scaled constraint bounds from autoscaler
         con_bounds = self._autoscaler.get_bounds_scaling('constraint')
 
+        # If the autoscaler mixes design variables, every constraint depends on every
+        # optimizer variable, so the model's relevance can't be used to limit the dependence.
+        couples_dvs = self._autoscaler.couples_design_vars
+
+        def _get_wrts(dvs):
+            if couples_dvs:
+                return list(dvs)
+            return [n for n, m in dvs.items() if relevance.is_relevant(m['source'])]
+
         eqcons = {n: m for n, m in self._cons.items() if m['equals'] is not None}
         if eqcons:
             # Add all equality constraints
@@ -482,8 +504,7 @@ class pyOptSparseDriver(Driver):
                 with relevance.seeds_active(rev_seeds=meta['source']):
 
                     if meta['linear']:
-                        wrts = [v for v in lin_dvs
-                                if relevance.is_relevant(lin_dvs[v]['source'])]
+                        wrts = _get_wrts(lin_dvs)
                         jac = {w: _lin_jacs[name][w] for w in wrts}
                         yi = _y_intercepts[name]
                         opt_prob.addConGroup(name, size,
@@ -491,8 +512,7 @@ class pyOptSparseDriver(Driver):
                                              upper=None if upper is None else upper - yi,
                                              linear=True, wrt=wrts, jac=jac)
                     else:
-                        wrts = [v for v in nl_dvs
-                                if relevance.is_relevant(nl_dvs[v]['source'])]
+                        wrts = _get_wrts(nl_dvs)
 
                         if name in self._con_subjacs:
                             resjac = self._con_subjacs[name]
@@ -518,8 +538,7 @@ class pyOptSparseDriver(Driver):
                 with relevance.seeds_active(rev_seeds=(meta['source'],)):
 
                     if meta['linear']:
-                        wrts = [n for n, meta in lin_dvs.items()
-                                if relevance.is_relevant(meta['source'])]
+                        wrts = _get_wrts(lin_dvs)
                         jac = {w: _lin_jacs[name][w] for w in wrts}
                         yi = _y_intercepts[name]
                         opt_prob.addConGroup(name, size,
@@ -527,8 +546,7 @@ class pyOptSparseDriver(Driver):
                                              upper=None if upper is None else upper - yi,
                                              linear=True, wrt=wrts, jac=jac)
                     else:
-                        wrts = [n for n, meta in nl_dvs.items()
-                                if relevance.is_relevant(meta['source'])]
+                        wrts = _get_wrts(nl_dvs)
                         if name in self._con_subjacs:
                             resjac = self._con_subjacs[name]
                             jac = {n: resjac[n] for n in wrts}
@@ -592,7 +610,7 @@ class pyOptSparseDriver(Driver):
         # (e.g. Uno). When Ctrl+C arrives between Python callbacks, this sets the termination
         # flag so the next callback entry returns fail=2 instead of crashing.
         _sigint_cache = None
-        if optimizer not in ('SNOPT',) and self.options['user_terminate_signal'] is None:
+        if optimizer not in ('SNOPT', 'Egor') and self.options['user_terminate_signal'] is None:
             _sigint_cache = signal.getsignal(signal.SIGINT)
             signal.signal(signal.SIGINT, self._signal_handler)
 
@@ -688,6 +706,10 @@ class pyOptSparseDriver(Driver):
             elif optimizer == 'PSQP':
                 if exit_status not in {1, 2, 3, 4}:
                     self.fail = True
+            elif optimizer == 'Egor':
+                # 3: user interruption, 6: unexpected exit, 7: objective function error
+                if exit_status in {3, 6, 7}:
+                    self.fail = True
             else:
                 # exit status may be the empty string for optimizers that don't support it
                 if exit_status and exit_status > 2:
@@ -740,6 +762,13 @@ class pyOptSparseDriver(Driver):
         if sigusr is not None and self._signal_cache is None:
             self._signal_cache = signal.getsignal(sigusr)
             signal.signal(sigusr, self._signal_handler)
+
+        # Egor takes a failed evaluation as a point to reject and goes on,
+        # so termination is handled with a KeyboardInterrupt instead.
+        is_egor = self.options['optimizer'] == 'Egor'
+        # Handle a user_terminate_signal received while Egor was running.
+        if is_egor and self._user_termination_flag:
+            raise KeyboardInterrupt('User requested termination.')
 
         try:
             dv_vec.set_data(dv_dict, driver_scaling=True)
@@ -805,6 +834,11 @@ class pyOptSparseDriver(Driver):
         # print(func_dict, flush=True)
 
         self._in_user_function = False
+
+        # Handle Ctrl+C or a user_terminate_signal received while the model was running.
+        if is_egor and self._user_termination_flag:
+            raise KeyboardInterrupt('User requested termination.')
+
         return func_dict, fail
 
     def _gradfunc(self, dv_dict, func_dict):
@@ -976,6 +1010,12 @@ class pyOptSparseDriver(Driver):
         """
         total_sparsity = None
         self._con_subjacs = {}
+
+        # The sparsity is that of the jacobian with respect to the model design variables. If the
+        # autoscaler mixes design variables, the jacobian seen by the optimizer is dense.
+        if self._autoscaler.couples_design_vars:
+            return
+
         coloring = coloring if coloring is not None else self._get_static_coloring()
         if coloring is not None:
             total_sparsity = coloring.get_subjac_sparsity()

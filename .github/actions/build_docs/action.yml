@@ -95,6 +95,25 @@ runs:
         path: openmdao/docs/_executed_book/_build/html
         retention-days: 1
 
+    - name: Attach docs tarball to GitHub release
+      if: github.event_name == 'release' && steps.build_docs.outcome == 'success'
+      shell: bash -l {0}
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ github.event.release.tag_name }}
+      run: |
+        ARCHIVE="openmdao-${TAG}-docs.tar.gz"
+        echo "============================================================="
+        echo "Creating ${ARCHIVE} and attaching it to release ${TAG}"
+        echo "============================================================="
+        tar -czf "${ARCHIVE}" \
+          -C openmdao/docs/_executed_book/_build \
+          --exclude='html/.doctrees' \
+          --exclude='html/_sources' \
+          --transform "s|^html|openmdao-${TAG}-docs|" \
+          html
+        gh release upload "${TAG}" "${ARCHIVE}" --clobber --repo "${GITHUB_REPOSITORY}"
+
     - name: Publish docs (conda)
       if: github.event_name != 'pull_request' && inputs.publish == 'true' && inputs.SECRET_docs_location != '' && inputs.use_pixi != 'true'
       shell: bash -l {0}
