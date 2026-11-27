@@ -1,6 +1,8 @@
 """ Unit tests for the Pyoptsparse Driver."""
 
 import unittest
+
+import numpy as np
 from packaging.version import Version
 from parameterized import parameterized
 
@@ -234,6 +236,119 @@ class TestComputeLagrangeMultipliers(unittest.TestCase):
                                     msg=f'Failed to converge optimization with {driver_name}.')
                     f_perturbed = prob.get_val('f_xy')
                     assert_near_equal((f_perturbed - f_nom) / 0.01, lambda_y, tolerance=1.0E-1)
+
+
+class _QuadraticComp(om.ExplicitComponent):
+    """
+    f = 1/2 x^T x - c^T x and g = A x.
+    """
+
+    def initialize(self):
+        self.options.declare('A')
+        self.options.declare('c')
+
+    def setup(self):
+        A = self.options['A']
+        m, n = A.shape
+        self.add_input('x', shape=n)
+        self.add_output('f', val=0.0)
+        self.add_output('g', shape=m)
+        self.declare_partials('f', 'x')
+        self.declare_partials('g', 'x', val=A)
+
+    def compute(self, inputs, outputs):
+        x = inputs['x']
+        outputs['f'] = 0.5 * x @ x - self.options['c'] @ x
+        outputs['g'] = self.options['A'] @ x
+
+    def compute_partials(self, inputs, partials):
+        partials['f', 'x'] = inputs['x'] - self.options['c']
+
+
+class TestComputeLagrangeMultipliersAccuracy(unittest.TestCase):
+    """
+    Compare the multipliers with exact values on problems built from a known solution.
+
+    The problem is minimize 1/2 x^T x - c^T x subject to A x = b. Its data are built from a
+    chosen solution and chosen multipliers, and the model is evaluated at that solution, so
+    no optimizer is needed.
+    """
+
+    def _make_problem(self, m=30, n=40, cond=1.0E3, dependent=False):
+        rng = np.random.default_rng(1)
+        U, _ = np.linalg.qr(rng.standard_normal((m, m)))
+        V, _ = np.linalg.qr(rng.standard_normal((n, n)))
+        # The singular values of the constraint jacobian are spread between 1 and 1 / cond.
+        A = U @ np.diag(np.geomspace(1.0, 1.0 / cond, m)) @ V[:, :m].T
+        if dependent:
+            A = np.vstack((A, A[3] + A[7]))
+        x_opt = rng.standard_normal(n)
+        lam = rng.uniform(1.0, 2.0, A.shape[0])
+        # Stationarity of the Lagrangian: (x - c) + A^T lam = 0
+        c = x_opt + A.T @ lam
+
+        prob = om.Problem()
+        prob.model.add_subsystem('comp', _QuadraticComp(A=A, c=c), promotes=['*'])
+        prob.model.add_design_var('x')
+        prob.model.add_objective('f')
+        prob.model.add_constraint('g', equals=A @ x_opt)
+        prob.driver = om.ScipyOptimizeDriver(optimizer='SLSQP')
+        prob.setup()
+        prob.set_val('x', x_opt)
+        prob.run_model()
+
+        return prob, A, lam
+
+    def test_multipliers_are_exact(self):
+        for cond in (1.0E1, 1.0E3, 1.0E5):
+            for use_sparse in (True, False):
+                with self.subTest(cond=cond, use_sparse=use_sparse):
+                    prob, _, lam = self._make_problem(cond=cond)
+                    _, active_cons = prob.driver.compute_lagrange_multipliers(
+                        use_sparse_solve=use_sparse)
+                    assert_near_equal(np.ravel(active_cons['g']['multipliers']), lam,
+                                      tolerance=1.0E-8)
+
+    def test_dependent_constraints(self):
+        # One constraint is the sum of two others, so the multipliers are not unique. Both
+        # solves return the solution of least norm.
+        prob, A, lam = self._make_problem(cond=1.0E2, dependent=True)
+        expected = np.linalg.lstsq(A.T, A.T @ lam, rcond=None)[0]
+
+        for use_sparse in (True, False):
+            with self.subTest(use_sparse=use_sparse):
+                _, active_cons = prob.driver.compute_lagrange_multipliers(
+                    use_sparse_solve=use_sparse)
+                mult = np.ravel(active_cons['g']['multipliers'])
+                assert_near_equal(mult, expected, tolerance=1.0E-8)
+                # The multipliers satisfy the stationarity condition.
+                assert_near_equal(A.T @ mult, A.T @ lam, tolerance=1.0E-10)
+
+    def test_sparse_lstsq(self):
+        import scipy.sparse as sp
+        from openmdao.core.driver import _sparse_lstsq
+
+        rng = np.random.default_rng(3)
+
+        # Full column rank, with an inconsistent right-hand side
+        mat = rng.standard_normal((25, 12))
+        rhs = rng.standard_normal(25)
+        assert_near_equal(_sparse_lstsq(sp.csr_matrix(mat), rhs),
+                          np.linalg.lstsq(mat, rhs, rcond=None)[0], tolerance=1.0E-10)
+
+        # Rank deficient
+        mat[:, 5] = mat[:, 2] - mat[:, 9]
+        assert_near_equal(_sparse_lstsq(sp.csr_matrix(mat), rhs),
+                          np.linalg.lstsq(mat, rhs, rcond=None)[0], tolerance=1.0E-8)
+
+        # More unknowns than equations
+        mat = rng.standard_normal((6, 10))
+        rhs = rng.standard_normal(6)
+        assert_near_equal(_sparse_lstsq(sp.csr_matrix(mat), rhs),
+                          np.linalg.lstsq(mat, rhs, rcond=None)[0], tolerance=1.0E-8)
+
+        # Zero right-hand side
+        assert_near_equal(_sparse_lstsq(sp.csr_matrix(mat), np.zeros(6)), np.zeros(10))
 
 
 if __name__ == "__main__":
