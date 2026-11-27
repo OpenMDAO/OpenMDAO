@@ -10,6 +10,7 @@ import inspect
 
 import numpy as np
 import networkx as nx
+from scipy.sparse import issparse
 
 from openmdao.core.configinfo import _ConfigInfo
 from openmdao.core.conn_graph import AllConnGraph
@@ -170,6 +171,15 @@ class Group(System):
         Cache for the system graph.
     _key_owner : dict
         The owning rank keyed by absolute jacobian key.
+    _approx_wrt_link_sets : list
+        Sets of inputs that can be perturbed together when approximating semi-total derivatives.
+        Each entry is (inputs, holders), where holders maps an input to the outputs whose summed
+        columns are stored in that input's subjacs.
+    _approx_wrt_links : dict
+        Inputs that are perturbed together when approximating semi-total derivatives, keyed by
+        the first input of each linked set.  Each value is a list of (input, outputs) for all
+        inputs in the set, where outputs are the outputs whose derivatives are stored in the
+        columns of that input.  The other inputs of the set map to None.
     """
 
     def __init__(self, **kwargs):
@@ -204,6 +214,8 @@ class Group(System):
         self._is_explicit = None
         self._sys_graph_cache = None
         self._key_owner = None
+        self._approx_wrt_link_sets = []
+        self._approx_wrt_links = {}
 
         # TODO: we cannot set the solvers with property setters at the moment
         # because our lint check thinks that we are defining new attributes
@@ -1127,6 +1139,8 @@ class Group(System):
         # first built during linearization, so the approximation blocks must be in place before
         # then.  They need the dataflow graph, so this can't happen in _setup_partials.
         if self._use_derivatives:
+            for group in self.system_iter(include_self=True, recurse=True, typ=Group):
+                group._setup_approx_wrt_link_sets(self._dataflow_graph)
             self._setup_approx_ancestor_views()
 
         # figure out if we can remove any edges based on zero partials we find
@@ -3349,7 +3363,11 @@ class Group(System):
                 wrt_seen.add(wrt)
                 approx.add_approximation(wrt, self, meta)
 
-        if not total:
+        if total:
+            self._approx_wrt_links = {}
+        else:
+            self._approx_wrt_links = self._get_approx_wrt_links(wrt_seen)
+
             # we're taking semi-total derivs for this group. Update _owns_approx_of
             # and _owns_approx_wrt so we can use the same approx code for totals and
             # semi-totals.  Also, the order must match order of vars in the output and
@@ -3371,6 +3389,125 @@ class Group(System):
                     self._owns_approx_wrt[n] = {'distributed': m['distributed']}
 
             self._owns_approx_jac = True
+
+    def _setup_approx_wrt_link_sets(self, graph):
+        """
+        Find inputs that can be perturbed together when approximating semi-total derivatives.
+
+        Inputs connected to the same source with the same src_indices and units always hold the
+        same values, for example the promoted copies of one input.  Perturbing all of them at
+        once gives, for each output, the sum of their columns in a single run.  That sum is
+        stored in the subjac of one of the inputs (the holder) and the subjacs of the other
+        inputs are zero, which gives the same derivatives once the inputs are mapped back to
+        their source.
+
+        A holder subjac must be able to hold every nonzero of the summed column, and it must
+        not be written by anything other than the approximation.  The component partials found
+        in _subjacs_info at this point share their 'val' array with the component, whose
+        compute_partials may run again during the approximation (for example under a Newton
+        solver inside this group).  So each holder is a dense subjac that belongs to this group
+        only, and each component partial of a linked input is replaced in this group's
+        _subjacs_info by a private copy that stays zero.  The component keeps its own partials.
+
+        This must run before the jacobians of this group or any assembling ancestor are built.
+
+        Parameters
+        ----------
+        graph : networkx.DiGraph
+            The dataflow graph.
+        """
+        self._approx_wrt_link_sets = []
+        if not self._owns_approx_jac or not self.pathname or self.comm.size > 1 or \
+                self._coloring_info.use_coloring():
+            return
+
+        abs2meta_in = self._var_abs2meta['input']
+        abs2meta_out = self._var_abs2meta['output']
+        get_source = self._resolver.source
+        prefix = self.pathname + '.'
+        linked = defaultdict(list)
+
+        for _, abs_inps in self._resolver.prom2abs_iter('input'):
+            if abs_inps[0] in self._conn_abs_in2out:
+                continue  # connected inside of this group
+            for wrt in abs_inps:
+                src = get_source(wrt)
+                if src.startswith(prefix):
+                    continue  # connected inside of a subgroup
+                meta = abs2meta_in[wrt]
+                inds = meta['src_inds_list']
+                if inds:
+                    inds = np.asarray(idx_list_to_index_array(inds), dtype=INT_DTYPE)
+                    inds = (inds.shape, inds.tobytes())
+                else:
+                    inds = None
+                linked[src, meta['units'], inds].append(wrt)
+
+        info = self._subjacs_info
+        ivcs = self.get_indep_vars(local=False)
+        ofs = [of for of in abs2meta_out if of not in ivcs]
+
+        for names in linked.values():
+            if len(names) < 2:
+                continue
+
+            holders = {}
+            for of in ofs:
+                connected = [n for n in names if are_connected(graph, n, of)]
+                if not connected:
+                    continue
+
+                # Prefer an input that has no subjac for this output yet, since the approximation
+                # would create a dense one for it anyway.
+                holder = next((n for n in connected if (of, n) not in info), connected[0])
+                key = (of, holder)
+                info[key] = Subjac.get_instance_metadata(
+                    SUBJAC_META_DEFAULTS.copy(), None,
+                    (abs2meta_out[of]['size'], abs2meta_in[holder]['size']), self, key)
+                holders.setdefault(holder, []).append(of)
+
+                for name in names:
+                    if name != holder and (of, name) in info:
+                        info[of, name] = _zeroed_subjac_meta(info[of, name])
+
+            self._approx_wrt_link_sets.append((names, holders))
+
+    def _get_approx_wrt_links(self, wrts):
+        """
+        Return the linked inputs that are perturbed together in the current approximation.
+
+        Parameters
+        ----------
+        wrts : set of str
+            Inputs that have an approximation.
+
+        Returns
+        -------
+        dict
+            The value of _approx_wrt_links.
+        """
+        links = {}
+        relevance = self._relevance
+        for names, holders in self._approx_wrt_link_sets:
+            names = [n for n in names if n in wrts]
+            if len(names) < 2:
+                continue
+
+            # A holder that relevance removed has no columns.  That is only fine if none of the
+            # outputs it holds are relevant either.  Otherwise perturb the inputs separately.
+            # The subjacs are still private to this group, so each one then just holds the
+            # column of its own input.
+            missing = [h for h in holders if h not in wrts]
+            if missing:
+                with relevance.all_seeds_active():
+                    if any(relevance.is_relevant(of) for h in missing for of in holders[h]):
+                        continue
+
+            links[names[0]] = [(n, holders.get(n, [])) for n in names]
+            for name in names[1:]:
+                links[name] = None
+
+        return links
 
     def _setup_approx_coloring(self):
         """
@@ -4279,3 +4416,28 @@ def iter_solver_info(system):
 
     return (system.pathname, system.__class__.__name__, sccs, lnslvname, nlslvname, lnmaxiter,
             nlmaxiter, missing, isgrp, nl_can_solve, lin_can_solve)
+
+
+def _zeroed_subjac_meta(meta):
+    """
+    Return a copy of the given subjac metadata with its own zero-valued 'val'.
+
+    Parameters
+    ----------
+    meta : dict
+        Subjac instance metadata.
+
+    Returns
+    -------
+    dict
+        Copy of the metadata with the same sparsity pattern and a separate, zeroed 'val'.
+    """
+    meta = meta.copy()
+    val = meta['val']
+    if issparse(val):
+        val = val.copy()
+        val.data[:] = 0.0
+    elif val is not None:
+        val = np.zeros_like(val)
+    meta['val'] = val
+    return meta
