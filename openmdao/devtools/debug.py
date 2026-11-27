@@ -265,7 +265,7 @@ def config_summary(problem, stream=sys.stdout):
     printer("============== Problem Summary ============")
     printer("Groups:           %5d" % len(grpnames))
     printer("Components:       %5d" % (len(sysnames) - len(grpnames)))
-    printer("Max tree depth:   %5d" % global_max_depth)
+    printer("Max tree depth:   %5d" % int(global_max_depth))
     printer()
 
     if setup_done:
